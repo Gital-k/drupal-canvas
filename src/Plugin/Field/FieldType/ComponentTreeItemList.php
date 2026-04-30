@@ -40,6 +40,8 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
   // @todo Remove in https://drupal.org/i/3495625
   public const string ROOT_UUID = 'a548b48d-58a8-4077-aa04-da9405a6f418';
 
+  private const string HYDRATION_EXCEPTION_KEY = 'hydration_exception';
+
   /**
    * @var null|array<string, array{'edges': array<string, TRUE>}>
    */
@@ -229,6 +231,15 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
     foreach ($hydrated as $component_subtree_uuid => $component_instances) {
       foreach ($component_instances as $component_instance_uuid => $component_instance) {
         try {
+          // If an exception occurred during hydration, re-throw it. (Such an
+          // exception results in explicit input not being available, and hence
+          // rendering the component instance being impossible.) This allows it
+          // to be presented in the same way as exceptions during rendering.
+          // @see ::getHydratedValue()
+          if (\array_key_exists(self::HYDRATION_EXCEPTION_KEY, $component_instance)) {
+            throw $component_instance[self::HYDRATION_EXCEPTION_KEY];
+          }
+
           $component = Component::load($component_instance['component']);
           \assert($component instanceof Component);
           $source = $component->getComponentSource();
@@ -270,7 +281,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
             foreach ($component_instance['slots'] as $slot => $slot_value) {
               // Handle default slot value: convert to renderable using either
               // #plain_text or `#markup`.
-              if (!$isPreview && is_string($slot_value)) {
+              if (!$isPreview && \is_string($slot_value)) {
                 $slots[$slot] = !str_starts_with($slot_value, '<')
                   // Match how Drupal core handles string values for components.
                   // @see https://www.drupal.org/node/3398039
@@ -283,7 +294,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
               }
               // When previewing and the slot value is a default: omit the
               // default in favor of a placeholder div.
-              elseif ($isPreview && is_string($slot_value)) {
+              elseif ($isPreview && \is_string($slot_value)) {
                 $slots[$slot] = ['#markup' => Markup::create('<div class="canvas--slot-empty-placeholder"></div>')];
               }
               // Explicit slot value: renderify, just like the rest of the
@@ -431,7 +442,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       // For each vertex (after the filtering above), all edges represent
       // child component instances placed in this slot.
       foreach (\array_keys($vertex['edges']) as $component_instance_uuid) {
-        \assert(is_string($component_instance_uuid));
+        \assert(\is_string($component_instance_uuid));
         yield $parent_uuid => [
           'slot' => $slot_map[$component_instance_uuid],
           'uuid' => $component_instance_uuid,
@@ -469,14 +480,33 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       $component->loadVersion($item->getComponentVersion());
 
       $source = $component->getComponentSource();
+      try {
+        $explicit_input = $source->getExplicitInput($uuid, $item);
+      }
+      catch (\Throwable $e) {
+        $hydrated[$uuid] = [
+          'component' => $component_id,
+          // Store the exception to be re-thrown during rendering, so that it
+          // can be presented in the same way as exceptions during rendering:
+          // - without breaking the rendering of the entire component tree
+          // - with the relevant details to a privileged user
+          // - without exposing sensitive details to an unprivileged user
+          self::HYDRATION_EXCEPTION_KEY => $e,
+        ];
+        // Continue hydrating the next component instance. (Without trying to
+        // hydrate the slots of this component instance, since this component
+        // instance won't be renderable anyway.)
+        continue;
+      }
+
       $hydrated[$uuid] = [
         'component' => $component_id,
       ] + $source->hydrateComponent(
-        $source->getExplicitInput($uuid, $item),
+        $explicit_input,
         $component->getSlotDefinitions(),
         $required_props_with_default_values_in_current_implementation,
       );
-      \assert(!\array_key_exists('slots', $hydrated[$uuid]) || is_array($hydrated[$uuid]['slots']));
+      \assert(!\array_key_exists('slots', $hydrated[$uuid]) || \is_array($hydrated[$uuid]['slots']));
     }
 
     // Transform the flat list of hydrated components into a hydrated component
@@ -487,7 +517,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       if ($parent_uuid === self::ROOT_UUID) {
         continue;
       }
-      \assert(\array_key_exists('slots', $hydrated[$parent_uuid]) && is_array($hydrated[$parent_uuid]['slots']));
+      \assert(\array_key_exists('slots', $hydrated[$parent_uuid]) && \is_array($hydrated[$parent_uuid]['slots']));
 
       // Remove default slot value: this slot is populated.
       if (\array_key_exists($slot, $hydrated[$parent_uuid]['slots']) && \is_string($hydrated[$parent_uuid]['slots'][$slot])) {

@@ -46,7 +46,7 @@ abstract class SequenceDependentConstraintValidatorBase extends ConstraintValida
   }
 
   protected function getTargetConfigObject(SequenceDependentConstraintBase $constraint): Mapping {
-    \assert(!is_null($constraint->configName));
+    \assert(!\is_null($constraint->configName));
     \assert($this->context->getObject() instanceof TypedDataInterface);
     $resolved_config_name = TypeResolver::resolveExpression(
       $constraint->configName,
@@ -54,7 +54,7 @@ abstract class SequenceDependentConstraintValidatorBase extends ConstraintValida
     );
     // This implies the existence of that other config, so reuse the message
     // from the ConfigExistsConstraint when that is not the case.
-    if (!in_array($constraint->configPrefix . $resolved_config_name, $this->configFactory->listAll($constraint->configPrefix), TRUE)) {
+    if (!\in_array($constraint->configPrefix . $resolved_config_name, $this->configFactory->listAll($constraint->configPrefix), TRUE)) {
       $config_exists_constraint = new ConfigExistsConstraint();
       $this->context->addViolation($config_exists_constraint->message, ['@name' => $constraint->configPrefix . $resolved_config_name]);
     }

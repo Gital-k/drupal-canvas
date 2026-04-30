@@ -70,8 +70,6 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 )]
 final class ContentTemplate extends ComponentTreeConfigEntityBase implements CanvasHttpApiEligibleConfigEntityInterface, EntityViewDisplayInterface, AutoSavePublishAwareInterface {
 
-  use ConfigUpdaterAwareEntityTrait;
-
   public const string ENTITY_TYPE_ID = 'content_template';
 
   public const string ADMIN_PERMISSION = 'administer content templates';
@@ -152,7 +150,6 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   public function preSave(EntityStorageInterface $storage): void {
     $this->id = $this->id();
     parent::preSave($storage);
-    self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
     if ($this->isSyncing() && self::getConfigUpdater()->needsIntermediateDependenciesComponentUpdate($this)) {
       // We might need to update dependencies even on import.
       // @see \canvas_post_update_0002_intermediate_component_dependencies_in_content_templates()
@@ -502,13 +499,13 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     $entity_definition = $entity_type_manager->getDefinition($entity_type_id);
 
     $id_key = $entity_definition->getKey('id');
-    \assert(is_string($id_key));
+    \assert(\is_string($id_key));
     $entity_query = $entity_type_manager->getStorage($entity_type_id)->getQuery()
       ->accessCheck(TRUE)
       ->range(0, $limit);
     if ($entity_definition->hasKey('bundle')) {
       $bundle_key = $entity_definition->getKey('bundle');
-      \assert(is_string($bundle_key));
+      \assert(\is_string($bundle_key));
       $entity_query->condition($bundle_key, $bundle);
     }
 
@@ -531,7 +528,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       1
     );
     $results = $query->execute();
-    \assert(is_array($results));
+    \assert(\is_array($results));
 
     if (empty($results)) {
       return NULL;

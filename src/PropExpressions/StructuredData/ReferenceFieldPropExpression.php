@@ -192,10 +192,10 @@ final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressi
     if ($is_branching) {
       // Find opening of first branch
       $opening_first_branch = mb_strpos($representation, self::PREFIX_BRANCH);
-      \assert(is_int($opening_first_branch));
+      \assert(\is_int($opening_first_branch));
       // Find closing of last branch.
       $closing_last_branch = mb_strrpos($representation, self::SUFFIX_BRANCH);
-      \assert(is_int($closing_last_branch));
+      \assert(\is_int($closing_last_branch));
       $branches = self::parseBranches(mb_substr($representation, $opening_first_branch, $closing_last_branch));
       $referenced_branches = \array_map(
       // Each of the branch expressions MUST be starting with an entity field,
@@ -232,7 +232,7 @@ final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressi
       throw new \DomainException(\sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `%s`.", (string) $this, $expected_entity_type_id, $entity->getEntityTypeId()));
     }
     $expected_bundles = $this->referencer->entityType->getBundles();
-    if ($expected_bundles !== NULL && !in_array($entity->bundle(), $expected_bundles, TRUE)) {
+    if ($expected_bundles !== NULL && !\in_array($entity->bundle(), $expected_bundles, TRUE)) {
       throw new \DomainException(\sprintf("`%s` is an expression for entity type `%s`, bundle(s) `%s`, but the provided entity is of the bundle `%s`.", (string) $this, $expected_entity_type_id, implode(', ', $expected_bundles), $entity->bundle()));
     }
     // @todo validate that the field exists?

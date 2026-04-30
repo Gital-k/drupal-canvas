@@ -145,7 +145,7 @@ final class PropShape {
     $normalized_prop_schema['type'] = JsonSchemaType::from(
     // TRICKY: SDC always allowed `object` for Twig integration reasons.
     // @see \Drupal\sdc\Component\ComponentMetadata::parseSchemaInfo()
-      is_array($prop_schema['type']) ? $prop_schema['type'][0] : $prop_schema['type']
+      \is_array($prop_schema['type']) ? $prop_schema['type'][0] : $prop_schema['type']
     )->value;
 
     // If this is a `type: object` with not a `$ref` but `properties`, normalize
@@ -187,14 +187,14 @@ final class PropShape {
     \assert(empty(array_intersect_key($installed_modules, $installed_themes)));
     $installed_extensions = $installed_modules + $installed_themes;
     foreach ($installed_extensions as $extension_name => $extension) {
-      \assert(is_string($extension_name));
+      \assert(\is_string($extension_name));
       $schema_json_path = $extension->getPath() . '/schema.json';
       if (!file_exists($schema_json_path)) {
         continue;
       }
       // @phpstan-ignore argument.type
       $json = json_decode(file_get_contents($schema_json_path), TRUE);
-      if (!is_array($json) || !\array_key_exists('$defs', $json)) {
+      if (!\is_array($json) || !\array_key_exists('$defs', $json)) {
         continue;
       }
       \assert(Inspector::assertAllStrings(\array_keys($json['$defs'])));
@@ -235,6 +235,31 @@ final class PropShape {
 
   private static function componentPluginManager(): ComponentPluginManager {
     return \Drupal::service(ComponentPluginManager::class);
+  }
+
+  /**
+   * Whether the given JSON schema for a prop is considered plain or rich prose.
+   *
+   * - Plain prose: `type: string`
+   * - Rich prose: `type: string, contentMediaType: text/html` — the
+   *   `x-formatting-context` does not matter. Invalid `x-formatting-contexts`
+   *   are blocked during discovery of components from ever making it into
+   *   Canvas component trees.
+   *
+   * @param JsonSchema $prop_schema
+   *   The JSON schema for a component prop.
+   *
+   * @return bool
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\StringSemanticsConstraint::PROSE
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\StringSemanticsConstraint::MARKUP
+   */
+  public static function isPlainOrRichProse(array $prop_schema): bool {
+    $normalized = static::normalizePropSchema($prop_schema);
+    return $normalized === ['type' => 'string']
+      || ($normalized['type'] === 'string'
+        && \array_key_exists('contentMediaType', $normalized)
+        && $normalized['contentMediaType'] === 'text/html');
   }
 
 }

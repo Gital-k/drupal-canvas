@@ -45,7 +45,7 @@ final class ComponentStatusController {
           continue;
         }
         $items = [];
-        $component_reasons = is_string($component_reasons) ? [$component_reasons] : $component_reasons;
+        $component_reasons = \is_string($component_reasons) ? [$component_reasons] : $component_reasons;
         foreach ($component_reasons as $item) {
           $items[] = Markup::create($item);
         }
@@ -79,7 +79,7 @@ final class ComponentStatusController {
    *   A redirect back to the listing page.
    */
   public function performOperation(Component $component, string $op) {
-    \assert(in_array($op, ['enable', 'disable'], TRUE));
+    \assert(\in_array($op, ['enable', 'disable'], TRUE));
 
     $component_id = $component->id();
     $source = $component->getComponentSource();

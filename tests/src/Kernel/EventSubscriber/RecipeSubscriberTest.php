@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\EventSubscriber;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Entity\Entity\EntityViewDisplay;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -27,14 +28,14 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
- * @group #slow
- * @covers \Drupal\canvas\EventSubscriber\RecipeSubscriber
- * @covers \Drupal\canvas\Plugin\Field\FieldTypeOverride\EntityReferenceItemOverride
+ * @legacy-covers \Drupal\canvas\EventSubscriber\RecipeSubscriber
+ * @legacy-covers \Drupal\canvas\Plugin\Field\FieldTypeOverride\EntityReferenceItemOverride
  *
  * Note this cannot use CanvasKernelTestBase because that would pre-install the
  * Canvas module: this test is installing Canvas via a recipe.
  */
+#[Group('canvas')]
+#[Group('#slow')]
 #[RunTestsInSeparateProcesses]
 final class RecipeSubscriberTest extends KernelTestBase {
 
@@ -84,7 +85,6 @@ final class RecipeSubscriberTest extends KernelTestBase {
       2 => ['Empty Page', '/test-page'],
       3 => ['Page without a path', NULL],
     ], \array_map(
-      // @phpstan-ignore-next-line
       fn (Page $page) => [$page->label(), $page->get('path')->alias],
       Page::loadMultiple()
     ));

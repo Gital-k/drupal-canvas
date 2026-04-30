@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -23,22 +26,24 @@ use PHPUnit\Framework\Attributes\TestWith;
 use Prophecy\Prophet;
 
 /**
- * @coversDefaultClass \Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression
- * @coversClass \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression
- * @coversClass \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression
- * @coversClass \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression
- * @coversClass \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression
- * @coversClass \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression
- * @coversClass \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression
- * @coversClass \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches
+ * Tests Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression.
+ *
  * @see \Drupal\Tests\canvas\Kernel\PropExpressionKernelTest::testLabel()
  * @see \Drupal\Tests\canvas\Kernel\PropExpressionKernelTest::testCalculateDependencies()
- * @group canvas
- * @group canvas_data_model
- * @group canvas_data_model__prop_expressions
  *
  * @phpstan-import-type ConfigDependenciesArray from \Drupal\canvas\Entity\VersionedConfigEntityInterface
  */
+#[CoversClass(StructuredDataPropExpression::class)]
+#[CoversClass(FieldPropExpression::class)]
+#[CoversClass(ReferenceFieldPropExpression::class)]
+#[CoversClass(FieldObjectPropsExpression::class)]
+#[CoversClass(FieldTypePropExpression::class)]
+#[CoversClass(ReferenceFieldTypePropExpression::class)]
+#[CoversClass(FieldTypeObjectPropsExpression::class)]
+#[CoversClass(ReferencedBundleSpecificBranches::class)]
+#[Group('canvas')]
+#[Group('canvas_data_model')]
+#[Group('canvas_data_model__prop_expressions')]
 class PropExpressionTest extends UnitTestCase {
 
   private const EXPECT_NO_DEPRECATION = NULL;
@@ -68,15 +73,17 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @dataProvider provider
-   */
+ * Tests to string.
+ */
+  #[DataProvider('provider')]
   public function testToString(string $string_representation, StructuredDataPropExpressionInterface $expression): void {
     $this->assertSame($string_representation, (string) $expression);
   }
 
   /**
-   * @dataProvider provider
-   */
+ * Tests from string.
+ */
+  #[DataProvider('provider')]
   public function testFromString(string $string_representation, StructuredDataPropExpressionInterface $expression, null|string|array $expected_deprecation_message): void {
     // TRICKY: work around PHPUnit limitations. ::expectDeprecation() does not
     // work here.
@@ -88,7 +95,7 @@ class PropExpressionTest extends UnitTestCase {
           self::fail(\sprintf('Unexpected deprecation detected: %s', $message));
         }
         else {
-          if (is_string($expected_deprecation_message)) {
+          if (\is_string($expected_deprecation_message)) {
             self::assertSame($expected_deprecation_message, $message);
           }
           else {
@@ -122,10 +129,12 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression::getReferenceChainPrefixes()
-   * @dataProvider providerReferenceFieldPropExpression
+   * Tests get reference chain prefixes.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression::getReferenceChainPrefixes
    */
-  public function testGetReferenceChainPrefixes(string $string_representation, StructuredDataPropExpressionInterface $expression, ?string $irrelevant_here_one, string|\Exception $irrelevant_here_two, array|\Exception $irrelevant_here_three, null|array $irrelevant_here_four, array $expected_reference_chain_prefixes): void {
+  #[DataProvider('providerReferenceFieldPropExpression')]
+  public function testGetReferenceChainPrefixes(string $string_representation, StructuredDataPropExpressionInterface $expression, ?string $irrelevant_here_one, string|\Exception $irrelevant_here_two, array|\Exception $irrelevant_here_three, array $expected_reference_chain_prefixes): void {
     $reconstructed = call_user_func([get_class($expression), 'fromString'], $string_representation);
     self::assertInstanceOf(ReferenceFieldPropExpression::class, $reconstructed);
     // PHPStan bug: despite the above test assertion, which PHPStan understands,
@@ -149,7 +158,7 @@ class PropExpressionTest extends UnitTestCase {
     \Drupal::setContainer($container);
     $generate_meaningful_case_label = function (string $prefix, array $cases) : array {
       return array_combine(
-        \array_map(fn (int|string $key) => \sprintf("$prefix - %s", is_string($key) ? $key : "#$key"), \array_keys($cases)),
+        \array_map(fn (int|string $key) => \sprintf("$prefix - %s", \is_string($key) ? $key : "#$key"), \array_keys($cases)),
         $cases,
       );
     };
@@ -295,7 +304,7 @@ class PropExpressionTest extends UnitTestCase {
         'field_image␟Title',
         [
           'module' => ['node', 'file'],
-          'config' => ['node.type.article', 'field.field.node.article.field_image', 'image.style.canvas_parametrized_width'],
+          'config' => ['node.type.article', 'field.field.node.article.field_image'],
         ],
       ],
       ['ℹ︎␜entity:node:article␝field_image␞0␟title', new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'field_image', 0, 'title'),
@@ -303,7 +312,7 @@ class PropExpressionTest extends UnitTestCase {
         'field_image␞1st item␟Title',
         [
           'module' => ['node', 'file'],
-          'config' => ['node.type.article', 'field.field.node.article.field_image', 'image.style.canvas_parametrized_width'],
+          'config' => ['node.type.article', 'field.field.node.article.field_image'],
         ],
       ],
       ['ℹ︎␜entity:node:article␝field_image␞99␟title', new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'field_image', 99, 'title'),
@@ -311,7 +320,7 @@ class PropExpressionTest extends UnitTestCase {
         'field_image␞100th item␟Title',
         [
           'module' => ['node', 'file'],
-          'config' => ['node.type.article', 'field.field.node.article.field_image', 'image.style.canvas_parametrized_width'],
+          'config' => ['node.type.article', 'field.field.node.article.field_image'],
         ],
       ],
 
@@ -399,7 +408,6 @@ class PropExpressionTest extends UnitTestCase {
           'module' => ['node', 'user'],
           'content' => ['user:user:some-user-uuid'],
         ],
-        NULL,
         ['ℹ︎␜entity:node␝uid␞␟entity␜'],
       ],
       [
@@ -419,7 +427,6 @@ class PropExpressionTest extends UnitTestCase {
           'module' => ['node', 'user'],
           'content' => ['user:user:some-user-uuid'],
         ],
-        NULL,
         ['ℹ︎␜entity:node␝uid␞␟entity␜'],
       ],
       [
@@ -439,7 +446,6 @@ class PropExpressionTest extends UnitTestCase {
           'module' => ['node', 'user'],
           'content' => ['user:user:some-user-uuid'],
         ],
-        NULL,
         ['ℹ︎␜entity:node␝uid␞␟entity␜'],
       ],
       [
@@ -459,7 +465,6 @@ class PropExpressionTest extends UnitTestCase {
           'module' => ['node', 'user'],
           'content' => ['user:user:some-user-uuid'],
         ],
-        NULL,
         ['ℹ︎␜entity:node␝uid␞0␟entity␜'],
       ],
       [
@@ -479,7 +484,6 @@ class PropExpressionTest extends UnitTestCase {
           'module' => ['node', 'user'],
           'content' => ['user:user:some-user-uuid'],
         ],
-        NULL,
         ['ℹ︎␜entity:node␝uid␞0␟entity␜'],
       ],
       [
@@ -499,7 +503,6 @@ class PropExpressionTest extends UnitTestCase {
           'module' => ['node', 'user'],
           'content' => ['user:user:some-user-uuid'],
         ],
-        NULL,
         ['ℹ︎␜entity:node␝uid␞0␟entity␜'],
       ],
       // Entity reference field with multiple target bundles.
@@ -528,17 +531,14 @@ class PropExpressionTest extends UnitTestCase {
             // The "baby_photos" branch.
             'media.type.baby_photos',
             'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
             // The "image" branch.
             'media.type.image',
             'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
           ],
           'content' => [
             'media:image:some-media-uuid',
           ],
         ],
-        NULL,
         [
           'ℹ︎␜entity:node:article␝yo_ho␞␟entity␜',
         ],
@@ -562,11 +562,8 @@ class PropExpressionTest extends UnitTestCase {
           'content' => ['user:user:some-user-uuid'],
           'config' => [
             'field.field.user.user.user_picture',
-            // @todo 🐛 This is not actually used by this expression!
-            'image.style.canvas_parametrized_width',
           ],
         ],
-        NULL,
         [
           'ℹ︎␜entity:node␝uid␞␟entity␜',
           'ℹ︎␜entity:node␝uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜',
@@ -606,18 +603,15 @@ class PropExpressionTest extends UnitTestCase {
             // The "baby_photos" branch.
             'media.type.baby_photos',
             'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
             // The "image" branch.
             'media.type.image',
             'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
           ],
           'content' => [
             'media:image:some-media-uuid',
             'file:file:some-image-uuid',
           ],
         ],
-        NULL,
         [
           'ℹ︎␜entity:node:article␝yo_ho␞␟entity␜',
         ],
@@ -651,17 +645,11 @@ class PropExpressionTest extends UnitTestCase {
           'content' => ['user:user:some-user-uuid'],
           'config' => [
             'field.field.user.user.user_picture',
-            // @todo 🐛 This is not actually used by this expression!
-            'image.style.canvas_parametrized_width',
             'field.field.user.user.user_picture',
-            'image.style.canvas_parametrized_width',
             'field.field.user.user.user_picture',
-            'image.style.canvas_parametrized_width',
             'field.field.user.user.user_picture',
-            'image.style.canvas_parametrized_width',
           ],
         ],
-        NULL,
         [
           'ℹ︎␜entity:node␝uid␞␟entity␜',
         ],
@@ -694,6 +682,7 @@ class PropExpressionTest extends UnitTestCase {
             'media',
             'media',
             'file',
+            'file',
             'media',
             'file',
             'media',
@@ -719,81 +708,24 @@ class PropExpressionTest extends UnitTestCase {
             'image.style.canvas_parametrized_width',
             'media.type.baby_photos',
             'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
             'media.type.baby_photos',
             'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
             'media.type.baby_photos',
             'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
             // The 4 props for the "image" branch.
             'media.type.image',
             'field.field.media.image.field_media_image',
             'image.style.canvas_parametrized_width',
             'media.type.image',
             'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
             'media.type.image',
             'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
             'media.type.image',
             'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
           ],
           'content' => [
             'media:image:some-media-uuid',
             'file:file:some-image-uuid',
-          ],
-        ],
-        [
-          'module' => [
-            'node',
-            'media',
-            'media',
-            'file',
-            'media',
-            'file',
-            'media',
-            'file',
-            'media',
-            'file',
-            'media',
-            'file',
-            'media',
-            'file',
-            'media',
-            'file',
-            'media',
-            'file',
-          ],
-          'config' => [
-            ...self::EXPECTED_YO_HO_FIELD_CONFIG_DEPENDENCIES,
-            // The 4 props for the "baby_photos" branch.
-            'media.type.baby_photos',
-            'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
-            'media.type.baby_photos',
-            'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
-            'media.type.baby_photos',
-            'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
-            'media.type.baby_photos',
-            'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
-            // The 4 props for the "image" branch.
-            'media.type.image',
-            'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
-            'media.type.image',
-            'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
-            'media.type.image',
-            'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
-            'media.type.image',
-            'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
           ],
         ],
         [
@@ -845,25 +777,21 @@ class PropExpressionTest extends UnitTestCase {
             // The "baby_photos" branch.
             'media.type.baby_photos',
             'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
             // The "image" branch.
             'media.type.image',
             'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
             // The "remote_image" branch.
             'media.type.remote_image',
             'field.field.media.remote_image.field_media_test',
             // The "vacation_photos" branch.
             'media.type.vacation_photos',
             'field.field.media.vacation_photos.field_media_image_2',
-            'image.style.canvas_parametrized_width',
           ],
           'content' => [
             'media:image:some-media-uuid',
             'file:file:some-image-uuid',
           ],
         ],
-        NULL,
         [
           'ℹ︎␜entity:node:article␝yo_ho␞␟entity␜',
         ],
@@ -884,7 +812,6 @@ class PropExpressionTest extends UnitTestCase {
         self::EXPECT_NO_DEPRECATION,
         'Authored by␞124th item␜User␝Name',
         new \LogicException('Requested delta 123 for single-cardinality field, must be either zero or omitted.'),
-        NULL,
         ['ℹ︎␜entity:node␝uid␞123␟entity␜'],
       ],
       [
@@ -901,7 +828,6 @@ class PropExpressionTest extends UnitTestCase {
         self::EXPECT_NO_DEPRECATION,
         'Authored by␞124th item␜User␝Name␞1st item',
         new \LogicException('Requested delta 123 for single-cardinality field, must be either zero or omitted.'),
-        NULL,
         ['ℹ︎␜entity:node␝uid␞123␟entity␜'],
       ],
       [
@@ -918,7 +844,6 @@ class PropExpressionTest extends UnitTestCase {
         self::EXPECT_NO_DEPRECATION,
         'Authored by␞124th item␜User␝Name␞100th item',
         new \LogicException('Requested delta 123 for single-cardinality field, must be either zero or omitted.'),
-        NULL,
         ['ℹ︎␜entity:node␝uid␞123␟entity␜'],
       ],
     ];
@@ -960,7 +885,7 @@ class PropExpressionTest extends UnitTestCase {
         'ℹ︎␜entity:node:article␝field_image␞␟{src↝entity␜␜entity:file␝uri␞␟url,width↠width}',
         new FieldObjectPropsExpression(BetterEntityDataDefinition::create('node', 'article'), 'field_image', NULL, [
           // SDC prop accepting an object, with >=1 mapped key-value pairs:
-          // 1. one (non-leaf) field property that follows an entity reference
+          // 1. one (non-leaf) field property that follows an entity reference.
           'src' => new ReferenceFieldPropExpression(
             referencer: new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'field_image', NULL, 'entity'),
             referenced: new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
@@ -975,10 +900,8 @@ class PropExpressionTest extends UnitTestCase {
           'config' => [
             'node.type.article',
             'field.field.node.article.field_image',
-            'image.style.canvas_parametrized_width',
             'node.type.article',
             'field.field.node.article.field_image',
-            'image.style.canvas_parametrized_width',
           ],
           'content' => ['file:file:some-image-uuid'],
         ],
@@ -988,14 +911,13 @@ class PropExpressionTest extends UnitTestCase {
         new FieldObjectPropsExpression(BetterEntityDataDefinition::create('node', 'article'), 'field_image', NULL, [
           // SDC prop accepting an object, with >=1 mapped key-value pairs:
           // 1. one (leaf) field property that is computed and has its own
-          // dependencies
+          // dependencies.
           'src' => new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'field_image', NULL, 'src_with_alternate_widths'),
           // 2. one (leaf) field property
           'width' => new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'field_image', NULL, 'width'),
         ]),
         self::EXPECT_NO_DEPRECATION,
         'field_image',
-        // Expected content-aware dependencies.
         [
           'module' => ['node', 'file', 'file', 'node', 'file'],
           'config' => [
@@ -1004,21 +926,8 @@ class PropExpressionTest extends UnitTestCase {
             'image.style.canvas_parametrized_width',
             'node.type.article',
             'field.field.node.article.field_image',
-            'image.style.canvas_parametrized_width',
           ],
           'content' => ['file:file:some-image-uuid'],
-        ],
-        // Expected content-unaware dependencies.
-        [
-          'module' => ['node', 'file', 'node', 'file'],
-          'config' => [
-            'node.type.article',
-            'field.field.node.article.field_image',
-            'image.style.canvas_parametrized_width',
-            'node.type.article',
-            'field.field.node.article.field_image',
-            'image.style.canvas_parametrized_width',
-          ],
         ],
       ],
 
@@ -1058,12 +967,10 @@ class PropExpressionTest extends UnitTestCase {
             ...self::EXPECTED_YO_HO_FIELD_CONFIG_DEPENDENCIES,
             'media.type.image',
             'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
             // The "alt" object prop.
             ...self::EXPECTED_YO_HO_FIELD_CONFIG_DEPENDENCIES,
             'media.type.image',
             'field.field.media.image.field_media_image',
-            'image.style.canvas_parametrized_width',
           ],
           'content' => [
             'media:image:some-media-uuid',
@@ -1121,10 +1028,8 @@ class PropExpressionTest extends UnitTestCase {
           'content' => [
             'file:file:some-image-uuid',
           ],
-        ],
-        [
-          'module' => [
-            'image',
+          'config' => [
+            'image.style.canvas_parametrized_width',
           ],
         ],
       ],
@@ -1282,12 +1187,10 @@ class PropExpressionTest extends UnitTestCase {
           'config' => [
             'media.type.baby_photos',
             'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
             'media.type.remote_image',
             'field.field.media.remote_image.field_media_test',
             'media.type.vacation_photos',
             'field.field.media.vacation_photos.field_media_image_2',
-            'image.style.canvas_parametrized_width',
           ],
         ],
       ],
@@ -1352,12 +1255,10 @@ class PropExpressionTest extends UnitTestCase {
           'config' => [
             'media.type.baby_photos',
             'field.field.media.baby_photos.field_media_image_1',
-            'image.style.canvas_parametrized_width',
             'media.type.remote_image',
             'field.field.media.remote_image.field_media_test',
             'media.type.vacation_photos',
             'field.field.media.vacation_photos.field_media_image_2',
-            'image.style.canvas_parametrized_width',
           ],
         ],
       ],
@@ -1390,7 +1291,7 @@ class PropExpressionTest extends UnitTestCase {
         'ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,width↠width}',
         new FieldTypeObjectPropsExpression('image', [
           // SDC prop accepting an object, with >=1 mapped key-value pairs:
-          // 1. one (non-leaf) field property that follows an entity reference
+          // 1. one (non-leaf) field property that follows an entity reference.
           'src' => new ReferenceFieldTypePropExpression(
             referencer: new FieldTypePropExpression('image', 'entity'),
             referenced: new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
@@ -1442,9 +1343,11 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct()
+   * Tests invalid field prop expression due to multiple field names without multiple bundles.
+   *
    * @testWith [null]
    *           ["article"]
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct
    */
   public function testInvalidFieldPropExpressionDueToMultipleFieldNamesWithoutMultipleBundles(?string $bundle): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1461,9 +1364,11 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct()
+   * Tests invalid field prop expression due to multiple field prop names without multiple bundles.
+   *
    * @testWith [null]
    *           ["article"]
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct
    */
   public function testInvalidFieldPropExpressionDueToMultipleFieldPropNamesWithoutMultipleBundles(?string $bundle): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1480,9 +1385,11 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @group legacy
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct()
+   * Tests invalid field prop expression due to multiple field prop names without multiple field names.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct
    */
+  #[IgnoreDeprecations]
   public function testInvalidFieldPropExpressionDueToMultipleFieldPropNamesWithoutMultipleFieldNames(): void {
     $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451);
     $this->expectException(\InvalidArgumentException::class);
@@ -1503,9 +1410,11 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @group legacy
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct()
+   * Tests invalid field prop expression due to only null field prop names.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct
    */
+  #[IgnoreDeprecations]
   public function testInvalidFieldPropExpressionDueToOnlyNullFieldPropNames(): void {
     $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451);
     $this->expectException(\InvalidArgumentException::class);
@@ -1525,9 +1434,11 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @group legacy
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct()
+   * Tests invalid field prop expression due to duplicate bundles.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct
    */
+  #[IgnoreDeprecations]
   public function testInvalidFieldPropExpressionDueToDuplicateBundles(): void {
     $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451);
     $this->expectException(\InvalidArgumentException::class);
@@ -1541,13 +1452,15 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @group legacy
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct()
+   * Tests invalid field prop expression due to field name mismatch.
+   *
    * @testWith [{"foo": "field_media_image", "bar": "field_media_image_1", "baz": "field_media_image_2"}]
    *           [{"foo": "field_media_image", "baz": "field_media_image_2"}]
    *           [{}]
    *           [{"foo": "field_media_image", "bar": "field_media_image_1"}]
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct
    */
+  #[IgnoreDeprecations]
   public function testInvalidFieldPropExpressionDueToFieldNameMismatch(array $field_name): void {
     $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451);
     $this->expectException(\InvalidArgumentException::class);
@@ -1561,7 +1474,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::__construct()
+   * Tests invalid field object props expression due to prop name.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::__construct
    */
   public function testInvalidFieldObjectPropsExpressionDueToPropName(): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1572,7 +1487,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::__construct()
+   * Tests invalid field object props expression due to delta.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::__construct
    */
   public function testInvalidFieldObjectPropsExpressionDueToDelta(): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1583,7 +1500,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::__construct()
+   * Tests invalid field object props expression inside reference field type expression.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::__construct
    */
   public function testInvalidFieldObjectPropsExpressionInsideReferenceFieldTypeExpression(): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1603,7 +1522,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * Tests invalid reference field type prop expression due to single branch.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    */
   public function testInvalidReferenceFieldTypePropExpressionDueToSingleBranch(): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1618,7 +1539,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * Tests invalid reference field type prop expression due to bundleless field prop expression.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    */
   public function testInvalidReferenceFieldTypePropExpressionDueToBundlelessFieldPropExpression(): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1634,7 +1557,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * Tests invalid reference field type prop expression due to unsupported branch expression.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    */
   public function testInvalidReferenceFieldTypePropExpressionDueToUnsupportedBranchExpression(): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1650,7 +1575,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * Tests invalid reference field type prop expression due to incorrect order.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    */
   public function testInvalidReferenceFieldTypePropExpressionDueToIncorrectOrder(): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1672,7 +1599,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * Tests invalid reference field type prop expression due to mismatched leaf expression classes.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    */
   public function testInvalidReferenceFieldTypePropExpressionDueToMismatchedLeafExpressionClasses(): void {
     $this->expectException(\InvalidArgumentException::class);
@@ -1702,7 +1631,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * Tests invalid reference field type prop expression due to inconsistent leaf expression deltas.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    */
   #[TestWith([NULL, NULL, NULL])]
   #[TestWith([0, 0, NULL])]
@@ -1732,7 +1663,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * Tests closing unopened branch exception.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    */
   public function testClosingUnopenedBranchException(): void {
     $this->expectException(\LogicException::class);
@@ -1741,7 +1674,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * Tests unclosed branch exception.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    */
   public function testUnclosedBranchException(): void {
     $this->expectException(\LogicException::class);
@@ -1750,7 +1685,9 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * Tests nested branch exception.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    */
   public function testNestedBranchException(): void {
     $this->expectException(\LogicException::class);
@@ -1759,10 +1696,12 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::hasBranch()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::withAdditionalBranch()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::withoutBranch()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::generateBundleSpecificBranches()
+   * Tests add and remove bundle specific expressions.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::hasBranch
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::withAdditionalBranch
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::withoutBranch
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::generateBundleSpecificBranches
    */
   public function testAddAndRemoveBundleSpecificExpressions(): void {
     $alphabetically_first = new FieldPropExpression(BetterEntityDataDefinition::create('media', ['alphabetically_first']), 'whatever', NULL, 'something');
@@ -1857,6 +1796,8 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
+   * Tests update path for 3563451.
+   *
    * @param string $original
    *   The original expression string.
    * @param string|null $updated
@@ -1864,9 +1805,9 @@ class PropExpressionTest extends UnitTestCase {
    *
    * @see \canvas_post_update_0011_multi_bundle_reference_prop_expressions()
    * @see https://www.drupal.org/node/3563451
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::generateBundleSpecificBranches())
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression::liftReferenceAndCreateBranchesIfNeeded
    * @see \Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface::SYMBOL_OBJECT_MAPPED_OPTIONAL_PROP
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::generateBundleSpecificBranches
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression::liftReferenceAndCreateBranchesIfNeeded
    */
   #[TestWith([
     'ℹ︎entity_reference␟entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image_1|field_media_image_2␞␟entity␜␜entity:file␝uri␞␟value',
@@ -1914,7 +1855,6 @@ class PropExpressionTest extends UnitTestCase {
     $updated_expr = match ($original_expr::class) {
       ReferenceFieldTypePropExpression::class => $original_expr->generateBundleSpecificBranches(),
       FieldTypeObjectPropsExpression::class => $original_expr->liftReferenceAndCreateBranchesIfNeeded(),
-      default => throw new \OutOfRangeException(),
     };
 
     self::assertSame($updated, (string) $updated_expr);

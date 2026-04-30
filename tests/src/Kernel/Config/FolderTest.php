@@ -8,13 +8,12 @@ use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Folder;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
-use Drupal\Tests\ConfigTestTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+#[Group('canvas')]
 #[RunTestsInSeparateProcesses]
 class FolderTest extends CanvasKernelTestBase {
-
-  use ConfigTestTrait;
 
   protected Folder $entity;
 
@@ -29,8 +28,10 @@ class FolderTest extends CanvasKernelTestBase {
 
   public function testFolderAutoCreationValidation(): void {
     $folders = Folder::loadMultiple();
-    // 1. At the start, only the ::setUp()-created Folder exists.
-    $this->assertEquals([$this->entity->id()], \array_keys($folders));
+    // 1. At the start, the ::setUp()-created Folder must exist.
+    // Additional Folders may already exist due to auto-generated Block
+    // Components.
+    $this->assertArrayHasKey($this->entity->id(), $folders);
     $this->enableModules(['canvas_test_sdc']);
 
     // 2. Generate Component config entities, this will create additional Folder

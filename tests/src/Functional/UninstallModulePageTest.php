@@ -4,26 +4,18 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-use Drupal\Core\Database\Database;
-use Drupal\field\Entity\FieldConfig;
-use Drupal\field\Entity\FieldStorageConfig;
-use Drupal\FunctionalTests\Installer\InstallerTestBase;
+use Drupal\canvas\CanvasNotificationHandler;
+use Drupal\Tests\BrowserTestBase;
+use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests the uninstalling module page is loaded.
- *
- * @group canvas
  */
 #[RunTestsInSeparateProcesses]
-class UninstallModulePageTest extends InstallerTestBase {
-
-  /**
-   * {@inheritdoc}
-   *
-   * This is to get config/optional/field.field.node.article.field_canvas_demo.yml installed, and trigger the edge case.
-   */
-  protected $profile = 'standard';
+#[Group('canvas')]
+class UninstallModulePageTest extends BrowserTestBase {
 
   /**
    * {@inheritdoc}
@@ -33,40 +25,39 @@ class UninstallModulePageTest extends InstallerTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp(): void {
-    parent::setUp();
-    $connection_info = Database::getConnectionInfo();
-    if (isset($connection_info['default']['driver']) && $connection_info['default']['driver'] == 'pgsql') {
-      $this->markTestSkipped("This test does not support the {$connection_info['default']['driver']} database driver. See https://drupal.org/i/3464830");
-    }
-  }
+  protected static $modules = ['canvas'];
 
   /**
    * Tests that the uninstalling module page is loaded.
    */
   public function testUninstallModulePage(): void {
-    \Drupal::service('module_installer')->install(['canvas']);
-    $this->drupalGet('admin/modules/uninstall');
-    $session = $this->assertSession();
-    $this->assertSession()->statusCodeEquals(200);
-    // Load & delete dependent field config for module uninstall.
-    $entity_type = 'node';
-    $field_name = 'field_canvas_demo';
-    $field_config = FieldConfig::load($entity_type . '.' . $field_name);
-    if ($field_config) {
-      $field_config->delete();
-    }
-    // Load & delete dependent field storage config for module uninstall.
-    $field_storage = FieldStorageConfig::load($entity_type . '.' . $field_name);
-    if ($field_storage) {
-      $field_storage->delete();
-    }
+    $account = $this->createUser(['administer modules']);
+    \assert($account instanceof UserInterface);
+    $this->drupalLogin($account);
+
+    // Trigger lazy creation of both notification tables.
+    $handler = $this->container->get(CanvasNotificationHandler::class);
+    $notification = $handler->create([
+      'type' => 'info',
+      'title' => 'Test notification',
+      'message' => 'Triggers table creation.',
+    ]);
+    $handler->markRead((int) $account->id(), [$notification['id']]);
+    $schema = $this->container->get('database')->schema();
+    self::assertTrue($schema->tableExists(CanvasNotificationHandler::NOTIFICATION_TABLE));
+    self::assertTrue($schema->tableExists(CanvasNotificationHandler::NOTIFICATION_READ_TABLE));
 
     $this->drupalGet('admin/modules/uninstall');
+    $assert_session = $this->assertSession();
+    $assert_session->statusCodeEquals(200);
     $this->submitForm(['uninstall[canvas]' => 1], 'Uninstall');
     $this->submitForm([], 'Uninstall');
-    $session->pageTextContains('The selected modules have been uninstalled.');
-    $session->pageTextNotContains('Drupal Canvas');
+    $assert_session->pageTextContains('The selected modules have been uninstalled.');
+    $assert_session->pageTextNotContains('Drupal Canvas');
+
+    $schema = \Drupal::database()->schema();
+    self::assertFalse($schema->tableExists(CanvasNotificationHandler::NOTIFICATION_TABLE));
+    self::assertFalse($schema->tableExists(CanvasNotificationHandler::NOTIFICATION_READ_TABLE));
   }
 
 }

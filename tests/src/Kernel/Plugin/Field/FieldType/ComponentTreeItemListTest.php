@@ -5,9 +5,13 @@ declare(strict_types=1);
 // cspell:ignore vlaquxuup
 namespace Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Element\RenderSafeComponentContainer;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -26,26 +30,30 @@ use Drupal\Component\Uuid\Php;
 use Drupal\Core\Access\AccessResultAllowed;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
+use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @coversDefaultClass \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList
- * @group canvas
+ * Tests Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList.
  */
 #[RunTestsInSeparateProcesses]
+#[CoversClass(ComponentTreeItemList::class)]
+#[Group('canvas')]
 class ComponentTreeItemListTest extends CanvasKernelTestBase {
 
   use ConstraintViolationsTestTrait;
@@ -55,6 +63,7 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
   use UserCreationTrait;
   use ComponentTreeItemListInstantiatorTrait;
   use CacheBustingTrait;
+  use DataProviderWithComponentTreeTrait;
 
   /**
    * {@inheritdoc}
@@ -80,11 +89,120 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers ::getHydratedTree()
-   * @covers ::toRenderable()
-   * @dataProvider provider
+   * Tests ::getTranslatableInputKeys() scenarios across entity types.
+   *
+   * Tests only edge case scenarios: invalid component trees. This ensures that
+   * ::getTranslatableInputKeys() always returns a sensible result, even when
+   * translating an invalid component tree — which could occur e.g. for an
+   * auto-saved version of it.
+   *
+   * These are source-agnostic. Non-edge case scenarios are tested for each
+   * component source.
+   *
+   * @see \Drupal\canvas\ComponentSource\ComponentInstanceInputsConfigSchemaGeneratorInterface
+   * @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase::testGetTranslatableInputKeys()
+   * @legacy-covers \Drupal\canvas\Plugin\DataType\ComponentInputs::getTranslatableInputKeys()
    */
+  #[DataProvider('hostEntityProvider')]
+  public function testGetTranslatableInputKeysSourceAgnosticEdgeCases(string $host_entity_type_id, array $host_entity_values): void {
+    // Content templates require nodes to exist, the full view mode, and >=1
+    // bundle.
+    if ($host_entity_type_id === ContentTemplate::ENTITY_TYPE_ID) {
+      $this->enableModules(['node', 'field']);
+      $this->installConfig(['node']);
+      NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+    }
+
+    // Simulate the expected host entity containing this component tree exists,
+    // without actually creating (and saving) the host entity.
+    $host_entity = match ($host_entity_type_id) {
+      Page::ENTITY_TYPE_ID => Page::create($host_entity_values)->enforceIsNew(FALSE),
+      PageRegion::ENTITY_TYPE_ID => PageRegion::create($host_entity_values),
+      Pattern::ENTITY_TYPE_ID => Pattern::create($host_entity_values),
+      ContentTemplate::ENTITY_TYPE_ID => ContentTemplate::create($host_entity_values),
+      default => throw new \LogicException("Unhandled host entity type ID $host_entity_type_id in " . __METHOD__),
+    };
+    if ($host_entity instanceof ContentEntityInterface) {
+      $this->installEntitySchema($host_entity_type_id);
+    }
+
+    $get_translatable_input_keys = function (string $component_instance_uuid) use ($host_entity): ?array {
+      return $host_entity->getComponentTree()
+        ->getComponentTreeItemByUuid($component_instance_uuid)
+        ?->get('inputs')
+          ->getTranslatableInputKeys();
+    };
+
+    // Scenario 1: Non-existent Component.
+    // Should robustly return [] without crashing.
+    $host_entity->setComponentTree([
+      [
+        'uuid' => 'd6f7e5f2-b3c1-5d0f-9e2f-b9d8e4f0c3f5',
+        'component_id' => 'nonexistent.component.id',
+        'component_version' => 'abc123',
+        'inputs' => ['key' => 'value'],
+      ],
+    ]);
+    $this->assertSame(
+      [],
+      $get_translatable_input_keys('d6f7e5f2-b3c1-5d0f-9e2f-b9d8e4f0c3f5'),
+      'Scenario 1: Non-existent Component should return empty array (robustness principle).'
+    );
+
+    // Scenario 2: Invalid component version (falls back to active).
+    // Use a valid component but an invalid version string.
+    $host_entity->setComponentTree([
+      [
+        'uuid' => 'e7f8f6f3-c4d2-5e1f-0f3f-c0e9f5f1d4f6',
+        'component_id' => 'sdc.canvas_test_sdc.my-cta',
+        'component_version' => 'invalid_version_xyz',
+        'inputs' => [
+          'text' => 'Some text',
+          'href' => ['uri' => 'https://example.com', 'options' => []],
+        ],
+      ],
+    ]);
+    // Should fall back to active version and return same keys as Scenario 1.
+    $this->assertSame(
+      ['text', 'href'],
+      $get_translatable_input_keys('e7f8f6f3-c4d2-5e1f-0f3f-c0e9f5f1d4f6'),
+      'Scenario 2: Invalid version should fall back to active version and return same translatable keys.'
+    );
+
+    // Scenario 3: Malformed/NULL inputs (treated as empty for refinement).
+    // The method should handle NULL inputs gracefully and return the component version's translatable keys.
+    $host_entity->setComponentTree([
+      [
+        'uuid' => 'f8f9f7f4-d5e3-5f2f-1f4f-d1f0f6f2e5f7',
+        'component_id' => 'sdc.canvas_test_sdc.my-cta',
+        'component_version' => '89881c04a0fde367',
+        'inputs' => [],
+      ],
+    ]);
+    // With empty inputs, all props that are translatable by definition should be returned.
+    $this->assertSame(
+      ['text', 'href'],
+      $get_translatable_input_keys('f8f9f7f4-d5e3-5f2f-1f4f-d1f0f6f2e5f7'),
+      'Scenario 3: Empty inputs should return all translatable props for the component version.'
+    );
+  }
+
+  /**
+   * Tests hydration and rendering.
+   *
+   * @legacy-covers ::getHydratedTree
+   * @legacy-covers ::toRenderable
+   */
+  #[DataProvider('provider')]
   public function testHydrationAndRendering(string $host_entity_type_id, array $host_entity_values, array $value, array $expected_value, array $expected_renderable, string $expected_html, array $expected_cache_tags, bool $isPreview): void {
+    // Content templates require nodes to exist, the full view mode, and >=1
+    // bundle.
+    if ($host_entity_type_id === ContentTemplate::ENTITY_TYPE_ID) {
+      $this->enableModules(['node', 'field']);
+      $this->installConfig(['node']);
+      NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+    }
+
     // Some test cases may contain StaticPropSources referencing Users.
     $this->setUpCurrentUser(permissions: ['access user profiles']);
 
@@ -108,6 +226,8 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
       ContentTemplate::ENTITY_TYPE_ID => ContentTemplate::create($host_entity_values),
       default => throw new \LogicException("Unhandled host entity type ID $host_entity_type_id in " . __METHOD__),
     };
+    $value = self::populateActiveComponentVersionPlaceholders($value);
+    $host_entity->setComponentTree($value);
 
     $typed_data_manager = $this->container->get(TypedDataManagerInterface::class);
     $list_definition = $typed_data_manager->createListDataDefinition('field_item:component_tree');
@@ -122,9 +242,16 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
     \assert($item_list instanceof ComponentTreeItemList);
     $item_list->setValue($value);
 
-    // Every test case must be valid.
+    // Every test case must be valid on its own.
     $violations = $item_list->validate();
     $this->assertSame([], self::violationsToArray($violations));
+
+    // The test case (a component tree) must also result in a valid entity that
+    // stores it.
+    if ($host_entity instanceof ContentEntityInterface) {
+      $this->installEntitySchema($host_entity_type_id);
+    }
+    self::assertEntityIsValid($host_entity);
 
     // Assert that the corresponding hydrated component tree is valid, in all
     // representations:
@@ -170,7 +297,7 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
       if ($key === '#is_preview' || $key === 'canvas_is_preview') {
         $value = $is_preview;
       }
-      if (is_string($value) && str_starts_with($value, 'canvas/')) {
+      if (\is_string($value) && str_starts_with($value, 'canvas/')) {
         $value .= '.draft';
       }
     });
@@ -194,12 +321,12 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
     $expectation = [];
 
     foreach ($expected_renderable as $key => $value) {
-      if (is_array($value)) {
+      if (\is_array($value)) {
         $value = self::addSlotPlaceholders($value);
       }
 
       if ($key === '#slots') {
-        if (is_array($value)) {
+        if (\is_array($value)) {
           foreach ($value as $slot_key => $slot_value) {
             if (isset($slot_value["#plain_text"]) || isset($slot_value["#markup"])) {
               $expectation[$key][$slot_key] = [
@@ -227,7 +354,7 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
         continue;
       }
 
-      if (is_array($value)) {
+      if (\is_array($value)) {
         $value = self::removePrefixSuffixKeysRecursive($value);
       }
       $expectation[$key] = $value;
@@ -268,7 +395,7 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
     return [
       'content entity type: Page' => [
         Page::ENTITY_TYPE_ID,
-        ['id' => 42],
+        ['id' => 42, 'title' => 'My pretty page'],
         'canvas_page:42',
       ],
       'config entity type: PageRegion' => [
@@ -278,7 +405,7 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
       ],
       'config entity type: Pattern' => [
         Pattern::ENTITY_TYPE_ID,
-        ['id' => 'my_pretty_pattern'],
+        ['id' => 'my_pretty_pattern', 'label' => 'My pretty pattern'],
         'config:canvas.pattern.my_pretty_pattern',
       ],
       'config entity type: ContentTemplate' => [
@@ -320,6 +447,7 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
         [
           'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'heading' => $generate_static_prop_source('world'),
           ],
@@ -426,6 +554,7 @@ HTML,
         [
           'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
           'component_id' => 'block.system_branding_block',
+          'component_version'  => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'label' => '',
             'label_display' => '0',
@@ -541,6 +670,7 @@ HTML,
         [
           'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'heading' => $generate_static_prop_source('world'),
           ],
@@ -548,6 +678,7 @@ HTML,
         [
           'uuid' => 'fcf67861-87da-45e5-916b-31f5b74be747',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'heading' => $generate_static_prop_source('another world'),
           ],
@@ -652,6 +783,7 @@ HTML,
         [
           'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'heading' => $generate_static_prop_source('world'),
           ],
@@ -659,6 +791,7 @@ HTML,
         [
           'uuid' => '3b305d86-86a7-4684-8664-7ef1fc2be070',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'parent_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
           'slot' => 'the_body',
           'inputs' => [
@@ -791,6 +924,7 @@ HTML,
         [
           'uuid' => 'dfd2e899-6d88-46f8-b6aa-98929d1586dd',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'parent_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
           'slot' => 'the_body',
           'inputs' => ['heading' => $generate_static_prop_source('from slot level 1')],
@@ -798,6 +932,7 @@ HTML,
         [
           'uuid' => '81c63cac-187d-4f05-8acc-1c38fb2489d3',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'parent_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'slot' => 'the_body',
           'inputs' => ['heading' => $generate_static_prop_source('from slot level 3')],
@@ -805,6 +940,7 @@ HTML,
         [
           'uuid' => '68167e4a-9245-41be-b564-f1e1dcad1dec',
           'component_id' => 'block.system_branding_block',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'parent_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'slot' => 'the_body',
           'inputs' => [
@@ -818,6 +954,7 @@ HTML,
         [
           'uuid' => '2f57ba57-f32a-4a7b-9896-9d1104b446f1',
           'component_id' => 'js.my-cta',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'parent_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'slot' => 'the_body',
           'inputs' => [
@@ -828,6 +965,7 @@ HTML,
         [
           'uuid' => 'b4bc6c8f-66f7-458a-99a9-41c29b2801e7',
           'component_id' => 'js.my-cta-with-auto-save',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'parent_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'slot' => 'the_body',
           'inputs' => [
@@ -838,11 +976,12 @@ HTML,
         [
           'uuid' => '9f09ecd8-ec65-408c-b5c8-ef036e6aeb97',
           'component_id' => 'sdc.canvas_test_entity_reference_shape_alter.props-no-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'parent_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'slot' => 'the_body',
           'inputs' => [
             'heading' => [
-                // @see ::testHydrationAndRendering()
+              // @see ::testHydrationAndRendering()
               'target_id' => 1103448,
             ],
           ],
@@ -850,6 +989,7 @@ HTML,
         [
           'uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'parent_uuid' => 'dfd2e899-6d88-46f8-b6aa-98929d1586dd',
           'slot' => 'the_body',
           'inputs' => ['heading' => $generate_static_prop_source('from slot level 2')],
@@ -857,6 +997,7 @@ HTML,
         [
           'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'heading' => $generate_static_prop_source('world'),
           ],
@@ -1126,6 +1267,7 @@ HTML,
                                           'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $path),
                                           '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $path),
                                         ],
+                                        ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS => [],
                                       ],
                                       '#attached' => [
                                         'html_head_link' => [
@@ -1147,6 +1289,7 @@ HTML,
                                         'library' => [
                                           'canvas/astro_island.my-cta',
                                           'canvas/asset_library.' . AssetLibrary::GLOBAL_ID,
+                                          'canvas/brand_kit.' . BrandKit::GLOBAL_ID,
                                         ],
                                       ],
                                       '#name' => 'My First Code Component',
@@ -1200,6 +1343,7 @@ HTML,
                                           'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $path),
                                           '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $path),
                                         ],
+                                        ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS => [],
                                       ],
                                       '#attached' => [
                                         'html_head_link' => [
@@ -1221,6 +1365,7 @@ HTML,
                                         'library' => [
                                           'canvas/astro_island.my-cta-with-auto-save',
                                           'canvas/asset_library.' . AssetLibrary::GLOBAL_ID,
+                                          'canvas/brand_kit.' . BrandKit::GLOBAL_ID,
                                         ],
                                       ],
                                       '#name' => 'My Code Component with Auto-Save',
@@ -1349,16 +1494,16 @@ HTML,
 <!-- canvas-end-68167e4a-9245-41be-b564-f1e1dcad1dec --><!-- canvas-start-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><canvas-island uid="2f57ba57-f32a-4a7b-9896-9d1104b446f1"
       component-url="::SITE_DIR_BASE_URL::/files/astro-island/zp6hEMcVLAQUXUUP3gsBwM5-MNs4_2kJ_7z16CTg1Sk.js"
       component-export="default"
-      renderer-url="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js"
+      renderer-url="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js?2.1.0-alpha3"
       props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;code component\&quot;!&quot;],&quot;href&quot;:[&quot;raw&quot;,&quot;https:\/\/example.com&quot;]}"
       ssr="" client="only"
-      opts="{&quot;name&quot;:&quot;My First Code Component&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="::SITE_DIR_BASE_URL::/files/astro-island/zp6hEMcVLAQUXUUP3gsBwM5-MNs4_2kJ_7z16CTg1Sk.js" blocking="render"></script></canvas-island><!-- canvas-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><!-- canvas-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><canvas-island uid="b4bc6c8f-66f7-458a-99a9-41c29b2801e7"
+      opts="{&quot;name&quot;:&quot;My First Code Component&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js?2.1.0-alpha3" blocking="render"></script><script type="module" src="::SITE_DIR_BASE_URL::/files/astro-island/zp6hEMcVLAQUXUUP3gsBwM5-MNs4_2kJ_7z16CTg1Sk.js" blocking="render"></script></canvas-island><!-- canvas-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><!-- canvas-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><canvas-island uid="b4bc6c8f-66f7-458a-99a9-41c29b2801e7"
       component-url="::SITE_DIR_BASE_URL::/files/astro-island/dErbetE11Vm2Twy1AoP3OU8bws4QaYAih9Gd8PgRrm4.js"
       component-export="default"
-      renderer-url="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js"
+      renderer-url="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js?2.1.0-alpha3"
       props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;auto-save code component\&quot;!&quot;],&quot;href&quot;:[&quot;raw&quot;,&quot;https:\/\/example.com&quot;]}"
       ssr="" client="only"
-      opts="{&quot;name&quot;:&quot;My Code Component with Auto-Save&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="::SITE_DIR_BASE_URL::/files/astro-island/dErbetE11Vm2Twy1AoP3OU8bws4QaYAih9Gd8PgRrm4.js" blocking="render"></script></canvas-island><!-- canvas-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><!-- canvas-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><div  data-component-id="canvas_test_entity_reference_shape_alter:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+      opts="{&quot;name&quot;:&quot;My Code Component with Auto-Save&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js?2.1.0-alpha3" blocking="render"></script><script type="module" src="::SITE_DIR_BASE_URL::/files/astro-island/dErbetE11Vm2Twy1AoP3OU8bws4QaYAih9Gd8PgRrm4.js" blocking="render"></script></canvas-island><!-- canvas-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><!-- canvas-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><div  data-component-id="canvas_test_entity_reference_shape_alter:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
   <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading -->Clurichaun<!-- canvas-prop-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading --></h1>
 </div>
 <!-- canvas-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><!-- canvas-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body -->
@@ -1503,16 +1648,16 @@ HTML,
      <!-- canvas-end-68167e4a-9245-41be-b564-f1e1dcad1dec --><!-- canvas-start-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><canvas-island uid="2f57ba57-f32a-4a7b-9896-9d1104b446f1"
           component-url="/canvas/api/v0/auto-saves/js/js_component/my-cta"
           component-export="default"
-          renderer-url="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js"
+          renderer-url="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js?2.1.0-alpha3"
           props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;code component\&quot;!&quot;],&quot;href&quot;:[&quot;raw&quot;,&quot;https:\/\/example.com&quot;]}"
           ssr="" client="only"
-          opts="{&quot;name&quot;:&quot;My First Code Component&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="/canvas/api/v0/auto-saves/js/js_component/my-cta" blocking="render"></script></canvas-island><!-- canvas-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><!-- canvas-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><canvas-island uid="b4bc6c8f-66f7-458a-99a9-41c29b2801e7"
+          opts="{&quot;name&quot;:&quot;My First Code Component&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js?2.1.0-alpha3" blocking="render"></script><script type="module" src="/canvas/api/v0/auto-saves/js/js_component/my-cta" blocking="render"></script></canvas-island><!-- canvas-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><!-- canvas-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><canvas-island uid="b4bc6c8f-66f7-458a-99a9-41c29b2801e7"
           component-url="/canvas/api/v0/auto-saves/js/js_component/my-cta-with-auto-save"
           component-export="default"
-          renderer-url="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js"
+          renderer-url="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js?2.1.0-alpha3"
           props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;auto-save code component\&quot;!&quot;],&quot;href&quot;:[&quot;raw&quot;,&quot;https:\/\/example.com&quot;]}"
           ssr="" client="only"
-          opts="{&quot;name&quot;:&quot;My Code Component with Auto-Save - Draft&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="/canvas/api/v0/auto-saves/js/js_component/my-cta-with-auto-save" blocking="render"></script></canvas-island><!-- canvas-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><!-- canvas-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><div  data-component-id="canvas_test_entity_reference_shape_alter:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+          opts="{&quot;name&quot;:&quot;My Code Component with Auto-Save - Draft&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/packages/astro-hydration/dist/client.js?2.1.0-alpha3" blocking="render"></script><script type="module" src="/canvas/api/v0/auto-saves/js/js_component/my-cta-with-auto-save" blocking="render"></script></canvas-island><!-- canvas-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><!-- canvas-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><div  data-component-id="canvas_test_entity_reference_shape_alter:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
       <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading -->Clurichaun<!-- canvas-prop-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading --></h1>
      </div>
      <!-- canvas-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><!-- canvas-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body -->
@@ -1695,10 +1840,11 @@ HTML,
   }
 
   /**
-   * @covers ::injectSubTreeItemList
+   * Tests inject sub tree item list.
    *
-   * @dataProvider providerInjectSubTreeItemList
+   * @legacy-covers ::injectSubTreeItemList
    */
+  #[DataProvider('providerInjectSubTreeItemList')]
   public function testInjectSubTreeItemList(array $initial_value, array $exposed_slot_info, array $subtrees, array|string $expected_tree_or_exception): void {
     $target_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
     $target_tree->setValue($initial_value);
@@ -1726,9 +1872,14 @@ HTML,
   }
 
   /**
-   * Test that hydration filters props/slots removed from the active version.
+   * Tests that hydration doesn't break with component evolution.
+   *
+   * It must:
+   * - Filter out props/slots removed from the active version.
+   * - Provide the default value for props required in the active version that
+   *   didn't exist before, or were not required and did not yet have a stored value.
    */
-  public function testHydrationFiltersUnsupportedPropsAndSlots(): void {
+  public function testHydrationOnComponentEvolution(): void {
     $this->config('system.logging')->set('error_level', ERROR_REPORTING_DISPLAY_VERBOSE)->save();
 
     $test_code_component_id = 'evolution-test';

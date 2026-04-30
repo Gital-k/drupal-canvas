@@ -8,15 +8,14 @@ use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\Tests\ConfigTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+#[Group('canvas')]
 #[RunTestsInSeparateProcesses]
 class FolderValidationTest extends BetterConfigEntityValidationTestBase {
-
-  use ConfigTestTrait;
 
   const FOLDER_NAME = 'Unique name';
 

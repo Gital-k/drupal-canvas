@@ -69,10 +69,17 @@ final class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Com
     // Props that are still present, need to allow the same field data to be
     // stored in the active version of the Component. If not
     // (If only the field widget or expression changes, it's SAFE to update.)
-    $irrelevant_prop_shape = new PropShape(['type' => 'string']);
-    $prop_field_definition_to_storable_prop_shape = static function (array $prop_field_definition) use ($irrelevant_prop_shape): StorablePropShape {
+    $prop_field_definition_to_storable_prop_shape = static function (array $prop_field_definition): StorablePropShape {
       $field_type_prop = StructuredDataPropExpression::fromString($prop_field_definition['expression']);
       \assert($field_type_prop instanceof FieldTypeBasedPropExpressionInterface);
+
+      // Shape details are irrelevant for update safety checks, but the
+      // constructor validates that cardinality aligns with array/non-array.
+      $is_single_value = ($prop_field_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) === 1;
+      $irrelevant_prop_shape = $is_single_value
+        ? new PropShape(['type' => 'object'])
+        : new PropShape(['type' => 'array', 'items' => ['type' => 'object']]);
+
       return new StorablePropShape(
         shape: $irrelevant_prop_shape,
         fieldTypeProp: $field_type_prop,
@@ -118,38 +125,61 @@ final class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Com
     $inputs = $component_instance->getInputs() ?? [];
     $needs_input_update = FALSE;
 
-    // Remove prop values for props that no longer exist in the active version.
-    $removed_prop_names = \array_diff_key($from_props, $to_props);
-    if (count($removed_prop_names) > 0) {
-      $inputs = \array_diff_key($inputs, $removed_prop_names);
+    // Remove inputs for props that don't exist in the active version. This
+    // covers both props removed between versions and garbage inputs for props
+    // that never existed in any version.
+    // @see https://www.drupal.org/project/canvas/issues/3578865
+    $unknown_inputs = \array_diff_key($inputs, $to_props);
+    if (count($unknown_inputs) > 0) {
+      $inputs = \array_intersect_key($inputs, $to_props);
       $needs_input_update = TRUE;
     }
 
-    // Add default prop values for required props that are new or now required
-    // in the active version, if they weren't already set.
+    // Validate the projected inputs against the target version's source to
+    // detect existing inputs that are invalid for the new version.
+    $target_source = $component->loadVersion($to_version)->getComponentSource();
+    $component_uuid = $component_instance->getUuid();
+    $violations = $target_source->validateComponentInput(
+      inputValues: $inputs,
+      component_instance_uuid: $component_uuid,
+      entity: NULL,
+    );
+    // Collect prop names that have violations in the target version.
+    $invalid_prop_names = [];
+    foreach ($violations as $violation) {
+      $path = $violation->getPropertyPath();
+      $prefix = "inputs.$component_uuid.";
+      if (str_starts_with($path, $prefix)) {
+        $invalid_prop_names[substr($path, \strlen($prefix))] = TRUE;
+      }
+    }
+
+    // Add default prop values for required props that are new, now required,
+    // or invalid in the active version.
     foreach ($to_props as $prop_name => $def) {
-      if ($def['required'] !== TRUE) {
+      if ($def['required'] !== TRUE ||
+          // If we happened to have a "garbage" value from a previous version,
+          // we would need to preserve it if now became valid.
+          (\array_key_exists($prop_name, $inputs) && !isset($invalid_prop_names[$prop_name]))) {
         continue;
       }
-      $default_explicit_input = $component->loadVersion($to_version)->getComponentSource()->getDefaultExplicitInput();
+
+      if (isset($from_props[$prop_name])) {
+        // This prop already existed, so we only need to add a default value if
+        // it was previously optional (and is now required) and no value exists
+        // for it yet — or if the existing input is invalid for the new version.
+        if (($from_props[$prop_name]['required'] === TRUE || isset($inputs[$prop_name])) && !isset($invalid_prop_names[$prop_name])) {
+          continue;
+        }
+      }
+
+      $default_explicit_input = $target_source->getDefaultExplicitInput();
       // Required props must have an example value and hence a value in this
       // component's default explicit input.
       // @see \Drupal\canvas\ComponentMetadataRequirementsChecker
       \assert(\array_key_exists('value', $default_explicit_input[$prop_name]) && $default_explicit_input[$prop_name]['value'] !== NULL);
-      $value = $default_explicit_input[$prop_name]['value'];
-      // New required prop: always set to default_value.
-      if (!isset($from_props[$prop_name])) {
-        // The prop didn't exist before, so there cannot be an existing input.
-        \assert(!isset($inputs[$prop_name]));
-        $inputs[$prop_name] = $value;
-        $needs_input_update = TRUE;
-      }
-      // Optional→required prop: only set default_value if no input exists
-      // (respect user-provided values for props that already existed).
-      elseif ($from_props[$prop_name]['required'] !== TRUE && !isset($inputs[$prop_name])) {
-        $inputs[$prop_name] = $value;
-        $needs_input_update = TRUE;
-      }
+      $inputs[$prop_name] = $default_explicit_input[$prop_name]['value'];
+      $needs_input_update = TRUE;
     }
 
     if ($needs_input_update) {
@@ -165,7 +195,7 @@ final class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Com
       $component_uuid = $component_instance->getUuid();
       $component_tree_list->filter(static function (ComponentTreeItem $item) use ($component_uuid, $removed_slot_names): bool {
         $slot = $item->getSlot();
-        return !($slot !== NULL && $item->getParentUuid() === $component_uuid && in_array($slot, $removed_slot_names, TRUE));
+        return !($slot !== NULL && $item->getParentUuid() === $component_uuid && \in_array($slot, $removed_slot_names, TRUE));
       });
     }
 

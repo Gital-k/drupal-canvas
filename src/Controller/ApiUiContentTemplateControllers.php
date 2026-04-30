@@ -108,7 +108,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     $entity_storage = $this->entityTypeManager->getStorage($entity_type_id);
 
     $entity_ids = $entity_query->execute();
-    \assert(is_array($entity_ids));
+    \assert(\is_array($entity_ids));
     $entity_query_cacheability = (new CacheableMetadata())
       ->addCacheTags($entity_definition->getBundleListCacheTags($bundle))
       ->addCacheContexts($entity_storage->getEntityType()->getListCacheContexts());
@@ -159,7 +159,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
         $template_id = "$entity_type_id.$bundle.$view_mode";
         $data[$entity_type_id][$bundle][$view_mode] = [
           'label' => $view_mode_label,
-          'hasTemplate' => in_array($template_id, $template_keys, TRUE),
+          'hasTemplate' => \in_array($template_id, $template_keys, TRUE),
         ];
       }
     }

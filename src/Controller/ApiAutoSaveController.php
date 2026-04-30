@@ -25,6 +25,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Utility\Error;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\AutoSavePublishAwareInterface;
 use Drupal\canvas\Entity\EntityConstraintViolationList;
 use Drupal\canvas\Entity\JavaScriptComponent;
@@ -99,16 +100,15 @@ final class ApiAutoSaveController extends ApiControllerBase {
         ], $unmatched_keys),
       ], status: Response::HTTP_CONFLICT);
     }
-    // If any JavaScriptComponents are being published ensure the global
-    // AssetLibrary is also being published.
+    // If any JavaScriptComponents are being published ensure dependent global
+    // config surfaces are also being published.
     // @todo Improve this in https://www.drupal.org/project/canvas/issues/3535038
-    $global_asset = AssetLibrary::load(AssetLibrary::GLOBAL_ID);
-    if ($global_asset !== NULL) {
-      $global_asset_key = AutoSaveManager::getAutoSaveKey($global_asset);
-      if (\array_key_exists($global_asset_key, $all_auto_saves) && !\array_key_exists($global_asset_key, $expected_auto_saves)) {
-        // There are changes to the global asset library, but it is not being
-        // published. We need to ensure there are not code components being
-        // published.
+    foreach ([AssetLibrary::load(AssetLibrary::GLOBAL_ID), BrandKit::load(BrandKit::GLOBAL_ID)] as $global_dependency) {
+      if ($global_dependency === NULL) {
+        continue;
+      }
+      $global_dependency_key = AutoSaveManager::getAutoSaveKey($global_dependency);
+      if (\array_key_exists($global_dependency_key, $all_auto_saves) && !\array_key_exists($global_dependency_key, $expected_auto_saves)) {
         foreach ($expected_auto_saves as $client_auto_save) {
           if ($client_auto_save['entity_type'] === JavaScriptComponent::ENTITY_TYPE_ID) {
             return new JsonResponse(data: [
@@ -116,15 +116,15 @@ final class ApiAutoSaveController extends ApiControllerBase {
                 [
                   'detail' => ErrorCodesEnum::GlobalAssetNotPublished->getMessage(),
                   'source' => [
-                    'pointer' => $global_asset_key,
+                    'pointer' => $global_dependency_key,
                   ],
                   'code' => ErrorCodesEnum::GlobalAssetNotPublished->value,
-                  'meta' => \array_intersect_key($all_auto_saves[$global_asset_key], \array_flip([
+                  'meta' => \array_intersect_key($all_auto_saves[$global_dependency_key], \array_flip([
                     'entity_type',
                     'entity_id',
                     'label',
                   ])) + [
-                    self::AUTO_SAVE_KEY => $global_asset_key,
+                    self::AUTO_SAVE_KEY => $global_dependency_key,
                   ],
                 ],
               ],
@@ -265,9 +265,9 @@ final class ApiAutoSaveController extends ApiControllerBase {
         $fields = $entity->getFieldDefinitions();
         $entity_definition = $entity->getEntityType();
         \assert($entity_definition instanceof ContentEntityTypeInterface);
-        \assert(!is_null($entity->id()));
+        \assert(!\is_null($entity->id()));
         $original_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
-        \assert($original_entity instanceof FieldableEntityInterface);
+        \assert($original_entity instanceof ContentEntityInterface);
         foreach ($fields as $field_name => $field) {
           $field_access = $entity->get($field_name)->access(operation: 'edit', return_as_object: TRUE);
           $original_field = $original_entity->get($field_name);
@@ -294,15 +294,19 @@ final class ApiAutoSaveController extends ApiControllerBase {
             );
           }
         }
-        $use_existing_revision_id = AutoSaveManager::entityIsConsideredNew($entity);
+        $is_draft = AutoSaveManager::entityIsConsideredNew($original_entity);
 
-        if ($entity instanceof EntityPublishedInterface) {
+        // For draft entities automatically publish them when publishing
+        // changes.
+        // For non-draft unpublished entities, preserve the published status
+        // from the autosaved entity to allow unpublishing to work correctly.
+        if ($is_draft && $entity instanceof EntityPublishedInterface) {
           $entity->setPublished();
         }
         // If the entity is new, the autosaved data is considered to be part
         // of the first revision. Therefore, do not create a new revision
         // for new entities.
-        if ($use_existing_revision_id) {
+        if ($is_draft) {
           $entity->setNewRevision(FALSE);
         }
         else {
@@ -312,13 +316,14 @@ final class ApiAutoSaveController extends ApiControllerBase {
           \assert(\is_string($revision_id_key));
           $entity->set($revision_id_key, NULL);
         }
+        $entity->isDefaultRevision(TRUE);
         // Always set the revision user to the current user. Even though we
         // might not be creating a new revision, this would only be in the case
         // where this entity should be considered new, which means it has never
         // published before in Drupal Canvas.
-        // @see \Drupal\canvas\AutoSave\AutoSaveManager::contentEntityIsConsideredNew()
+        // @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew()
         if ($revision_user = $entity_definition->getRevisionMetadataKey('revision_user')) {
-          \assert(is_string($revision_user));
+          \assert(\is_string($revision_user));
           $entity->set($revision_user, $this->currentUser->id());
         }
         // Even though we will validate each entity individually before it is

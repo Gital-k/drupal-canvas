@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\TestWith;
 use Drupal\Component\Datetime\Time;
 use Drupal\content_moderation\Permissions;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -50,11 +52,13 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * @group canvas
- * @group #slow
+ * Tests Client Data To Entity Converter.
+ *
  * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+#[Group('#slow')]
 class ClientDataToEntityConverterTest extends KernelTestBase {
 
   use CanvasFieldTrait {
@@ -103,9 +107,10 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
   }
 
   /**
-   * @testWith [false]
-   *           [true]
-   */
+ * Tests convert.
+ */
+  #[TestWith([FALSE])]
+  #[TestWith([TRUE])]
   public function testConvert(bool $with_content_moderation = FALSE): void {
     if ($with_content_moderation) {
       $this->container->get(ModuleInstallerInterface::class)->install(['content_moderation']);
@@ -362,7 +367,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     self::assertEquals($date->modify('+2 days')->format('H:i:s'), $invalid_form_callback_client_json['entity_form_fields'][\sprintf('%s[1][value][time]', $date_field)]);
     // Submit with an invalid value for time in the second item/delta.
     $invalid_form_callback_client_json['entity_form_fields'][\sprintf('%s[1][value][time]', $date_field)] = '';
-    // But a valid value in the first item/delta
+    // But a valid value in the first item/delta.
     $invalid_form_callback_client_json['entity_form_fields'][\sprintf('%s[0][value][time]', $date_field)] = $date->modify('+2 hours')->format('H:i:s');
     // And a third (new) item/delta.
     $invalid_form_callback_client_json['entity_form_fields'][\sprintf('%s[2][value][date]', $date_field)] = $date->modify('+5 hours')->format('Y-m-d');
@@ -558,12 +563,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       'uid' => $this->otherUser->id(),
       'type' => 'article',
       'title' => 'The original title.',
-      'field_canvas_demo' => [
-        'tree' => [
-          ComponentTreeItemList::ROOT_UUID => [],
-        ],
-        'inputs' => [],
-      ],
+      'field_canvas_demo' => [],
       'revision_log' => [
         [
           'value' => 'Initial revision.',
@@ -571,6 +571,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       ],
     ] + $values);
     \assert($node instanceof Node);
+    self::assertSame([], self::violationsToArray($node->validate()));
     $this->assertSame(SAVED_NEW, $node->save());
     return $node;
   }
@@ -604,7 +605,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     // Uncheck this checkbox. This should change the (auto-saved) entity title.
     // @see \Drupal\canvas_test_article_fields\Hook\CanvasTestArticleFieldsHooks::canvasPageEntityGravyBuilder()
     $json['entity_form_fields'][CanvasTestArticleFieldsHooks::NO_MORE_GRAVY] = FALSE;
-    unset($json['isNew'], $json['isPublished'], $json['html']);
+    unset($json['isNew'], $json['isPublished'], $json['html'], $json['hasUnsavedStatusChange']);
     $json += $this->getPostContentsDefaults($node);
     $response = $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', server: ['CONTENT_TYPE' => 'application/json'], content: \json_encode($json, \JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -616,7 +617,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     // Re-check it. This should change the (auto-saved) entity title again.
     // @see \Drupal\canvas_test_article_fields\Hook\CanvasTestArticleFieldsHooks::canvasPageEntityGravyBuilder()
     $json['entity_form_fields'][CanvasTestArticleFieldsHooks::NO_MORE_GRAVY] = TRUE;
-    unset($json['isNew'], $json['isPublished'], $json['html']);
+    unset($json['isNew'], $json['isPublished'], $json['html'], $json['hasUnsavedStatusChange']);
     $json += $this->getPostContentsDefaults($node);
     $response = $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', server: ['CONTENT_TYPE' => 'application/json'], content: \json_encode($json, \JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());

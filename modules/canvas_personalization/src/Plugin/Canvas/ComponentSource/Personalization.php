@@ -10,7 +10,6 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\Core\Plugin\ContextAwarePluginTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
 use Drupal\canvas\Attribute\ComponentSource;
@@ -55,7 +54,6 @@ final class Personalization extends ComponentSourceBase implements
   ComponentSourceWithSwitchCasesInterface,
   ContainerFactoryPluginInterface {
 
-  use ContextAwarePluginTrait;
   use ConstraintPropertyPathTranslatorTrait;
 
   public const string SOURCE_PLUGIN_ID = 'p13n';
@@ -163,9 +161,9 @@ final class Personalization extends ComponentSourceBase implements
     // @todo Evaluate this `case` component instance's `segments` explicit input against the given contexts (aka from the Drupal context system), and remove this hardcoded logic in https://www.drupal.org/project/canvas/issues/3525797
     // @phpstan-ignore-next-line globalDrupalDependencyInjection.useDependencyInjection
     if (str_contains(\Drupal::request()->getRequestUri(), 'HALLOWEEN')) {
-      return in_array('halloween', $inputs['segments'], TRUE);
+      return \in_array('halloween', $inputs['segments'], TRUE);
     }
-    return in_array(Segment::DEFAULT_ID, $inputs['segments'], TRUE);
+    return \in_array(Segment::DEFAULT_ID, $inputs['segments'], TRUE);
   }
 
   public function requiresExplicitInput(): bool {

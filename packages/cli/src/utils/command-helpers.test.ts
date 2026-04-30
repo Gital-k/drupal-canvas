@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getConfig, setConfig } from '../config';
 import {
+  parseBooleanOption,
   pluralizeComponent,
   updateConfigFromOptions,
   validateComponentOptions,
@@ -15,9 +16,13 @@ describe('command-helpers', () => {
       siteUrl: '',
       clientId: '',
       clientSecret: '',
-      scope: '',
+      scope:
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
+      includePages: false,
       componentDir: './components',
       userAgent: '',
+      aliasBaseDir: '',
+      outputDir: '',
     });
   });
 
@@ -74,8 +79,47 @@ describe('command-helpers', () => {
       expect(config.componentDir).toBe('./my-components');
     });
 
+    it('should update aliasBaseDir when provided', () => {
+      updateConfigFromOptions({ aliasBaseDir: 'src/components' });
+
+      const config = getConfig();
+      expect(config.aliasBaseDir).toBe('src/components');
+    });
+
+    it('should update outputDir when provided', () => {
+      updateConfigFromOptions({ outputDir: 'output' });
+
+      const config = getConfig();
+      expect(config.outputDir).toBe('output');
+    });
+
     it('should update scope when provided', () => {
       updateConfigFromOptions({ scope: 'custom:scope' });
+
+      const config = getConfig();
+      expect(config.scope).toBe('custom:scope');
+    });
+
+    it('should update includePages when provided', () => {
+      updateConfigFromOptions({ includePages: true });
+
+      const config = getConfig();
+      expect(config.includePages).toBe(true);
+    });
+
+    it('should update the default scope when includePages changes', () => {
+      updateConfigFromOptions({ includePages: true });
+
+      const config = getConfig();
+      expect(config.scope).toBe(
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
+      );
+    });
+
+    it('should preserve an explicit scope when includePages changes', () => {
+      setConfig({ scope: 'custom:scope' });
+
+      updateConfigFromOptions({ includePages: true });
 
       const config = getConfig();
       expect(config.scope).toBe('custom:scope');
@@ -135,6 +179,26 @@ describe('command-helpers', () => {
 
     it('should return "components" for count of 2', () => {
       expect(pluralizeComponent(2)).toBe('components');
+    });
+  });
+
+  describe('parseBooleanOption', () => {
+    it('parses truthy values', () => {
+      expect(parseBooleanOption('true')).toBe(true);
+      expect(parseBooleanOption('1')).toBe(true);
+      expect(parseBooleanOption('yes')).toBe(true);
+    });
+
+    it('parses falsy values', () => {
+      expect(parseBooleanOption('false')).toBe(false);
+      expect(parseBooleanOption('0')).toBe(false);
+      expect(parseBooleanOption('no')).toBe(false);
+    });
+
+    it('throws for invalid values', () => {
+      expect(() => parseBooleanOption('maybe')).toThrow(
+        'Expected a boolean value',
+      );
     });
   });
 });

@@ -15,6 +15,7 @@ import {
   setInitialLayoutModel,
   setUpdatePreview,
 } from '@/features/layout/layoutModelSlice';
+import { notificationsSlice } from '@/features/notifications/notificationsSlice';
 import {
   pageDataReducer,
   setInitialPageData,
@@ -32,10 +33,12 @@ import {
   uiSlice,
 } from '@/features/ui/uiSlice';
 import { assetLibraryApi } from '@/services/assetLibrary';
+import { brandKitApi } from '@/services/brandKit';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import { componentInstanceFormApi } from '@/services/componentInstanceForm';
 import { contentApi } from '@/services/content';
 import { extensionsApi } from '@/services/extensions';
+import { notificationsApi } from '@/services/notificationsApi';
 import { pageDataFormApi } from '@/services/pageDataForm';
 import { patternApi } from '@/services/patterns';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
@@ -138,6 +141,7 @@ const rootReducer = combineSlices(
   },
   patternApi,
   assetLibraryApi,
+  brandKitApi,
   personalizationApi,
   componentAndLayoutApi,
   previewApi,
@@ -151,6 +155,8 @@ const rootReducer = combineSlices(
   uiSlice,
   formStateSlice,
   extensionsSlice,
+  notificationsApi,
+  notificationsSlice,
   pendingChangesApi,
   publishReviewSlice,
   contentApi,
@@ -231,12 +237,14 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
       return getDefaultMiddleware().concat(
         patternApi.middleware,
         assetLibraryApi.middleware,
+        brandKitApi.middleware,
         personalizationApi.middleware,
         componentAndLayoutApi.middleware,
         previewApi.middleware,
         componentInstanceFormApi.middleware,
         pageDataFormApi.middleware,
         extensionsApi.middleware,
+        notificationsApi.middleware,
         undoRedoActionIdMiddleware,
         pendingChangesApi.middleware,
         contentApi.middleware,

@@ -47,6 +47,7 @@ to one of us! 😊 🙏
 - `component type`: see [`Canvas Components` doc](components.md)
 - `component tree`: see [`Canvas Data Model` doc](data-model.md)
 - `content type template`: the default `component tree` for a particular `content type`, which typically includes assigning the smallest units of `structured data` to particular `component input`s, and uses `configuration entity dependencies` to ensure the necessary `component`s are present
+- `Brand kit config entity`: stores brand assets (e.g., fonts and design tokens) that can be accessed in CSS.
 - `Folders`: a way to organize components, patterns and code components into individual "Folders" on the client-side of Canvas
 - `Folder config entity`: stores a list of `items` of particular `configEntityTypeId`, currently limited to `component`, `pattern` and `js_component`
 - `PageRegion config entity`: stores a `component tree` for every `theme region` in a given Drupal theme
@@ -83,7 +84,7 @@ and data consistency reasons.
 
 Canvas intentionally does not use Drupal core's [JSON:API module](https://jsonapi.org/), because:
 -  requiring the Drupal JSON:API module to be installed is excessive
--  Canvas's HTTP API does not need pagination support
+-  Canvas's config entity HTTP API does not need pagination support
 -  Canvas tracks all available Components as config entities, but those actually do not need to be exposed in full; there's
    no need to modify them from the  client-side UI, and there already is `Component::normalizeForClientSide()` which
    enriches it with additional metadata, matching the UI's needs
@@ -137,7 +138,7 @@ The `Component` config entity contains:
 These config entities are therefore the foundations that enable Canvas to work reliably, and allow:
 - auditing (listing which components are available to Canvas and reasons why components are unavailable, tracking changes in
   computed `field type` and `field widget` for a `component input` thanks to those being stored in _versioned_
-  `settings` — see [`Canvas Data model`, section 3.1.2.b](./data-model#3.1.2.b))
+  `settings` — see [`Canvas Data model`, section 3.1.2.a](./data-model#3.1.2.a))
 - dependency-checking (this config entity's dependencies on other modules, as well as other config entities depending on
   this config entity, but also ensuring the necessary code is present, such as `field type` and `field widget` plugins)
 - exporting, importing, synchronizing from one environment or site to another
@@ -157,7 +158,8 @@ See:
 - `\Drupal\canvas\Plugin\Validation\Constraint\JsComponentHasValidAndSupportedSdcMetadataConstraintValidator`
 - `\Drupal\canvas\Plugin\Validation\Constraint\IsStorablePropShapeConstraintValidator`
 - `type: canvas.js_component.*`
-- `type: canvas.json_schema.prop.*`
+- `type: canvas.json_schema.prop.*
+- `type: canvas.json_schema.prop_shape.(boolean|integer|number|string|object|array)`
 
 A `JavaScriptComponent config entity` (UI label: _code components_) can be created by Ambitious Site Builders to create
 so-called components in the browser, without the need for learning how to create `SDC`s, and most importantly: without
@@ -316,3 +318,11 @@ type. Each such config config entity can only exist  in a single `Folder`.
 - A UI to manage `Folder`s: https://www.drupal.org/project/canvas/issues/3540580
 - Adding UI to create and manage `Pattern`s and `Code Component`s
 - Automated creation of `Folder`s based on `Component` category or group: https://www.drupal.org/project/canvas/issues/3541364
+
+### 3.8 `Brand kit` config entity
+
+See:
+- `\Drupal\canvas\Entity\BrandKit`
+
+Only one brand kit exists: the global one, created by default on config install. It stores font entries and loads them using
+CSS on the frontend of the site as well as the Canvas preview.

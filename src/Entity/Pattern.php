@@ -43,7 +43,6 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
   public const string ADMIN_PERMISSION = 'administer patterns';
 
   use ClientServerConversionTrait;
-  use ConfigUpdaterAwareEntityTrait;
 
   /**
    * Pattern entity ID.
@@ -87,18 +86,18 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
     $id = mb_strtolower($label);
 
     $id = preg_replace('@[^a-z0-9_.]+@', '', $id);
-    \assert(is_string($id));
+    \assert(\is_string($id));
     // Furthermore remove any characters that are not alphanumerical from the
     // beginning and end of the transliterated string.
     $id = preg_replace('@^([^a-z0-9]+)|([^a-z0-9]+)$@', '', $id);
-    \assert(is_string($id));
+    \assert(\is_string($id));
     if (strlen($id) > 23) {
       $id = substr($id, 0, 23);
     }
 
     $query = \Drupal::entityTypeManager()->getStorage('pattern')->getQuery()->accessCheck(FALSE);
     $ids = $query->execute();
-    $id_exists = in_array($id, $ids, TRUE);
+    $id_exists = \in_array($id, $ids, TRUE);
     if ($id_exists) {
       $id = $id . '_' . (new Random())->machineName(8);
     }
@@ -181,11 +180,6 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
       $value = self::generateComponentTreeKeys($value);
     }
     return parent::set($property_name, $value);
-  }
-
-  public function preSave(EntityStorageInterface $storage): void {
-    parent::preSave($storage);
-    self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
   }
 
 }

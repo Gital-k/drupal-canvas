@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Functional;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\Entity\Page;
 use Drupal\Tests\canvas\Functional\HttpApiTestBase;
-use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\user\UserInterface;
 use Drupal\canvas_personalization\Entity\Segment;
@@ -19,13 +20,12 @@ use GuzzleHttp\RequestOptions;
  * Tests the details of auto-saving config entities, NOT the "live" version.
  *
  * @see \Drupal\Tests\canvas\Functional\ApiConfigAutoSaveControllersTest
- * @group canvas
- * @group canvas_personalization
  */
+#[Group('canvas')]
+#[Group('canvas_personalization')]
 class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
-  use AutoSaveManagerTestTrait;
 
   /**
    * {@inheritdoc}
@@ -126,8 +126,9 @@ class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
   }
 
   /**
-   * @dataProvider providerTest
-   */
+ * Tests .
+ */
+  #[DataProvider('providerTest')]
   public function test(
     string $entity_type_id,
     array $initial_entity,
@@ -176,7 +177,7 @@ class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
     $original_entity = $storage->load($entity_id);
     \assert($original_entity instanceof SegmentInterface);
     $original_entity_array = $original_entity->toArray();
-    \assert(is_array($original_entity_array));
+    \assert(\is_array($original_entity_array));
 
     // Insufficient Permissions: 403.
     $this->drupalLogin($this->limitedPermissionsUser);

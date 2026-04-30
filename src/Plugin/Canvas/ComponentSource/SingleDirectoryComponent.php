@@ -28,6 +28,7 @@ use Symfony\Component\Filesystem\Path;
   supportsImplicitInputs: FALSE,
   discovery: SingleDirectoryComponentDiscovery::class,
   updater: GeneratedFieldExplicitInputUxComponentInstanceUpdater::class,
+  inputs_config_schema_generator: GeneratedFieldExplicitInputUxComponentInstanceInputsConfigSchemaGenerator::class,
   // @see \Drupal\Core\Theme\ComponentPluginManager::__construct()
   discoveryCacheTags: ['component_plugins'],
 )]
@@ -70,7 +71,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
 
   public function determineDefaultFolder(): string {
     $plugin_definition = $this->getComponentPlugin()->getPluginDefinition();
-    \assert(is_array($plugin_definition));
+    \assert(\is_array($plugin_definition));
     // TRICKY: SDCs metadata specifies `group`, but gets exposed as `category`.
     // @see \Drupal\Core\Theme\ComponentPluginManager::processDefinitionCategory()
     \assert(!empty($plugin_definition['category']));
@@ -184,7 +185,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
    */
   protected function getSourceLabel(): TranslatableMarkup {
     $component_plugin = $this->getComponentPlugin();
-    \assert(is_array($component_plugin->getPluginDefinition()));
+    \assert(\is_array($component_plugin->getPluginDefinition()));
 
     // The 'extension_type' key is guaranteed to be set.
     // @see \Drupal\Core\Theme\ComponentPluginManager::alterDefinition()

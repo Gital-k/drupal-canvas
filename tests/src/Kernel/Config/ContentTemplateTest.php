@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\TestWith;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\EntityTypeInterface;
@@ -16,13 +19,13 @@ use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
-use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
- * @coversDefaultClass \Drupal\canvas\Entity\ContentTemplate
- * @group canvas
+ * Tests Drupal\canvas\Entity\ContentTemplate.
  */
 #[RunTestsInSeparateProcesses]
+#[CoversClass(ContentTemplate::class)]
+#[Group('canvas')]
 final class ContentTemplateTest extends CanvasKernelTestBase {
 
   use ContentTypeCreationTrait;
@@ -47,11 +50,12 @@ final class ContentTemplateTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers ::label
+   * Tests label.
    *
-   * @testWith ["node.helpful.full", "Helpful content items — Full content view"]
-   *           ["user.user.compact", "Users — Compact view"]
+   * @legacy-covers ::label
    */
+  #[TestWith(["node.helpful.full", "Helpful content items — Full content view"])]
+  #[TestWith(["user.user.compact", "Users — Compact view"])]
   public function testLabel(string $id, string $expected_label): void {
     [$entity_type_id, $bundle, $view_mode] = explode('.', $id, 3);
 
@@ -65,7 +69,9 @@ final class ContentTemplateTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\Hook\ContentTemplateHooks::entityTypeAlter()
+   * Tests only content entities can use templates.
+   *
+   * @legacy-covers \Drupal\canvas\Hook\ContentTemplateHooks::entityTypeAlter
    */
   public function testOnlyContentEntitiesCanUseTemplates(): void {
     $manager = \Drupal::entityTypeManager();
@@ -230,8 +236,7 @@ final class ContentTemplateTest extends CanvasKernelTestBase {
       ], $template->get('component_tree'),
     );
     // Sanity-check that the test template is valid.
-    $violations = $template->getTypedData()->validate();
-    self::assertCount(0, $violations, \implode(', ', \array_map(static fn (ConstraintViolationInterface $violation) => $violation->getMessage(), \iterator_to_array($violations))));
+    self::assertEntityIsValid($template);
   }
 
   public function testAbsentContentTemplateKeepsCacheMetadata(): void {
@@ -250,11 +255,17 @@ final class ContentTemplateTest extends CanvasKernelTestBase {
 
     // Assert the right cacheability.
     $this->assertContains('without-canvas', $build['#cache']['keys']);
+    // Note: AutoSaveManager::CACHE_TAG is NOT present because we're not on a
+    // preview route. It's only added on preview routes to avoid invalidating
+    // all rendered nodes on the live site when auto-saves change.
+    // @see \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder::getBuildDefaults()
     $this->assertEqualsCanonicalizing([
       'node_view',
       'node:1',
       'config:content_template_list',
     ], $build['#cache']['tags']);
+    // Verify the specialized cache context is present.
+    $this->assertContains('route.name.is_canvas_editor_ui', $build['#cache']['contexts']);
   }
 
 }

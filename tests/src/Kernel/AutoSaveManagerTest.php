@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Component\Datetime\Time;
 use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -32,10 +34,11 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
- * @coversDefaultClass \Drupal\canvas\AutoSave\AutoSaveManager
- * @group canvas.
+ * Tests Drupal\canvas\AutoSave\AutoSaveManager.
  */
 #[RunTestsInSeparateProcesses]
+#[CoversClass(AutoSaveManager::class)]
+#[Group('canvas')]
 class AutoSaveManagerTest extends CanvasKernelTestBase {
 
   use CanvasFieldCreationTrait;
@@ -58,7 +61,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
       $data = array_reverse($data, TRUE);
     }
     foreach ($data as $key => $value) {
-      if (is_array($value)) {
+      if (\is_array($value)) {
         $data[$key] = self::recursiveReverseSort($value);
       }
     }
@@ -185,7 +188,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
       'title' => '5 amazing uses for old toothbrushes',
       'components' => [],
     ]);
-    self::assertCount(0, iterator_to_array($canvas_page->validate()));
+    self::assertEntityIsValid($canvas_page);
     self::assertSame(SAVED_NEW, $canvas_page->save());
 
     $envelope = \Drupal::classResolver(ApiLayoutController::class)->get($canvas_page);
@@ -236,7 +239,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
       'langcode' => 'en',
       'components' => [],
     ]);
-    self::assertCount(0, iterator_to_array($page_en->validate()));
+    self::assertEntityIsValid($page_en);
     self::assertSame(SAVED_NEW, $page_en->save());
 
     // Add French translation.
@@ -403,7 +406,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
         'summary' => '',
       ],
     ]);
-    self::assertCount(0, $node->validate());
+    self::assertEntityIsValid($node);
     $this->assertSame(SAVED_NEW, $node->save());
 
     $envelope = \Drupal::classResolver(ApiLayoutController::class)->get($node);
@@ -544,6 +547,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
         ],
       ],
     ]);
+    self::assertEntityIsValid($page);
     $auto_save_manager->delete($page);
     $violations = $auto_save_manager->getComponentInstanceFormViolations($uuid);
     self::assertCount(0, $violations);
@@ -555,9 +559,9 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
    * Verifies that auto-save entries stored in the key-value store remain
    * accessible over extended periods of time.
    *
-   * @covers ::saveEntity
-   * @covers ::getAutoSaveEntity
-   * @covers ::getAllAutoSaveList
+   * @legacy-covers ::saveEntity
+   * @legacy-covers ::getAutoSaveEntity
+   * @legacy-covers ::getAllAutoSaveList
    */
   public function testAutoSaveDoesNotExpire(): void {
     $this->installEntitySchema('user');

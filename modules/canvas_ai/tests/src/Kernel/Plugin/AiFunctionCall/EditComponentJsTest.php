@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel\Plugin\AiFunctionCall;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\EditComponentJs;
 use Drupal\Component\Serialization\Json;
 use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas_ai\Traits\FunctionalCallTestTrait;
 use Symfony\Component\Yaml\Yaml;
 
 /**
  * Tests for the EditComponentJs function call plugin.
- *
- * @group canvas_ai
  */
-final class EditComponentJsTest extends KernelTestBase {
+#[Group('canvas_ai')]
+final class EditComponentJsTest extends CanvasKernelTestBase {
 
   use FunctionalCallTestTrait;
 
@@ -33,9 +33,6 @@ final class EditComponentJsTest extends KernelTestBase {
   protected static $modules = [
     'ai',
     'ai_agents',
-    'canvas',
-    'system',
-    'user',
     'canvas_ai',
   ];
 
@@ -167,7 +164,7 @@ final class EditComponentJsTest extends KernelTestBase {
         'component_machine_name' => $component_machine_name,
       ]
     );
-    self::assertYamlError($result, 'Component validation errors: component_structure.: Prop "title" has invalid example value: [] Integer value found, but a string or an object is required component_structure.: Prop "count" has invalid example value: [] String value found, but an integer or an object is required component_structure.props.count.examples.0: This value should be of the correct primitive type.');
+    self::assertYamlError($result, 'Component validation errors: component_structure: Prop "title" has invalid example value: [] Integer value found, but a string or an object is required component_structure: Prop "count" has invalid example value: [] String value found, but an integer or an object is required component_structure.props.count.examples.0: This value should be of the correct primitive type.');
   }
 
   /**

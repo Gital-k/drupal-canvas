@@ -25,7 +25,8 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\MissingComponentInputsException;
 use Drupal\canvas\Plugin\DataType\ConfigEntityVersionAdapter;
-use Drupal\canvas\PropSource\ContentAwareDependentInterface;
+use Drupal\canvas\Plugin\DataType\ResolvedComponentInputs;
+use Drupal\canvas\PropExpressions\StructuredData\ContentAwareDependentInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -39,7 +40,7 @@ use Symfony\Component\Validator\ConstraintViolationList;
  *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  * @phpstan-import-type ConfigDependenciesArray from \Drupal\canvas\Entity\VersionedConfigEntityInterface
- * @phpstan-type ComponentTreeItemPropName 'uuid'|'inputs'|'component_id'|'component'|'parent_item'|'slot'|'parent_uuid'|'label'|'component_version'
+ * @phpstan-type ComponentTreeItemPropName 'uuid'|'inputs'|'inputs_resolved'|'component_id'|'component'|'parent_item'|'slot'|'parent_uuid'|'label'|'component_version'
  *
  * @property \Drupal\canvas\HydratedTree $hydrated
  */
@@ -118,6 +119,9 @@ use Symfony\Component\Validator\ConstraintViolationList;
 class ComponentTreeItem extends FieldItemBase {
 
   public const string PLUGIN_ID = 'component_tree';
+
+  // @todo Decide what the best location is for this constant.
+  public const string VIOLATION_CODE_GARBAGE_INPUT = 'garbage';
 
   use ComponentTreeItemListInstantiatorTrait;
 
@@ -356,7 +360,7 @@ class ComponentTreeItem extends FieldItemBase {
       ->addConstraint('EntityType', ['type' => Component::ENTITY_TYPE_ID]);
 
     $properties['inputs'] = DataDefinition::create('component_inputs')
-      ->setLabel(new TranslatableMarkup('Input values for each component in the component tree'))
+      ->setLabel(new TranslatableMarkup('The stored input values for each component in the component tree'))
       ->setRequired(TRUE);
 
     $properties['label'] = DataDefinition::create('string')
@@ -364,6 +368,16 @@ class ComponentTreeItem extends FieldItemBase {
       ->setSetting('max_length', 255)
       ->addConstraint('Length', ['max' => 255])
       ->setRequired(FALSE);
+
+    $properties['inputs_resolved'] = DataDefinition::create('any')
+      ->setLabel(new TranslatableMarkup('Resolved component inputs'))
+      ->setDescription(new TranslatableMarkup('The resolved input values for this component instance.'))
+      ->setComputed(TRUE)
+      ->setReadOnly(TRUE)
+      ->setClass(ResolvedComponentInputs::class)
+      // Computed properties default to internal (excluded from normalization).
+      // Override to expose resolved values via JSON:API/REST normalizers.
+      ->setInternal(FALSE);
 
     return $properties;
   }
@@ -389,6 +403,12 @@ class ComponentTreeItem extends FieldItemBase {
   public function onChange(mixed $property_name, $notify = TRUE): void {
     if ($property_name === 'inputs') {
       $this->values[$property_name] = $this->get($property_name)->getValue();
+    }
+    // Invalidate the resolved computed property when its source data changes.
+    if (\in_array($property_name, ['inputs', 'component_id', 'component_version'], TRUE)) {
+      $inputs_resolved = $this->get('inputs_resolved');
+      \assert($inputs_resolved instanceof ResolvedComponentInputs);
+      $inputs_resolved->invalidateComputedValue();
     }
     $pairs = [
       ['component_id', 'component'],
@@ -435,7 +455,7 @@ class ComponentTreeItem extends FieldItemBase {
    */
   // @phpstan-ignore-next-line method.childParameterType
   public function setValue($values, $notify = TRUE): void {
-    if (is_array($values)) {
+    if (\is_array($values)) {
       parent::setValue($values, FALSE);
       $pairs = [
         ['component_id', 'component'],
@@ -472,7 +492,7 @@ class ComponentTreeItem extends FieldItemBase {
     // if there already is a validation error for a missing key, another
     // validation error for an invalid value is not helpful.
     // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
-    if (!is_array($values) || !\array_key_exists('inputs', $values)) {
+    if (!\is_array($values) || !\array_key_exists('inputs', $values)) {
       $this->getProperties()['inputs']->applyDefaultValue(FALSE);
     }
 
@@ -665,7 +685,7 @@ class ComponentTreeItem extends FieldItemBase {
     // It will be triggered with config schema validation instead.
     // @see \Drupal\canvas\Entity\Component::save()
     $version = $this->get('component_version')->getValue();
-    if ($version && in_array($version, $component?->getVersions() ?? [], TRUE)) {
+    if ($version && \in_array($version, $component?->getVersions() ?? [], TRUE)) {
       $component?->loadVersion($version);
     }
     $source = $component?->getComponentSource();

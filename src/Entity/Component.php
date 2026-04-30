@@ -211,7 +211,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * Returns the source plugin collection.
    */
   private function sourcePluginCollection(): VersionedConfigurationSubsetSingleLazyPluginCollection {
-    if (is_null($this->sourcePluginCollection)) {
+    if (\is_null($this->sourcePluginCollection)) {
       $source_plugin_id = $this->getComponentSourcePluginId();
       $source_plugin_configuration = match ($source_plugin_id) {
         ComponentInterface::FALLBACK_VERSION => [
@@ -266,7 +266,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * @see https://www.drupal.org/node/3353397
    */
   public static function providerExists(?string $provider): bool {
-    if (is_null($provider)) {
+    if (\is_null($provider)) {
       return TRUE;
     }
     $container = \Drupal::getContainer();
@@ -400,7 +400,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     }
 
     // 2. Is the component provided by a module?
-    if (in_array($this->provider, $installed_modules, TRUE)) {
+    if (\in_array($this->provider, $installed_modules, TRUE)) {
       return $this->provider === 'canvas'
         // 2.B Is the providing module Canvas?
         ? LibraryEnum::Elements
@@ -408,7 +408,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     }
 
     // 3. Is the component provided by the default theme (or its base theme)?
-    if (in_array($this->provider, $theme_with_ancestors, TRUE)) {
+    if (\in_array($this->provider, $theme_with_ancestors, TRUE)) {
       return LibraryEnum::PrimaryComponents;
     }
 
@@ -619,7 +619,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
       }
       // If a version was created and immediately deleted, it doesn't need any
       // fallback metadata.
-      if (!in_array($new_version, $this->getVersions(), TRUE)) {
+      if (!\in_array($new_version, $this->getVersions(), TRUE)) {
         continue;
       }
       $this->versioned_properties[$new_version]['fallback_metadata'] = $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata'];

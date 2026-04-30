@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\EcosystemSupport;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Checks that all core field widgets have Canvas client-side transforms metadata.
  *
- * @covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter()
  * @see docs/redux-integrated-field-widgets.md#3.4
- * @group canvas
+ * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class FieldWidgetSupportTest extends EcosystemSupportTestBase {
 
-  public const COMPLETION = 0.5;
+  public const COMPLETION = 15 / 28;
   public const SUPPORTED = [
     'boolean_checkbox',
+    'daterange_default',
     'datetime_default',
     'email_default',
     'file_generic',

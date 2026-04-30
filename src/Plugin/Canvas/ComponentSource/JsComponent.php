@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
@@ -17,6 +20,7 @@ use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\AutoSaveEntity;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\GlobalImports;
 use Drupal\canvas\ComponentSource\UrlRewriteInterface;
@@ -32,6 +36,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   supportsImplicitInputs: FALSE,
   discovery: JsComponentDiscovery::class,
   updater: GeneratedFieldExplicitInputUxComponentInstanceUpdater::class,
+  inputs_config_schema_generator: GeneratedFieldExplicitInputUxComponentInstanceInputsConfigSchemaGenerator::class,
   // @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()
   discoveryCacheTags: ['config:js_component_list'],
 )]
@@ -146,7 +151,20 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
     $component = $this->getJavaScriptComponent();
 
-    $autoSave = $this->autoSaveManager->getAutoSaveEntity($component);
+    // Rendering will validate the props against the version that is published,
+    // but on preview the auto-saved version will be used for those components
+    // whose implementation lives in config entities (e.g. for JS Components,
+    // but not SDCs). This means that required props might be mismatched, so we
+    // need to ensure there are explicit inputs for the set of props that are
+    // required in any of those.
+    if ($isPreview) {
+      $published_required_props = $this->getDefaultExplicitInput(only_required: TRUE);
+      \assert(Inspector::assertAllHaveKey($published_required_props, 'value'));
+      $published_required_props = \array_map(fn(array $prop_source) => new EvaluationResult($prop_source['value']), $published_required_props);
+      [$published_required_props, $published_required_props_cacheability] = self::getResolvedPropsAndCacheability(\array_intersect_key($inputs[self::EXPLICIT_INPUT_NAME] ?? [], $published_required_props));
+    }
+
+    $autoSave = $this->loadAutoSaveEntity($component, $isPreview);
     $component_url = $component->getComponentUrl($this->fileUrlGenerator, $isPreview);
 
     $build = [];
@@ -155,21 +173,21 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
 
     $canvas_path = $this->extensionPathResolver->getPath('module', 'canvas');
     // Build base import map.
-    $import_maps[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS] = $this->globalImports->getGlobalImports();
+    $import_maps = $this->globalImports->getImportMap();
     // For scoped dependencies we don't need cache-busting query strings, as
     // those are already busted by its content-dependent filename: when the
     // code component changes, so does the filename.
     // @see \Drupal\canvas\Entity\CanvasAssetLibraryTrait::getJsPath()
     $scoped_map = $this->getScopedDependencies($component, $autoSave, $isPreview);
-    if (count($scoped_map) > 0) {
-      $import_maps[ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS] = $scoped_map;
-    }
+    $import_maps[ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS] = \array_merge($import_maps[ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS], $scoped_map);
 
     $build['#attached']['library'] = \array_merge($build['#attached']['library'], $this->getDependencyLibraries($component, $autoSave, $isPreview));
 
     if (\count($build['#attached']['library']) === 0) {
       unset($build['#attached']['library']);
     }
+
+    $global_brand_kit = $this->getActiveGlobalBrandKit($isPreview);
     // Resource hints.
     $resource_hints = [
       'preact/signals' => \sprintf('%s%s/packages/astro-hydration/dist/signals.module.js', $base_path, $canvas_path),
@@ -184,6 +202,13 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
         ],
       ];
     }
+    if ($global_brand_kit instanceof BrandKit) {
+      foreach ($this->getFontPreloadLinks($global_brand_kit) as $font_preload) {
+        $build['#attached']['html_head_link'][] = [
+          $font_preload,
+        ];
+      }
+    }
     if ($isPreview && !$autoSave->isEmpty()) {
       \assert($autoSave->entity instanceof JavaScriptComponent);
       $component = $autoSave->entity;
@@ -194,16 +219,31 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       // race conditions; let the controller handle it for us.
       // @see \Drupal\canvas\Controller\ApiConfigAutoSaveControllers::getCss()
       $build['#attached']['library'][] = 'canvas/asset_library.' . AssetLibrary::GLOBAL_ID . '.draft';
+      $build['#attached']['library'][] = 'canvas/brand_kit.' . BrandKit::GLOBAL_ID . '.draft';
     }
     else {
       $build['#attached']['library'][] = 'canvas/asset_library.' . AssetLibrary::GLOBAL_ID;
+      $build['#attached']['library'][] = 'canvas/brand_kit.' . BrandKit::GLOBAL_ID;
     }
 
     $valid_props = $component->getProps() ?? [];
 
     [$props, $props_cacheability] = self::getResolvedPropsAndCacheability(\array_intersect_key($inputs[self::EXPLICIT_INPUT_NAME] ?? [], $valid_props));
+
+    // Explicit inputs for required props for both the auto-saved version and
+    // the live versions, including cacheability.
+    if ($isPreview) {
+      $props += $published_required_props;
+      $props_cacheability->merge($published_required_props_cacheability);
+    }
+
     // Match SDC's developer-only validation of props.
     // @see \Drupal\Core\Template\ComponentsTwigExtension::validateProps()
+    // Any InvalidComponentException propagates to RenderSafeComponentContainer
+    // which in preview mode renders an empty container (no error text) so the
+    // canvas-island stays visible while the user corrects the value.
+    // @see \Drupal\canvas\Element\RenderSafeComponentContainer::handleComponentException()
+    // @see https://www.drupal.org/project/canvas/issues/3583639
     \assert($this->componentValidator->validateProps($props, $this->getComponentPlugin()));
     CacheableMetadata::createFromRenderArray($build)
       ->addCacheableDependency($component)
@@ -229,6 +269,64 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    */
   public function setSlots(array &$build, array $slots): void {
     $build['#slots'] = $slots;
+  }
+
+  private function getActiveGlobalBrandKit(bool $isPreview): ?BrandKit {
+    $brand_kit_storage = $this->entityTypeManager->getStorage(BrandKit::ENTITY_TYPE_ID);
+    \assert($brand_kit_storage instanceof ConfigEntityStorageInterface);
+    $brand_kit = $brand_kit_storage->load(BrandKit::GLOBAL_ID);
+    if (!$brand_kit instanceof BrandKit) {
+      return NULL;
+    }
+
+    if (!$isPreview) {
+      return $brand_kit;
+    }
+
+    $auto_save = $this->autoSaveManager->getAutoSaveEntity($brand_kit);
+    if (!$auto_save->isEmpty()) {
+      \assert($auto_save->entity instanceof BrandKit);
+      return $auto_save->entity;
+    }
+
+    return $brand_kit;
+  }
+
+  /**
+   * @param \Drupal\canvas\Entity\BrandKit $brand_kit
+   *
+   * @return list<array{
+   *   rel: string,
+   *   as: string,
+   *   type: string,
+   *   href: string,
+   *   crossorigin: string
+   *   }>
+   */
+  private function getFontPreloadLinks(BrandKit $brand_kit): array {
+    $links = [];
+    foreach ($brand_kit->getFonts() as $font) {
+      $href = $this->fileUrlGenerator->generateString($font['uri']);
+      $links[$href] = [
+        'rel' => 'preload',
+        'as' => 'font',
+        'type' => self::getFontMimeType($font['format']),
+        'href' => $href,
+        'crossorigin' => 'anonymous',
+      ];
+    }
+
+    return array_values($links);
+  }
+
+  private static function getFontMimeType(string $format): string {
+    return match ($format) {
+      'woff2' => 'font/woff2',
+      'woff' => 'font/woff',
+      'ttf' => 'font/ttf',
+      'otf' => 'font/otf',
+      default => 'font/woff2',
+    };
   }
 
   /**
@@ -266,7 +364,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       self::EXAMPLE_VIDEO_HORIZONTAL,
       self::EXAMPLE_VIDEO_VERTICAL,
     ];
-    if (in_array($url, $example_videos, TRUE)) {
+    if (\in_array($url, $example_videos, TRUE)) {
       $file_path = $this->extensionPathResolver->getPath('module', 'canvas') . $url;
       return Url::fromUri('base:/' . $file_path)->toString(TRUE);
     }
@@ -284,7 +382,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       }
       $seen[] = $js_component_dependency_name;
       \assert($js_component_dependency instanceof JavaScriptComponent);
-      $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
+      $dependencyAutoSave = $this->loadAutoSaveEntity($js_component_dependency, $isPreview);
       $dependency_component_url = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
       $scoped_dependencies[$component_url]["@/components/{$js_component_dependency_name}"] = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
       $scoped_dependencies = array_merge($scoped_dependencies, $this->getScopedDependencies($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));
@@ -306,7 +404,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       }
       $seen[] = $js_component_dependency_name;
       \assert($js_component_dependency instanceof JavaScriptComponent);
-      $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
+      $dependencyAutoSave = $this->loadAutoSaveEntity($js_component_dependency, $isPreview);
       $libraries[] = $js_component_dependency->getAssetLibrary($isPreview);
       $libraries = array_merge($libraries, $this->getDependencyLibraries($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));
     }
@@ -316,6 +414,11 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   public function setJavaScriptComponent(?JavaScriptComponent $jsComponent): static {
     $this->jsComponent = $jsComponent;
     return $this;
+  }
+
+  private function loadAutoSaveEntity(EntityInterface $entity, bool $isPreview): AutoSaveEntity {
+    // If we are not previewing then we never need to load the auto-save data.
+    return $isPreview ? $this->autoSaveManager->getAutoSaveEntity($entity) : AutoSaveEntity::empty();
   }
 
 }

@@ -80,9 +80,11 @@ final class ApiLayoutController {
    * Returns JSON for the entity layout and fields that the user can edit.
    */
   public function get((ContentEntityInterface&EntityPublishedInterface)|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): PreviewEnvelope {
-    \assert(!$entity instanceof ContentTemplate || !is_null($preview_entity));
-    $regions = PageRegion::loadForActiveTheme();
+    \assert(!$entity instanceof ContentTemplate || !\is_null($preview_entity));
+    $regions = self::shouldIncludeGlobalRegions($entity) ? PageRegion::loadForActiveTheme() : [];
 
+    // Store the original entity for comparison purposes.
+    $original_entity = $entity;
     $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($entity);
     if (!$autoSaveData->isEmpty()) {
       $entity = $autoSaveData->entity;
@@ -94,7 +96,10 @@ final class ApiLayoutController {
     $tree = $this->componentTreeLoader->load($entity);
     $content_layout = $this->buildRegion(CanvasPageVariant::MAIN_CONTENT_REGION, $tree, $model, $preview_entity);
     $layout = [$content_layout];
-    $is_new = AutoSaveManager::entityIsConsideredNew($entity);
+    // Determine if entity is a draft based on the original entity,
+    // not auto-save, because draft status is an intrinsic property
+    // of the stored entity.
+    $is_new = AutoSaveManager::entityIsConsideredNew($original_entity);
 
     if ($regions) {
       \assert($model !== NULL);
@@ -119,11 +124,22 @@ final class ApiLayoutController {
       // an object and not empty array.
       'model' => empty($model) ? new \stdClass() : $model,
       'isNew' => $is_new,
-      'autoSaves' => $this->getAutoSaveHashes(array_merge([$entity], self::getEditableRegions())),
+      'autoSaves' => $this->getAutoSaveHashes(array_merge(
+        [$entity],
+        self::getEditableRegions($entity),
+      )),
     ];
     if ($entity instanceof ContentEntityInterface && $entity instanceof EntityPublishedInterface) {
       $data['isPublished'] = $entity->isPublished();
       $data['entity_form_fields'] = $this->getFilteredEntityData($entity);
+
+      // Determine if there's an unsaved status change by comparing the current
+      // entity (which may be autosaved) with the original stored entity.
+      $data['hasUnsavedStatusChange'] = FALSE;
+      if ($original_entity instanceof EntityPublishedInterface
+        && $entity !== $original_entity) {
+        $data['hasUnsavedStatusChange'] = $entity->isPublished() !== $original_entity->isPublished();
+      }
     }
     return new PreviewEnvelope($this->buildPreviewRenderable($entity, $preview_entity), $data);
   }
@@ -230,7 +246,7 @@ final class ApiLayoutController {
    * Updates single component instance's auto-save entry and returns a preview.
    */
   public function patch(Request $request, FieldableEntityInterface|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): PreviewEnvelope {
-    \assert(!$entity instanceof ContentTemplate || !is_null($preview_entity));
+    \assert(!$entity instanceof ContentTemplate || !\is_null($preview_entity));
     $body = \json_decode($request->getContent(), TRUE, flags: JSON_THROW_ON_ERROR);
     if (!\array_key_exists('componentInstanceUuid', $body)) {
       throw new BadRequestHttpException('Missing componentInstanceUuid');
@@ -277,12 +293,18 @@ final class ApiLayoutController {
     //   containing the component, determine if here we should only validate
     //   that entity in https://drupal.org/i/3532056 or implement concurrent
     //   editing in https://drupal.org/i/3492065.
-    $this->validateAutoSaves(array_merge([$entity], self::getEditableRegions()), $autoSaves, $clientInstanceId);
+    $this->validateAutoSaves(
+      array_merge([$entity], self::getEditableRegions($entity)),
+      $autoSaves,
+      $clientInstanceId,
+    );
 
     // Determine which entity to PATCH.
     $entity = $this->getAutoSavedVersionIfAvailable([$entity])[$entity->id()];
     \assert($entity instanceof FieldableEntityInterface || $entity instanceof ContentTemplate);
-    $regions = $this->getAutoSavedVersionIfAvailable(PageRegion::loadForActiveTheme());
+    $regions = self::shouldIncludeGlobalRegions($entity)
+      ? $this->getAutoSavedVersionIfAvailable(PageRegion::loadForActiveTheme())
+      : [];
     $entity_to_patch = $this->getEntityWithComponentInstance([$entity, ...$regions], $componentInstanceUuid);
 
     // Route-level access checks already verified `edit` access to $entity. Only
@@ -303,7 +325,10 @@ final class ApiLayoutController {
     if ($entity instanceof FieldableEntityInterface) {
       $data['entity_form_fields'] = $this->getFilteredEntityData($entity);
     }
-    $data['autoSaves'] = $this->getAutoSaveHashes(array_merge([$entity], self::getEditableRegions()));
+    $data['autoSaves'] = $this->getAutoSaveHashes(array_merge(
+      [$entity],
+      self::getEditableRegions($entity),
+    ));
     return new PreviewEnvelope(
       $this->buildPreviewRenderable($entity, $preview_entity),
       additionalData: $data
@@ -316,7 +341,7 @@ final class ApiLayoutController {
    * @todo Remove this in https://drupal.org/i/3492065
    */
   public function post(Request $request, FieldableEntityInterface|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): PreviewEnvelope {
-    \assert(!$entity instanceof ContentTemplate || !is_null($preview_entity));
+    \assert(!$entity instanceof ContentTemplate || !\is_null($preview_entity));
     $body = json_decode($request->getContent(), TRUE);
     if (!\array_key_exists('model', $body)) {
       throw new BadRequestHttpException('Missing model');
@@ -347,7 +372,11 @@ final class ApiLayoutController {
       $entity_form_fields = NULL;
     }
 
-    $this->validateAutoSaves(array_merge([$entity], self::getEditableRegions()), $autoSaves, $clientInstanceId);
+    $this->validateAutoSaves(
+      array_merge([$entity], self::getEditableRegions($entity)),
+      $autoSaves,
+      $clientInstanceId,
+    );
 
     // Route-level access checks already verified `edit` access to $entity. But
     // any PageRegion entities present in the layout provided by the client
@@ -392,7 +421,10 @@ final class ApiLayoutController {
     return new PreviewEnvelope(
       $this->buildPreviewRenderable($entity, $preview_entity),
       additionalData: [
-        'autoSaves' => $this->getAutoSaveHashes([$entity, ...self::getEditableRegions()]),
+        'autoSaves' => $this->getAutoSaveHashes(array_merge(
+          [$entity],
+          self::getEditableRegions($entity),
+        )),
       ],
     );
   }
@@ -413,6 +445,9 @@ final class ApiLayoutController {
       : Markup::create('<!-- canvas-region-start-content --><div class="canvas--region-empty-placeholder"></div>');
     $build['#suffix'] = Markup::create('<!-- canvas-region-end-content -->');
     $build['#attached']['library'][] = 'canvas/preview';
+    if (!self::shouldIncludeGlobalRegions($entity)) {
+      $build['#canvas_hide_global_regions'] = TRUE;
+    }
     return $build;
   }
 
@@ -453,7 +488,7 @@ final class ApiLayoutController {
     // Build the content region.
     $tree = $this->componentTreeLoader->load($entity);
     $data['layout'] = [$this->buildRegion(CanvasPageVariant::MAIN_CONTENT_REGION, $tree, $data['model'], $preview_entity)];
-    \assert(is_array($data['model']));
+    \assert(\is_array($data['model']));
     $this->addGlobalRegions($regions, $data['model'], $data['layout'], includeAllRegions: TRUE);
     $layout_keyed_by_region = array_combine(\array_map(static fn($region) => $region['id'], $data['layout']), $data['layout']);
     // Reorder the layout to match theme order.
@@ -465,10 +500,24 @@ final class ApiLayoutController {
   }
 
   /**
-   * @return \Drupal\canvas\Entity\PageRegion[]
-   *   The editable regions for the active theme.
+   * Whether global regions are included in layout and preview for this entity.
+   *
+   * For content templates with a view mode other than "full", global regions
+   * are not part of the display and are excluded from the editor and preview.
    */
-  private static function getEditableRegions(): array {
+  private static function shouldIncludeGlobalRegions(ContentTemplate|FieldableEntityInterface $entity): bool {
+    return !($entity instanceof ContentTemplate && $entity->getMode() !== 'full');
+  }
+
+  /**
+   * @return \Drupal\canvas\Entity\PageRegion[]
+   *   The editable regions for the active theme, or empty if global regions
+   *   should not be included for the given entity.
+   */
+  private static function getEditableRegions(ContentTemplate|FieldableEntityInterface $entity): array {
+    if (!self::shouldIncludeGlobalRegions($entity)) {
+      return [];
+    }
     return array_filter(PageRegion::loadForActiveTheme(), fn(PageRegion $region) => $region->access('update'));
   }
 
@@ -581,7 +630,7 @@ final class ApiLayoutController {
    */
   private function updateEntity(ContentTemplate|FieldableEntityInterface $entity, array $layout, array $model, ?array $entity_form_fields, ?FieldableEntityInterface $preview_entity): void {
     if ($entity instanceof FieldableEntityInterface) {
-      \assert(!is_null($entity_form_fields));
+      \assert(!\is_null($entity_form_fields));
       // If we are not auto-saving there is no reason to convert the
       // 'entity_form_fields'. This can cause access issue for just viewing the
       // preview. This runs the conversion as if the user had no access to edit
@@ -594,8 +643,8 @@ final class ApiLayoutController {
       ], $entity, validate: FALSE);
     }
     else {
-      \assert(is_null($entity_form_fields));
-      \assert(!is_null($preview_entity));
+      \assert(\is_null($entity_form_fields));
+      \assert(!\is_null($preview_entity));
       // @todo Use \Drupal\canvas\ClientDataToEntityConverter here
       //   as well in https://drupal.org/i/3543197.
       // @todo Remove php-stan-ignore in https://drupal.org/i/3548273.

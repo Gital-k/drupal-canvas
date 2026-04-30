@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\TestWith;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery;
 use Drupal\Core\Config\Schema\SchemaIncompleteException;
@@ -197,11 +198,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @covers `type: canvas.component_source_settings.*`
-   * @covers `type: canvas.generated_field_explicit_input_ux`
-   * @covers `type: canvas.component_source_settings.sdc`
-   * @covers `type: canvas.component_source_settings.js`
-   * @covers `type: canvas.component_source_settings.block`
+   * Tests all ComponentSource plugin-specific settings.
    *
    * - `canvas.generated_field_explicit_input_ux` extends the
    * fallback `canvas.component_source_settings.*`
@@ -209,9 +206,14 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
    *   `canvas.component_source_settings.*`
    * - The "block" one extends the fallback one.
    *
-   * This test method is aimed to test the ComponentSource-specific settings.
+   * See the base type (`type: canvas.component_source_settings.*`) and all
+   * source-specific subtypes:
+   * - `type: canvas.generated_field_explicit_input_ux`
+   * - `type: canvas.component_source_settings.sdc`
+   * - `type: canvas.component_source_settings.js`
+   * - `type: canvas.component_source_settings.block`
    *
-   * @covers \Drupal\canvas\Plugin\Validation\Constraint\SdcPropKeysConstraintValidator
+   * @legacy-covers \Drupal\canvas\Plugin\Validation\Constraint\SdcPropKeysConstraintValidator
    */
   public function testComponentSourceSpecificSettings(): void {
     // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
@@ -347,7 +349,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
               'use_site_name' => FALSE,
               // But intentionally omitted `use_site_slogan`, which SHOULD
               // trigger a validation error.
-              // 'use_site_slogan' => FALSE,
+              // 'use_site_slogan' => FALSE,.
               // @todo Upstream core bug in `type: block_settings`: `label_display` should be a boolean but has `type: label` — change to FALSE once https://www.drupal.org/i/2544708 is fixed
               'label_display' => '0',
             ] + $defaults,
@@ -453,10 +455,12 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentStatusConstraintValidator
+   * Tests status with sdc.
+   *
    * @todo Consider moving this (and its sibling ::testStatusWithBlock()) to
    *   \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase in https://www.drupal.org/project/canvas/issues/3561271.
    * @see \Drupal\canvas\ComponentSource\ComponentSourceManager::generateComponentsForSource())
+   * @legacy-covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentStatusConstraintValidator
    */
   public function testStatusWithSdc(): void {
     $source_specific_component_id = 'canvas_test_sdc:image-required-without-example';
@@ -497,7 +501,9 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentStatusConstraintValidator
+   * Tests status with block.
+   *
+   * @legacy-covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentStatusConstraintValidator
    */
   public function testStatusWithBlock(): void {
     $this->enableModules(['node', 'block']);
@@ -551,15 +557,16 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @testWith ["valid", false, "102d161a6069b0bf"]
-   *           ["rm -rf /", true, "d4b25a8c7fa2617c"]
+   * Tests slot name validation.
    *
    * @see \Drupal\Tests\canvas\Unit\Plugin\Validation\Constraint\ValidSlotNameConstraintValidatorTest
    */
+  #[TestWith(["valid", FALSE, "102d161a6069b0bf"])]
+  #[TestWith(["rm -rf /", TRUE, "d4b25a8c7fa2617c"])]
   public function testSlotNameValidation(string $slot_name, bool $is_invalid, string $expected_version): void {
     // For every "code component" (JavaScriptComponent) with `status: true`, a
     // corresponding Component config entity is auto-created. Use this to be
-    // able to test
+    // able to test.
     $js_component_with_invalid_slot = JavaScriptComponent::create([
       'machineName' => 'invalid_slot',
       'name' => $this->getRandomGenerator()->sentences(5),
@@ -644,7 +651,9 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
+   * Tests unmatched enum and meta enum.
+   *
+   * @legacy-covers \Drupal\canvas\ComponentMetadataRequirementsChecker::check
    */
   public function testUnmatchedEnumAndMetaEnum(): void {
     // In an SDC, periods are valid `meta:enum` keys.
@@ -691,6 +700,54 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     }
   }
 
+  /**
+   * Tests unmatched enum and meta enum for array items.
+   *
+   * @legacy-covers \Drupal\canvas\ComponentMetadataRequirementsChecker::check
+   */
+  public function testUnmatchedEnumAndMetaEnumForArrayItems(): void {
+    // In an SDC, periods are valid `meta:enum` keys.
+    $component = Component::load('sdc.canvas_test_sdc.component-mismatch-meta-enum-array-items');
+    self::assertNotNull($component);
+    $this->entity = $component;
+    $this->assertValidationErrors([]);
+
+    // Create a code component that has the same schema, where this is NOT
+    // allowed, due to config (schema) limitations.
+    $sdc_yaml = Yaml::parseFile($this->root . self::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/component-mismatch-meta-enum-array-items/component-mismatch-meta-enum-array-items.component.yml');
+    $component = Component::load('js.component-mismatch-meta-enum-array-items');
+    self::assertNull($component);
+    $code_component = JavaScriptComponent::create([
+      'machineName' => 'component-mismatch-meta-enum-array-items',
+      'name' => $this->getRandomGenerator()->sentences(5),
+      'status' => FALSE,
+      'props' => $sdc_yaml['props']['properties'],
+      'required' => $sdc_yaml['props']['required'] ?? [],
+      'js' => ['original' => '', 'compiled' => ''],
+      'css' => ['original' => '', 'compiled' => ''],
+      'dataDependencies' => [],
+    ]);
+    $this->entity = $code_component;
+    try {
+      $this->assertValidationErrors([
+        '' => [
+          'The "meta:enum" keys for the "colors" prop enum cannot contain a dot. Offending key: "green.light"',
+          'The values for the "colors" prop enum must be defined in "meta:enum". Missing keys: "green_light"',
+        ],
+      ]);
+    }
+    catch (\InvalidArgumentException $e) {
+      // The ::assertValidationErrors() call above did in fact confirm that the
+      // listed validation errors occurred. However, it then checks whether the
+      // config schema checker finds additional problems. And in this case, it
+      // does, precisely because it is using dots in keys, which is not allowed
+      // by the config (schema) system.
+      // In other words: this demonstrates exactly why we need to special-case
+      // code components' metadata!
+      self::assertSame("The configuration property green doesn't exist.", $e->getMessage());
+    }
+  }
+
   public function testInvalidPropFieldDefinition(): void {
     \assert($this->entity instanceof Component);
     $settings = $this->entity->getSettings();
@@ -714,18 +771,19 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @testWith ["ℹ︎non_existing_field_type␟value", null]
-   *           ["ℹ︎string␟non_existing_field_property", null]
-   *           ["nonsense", "<em class=\"placeholder\">nonsense</em> is not a valid prop expression."]
-   *           ["oops_lost_the_prefix_field_type␟value", "<em class=\"placeholder\">oops_lost_the_prefix_field_type␟value</em> is not a valid prop expression."]
-   *           ["ℹ︎string␞this_is_not_a_delta", "<em class=\"placeholder\">ℹ︎string␞this_is_not_a_delta</em> is not a valid prop expression."]
-   *           ["ℹ︎␜entity:node␝title␞␟value", "The expression is valid, but not one of the allowed types: <em class=\"placeholder\">&quot;FieldTypePropExpression&quot;, &quot;FieldTypeObjectPropsExpression&quot;, &quot;ReferenceFieldTypePropExpression&quot;</em>."]
+   * Tests invalid prop field definition expression.
    *
    * @see `type:canvas.generated_field_explicit_input_ux`
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+   * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
    */
+  #[TestWith(["ℹ︎non_existing_field_type␟value", NULL])]
+  #[TestWith(["ℹ︎string␟non_existing_field_property", NULL])]
+  #[TestWith(["nonsense", "<em class=\"placeholder\">nonsense</em> is not a valid prop expression."])]
+  #[TestWith(["oops_lost_the_prefix_field_type␟value", "<em class=\"placeholder\">oops_lost_the_prefix_field_type␟value</em> is not a valid prop expression."])]
+  #[TestWith(["ℹ︎string␞this_is_not_a_delta", "<em class=\"placeholder\">ℹ︎string␞this_is_not_a_delta</em> is not a valid prop expression."])]
+  #[TestWith(["ℹ︎␜entity:node␝title␞␟value", "The expression is valid, but not one of the allowed types: <em class=\"placeholder\">&quot;FieldTypePropExpression&quot;, &quot;FieldTypeObjectPropsExpression&quot;, &quot;ReferenceFieldTypePropExpression&quot;</em>."])]
   public function testInvalidPropFieldDefinitionExpression(string $expression, ?string $expected_message): void {
-    $expected_validation_errors = is_string($expected_message)
+    $expected_validation_errors = \is_string($expected_message)
       ? ['versioned_properties.active.settings.prop_field_definitions.text.expression' => $expected_message]
       : [];
 

@@ -39,7 +39,7 @@ final class ValidConfigEntityVersionConstraintValidator extends ConstraintValida
     if (!$constraint instanceof ValidConfigEntityVersionConstraint) {
       throw new UnexpectedTypeException($constraint, __NAMESPACE__ . '\ValidConfigEntityVersionConstraint');
     }
-    if (!is_string($version)) {
+    if (!\is_string($version)) {
       throw new UnexpectedValueException($version, 'string');
     }
 
@@ -94,7 +94,7 @@ final class ValidConfigEntityVersionConstraintValidator extends ConstraintValida
     }
 
     $available_versions = \array_unique($versioned_config_entity->getVersions());
-    if (!in_array($version, $available_versions, TRUE)) {
+    if (!\in_array($version, $available_versions, TRUE)) {
       $this->context->buildViolation($constraint->message)
         ->setParameter('@version', $version)
         ->setParameter('@entity_type', (string) $versioned_config_entity->getEntityType()->getSingularLabel())

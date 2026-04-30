@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\Depends;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\PropShape\PersistentPropShapeRepository;
@@ -19,7 +22,6 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormState;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
-use Drupal\canvas\Entity\Component;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
@@ -32,6 +34,7 @@ use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\link\LinkItemInterface;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
+use Drupal\Tests\system\Functional\Form\StubForm;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use JsonSchema\Constraints\Constraint;
@@ -40,13 +43,15 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DependencyInjection\Reference;
 
 /**
- * @coversDefaultClass \Drupal\canvas\PropShape\PersistentPropShapeRepository
- * @covers \Drupal\canvas\PropShape\EphemeralPropShapeRepository
- * @group canvas
- * @group canvas_data_model
- * @group canvas_data_model__prop_expressions
+ * Tests Drupal\canvas\PropShape\PersistentPropShapeRepository.
+ *
+ * @legacy-covers \Drupal\canvas\PropShape\EphemeralPropShapeRepository
  */
 #[RunTestsInSeparateProcesses]
+#[CoversClass(PersistentPropShapeRepository::class)]
+#[Group('canvas')]
+#[Group('canvas_data_model')]
+#[Group('canvas_data_model__prop_expressions')]
 class PropShapeRepositoryTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;
@@ -110,10 +115,14 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
     $persistent_prop_shape_repository = $this->container->get(PropShapeRepositoryInterface::class);
     self::assertInstanceOf(PersistentPropShapeRepository::class, $persistent_prop_shape_repository);
 
-    // Empty prop shape repositories at the start. And no Components.
+    // Empty prop shape repositories at the start. And only Block Components,
+    // which do not use prop shapes.
     self::assertEmpty($ephemeral_prop_shape_repository->getUniquePropShapes());
     self::assertEmpty($persistent_prop_shape_repository->getUniquePropShapes());
-    self::assertEmpty(Component::loadMultiple());
+    self::assertSame(['block'], \array_values(\array_unique(\array_map(
+      fn (ComponentEntity $component): string => $component->get('source'),
+      ComponentEntity::loadMultiple()
+    ))));
 
     // Discover all Components, which will cause the prop shape repositories to
     // get populated.
@@ -124,9 +133,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
     // @todo Remove this when https://github.com/phpstan/phpstan/issues/13566#issuecomment-3645405380 is fixed.
     // @phpstan-ignore staticMethod.impossibleType
     self::assertNotEmpty($persistent_prop_shape_repository->getUniquePropShapes());
-    // @todo Remove this when https://github.com/phpstan/phpstan/issues/13566#issuecomment-3645405380 is fixed.
-    // @phpstan-ignore staticMethod.impossibleType
-    self::assertNotEmpty(Component::loadMultiple());
+    self::assertNotEmpty(ComponentEntity::loadMultiple());
 
     // EphemeralPropShapeRepository must contain a superset, because the
     // persistent prop shape repository contains only the shapes that actually
@@ -141,21 +148,41 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
 
     $unique_prop_shapes = array_values($ephemeral_prop_shape_repository->getUniquePropShapes());
     $this->assertEquals([
-      new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image']]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'], 'maxItems' => 2]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'], 'minItems' => 1]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer']]),
-      new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100]),
+      PropShape::normalize(['type' => 'array', 'items' => ['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']]]),
+      PropShape::normalize(['type' => 'array', 'items' => ['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']], 'maxItems' => 3]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100, 'minItems' => 1]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100, 'minItems' => 2]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 2]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 20, 'minItems' => 1]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 3]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'number']]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'number'], 'maxItems' => 3]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'string']]),
+      PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']]]),
+      PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']], 'maxItems' => 3]),
+      PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['red', 'blue', 'green_light', 'yellow'], 'meta:enum' => ['red' => 'Red', 'blue' => 'Blue', 'green.light' => 'Light Green', 'yellow' => 'Yellow']]]),
+      PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['red', 'green', 'blue', 'yellow'], 'meta:enum' => ['red' => 'Red', 'blue' => 'Blue', 'yellow' => 'Yellow', 'green' => 'Green']]]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'date']]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'date'], 'maxItems' => 3]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'date-time']]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'date-time'], 'maxItems' => 3]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri']]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri'], 'maxItems' => 3]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri-reference']]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri-reference'], 'maxItems' => 3]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 3]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1]),
       new PropShape(['type' => 'boolean']),
       new PropShape(['type' => 'integer']),
       new PropShape(['type' => 'integer', '$ref' => 'json-schema-definitions://canvas.module/column-width']),
       new PropShape(['type' => 'integer', 'enum' => [1, 2]]),
       new PropShape(['type' => 'integer', 'enum' => [1, 2, 3, 4, 5, 6]]),
+      PropShape::normalize(['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']]),
       new PropShape(['type' => 'integer', 'maximum' => 100, 'minimum' => -100]),
       new PropShape(['type' => 'integer', 'maximum' => 2147483648, 'minimum' => -2147483648]),
       new PropShape(['type' => 'integer', 'minimum' => 0]),
@@ -185,10 +212,13 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       new PropShape(['type' => 'string', 'enum' => ['full', 'wide', 'normal', 'narrow']]),
       new PropShape(['type' => 'string', 'enum' => ['horizontal', 'vertical']]),
       new PropShape(['type' => 'string', 'enum' => ['lazy', 'eager']]),
+      PropShape::normalize(['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']]),
       new PropShape(['type' => 'string', 'enum' => ['power', 'like', 'external']]),
       new PropShape(['type' => 'string', 'enum' => ['prefix', 'suffix']]),
       new PropShape(['type' => 'string', 'enum' => ['primary', 'secondary']]),
       new PropShape(['type' => 'string', 'enum' => ['primary', 'success', 'neutral', 'warning', 'danger']]),
+      PropShape::normalize(['type' => 'string', 'enum' => ['red', 'blue', 'green_light', 'yellow'], 'meta:enum' => ['red' => 'Red', 'blue' => 'Blue', 'green.light' => 'Light Green', 'yellow' => 'Yellow']]),
+      PropShape::normalize(['type' => 'string', 'enum' => ['red', 'green', 'blue', 'yellow'], 'meta:enum' => ['red' => 'Red', 'green' => 'Green', 'blue' => 'Blue', 'yellow' => 'Yellow']]),
       new PropShape(['type' => 'string', 'enum' => ['small', 'big', 'huge']]),
       new PropShape(['type' => 'string', 'enum' => ['small', 'big', 'huge', 'contains.dots']]),
       new PropShape(['type' => 'string', 'enum' => ['small', 'medium', 'large']]),
@@ -448,6 +478,14 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ],
       ),
+      'type=string&enum[0]=red&enum[1]=blue&enum[2]=green_light&enum[3]=yellow' => new StorablePropShape(
+        shape: PropShape::normalize(['type' => 'string', 'enum' => ['red', 'blue', 'green_light', 'yellow'], 'meta:enum' => ['red' => 'Red', 'blue' => 'Blue', 'green.light' => 'Light Green', 'yellow' => 'Yellow']]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
       'type=string&enum[0]=small&enum[1]=medium&enum[2]=large' => new StorablePropShape(
         shape: new PropShape([
           'type' => 'string',
@@ -615,6 +653,24 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldWidget: 'number',
       ),
+      'type=array&items[type]=integer&items[enum][0]=10&items[enum][1]=20&items[enum][2]=30&items[enum][3]=40&items[meta:enum][10]=Ten&items[meta:enum][20]=Twenty&items[meta:enum][30]=Thirty&items[meta:enum][40]=Forty' => new StorablePropShape(
+        shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']]]),
+        fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=array&items[type]=integer&items[enum][0]=10&items[enum][1]=20&items[enum][2]=30&items[enum][3]=40&items[meta:enum][10]=Ten&items[meta:enum][20]=Twenty&items[meta:enum][30]=Thirty&items[meta:enum][40]=Forty&maxItems=3' => new StorablePropShape(
+        shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']], 'maxItems' => 3]),
+        fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
+        cardinality: 3,
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
       'type=array&items[type]=integer&maxItems=2' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 2]),
         fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
@@ -632,8 +688,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: 2,
         fieldWidget: 'image_image',
       ),
-      'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object' => new StorablePropShape(
-        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image']]),
+      'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object&minItems=1' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'], 'minItems' => 1]),
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
           'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
           'alt' => new FieldTypePropExpression('image', 'alt'),
@@ -643,8 +699,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldWidget: 'image_image',
       ),
-      'type=array&items[type]=integer&items[minimum]=-100&items[maximum]=100&maxItems=100' => new StorablePropShape(
-        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100]),
+      'type=array&items[type]=integer&items[minimum]=-100&items[maximum]=100&maxItems=100&minItems=1' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100, 'minItems' => 1]),
         fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
         cardinality: 100,
         fieldWidget: 'number',
@@ -659,6 +715,50 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('string', 'value'),
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldWidget: 'string_textfield',
+      ),
+      'type=array&items[type]=string&items[enum][0]=option_one&items[enum][1]=option_two&items[enum][2]=option_three&items[enum][3]=option_four&items[meta:enum][option_one]=Option One&items[meta:enum][option_two]=Option Two&items[meta:enum][option_three]=Option Three&items[meta:enum][option_four]=Option Four' => new StorablePropShape(
+        shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']]]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=array&items[type]=string&items[enum][0]=option_one&items[enum][1]=option_two&items[enum][2]=option_three&items[enum][3]=option_four&items[meta:enum][option_one]=Option One&items[meta:enum][option_two]=Option Two&items[meta:enum][option_three]=Option Three&items[meta:enum][option_four]=Option Four&maxItems=3' => new StorablePropShape(
+        shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']], 'maxItems' => 3]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        cardinality: 3,
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=array&items[type]=string&items[enum][0]=red&items[enum][1]=blue&items[enum][2]=green_light&items[enum][3]=yellow&items[meta:enum][red]=Red&items[meta:enum][blue]=Blue&items[meta:enum][green.light]=Light Green&items[meta:enum][yellow]=Yellow' => new StorablePropShape(
+        shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['red', 'blue', 'green_light', 'yellow'], 'meta:enum' => ['red' => 'Red', 'blue' => 'Blue', 'green.light' => 'Light Green', 'yellow' => 'Yellow']]]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=array&items[type]=string&items[enum][0]=red&items[enum][1]=green&items[enum][2]=blue&items[enum][3]=yellow&items[meta:enum][red]=Red&items[meta:enum][green]=Green&items[meta:enum][blue]=Blue&items[meta:enum][yellow]=Yellow' => new StorablePropShape(
+        shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['red', 'green', 'blue', 'yellow'], 'meta:enum' => ['red' => 'Red', 'green' => 'Green', 'blue' => 'Blue', 'yellow' => 'Yellow']]]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=string&enum[0]=red&enum[1]=green&enum[2]=blue&enum[3]=yellow' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'enum' => ['red', 'green', 'blue', 'yellow']]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
       ),
       'type=string&enum[0]=7&enum[1]=3.14' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'enum' => ['7', '3.14']]),
@@ -705,6 +805,140 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('string_long', 'value'),
         fieldWidget: 'string_textarea',
       ),
+      'type=array&items[type]=number' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'number']]),
+        fieldTypeProp: new FieldTypePropExpression('float', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'number',
+      ),
+      'type=array&items[type]=number&maxItems=3' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'number'], 'maxItems' => 3]),
+        fieldTypeProp: new FieldTypePropExpression('float', 'value'),
+        cardinality: 3,
+        fieldWidget: 'number',
+      ),
+      'type=array&items[type]=integer&maxItems=20&minItems=1' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 20, 'minItems' => 1]),
+        fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
+        cardinality: 20,
+        fieldWidget: 'number',
+      ),
+      'type=array&items[type]=integer&maxItems=3' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 3]),
+        fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
+        cardinality: 3,
+        fieldWidget: 'number',
+      ),
+      'type=array&items[type]=integer&minItems=1' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1]),
+        fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'number',
+      ),
+      'type=array&items[type]=string&items[format]=date' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'date']]),
+        fieldTypeProp: new FieldTypePropExpression('datetime', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'datetime_default',
+        fieldStorageSettings: [
+          'datetime_type' => DateTimeItem::DATETIME_TYPE_DATE,
+        ],
+      ),
+      'type=array&items[type]=string&items[format]=date&maxItems=3' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'date'], 'maxItems' => 3]),
+        fieldTypeProp: new FieldTypePropExpression('datetime', 'value'),
+        cardinality: 3,
+        fieldWidget: 'datetime_default',
+        fieldStorageSettings: [
+          'datetime_type' => DateTimeItem::DATETIME_TYPE_DATE,
+        ],
+      ),
+      'type=array&items[type]=string&items[format]=date-time' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'date-time']]),
+        fieldTypeProp: new FieldTypePropExpression('datetime', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'datetime_default',
+        fieldStorageSettings: [
+          'datetime_type' => DateTimeItem::DATETIME_TYPE_DATETIME,
+        ],
+      ),
+      'type=array&items[type]=string&items[format]=date-time&maxItems=3' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'date-time'], 'maxItems' => 3]),
+        fieldTypeProp: new FieldTypePropExpression('datetime', 'value'),
+        cardinality: 3,
+        fieldWidget: 'datetime_default',
+        fieldStorageSettings: [
+          'datetime_type' => DateTimeItem::DATETIME_TYPE_DATETIME,
+        ],
+      ),
+      'type=array&items[type]=string&items[format]=uri' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri']]),
+        fieldTypeProp: new FieldTypePropExpression('link', 'url'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldInstanceSettings: [
+          'title' => DRUPAL_DISABLED,
+          'link_type' => LinkItemInterface::LINK_EXTERNAL,
+        ],
+        fieldWidget: 'link_default',
+      ),
+      'type=array&items[type]=string&items[format]=uri&maxItems=3' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri'], 'maxItems' => 3]),
+        fieldTypeProp: new FieldTypePropExpression('link', 'url'),
+        cardinality: 3,
+        fieldInstanceSettings: [
+          'title' => DRUPAL_DISABLED,
+          'link_type' => LinkItemInterface::LINK_EXTERNAL,
+        ],
+        fieldWidget: 'link_default',
+      ),
+      'type=array&items[type]=string&items[format]=uri-reference' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri-reference']]),
+        fieldTypeProp: new FieldTypePropExpression('link', 'url'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldInstanceSettings: [
+          'title' => DRUPAL_DISABLED,
+          'link_type' => LinkItemInterface::LINK_GENERIC,
+        ],
+        fieldWidget: 'link_default',
+      ),
+      'type=array&items[type]=string&items[format]=uri-reference&maxItems=3' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri-reference'], 'maxItems' => 3]),
+        fieldTypeProp: new FieldTypePropExpression('link', 'url'),
+        cardinality: 3,
+        fieldInstanceSettings: [
+          'title' => DRUPAL_DISABLED,
+          'link_type' => LinkItemInterface::LINK_GENERIC,
+        ],
+        fieldWidget: 'link_default',
+      ),
+      'type=array&items[type]=string&maxItems=3' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 3]),
+        fieldTypeProp: new FieldTypePropExpression('string', 'value'),
+        cardinality: 3,
+        fieldWidget: 'string_textfield',
+      ),
+      'type=integer&enum[0]=10&enum[1]=20&enum[2]=30&enum[3]=40' => new StorablePropShape(
+        shape: PropShape::normalize(['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']]),
+        fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=string&enum[0]=option_one&enum[1]=option_two&enum[2]=option_three&enum[3]=option_four' => new StorablePropShape(
+        shape: PropShape::normalize(['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=array&items[type]=string&minItems=1' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1]),
+        fieldTypeProp: new FieldTypePropExpression('string', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'string_textfield',
+      ),
     ];
   }
 
@@ -713,8 +947,6 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
    */
   public static function getExpectedUnstorablePropShapes(): array {
     return [
-      'type=array&items[type]=integer&maxItems=20&minItems=1' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 20, 'minItems' => 1]),
-      'type=array&items[type]=integer&minItems=1' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1]),
       'type=array&items[type]=integer&minItems=2' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2]),
       'type=object&$ref=json-schema-definitions://canvas.module/date-range' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/date-range']),
       'type=object&$ref=json-schema-definitions://canvas.module/shoe-icon' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/shoe-icon']),
@@ -748,8 +980,9 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @depends testUniquePropShapeDiscovery
-   */
+ * Tests storable prop shapes.
+ */
+  #[Depends('testUniquePropShapeDiscovery')]
   public function testStorablePropShapes(array $unique_prop_shapes): array {
     $this->assertNotEmpty($unique_prop_shapes);
 
@@ -775,9 +1008,11 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @depends testStorablePropShapes
+   * Tests prop shapes yield working static prop sources.
+   *
    * @param \Drupal\canvas\PropShape\StorablePropShape[] $storable_prop_shapes
    */
+  #[Depends('testStorablePropShapes')]
   public function testPropShapesYieldWorkingStaticPropSources(array $storable_prop_shapes): void {
     // If a test method extending this one has already set up a user with
     // permissions, we do not need to do it again.
@@ -800,6 +1035,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       // @see \Drupal\Core\Field\WidgetBase::form()
       $form = ['#parents' => [$this->randomMachineName()]];
       $form_state = new FormState();
+      $form_object = new StubForm('some_id', $form);
+      $form_state->setFormObject($form_object);
       $form = $prop_source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, 'some-prop-name', FALSE, User::create([]), $form, $form_state);
 
       // Finally, prove the total compatibility of the StaticPropSource
@@ -820,6 +1057,13 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       // which will include https://drupal.org/i/3493070.
       if (isset($storable_prop_shape->shape->schema['enum'])) {
         $randomized_prop_source = $prop_source->withValue($storable_prop_shape->shape->schema['enum'][0]);
+      }
+      // For array shapes whose items have an enum (e.g. list_string with
+      // CARDINALITY_UNLIMITED), generateSampleItems() cannot produce values
+      // because the allowed_values_function requires a Component entity.
+      // Use a single valid item value instead.
+      elseif (isset($storable_prop_shape->shape->schema['items']['enum'])) {
+        $randomized_prop_source = $prop_source->withValue([['value' => $storable_prop_shape->shape->schema['items']['enum'][0]]]);
       }
 
       $random_value = $randomized_prop_source->getValue();
@@ -852,11 +1096,13 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @depends testStorablePropShapes
+   * Tests all widgets for prop shapes have transforms.
+   *
    * @param \Drupal\canvas\PropShape\StorablePropShape[] $storable_prop_shapes
    *
-   * @covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter()
+   * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter
    */
+  #[Depends('testStorablePropShapes')]
   public function testAllWidgetsForPropShapesHaveTransforms(array $storable_prop_shapes): void {
     self::assertNotEmpty($storable_prop_shapes);
     $widget_manager = $this->container->get('plugin.manager.field.widget');
@@ -875,8 +1121,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropShape\PersistentPropShapeRepository::resolveCacheMiss()
-   * @covers \Drupal\canvas\PropShape\PersistentPropShapeRepository::invalidateTags()
+   * Tests storable prop shape alter.
    *
    * @see ::getExpectedUnstorablePropShapes()
    * @see \Drupal\canvas_test_storable_prop_shape_alter\Hook\CanvasTestStorablePropShapeAlterHooks::storablePropShapeAlter()
@@ -884,20 +1129,22 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
    *
    * This using Component config entities too, but only to help prove the alter
    * hooks are invoked when necessary.
+   * @legacy-covers \Drupal\canvas\PropShape\PersistentPropShapeRepository::resolveCacheMiss
+   * @legacy-covers \Drupal\canvas\PropShape\PersistentPropShapeRepository::invalidateTags
    */
   public function testStorablePropShapeAlter(): void {
     // If the module is already installed during ::setUp(), then this test is
     // still worth running, but only needs to test the "not resolving" part.
     $module_to_install = 'canvas_test_storable_prop_shape_alter';
-    $module_is_already_installed = in_array($module_to_install, static::$modules, TRUE);
+    $module_is_already_installed = \in_array($module_to_install, static::$modules, TRUE);
 
     \Drupal::service(ComponentSourceManager::class)->generateComponents();
 
     $component_id = SingleDirectoryComponent::SOURCE_PLUGIN_ID . '.sdc_test_all_props.all-props';
     $prop_name = 'test_integer_by_the_dozen';
 
-    $component = \Drupal::entityTypeManager()->getStorage(Component::ENTITY_TYPE_ID)->loadUnchanged($component_id);
-    \assert($component instanceof Component);
+    $component = \Drupal::entityTypeManager()->getStorage(ComponentEntity::ENTITY_TYPE_ID)->loadUnchanged($component_id);
+    \assert($component instanceof ComponentEntity);
     self::assertCount(1, $component->getVersions());
     $settings = $component->getSettings();
     if ($module_is_already_installed) {
@@ -912,11 +1159,10 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         ->install([$module_to_install]);
       // Note that we don't need to call destruct() here. The
       // invalidation is triggering that as expected!
-
       $component = \Drupal::entityTypeManager()
-        ->getStorage(Component::ENTITY_TYPE_ID)
+        ->getStorage(ComponentEntity::ENTITY_TYPE_ID)
         ->loadUnchanged($component_id);
-      \assert($component instanceof Component);
+      \assert($component instanceof ComponentEntity);
       self::assertCount(2, $component->getVersions());
       $settings = $component->getSettings();
     }
@@ -940,8 +1186,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
     $prop_shape_repository->setCacheCreated(\time());
     $prop_shape_repository->destruct();
 
-    $component = \Drupal::entityTypeManager()->getStorage(Component::ENTITY_TYPE_ID)->loadUnchanged($component_id);
-    \assert($component instanceof Component);
+    $component = \Drupal::entityTypeManager()->getStorage(ComponentEntity::ENTITY_TYPE_ID)->loadUnchanged($component_id);
+    \assert($component instanceof ComponentEntity);
     self::assertCount($module_is_already_installed ? 2 : 3, $component->getVersions());
     $settings = $component->getSettings();
     self::assertArrayNotHasKey($prop_name, $settings['prop_field_definitions']);

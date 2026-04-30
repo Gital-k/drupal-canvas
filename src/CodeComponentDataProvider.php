@@ -133,11 +133,32 @@ readonly final class CodeComponentDataProvider {
       ];
     }
     $jsonapi_base_path = $this->container->getParameter('jsonapi.base_path');
-    \assert(is_string($jsonapi_base_path));
+    \assert(\is_string($jsonapi_base_path));
     return [
       self::V0 => [
         'jsonapiSettings' => [
           'apiPrefix' => ltrim($jsonapi_base_path, '/'),
+        ],
+      ],
+    ];
+  }
+
+  /**
+   * Returns theme assets for V0 of drupalSettings.canvasData.
+   *
+   * @return array[]
+   */
+  public function getCanvasDataThemeAssetsV0(): array {
+    return [
+      self::V0 => [
+        'themeAssets' => [
+          'logo' => [
+            'url' => theme_get_setting('logo.url') ?? '',
+          ],
+          'favicon' => [
+            'url' => theme_get_setting('favicon.url') ?? '',
+            'mimeType' => theme_get_setting('favicon.mimetype') ?? '',
+          ],
         ],
       ],
     ];

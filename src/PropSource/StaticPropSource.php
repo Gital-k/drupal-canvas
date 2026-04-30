@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Drupal\canvas\PropSource;
 
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\Component\Utility\NestedArray;
@@ -24,8 +26,6 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
-use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 
 /**
  * Contains unstructured data for 1 explicit input of a component instance.
@@ -162,7 +162,7 @@ final class StaticPropSource extends PropSourceBase {
   /**
    * @return \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED|int<1, max>
    */
-  private function getCardinality() : int {
+  public function getCardinality() : int {
     // TRICKY: unfortunately, `field.storage_settings.*` does not store
     // cardinality, but the FieldStorageConfig entity does (config schema:
     // `field.storage.*.*`). Hence the need for an additional key-value pair.
@@ -253,6 +253,27 @@ final class StaticPropSource extends PropSourceBase {
   }
 
   /**
+   * Determines if this prop source is empty.
+   *
+   * Uses the field type's own isEmpty() logic (via filterEmptyItems()) to
+   * determine which items to drop, rather than a PHP-level falsy check. This
+   * correctly handles all field types, including those where a value of 0,
+   * FALSE, or '' is valid and must be retained.
+   *
+   * Intended for multiple-cardinality prop sources that arrive in a
+   * "mid-input" state during preview/auto-save, where the user may have left
+   * some entries blank while still filling in others.
+   *
+   * @return bool
+   *   If the prop is empty.
+   */
+  public function isEmpty(): bool {
+    $filtered = clone $this->fieldItemList;
+    $filtered->filterEmptyItems();
+    return $filtered->isEmpty();
+  }
+
+  /**
    * {@inheritdoc}
    */
   public static function parse(array $sdc_prop_source): static {
@@ -298,6 +319,14 @@ final class StaticPropSource extends PropSourceBase {
    * @see \Drupal\canvas\PropSource\StaticPropSource::denormalizeValue()
    */
   public static function isMinimalRepresentation(array $sdc_prop_source): void {
+    // A null value signals that the user explicitly removed
+    // an optional prop value. Validation of whether the prop
+    // is actually optional (i.e. not required) is handled separately by the
+    // ComponentValidator, so there is nothing more to check here.
+    if ($sdc_prop_source['value'] === NULL) {
+      return;
+    }
+
     $expression = StructuredDataPropExpression::fromString($sdc_prop_source['expression']);
     \assert($expression instanceof FieldTypeBasedPropExpressionInterface);
     $cardinality = $sdc_prop_source['sourceTypeSettings']['cardinality'] ?? NULL;
@@ -330,7 +359,7 @@ final class StaticPropSource extends PropSourceBase {
     // Multiple-cardinality StaticPropSources MUST store a list of minimal
     // representations.
     else {
-      if (!is_array($stored_value) || !array_is_list($stored_value)) {
+      if (!\is_array($stored_value) || !array_is_list($stored_value)) {
         throw new \LogicException('Multiple-cardinality prop source expects a list of values.');
       }
       // The deltas can be assumed to be 0-based and sequential.
@@ -382,9 +411,8 @@ final class StaticPropSource extends PropSourceBase {
    */
   public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): EvaluationResult {
     return match ($this->getCardinality()) {
-      // @phpstan-ignore-next-line
       1 => Evaluator::evaluate($this->fieldItemList->first(), $this->expression, $is_required),
-      default => Evaluator::evaluate($this->fieldItemList->isEmpty() ? NULL : $this->fieldItemList, $this->expression, $is_required)
+      default => Evaluator::evaluate($this->fieldItemList, $this->expression, $is_required)
     };
   }
 
@@ -507,13 +535,54 @@ final class StaticPropSource extends PropSourceBase {
     if ($host_entity) {
       $field->setContext(NULL, EntityAdapter::createFromEntity($host_entity));
     }
+
+    // Initialize widget state with existing items for widgets that rely on it.
+    // This ensures that on AJAX rebuilds, the widget knows about existing items
+    // and doesn't lose them. Only initialize when there are actual items to
+    // preserve.
+    // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::form()
+    // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::addItems()
+    if ($widget->getPluginId() === 'media_library_widget' && $this->getCardinality() !== 1 && !$this->fieldItemList->isEmpty()) {
+      $field_name = $field_definition->getName();
+      $widget_state = $widget::getWidgetState($form['#parents'] ?? [], $field_name, $form_state);
+      if (!isset($widget_state['items'])) {
+        // Initialize with current field values including weight, matching the
+        // structure that MediaLibraryWidget::addItems() uses. The weight is
+        // required for usort() in MediaLibraryWidget::form() and for correctly
+        // calculating the next weight when adding new items.
+        $items = [];
+        foreach ($field->getValue() as $delta => $value) {
+          $items[] = [
+            'target_id' => $value['target_id'] ?? NULL,
+            'weight' => $delta,
+          ];
+        }
+        $widget_state['items'] = $items;
+        $widget::setWidgetState($form['#parents'] ?? [], $field_name, $form_state, $widget_state);
+      }
+    }
+
+    // Don't add the "Empty" field automatically.
+    if ($this->getCardinality() === FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
+      $parents = $form['#parents'] ?? [];
+      if (!$widget::getWidgetState($parents, $sdc_prop_name, $form_state)) {
+        $widget::setWidgetState($parents, $sdc_prop_name, $form_state, [
+          'items_count' => max(0, $field->count() - 1),
+          'array_parents' => [],
+        ]);
+      }
+    }
+
     $widget_form = $widget->form($field, $form, $form_state);
     if ($widget->getPluginId() === 'datetime_default' && !$this->fieldItemList->isEmpty()) {
       // The datetime widget needs a DrupalDateTime object as the value.
-      // @todo Figure out why this is necessary — \DateTimeWidgetBase::createDefaultValue() *is* getting called, but somehow it does not result in the default value being populated unless we do this.
+      // @todo Figure out why this is necessary — \DateTimeWidgetBase::createDefaultValue() *is* getting called, but somehow it does not result in the default value being populated unless we do this. Fix in https://www.drupal.org/project/canvas/issues/3530808
       // @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase::createDefaultValue()
       for ($i = 0; $i < $this->fieldItemList->count(); $i++) {
         \assert($this->fieldItemList[$i] !== NULL);
+        // @see \Drupal\Core\Field\FieldItemList::__get()
+        // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItem::propertyDefinitions()
+        // @phpstan-ignore property.notFound
         $widget_form['widget'][$i]['value']['#default_value'] = new DrupalDateTime($this->fieldItemList[$i]->value);
       }
     }

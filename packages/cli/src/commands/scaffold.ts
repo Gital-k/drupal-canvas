@@ -35,14 +35,14 @@ export function scaffoldCommand(program: Command): void {
         // Update config with CLI options
         if (options.dir) setConfig({ componentDir: options.dir });
         const config = getConfig();
-        const baseDir = config.componentDir;
+        const baseDir = config.deprecatedComponentDir;
 
         // Get component name
         let componentName = options.name;
         if (!componentName) {
           const name = await p.text({
             message: 'Enter the component name',
-            placeholder: 'my-component',
+            placeholder: 'hello-world',
             validate: (value) => {
               if (!value) return 'Component name is required';
               if (!/^[a-zA-Z0-9-_]+$/.test(value))

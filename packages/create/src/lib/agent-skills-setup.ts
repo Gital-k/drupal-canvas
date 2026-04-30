@@ -18,6 +18,8 @@ import { pluralize } from './text.js';
 import type { AgentType } from './agents.js';
 
 type SetupAgentSkillsOptions = {
+  selectedAgents?: AgentType[];
+  interactive?: boolean;
   promptForAgents?: () => Promise<AgentType[] | symbol>;
   onInfo?: (message: string) => void;
   onWarning?: (message: string) => void;
@@ -42,33 +44,42 @@ export async function setupAgentSkills(
 ): Promise<void> {
   const info = options.onInfo ?? p.log.info;
   const warning = options.onWarning ?? p.log.warn;
+  const interactive = options.interactive ?? true;
+  const hasExplicitSelection = options.selectedAgents !== undefined;
 
   try {
+    if (!hasExplicitSelection && !interactive) {
+      return;
+    }
+
     const canonicalSkillsDir = join(projectDir, DEFAULT_SKILLS_DIR);
 
     const hasSkillsDir = await pathExists(canonicalSkillsDir);
     if (!hasSkillsDir) {
+      info('No .agents/skills directory found. Skipping compatibility setup.');
       return;
     }
 
     const skillNames = await discoverSkillNames(canonicalSkillsDir);
     if (skillNames.length === 0) {
-      info(
-        'No skills found in .agents/skills. Skipping agent compatibility setup.',
-      );
+      info('No skills found in .agents/skills. Skipping compatibility setup.');
       return;
     }
 
-    const promptForAgents = options.promptForAgents ?? defaultPromptForAgents;
-    const selected = await promptForAgents();
+    let selected: AgentType[] | symbol | undefined = options.selectedAgents;
+
+    if (selected === undefined) {
+      const promptForAgents = options.promptForAgents ?? defaultPromptForAgents;
+      selected = await promptForAgents();
+    }
 
     if (p.isCancel(selected) || typeof selected === 'symbol') {
-      info('Skipped agent compatibility setup.');
+      info('Skipped compatibility setup.');
       return;
     }
 
     if (selected.length === 0) {
-      info('No agents selected. Skipping agent compatibility setup.');
+      info('No additional agents selected. Skipping compatibility setup.');
       return;
     }
 
@@ -76,7 +87,9 @@ export async function setupAgentSkills(
       (agent) => !isUniversalAgent(agent),
     );
     if (nonUniversalAgents.length === 0) {
-      info('Selected agents already use .agents/skills. No symlinks needed.');
+      info(
+        'Selected agents already use .agents/skills. No compatibility symlinks needed.',
+      );
       return;
     }
 
@@ -90,7 +103,7 @@ export async function setupAgentSkills(
     const selectedAgentNames = selected
       .map((agent) => agents[agent].displayName)
       .join(', ');
-    info(`Agent skill support selected: ${selectedAgentNames}.`);
+    info(`Selected agent support: ${selectedAgentNames}.`);
 
     if (results.created.length > 0) {
       info(
@@ -118,18 +131,21 @@ export async function setupAgentSkills(
     const message =
       error instanceof Error
         ? error.message
-        : 'Unknown error during agent compatibility setup';
-    warning(`Agent compatibility setup skipped: ${message}`);
+        : 'Unknown error during compatibility setup';
+    warning(`Compatibility setup skipped: ${message}`);
   }
 }
 
 export async function defaultPromptForAgents(): Promise<AgentType[] | symbol> {
   const universalAgents = getUniversalAgents();
-  const otherAgents = getNonUniversalAgents();
+  const additionalAgents = getNonUniversalAgents();
+
+  // Add space between earlier message and the prompt.
+  p.log.message('');
 
   const selected = await searchMultiselect({
-    message: 'Which coding agents should this codebase support?',
-    items: otherAgents.map((agent) => ({
+    message: 'Which additional agents should this codebase support?',
+    items: additionalAgents.map((agent) => ({
       value: agent,
       label: agents[agent].displayName,
       hint: agents[agent].skillsDir,

@@ -12,7 +12,7 @@ use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
 use Drupal\KernelTests\Core\Config\ConfigEntityValidationTestBase;
 
-class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBase {
+abstract class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBase {
 
   use SchemaCheckTrait;
 
@@ -62,18 +62,18 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
         // For example, schema error for `props.some_boolean.enum` but a
         // validation error for `props.some_boolean` like:
         // @code
-        // 'enum' is an unknown key because props.some_boolean.type is boolean (see config schema type canvas.json_schema.prop.boolean).
+        // 'enum' is an unknown key because props.some_boolean.type is boolean (see config schema type canvas.json_schema.prop_shape.boolean).
         // @endcode
         $parts = explode('.', $relative_property_path);
         $popped = array_pop($parts);
         $parent_property_path = implode('.', $parts);
         $validation_error_message = match (\array_key_exists($parent_property_path, $expected_messages)) {
-          TRUE => is_array($expected_messages[$parent_property_path])
+          TRUE => \is_array($expected_messages[$parent_property_path])
             ? reset($expected_messages[$parent_property_path])
             : $expected_messages[$parent_property_path],
           FALSE => '',
         };
-        \assert(is_string($validation_error_message));
+        \assert(\is_string($validation_error_message));
         if (str_starts_with($validation_error_message, \sprintf("'%s' is an unknown key because %s.type is", $popped, $parent_property_path))) {
           NestedArray::setValue($nonsensical_subtrees, $parts, TRUE);
           return FALSE;
@@ -112,8 +112,15 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
    * the changes made here (other than three extra asserts to meet phpstan level
    * 6).
    *
+   * @param array<string, array<string, string|string[]>>|null $additional_expected_validation_errors_when_missing
+   *   Some required config entity properties have additional validation
+   *   constraints that cause additional messages to appear. Keys must be
+   *   config entity properties, values must be arrays as expected by
+   *   ::assertValidationErrors().
+   *
    * @todo Remove when https://drupal.org/i/3526908 is fixed
    */
+  // @phpstan-ignore-next-line method.childParameterType
   public function testRequiredPropertyValuesMissing(?array $additional_expected_validation_errors_when_missing = NULL): void {
     \assert($this->entity->getEntityType() instanceof ConfigEntityTypeInterface);
     \assert(\is_array($this->entity->getEntityType()->getPropertiesToExport()));
@@ -153,12 +160,12 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
       // Do not try to set immutable properties to NULL: their immutability is
       // already tested.
       // @see ::testImmutableProperties()
-      if (in_array($property, $immutable_properties, TRUE)) {
+      if (\in_array($property, $immutable_properties, TRUE)) {
         continue;
       }
 
       // Do not try to set plugin collection properties to NULL.
-      if (in_array($property, $plugin_collection_properties, TRUE)) {
+      if (\in_array($property, $plugin_collection_properties, TRUE)) {
         continue;
       }
 
@@ -173,7 +180,7 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
         continue;
       }
       // End overrides of core 👈️.
-      $expected_validation_errors = in_array($property, $properties_with_optional_values, TRUE)
+      $expected_validation_errors = \in_array($property, $properties_with_optional_values, TRUE)
         ? []
         : [$property => 'This value should not be null.'];
 

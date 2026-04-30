@@ -15,6 +15,7 @@ use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -26,6 +27,7 @@ use Symfony\Component\HttpFoundation\Response;
 abstract class ApiLayoutControllerTestBase extends KernelTestBase {
 
   use AutoSaveManagerTestTrait;
+  use ConstraintViolationsTestTrait;
 
   const REGION_PATTERN = '/<!-- canvas-region-start-%1$s -->([\n\s\S]*)<!-- canvas-region-end-%1$s -->/';
 
@@ -65,7 +67,7 @@ abstract class ApiLayoutControllerTestBase extends KernelTestBase {
    */
   protected function filterLayoutForPost(string $content): string {
     $json = \json_decode($content, TRUE);
-    unset($json['isNew'], $json['isPublished'], $json['html']);
+    unset($json['isNew'], $json['isPublished'], $json['html'], $json['hasUnsavedStatusChange']);
     $json += ['clientInstanceId' => $this->randomString(100)];
     return \json_encode($json, JSON_THROW_ON_ERROR);
   }

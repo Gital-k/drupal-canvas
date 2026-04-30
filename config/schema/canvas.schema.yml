@@ -172,6 +172,7 @@ canvas.js_component.*:
         label: 'Prop'
         # This MUST be one of the keys available at %parent.props. Rather than repeating that validation logic here, let
         # the JsComponentHasValidAndSupportedSdcMetadata constraint take care of that.
+        # Entity reference props cannot be required: validated by JsComponentHasValidAndSupportedSdcMetadata.
         constraints: {}
     # See core/assets/schemas/v1/metadata-full.schema.json#properties.props
     props:
@@ -223,12 +224,51 @@ canvas.js_component.*:
             label: 'Canvas Drupal settings needed by the component'
             constraints:
               Choice:
+                - v0.baseUrl
                 - v0.branding
                 - v0.breadcrumbs
+                - v0.jsonapiSettings
                 - v0.mainEntity
                 - v0.pageTitle
-                - v0.jsonapiSettings
-                - v0.baseUrl
+                - v0.themeAssets
+        entityFields:
+          # Should be omitted when there's no entity field data dependencies.
+          requiredKey: false
+          type: sequence
+          orderby: key
+          constraints:
+            # There must be >=1 entity reference prop; otherwise the key should be omitted.
+            NotBlank:
+              message: "There must be >=1 entity reference prop; otherwise the 'entityFields' key should be omitted."
+            # Each key must be a prop name from the component's props.
+            SequenceKeysMustMatch:
+              matchType: subset
+              # @todo allow filtering to the subset that are actually "entity reference" props, rather than all props.
+              propertyPathToSequence: props
+          sequence:
+            type: sequence
+            orderby: value
+            constraints:
+              # There must be >=1 entity field expression.
+              NotBlank:
+                message: 'There must be >=1 entity field expression; otherwise the entity reference prop should be deleted.'
+              # All expressions must target the same entity type and bundle.
+              EntityFieldExpressionsSameTarget: ~
+            sequence:
+              type: string
+              label: 'Entity field prop expression'
+              constraints:
+                # 💡 Crucially, this also will ensure that every expression for every entity field for every
+                # version of this JavaScriptComponent config entity is valid against the current set of supported
+                # expressions: any exception thrown during validation will prevent saving.
+                ValidStructuredDataPropExpression:
+                  choices:
+                    - FieldPropExpression
+                    - FieldObjectPropsExpression
+                    - ReferenceFieldPropExpression
+                  message: 'The expression is valid, but not one of the allowed types: %choices.'
+                # Validate that the expression targets an existing entity type and bundle.
+                ExpressionTargetEntityBundleExists: ~
 
 canvas.page_region.*:
   type: config_entity
@@ -701,6 +741,138 @@ canvas.asset_library.*:
       label: 'JS'
       # The asset library may contain only CSS, no JS.
       nullable: true
+    imports:
+      type: sequence
+      label: 'Import manifest entries'
+      requiredKey: false
+      orderby: value
+      constraints:
+        # There must be >=1 import; otherwise the key should be omitted.
+        NotBlank: ~
+      sequence:
+        type: canvas.asset_library_manifest_entry
+    assets:
+      type: sequence
+      label: 'Asset manifest entries'
+      requiredKey: false
+      orderby: value
+      constraints:
+        # There must be >=1 import; otherwise the key should be omitted.
+        NotBlank: ~
+      sequence:
+        type: canvas.asset_library_manifest_entry
+    shared:
+      type: sequence
+      label: 'Shared chunk manifest entries'
+      requiredKey: false
+      orderby: value
+      constraints:
+        # There must be >=1 import; otherwise the key should be omitted.
+        NotBlank: ~
+      sequence:
+        type: canvas.asset_library_manifest_entry
+
+canvas.asset_library_manifest_entry:
+  type: mapping
+  label: 'Asset library manifest entry'
+  mapping:
+    name:
+      type: string
+      label: 'Name'
+      constraints:
+        NotBlank: []
+    uri:
+      type: uri
+      label: 'Managed file URI'
+      constraints:
+        NotBlank: []
+        UriScheme: ['public']
+
+canvas.brand_kit.*:
+  type: config_entity
+  constraints:
+    FullyValidatable: ~
+  mapping:
+    id:
+      type: machine_name
+      label: 'Brand kit ID'
+      constraints:
+        Regex:
+          pattern: '/^global$/'
+          message: "The %value machine name is not valid."
+    label:
+      type: required_label
+      label: 'Human-readable label'
+    fonts:
+      type: sequence
+      label: 'Font entries'
+      nullable: true
+      orderby: value
+      # Should be omitted when there are no fonts.
+      requiredKey: false
+      constraints:
+        # There must be >=1 font file; otherwise the key should be omitted.
+        NotBlank: ~
+        Unique:
+          fields: [id]
+          errorPath: id
+          message: 'Font IDs must be unique.'
+          stopOnFirstError: false
+        Callback:
+          callback: ['\Drupal\canvas\Entity\BrandKit', validateFonts]
+      sequence:
+        type: mapping
+        label: 'Uploaded font file'
+        mapping:
+          id:
+            type: uuid
+            label: 'Font ID'
+          family:
+            type: string
+            label: 'Font family'
+          uri:
+            type: string
+            label: 'Managed file URI'
+          format:
+            type: string
+            label: 'Font format'
+          weight:
+            type: string
+            label: 'Font weight'
+          style:
+            type: string
+            label: 'Font style'
+          axes:
+            type: sequence
+            label: 'Font variation axes'
+            requiredKey: false
+            nullable: true
+            constraints:
+              Unique:
+                fields: [tag]
+                errorPath: tag
+                message: 'Axis tags must be unique within a font entry.'
+                stopOnFirstError: false
+            sequence:
+              type: mapping
+              label: 'Font variation axis'
+              mapping:
+                tag:
+                  type: string
+                  label: 'Axis tag'
+                name:
+                  type: string
+                  label: 'Axis name'
+                  requiredKey: false
+                min:
+                  type: float
+                  label: 'Minimum axis value'
+                max:
+                  type: float
+                  label: 'Maximum axis value'
+                default:
+                  type: float
+                  label: 'Default axis value'
 
 canvas.compilable_code:
   type: mapping

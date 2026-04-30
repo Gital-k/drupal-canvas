@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
@@ -44,11 +45,11 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * test coverage.
  *
  * @see \Drupal\Tests\canvas\Unit\PropExpressionTest
- * @group canvas
- * @group canvas_data_model
- * @group canvas_data_model__prop_expressions
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+#[Group('canvas_data_model')]
+#[Group('canvas_data_model__prop_expressions')]
 class PropExpressionKernelTest extends CanvasKernelTestBase {
 
   use EntityReferenceFieldCreationTrait;
@@ -88,6 +89,8 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
     $this->installEntitySchema('user');
     $this->installSchema('file', 'file_usage');
     $this->installEntitySchema('media');
+    // @see core/modules/filter/config/install/filter.format.plain_text.yml
+    $this->installConfig(['filter']);
 
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
     $this->createMediaType('image', ['id' => 'baby_photos', 'label' => 'Baby photos']);
@@ -240,7 +243,7 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
       'uuid' => 'baby-photos-media-uuid',
     ]);
     $baby_photos_media->save();
-    Node::create([
+    $node = Node::create([
       'uuid' => self::NODE_1_UUID,
       'title' => 'dummy_title',
       'type' => 'article',
@@ -265,7 +268,10 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
       'yo_ho' => [
         'target_id' => $image_media->id(),
       ],
-    ])->save();
+    ]);
+    $this->setUpCurrentUser(permissions: ['access content', 'view media', 'access user profiles']);
+    self::assertEntityIsValid($node);
+    $node->save();
 
     // `xyz` node type.
     NodeType::create([
@@ -284,12 +290,12 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
       'bundle' => 'xyz',
       'label' => 'The XYZ map field',
     ])->save();
-
-    $this->setUpCurrentUser(permissions: ['access content', 'view media', 'access user profiles']);
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\Labeler
+   * Tests label.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\Labeler
    */
   #[IgnoreDeprecations]
   public function testLabel(): void {
@@ -340,12 +346,14 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression::calculateDependencies()
+   * Tests calculate dependencies.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression::calculateDependencies
    */
   #[IgnoreDeprecations]
   public function testCalculateDependencies(): void {
@@ -365,14 +373,11 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
       $expression = $case[1];
       \assert($expression instanceof EntityFieldBasedPropExpressionInterface || $expression instanceof FieldTypeBasedPropExpressionInterface);
       $expected_dependencies = $case[4];
-      // Almost always, the content-aware dependencies are the same as the
-      // content-unaware ones, just with the `content` key-value pair omitted,
-      // if any.
-      $expected_content_unaware_dependencies = $case[5] ?? (
-        is_array($expected_dependencies)
-          ? array_diff_key($expected_dependencies, array_flip(['content']))
-          : NULL
-      );
+      // The content-aware dependencies MUST be the same as the content-unaware
+      // ones, just with the `content` key-value pair omitted, if any.
+      $expected_content_unaware_dependencies = \is_array($expected_dependencies)
+        ? array_diff_key($expected_dependencies, array_flip(['content']))
+        : [];
 
       $test_case_precise_label = \sprintf("%s (%s)", $test_case_label, (string) $expression);
 
@@ -481,10 +486,10 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
    * support, because they both use ReferencedBundleSpecificBranches in exactly
    * the same way.
    *
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression
    * @see \Drupal\Tests\canvas\Unit\PropExpressionTest::testInvalidReferencePropExpressionDueToMismatchedLeafExpressionCardinality()
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression
    */
   public function testInvalidReferencePropExpressionDueToMismatchedLeafExpressionCardinality(): void {
     // @phpstan-ignore method.nonObject

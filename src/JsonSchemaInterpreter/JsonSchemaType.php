@@ -26,7 +26,7 @@ use Drupal\canvas\TypedData\BetterEntityDataDefinition;
  *   `hook_canvas_storable_prop_shape_alter()`
  * - Drupal field instances' props thanks to hardcoded knowledge about Drupal
  *   validation constraint equivalents: `::toDataTypeShapeRequirements()`, used
- *   by \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
+ *   by \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher
  *
  * KNOWN UNKNOWNS.
  *
@@ -105,7 +105,7 @@ enum JsonSchemaType: string {
    * @see \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo
    */
   public static function fromSdcPropJsonSchema(array $schema) : static {
-    $type = is_array($schema['type'])
+    $type = \is_array($schema['type'])
       ? $schema['type'][0]
       : $schema['type'];
     return JsonSchemaType::from($type);
@@ -121,7 +121,7 @@ enum JsonSchemaType: string {
    * @param JsonSchema $schema
    *
    * @see \Drupal\canvas\PropSource\EntityFieldPropSource
-   * @see \Drupal\canvas\JsonSchemaFieldInstanceMatcher
+   * @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher
    */
   public function toDataTypeShapeRequirements(array $schema): DataTypeShapeRequirement|DataTypeShapeRequirements|false {
     return match ($this) {
@@ -245,12 +245,24 @@ enum JsonSchemaType: string {
       // configure a minimum number of values for a field. Plus, JSON schema
       // allows declaring that an array must be non-empty (`minItems: 1`) even
       // for an optional array (not listed in `required`). So, it is impossible
-      // to support `minItems`. And in fact, marking an SDC prop as required has
-      // the same effect as `minItems: 1`.
+      // to support arbitrary `minItems` values.
+      // However, `minItems: 1` is supported: it aligns exactly with Drupal's
+      // "required means >=1 value" Field API semantics, and unlike `required`
+      // alone (which in JSON Schema only means "the key must be present"), it
+      // correctly enforces that an array cannot be empty.
+      // Note: marking a prop as `required` does NOT have the same effect as
+      // `minItems: 1`. JSON Schema `required: [prop]` only means the key must
+      // be present — it does not prevent `value: []`.
       // @see https://www.drupal.org/project/unlimited_field_settings
       // @see https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-00#rfc.section.6.4.2
       // @see https://stackoverflow.com/a/49548055
-      if (!empty(array_diff(\array_keys($schema), ['type', 'items', 'maxItems']))) {
+      // @see https://www.drupal.org/project/canvas/issues/3516754
+      if (!empty(array_diff(\array_keys($schema), ['type', 'items', 'maxItems', 'minItems']))) {
+        return NULL;
+      }
+      // Only minItems: 1 is supported. Higher values cannot be enforced by
+      // Drupal's Field API, which has no concept of minimum cardinality > 1.
+      if (isset($schema['minItems']) && $schema['minItems'] !== 1) {
         return NULL;
       }
       \assert($schema['type'] === 'array');
@@ -266,7 +278,10 @@ enum JsonSchemaType: string {
       }
 
       if (\array_key_exists('maxItems', $schema) && $schema['maxItems'] < 2) {
-        throw new \InvalidArgumentException('Nonsensical array size limit specified.');
+        throw new \InvalidArgumentException(\sprintf(
+          'The "maxItems" value must be at least 2 for array types, but got %d. Use a non-array type for single-value props.',
+          $schema['maxItems'],
+        ));
       }
       return new StorablePropShape(
         // The original shape, not the item shape.
@@ -303,7 +318,7 @@ enum JsonSchemaType: string {
         // Require $ref to be resolved, because that might add some of the other
         // keywords.
         \array_key_exists('$ref', $schema) => NULL,
-        \array_key_exists('enum', $schema) => match(in_array('', $schema['enum'], TRUE)) {
+        \array_key_exists('enum', $schema) => match(\in_array('', $schema['enum'], TRUE)) {
           // The empty string is not a sensible enum value. To indicate
           // optionality, the prop should be made optional.
           TRUE => NULL,

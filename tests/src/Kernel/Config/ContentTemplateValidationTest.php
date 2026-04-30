@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
@@ -12,7 +14,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
-use Drupal\Tests\canvas\Traits\DataProviderWithCoreSpecificComponentActiveVersionTrait;
+use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
@@ -20,15 +22,17 @@ use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\TestTools\Random;
 use Drupal\canvas_test_validation\Plugin\Canvas\ComponentSource\InvalidSlots;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\TestWith;
 
 /**
- * @group canvas
+ * Tests Content Template Validation.
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class ContentTemplateValidationTest extends BetterConfigEntityValidationTestBase {
 
   use BetterConfigDependencyManagerTrait;
-  use DataProviderWithCoreSpecificComponentActiveVersionTrait;
+  use DataProviderWithComponentTreeTrait;
   use ContentTypeCreationTrait;
   use ContribStrictConfigSchemaTestTrait;
   use CreateTestJsComponentTrait;
@@ -232,10 +236,11 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
   }
 
   /**
-   * @dataProvider providerInvalidComponentTree
-   */
+ * Tests invalid component tree.
+ */
+  #[DataProvider('providerInvalidComponentTree')]
   public function testInvalidComponentTree(array $component_tree, array $expected_messages): void {
-    self::addMissingBlockComponentVersions($component_tree);
+    $component_tree = self::populateActiveComponentVersionPlaceholders($component_tree);
     \assert($this->entity instanceof ContentTemplate);
     $this->entity->setComponentTree($component_tree);
     $this->assertValidationErrors($expected_messages);
@@ -556,14 +561,6 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     ]);
   }
 
-  public function testInvalidContentEntityTypeViewMode(): void {
-    $this->entity->set('content_entity_type_view_mode', 'nope');
-    $this->assertValidationErrors([
-      '' => "The 'content_entity_type_view_mode' property cannot be changed.",
-      'content_entity_type_view_mode' => "The 'core.entity_view_mode.node.nope' config does not exist.",
-    ]);
-  }
-
   public function testExposedSlotMustBeEmpty(): void {
     \assert($this->entity instanceof ContentTemplate);
 
@@ -650,8 +647,9 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
   }
 
   /**
-   * @dataProvider providerInvalidExposedSlot
-   */
+ * Tests invalid exposed slot.
+ */
+  #[DataProvider('providerInvalidExposedSlot')]
   public function testInvalidExposedSlot(array $exposed_slots, array $expected_errors): void {
     $this->entity->set('exposed_slots', $exposed_slots);
     $this->assertValidationErrors($expected_errors);
@@ -668,7 +666,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     ])->save();
 
     $tree = $this->entity->get('component_tree');
-    \assert(is_array($tree));
+    \assert(\is_array($tree));
     $tree[] = [
       'uuid' => '1870f74a-2611-4864-8fc0-639f0d125d7f',
       'component_id' => InvalidSlots::PLUGIN_ID . '.' . InvalidSlots::PLUGIN_ID,
@@ -705,6 +703,25 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     $this->assertValidationErrors([
       'exposed_slots.footer_for_you' => 'Exposed slots are only allowed in the <em class="placeholder">full</em> view mode.',
     ]);
+  }
+
+  #[TestWith([
+    'full',
+    [],
+  ])]
+  #[TestWith([
+    'teaser',
+    [],
+  ])]
+  #[TestWith([
+    'nope',
+    ['content_entity_type_view_mode' => "The 'core.entity_view_mode.node.nope' config does not exist."],
+  ])]
+  public function testContentEntityTypeViewMode(string $view_mode, array $expected_validation_errors): void {
+    $this->entity = $this->entity->createDuplicate();
+    $this->entity->set('content_entity_type_view_mode', $view_mode);
+    $this->entity->set('id', "node.alpha.$view_mode");
+    $this->assertValidationErrors($expected_validation_errors);
   }
 
 }

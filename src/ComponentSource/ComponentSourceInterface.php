@@ -42,6 +42,15 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * - updater: a ComponentInstanceUpdaterInterface — handles updating existing
  *   component instances to the active (aka latest) version of the Component
  *   config entity
+ * - inputs_config_schema_generator: a
+ *   ComponentInstanceInputsConfigSchemaGeneratorInterface — handles generating
+ *   a config schema for component instances, which enables both predictable
+ *   config exports and (config) translation support for component instances'
+ *   inputs. The default/fallback implementation is able to provide predictable
+ *   config exports for any component source plugin automatically. Automatic
+ *   translation support is impossible, because that requires both understanding
+ *   how that source stores its explicit inputs and generating an editing UX,
+ *   which may require a custom Configuration Translation `form_element_class`.
  *
  * @see \Drupal\canvas\Attribute\ComponentSource
  * @see \Drupal\canvas\ComponentSource\ComponentSourceBase
@@ -49,6 +58,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * @see \Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface
  * @see \Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface
  * @see \Drupal\canvas\ComponentSource\ComponentInstanceUpdaterInterface
+ * @see \Drupal\canvas\ComponentSource\ComponentInstanceInputsConfigSchemaGeneratorInterface
  *
  * @phpstan-import-type PropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
  * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
@@ -137,6 +147,10 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
   /**
    * Returns the default explicit input (prop sources) for this component.
    *
+   * @param bool $only_required
+   *   (Optional) If true, only required explicit inputs will be returned. False
+   *   by default.
+   *
    * @phpcs:ignore
    * @return SingleComponentInputArray
    *   An array of prop sources to use for the inputs of this component, keyed
@@ -156,6 +170,22 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    * @todo Add ::getImplicitInput() in https://www.drupal.org/project/canvas/issues/3485502 — SDCs don't have implicit inputs, but Block plugins do: contexts
    */
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array;
+
+  /**
+   * Retrieves the resolved explicit input for this component instance.
+   *
+   * For component sources that wrap explicit input in a structured format
+   * (e.g. with 'source' and 'resolved' keys), this returns only the resolved
+   * values. For component sources that return flat values from
+   * ::getExplicitInput(), this returns those values as-is.
+   *
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|null $host_entity
+   *   Host entity. Required when a component instance has inputs populated by
+   *   EntityFieldPropSources AND the parent entity of $item is not the host
+   *   entity to use during evaluation of the EntityFieldPropSources.
+   *   (Typically: when this is a component instance in a ContentTemplate.)
+   */
+  public function getResolvedExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array;
 
   /**
    * Hydrates a component with its explicit input plus slots (if any).

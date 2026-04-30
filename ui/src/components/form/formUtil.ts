@@ -56,17 +56,22 @@ export function jsonSchemaValidate(
     }
   }
 
-  // Properties prefixed with `x-`, however useful are not part of the JSON
-  // Schema spec and should be filtered before validation.
-  const filteredSchema = Object.entries(schema).reduce<Record<string, any>>(
-    (carry, [key, value]) => {
-      if (!key.match(/^x-/)) {
-        carry[key] = value;
+  // Properties prefixed with `x-` and `meta:enum` are not part of the JSON
+  // Schema spec and must be filtered before passing to Ajv (strict mode).
+  // Apply this recursively so nested schemas (e.g. `items` for array props)
+  // are also cleaned.
+  const stripNonStandardKeys = (s: Record<string, any>): Record<string, any> =>
+    Object.entries(s).reduce<Record<string, any>>((carry, [key, value]) => {
+      if (!key.match(/^x-/) && key !== 'meta:enum') {
+        carry[key] =
+          typeof value === 'object' && value !== null && !Array.isArray(value)
+            ? stripNonStandardKeys(value)
+            : value;
       }
       return carry;
-    },
-    {},
-  );
+    }, {});
+
+  const filteredSchema = stripNonStandardKeys(schema);
 
   const validate = ajv.compile(filteredSchema);
   const valid = validate(data);
@@ -161,6 +166,51 @@ export const shouldSkipPropValidation = (
 };
 
 /**
+ * Coerces a form value to the type expected by the prop schema.
+ *
+ * Form values are strings; when the schema expects integer, number, or boolean,
+ * this applies the same cast transform that getPropsValues uses so validation
+ * and submit see the same typed value.
+ *
+ * @param {any} value - The raw value (e.g. from an input).
+ * @param {SchemaObject | undefined} schema - The prop's JSON Schema.
+ * @return {any} The value, possibly coerced to the schema type.
+ */
+export function coerceValueForSchema(
+  value: any,
+  schema: SchemaObject | undefined,
+): any {
+  if (!schema?.type) {
+    return value;
+  }
+  const propType = schema.type as string;
+  if (
+    (propType !== 'integer' &&
+      propType !== 'number' &&
+      propType !== 'boolean') ||
+    typeof value !== 'string' ||
+    value === ''
+  ) {
+    return propType === 'string' && typeof value === 'number'
+      ? `${value}`
+      : value;
+  }
+
+  const coerced = transforms.cast(
+    value,
+    { to: propType as 'integer' | 'number' | 'boolean' },
+    undefined as any,
+  );
+  if (
+    coerced !== null &&
+    (typeof coerced !== 'number' || !Number.isNaN(coerced))
+  ) {
+    return coerced;
+  }
+  return value;
+}
+
+/**
  * Validates a prop's data against a JSON Schema.
  *
  * @param {string} schemaName
@@ -230,6 +280,9 @@ export function propInputData(
 ) {
   const { selectedComponent, components, selectedComponentType } =
     inputAndUiData;
+
+  const component = components?.[selectedComponentType];
+
   // Keep track of fields that are part of a group of fields that result
   // in a single prop value being stored, such as individual date and time
   // fields being stored as a single datetime prop.
@@ -240,8 +293,15 @@ export function propInputData(
   const propsInThisForm: string[] = [];
   Object.keys(formState).forEach((itemKey) => {
     if (itemKey.includes(`canvas_component_props[${selectedComponent}][`)) {
-      const propName = itemKey.split('][')[1];
-      if (propsInThisForm.includes(propName)) {
+      const propName = toPropName(itemKey, selectedComponent);
+      // @ts-ignore
+      const cardinality =
+        isPropSourceComponent(component) &&
+        component?.propSources?.[propName]?.sourceTypeSettings?.cardinality;
+      if (
+        propsInThisForm.includes(propName) &&
+        (!cardinality || cardinality === 1)
+      ) {
         // If we hit a prop that is already in `propsInThisForm`, add it
         // to the array keeping track of props that have multiple single
         // value form elements associated with it.
@@ -255,9 +315,7 @@ export function propInputData(
 
   const propsWithObjectValues: PropsValues = {};
   const propsWithSourceStorageSettings: PropsValues = {};
-  // OpenAPI already ensures this exists, but the condition check is here
-  // to soothe Typescript.
-  const component = components?.[selectedComponentType];
+
   if (isPropSourceComponent(component)) {
     Object.entries(component.propSources).forEach(
       // @ts-ignore
@@ -302,11 +360,24 @@ export function getDefaultValue(
     return !!attributes?.checked;
   }
 
+  // Make sure 0 is seen as a value and not falsy.
+  if (attributes?.type === 'number' && attributes?.value === 0) {
+    return '0';
+  }
+
   // If options are present:
   // - If an option is defined as selected, use that value
   // Else if `attributes.value` is truthy, use that value.
   // Else if `value` is truthy, use that value.
   // Otherwise, return null.
+  // For <select multiple>, return every selected option as an array so
+  // React can properly control the multi-select (value must be an array).
+  if (options && attributes !== undefined && 'multiple' in attributes) {
+    return options
+      .filter((option: React.ComponentProps<any>) => option.selected)
+      .map((option: React.ComponentProps<any>) => option.value);
+  }
+
   return options
     ? options.find((option: React.ComponentProps<any>) => option.selected)
         ?.value
@@ -323,16 +394,58 @@ export const formStateToObject = (
   componentId: string,
 ): PropsValues => {
   const params = new URLSearchParams();
+  const arrayPropNames: string[] = [];
+  const prefix = `canvas_component_props[${componentId}][`;
   Object.entries(formState).forEach(([key, value]) => {
-    params.append(key, value);
+    // Drupal's <select multiple> appends `[]` to the element name.
+    // Strip it so the single-bracket check works for both forms:
+    //   `...[colors]`   -> direct prop key (from JS dispatch)
+    //   `...[colors][]` -> direct prop key (from Drupal multi-select)
+    //   `...[video][0][fids]` -> nested widget key (not a direct prop)
+    const normalizedKey = key.endsWith('[]') ? key.slice(0, -2) : key;
+    const isDirectArrayProp =
+      Array.isArray(value) &&
+      normalizedKey.startsWith(prefix) &&
+      normalizedKey.indexOf(']', prefix.length) === normalizedKey.length - 1;
+    if (isDirectArrayProp) {
+      arrayPropNames.push(toPropName(normalizedKey, componentId));
+      if ((value as any[]).length) {
+        (value as any[]).forEach((item) => params.append(key, item));
+      } else {
+        // Represent an empty array with an empty string to convey an
+        // empty value in the query string.
+        params.append(key, '');
+      }
+    } else {
+      params.append(key, value as any);
+    }
   });
   const parsed = qs.parse(params.toString());
-  if (isParsedQ(parsed.canvas_component_props)) {
-    if (parsed.canvas_component_props[componentId]) {
-      return parsed.canvas_component_props[componentId] as PropsValues;
-    }
+  if (
+    !isParsedQ(parsed.canvas_component_props) ||
+    !parsed.canvas_component_props[componentId]
+  ) {
+    return {};
   }
-  return {};
+  const result = parsed.canvas_component_props[componentId] as PropsValues;
+  arrayPropNames.forEach((propName) => {
+    if (!(propName in result)) {
+      result[propName] = [];
+    } else if (
+      result[propName] === '' ||
+      // When the key has a `[]` suffix, qs.parse wraps the sentinel empty
+      // string into a single-element array [''] — treat that as empty too.
+      (Array.isArray(result[propName]) &&
+        (result[propName] as any[]).length === 1 &&
+        (result[propName] as any[])[0] === '')
+    ) {
+      // An empty string (or ['']) is our sentinel for an empty array.
+      result[propName] = [];
+    } else if (!Array.isArray(result[propName])) {
+      result[propName] = [result[propName]];
+    }
+  });
+  return result;
 };
 
 /**
@@ -407,7 +520,6 @@ export function getPropsValues(
         value,
       );
       if (transformed === null) {
-        // Ignore null values.
         return carry;
       }
       return {
@@ -436,6 +548,13 @@ export function getPropsValues(
         delete resolved[fieldName as keyof ComponentModel['resolved']];
         selectedModel.resolved = resolved;
       }
+    }
+
+    // Slice the array to the configured `maxItems` available so it doesn't fail
+    // to render.
+    const maxItems = propFieldData?.jsonSchema?.maxItems;
+    if (Array.isArray(value) && maxItems && value.length > maxItems) {
+      propsValues[fieldName as keyof PropsValues] = value.slice(0, maxItems);
     }
 
     // If the value is empty on an optional field, but the fields has format
@@ -494,3 +613,14 @@ export class ComponentPreviewUpdateEvent extends Event {
     return this.previewBackgroundUpdate;
   }
 }
+
+export const isDateOnly = (val: string): boolean =>
+  /^\d{4}-\d{2}-\d{2}$/.test(val);
+export const isTimeOnly = (val: string): boolean =>
+  /^\d{2}:\d{2}(:\d{2})?$/.test(val);
+
+export const toDateTime = (val: string): string => {
+  if (isDateOnly(val)) return `${val}T00:00:00Z`;
+  if (isTimeOnly(val)) return `1970-01-01T${val}Z`;
+  return val;
+};

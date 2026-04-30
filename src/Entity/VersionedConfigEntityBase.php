@@ -52,7 +52,6 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
 
   public function loadVersion(string $version): static {
     if ($version !== $this->loadedVersion) {
-      \assert(isset($this->versioned_properties));
       $this->assertVersionExists($version);
       $this->loadedVersion = $version;
     }
@@ -68,7 +67,6 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
    * @return void
    */
   protected function assertVersionExists(string $version): void {
-    \assert(isset($this->versioned_properties));
     if ($version !== $this->active_version && !\array_key_exists($version, $this->versioned_properties)) {
       throw new \OutOfRangeException(\sprintf('The requested version `%s` is not available. Available versions: %s.',
         (string) $version,
@@ -88,7 +86,6 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
       return $this;
     }
     // Reverse chronological order: new versions appear at the top.
-    \assert(isset($this->versioned_properties));
     $this->versioned_properties = [
       // At the top: the new version, with empty settings by default.
       self::ACTIVE_VERSION => [],
@@ -131,11 +128,28 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
     return $this;
   }
 
+  /**
+   * @return non-empty-list<string>
+   */
   public function getVersions(): array {
-    return [
+    $versions = [
       $this->active_version,
       ...array_diff(\array_keys($this->versioned_properties), [self::ACTIVE_VERSION]),
     ];
+    // Ensure all versions are strings.
+    $versions = \array_map(
+      // TRICKY: the version hash is a hexadecimal string (0–9, A–F). There is a
+      // tiny probability that the entire string consists of digits (10 of the
+      // 16 possible characters are digits (probability: 10/16), and a 64-bit
+      // hash can be represented by a 16-character string. So the probability of
+      // an all-digit hexadecimal string is (10/16)^16 or about 1 in 4 million.
+      // PHP automatically converts all-digit strings to integers when used as
+      // array keys, which can cause problems. To prevent this, explicitly cast
+      // versions (which are hashes) to strings.
+      fn (string|int $version) => (string) $version,
+      $versions
+    );
+    return $versions;
   }
 
   /**
@@ -202,7 +216,7 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
         // Not all plugin configuration key-value pairs may be needed in the
         // versioned property.
         if ($plugin_instance instanceof VersionedConfigurationSubsetSingleLazyPluginCollection) {
-          \assert(is_array($value));
+          \assert(\is_array($value));
           $value = array_diff_key($value, array_flip($plugin_instance->omittedKeys));
         }
       }

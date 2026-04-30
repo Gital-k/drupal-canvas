@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Controller\ApiConfigAutoSaveControllers;
+use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -33,10 +37,9 @@ use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
  * Test JS Components can evolve over time.
- *
- * @group canvas
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class JsComponentEvolutionTest extends CanvasKernelTestBase {
 
   use CiModulePathTrait;
@@ -65,7 +68,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     'canvas_test_code_components',
   ];
 
-  protected function reloadJavascriptComponent(): JavascriptComponent {
+  protected function reloadJavascriptComponent(): JavaScriptComponent {
     /** @var \Drupal\canvas\Entity\JavaScriptComponent */
     return \Drupal::entityTypeManager()->getStorage(JavaScriptComponent::ENTITY_TYPE_ID)->loadUnchanged(self::JAVASCRIPT_COMPONENT_ID);
   }
@@ -203,8 +206,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
       ];
     }
     $new_items->setValue($values);
-    $violations = $new_items->validate();
-    self::assertCount(0, $violations, \implode(', ', \array_map(static fn (ConstraintViolationInterface $violation): string => (string) $violation->getMessage(), \iterator_to_array($violations))));
+    self::assertSame([], self::violationsToArray($new_items->validate()));
 
     // Creating a component of this type should set the `component_version`
     // field property and column to the active version.
@@ -316,7 +318,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
         // Fix the missing example.
         $props['age']['examples'][] = 27;
         $js_component->setProps($props);
-        self::assertCount(0, $js_component->getTypedData()->validate());
+        self::assertEntityIsValid($js_component);
       }
       $js_component->save();
       return;
@@ -394,19 +396,19 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanAddOptionalProp(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanAddOptionalProp(bool $usingHttpApi): void {
     $this->addOrUpdateAgeProp($usingHttpApi);
     $this->assertOptionalPropNewVersion();
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanAddRequiredProp(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanAddRequiredProp(bool $usingHttpApi): void {
     $this->addOrUpdateAgeProp($usingHttpApi, TRUE);
     $this->assertRequiredPropNewVersion();
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanRemoveRequiredPropThenAddAnotherRequiredProp(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanRemoveRequiredPropThenAddAnotherRequiredProp(bool $usingHttpApi): void {
     $this->removeNamePropAndAddAgeProp($usingHttpApi, TRUE);
 
     unset($this->expectedClientModel['model'][self::COMPONENT_INSTANCE_UUID]['source']['name']);
@@ -463,6 +465,27 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     ], canAutoUpdate: TRUE, withChild: TRUE);
   }
 
+  public function testCodeComponentCanRemoveRequiredPropAndStillRenderPreviews(): void {
+    $js_component = $this->reloadJavascriptComponent();
+    $props = $js_component->getProps();
+    \assert(\is_array($props));
+    self::assertArrayHasKey('name', $props);
+    $required = $js_component->getRequiredProps();
+    self::assertContains('name', $required);
+    unset($props['name']);
+    $js_component->set('required', []);
+    $js_component->setProps($props);
+    self::assertEntityIsValid($js_component);
+
+    $autoSaveManager = \Drupal::service(AutoSaveManager::class);
+    \assert($autoSaveManager instanceof AutoSaveManager);
+    $autoSaveManager->saveEntity($js_component);
+
+    // Component previews will still work.
+    \Drupal::classResolver(ApiConfigControllers::class)->list(Component::ENTITY_TYPE_ID);
+    \Drupal::classResolver(ApiConfigAutoSaveControllers::class)->get($js_component);
+  }
+
   protected function removeNamePropAndAddAgeProp(bool $usingHttpRequest = FALSE, bool $required = FALSE): void {
     $js_component = $this->reloadJavascriptComponent();
     $props = $js_component->getProps();
@@ -483,7 +506,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     if (!$usingHttpRequest) {
       $js_component->set('required', $requiredProps);
       $js_component->setProps($props);
-      self::assertCount(0, $js_component->getTypedData()->validate());
+      self::assertEntityIsValid($js_component);
       $js_component->save();
       return;
     }
@@ -561,7 +584,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
       $slots = $js_component->get('slots');
       $slots['intro'] = $slot;
       $js_component->set('slots', $slots);
-      self::assertCount(0, $js_component->getTypedData()->validate());
+      self::assertEntityIsValid($js_component);
       $js_component->save();
       return;
     }
@@ -571,7 +594,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanAddNewSlot(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanAddNewSlot(bool $usingHttpApi): void {
     $this->addSlot($usingHttpApi);
     $inputs = [
       'name' => 'mike_watt',
@@ -709,7 +732,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanMakeAnOptionalPropRequired(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanMakeAnOptionalPropRequired(bool $usingHttpApi): void {
     $this->addOrUpdateAgeProp($usingHttpApi);
     $this->makeAgePropRequired($usingHttpApi);
     $this->assertRequiredPropNewVersion();
@@ -725,7 +748,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanMakeARequiredPropOptional(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanMakeARequiredPropOptional(bool $usingHttpApi): void {
     $this->addOrUpdateAgeProp($usingHttpApi, TRUE);
     $this->makeAgePropOptional($usingHttpApi);
     $this->assertOptionalPropNewVersion();
@@ -741,7 +764,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     if (!$usingHttpRequest) {
       $js_component->set('required', $requiredProps);
       $js_component->setProps($props);
-      self::assertCount(0, $js_component->getTypedData()->validate());
+      self::assertEntityIsValid($js_component);
       $js_component->save();
       return;
     }
@@ -752,7 +775,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanRemoveProp(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanRemoveProp(bool $usingHttpApi): void {
     $this->removeNameProp($usingHttpApi);
     // When a prop is removed and an update happens, the old instances get
     // upgraded and their removed prop values are cleaned up. If all props are
@@ -800,7 +823,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     if (!$usingHttpRequest) {
       $js_component->setProps($props);
       $js_component->set('slots', $slots);
-      self::assertCount(0, $js_component->getTypedData()->validate());
+      self::assertEntityIsValid($js_component);
       $js_component->save();
       return;
     }
@@ -811,7 +834,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanModifyDefaultValuesAndExamples(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanModifyDefaultValuesAndExamples(bool $usingHttpApi): void {
     $this->modifyExamples($usingHttpApi);
     $inputs = [
       'name' => 'Mike Watt',
@@ -865,7 +888,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     unset($slots['description']);
     if (!$usingHttpRequest) {
       $js_component->set('slots', $slots);
-      self::assertCount(0, $js_component->getTypedData()->validate());
+      self::assertEntityIsValid($js_component);
       $js_component->save();
       return;
     }
@@ -875,7 +898,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanRemoveASlot(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanRemoveASlot(bool $usingHttpApi): void {
     $this->removeDescriptionSlot($usingHttpApi);
     $inputs = ['name' => 'D. Boon'];
     $expectedClientModelFunction = fn(string $version) => [
@@ -942,7 +965,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     ];
     if (!$usingHttpRequest) {
       $js_component->set('slots', $slots);
-      self::assertCount(0, $js_component->getTypedData()->validate());
+      self::assertEntityIsValid($js_component);
       $js_component->save();
       return;
     }
@@ -975,8 +998,9 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanChangeThePropType(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanChangeThePropType(bool $usingHttpApi): void {
     $this->markTestSkipped('To be fixed in https://www.drupal.org/project/canvas/issues/3557271');
+    // @phpstan-ignore deadCode.unreachable
     $this->modifyPropType($usingHttpApi);
     $inputs = [
       'name' => 'mike_watt',

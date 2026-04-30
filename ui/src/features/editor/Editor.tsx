@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ErrorBoundary from '@/components/error/ErrorBoundary';
-import ContextualPanel from '@/components/panel/ContextualPanel';
 import ConflictWarning from '@/features/editor/ConflictWarning';
 import EditorFrame from '@/features/editorFrame/EditorFrame';
 import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
@@ -51,13 +50,11 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
 
   useEffect(() => {
     dispatch(setUpdatePreview(false));
-    // When the entityId or entityType changes, we want to reset the first load complete state
     dispatch(setFirstLoadComplete(false));
   }, [dispatch, entityId, entityType]);
 
   if (latestError) {
     if (latestError.status === '409') {
-      // There has been an editing conflict and the user should be blocked from continuing!
       return <ConflictWarning />;
     }
   }
@@ -66,7 +63,6 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
     return null;
   }
 
-  // Render content based on context.
   const renderContextContent = () => {
     switch (editorFrameContext) {
       case 'entity':
@@ -113,14 +109,15 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
 
   return (
     <>
-      {renderContextContent()}
-      <EditorFrame />
-      <ContextualPanel />
+      <div className={styles.editorMainPane}>
+        {renderContextContent()}
+        <EditorFrame />
+      </div>
       <div
         className={clsx(styles.editorInactive, {
           [styles.visible]: disable,
         })}
-      ></div>
+      />
     </>
   );
 };

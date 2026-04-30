@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers \Drupal\canvas\PropShape\PersistentPropShapeRepository
- * @group canvas
- * @group canvas_data_model
- * @group canvas_data_model__prop_expressions
+ * Tests Hook Canvas Storable Prop Alter.
+ *
+ * @legacy-covers \Drupal\canvas\PropShape\PersistentPropShapeRepository
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+#[Group('canvas_data_model')]
+#[Group('canvas_data_model__prop_expressions')]
 class HookCanvasStorablePropAlterTest extends PropShapeRepositoryTest {
 
   /**
@@ -50,6 +55,20 @@ class HookCanvasStorablePropAlterTest extends PropShapeRepositoryTest {
       fieldWidget: 'uri',
     );
 
+    // 1b. The `link` → `uri` alteration also cascades to the array variants.
+    $storable_prop_shapes['type=array&items[type]=string&items[format]=uri'] = new StorablePropShape(
+      shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri']]),
+      fieldTypeProp: new FieldTypePropExpression('uri', 'value'),
+      cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+      fieldWidget: 'uri',
+    );
+    $storable_prop_shapes['type=array&items[type]=string&items[format]=uri&maxItems=3'] = new StorablePropShape(
+      shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'uri'], 'maxItems' => 3]),
+      fieldTypeProp: new FieldTypePropExpression('uri', 'value'),
+      cardinality: 3,
+      fieldWidget: 'uri',
+    );
+
     // 2. This proves it is possible to add support for an arbitrary (so not
     // well-known, no `$ref`) prop shape that Canvas does not natively support.
     $storable_prop_shapes['type=integer&multipleOf=12'] = new StorablePropShape(
@@ -80,15 +99,6 @@ class HookCanvasStorablePropAlterTest extends PropShapeRepositoryTest {
     unset($unstorable_prop_shapes['type=integer&multipleOf=12']);
     unset($unstorable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/date-range']);
     return $unstorable_prop_shapes;
-  }
-
-  /**
-   * @depends testStorablePropShapes
-   * @todo Remove this method override by making the `daterange_default` widget actually work in component instance forms in https://www.drupal.org/project/canvas/issues/3523379
-   */
-  public function testAllWidgetsForPropShapesHaveTransforms(array $storable_prop_shapes): void {
-    unset($storable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/date-range']);
-    parent::testAllWidgetsForPropShapesHaveTransforms($storable_prop_shapes);
   }
 
 }

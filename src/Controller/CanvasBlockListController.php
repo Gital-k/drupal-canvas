@@ -74,11 +74,15 @@ final class CanvasBlockListController extends BlockListController implements Eve
    */
   public function listing($theme = NULL, ?Request $request = NULL): array {
     $build = parent::listing($theme, $request);
-    \assert(is_array($build));
+    \assert(\is_array($build));
 
     // Load the editable page regions for the current default theme.
     $theme = $theme ?? $this->configFactory->get('system.theme')->get('default');
-    $regions = $this->entityTypeManager->getStorage(PageRegion::ENTITY_TYPE_ID)->loadByProperties(['theme' => $theme, 'status' => TRUE]);
+    $regions = $this->entityTypeManager->getStorage(PageRegion::ENTITY_TYPE_ID)
+      ->loadByProperties([
+        'theme' => $theme,
+        'status' => TRUE,
+      ]);
     if (!empty($regions)) {
       $theme_settings_url = Url::fromRoute('system.theme_settings_theme', ['theme' => $theme]);
       $link = Link::fromTextAndUrl($this->t('theme'), $theme_settings_url)->toString();

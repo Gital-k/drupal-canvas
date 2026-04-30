@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Controller;
 
 // cspell:ignore Gábor Hojtsy uniquesearchterm gàbor autosave searchterm
-
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Component\Transliteration\TransliterationInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
@@ -20,11 +21,10 @@ use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Tests the ApiContentControllers::list() method.
- *
- * @group canvas
- * @coversDefaultClass \Drupal\canvas\Controller\ApiContentControllers
  */
 #[RunTestsInSeparateProcesses]
+#[CoversClass(ApiContentControllers::class)]
+#[Group('canvas')]
 class ApiContentControllersListTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;
@@ -175,7 +175,8 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
     $content = $response->getContent();
     self::assertNotEmpty($content);
 
-    return json_decode($content, TRUE);
+    $decoded = json_decode($content, TRUE);
+    return array_column($decoded['data'], NULL, 'id');
   }
 
   /**
@@ -207,7 +208,7 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
   /**
    * Tests basic list functionality with no search parameter.
    *
-   * @covers ::list
+   * @legacy-covers ::list
    */
   public function testBasicList(): void {
     $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
@@ -215,9 +216,11 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
     $content = $response->getContent();
     self::assertNotEmpty($content, 'Response content should not be empty');
 
-    $data = json_decode($content, TRUE);
-    self::assertIsArray($data, 'Response data should be an array');
+    $decoded = json_decode($content, TRUE);
+    self::assertIsArray($decoded, 'Response data should be an array');
+    self::assertArrayHasKey('data', $decoded, 'Response should have a data key');
 
+    $data = array_column($decoded['data'], NULL, 'id');
     self::assertCount(count($this->pages), $data, 'Response should contain all test pages');
 
     foreach ($this->pages as $page) {
@@ -241,6 +244,7 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
 
     $expected_cache_contexts = [
       'url.query_args:search',
+      'url.query_args:page',
       'user.permissions',
     ];
     $actual_cache_contexts = $cache_metadata->getCacheContexts();
@@ -251,7 +255,7 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
   /**
    * Tests list method with search parameter.
    *
-   * @covers ::list
+   * @legacy-covers ::list
    */
   public function testListWithSearch(): void {
     $data = $this->executeListRequest(['search' => 'UniqueSearchTerm']);
@@ -291,7 +295,7 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
   /**
    * Tests search when no searchable content entities (currently only pages) exist yet.
    *
-   * @covers ::list
+   * @legacy-covers ::list
    */
   public function testEmptyEntityList(): void {
     foreach ($this->pages as $page) {
@@ -333,8 +337,8 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
   /**
    * Tests that search results are sorted by most recently updated first.
    *
-   * @covers ::list
-   * @covers ::filterAndMergeIds
+   * @legacy-covers ::list
+   * @legacy-covers ::filterAndMergeIds
    */
   public function testSearchSortOrder(): void {
     // Create test pages with the same search term but different titles
@@ -383,8 +387,8 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
   /**
    * Tests auto-save entries in search results.
    *
-   * @covers ::list
-   * @covers ::filterAndMergeIds
+   * @legacy-covers ::list
+   * @legacy-covers ::filterAndMergeIds
    */
   public function testSearchWithAutoSave(): void {
     $page = Page::create([
@@ -430,6 +434,180 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
       'internalPath' => '/' . $entity->toUrl()->getInternalPath(),
       'path' => $entity->toUrl()->toString(),
     ];
+  }
+
+  /**
+   * Tests that unpublished pages are correctly identified in list.
+   *
+   * @legacy-covers ::list
+   * @legacy-covers \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew
+   */
+  public function testUnpublishedPageInList(): void {
+    // Create a published page, then unpublish it.
+    $unpublished_page = Page::create([
+      'title' => 'Unpublished Canvas Page',
+      'status' => TRUE,
+      'path' => ['alias' => '/unpublished-page'],
+    ]);
+    $unpublished_page->save();
+
+    // Now unpublish it to create an unpublished page.
+    $unpublished_page->setNewRevision(TRUE);
+    $unpublished_page->setUnpublished();
+    $unpublished_page->save();
+
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = array_column(json_decode($content, TRUE)['data'], NULL, 'id');
+
+    $unpublished_page_id = (int) $unpublished_page->id();
+    self::assertArrayHasKey($unpublished_page_id, $data, 'Unpublished page should be in the list');
+
+    $expected_data = $this->getEntityData($unpublished_page);
+    $expected_data['isNew'] = FALSE;
+    $this->assertValidResultData($data[$unpublished_page_id], $expected_data);
+
+    // Verify that hasUnsavedStatusChange is false for a saved unpublished page.
+    self::assertFalse($data[$unpublished_page_id]['hasUnsavedStatusChange'], 'Saved unpublished page should not have unsaved status change');
+
+    // Verify cache metadata.
+    $cache_metadata = $response->getCacheableMetadata();
+    $expected_cache_contexts = [
+      'url.query_args:search',
+      'url.query_args:page',
+      'user.permissions',
+    ];
+    $actual_cache_contexts = $cache_metadata->getCacheContexts();
+    self::assertEquals($expected_cache_contexts, $actual_cache_contexts, 'Cache contexts should match');
+
+    $expected_cache_tags = [
+      'canvas_page_list',
+      'config:system.site',
+      'test_create_access_cache_tag',
+      AutoSaveManager::CACHE_TAG,
+    ];
+    $actual_cache_tags = $cache_metadata->getCacheTags();
+    self::assertEquals($expected_cache_tags, $actual_cache_tags, 'Cache tags should match');
+  }
+
+  /**
+   * Tests that draft pages are correctly identified in list.
+   *
+   * @legacy-covers ::list
+   * @legacy-covers \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew
+   */
+  public function testDraftPageInList(): void {
+    // Create an unpublished page with default title (draft).
+    $draft_page = Page::create([
+      'title' => 'Untitled page',
+      'status' => FALSE,
+    ]);
+    $draft_page->save();
+
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = array_column(json_decode($content, TRUE)['data'], NULL, 'id');
+
+    $draft_page_id = (int) $draft_page->id();
+    self::assertArrayHasKey($draft_page_id, $data, 'Draft page should be in the list');
+
+    $expected_data = $this->getEntityData($draft_page);
+    $expected_data['isNew'] = TRUE;
+    $this->assertValidResultData($data[$draft_page_id], $expected_data);
+
+    // Verify cache metadata.
+    $cache_metadata = $response->getCacheableMetadata();
+    $expected_cache_contexts = [
+      'url.query_args:search',
+      'url.query_args:page',
+      'user.permissions',
+    ];
+    $actual_cache_contexts = $cache_metadata->getCacheContexts();
+    self::assertEquals($expected_cache_contexts, $actual_cache_contexts, 'Cache contexts should match');
+
+    $expected_cache_tags = [
+      'canvas_page_list',
+      'config:system.site',
+      'test_create_access_cache_tag',
+      AutoSaveManager::CACHE_TAG,
+    ];
+    $actual_cache_tags = $cache_metadata->getCacheTags();
+    self::assertEquals($expected_cache_tags, $actual_cache_tags, 'Cache tags should match');
+  }
+
+  /**
+   * Tests unpublish/publish operations with auto-save.
+   *
+   * @legacy-covers ::list
+   */
+  public function testUnpublishPublishWithAutoSave(): void {
+    // Use the published page from setup.
+    $page = $this->pages['published'];
+
+    // Create auto-save data that unpublishes the page.
+    $page->setUnpublished();
+    $this->autoSaveManager->saveEntity($page);
+
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = array_column(json_decode($content, TRUE)['data'], NULL, 'id');
+
+    $page_id = (int) $page->id();
+    self::assertArrayHasKey($page_id, $data);
+
+    // The list should show the auto-saved status (unpublished).
+    self::assertFalse($data[$page_id]['status'], 'Page should show auto-saved unpublished status');
+    self::assertFalse($data[$page_id]['isNew'], 'Page should not be marked as new (it was published before)');
+    self::assertTrue($data[$page_id]['hasUnsavedStatusChange'], 'Page should have unsaved status change (will be unpublished)');
+
+    // Create auto-save data that publishes an unpublished page.
+    $unpublished_page = Page::create([
+      'title' => 'Test Unpublished',
+      'status' => TRUE,
+    ]);
+    $unpublished_page->save();
+    $unpublished_page->setNewRevision(TRUE);
+    $unpublished_page->setUnpublished();
+    $unpublished_page->save();
+
+    // Now create auto-save that publishes it.
+    $unpublished_page->setPublished();
+    $this->autoSaveManager->saveEntity($unpublished_page);
+
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = array_column(json_decode($content, TRUE)['data'], NULL, 'id');
+
+    $unpublished_page_id = (int) $unpublished_page->id();
+    self::assertArrayHasKey($unpublished_page_id, $data);
+
+    // The list should show the auto-saved status (published).
+    self::assertTrue($data[$unpublished_page_id]['status'], 'Unpublished page should show auto-saved published status');
+    self::assertFalse($data[$unpublished_page_id]['isNew'], 'Page should not be marked as new');
+    self::assertTrue($data[$unpublished_page_id]['hasUnsavedStatusChange'], 'Page should have unsaved status change (will be published)');
+
+    // Verify cache metadata.
+    $cache_metadata = $response->getCacheableMetadata();
+    $expected_cache_contexts = [
+      'url.query_args:search',
+      'url.query_args:page',
+      'user.permissions',
+    ];
+    $actual_cache_contexts = $cache_metadata->getCacheContexts();
+    self::assertEquals($expected_cache_contexts, $actual_cache_contexts, 'Cache contexts should match');
+
+    $expected_cache_tags = [
+      'canvas_page_list',
+      'config:system.site',
+      'test_create_access_cache_tag',
+      AutoSaveManager::CACHE_TAG,
+    ];
+    $actual_cache_tags = $cache_metadata->getCacheTags();
+    self::assertEquals($expected_cache_tags, $actual_cache_tags, 'Cache tags should match');
   }
 
 }

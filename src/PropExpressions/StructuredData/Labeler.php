@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropExpressions\StructuredData;
 
-use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinitionInterface;
@@ -42,7 +41,7 @@ final class Labeler {
 
     // To generate a label, the target entity type and bundle must be known.
     $actual_bundles = $actual_entity_type_and_bundle->getBundles();
-    if (is_array($actual_bundles) && count($actual_bundles) > 1) {
+    if (\is_array($actual_bundles) && count($actual_bundles) > 1) {
       throw new \LogicException(\sprintf('Multi-bundle entity definition given (`%s`), not allowed.', implode('`, `', $actual_bundles)));
     }
 
@@ -70,7 +69,7 @@ final class Labeler {
     \assert($field_definition->getItemDefinition() instanceof FieldItemDataDefinitionInterface);
 
     // To correctly represent this, this must take into account what
-    // JsonSchemaFieldInstanceMatcher may or may not match. It will
+    // EntityFieldPropSourceMatcher may or may not match. It will
     // never match:
     // - DataReferenceTargetDefinition field props: it considers these
     //   irrelevant; it's only the twin DataReferenceDefinition that
@@ -78,7 +77,7 @@ final class Labeler {
     // - props explicitly marked as internal
     // @see \Drupal\Core\TypedData\DataDefinition::isInternal
     $main_property = $field_definition->getItemDefinition()->getMainPropertyName();
-    \assert(is_string($main_property));
+    \assert(\is_string($main_property));
 
     // When an expression targets a specific field item, generate an ordinal
     // suffix for the label.
@@ -206,9 +205,9 @@ final class Labeler {
         '@field-label' => $field_definition->getLabel(),
         ...$label_item_delta_arguments,
         '@field-item-properties-labels' => implode(', ', \array_map(
-          // @phpstan-ignore-next-line method.nonObject
           fn (string $field_property_name): string => (string) $field_definition->getItemDefinition()
             ->getPropertyDefinition($field_property_name)
+            // @phpstan-ignore-next-line method.nonObject
             ->getLabel(),
           $used_field_properties,
         )),
@@ -271,7 +270,7 @@ final class Labeler {
     };
 
     // An array of props can only be returned for object expressions.
-    \assert(is_string($props) || ($expr instanceof ObjectPropExpressionInterface && !array_is_list($props)));
+    \assert(\is_string($props) || ($expr instanceof ObjectPropExpressionInterface && !array_is_list($props)));
     return $props;
   }
 
@@ -285,13 +284,13 @@ final class Labeler {
     $field_item_definition = $field_definition->getItemDefinition();
     \assert($field_item_definition instanceof FieldItemDataDefinitionInterface);
     $main_property = $field_item_definition->getMainPropertyName();
-    \assert(is_string($main_property));
+    \assert(\is_string($main_property));
 
     $used_props = (array) self::getUsedFieldProps($expr, $actual_entity_type_and_bundle);
     \assert(count($used_props) >= 1);
 
     // Easy case: if the main property is used directly.
-    if (in_array($main_property, $used_props, TRUE)) {
+    if (\in_array($main_property, $used_props, TRUE)) {
       return TRUE;
     }
 
@@ -299,7 +298,7 @@ final class Labeler {
     // that depends on the main one.
     $main_property_definition = $field_item_definition->getPropertyDefinition($main_property);
     \assert($main_property_definition instanceof DataDefinitionInterface);
-    if (in_array($main_property_definition->getSetting('is source for'), $used_props, TRUE)) {
+    if (\in_array($main_property_definition->getSetting('is source for'), $used_props, TRUE)) {
       return TRUE;
     }
 
@@ -328,7 +327,7 @@ final class Labeler {
         return TRUE;
       }
 
-      $expr_used_by_computed_property = JsonSchemaFieldInstanceMatcher::getReferenceDependency($property_definition);
+      $expr_used_by_computed_property = FieldItemAnalyzer::getReferenceDependency($property_definition);
       if ($expr_used_by_computed_property === NULL) {
         continue;
       }

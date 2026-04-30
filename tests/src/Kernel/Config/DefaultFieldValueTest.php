@@ -2,9 +2,15 @@
 
 declare(strict_types=1);
 
+// cspell:ignore elink estring
+
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\InvalidComponentInputsPropSourceException;
+use Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator;
 use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
@@ -13,11 +19,8 @@ use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
-// cspell:ignore elink estring
-
-/**
- * @group canvas
- */
+#[CoversClass(ValidComponentTreeItemConstraintValidator::class)]
+#[Group('canvas')]
 #[RunTestsInSeparateProcesses]
 class DefaultFieldValueTest extends CanvasKernelTestBase {
 
@@ -85,7 +88,7 @@ class DefaultFieldValueTest extends CanvasKernelTestBase {
     array_push(
       $test_cases['inputs invalid, using entity field prop sources'],
       SchemaIncompleteException::class,
-      'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0] The &#039;entity-field&#039; prop source type must be absent.',
+      'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0.inputs.9145b0da-85a1-4ee7-ad1d-b1b63614aed6.heading-2] Component `9145b0da-85a1-4ee7-ad1d-b1b63614aed6`: the `heading-2` prop is not defined., 1 [default_value.0.inputs.9145b0da-85a1-4ee7-ad1d-b1b63614aed6.heading] The property heading is required., 2 [default_value.0] The &#039;entity-field&#039; prop source type must be absent., 3 [default_value.1.inputs.dab1145b-c5d5-4779-9be8-0a41c2d8ed29.heading-1] Component `dab1145b-c5d5-4779-9be8-0a41c2d8ed29`: the `heading-1` prop is not defined., 4 [default_value.1.inputs.dab1145b-c5d5-4779-9be8-0a41c2d8ed29.heading] The property heading is required., 5 [default_value.1] The &#039;entity-field&#039; prop source type must be absent., 6 [default_value.2] The &#039;entity-field&#039; prop source type must be absent.',
     );
     array_push(
       $test_cases['missing components, using only static prop sources'],
@@ -112,16 +115,15 @@ class DefaultFieldValueTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @coversClass \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
+   * Tests default field value.
    *
    * @param array $field_values
    *   The component tree that will be set at the default value for a
    *   `component_tree` field.
    * @param ?class-string<\Throwable> $expected_exception
    * @param ?string $exception_message
-   *
-   * @dataProvider providerDefaultFieldValue
    */
+  #[DataProvider('providerDefaultFieldValue')]
   public function testDefaultFieldValue(array $field_values, ?string $expected_exception, ?string $exception_message): void {
     $field_config = FieldConfig::loadByName('node', 'article', 'field_canvas_test');
     $this->assertInstanceOf(FieldConfig::class, $field_config);
@@ -129,7 +131,7 @@ class DefaultFieldValueTest extends CanvasKernelTestBase {
     $field_config->setDefaultValue($field_values);
     if ($expected_exception != NULL) {
       $this->expectException($expected_exception);
-      \assert(is_string($exception_message));
+      \assert(\is_string($exception_message));
       $this->expectExceptionMessage($exception_message);
     }
 

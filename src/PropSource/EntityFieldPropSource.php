@@ -25,7 +25,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
  *   field on the host entity)
  *
  * @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
- * @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
+ * @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher
  *
  * @phpstan-import-type PropSourceArray from PropSourceBase
  * @internal
@@ -146,7 +146,7 @@ final class EntityFieldPropSource extends PropSourceBase {
       $plugin_definition = $this->adapter->getPluginDefinition();
       $deps['module'][] = match (TRUE) {
         $plugin_definition instanceof PluginDefinitionInterface => $plugin_definition->getProvider(),
-        is_array($plugin_definition) => $plugin_definition['provider'],
+        \is_array($plugin_definition) => $plugin_definition['provider'],
         default => NULL,
       };
     }

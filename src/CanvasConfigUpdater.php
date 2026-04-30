@@ -230,7 +230,7 @@ class CanvasConfigUpdater {
   }
 
   public function unsetComponentCategoryProperty(Component $component): bool {
-    if (!is_null($component->get('category'))) {
+    if (!\is_null($component->get('category'))) {
       $component->set('category', NULL);
       $deprecations_triggered = &$this->triggeredDeprecations['3549726'][$component->id()];
       if ($this->deprecationsEnabled && !$deprecations_triggered) {
@@ -274,7 +274,7 @@ class CanvasConfigUpdater {
     $active_version_updated = FALSE;
     foreach ($settings['prop_field_definitions'] as $prop_name => &$prop_field_definition) {
       if (!isset($prop_field_definition['required'])) {
-        $prop_field_definition['required'] = in_array($prop_name, $required_props, TRUE);
+        $prop_field_definition['required'] = \in_array($prop_name, $required_props, TRUE);
         $active_version_updated = TRUE;
         $updated_versions[] = $component->getActiveVersion();
       }
@@ -312,7 +312,7 @@ class CanvasConfigUpdater {
       \assert(\array_key_exists('prop_field_definitions', $settings));
       foreach ($settings['prop_field_definitions'] as $prop_name => &$prop_field_definition) {
         if (!isset($prop_field_definition['required'])) {
-          $prop_field_definition['required'] = in_array($prop_name, $required_props, TRUE);
+          $prop_field_definition['required'] = \in_array($prop_name, $required_props, TRUE);
           $past_version_updated = TRUE;
           $updated_versions[] = $version;
         }
@@ -535,7 +535,7 @@ class CanvasConfigUpdater {
     // If new props appeared, or they didn't have a proper definition match,
     // this is not the right time to include them.
     $settings['prop_field_definitions'] = array_filter($settings['prop_field_definitions'], function ($value) {
-      return is_array($value);
+      return \is_array($value);
     });
     $component->setSettings($settings);
 

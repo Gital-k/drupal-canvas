@@ -10,7 +10,6 @@ use Drupal\canvas\Config\ThemeSettingsDiscovery;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Extension\CanvasExtensionPluginManager;
-use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
 use Drupal\Component\Utility\Html;
@@ -34,6 +33,7 @@ use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\AssetRenderer;
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageRegion;
@@ -199,6 +199,7 @@ HTML;
             'permissions' => [
               'globalRegions' => $this->currentUser->hasPermission(PageRegion::ADMIN_PERMISSION),
               'patterns' => $this->currentUser->hasPermission(Pattern::ADMIN_PERMISSION),
+              'brandKit' => $this->currentUser->hasPermission(BrandKit::ADMIN_PERMISSION),
               'codeComponents' => $this->currentUser->hasPermission(JavaScriptComponent::ADMIN_PERMISSION),
               'contentTemplates' => $this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION),
               'publishChanges' => $this->currentUser->hasPermission(AutoSaveManager::PUBLISH_PERMISSION),
@@ -240,9 +241,7 @@ HTML;
           'styles' => '<css-placeholder token="CSS-HERE-PLEASE">',
           'scripts' => '<js-placeholder token="JS-HERE-PLEASE">',
         ],
-        'import_maps' => [
-          ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS => $this->globalImports->getGlobalImports(),
-        ],
+        'import_maps' => $this->globalImports->getImportMap(),
       ]);
   }
 
@@ -336,7 +335,7 @@ HTML;
     // Find all used client-side transforms.
     $transforms = [];
     foreach ($this->fieldWidgetPluginManager->getDefinitions() as $definition) {
-      if (!isset($definition['canvas']['transforms']) || !is_array($definition['canvas']['transforms'])) {
+      if (!isset($definition['canvas']['transforms']) || !\is_array($definition['canvas']['transforms'])) {
         continue;
       }
       $transforms = [...$transforms, ...\array_keys($definition['canvas']['transforms'])];

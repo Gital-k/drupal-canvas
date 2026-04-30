@@ -1,15 +1,59 @@
 import prettier from 'eslint-config-prettier';
+import pluginChaiFriendly from 'eslint-plugin-chai-friendly';
+import cypress from 'eslint-plugin-cypress';
+import mochaPlugin from 'eslint-plugin-mocha';
+import playwright from 'eslint-plugin-playwright';
+import react from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import js from '@eslint/js';
-import vitest from "@vitest/eslint-plugin"
-import mochaPlugin from "eslint-plugin-mocha";
-import drupal from "eslint-config-drupal"
-import react from 'eslint-plugin-react';
-import reactHooks from 'eslint-plugin-react-hooks';
-import pluginChaiFriendly from 'eslint-plugin-chai-friendly';
-import cypress from "eslint-plugin-cypress"
+import vitest from '@vitest/eslint-plugin';
+
+const drupalGlobals = {
+  Drupal: true,
+  drupalSettings: true,
+};
+
+const isolatedPerTestPlugin = {
+  rules: {
+    'require-isolated-per-test-import': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description:
+            "Require `import { isolatedPerTest as test } from '../../fixtures/test.js'` in isolatedPerTest spec files",
+        },
+        schema: [],
+        messages: {
+          missingImport:
+            "isolatedPerTest spec files must import `{ isolatedPerTest as test }` from '../../fixtures/test.js'.",
+        },
+      },
+      create(context) {
+        let found = false;
+        return {
+          ImportDeclaration(node) {
+            if (node.source.value !== '../../fixtures/test.js') return;
+            const hasSpecifier = node.specifiers.some(
+              (s) =>
+                s.type === 'ImportSpecifier' &&
+                s.imported.name === 'isolatedPerTest' &&
+                s.local.name === 'test',
+            );
+            if (hasSpecifier) found = true;
+          },
+          'Program:exit'(node) {
+            if (!found) {
+              context.report({ node, messageId: 'missingImport' });
+            }
+          },
+        };
+      },
+    },
+  },
+};
 
 export default defineConfig([
   js.configs.recommended,
@@ -30,7 +74,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['**/*.cy.*', "ui/tests/e2e/entity-form-fields/*"],
+    files: ['**/*.cy.*', 'ui/tests/e2e/entity-form-fields/*'],
     plugins: {
       mocha: mochaPlugin,
       cypress: cypress,
@@ -44,7 +88,7 @@ export default defineConfig([
       'mocha/no-top-level-hooks': 'off',
       'mocha/max-top-level-suites': 'off',
       'mocha/no-exclusive-tests': 'error',
-    }
+    },
   },
   {
     rules: {
@@ -90,14 +134,14 @@ export default defineConfig([
         { args: 'none', caughtErrors: 'none' },
       ],
       'no-redeclare': ['error', { builtinGlobals: false }],
-    }
+    },
   },
   {
-    files: ["**/*.{mjs,cjs,js,jsx}"],
+    files: ['**/*.{mjs,cjs,js,jsx}'],
     rules: {
       '@typescript-eslint/no-unused-expressions': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
-    }
+    },
   },
   {
     languageOptions: {
@@ -110,7 +154,7 @@ export default defineConfig([
         ...globals.browser,
         ...globals.node,
         ...vitest.environments.env.globals,
-        ...drupal.globals,
+        ...drupalGlobals,
         ...mochaPlugin.configs.recommended.languageOptions.globals,
         once: true,
         cy: true,
@@ -128,12 +172,27 @@ export default defineConfig([
     },
   },
   {
+    files: ['tests/src/Playwright/**/*.ts'],
+    extends: [playwright.configs['flat/recommended']],
+  },
+  {
+    files: ['**/tests/isolatedPerTest/**/*.spec.ts'],
+    plugins: {
+      'isolated-per-test': isolatedPerTestPlugin,
+    },
+    rules: {
+      'isolated-per-test/require-isolated-per-test-import': 'error',
+    },
+  },
+  {
     ignores: [
-      "**/dist",
-      "**/.astro",
-      "js/astro-bundles/*",
-      "js/assets/**/*",
-      "ui/src/local_packages",
-    ]
-  }
+      '.cache',
+      '**/dist',
+      '**/.astro',
+      'js/astro-bundles/*',
+      'js/assets/**/*',
+      'ui/src/local_packages',
+      '.cache/**',
+    ],
+  },
 ]);

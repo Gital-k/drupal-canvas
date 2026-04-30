@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Component\Serialization\Json;
@@ -31,10 +33,10 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
- * @covers \Drupal\canvas\Controller\ApiLayoutController::post()
- * @group canvas
- * @group #slow
+ * @legacy-covers \Drupal\canvas\Controller\ApiLayoutController::post
  */
+#[Group('canvas')]
+#[Group('#slow')]
 #[RunTestsInSeparateProcesses]
 final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
 
@@ -59,9 +61,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     ]);
   }
 
-  /**
-   * @dataProvider providerEntityTypes
-   */
+  #[DataProvider('providerEntityTypes')]
   public function testEntityAccessRequired(string $entity_type): void {
     $this->setUpCurrentUser([], [
       'administer url aliases',
@@ -134,9 +134,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->assertSame('Updated title', $entityFromAutoSave->label());
   }
 
-  /**
-   * @dataProvider providerEntityTypes
-   */
+  #[DataProvider('providerEntityTypes')]
   public function testEmpty(string $entity_type): void {
     $entity = $this->getTestEntity($entity_type);
     $this->setUpCurrentUser([], [self::getAdminPermission($entity)]);
@@ -158,9 +156,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->assertEquals('<div class="canvas--region-empty-placeholder"></div>', $root);
   }
 
-  /**
-   * @dataProvider providerEntityTypes
-   */
+  #[DataProvider('providerEntityTypes')]
   public function testMissingSlot(string $entity_type): void {
     $entity = $this->getTestEntity($entity_type);
     $this->setUpCurrentUser([], [self::getAdminPermission($entity)]);
@@ -214,9 +210,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->assertSame(['c4074d1f-149a-4662-aaf3-615151531cf6'], $slot_and_component_comments);
   }
 
-  /**
-   * @dataProvider providerEntityTypes
-   */
+  #[DataProvider('providerEntityTypes')]
   public function test(string $entity_type): void {
     $entity = $this->getTestEntity($entity_type);
     $this->setUpCurrentUser([], [self::getAdminPermission($entity)]);
@@ -279,7 +273,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     else {
       $expected_heading_text = $static_heading_text;
     }
-    unset($json['isNew'], $json['isPublished'], $json['html']);
+    unset($json['isNew'], $json['isPublished'], $json['hasUnsavedStatusChange'], $json['html']);
     $json['layout'][0]['components'][] = [
       'nodeType' => 'component',
       'uuid' => $uuid,
@@ -326,9 +320,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     self::assertArrayHasKey($uuid, $json['model']);
   }
 
-  /**
-   * @dataProvider providerEntityTypes
-   */
+  #[DataProvider('providerEntityTypes')]
   public function testWithGlobal(string $entity_type): void {
     $entity = $this->getTestEntity($entity_type);
     $this->setUpCurrentUser(
@@ -368,7 +360,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     // Add a new component to a global region.
     $uuid = '173c4899-a5f7-442a-b008-ea8c925735be';
     $json['model'][$uuid] = self::getNewHeadingComponentModel();
-    unset($json['isNew'], $json['isPublished'], $json['html']);
+    unset($json['isNew'], $json['isPublished'], $json['hasUnsavedStatusChange'], $json['html']);
     $json['layout'][\key($highlightedRegion)]['components'][] = [
       'nodeType' => 'component',
       'uuid' => $uuid,
@@ -386,9 +378,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     }
   }
 
-  /**
-   * @dataProvider providerEntityTypes
-   */
+  #[DataProvider('providerEntityTypes')]
   public function testWithoutPageRegionPermission(string $entity_type): void {
     $entity = $this->getTestEntity($entity_type);
     $this->setUpCurrentUser([], [
@@ -426,7 +416,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     // Add a new component instance to a ("global") region.
     $uuid = '173c4899-a5f7-442a-b008-ea8c925735be';
     $json['model'][$uuid] = self::getNewHeadingComponentModel();
-    unset($json['isNew'], $json['isPublished'], $json['html']);
+    unset($json['isNew'], $json['isPublished'], $json['hasUnsavedStatusChange'], $json['html']);
     $json['layout'][1] = [
       'nodeType' => 'region',
       'id' => 'highlighted',
@@ -446,9 +436,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->request(Request::create($url, method: 'POST', content: \json_encode($json, JSON_THROW_ON_ERROR)));
   }
 
-  /**
-   * @dataProvider providerEntityTypes
-   */
+  #[DataProvider('providerEntityTypes')]
   public function testWithCodeComponent(string $entity_type): void {
     $entity = $this->getTestEntity($entity_type);
     $this->setUpCurrentUser([], [self::getAdminPermission($entity)]);
@@ -538,7 +526,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $cache->invalidateTags([\sprintf('entity.memory_cache:%s', JavaScriptComponent::ENTITY_TYPE_ID)]);
     $this->container->get(ConfigFactoryInterface::class)->reset();
 
-    unset($json['isNew'], $json['isPublished'], $json['html']);
+    unset($json['isNew'], $json['isPublished'], $json['hasUnsavedStatusChange'], $json['html']);
     $node = Node::load(1);
     \assert($node instanceof NodeInterface);
     $json += $this->getPostContentsDefaults($node);
@@ -684,10 +672,9 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $module_path = \Drupal::service('extension.list.module')->getPath('canvas');
     $expected_preview_html = str_replace('Canvas/MODULE/PATH', $module_path, $expected_preview_html);
     \assert($reference_media->field_media_image->entity instanceof FileInterface);
-    // @phpstan-ignore-next-line
     $expected_preview_html = str_replace('!!REFERENCED_MEDIA!!', $reference_media->field_media_image->src_with_alternate_widths->getGeneratedUrl(), $expected_preview_html);
 
-    unset($json['html'], $json['isPublished'], $json['isNew']);
+    unset($json['html'], $json['isPublished'], $json['isNew'], $json['hasUnsavedStatusChange']);
     $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', content: json_encode($json, JSON_THROW_ON_ERROR)));
     // Ensure the component is rendered using the expected markup.
     $this->assertRaw('<!-- canvas-start-166c9eee-35e9-4795-8c6f-24537728e95e -->' . $expected_preview_html . '<!-- canvas-end-166c9eee-35e9-4795-8c6f-24537728e95e -->');
@@ -704,7 +691,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     self::assertIsString($content);
     $json = \json_decode($content, TRUE);
     self::assertEquals('Anonymous (0)', $json['entity_form_fields']['uid[0][target_id]']);
-    unset($json['html'], $json['isPublished'], $json['isNew']);
+    unset($json['html'], $json['isPublished'], $json['isNew'], $json['hasUnsavedStatusChange']);
     $json['entity_form_fields']['uid[0][target_id]'] = 'This is not a user';
     $node = Node::load(1);
     \assert($node instanceof NodeInterface);
@@ -741,7 +728,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     self::assertIsString($content);
     $json = \json_decode($content, TRUE);
     self::assertEquals('Anonymous (0)', $json['entity_form_fields']['uid[0][target_id]']);
-    unset($json['html'], $json['isPublished'], $json['isNew']);
+    unset($json['html'], $json['isPublished'], $json['isNew'], $json['hasUnsavedStatusChange']);
     $json['entity_form_fields']['uid[0][target_id]'] = \sprintf('%s (%d)', $admin->getDisplayName(), $admin->id());
     $response = $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', content: json_encode($json + $this->getPostContentsDefaults($node), JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -772,7 +759,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     self::assertArrayNotHasKey('uid[0][target_id]', $json['entity_form_fields']);
 
     // Make an edit as this user.
-    unset($json['html'], $json['isPublished'], $json['isNew']);
+    unset($json['html'], $json['isPublished'], $json['isNew'], $json['hasUnsavedStatusChange']);
     $new_title = $this->randomMachineName();
     $json['entity_form_fields']['title[0][value]'] = $new_title;
     $content = $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', content: json_encode($json + $this->getPostContentsDefaults($node), JSON_THROW_ON_ERROR)));

@@ -6,7 +6,9 @@ namespace Drupal\Tests\canvas_ai\Kernel;
 
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Page;
-use Drupal\KernelTests\KernelTestBase;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Tests\user\Traits\UserCreationTrait;
@@ -15,10 +17,9 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * Tests for the CanvasAiPageBuilderHelper.
- *
- * @group canvas_ai
  */
-final class CanvasAiPageBuilderHelperTest extends KernelTestBase {
+#[Group('canvas_ai')]
+final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
   use UserCreationTrait;
 
   /**
@@ -32,9 +33,6 @@ final class CanvasAiPageBuilderHelperTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'system',
-    'user',
-    'canvas',
     'canvas_ai',
     'media',
   ];
@@ -323,9 +321,8 @@ YAML;
 
   /**
    * Tests the generateVerboseContextForOrchestrator method.
-   *
-   * @dataProvider generateVerboseContextProvider
    */
+  #[DataProvider('generateVerboseContextProvider')]
   public function testGenerateVerboseContextForOrchestrator(array $prompt, string $expected): void {
     $result = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
     $this->assertEquals($expected, $result);

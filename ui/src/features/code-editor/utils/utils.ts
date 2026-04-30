@@ -39,6 +39,10 @@ export function parsePropValueForPreview(
       return Number(prop.example);
     case 'boolean':
       return String(prop.example) === 'true';
+    case 'array':
+      // For multi-value props, return the array as-is
+      // It should already be an array of the correct type (string[] | number[])
+      return Array.isArray(prop.example) ? prop.example : [];
     default:
       return prop.example as string;
   }
@@ -98,6 +102,48 @@ export function getJsForSlotsPreview(slots: CodeComponentSlot[]) {
     .join('\n');
 }
 
+function serializeExample(
+  example: CodeComponentProp['example'],
+  flags: {
+    isNumberType: boolean;
+    isStringArrayProp: boolean | undefined;
+    isVideo: boolean;
+    isImage: boolean;
+  },
+) {
+  const { isNumberType, isStringArrayProp, isVideo, isImage } = flags;
+
+  // Multi-value props (allowMultiple)
+  if (Array.isArray(example)) {
+    if (isNumberType) {
+      return example.filter((v) => v !== '').map((v) => Number(v));
+    }
+    if (isStringArrayProp) {
+      return (example as string[]).filter((v) => v !== '');
+    }
+    if (isVideo) {
+      return (example as CodeComponentPropVideoExample[])
+        .filter((v) => v && typeof v === 'object' && v.src && v.src !== '')
+        .map(serializeVideoSrc);
+    }
+    if (isImage) {
+      return (example as CodeComponentPropImageExample[]).filter(
+        (v) => v && typeof v === 'object' && v.src && v.src !== '',
+      );
+    }
+    return example;
+  }
+
+  // Single-value props
+  if (isNumberType) {
+    return Number(example);
+  }
+  if (isVideo && typeof example === 'object') {
+    return serializeVideoSrc(example as CodeComponentPropVideoExample);
+  }
+  return example!;
+}
+
 /**
  * Serializes props for saving in the JS Component config entity.
  *
@@ -123,40 +169,95 @@ export function serializeProps(props: CodeComponentProp[]) {
           contentMediaType,
           'x-formatting-context': xFormattingContext,
           derivedType,
+          allowMultiple,
+          items,
+          valueMode,
+          limitedCount,
         } = prop;
-        const isNumberType = ['integer', 'number'].includes(type);
+        // Check if the base type (or items type for arrays) is numeric
+        const baseType = allowMultiple && items ? items.type : type;
+        const isNumberType = ['integer', 'number'].includes(baseType);
         const isVideo = derivedType === 'video';
+        const isImage = derivedType === 'image';
+
+        // Determine the actual type for serialization
+        const serializedType = allowMultiple && items ? 'array' : type;
+
+        // For string-based array props (e.g. date, link), empty strings should
+        // be treated as "no value" and excluded from the serialized output.
+        // Number arrays already filter empty strings inline below.
+        const isStringArrayProp =
+          allowMultiple && items?.type === 'string' && !isNumberType;
+
+        // Whether this prop has a non-empty example worth serializing.
+        // For arrays: check length > 0 (string arrays also require non-empty strings)
+        // For non-arrays: check truthy value or explicit false (for booleans)
+        const hasExample = Array.isArray(example)
+          ? isStringArrayProp
+            ? (example as string[]).some((v) => v !== '')
+            : example.length > 0
+          : example || example === false;
+
         const processed: CodeComponentPropSerialized = {
           title: name,
-          type,
-          // The example is taken from the prop if it's a truthy value, or a
-          // boolean false value (which could be an example of a boolean prop).
-          ...((example || example === false) && {
+          type: serializedType,
+          ...(hasExample && {
             examples: [
-              isNumberType
-                ? Number(example)
-                : isVideo && typeof example === 'object'
-                  ? serializeVideoSrc(example as CodeComponentPropVideoExample)
-                  : example,
+              serializeExample(example, {
+                isNumberType,
+                isStringArrayProp,
+                isVideo,
+                isImage,
+              }),
             ],
           }),
-          ...(enumValues && {
-            enum: enumValues
-              .filter(({ value }) => value !== '')
-              .map(({ value }) => (isNumberType ? Number(value) : value)),
-            'meta:enum': Object.fromEntries(
-              enumValues
+          // Only add enum/meta:enum at root level if NOT an array
+          ...(!allowMultiple &&
+            enumValues && {
+              enum: enumValues
                 .filter(({ value }) => value !== '')
-                .map(({ value, label }) => [value, label]),
-            ),
-          }),
-          ...($ref && { $ref }),
-          ...(format && { format }),
-          ...(contentMediaType && { contentMediaType }),
-          ...(xFormattingContext && {
-            'x-formatting-context': xFormattingContext,
-          }),
+                .map(({ value }) => (isNumberType ? Number(value) : value)),
+              'meta:enum': Object.fromEntries(
+                enumValues
+                  .filter(({ value }) => value !== '')
+                  .map(({ value, label }) => [value, label]),
+              ),
+            }),
         };
+        // When allowMultiple is true, metadata goes INSIDE items
+        if (allowMultiple && items) {
+          processed.items = {
+            type: items.type,
+            ...($ref && { $ref }),
+            ...(format && { format }),
+            ...(contentMediaType && { contentMediaType }),
+            ...(xFormattingContext && {
+              'x-formatting-context': xFormattingContext,
+            }),
+            // Add enum/meta:enum inside items for array types
+            ...(enumValues && {
+              enum: enumValues
+                .filter(({ value }) => value !== '')
+                .map(({ value }) => (isNumberType ? Number(value) : value)),
+              'meta:enum': Object.fromEntries(
+                enumValues
+                  .filter(({ value }) => value !== '')
+                  .map(({ value, label }) => [value, label]),
+              ),
+            }),
+          };
+          // Add maxItems when valueMode is 'limited'
+          if (valueMode === 'limited' && limitedCount) {
+            processed.maxItems = limitedCount;
+          }
+        } else {
+          // When not an array, metadata goes at top level
+          if ($ref) processed.$ref = $ref;
+          if (format) processed.format = format;
+          if (contentMediaType) processed.contentMediaType = contentMediaType;
+          if (xFormattingContext)
+            processed['x-formatting-context'] = xFormattingContext;
+        }
         return { ...acc, [getPropMachineName(name)]: processed };
       },
       {} as Record<string, CodeComponentPropSerialized>,
@@ -178,7 +279,7 @@ export function deserializeProps(
   if (!props) {
     return [];
   }
-  return Object.entries(props).map(([key, prop]) => {
+  return Object.entries(props).map(([, prop]) => {
     const {
       title,
       type,
@@ -189,22 +290,62 @@ export function deserializeProps(
       format,
       contentMediaType,
       'x-formatting-context': xFormattingContext,
+      items,
+      maxItems,
     } = prop;
 
-    const isNumberType = ['integer', 'number'].includes(type);
-    let example: CodeComponentProp['example'] = '';
+    // Detect if this is an array type (allowMultiple)
+    const allowMultiple = type === 'array' && items;
+    const actualType = allowMultiple ? items.type : type;
+
+    // When it's an array, enum is inside items; otherwise at top level
+    const actualEnumValues = allowMultiple ? items?.enum : enumValues;
+    const actualMetaEnum = allowMultiple ? items?.['meta:enum'] : metaEnum;
+
+    // When it's an array, metadata is inside items; otherwise at top level
+    const actualRef = allowMultiple ? items?.$ref : $ref;
+    const actualFormat = allowMultiple ? items?.format : format;
+    const actualContentMediaType = allowMultiple
+      ? items?.contentMediaType
+      : contentMediaType;
+    const actualXFormattingContext = allowMultiple
+      ? items?.['x-formatting-context']
+      : xFormattingContext;
+
+    const isNumberType = ['integer', 'number'].includes(actualType);
+    let example: CodeComponentProp['example'] = allowMultiple ? [] : '';
+
+    // Create a normalized prop for type derivation
+    // For array types, we need to check items.type instead of top-level type
+    const propForDerivation =
+      allowMultiple && items
+        ? {
+            ...prop,
+            type: items.type,
+            $ref: items.$ref,
+            format: items.format,
+            contentMediaType: items.contentMediaType,
+            'x-formatting-context': items['x-formatting-context'],
+            enum: items.enum,
+            'meta:enum': items['meta:enum'],
+          }
+        : prop;
+
     const derivedType =
-      derivedPropTypes.find((type) => type.derive(prop))?.type ?? null;
+      derivedPropTypes.find((type) => type.derive(propForDerivation))?.type ??
+      null;
     const isVideo = derivedType == 'video';
 
     if (examples?.length) {
-      if (type === 'object') {
+      if (actualType === 'object') {
         example = examples[0] as unknown as
           | CodeComponentPropImageExample
           | CodeComponentPropVideoExample;
-      } else if (type === 'boolean') {
+      } else if (actualType === 'boolean') {
         example = examples[0] as unknown as boolean;
-      } else {
+      } else if (allowMultiple && Array.isArray(examples[0])) {
+        example = examples[0] as string[] | number[];
+      } else if (!allowMultiple) {
         example = String(examples[0]);
       }
     }
@@ -213,28 +354,47 @@ export function deserializeProps(
     const deserializedProp = {
       id: uuidv4(),
       name: title,
-      type,
+      type: actualType,
       example:
-        isVideo && typeof example === 'object'
-          ? deserializeVideoSrc(example as CodeComponentPropVideoExample)
-          : example,
-      ...(enumValues && {
-        enum: enumValues.map((value) => ({
+        isVideo && Array.isArray(example)
+          ? (example as CodeComponentPropVideoExample[]).map(
+              deserializeVideoSrc,
+            )
+          : isVideo && typeof example === 'object'
+            ? deserializeVideoSrc(example as CodeComponentPropVideoExample)
+            : example,
+      ...(actualEnumValues && {
+        enum: actualEnumValues.map((value) => ({
           value: isNumberType ? Number(value) : value,
           label: String(value),
         })),
       }),
-      ...(metaEnum && {
-        enum: Object.entries(metaEnum).map(([value, label]) => ({
+      ...(actualMetaEnum && {
+        enum: Object.entries(actualMetaEnum).map(([value, label]) => ({
           value: isNumberType ? Number(value) : value,
           label,
         })),
       }),
-      ...($ref && { $ref }),
-      ...(format && { format }),
-      ...(contentMediaType && { contentMediaType }),
-      ...(xFormattingContext && { 'x-formatting-context': xFormattingContext }),
+      ...(actualRef && { $ref: actualRef }),
+      ...(actualFormat && { format: actualFormat }),
+      ...(actualContentMediaType && {
+        contentMediaType: actualContentMediaType,
+      }),
+      ...(actualXFormattingContext && {
+        'x-formatting-context': actualXFormattingContext,
+      }),
       derivedType,
+      ...(allowMultiple && { allowMultiple: true, items }),
+      ...(allowMultiple &&
+        maxItems && {
+          valueMode: 'limited' as const,
+          limitedCount: maxItems,
+        }),
+      ...(allowMultiple &&
+        !maxItems && {
+          valueMode: 'unlimited' as const,
+          limitedCount: 1,
+        }),
     };
 
     // Backwards compatibility
@@ -243,6 +403,35 @@ export function deserializeProps(
       deserializedProp.contentMediaType = 'text/html';
       deserializedProp['x-formatting-context'] = 'block';
       delete deserializedProp.$ref;
+    }
+
+    // Backwards compatibility: remove stale contentMediaType /
+    // x-formatting-context fields that were incorrectly carried over when
+    // switching a prop away from 'formattedText' to a type with other
+    // distinguishing fields (a format or enum values), before the type-switch
+    // logic was fixed to clear those fields. Without this fix, those props
+    // would incorrectly re-derive as 'formattedText' on page load.
+    // @see https://www.drupal.org/i/3583386
+    if (
+      derivedType === 'formattedText' &&
+      (actualFormat || (actualEnumValues && actualEnumValues.length > 0))
+    ) {
+      delete deserializedProp.contentMediaType;
+      delete deserializedProp['x-formatting-context'];
+      // Remove stale fields from items for multi-value (allowMultiple) props.
+      if (allowMultiple && deserializedProp.items) {
+        delete deserializedProp.items.contentMediaType;
+        delete deserializedProp.items['x-formatting-context'];
+      }
+      // Re-derive the correct type now that the stale fields are removed.
+      deserializedProp.derivedType =
+        derivedPropTypes.find((type) =>
+          type.derive({
+            ...propForDerivation,
+            contentMediaType: undefined,
+            'x-formatting-context': undefined,
+          }),
+        )?.type ?? null;
     }
 
     return deserializedProp;
@@ -286,7 +475,7 @@ export function deserializeSlots(
   if (!slots) {
     return [];
   }
-  return Object.entries(slots).map(([key, slot]) => ({
+  return Object.entries(slots).map(([, slot]) => ({
     id: uuidv4(),
     name: slot.title,
     example: slot.examples?.length ? slot.examples[0] : '',

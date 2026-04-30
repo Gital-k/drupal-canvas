@@ -4,11 +4,13 @@ import { debounce } from 'lodash';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { useComponentTransforms } from '@/components/ComponentInstanceForm';
 import {
+  coerceValueForSchema,
   ComponentPreviewUpdateEvent,
   getPropSchemas,
   getPropsValues,
   propInputData,
   shouldSkipPropValidation,
+  toDateTime,
   toPropName,
   validateProp,
 } from '@/components/form/formUtil';
@@ -21,12 +23,10 @@ import { FORM_TYPES } from '@/features/form/constants';
 import { selectFormValues } from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
-import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
-import { useGetComponentsQuery } from '@/services/componentAndLayout';
-import { useUpdateComponentMutation } from '@/services/preview';
+import { usePatchComponent } from '@/services/preview';
 import { isPropSourceComponent } from '@/types/Component';
-import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
+import { parseValue } from '@/utils/function-utils';
 
 import type { PropsValues } from '@drupal-canvas/types';
 import type {
@@ -47,18 +47,15 @@ export const InputBehaviorsComponentPropsForm = (
    * rendering in the correct React Router context so we can't get the selected component ID from the url in inputBehaviors.tsx.
    * We already have a workaround for this for the Redux provider, could we do the same for the React Router context?
    */
-  const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const dispatch = useAppDispatch();
   const polledBackgroundUpdate = useRef<number | null>(null);
   const { attributes } = props;
-  const { data: components } = useGetComponentsQuery();
   const transforms = useComponentTransforms();
   const inputAndUiData = useInputUIData();
-  const { selectedComponentType, version, selectedComponent } = inputAndUiData;
+  const { selectedComponentType, selectedComponent, components } =
+    inputAndUiData;
   const component = components?.[selectedComponentType] as PropSourceComponent;
-  const [patchComponent] = useUpdateComponentMutation({
-    fixedCacheKey: selectedComponent,
-  });
+  const patchComponent = usePatchComponent();
 
   const fieldName = attributes.name || attributes['data-canvas-name'];
   const propName = toPropName(fieldName, selectedComponent);
@@ -90,28 +87,6 @@ export const InputBehaviorsComponentPropsForm = (
     // @see \Drupal\Core\Field\WidgetInterface::massageFormValues()
     const resolved = { ...selectedModel.resolved, ...values };
 
-    // Check the object for any values that are flagged for removal. Note that
-    // removal flagging is not necessary for all prop types. It is used for
-    // props with complex prop shapes where the empty-indicating value is nested
-    // with the structure.
-    Object.keys(values).forEach((prop) => {
-      if (flaggedForRemoval(values[prop]) && component?.propSources?.[prop]) {
-        // If the prop is optional, it can be removed.
-        if (!component.propSources[prop]?.required) {
-          if (isEvaluatedComponentModel(selectedModel)) {
-            // The source value can also be updated to empty when permitted.
-            if (!Object.isFrozen(selectedModel.source[prop])) {
-              selectedModel.source[prop].value = [];
-            }
-          }
-          resolved[prop] = [];
-        } else {
-          // If the prop is required, we need to set it back to the default.
-          resolved[prop] = component.propSources[prop].default_values.resolved;
-        }
-      }
-    });
-
     let backgroundPreviewUpdate = false;
     if (isScalarProp) {
       // Fire an event to allow listeners to attempt real-time updates.
@@ -132,18 +107,13 @@ export const InputBehaviorsComponentPropsForm = (
 
     if (isEvaluatedComponentModel(selectedModel) && component) {
       const updateBackend = () => {
-        patchComponent({
-          type: editorFrameContext,
-          componentInstanceUuid: selectedComponent,
-          componentType: `${selectedComponentType}@${version}`,
-          model: {
-            source: syncPropSourcesToResolvedValues(
-              selectedModel.source,
-              component,
-              resolved,
-            ),
+        patchComponent(newInputAndUiData, {
+          source: syncPropSourcesToResolvedValues(
+            selectedModel.source,
+            component,
             resolved,
-          },
+          ),
+          resolved,
         });
       };
       if (backgroundPreviewUpdate) {
@@ -164,14 +134,9 @@ export const InputBehaviorsComponentPropsForm = (
       updateBackend();
       return;
     }
-    patchComponent({
-      type: editorFrameContext,
-      componentInstanceUuid: selectedComponent,
-      componentType: `${selectedComponentType}@${version}`,
-      model: {
-        ...selectedModel,
-        resolved,
-      },
+    patchComponent(newInputAndUiData, {
+      ...selectedModel,
+      resolved,
     });
   };
 
@@ -198,12 +163,27 @@ export const InputBehaviorsComponentPropsForm = (
 
   const parseNewValue = (e: React.ChangeEvent) => {
     const schemas = getPropSchemas(inputAndUiData);
+    const target = e.target as HTMLInputElement | HTMLSelectElement;
+    const eventFieldName = target.name;
+    const fieldName = eventFieldName;
+    const isNestedArraySubfield =
+      fieldName &&
+      schemas?.[propName]?.type === 'array' &&
+      fieldName.startsWith(
+        `canvas_component_props[${selectedComponent}][${propName}][`,
+      );
+
+    // A <select multiple> element's .value is only the last-clicked option.
+    // For array props rendered as multi-selects, collect every selected option.
+    if (target instanceof HTMLSelectElement && target.multiple) {
+      return Array.from(target.selectedOptions).map((opt) => opt.value);
+    }
+
     const rawValue = parseValue(
       (e.target as HTMLInputElement | HTMLSelectElement).value,
       e.target as HTMLInputElement,
       schemas?.[propName],
     );
-    const fieldName = (e.target as HTMLInputElement | HTMLSelectElement).name;
     if (
       // If there are no transforms, we cannot use them, just return the raw
       // value. Note that the 'undefined' check here is technically not required
@@ -215,7 +195,11 @@ export const InputBehaviorsComponentPropsForm = (
       // overhead of transforms.
       !(propName in transforms) ||
       // Or if the prop relies on multiple input fields.
-      multipleInputsSingleValue.includes(propName)
+      multipleInputsSingleValue.includes(propName) ||
+      // Nested updates for array props (for example multivalue `_weight` and
+      // `value` subfields) should bypass per-field transforms. Transforms will
+      // be applied at the entire-prop level.
+      isNestedArraySubfield
     ) {
       return rawValue;
     }
@@ -232,9 +216,24 @@ export const InputBehaviorsComponentPropsForm = (
     if (
       !shouldSkipPropValidation(fieldName, target, inputAndUiData, newValue)
     ) {
+      const schemas = getPropSchemas(inputAndUiData);
+      const schema = schemas?.[toPropName(fieldName, selectedComponent)];
+
+      let valueToValidate = coerceValueForSchema(
+        newValue,
+        schema?.type === 'array' ? schema.items : schema,
+      );
+
+      if ([schema?.format, schema?.items?.format].includes('date-time')) {
+        valueToValidate = toDateTime(valueToValidate);
+      }
+
+      if (schema?.type === 'array' && !Array.isArray(valueToValidate)) {
+        valueToValidate = [valueToValidate];
+      }
       const [valid, validate] = validateProp(
         toPropName(fieldName, selectedComponent),
-        newValue,
+        valueToValidate,
         inputAndUiData,
       );
       return {
@@ -250,16 +249,22 @@ export const InputBehaviorsComponentPropsForm = (
     // and there is no value stored for this prop, then we set that _none as the
     // selected option. This logic is only necessary in the component instance
     // form, hence it being located here.
-    if (
-      props.options.some((option: PropsValues) => option.value === '_none') &&
-      !inputAndUiData?.model?.[selectedComponent as keyof ComponentModels]
-        ?.resolved?.[propName]
-    ) {
-      propsOverrides.options = props.options.map((option: PropsValues) =>
-        option.value === '_none'
-          ? { ...option, selected: true }
-          : { ...option, selected: false },
-      );
+    if (props.options.some((option: PropsValues) => option.value === '_none')) {
+      if ('multiple' in props.attributes) {
+        // For multi-select (array props), _none has no meaning: an empty
+        // selection is represented as an empty array. Remove it entirely.
+        propsOverrides.options = props.options.filter(
+          (option: PropsValues) => option.value !== '_none',
+        );
+      } else if (
+        !inputAndUiData?.model?.[selectedComponent as keyof ComponentModels]
+          ?.resolved?.[propName]
+      ) {
+        propsOverrides.options = props.options.map((option: PropsValues) => ({
+          ...option,
+          selected: option.value === '_none',
+        }));
+      }
     }
   }
 

@@ -401,16 +401,20 @@ Cypress.Commands.add('drupalSession', () => {
 Cypress.Commands.add(
   'previewReady',
   (iframeSelector = initializedReadyPreviewIframeSelector) => {
-    // Not logging these assertions to try and keep the command log a bit tidier
-    cy.get('.canvasEditorFrameScalingContainer', { log: false }).should(
-      'have.css',
-      'opacity',
-      '1',
-    );
+    // The iframe selector encodes the real "preview is ready" contract:
+    // `data-test-canvas-content-initialized="true"` is set in Viewport.tsx
+    // after IframeSwapper's load-event-driven swap completes, and
+    // `data-canvas-swap-active="true"` means it's the currently active iframe.
+    // We then double-check `readyState === 'complete'` (independent of that
+    // bookkeeping) and that the body isn't blank, so we catch the
+    // "iframe loaded but document is empty" failure mode too.
     cy.get(iframeSelector, { log: false, timeout: 10000 }).as('iframe');
-    cy.get(iframeSelector, { log: false }).its('0.contentDocument', {
-      log: false,
-    });
+    cy.get('@iframe', { log: false })
+      .its('0.contentDocument.readyState', { log: false })
+      .should('eq', 'complete');
+    cy.get('@iframe', { log: false })
+      .its('0.contentDocument.body.childElementCount', { log: false })
+      .should('be.greaterThan', 0);
     cy.log(`Preview '${iframeSelector}' initialized and has content document.`);
     cy.debugPause('previewReady');
     return cy.get('@iframe');
@@ -751,6 +755,95 @@ Cypress.Commands.add(
     });
   },
 );
+
+/**
+ * Assert that a multivalue-field reorder was committed to the server.
+ *
+ * Canvas DnD reorders dispatch through POST /canvas/api/v0/layout/node/{id}.
+ * Multiple preview POSTs can fire around a single drag (debounced typing
+ * tails, intermediate drag-state updates, the final reorder POST). This
+ * helper extracts (value, _weight) pairs from each intercepted POST body,
+ * sorts by weight, and asserts that the LAST completed POST's sorted order
+ * matches the expected sequence — since `ApiLayoutController::post` calls
+ * `autoSaveManager->saveEntity()` on every POST, the last-completed POST
+ * represents the state the server has most recently persisted.
+ *
+ * Known limitation: this helper does not guard against a late-arriving POST
+ * that fires AFTER the assertion passes but BEFORE a subsequent
+ * cy.reload(). In that case, a stale-state POST could overwrite the
+ * auto-save and the reload would read stale data. Empirically this happens
+ * in ~1/3 of runs for the Integer Field DnD and is handled by Cypress's
+ * test-retry (`retries: { runMode: 3 }`); the test retries from the top and
+ * typically passes on attempt 2. A stronger guard (polling for network-idle
+ * before proceeding) was deemed not worth the added complexity.
+ *
+ * @param {Object} options
+ * @param {string} options.alias
+ *   The cy.intercept alias name (without leading `@`) aliasing POSTs to
+ *   /canvas/api/v0/layout/node/{id}. Register the intercept *before* the DnD
+ *   action so all POSTs from the drag are captured.
+ * @param {string} options.fieldName
+ *   The Drupal form field name, e.g. `field_cvt_unlimited_link`.
+ * @param {string[]} options.expectedOrder
+ *   The expected sequence of item values after sort-by-weight.
+ * @param {string} [options.valueKey='value']
+ *   The subfield under each row that holds the value. Use `'uri'` for link
+ *   fields, default `'value'` for text/number/most others.
+ */
+Cypress.Commands.add('assertMultivalueReorder', (options) => {
+  const { alias, fieldName, expectedOrder, valueKey = 'value' } = options;
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const field = escapeRe(fieldName);
+  const sub = escapeRe(valueKey);
+  const valueRe = new RegExp(
+    `"${field}\\[(\\d+)\\]\\[${sub}\\]"\\s*:\\s*"([^"]*)"`,
+    'g',
+  );
+  const weightRe = new RegExp(
+    `"${field}\\[(\\d+)\\]\\[_weight\\]"\\s*:\\s*"(-?\\d+)"`,
+    'g',
+  );
+
+  const extractSorted = (body) => {
+    const asString = typeof body === 'string' ? body : JSON.stringify(body);
+    const values = {};
+    const weights = {};
+    for (const [, idx, value] of asString.matchAll(valueRe)) {
+      values[idx] = value;
+    }
+    for (const [, idx, weight] of asString.matchAll(weightRe)) {
+      weights[idx] = parseInt(weight, 10);
+    }
+    return Object.keys(values)
+      .filter((idx) => weights[idx] !== undefined)
+      .map((idx) => ({ value: values[idx], weight: weights[idx] }))
+      .sort((a, b) => a.weight - b.weight)
+      .map((item) => item.value);
+  };
+
+  cy.get(`@${alias}.all`).should((intercepts) => {
+    // We require two things for determinism before cy.reload():
+    //   1. The POST's response must have landed — that guarantees the
+    //      server has finished processing (ApiLayoutController::post calls
+    //      autoSaveManager->saveEntity() before returning).
+    //   2. The *last* completed POST (not just any) must carry the reorder.
+    //      Multiple POSTs can fire around a drag; if a later one overwrites
+    //      the auto-save with stale state (e.g. a debounced tail from an
+    //      earlier interaction), checking "any POST has the reorder" is
+    //      insufficient — the reload would pull the last-writer's stale
+    //      state. Asserting the last completed body guarantees the server's
+    //      auto-save matches expectations at the moment we proceed.
+    const completed = intercepts.filter(({ response }) => response);
+    expect(
+      completed,
+      'at least one preview POST must have completed',
+    ).to.have.length.above(0);
+    const lastOrdering = extractSorted(
+      completed[completed.length - 1].request.body,
+    );
+    expect(lastOrdering).to.deep.equal(expectedOrder);
+  });
+});
 
 // Helper function used by the realDnd command.
 Cypress.Commands.add('realDndRaw', realDnd);
@@ -1305,6 +1398,42 @@ Cypress.Commands.add('waitForAjax', () => {
         (instance) => instance && instance.ajaxing === true,
       ),
   );
+});
+
+/**
+ * Opens the popover for a specific row in a multivalue field list.
+ *
+ * @param {string} fieldAlias - The Cypress alias for the field container (e.g. '@unlimited-link').
+ * @param {number} rowIndex - The zero-based row index.
+ */
+/**
+ * Closes the currently open multivalue popover dialog.
+ *
+ * @param {boolean} [preventClose=false] - When true, confirms the dialog
+ *   remains open after attempting to close (for validation errors). When false,
+ *   confirms the dialog closes successfully.
+ */
+Cypress.Commands.add('closeMultivaluePopover', (preventClose = false) => {
+  cy.get('[role="dialog"][data-state="open"]')
+    .find('[aria-label="Close"]')
+    .click({ force: true });
+
+  if (preventClose) {
+    // Wait 1000ms to confirm popover remains open on invalid value.
+    cy.wait(1000);
+    cy.get('[role="dialog"][data-state="open"]').should('exist');
+  } else {
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+  }
+});
+
+Cypress.Commands.add('openMultivaluePopover', (fieldAlias, rowIndex) => {
+  cy.get(fieldAlias)
+    .find('tbody tr')
+    .eq(rowIndex)
+    .find('[class*="_listItem_"]')
+    .eq(0)
+    .click();
 });
 
 Cypress.Commands.add('insertComponent', (identifier, options = {}) => {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\Depends;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
@@ -11,13 +13,15 @@ use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
- * @covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::mediaLibraryFieldWidgetInfoAlter()
- * @group canvas
- * @group canvas_data_model
- * @group canvas_data_model__prop_expressions
+ * Tests Media Library Hook Storage Prop Alter.
+ *
+ * @legacy-covers \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter
+ * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::mediaLibraryFieldWidgetInfoAlter
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+#[Group('canvas_data_model')]
+#[Group('canvas_data_model__prop_expressions')]
 class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
 
   use MediaTypeCreationTrait;
@@ -77,7 +81,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
       $storable_prop_shapes,
       array_flip([
         'type=object&$ref=json-schema-definitions://canvas.module/image',
-        'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object',
+        'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object&minItems=1',
         'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object&maxItems=2',
       ]),
     );
@@ -145,9 +149,11 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
   }
 
   /**
-   * @depends testStorablePropShapes
+   * Tests prop shapes yield working static prop sources.
+   *
    * @param \Drupal\canvas\PropShape\StorablePropShape[] $storable_prop_shapes
    */
+  #[Depends('testStorablePropShapes')]
   public function testPropShapesYieldWorkingStaticPropSources(array $storable_prop_shapes): void {
     $this->setUpCurrentUser(permissions: ['access content', 'administer media']);
     parent::testPropShapesYieldWorkingStaticPropSources($storable_prop_shapes);

@@ -6,11 +6,16 @@ namespace Drupal\Tests\canvas_oauth\Kernel;
 
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Url;
+use Drupal\Tests\canvas\Kernel\Traits\MockFileUploadTrait;
+use Drupal\Tests\canvas\Kernel\Traits\PredictableImageStyleItokTestTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\simple_oauth\Kernel\AuthorizedRequestBase;
-use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\image\Entity\ImageStyle;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\Pattern;
@@ -18,19 +23,23 @@ use Drupal\consumers\Entity\Consumer;
 use Drupal\simple_oauth\Entity\Oauth2Scope;
 use Drupal\simple_oauth\Exception\OAuthUnauthorizedHttpException;
 use Drupal\simple_oauth\Oauth2ScopeInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Tests API endpoints where the Canvas OAuth authentication provider is applied.
- *
- * @group canvas_oauth
  */
+#[Group('canvas_oauth')]
 class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
 
   use CreateTestJsComponentTrait;
+  use MediaTypeCreationTrait;
+  use MockFileUploadTrait;
   use RequestTrait;
-  use UserCreationTrait;
+  use PredictableImageStyleItokTestTrait;
 
   /**
    * {@inheritdoc}
@@ -38,20 +47,40 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
   protected static $modules = [
     'system',
     'canvas',
+    'file',
     'media',
     'path',
     'canvas_oauth',
   ];
+
+  protected Page $page;
+
+  private string $testImagePath;
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->setupPredictableItok();
+    // Parent class setup creates a redirect uri, which triggers the path_alias
+    // storage to check if that's used as an alias. So we need to install it
+    // manually instead of using the $modules array.
+    $this->installModule('path_alias');
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    // Set a default theme so Component::normalizeForClientSide() can resolve
+    // theme ancestors when listing Component config entities.
+    $this->config('system.theme')->set('default', 'stark')->save();
     $this->createTestCodeComponent();
     AssetLibrary::create([
       'id' => AssetLibrary::GLOBAL_ID,
       'label' => 'Global',
+    ])->save();
+    BrandKit::create([
+      'id' => BrandKit::GLOBAL_ID,
+      'label' => 'Global brand kit',
+      'fonts' => NULL,
     ])->save();
     Pattern::create([
       'id' => 'test-pattern',
@@ -59,7 +88,50 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       'status' => TRUE,
       'component_tree' => [],
     ])->save();
+    $this->page = Page::create([
+      'uuid' => '80395cae-8381-4298-8bed-8fa319b0a443',
+      'title' => 'Test page',
+      'status' => TRUE,
+      'components' => [],
+    ]);
+    $this->page->save();
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+  }
+
+  /**
+   * Sets up the environment for media upload tests.
+   *
+   * Installs additional entity schemas, config, and mocks the file system
+   * so that file uploads work in kernel tests.
+   */
+  private function setUpMediaUpload(): void {
+    $this->installEntitySchema('media');
+    $this->installEntitySchema('file');
+    $this->installSchema('file', ['file_usage']);
+    $this->installConfig(['field', 'system']);
+    // The media upload response resolves image derivatives which requires
+    // the canvas_parametrized_width image style. We don't really need to test
+    // the actual image style: we can avoid installing a dozen of modules just
+    // by ensuring an image style with that ID exists, as we only care about the
+    // Oauth authentication in this test.
+    // @see \Drupal\Tests\canvas\Kernel\CanvasKernelTestBase::CANVAS_KERNEL_TEST_MINIMAL_MODULES
+    // @see \Drupal\Tests\canvas\Kernel\Controller\ApiMediaControllersPostTest for proper test coverage of the operation itself.
+    ImageStyle::create([
+      'name' => 'canvas_parametrized_width',
+      'label' => 'Drupal Canvas parametrized width',
+    ])->save();
+
+    $this->createMediaType('image', [
+      'id' => 'image',
+      'label' => 'Image',
+    ]);
+
+    $this->mockFileSystemForUploads();
+
+    $source = \dirname(__DIR__, 5) . '/tests/fixtures/images/gracie-big.jpg';
+    $temp_dir = $this->container->get('file_system')->getTempDirectory();
+    $this->testImagePath = $temp_dir . '/canvas-oauth-test-upload-' . \uniqid() . '.jpg';
+    \copy($source, $this->testImagePath);
   }
 
   /**
@@ -67,26 +139,27 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
    *
    * @return array<string, array{
    *   0: string,
-   *   1: array<string>,
+   *   1: array<string, mixed>,
    *   2: array<string>,
    *   3: string,
    *   4: array<string, mixed>
    *   }> Array of test cases where:
    *   - Index 0: Route name
-   *   - Index 1: Route parameter values for `canvas_config_entity_type_id` and
-   *     `canvas_config_entity`
+   *   - Index 1: Route parameters
    *   - Index 2: Required permissions
    *   - Index 3: HTTP method
    *   - Index 4: Request body data for POST/PATCH
    */
   public static function dataProviderRoutes(): array {
     return [
-      'INDEX js components' => ['canvas.api.config.list', [JavaScriptComponent::ENTITY_TYPE_ID], [], 'GET', []],
-      'GET js component' => ['canvas.api.config.get', [JavaScriptComponent::ENTITY_TYPE_ID, 'test-code-component'], [], 'GET', []],
-      'GET asset library' => ['canvas.api.config.get', [AssetLibrary::ENTITY_TYPE_ID, AssetLibrary::GLOBAL_ID], [], 'GET', []],
+      'INDEX components' => ['canvas.api.config.list', ['canvas_config_entity_type_id' => Component::ENTITY_TYPE_ID], [], 'GET', []],
+      'INDEX js components' => ['canvas.api.config.list', ['canvas_config_entity_type_id' => JavaScriptComponent::ENTITY_TYPE_ID], [], 'GET', []],
+      'GET js component' => ['canvas.api.config.get', ['canvas_config_entity_type_id' => JavaScriptComponent::ENTITY_TYPE_ID, 'canvas_config_entity' => 'test-code-component'], [], 'GET', []],
+      'GET asset library' => ['canvas.api.config.get', ['canvas_config_entity_type_id' => AssetLibrary::ENTITY_TYPE_ID, 'canvas_config_entity' => AssetLibrary::GLOBAL_ID], [], 'GET', []],
+      'GET brand kit' => ['canvas.api.config.get', ['canvas_config_entity_type_id' => BrandKit::ENTITY_TYPE_ID, 'canvas_config_entity' => BrandKit::GLOBAL_ID], [], 'GET', []],
       'POST js component' => [
         'canvas.api.config.post',
-        [JavaScriptComponent::ENTITY_TYPE_ID],
+        ['canvas_config_entity_type_id' => JavaScriptComponent::ENTITY_TYPE_ID],
         ['administer code components'],
         'POST',
         [
@@ -103,7 +176,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       ],
       'PATCH js component' => [
         'canvas.api.config.patch',
-        [JavaScriptComponent::ENTITY_TYPE_ID, 'test-code-component'],
+        ['canvas_config_entity_type_id' => JavaScriptComponent::ENTITY_TYPE_ID, 'canvas_config_entity' => 'test-code-component'],
         ['administer code components'],
         'PATCH',
         [
@@ -112,7 +185,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       ],
       'PATCH asset library' => [
         'canvas.api.config.patch',
-        [AssetLibrary::ENTITY_TYPE_ID, AssetLibrary::GLOBAL_ID],
+        ['canvas_config_entity_type_id' => AssetLibrary::ENTITY_TYPE_ID, 'canvas_config_entity' => AssetLibrary::GLOBAL_ID],
         ['administer code components'],
         'PATCH',
         [
@@ -122,10 +195,60 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
           ],
         ],
       ],
+      'PATCH brand kit' => [
+        'canvas.api.config.patch',
+        ['canvas_config_entity_type_id' => BrandKit::ENTITY_TYPE_ID, 'canvas_config_entity' => BrandKit::GLOBAL_ID],
+        ['administer brand kit'],
+        'PATCH',
+        ['label' => 'Global brand kit'],
+      ],
       'DELETE js component' => [
         'canvas.api.config.delete',
-        [JavaScriptComponent::ENTITY_TYPE_ID, 'test-code-component'],
+        ['canvas_config_entity_type_id' => JavaScriptComponent::ENTITY_TYPE_ID, 'canvas_config_entity' => 'test-code-component'],
         ['administer code components'],
+        'DELETE',
+        [],
+      ],
+      'INDEX pages' => [
+        'canvas.api.content.list',
+        ['entity_type' => Page::ENTITY_TYPE_ID],
+        [Page::EDIT_PERMISSION],
+        'GET',
+        [],
+      ],
+      'GET page' => [
+        'canvas.api.content.get',
+        [Page::ENTITY_TYPE_ID => 1],
+        ['access content'],
+        'GET',
+        [],
+      ],
+      'PATCH page' => [
+        'canvas.api.content.patch',
+        [Page::ENTITY_TYPE_ID => 1],
+        [Page::EDIT_PERMISSION],
+        'PATCH',
+        [
+          'title' => 'Edited page',
+          'status' => TRUE,
+          'path' => '/edited-path',
+          'components' => [
+            [
+              'uuid' => '09365c2d-1ee1-47fd-b5a3-7e4f34866186',
+              'component_version' => '36a8cee6a86c3d8d',
+              'component_id' => 'js.test-code-component',
+              'inputs' => [
+                'heading' => 'Welcome',
+                'content' => '',
+              ],
+            ],
+          ],
+        ],
+      ],
+      'DELETE page' => [
+        'canvas.api.content.delete',
+        [Page::ENTITY_TYPE_ID => 1],
+        [Page::DELETE_PERMISSION],
         'DELETE',
         [],
       ],
@@ -137,10 +260,9 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
    *
    * This verifies that cookie-based authentication keeps working as expected
    * when the request doesn't contain an OAuth2 access token.
-   *
-   * @dataProvider dataProviderRoutes
    */
-  public function testRouteWithUserWithNoPermissions(string $route_name, array $parameter_values, array $required_permissions, string $method, array $data): void {
+  #[DataProvider('dataProviderRoutes')]
+  public function testRouteWithUserWithNoPermissions(string $route_name, array $parameters, array $required_permissions, string $method, array $data): void {
     // Create a user with the minimum permissions: we use Page:CREATE_PERMISSION
     // for allowing `$user` to use Canvas, but not altering the
     // `$required_permissions` argument.
@@ -148,8 +270,8 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
     // @phpstan-ignore-next-line varTag.nativeType
     $user = $this->createUser([Page::CREATE_PERMISSION]);
     $this->setCurrentUser($user);
-    $request = $this->createRequest($route_name, $parameter_values, $method, $data);
-    if (!empty($required_permissions)) {
+    $request = $this->createRequest($route_name, $parameters, $method, $data);
+    if (!empty($required_permissions) && !(count($required_permissions) === 1 && $required_permissions[0] === 'access content')) {
       // Expect an exception because the user has no permissions.
       $exception_class = $method === 'GET' ? CacheableAccessDeniedHttpException::class : AccessDeniedHttpException::class;
       $this->expectException($exception_class);
@@ -166,28 +288,26 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
    *
    * This verifies that cookie-based authentication keeps working as expected
    * when the request doesn't contain an OAuth2 access token.
-   *
-   * @dataProvider dataProviderRoutes
    */
-  public function testRouteWithUserWithPermissions(string $route_name, array $parameter_values, array $required_permissions, string $method, array $data): void {
+  #[DataProvider('dataProviderRoutes')]
+  public function testRouteWithUserWithPermissions(string $route_name, array $parameters, array $required_permissions, string $method, array $data): void {
     /** @var \Drupal\Core\Session\AccountInterface $user */
     // We need some Canvas-enabled content permission in every case for accessing
     // Canvas URLs.
     // @phpstan-ignore-next-line varTag.nativeType
     $user = $this->createUser([Page::CREATE_PERMISSION, ...$required_permissions]);
     $this->setCurrentUser($user);
-    $request = $this->createRequest($route_name, $parameter_values, $method, $data);
+    $request = $this->createRequest($route_name, $parameters, $method, $data);
     $response = $this->request($request);
     self::assertTrue($response->isSuccessful());
   }
 
   /**
    * Tests a route with an invalid access token.
-   *
-   * @dataProvider dataProviderRoutes
    */
-  public function testRouteWithInvalidToken(string $route_name, array $parameter_values, array $required_permissions, string $method, array $data): void {
-    $request = $this->createRequest($route_name, $parameter_values, $method, $data);
+  #[DataProvider('dataProviderRoutes')]
+  public function testRouteWithInvalidToken(string $route_name, array $parameters, array $required_permissions, string $method, array $data): void {
+    $request = $this->createRequest($route_name, $parameters, $method, $data);
     $this->expectException(OAuthUnauthorizedHttpException::class);
     $this->expectExceptionMessage("The resource owner or authorization server denied the request");
     // Set an invalid access token.
@@ -206,39 +326,38 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
    *
    * @return array<string, array{
    *   0: string,
-   *   1: array<string>,
+   *   1: array<string, mixed>,
    *   2: array<string>,
    *   3: string,
    *   4: array<string, mixed>
    *   }> Array of test cases where:
    *   - Index 0: Route name
-   *   - Index 1: Route parameter values for `canvas_config_entity_type_id` and
-   *     `canvas_config_entity`
+   *   - Index 1: Route parameters
    *   - Index 2: Required permissions
    *   - Index 3: HTTP method
    *   - Index 4: Request body data for POST/PATCH
    */
   public static function dataProviderRoutesNotCovered(): array {
     return [
-      'INDEX patterns' => ['canvas.api.config.list', [Pattern::ENTITY_TYPE_ID], [], 'GET', []],
-      'GET pattern' => ['canvas.api.config.get', [Pattern::ENTITY_TYPE_ID, 'test-pattern'], [], 'GET', []],
+      'INDEX patterns' => ['canvas.api.config.list', ['canvas_config_entity_type_id' => Pattern::ENTITY_TYPE_ID], [], 'GET', []],
+      'GET pattern' => ['canvas.api.config.get', ['canvas_config_entity_type_id' => Pattern::ENTITY_TYPE_ID, 'canvas_config_entity' => 'test-pattern'], [], 'GET', []],
       'POST pattern' => [
         'canvas.api.config.post',
-        [Pattern::ENTITY_TYPE_ID],
+        ['canvas_config_entity_type_id' => Pattern::ENTITY_TYPE_ID],
         ['administer patterns'],
         'POST',
         [],
       ],
       'PATCH pattern' => [
         'canvas.api.config.patch',
-        [Pattern::ENTITY_TYPE_ID, 'test-pattern'],
+        ['canvas_config_entity_type_id' => Pattern::ENTITY_TYPE_ID, 'canvas_config_entity' => 'test-pattern'],
         ['administer patterns'],
         'PATCH',
         [],
       ],
       'DELETE pattern' => [
         'canvas.api.config.delete',
-        [Pattern::ENTITY_TYPE_ID, 'test-pattern'],
+        ['canvas_config_entity_type_id' => Pattern::ENTITY_TYPE_ID, 'canvas_config_entity' => 'test-pattern'],
         ['administer patterns'],
         'DELETE',
         [],
@@ -248,17 +367,16 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
 
   /**
    * Tests a route that is not covered by this module's auth provider.
-   *
-   * @dataProvider dataProviderRoutesNotCovered
    */
-  public function testNotCoveredRoute(string $route_name, array $parameter_values, array $required_permissions, string $method, array $data): void {
+  #[DataProvider('dataProviderRoutesNotCovered')]
+  public function testNotCoveredRoute(string $route_name, array $parameters, array $required_permissions, string $method, array $data): void {
     // Request an access token for scopes that get created with the required
     // permissions.
     // In case no permissions are required, we still need to pass a permission
     // for a scope to be created, and some Canvas-enabled content permission for
     // accessing any Canvas URL.
     $access_token = $this->requestAccessToken([Page::CREATE_PERMISSION, ...$required_permissions]);
-    $request = $this->createRequest($route_name, $parameter_values, $method, $data);
+    $request = $this->createRequest($route_name, $parameters, $method, $data);
     $request->headers->set('Authorization', 'Bearer ' . $access_token);
     $this->expectException(AccessDeniedHttpException::class);
     $this->expectExceptionMessage('The used authentication method is not allowed on this route.');
@@ -270,8 +388,8 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
    *
    * @param string $route_name
    *   The route name.
-   * @param array $parameter_values
-   *   The parameter values.
+   * @param array $parameters
+   *   The parameters for the request.
    * @param string $method
    *   The HTTP method.
    * @param array $data
@@ -280,33 +398,16 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
    * @return \Symfony\Component\HttpFoundation\Request
    *   The request.
    */
-  private function createRequest(string $route_name, array $parameter_values, string $method, array $data): Request {
+  private function createRequest(string $route_name, array $parameters, string $method, array $data): Request {
     $request = Request::create(
-      Url::fromRoute($route_name, $this->getParameters($parameter_values))->toString(),
+      Url::fromRoute($route_name, $parameters)->toString(),
       $method,
       content: json_encode($data) ?: NULL,
     );
-    if (in_array($method, ['POST', 'PATCH'], TRUE)) {
+    if (\in_array($method, ['POST', 'PATCH'], TRUE)) {
       $request->headers->set('Content-Type', 'application/json');
     }
     return $request;
-  }
-
-  /**
-   * Returns route parameters for a request based on an array of values.
-   *
-   * @param array $parameter_values
-   *   The parameter values.
-   *
-   * @return array
-   *   The parameters keyed as 'canvas_config_entity_type_id' and 'canvas_config_entity'.
-   */
-  private function getParameters(array $parameter_values): array {
-    $parameters = ['canvas_config_entity_type_id' => $parameter_values[0]];
-    if (isset($parameter_values[1])) {
-      $parameters['canvas_config_entity'] = $parameter_values[1];
-    }
-    return $parameters;
   }
 
   /**
@@ -392,6 +493,46 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
     ]);
     $client->save();
     return $client;
+  }
+
+  /**
+   * Creates a media upload request.
+   */
+  private function createMediaUploadRequest(): Request {
+    $request = Request::create(
+      Url::fromRoute('canvas.api.media.upload', ['media_type' => 'image'])->toString(),
+      'POST',
+      parameters: [],
+      files: [
+        'file' => new UploadedFile($this->testImagePath, 'gracie-big.jpg', 'image/jpeg', NULL, test: TRUE),
+      ],
+      server: ['CONTENT_TYPE' => 'multipart/form-data'],
+    );
+    return $request;
+  }
+
+  /**
+   * Tests media upload route with an invalid access token.
+   */
+  public function testMediaUploadRouteWithInvalidToken(): void {
+    $this->setUpMediaUpload();
+    $request = $this->createMediaUploadRequest();
+    $request->headers->set('Authorization', 'Bearer wicked-witch-of-the-west');
+    $this->expectException(OAuthUnauthorizedHttpException::class);
+    $this->expectExceptionMessage('The resource owner or authorization server denied the request');
+    $this->request($request);
+  }
+
+  /**
+   * Tests media upload route with a valid access token and permissions.
+   */
+  public function testMediaUploadRouteWithValidToken(): void {
+    $this->setUpMediaUpload();
+    $access_token = $this->requestAccessToken([Page::CREATE_PERMISSION, 'create image media']);
+    $request = $this->createMediaUploadRequest();
+    $request->headers->set('Authorization', 'Bearer ' . $access_token);
+    $response = $this->request($request);
+    self::assertTrue($response->isSuccessful());
   }
 
 }

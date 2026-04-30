@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\DataType;
 
+use Drupal\canvas\Plugin\DataType\ResolvedComponentInputs;
+use PHPUnit\Framework\Attributes\CoversMethod;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Component\Uuid\UuidInterface;
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
@@ -25,11 +30,15 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers \Drupal\canvas\Plugin\DataType\ComponentInputs::calculateDependencies()
+ * Tests Component Inputs Dependencies.
+ *
  * @see \Drupal\Tests\canvas\Unit\DataType\ComponentInputsTest
- * @group canvas
+ * @legacy-covers \Drupal\canvas\Plugin\DataType\ComponentInputs::calculateDependencies
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+#[Group('canvas_data_model')]
+#[CoversMethod(ResolvedComponentInputs::class, 'computeValue')]
 class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
 
   use ComponentTreeItemListInstantiatorTrait;
@@ -109,6 +118,7 @@ class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
       'body' => [['value' => 'My test node body', 'summary' => 'Body Summary', 'format' => 'plain_text']],
       'field_hero' => $image_field_sample_value,
     ]);
+    self::assertEntityIsValid($node);
     $node->save();
 
     $this->generateComponentConfig();
@@ -146,7 +156,7 @@ class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
       'uuid' => $uuid->generate(),
       'component_id' => 'sdc.canvas_test_sdc.heading',
       'inputs' => [
-        'heading' => [
+        'text' => [
           'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:alpha␝body␞␟value',
         ],
@@ -216,13 +226,10 @@ class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
         'image.style.canvas_parametrized_width',
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
-        'image.style.canvas_parametrized_width',
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
-        'image.style.canvas_parametrized_width',
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
-        'image.style.canvas_parametrized_width',
       ],
       'content' => [
         'file:file:' . $file_uuid,
@@ -247,6 +254,36 @@ class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
         'file:file:' . $file_uuid,
       ],
     ], $component_instance_deps_by_uuid);
+
+    // Test cacheability metadata on the 'inputs_resolved' computed property.
+    // Static prop sources: trivial case.
+    $static_resolved = $item_list->get(1)->get('inputs_resolved');
+    self::assertInstanceOf(CacheableDependencyInterface::class, $static_resolved);
+    self::assertSame([], $static_resolved->getCacheTags());
+    self::assertSame([], $static_resolved->getCacheContexts());
+    self::assertSame(Cache::PERMANENT, $static_resolved->getCacheMaxAge());
+
+    // Entity field prop sources: re-parent the item list to the node so
+    // getExplicitInput() can resolve the host entity.
+    $item_list->setContext(parent: $node->getTypedData());
+
+    // Body field (item 2): cacheability carries the host entity's cache tags
+    // and user.permissions cache context from access checking.
+    $body_resolved = $item_list->get(2)->get('inputs_resolved');
+    self::assertInstanceOf(CacheableDependencyInterface::class, $body_resolved);
+    self::assertContains('node:' . $node->id(), $body_resolved->getCacheTags());
+    self::assertContains('user.permissions', $body_resolved->getCacheContexts());
+    self::assertSame(Cache::PERMANENT, $body_resolved->getCacheMaxAge());
+
+    // Image field (item 3): cacheability carries tags from the node, the file
+    // entity, and the image style config.
+    $image_resolved = $item_list->get(3)->get('inputs_resolved');
+    self::assertInstanceOf(CacheableDependencyInterface::class, $image_resolved);
+    self::assertContains('node:' . $node->id(), $image_resolved->getCacheTags());
+    self::assertContains('file:' . $file_entity->id(), $image_resolved->getCacheTags());
+    self::assertContains('config:image.style.canvas_parametrized_width', $image_resolved->getCacheTags());
+    self::assertContains('user.permissions', $image_resolved->getCacheContexts());
+    self::assertSame(Cache::PERMANENT, $image_resolved->getCacheMaxAge());
   }
 
 }

@@ -15,7 +15,7 @@ use Drupal\Core\Render\Element;
  * Identifies templates that should be Twig rendered.
  *
  * @see themes/canvas_stark/templates/process_as_regular_twig
- * @see \Drupal\canvas\Hook\SemiCoupledThemeEngineHooks
+ * @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks
  * @see https://git.drupalcode.org/project/canvas/-/commit/c5b5d93d79cb7260ec5160fa22014a1f755b40cf
  */
 class SemiCoupledThemeEngineForceTwigHooks {
@@ -113,6 +113,10 @@ class SemiCoupledThemeEngineForceTwigHooks {
     $ml_form = isset($variables['element']['#form_id']) && str_contains($variables['element']['#form_id'], 'media_library');
     if ($ml_ajax || $ml_form) {
       $suggestions[] = 'input__media_library';
+    }
+    if (isset($variables['element']['#is_multivalue_form']) &&
+        $variables['element']['#is_multivalue_form']) {
+      $suggestions[] = 'input__multivalue_form';
     }
     return $suggestions;
   }

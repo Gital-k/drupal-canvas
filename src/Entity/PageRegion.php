@@ -50,7 +50,6 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
   public const string ENTITY_TYPE_ID = 'page_region';
   public const string ADMIN_PERMISSION = 'administer page template';
   use ClientServerConversionTrait;
-  use ConfigUpdaterAwareEntityTrait;
 
   /**
    * ID, composed of theme + region.
@@ -87,7 +86,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
    * {@inheritdoc}
    */
   public function label(): TranslatableMarkup {
-    \assert(is_string($this->theme));
+    \assert(\is_string($this->theme));
     $regions = system_region_list($this->theme);
     return new TranslatableMarkup('@region region', [
       '@region' => $regions[$this->get('region')],
@@ -133,7 +132,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
    * {@inheritdoc}
    */
   public function getComponentTree(): ComponentTreeItemList {
-    \assert(is_array($this->component_tree));
+    \assert(\is_array($this->component_tree));
 
     $field_items = $this->createDanglingComponentTreeItemList($this);
     $field_items->setValue(\array_values($this->component_tree ?? []));
@@ -201,7 +200,6 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
       throw new \LogicException('Attempted to save a PageRegion targeting the main content region, which is not allowed. (This means it bypassed validation.)');
     }
     parent::preSave($storage);
-    self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
     if ($this->isSyncing() && self::getConfigUpdater()->needsIntermediateDependenciesComponentUpdate($this)) {
       // We might need to update dependencies even on import.
       // @see \canvas_post_update_0002_intermediate_component_dependencies_in_page_regions()
@@ -229,7 +227,11 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
       fn ($s) => $s !== CanvasPageVariant::MAIN_CONTENT_REGION,
     );
 
-    $blocks = \Drupal::service('entity_type.manager')->getStorage('block')->loadByProperties(['theme' => $theme, 'status' => TRUE]);
+    $blocks = \Drupal::service('entity_type.manager')->getStorage('block')
+      ->loadByProperties([
+        'theme' => $theme,
+        'status' => TRUE,
+      ]);
 
     $regions = [];
     foreach ($blocks as $block) {
