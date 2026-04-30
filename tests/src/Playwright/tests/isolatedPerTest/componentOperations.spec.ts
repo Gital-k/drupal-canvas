@@ -2,9 +2,57 @@ import { expect } from '@playwright/test';
 
 import { isolatedPerTest as test } from '../../fixtures/test.js';
 
-test.use({ modules: ['canvas_test_sdc'], enableTestExtensions: true });
+test.use({
+  modules: ['canvas_test_sdc', 'sdc_test_all_props'],
+  enableTestExtensions: true,
+});
 
 test.describe('Perform CRUD operations on components', () => {
+  test('Single datetime prop persists across reload', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.login({ username: 'editor', password: 'editor' });
+    await canvas.openCanvas(await canvas.createCanvas());
+    await canvas.openLibraryPanel();
+    await canvas.addComponent({ id: 'sdc.sdc_test_all_props.all-props' });
+
+    const dateSelector =
+      '[name$="[test_string_format_date_time][0][value][date]"]';
+    const timeSelector =
+      '[name$="[test_string_format_date_time][0][value][time]"]';
+
+    // Capture the input values and preview text before reload.
+    const dateBefore = await page.locator(dateSelector).inputValue();
+    const timeBefore = await page.locator(timeSelector).inputValue();
+    const previewTextBefore = await (await canvas.getActivePreviewFrame())
+      .locator('#test-string-format-date-time code')
+      .textContent();
+
+    // Provide a fixed wait to ensure changes are saved.
+    // It's highly preferable to use something non-arbitrary that confirms a
+    // save has occurred. This should be considered a temporary hack to ensure
+    // the tests run reliably.
+    // eslint-disable-next-line playwright/no-wait-for-timeout
+    await page.waitForTimeout(10000);
+    await page.reload();
+    await canvas.waitForEditorUi();
+
+    // Raw input values should be unchanged — if these differ the bug is in
+    // storage/retrieval, not just in label formatting.
+    await expect(page.locator(dateSelector)).toHaveValue(dateBefore);
+    await expect(page.locator(timeSelector)).toHaveValue(timeBefore);
+
+    // Preview output should also be unchanged.
+    await canvas.testInPreviewFrame(
+      '#test-string-format-date-time code',
+      async (el) => {
+        await expect(el).toHaveText(previewTextBefore!);
+      },
+    );
+  });
+
   test('Layer and Components Panel', async ({ page, drupal, canvas }) => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.openCanvas(await canvas.createCanvas());
