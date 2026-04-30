@@ -8,6 +8,7 @@ use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
+use Drupal\canvas\Plugin\ComponentPluginManager as CanvasComponentPluginManager;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 
 /**
@@ -102,8 +103,8 @@ final class PropShape {
    * @return JsonSchema
    */
   private static function resolveSchemaReferences(array $schema): array {
-    /** @var \Drupal\canvas\Plugin\ComponentPluginManager $componentManager */
     $componentManager = self::componentPluginManager();
+    assert($componentManager instanceof CanvasComponentPluginManager);
     return $componentManager->resolveJsonSchemaReferences($schema);
   }
 

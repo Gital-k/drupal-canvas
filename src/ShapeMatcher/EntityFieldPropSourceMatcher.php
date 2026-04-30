@@ -49,6 +49,7 @@ use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Drupal\Core\Validation\ConstraintManager;
 use Drupal\Core\Validation\Plugin\Validation\Constraint\ComplexDataConstraint;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
+use Drupal\canvas\Plugin\ComponentPluginManager as CanvasComponentPluginManager;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
@@ -200,9 +201,8 @@ final class EntityFieldPropSourceMatcher {
    * @return JsonSchema
    */
   private static function resolveSchemaReferences(array $schema): array {
-    /** @var \Drupal\canvas\Plugin\ComponentPluginManager $componentManager */
-    // @phpstan-ignore-next-line phpat.shapeMatcher
     $componentManager = self::componentPluginManager();
+    assert($componentManager instanceof CanvasComponentPluginManager);
     return $componentManager->resolveJsonSchemaReferences($schema);
   }
 
