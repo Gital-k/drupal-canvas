@@ -1,12 +1,6 @@
 import { expect } from '@playwright/test';
 
-
-
 import { isolatedPerTest as test } from '../../fixtures/test.js';
-
-
-
-
 
 test.use({ modules: ['canvas_test_sdc'], enableTestExtensions: true });
 
