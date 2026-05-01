@@ -1762,9 +1762,7 @@ paths:
                     type: array
                     description: Layout regions
                     items:
-                      type: object
-                      schema:
-                        $ref: '#/components/schemas/LayoutSlot'
+                      $ref: '#/components/schemas/LayoutSlot'
                   model:
                     $ref: '#/components/schemas/Model'
                   isNew:
@@ -1805,9 +1803,7 @@ paths:
                     type: array
                     description: Layout regions
                     items:
-                      type: object
-                      schema:
-                        $ref: '#/components/schemas/LayoutSlot'
+                      $ref: '#/components/schemas/LayoutSlot'
                   model:
                     $ref: '#/components/schemas/Model'
                   autoSaves:
@@ -1978,9 +1974,7 @@ paths:
                     type: array
                     description: Layout regions
                     items:
-                      type: object
-                      schema:
-                        $ref: '#/components/schemas/LayoutSlot'
+                      $ref: '#/components/schemas/LayoutSlot'
                   model:
                     $ref: '#/components/schemas/Model'
                   entity_form_fields:
@@ -2034,9 +2028,7 @@ paths:
                     type: array
                     description: Layout regions
                     items:
-                      type: object
-                      schema:
-                        $ref: '#/components/schemas/LayoutSlot'
+                      $ref: '#/components/schemas/LayoutSlot'
                   model:
                     $ref: '#/components/schemas/Model'
                   entity_form_fields:
@@ -3035,9 +3027,7 @@ components:
           type: array
           description: Layout regions
           items:
-            type: object
-            schema:
-              $ref: '#/components/schemas/LayoutSlot'
+            $ref: '#/components/schemas/LayoutSlot'
         model:
           $ref: '#/components/schemas/Model'
         autoSaves:
