@@ -2861,10 +2861,10 @@ components:
             properties:
               title:
                 type: string
-                label: Title
+                title: Title
               description:
                 type: string
-                label: Description
+                title: Description
               examples:
                 type: array
                 items:
