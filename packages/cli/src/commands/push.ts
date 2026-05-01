@@ -498,7 +498,7 @@ export function pushCommand(program: Command): void {
           const localImportMap = localResult.localImportMap;
           p.log.info(
             chalk.green(
-              `Analyzed imports: ${imports.thirdPartyPackages.size} vendor, ${imports.aliasImports.size} local`,
+              `Analyzed imports: ${imports.thirdPartyPackages.size} vendor, ${imports.aliasImports.size + imports.assetImports.size} local`,
             ),
           );
           if (vendorResult.success) {

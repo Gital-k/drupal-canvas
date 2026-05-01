@@ -114,7 +114,7 @@ export function buildCommand(program: Command): void {
 
         s2.stop(
           chalk.green(
-            `Found ${imports.thirdPartyPackages.size} third-party ${pluralize(imports.thirdPartyPackages.size, 'package')} and ${imports.aliasImports.size} local ${pluralize(imports.aliasImports.size, 'import')}`,
+            `Found ${imports.thirdPartyPackages.size} third-party ${pluralize(imports.thirdPartyPackages.size, 'package')} and ${imports.aliasImports.size + imports.assetImports.size} local ${pluralize(imports.aliasImports.size + imports.assetImports.size, 'import')}`,
           ),
         );
 

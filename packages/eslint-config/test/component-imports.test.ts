@@ -46,6 +46,28 @@ testRunner.run('component-imports rule', rule, {
       filename: '/components/button/index.jsx',
     },
     {
+      name: 'should pass when component imports a relative image asset',
+      code: `
+        import imageUrl from './image.webp';
+        const Card = ({ title }) => {
+          return <img src={imageUrl} alt={title} />;
+        };
+        export default Card;
+      `,
+      filename: '/components/button/index.jsx',
+    },
+    {
+      name: 'should pass when component imports an aliased image asset',
+      code: `
+        import imageUrl from '@/components/card/image.webp';
+        const Card = ({ title }) => {
+          return <img src={imageUrl} alt={title} />;
+        };
+        export default Card;
+      `,
+      filename: '/components/button/index.jsx',
+    },
+    {
       name: 'should pass when component imports third party packages using full urls',
       code: `
         import { FiArrowRight } from "https://esm.sh/react-icons/fi";
@@ -148,23 +170,6 @@ testRunner.run('component-imports rule', rule, {
           message:
             'Importing font packages ("@fontsource-variable/open-sans") is not supported in components.',
           line: 3,
-        },
-      ],
-    },
-    {
-      name: 'should fail for component importing asset files',
-      code: `
-        import logo from '@/assets/logo.png';
-        export default ({ title }) => {
-          return <button>{title}</button>;
-        };
-      `,
-      filename: '/components/button/index.jsx',
-      errors: [
-        {
-          message:
-            'Importing asset files ("@/assets/logo.png") is not supported in components.',
-          line: 2,
         },
       ],
     },
