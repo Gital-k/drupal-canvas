@@ -571,8 +571,6 @@ playwright:
   rules: *e2e-ci-job-rules
   interruptible: true
   image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
-  extends:
-    - .test-variables
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       fallback_keys:
