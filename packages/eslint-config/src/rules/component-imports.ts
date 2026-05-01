@@ -17,6 +17,8 @@ function checkImportSource(
   node: ImportDeclaration | ImportExpression,
   source: string,
 ): void {
+  const isAssetImport = ASSET_EXTENSIONS.some((ext) => source.endsWith(ext));
+
   // Font package imports are not supported.
   if (source.startsWith('@fontsource')) {
     context.report({
@@ -26,8 +28,18 @@ function checkImportSource(
     return;
   }
 
-  // Asset imports (images, video, SVG, fonts, etc.) are not supported in components.
-  if (ASSET_EXTENSIONS.some((ext) => source.endsWith(ext))) {
+  // Vite-style asset imports are supported for local files that Canvas can
+  // upload and expose through the import map.
+  if (
+    isAssetImport &&
+    (source.startsWith('./') ||
+      source.startsWith('../') ||
+      source.startsWith('@/'))
+  ) {
+    return;
+  }
+
+  if (isAssetImport) {
     context.report({
       node,
       message: `Importing asset files ("${source}") is not supported in components.`,
