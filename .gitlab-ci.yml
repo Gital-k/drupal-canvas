@@ -29,14 +29,16 @@ variables:
 
   # Target a specific release, not 11.x.x-dev, to avoid breaking on evolving
   # test expectations unnecessarily.
-  DRUPAL_CORE: 11.3.8
-  DRUPAL_CORE_PREVIOUS_MINOR: 11.2.11
+  DRUPAL_CORE: 11.2.11
+  DRUPAL_CORE_NEXT_MINOR: 11.3.8
 
   # Enable Canvas contributors to change this from `true` to `false` to disable E2E (end-to-end) tests.
   # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
   _CANVAS_E2E_TESTS: true
 
   DRUPAL_TEST_WEBSERVER_USER: www-data
+
+.image-node: &image-node: node:24-alpine
 
 .is-nightly-scheduled-rule: &is-nightly-scheduled-rule
   if: $CI_PIPELINE_SOURCE == "schedule"
@@ -130,7 +132,6 @@ default:
     policy: pull
 
 cache dependencies:
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   stage: cache
   needs: []
   cache:
@@ -250,8 +251,9 @@ phpunit (11.3, sqlite):
         - .env.defaults
         - phpunit.xml.dist
     - *manual-rule
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   needs: []
+  variables:
+    DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
   parallel:
     matrix:
       # The KUBERNETES_CPU_REQUEST and DRUPAL_TEST_CONCURRENCY values match core.
@@ -345,8 +347,6 @@ phpunit (11.3, mysql 8):
 
 phpunit (11.2, sqlite):
   extends: phpunit (11.3, sqlite)
-  variables:
-    DRUPAL_CORE: $CORE_NEXT_MINOR
   before_script:
     # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
     # (PHPUnit SourceMapper races with concurrent test cleanup under sites/simpletest,
@@ -354,6 +354,8 @@ phpunit (11.2, sqlite):
     # Fixed on Drupal 11.x (commit 3753f904, 2026-03-30); not yet in 11.2.x. Idempotent —
     # becomes a no-op once the minimum supported core version ships the fix.
     - sed -i '\|<directory>\.\./sites</directory>|d' $CI_PROJECT_DIR/_drupal/web/core/phpunit.xml.dist
+  variables:
+    DRUPAL_CORE: $DRUPAL_CORE
 
 phpunit (11.2, mariadb 10.6):
   extends: phpunit (11.2, sqlite)
@@ -361,7 +363,6 @@ phpunit (11.2, mariadb 10.6):
     - mariadb:10.6
   variables:
     _FOR_EVERY_MR_COMMIT: false
-    DRUPAL_CORE: $CORE_NEXT_MINOR
     SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
     MYSQL_DATABASE: drupal
     MYSQL_USER: drupal
@@ -374,7 +375,6 @@ phpunit (11.2, pgsql 16):
     - postgres:16
   variables:
     _FOR_EVERY_MR_COMMIT: false
-    DRUPAL_CORE: $CORE_NEXT_MINOR
     SIMPLETEST_DB: pgsql://drupal:drupal@127.0.0.1/drupal
     POSTGRES_DB: drupal
     POSTGRES_USER: drupal
@@ -386,7 +386,6 @@ phpunit (11.2, mysql 8):
     - mysql:8.0
   variables:
     _FOR_EVERY_MR_COMMIT: false
-    DRUPAL_CORE: $CORE_NEXT_MINOR
     SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
     MYSQL_DATABASE: drupal
     MYSQL_USER: drupal
@@ -395,7 +394,7 @@ phpunit (11.2, mysql 8):
 
 vitest:
   stage: test
-  image: node:20-alpine
+  image: *image-node
   allow_failure: false
   needs: []
   rules:
@@ -501,7 +500,6 @@ cypress unit:
 lint (php):
   stage: validate
   needs: []
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   variables:
     GIT_DEPTH: 1
     COMPOSER_ROOT_VERSION: 0.0.0
@@ -554,8 +552,8 @@ lint (php):
 
 lint (node):
   stage: validate
+  image: *image-node
   needs: []
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   script:
     - npm ci
     - npm run build --workspace=drupal-canvas
@@ -570,7 +568,6 @@ playwright:
         #PROJECT: [ "chromium", "firefox", "webkit" ]
   rules: *e2e-ci-job-rules
   interruptible: true
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       fallback_keys:
@@ -612,7 +609,7 @@ playwright-reports:
     - playwright
   when:
     always
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
+  image: *image-node
   script:
     - mkdir -p test-results
     - npx playwright merge-reports --reporter=html ./blob-report
@@ -644,7 +641,6 @@ playwright-reports:
 
 CLI Test:
   stage: test
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   needs: []
   rules:
     - *e2e-tests-must-not-be-disabled-rule
@@ -691,7 +687,7 @@ CLI Test:
 
 CLI Publish:
   stage: publish
-  image: node:20-alpine
+  image: *image-node
   needs:
     - lint (node)
     - CLI Test
@@ -707,8 +703,8 @@ CLI Publish:
 
 # User facing documentation.
 pages-mr:
-  image: node:22
   stage: publish
+  image: *image-node
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -731,6 +727,7 @@ pages-mr:
 
 stop-pages-mr:
   stage: publish
+  image: *image-node
   needs: []
   rules:
     # Branch merge.
@@ -748,8 +745,8 @@ stop-pages-mr:
     action: stop
 
 pages-publish:
-  image: node:22
   stage: publish
+  image: *image-node
   needs: []
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -767,7 +764,7 @@ pages-publish:
 release:
   # For release flow details, see docs/release-process.md.
   stage: publish
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
+  image: *image-node
   needs: []
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
