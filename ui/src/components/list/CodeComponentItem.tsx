@@ -55,10 +55,7 @@ const CodeComponentItem: React.FC<CodeComponentItemProps> = ({
   const componentId = getComponentId(component);
   const machineName = removeJsPrefix(componentId);
   const layout = useAppSelector(selectLayout);
-  const isComponentInLayout = componentExistsInLayout(
-    layout,
-    `js.${machineName}`,
-  );
+  const isComponentInLayout = componentExistsInLayout(layout, componentId);
   const { navigateToCodeEditor, urlForCodeEditor } = useEditorNavigation();
   const { codeComponentId: selectedComponent } = useParams();
   const activePanel = useAppSelector(selectActivePanel);
