@@ -2881,7 +2881,7 @@ components:
           type: string
         dataDependencies:
           type: object
-          schema:
+          properties:
             urls:
               type: array
               items:
