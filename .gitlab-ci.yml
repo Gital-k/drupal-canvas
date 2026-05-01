@@ -152,6 +152,7 @@ default:
 
 cache dependencies:
   stage: cache
+  allow_failure: true
   needs: []
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
