@@ -1,52 +1,4 @@
-################
-# DrupalCI GitLabCI template
-#
-# Gitlab-ci.yml to replicate DrupalCI testing for Contrib
-#
-# With thanks to:
-#   * The GitLab Acceleration Initiative participants
-#   * DrupalSpoons
-################
-
-################
-# Guidelines
-#
-# This template is designed to give any Contrib maintainer everything they need to test, without requiring modification. It is also designed to keep up to date with Core Development automatically through the use of include files that can be centrally maintained.
-#
-# However, you can modify this template if you have additional needs for your project.
-################
-
-################
-# Includes
-#
-# Additional configuration can be provided through includes.
-# One advantage of include files is that if they are updated upstream, the changes affect all pipelines using that include.
-#
-# Includes can be overridden by re-declaring anything provided in an include, here in gitlab-ci.yml
-# https://docs.gitlab.com/ee/ci/yaml/includes.html#override-included-configuration-values
-################
-
 include:
-  ################
-  # DrupalCI includes:
-  # As long as you include this, any future includes added by the Drupal Association will be accessible to your pipelines automatically.
-  # View these include files at https://git.drupalcode.org/project/gitlab_templates/
-  ################
-  - project: $_GITLAB_TEMPLATES_REPO
-    # "ref" value can be:
-    # - Recommended (default) - `ref: $_GITLAB_TEMPLATES_REF` - The Drupal Association will update this value to the recommended tag for contrib.
-    # - Latest - `ref: main` - Get the latest additions and bug fixes as they are merged into the templates.
-    # - Minor or Major latests - `ref: 1.x-latest` or `ref: 1.0.x-latest` - Get the latest additions within a minor (mostly bugfixes) or major (bugs and new features).
-    # - Fixed tag - `ref: 1.0.1` - Set the value to a known tag. This will not get any updates.
-    # If you change the default value of ref, you should set the _CURL_TEMPLATES_REF variable in the variables section to be the same as set here.
-    ref: 1.12.x-latest
-    file:
-      - "/includes/include.drupalci.main.yml"
-      # For Drupal 7, remove the above line and uncomment the below.
-      # - "/includes/include.drupalci.main-d7.yml"
-      - "/includes/include.drupalci.variables.yml"
-      - "/includes/include.drupalci.workflows.yml"
-  # Local includes
   - local: .gitlab/ci/canvas.yml
   - local: .gitlab/ci/drupal.yml
   - local: .gitlab/ci/test.yml
@@ -60,14 +12,6 @@ stages:
   - cache
   - publish
 
-#
-################
-# Pipeline configuration variables
-#
-# These are the variables provided to the Run Pipeline form that a user may want to override.
-#
-# Docs at https://git.drupalcode.org/project/gitlab_templates/-/blob/main/includes/include.drupalci.variables.yml
-################
 variables:
   PLAYWRIGHT_BROWSERS_PATH: $CI_PROJECT_DIR/.cache/ms-playwright
   COMPOSER_CACHE_DIR: $CI_PROJECT_DIR/.cache/composer
@@ -76,44 +20,25 @@ variables:
   # Disable npm lifecycle scripts.
   npm_config_ignore_scripts: "true"
 
-  # This needs to match $_GITLAB_TEMPLATES_REPO `ref`. Omit if `ref` value is `_GITLAB_TEMPLATES_REF`.
-  _CURL_TEMPLATES_REF: 1.12.x-latest
-  # Show env variables always to help with debugging.
-  _SHOW_ENVIRONMENT_VARIABLES: 1
-
-  # Ignore that `ext-sodium` is not available in the CI environment.
-  # It's required by a dependency of `drupal/simple_oauth`, but it doesn't cause any issues with what
-  # `drupal/simple_oauth` does.
-  # See https://git.drupalcode.org/project/simple_oauth/-/blob/6.0.x/.gitlab-ci.yml
-  COMPOSER_IGNORE_PLATFORM_REQS: ext-sodium
   COMPOSER_PROCESS_TIMEOUT: 0
-  COMPOSER_ROOT_VERSION: 0.0.0
   GIT_DEPTH: 1
 
-  PHP_VERSION: "8.3"
-  _TARGET_PHP_IMAGE_TAG: "production"
-
-  # Needed to allow this to run locally.
-  # https://project.pages.drupalcode.org/gitlab_templates/info/test-locally/
-  DRUPALORG_CI_SERVER_URL: https://git.drupalcode.org
   # Set this as CI_PROJECT_NAME changes on forks.
   CI_PARENT_PROJECT_NAME: canvas
-  DRUPAL_PROJECT_FOLDER: "$CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas"
-  PHPUNIT_FAIL_ON_PHPUNIT_DEPRECATION: 0
   _CONCURRENCY_THREADS: '12'
 
-  # Enable testing against next minor version of Drupal core
-  OPT_IN_TEST_NEXT_MINOR: '1'
-  # Target a specific 11.3 release, not 11.3.x-dev, to avoid breaking on evolving test expectations unnecessarily.
-  # It should match the latest security release on the branch.
-  CORE_NEXT_MINOR: 11.3.8
-  # Target a specific 11.2 release, not 11.2.x-dev, to avoid breaking on evolving test expectations unnecessarily.
-  # It should match the latest security release on the branch.
+  # Target a specific release, not 11.x.x-dev, to avoid breaking on evolving
+  # test expectations unnecessarily.
   DRUPAL_CORE: 11.2.11
+  DRUPAL_CORE_NEXT_MINOR: 11.3.8
 
   # Enable Canvas contributors to change this from `true` to `false` to disable E2E (end-to-end) tests.
   # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
-  _CANVAS_E2E_TESTS: true
+  _CANVAS_E2E_TESTS: "true"
+
+  DRUPAL_TEST_WEBSERVER_USER: www-data
+
+.image-node: &image-node node:24-alpine
 
 .is-nightly-scheduled-rule: &is-nightly-scheduled-rule
   if: $CI_PIPELINE_SOURCE == "schedule"
@@ -182,19 +107,33 @@ variables:
       - ui/tests/fixtures/**/*
     when: on_success
 
-.e2e-tests-must-not-be-disabled-rule: &e2e-tests-must-not-be-disabled-rule
-  - if: $_CANVAS_E2E_TESTS == "false"
-    when: never
-
 # The rules to be used by all E2E CI jobs, to ensure they are triggered consistently.
 .e2e-ci-job-rules: &e2e-ci-job-rules
-  - *e2e-tests-must-not-be-disabled-rule
   - *is-push-rule
   - *backend-files-change-rule
   - *UI-files-change-rule
   - *manual-rule
 
+workflow:
+  auto_cancel:
+    # cancels running interruptible jobs when a new commit is pushed.
+    on_new_commit: conservative
+    # cancels all remaining jobs as soon as one fails.
+    on_job_failure: all
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_train"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    # suppresses the branch pipeline when an MR pipeline will already run for
+    # the same commit.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
 default:
+  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
+  interruptible: true
   cache:
     key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
     fallback_keys:
@@ -207,9 +146,12 @@ default:
     policy: pull
 
 cache dependencies:
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   stage: cache
+  allow_failure: true
   needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - *manual-rule
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       paths:
@@ -229,55 +171,6 @@ cache dependencies:
     - !reference [ .canvas-ui ]
   script:
     - npx playwright install
-
-# Disable jobs from the upstream template.
-composer:
-  rules:
-    - when: never
-
-composer (next minor):
-  rules:
-    - when: never
-
-eslint:
-  rules:
-    - when: never
-
-phpcs:
-  rules:
-    - when: never
-
-phpstan:
-  rules:
-    - when: never
-
-phpunit:
-  rules:
-    - when: never
-
-phpunit (next minor):
-  rules:
-    - when: never
-
-cspell:
-  rules:
-    - when: never
-
-composer-lint:
-  rules:
-    - when: never
-
-phpstan (next minor):
-  rules:
-    - when: never
-
-stylelint:
-  rules:
-    - when: never
-
-test-only changes:
-  rules:
-    - when: never
 
 phpstan-is-up-to-date:
   stage: development
@@ -327,27 +220,22 @@ phpstan-is-up-to-date:
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
 
-phpcs-rules-match-drupal-11:
+phpcs-rules-match-drupal-core:
   stage: development
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - *manual-rule
   script:
     - |
+      DRUPAL_MAJOR=$(echo "$DRUPAL_CORE" | cut -d. -f1)
+      DRUPAL_URL="https://git.drupalcode.org/project/drupal/-/raw/${DRUPAL_MAJOR}.x/core/phpcs.xml.dist?ref_type=heads"
       # Download the file from the Drupal repository
-      curl -o drupal_core_phpcs.xml.dist https://git.drupalcode.org/project/drupal/-/raw/11.x/core/phpcs.xml.dist?ref_type=heads
+      curl --fail -o drupal_core_phpcs.xml.dist "$DRUPAL_URL"
 
-      # Check if the download was successful
-      if [ $? -ne 0 ]; then
-        echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
-        echo "Error: Failed to download $DRUPAL_URL"
-        exit 1
-      fi
-
-      # Compare the downloaded file with the local file using a subshell to prevent premature exit
+      # diff returns exit code 1 when files differ; `set -e` would abort the script
+      # before we can capture it, so wrap in a block with `|| true` to preserve it.
       echo "Comparing downloaded file with local file..."
-      # With uses the braces the job just ends here for some reason.
-       {
+      {
         diff drupal_core_phpcs.xml.dist core.phpcs.xml.dist
         DIFF_EXIT_CODE=$?
       } || true
@@ -366,24 +254,27 @@ phpcs-rules-match-drupal-11:
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
 
-phpunit (11.2, sqlite):
+phpunit (11.3 sqlite):
   rules:
     - *is-nightly-scheduled-rule
     - *backend-files-change-rule
     # Changes to the infra for running PHPUnit itself also need to trigger CI.
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null)
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train") && ($_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null)
       changes:
         - .env.defaults
         - phpunit.xml.dist
     - *manual-rule
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   needs: []
+  variables:
+    DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
   parallel:
     matrix:
       # The KUBERNETES_CPU_REQUEST and DRUPAL_TEST_CONCURRENCY values match core.
       - PHPUNIT_TESTSUITE: 'PHPUnit-Unit'
         KUBERNETES_CPU_REQUEST: "4"
         DRUPAL_TEST_CONCURRENCY: '24'
+        CI_PARALLEL_NODE_INDEX: '1'
+        CI_PARALLEL_NODE_TOTAL: '1'
       - PHPUNIT_TESTSUITE: 'PHPUnit-Kernel'
         CI_PARALLEL_NODE_INDEX: ['1', '2', '3']
         CI_PARALLEL_NODE_TOTAL: '3'
@@ -392,18 +283,11 @@ phpunit (11.2, sqlite):
       - PHPUNIT_TESTSUITE: 'PHPUnit-Functional'
         KUBERNETES_CPU_REQUEST: "20"
         DRUPAL_TEST_CONCURRENCY: '14'
-  variables:
-    DRUPAL_TEST_WEBSERVER_USER: www-data
+        CI_PARALLEL_NODE_INDEX: '1'
+        CI_PARALLEL_NODE_TOTAL: '1'
   before_script:
     - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
-    # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
-    # (PHPUnit SourceMapper races with concurrent test cleanup under sites/simpletest,
-    # causing "RecursiveDirectoryIterator: Failed to open directory" random failures).
-    # Fixed on Drupal 11.x (commit 3753f904, 2026-03-30); not yet in 11.2.x. Idempotent —
-    # becomes a no-op once the minimum supported core version ships the fix.
-    - sed -i '\|<directory>\.\./sites</directory>|d' $CI_PROJECT_DIR/_drupal/web/core/phpunit.xml.dist
-
   script:
     - !reference [ .test_runner ]
     - run_test "phpunit" "composer run phpunit -- --types $PHPUNIT_TESTSUITE --ci-parallel-node-index $CI_PARALLEL_NODE_INDEX --ci-parallel-node-total $CI_PARALLEL_NODE_TOTAL"
@@ -435,8 +319,8 @@ phpunit (11.2, sqlite):
         - test-results/*.xml
       annotations: test-results/links.json
 
-phpunit (11.2, mariadb 10.6):
-  extends: phpunit (11.2, sqlite)
+phpunit (11.3 mariadb 10.6):
+  extends: phpunit (11.3 sqlite)
   # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
   rules:
     - *is-nightly-scheduled-rule
@@ -450,8 +334,8 @@ phpunit (11.2, mariadb 10.6):
     MYSQL_PASSWORD: drupal
     MYSQL_ROOT_PASSWORD: root
 
-phpunit (11.2, pgsql 16):
-  extends: phpunit (11.2, sqlite)
+phpunit (11.3 pgsql 16):
+  extends: phpunit (11.3 sqlite)
   # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
   rules:
     - *is-nightly-scheduled-rule
@@ -464,8 +348,8 @@ phpunit (11.2, pgsql 16):
     POSTGRES_USER: drupal
     POSTGRES_PASSWORD: drupal
 
-phpunit (11.2, mysql 8):
-  extends: phpunit (11.2, sqlite)
+phpunit (11.3 mysql 8):
+  extends: phpunit (11.3 sqlite)
   # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
   rules:
     - *is-nightly-scheduled-rule
@@ -479,43 +363,48 @@ phpunit (11.2, mysql 8):
     MYSQL_PASSWORD: drupal
     MYSQL_ROOT_PASSWORD: root
 
-phpunit (11.3, sqlite):
-  extends: phpunit (11.2, sqlite)
+phpunit (11.2 sqlite):
+  extends: phpunit (11.3 sqlite)
+  before_script:
+    - !reference [ phpunit (11.3 sqlite), before_script ]
+    # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
+    # (PHPUnit SourceMapper races with concurrent test cleanup under sites/simpletest,
+    # causing "RecursiveDirectoryIterator: Failed to open directory" random failures).
+    # Fixed on Drupal 11.x (commit 3753f904, 2026-03-30); not yet in 11.2.x. Idempotent —
+    # becomes a no-op once the minimum supported core version ships the fix.
+    - sed -i '\|<directory>\.\./sites</directory>|d' $CI_PROJECT_DIR/_drupal/web/core/phpunit.xml.dist
   variables:
-    DRUPAL_CORE: $CORE_NEXT_MINOR
+    DRUPAL_CORE: $DRUPAL_CORE
 
-phpunit (11.3, mariadb 10.6):
-  extends: phpunit (11.2, sqlite)
+phpunit (11.2 mariadb 10.6):
+  extends: phpunit (11.2 sqlite)
   services:
     - mariadb:10.6
   variables:
-    _FOR_EVERY_MR_COMMIT: false
-    DRUPAL_CORE: $CORE_NEXT_MINOR
+    _FOR_EVERY_MR_COMMIT: "false"
     SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
     MYSQL_DATABASE: drupal
     MYSQL_USER: drupal
     MYSQL_PASSWORD: drupal
     MYSQL_ROOT_PASSWORD: root
 
-phpunit (11.3, pgsql 16):
-  extends: phpunit (11.2, sqlite)
+phpunit (11.2 pgsql 16):
+  extends: phpunit (11.2 sqlite)
   services:
     - postgres:16
   variables:
-    _FOR_EVERY_MR_COMMIT: false
-    DRUPAL_CORE: $CORE_NEXT_MINOR
+    _FOR_EVERY_MR_COMMIT: "false"
     SIMPLETEST_DB: pgsql://drupal:drupal@127.0.0.1/drupal
     POSTGRES_DB: drupal
     POSTGRES_USER: drupal
     POSTGRES_PASSWORD: drupal
 
-phpunit (11.3, mysql 8):
-  extends: phpunit (11.2, sqlite)
+phpunit (11.2 mysql 8):
+  extends: phpunit (11.2 sqlite)
   services:
     - mysql:8.0
   variables:
-    _FOR_EVERY_MR_COMMIT: false
-    DRUPAL_CORE: $CORE_NEXT_MINOR
+    _FOR_EVERY_MR_COMMIT: "false"
     SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
     MYSQL_DATABASE: drupal
     MYSQL_USER: drupal
@@ -524,12 +413,11 @@ phpunit (11.3, mysql 8):
 
 vitest:
   stage: test
-  image: node:20-alpine
-  allow_failure: false
+  image: *image-node
   needs: []
   rules:
     - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train") && ($_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null)
       changes:
         - ui/src/**/*
         - ui/tsconfig.json
@@ -559,54 +447,29 @@ vitest:
 
 .cypress-base:
   stage: test
-  extends:
-    - .test-variables
   before_script:
-    - echo -e "\e[0Ksection_start:`date +%s`:Cypress-deps[collapsed=true]\r\e[0KInstall Cypress dependencies."
-    # Remove Yarn repository to avoid GPG key errors (we use npm, not yarn)
-    - sudo rm -f /etc/apt/sources.list.d/yarn.list
-    - sudo apt-get -y update
-    - sudo apt-get -y install libgtk2.0-0t64 libgtk-3-0t64 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth xvfb alsa-utils pulseaudio
-    - echo "pcm.!default { type pulse }" > ~/.asoundrc
-    - echo "ctl.!default { type pulse }" >> ~/.asoundrc
-    - pulseaudio --system --disallow-exit --disallow-module-loading &
-    - echo -e "\e[0Ksection_end:`date +%s`:Cypress-deps\r\e[0K"
-    #
-    # Copied from `.nightwatch-base`, but converted to use GitLab CI references.
-    # 👇
-    #
     - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .drupal-enable-test-modules ]
     - !reference [ .canvas-ui ]
-    #
-    # 👆
-    #
-    - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
     - npm ci
     - cd ui
     - cp .env.example .env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> .env
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> .env
-    - echo "DRUPAL_TEST_WEBSERVER_USER=www-data" >> .env
+    - echo "DRUPAL_TEST_WEBSERVER_USER=${DRUPAL_TEST_WEBSERVER_USER}" >> .env
     - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/_drupal/web/core'" >> .env
     - cat .env
-    - mkdir -p $CYPRESS_CACHE_FOLDER /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - chown -R www-data:www-data $CYPRESS_CACHE_FOLDER /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - chmod -R 755 $CYPRESS_CACHE_FOLDER
-    - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npx cypress install
-    - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npx cypress --version
-    - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
+    - npx cypress install
+    - npx cypress --version
   variables:
     DRUPAL_PROJECT_FOLDER: "$CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas"
     _TARGET_DB_TYPE: sqlite
     CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas/ui/cycache
-    DRUPAL_TEST_WEBSERVER_USER: www-data
     DRUPAL_TEST_WEBDRIVER_AUTOSTART: true
     DRUPAL_TEST_WEBDRIVER_BINARY: "chromedriver"
     DRUPAL_TEST_WEBDRIVER_BINARY_FLAGS: "--port=9515"
     DRUPAL_TEST_BASE_URL: http://localhost
     DRUPAL_TEST_DB_URL: sqlite://localhost/sites/default/files/.ht.sqlite
-    MINK_DRIVER_ARGSP: '["chrome", {"browserName":"chrome", "goog:chromeOptions":{"w3c": true, "args":["--no-sandbox","--ignore-certificate-errors", "--allow-insecure-localhost", "--headless", "--disable-dev-shm-usage", "--disable-gpu"]}}, "http://localhost:9515"]'
     MINK_DRIVER_ARGS_WEBDRIVER: '["chrome", {"browserName":"chrome", "goog:chromeOptions":{"w3c": true, "args":["--no-sandbox","--ignore-certificate-errors", "--allow-insecure-localhost", "--headless", "--disable-dev-shm-usage", "--disable-gpu"]}}, "http://localhost:9515"]'
     SIMPLETEST_BASE_URL: http://localhost
     SIMPLETEST_DB: sqlite://localhost/sites/default/files/.ht.sqlite
@@ -624,6 +487,7 @@ cypress E2E:
   rules: *e2e-ci-job-rules
   parallel: 4
   script:
+    - EXIT_CODE=0
     - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log || EXIT_CODE=$?
     # Auto-retry when known frequent random failures occur.
     - grep "✖.*autocomplete-props" $CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas/ui/cypress.log && exit 112 || true
@@ -642,7 +506,7 @@ cypress unit:
     - npx cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
   rules:
     - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train"
       changes:
         - ui/src/**/*
         - ui/tsconfig.json
@@ -654,10 +518,8 @@ cypress unit:
 lint (php):
   stage: validate
   needs: []
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
-  variables:
-    GIT_DEPTH: 1
-    COMPOSER_ROOT_VERSION: 0.0.0
+  rules:
+    - when: on_success
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       fallback_keys:
@@ -707,12 +569,19 @@ lint (php):
 
 lint (node):
   stage: validate
+  image: *image-node
   needs: []
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
+  rules:
+    - when: on_success
   script:
     - npm ci
     - npm run build --workspace=drupal-canvas
     - npm run lint
+    - |
+      if [ "$_CANVAS_E2E_TESTS" != "true" ]; then
+        echo "❌ _CANVAS_E2E_TESTS is '$_CANVAS_E2E_TESTS' — E2E tests must not be disabled when merging. Reset it to 'true'."
+        exit 1
+      fi
 
 playwright:
   stage: test
@@ -722,10 +591,6 @@ playwright:
       - SHARD: [ "1/6", "2/6", "3/6", "4/6", "5/6", "6/6" ]
         #PROJECT: [ "chromium", "firefox", "webkit" ]
   rules: *e2e-ci-job-rules
-  interruptible: true
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
-  extends:
-    - .test-variables
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       fallback_keys:
@@ -743,12 +608,9 @@ playwright:
         - .cache/ms-playwright
       policy: pull
   variables:
-    GIT_DEPTH: 1
     _TARGET_DB_TYPE: sqlite
     DRUPAL_TEST_BASE_URL: http://localhost
-    DRUPAL_TEST_WEBSERVER_USER: www-data
     DRUPAL_TEST_PLAYWRIGHT_SKIP_TEARDOWN: true
-    COMPOSER_IGNORE_PLATFORM_REQS:
   before_script:
     - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
@@ -765,12 +627,10 @@ playwright:
 
 playwright-reports:
   stage: report
-  rules: *e2e-ci-job-rules
   needs:
     - playwright
-  when:
-    always
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
+  when: always
+  image: *image-node
   script:
     - mkdir -p test-results
     - npx playwright merge-reports --reporter=html ./blob-report
@@ -802,11 +662,11 @@ playwright-reports:
 
 CLI Test:
   stage: test
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   needs: []
   rules:
-    - *e2e-tests-must-not-be-disabled-rule
-    - changes:
+    - *is-push-rule
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train"
+      changes:
         - "packages/cli/**/*"
         - package.json
         - package-lock.json
@@ -820,11 +680,9 @@ CLI Test:
     - *data-integrity-files-change-rule
     - *manual-rule
   variables:
-    GIT_DEPTH: 1
     _TARGET_DB_TYPE: sqlite
     TEST_CANVAS_CLIENT_ID: cli
     TEST_CANVAS_CLIENT_SECRET: secret
-    DRUPAL_TEST_WEBSERVER_USER: www-data
     DRUPAL_TEST_BASE_URL: http://localhost
   before_script:
     - !reference [ .drupal-with-dev-dependencies ]
@@ -851,7 +709,8 @@ CLI Test:
 
 CLI Publish:
   stage: publish
-  image: node:20-alpine
+  interruptible: false
+  image: *image-node
   needs:
     - lint (node)
     - CLI Test
@@ -867,8 +726,8 @@ CLI Publish:
 
 # User facing documentation.
 pages-mr:
-  image: node:22
   stage: publish
+  image: *image-node
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -891,7 +750,10 @@ pages-mr:
 
 stop-pages-mr:
   stage: publish
+  image: *image-node
   needs: []
+  variables:
+    GIT_STRATEGY: none
   rules:
     # Branch merge.
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_MERGE_REQUEST_IID
@@ -908,8 +770,9 @@ stop-pages-mr:
     action: stop
 
 pages-publish:
-  image: node:22
   stage: publish
+  interruptible: false
+  image: *image-node
   needs: []
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -927,7 +790,8 @@ pages-publish:
 release:
   # For release flow details, see docs/release-process.md.
   stage: publish
-  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
+  interruptible: false
+  image: *image-node
   needs: []
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
