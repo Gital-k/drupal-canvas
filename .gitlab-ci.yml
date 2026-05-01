@@ -329,7 +329,7 @@ phpunit (11.3 sqlite):
       annotations: test-results/links.json
 
 phpunit (11.3 mariadb 10.6):
-  extends: phpunit (11.3, sqlite)
+  extends: phpunit (11.3 sqlite)
   # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
   rules:
     - *is-nightly-scheduled-rule
@@ -344,7 +344,7 @@ phpunit (11.3 mariadb 10.6):
     MYSQL_ROOT_PASSWORD: root
 
 phpunit (11.3 pgsql 16):
-  extends: phpunit (11.3, sqlite)
+  extends: phpunit (11.3 sqlite)
   # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
   rules:
     - *is-nightly-scheduled-rule
@@ -358,7 +358,7 @@ phpunit (11.3 pgsql 16):
     POSTGRES_PASSWORD: drupal
 
 phpunit (11.3 mysql 8):
-  extends: phpunit (11.3, sqlite)
+  extends: phpunit (11.3 sqlite)
   # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
   rules:
     - *is-nightly-scheduled-rule
@@ -373,7 +373,7 @@ phpunit (11.3 mysql 8):
     MYSQL_ROOT_PASSWORD: root
 
 phpunit (11.2 sqlite):
-  extends: phpunit (11.3, sqlite)
+  extends: phpunit (11.3 sqlite)
   before_script:
     - !reference [ phpunit (11.3 sqlite), before_script ]
     # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
@@ -386,7 +386,7 @@ phpunit (11.2 sqlite):
     DRUPAL_CORE: $DRUPAL_CORE
 
 phpunit (11.2 mariadb 10.6):
-  extends: phpunit (11.2, sqlite)
+  extends: phpunit (11.2 sqlite)
   services:
     - mariadb:10.6
   variables:
@@ -398,7 +398,7 @@ phpunit (11.2 mariadb 10.6):
     MYSQL_ROOT_PASSWORD: root
 
 phpunit (11.2 pgsql 16):
-  extends: phpunit (11.2, sqlite)
+  extends: phpunit (11.2 sqlite)
   services:
     - postgres:16
   variables:
@@ -409,7 +409,7 @@ phpunit (11.2 pgsql 16):
     POSTGRES_PASSWORD: drupal
 
 phpunit (11.2 mysql 8):
-  extends: phpunit (11.2, sqlite)
+  extends: phpunit (11.2 sqlite)
   services:
     - mysql:8.0
   variables:
