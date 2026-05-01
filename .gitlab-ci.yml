@@ -38,7 +38,7 @@ variables:
 
   DRUPAL_TEST_WEBSERVER_USER: www-data
 
-.image-node: &image-node: node:24-alpine
+.image-node: &image-node node:24-alpine
 
 .is-nightly-scheduled-rule: &is-nightly-scheduled-rule
   if: $CI_PIPELINE_SOURCE == "schedule"
