@@ -119,7 +119,25 @@ variables:
   - *UI-files-change-rule
   - *manual-rule
 
+workflow:
+  auto_cancel:
+    # cancels running interruptible jobs when a new commit is pushed.
+    on_new_commit: conservative
+    # cancels all remaining jobs as soon as one fails.
+    on_job_failure: all
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_train"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    # suppresses the branch pipeline when an MR pipeline will already run for
+    # the same commit.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
 default:
+  interruptible: true
   cache:
     key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
     fallback_keys:
@@ -500,9 +518,8 @@ cypress unit:
 lint (php):
   stage: validate
   needs: []
-  variables:
-    GIT_DEPTH: 1
-    COMPOSER_ROOT_VERSION: 0.0.0
+  rules:
+    - *manual-rule
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       fallback_keys:
@@ -554,6 +571,8 @@ lint (node):
   stage: validate
   image: *image-node
   needs: []
+  rules:
+    - *manual-rule
   script:
     - npm ci
     - npm run build --workspace=drupal-canvas
@@ -687,6 +706,7 @@ CLI Test:
 
 CLI Publish:
   stage: publish
+  interruptible: false
   image: *image-node
   needs:
     - lint (node)
@@ -746,6 +766,7 @@ stop-pages-mr:
 
 pages-publish:
   stage: publish
+  interruptible: false
   image: *image-node
   needs: []
   rules:
@@ -764,6 +785,7 @@ pages-publish:
 release:
   # For release flow details, see docs/release-process.md.
   stage: publish
+  interruptible: false
   image: *image-node
   needs: []
   rules:
