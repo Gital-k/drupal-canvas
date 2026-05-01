@@ -263,7 +263,7 @@ phpcs-rules-match-drupal-core:
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
 
-phpunit (11.3, sqlite):
+phpunit (11.3 sqlite):
   rules:
     - *is-nightly-scheduled-rule
     - *backend-files-change-rule
@@ -328,7 +328,7 @@ phpunit (11.3, sqlite):
         - test-results/*.xml
       annotations: test-results/links.json
 
-phpunit (11.3, mariadb 10.6):
+phpunit (11.3 mariadb 10.6):
   extends: phpunit (11.3, sqlite)
   # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
   rules:
@@ -343,7 +343,7 @@ phpunit (11.3, mariadb 10.6):
     MYSQL_PASSWORD: drupal
     MYSQL_ROOT_PASSWORD: root
 
-phpunit (11.3, pgsql 16):
+phpunit (11.3 pgsql 16):
   extends: phpunit (11.3, sqlite)
   # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
   rules:
@@ -357,7 +357,7 @@ phpunit (11.3, pgsql 16):
     POSTGRES_USER: drupal
     POSTGRES_PASSWORD: drupal
 
-phpunit (11.3, mysql 8):
+phpunit (11.3 mysql 8):
   extends: phpunit (11.3, sqlite)
   # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
   rules:
@@ -372,10 +372,10 @@ phpunit (11.3, mysql 8):
     MYSQL_PASSWORD: drupal
     MYSQL_ROOT_PASSWORD: root
 
-phpunit (11.2, sqlite):
+phpunit (11.2 sqlite):
   extends: phpunit (11.3, sqlite)
   before_script:
-    - !reference [phpunit (11.3, sqlite), before_script]
+    - !reference [ phpunit (11.3 sqlite), before_script ]
     # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
     # (PHPUnit SourceMapper races with concurrent test cleanup under sites/simpletest,
     # causing "RecursiveDirectoryIterator: Failed to open directory" random failures).
@@ -385,7 +385,7 @@ phpunit (11.2, sqlite):
   variables:
     DRUPAL_CORE: $DRUPAL_CORE
 
-phpunit (11.2, mariadb 10.6):
+phpunit (11.2 mariadb 10.6):
   extends: phpunit (11.2, sqlite)
   services:
     - mariadb:10.6
@@ -397,7 +397,7 @@ phpunit (11.2, mariadb 10.6):
     MYSQL_PASSWORD: drupal
     MYSQL_ROOT_PASSWORD: root
 
-phpunit (11.2, pgsql 16):
+phpunit (11.2 pgsql 16):
   extends: phpunit (11.2, sqlite)
   services:
     - postgres:16
@@ -408,7 +408,7 @@ phpunit (11.2, pgsql 16):
     POSTGRES_USER: drupal
     POSTGRES_PASSWORD: drupal
 
-phpunit (11.2, mysql 8):
+phpunit (11.2 mysql 8):
   extends: phpunit (11.2, sqlite)
   services:
     - mysql:8.0
