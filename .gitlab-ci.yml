@@ -222,15 +222,17 @@ phpstan-is-up-to-date:
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
 
-phpcs-rules-match-drupal-11:
+phpcs-rules-match-drupal-core:
   stage: development
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - *manual-rule
   script:
     - |
+      DRUPAL_MAJOR=$(echo "$DRUPAL_CORE" | cut -d. -f1)
+      DRUPAL_URL="https://git.drupalcode.org/project/drupal/-/raw/${DRUPAL_MAJOR}.x/core/phpcs.xml.dist?ref_type=heads"
       # Download the file from the Drupal repository
-      curl -o drupal_core_phpcs.xml.dist https://git.drupalcode.org/project/drupal/-/raw/11.x/core/phpcs.xml.dist?ref_type=heads
+      curl -o drupal_core_phpcs.xml.dist "$DRUPAL_URL"
 
       # Check if the download was successful
       if [ $? -ne 0 ]; then
@@ -266,7 +268,7 @@ phpunit (11.3, sqlite):
     - *is-nightly-scheduled-rule
     - *backend-files-change-rule
     # Changes to the infra for running PHPUnit itself also need to trigger CI.
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null)
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train") && ($_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null)
       changes:
         - .env.defaults
         - phpunit.xml.dist
@@ -280,6 +282,8 @@ phpunit (11.3, sqlite):
       - PHPUNIT_TESTSUITE: 'PHPUnit-Unit'
         KUBERNETES_CPU_REQUEST: "4"
         DRUPAL_TEST_CONCURRENCY: '24'
+        CI_PARALLEL_NODE_INDEX: '1'
+        CI_PARALLEL_NODE_TOTAL: '1'
       - PHPUNIT_TESTSUITE: 'PHPUnit-Kernel'
         CI_PARALLEL_NODE_INDEX: ['1', '2', '3']
         CI_PARALLEL_NODE_TOTAL: '3'
@@ -288,9 +292,12 @@ phpunit (11.3, sqlite):
       - PHPUNIT_TESTSUITE: 'PHPUnit-Functional'
         KUBERNETES_CPU_REQUEST: "20"
         DRUPAL_TEST_CONCURRENCY: '14'
-  script:
+        CI_PARALLEL_NODE_INDEX: '1'
+        CI_PARALLEL_NODE_TOTAL: '1'
+  before_script:
     - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
+  script:
     - !reference [ .test_runner ]
     - run_test "phpunit" "composer run phpunit -- --types $PHPUNIT_TESTSUITE --ci-parallel-node-index $CI_PARALLEL_NODE_INDEX --ci-parallel-node-total $CI_PARALLEL_NODE_TOTAL"
     - !reference [ .test_summary ]
@@ -368,6 +375,7 @@ phpunit (11.3, mysql 8):
 phpunit (11.2, sqlite):
   extends: phpunit (11.3, sqlite)
   before_script:
+    - !reference [phpunit (11.3, sqlite), before_script]
     # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
     # (PHPUnit SourceMapper races with concurrent test cleanup under sites/simpletest,
     # causing "RecursiveDirectoryIterator: Failed to open directory" random failures).
@@ -415,11 +423,10 @@ phpunit (11.2, mysql 8):
 vitest:
   stage: test
   image: *image-node
-  allow_failure: false
   needs: []
   rules:
     - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train"
       changes:
         - ui/src/**/*
         - ui/tsconfig.json
@@ -490,6 +497,7 @@ cypress E2E:
   rules: *e2e-ci-job-rules
   parallel: 4
   script:
+    - EXIT_CODE=0
     - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log || EXIT_CODE=$?
     # Auto-retry when known frequent random failures occur.
     - grep "✖.*autocomplete-props" $CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas/ui/cypress.log && exit 112 || true
@@ -508,7 +516,7 @@ cypress unit:
     - npx cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
   rules:
     - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train"
       changes:
         - ui/src/**/*
         - ui/tsconfig.json
@@ -521,7 +529,7 @@ lint (php):
   stage: validate
   needs: []
   rules:
-    - *manual-rule
+    - when: on_success
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       fallback_keys:
@@ -574,7 +582,7 @@ lint (node):
   image: *image-node
   needs: []
   rules:
-    - *manual-rule
+    - when: on_success
   script:
     - npm ci
     - npm run build --workspace=drupal-canvas
@@ -627,8 +635,7 @@ playwright-reports:
   rules: *e2e-ci-job-rules
   needs:
     - playwright
-  when:
-    always
+  when: always
   image: *image-node
   script:
     - mkdir -p test-results
@@ -750,6 +757,8 @@ stop-pages-mr:
   stage: publish
   image: *image-node
   needs: []
+  variables:
+    GIT_STRATEGY: none
   rules:
     # Branch merge.
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_MERGE_REQUEST_IID
