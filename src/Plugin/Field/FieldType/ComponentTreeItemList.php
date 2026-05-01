@@ -53,6 +53,11 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
     return parent::first();
   }
 
+  public function get($index) : ?ComponentTreeItem {
+    // @phpstan-ignore-next-line
+    return parent::get($index);
+  }
+
   /**
    * {@inheritdoc}
    */
