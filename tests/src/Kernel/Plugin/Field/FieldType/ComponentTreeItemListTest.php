@@ -2037,4 +2037,91 @@ HTML,
     $this->assertNoText('[canvas:evolution-test/optional_text] The property optional_text is required.');
   }
 
+  /**
+   * Tests incompatible JS component evolution is surfaced during hydration.
+   */
+  public function testHydrationRejectsIncompatibleActiveJsComponentVersion(): void {
+    // @see https://www.drupal.org/i/3587711
+    // This covers an incompatible prop-type evolution: the component instance
+    // stores a `string` value from an older component version, while the active
+    // version has changed that prop to `integer`. Because this change is not
+    // auto-updatable, hydration must stop before the stale value reaches active
+    // version rendering and triggers prop validation there.
+
+    $test_code_component_id = 'incompatible-evolution-test';
+    $test_component_id = JsComponent::componentIdFromJavascriptComponentId($test_code_component_id);
+    $js_component = JavaScriptComponent::create([
+      'machineName' => $test_code_component_id,
+      'name' => 'Incompatible Evolution Test Component',
+      'status' => TRUE,
+      'props' => [
+        'value' => [
+          'title' => 'Value',
+          'type' => 'string',
+          'examples' => ['Legacy text value'],
+        ],
+      ],
+      'required' => ['value'],
+      'slots' => [],
+      'js' => [
+        'original' => 'export default function() { return null; }',
+        'compiled' => 'export default function() { return null; }',
+      ],
+      'css' => ['original' => '', 'compiled' => ''],
+    ]);
+    $js_component->save();
+
+    $component = Component::load($test_component_id);
+    $this->assertInstanceOf(ComponentInterface::class, $component);
+    $original_version = $component->getActiveVersion();
+
+    $item_list = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $parent_uuid = (new Php())->generate();
+    $item_list->setValue([
+      [
+        'uuid' => $parent_uuid,
+        'component_id' => $test_component_id,
+        'inputs' => [
+          'value' => 'Persisted legacy text value',
+        ],
+      ],
+    ]);
+    self::assertCount(0, $item_list->validate());
+    self::assertSame($original_version, $item_list->getValue()[0]['component_version']);
+
+    $js_component = \Drupal::entityTypeManager()
+      ->getStorage(JavaScriptComponent::ENTITY_TYPE_ID)
+      ->loadUnchanged($test_code_component_id);
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $js_component->setProps([
+      'value' => [
+        'title' => 'Value',
+        'type' => 'integer',
+        'examples' => [27],
+      ],
+    ]);
+    $js_component->save();
+
+    $component = \Drupal::entityTypeManager()
+      ->getStorage(Component::ENTITY_TYPE_ID)
+      ->loadUnchanged($test_component_id);
+    $this->assertInstanceOf(ComponentInterface::class, $component);
+    $this->assertNotSame($original_version, $component->getActiveVersion());
+
+    $hydrated_value = \Closure::bind(function () {
+      return $this->getHydratedTree();
+    }, $item_list, $item_list)();
+    $tree = $hydrated_value->getTree();
+
+    $this->assertArrayHasKey(ComponentTreeItemList::ROOT_UUID, $tree);
+    $this->assertArrayHasKey($parent_uuid, $tree[ComponentTreeItemList::ROOT_UUID]);
+    $hydrated_parent = $tree[ComponentTreeItemList::ROOT_UUID][$parent_uuid];
+    $this->assertSame($test_component_id, $hydrated_parent['component']);
+    $this->assertArrayHasKey(
+      'hydration_exception',
+      $hydrated_parent,
+      'Hydration should stop before rendering an incompatible old component instance against the active JS component schema.',
+    );
+  }
+
 }
