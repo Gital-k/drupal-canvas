@@ -7,8 +7,8 @@
 
 set -e
 
-CANVAS_DIR="${DDEV_COMPOSER_ROOT}/${DDEV_DOCROOT}/modules/contrib/canvas"
-cd "$CANVAS_DIR/ui"
+PROJECT_DIR="${DDEV_COMPOSER_ROOT}/${DDEV_DOCROOT}/${DRUPAL_PROJECTS_PATH}/${DDEV_PROJECT}"
+cd "$PROJECT_DIR/ui"
 
 # Ensure .env exists with required variables
 if [[ ! -f .env ]]; then

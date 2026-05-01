@@ -1,7 +1,7 @@
 name: ddev-playwright
 repository: Lullabot/ddev-playwright
 version: v0.5.3
-install_date: "2026-04-28T13:45:06-07:00"
+install_date: "2026-05-01T11:30:02-07:00"
 project_files:
     - commands/host/install-playwright
     - commands/web/playwright

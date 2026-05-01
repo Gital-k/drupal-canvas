@@ -1,6 +1,11 @@
-#!/bin/sh
-#ddev-generated
+#!/usr/bin/env bash
 
-cd /var/www/html
+## Description: Run playwright inside the web container
+## Usage: playwright [flags] [args]
+## Example: "ddev playwright"
+## ExecRaw: true
+set -eu -o pipefail
+
+cd ${DDEV_APPROOT}
 npm ci
 DRUPAL_TEST_DRUPAL_ROOT=web npx playwright "$@"
