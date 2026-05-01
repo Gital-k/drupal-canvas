@@ -38,22 +38,46 @@ import type { CanvasComponent, PropSourceComponent } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
 
 /**
- * One shared debounced sender per component instance UUID.
+ * One shared debounce timer per component instance UUID.
  *
  * All InputBehaviorsComponentPropsForm instances that belong to the same
- * component instance form share this entry, so rapid changes across multiple
+ * component instance form share this timer, so rapid changes across multiple
  * inputs (e.g. reordering a multivalue field updates N _weight fields at once)
  * are coalesced into a single backend request instead of firing N requests.
  *
+ * Each call schedules its own `formStateToStore` closure (which captures the
+ * latest values for that specific input), but the timer is shared so only the
+ * last scheduled call actually fires.
+ *
  * Entries are cleaned up when the last input for a given component unmounts.
  */
-const perComponentDebouncedSenders = new Map<
+const perComponentDebounceTimers = new Map<
   string,
   {
-    fn: ReturnType<typeof debounce>;
+    timerId: ReturnType<typeof setTimeout> | null;
     refCount: number;
   }
 >();
+
+function scheduleSharedDebounce(
+  componentId: string,
+  fn: () => void,
+  delay: number,
+): void {
+  const entry = perComponentDebounceTimers.get(componentId);
+  if (!entry) {
+    // Fallback: entry not registered yet (shouldn't normally happen).
+    fn();
+    return;
+  }
+  if (entry.timerId !== null) {
+    clearTimeout(entry.timerId);
+  }
+  entry.timerId = setTimeout(() => {
+    entry.timerId = null;
+    fn();
+  }, delay);
+}
 
 export const InputBehaviorsComponentPropsForm = (
   OriginalInput: React.FC,
@@ -162,36 +186,38 @@ export const InputBehaviorsComponentPropsForm = (
     debounce(formStateToStore, DEBOUNCE_TIMEOUT),
   ).current;
 
-  // Shared debounced sender for this component instance.
+  // Shared debounce timer for this component instance.
   //
-  // All inputs that belong to the same component instance form share one entry
-  // in perComponentDebouncedSenders, so rapid changes across multiple inputs
+  // All inputs that belong to the same component instance form share one timer
+  // in perComponentDebounceTimers, so rapid changes across multiple inputs
   // (e.g. reordering a multivalue field updates N _weight fields at once) are
   // coalesced into a single backend request instead of firing N requests.
   //
+  // Unlike a shared debounced function, each call schedules its own fresh
+  // formStateToStore closure so there is no risk of stale captured values.
+  //
   // The ref-count lets us safely remove the entry only when the last input for
-  // this component unmounts, without cancelling a pending call that another
+  // this component unmounts, without cancelling a pending timer that another
   // still-mounted input might be waiting on.
   useEffect(() => {
-    if (!perComponentDebouncedSenders.has(selectedComponent)) {
-      perComponentDebouncedSenders.set(selectedComponent, {
-        fn: debounce(formStateToStore, DEBOUNCE_TIMEOUT),
+    if (!perComponentDebounceTimers.has(selectedComponent)) {
+      perComponentDebounceTimers.set(selectedComponent, {
+        timerId: null,
         refCount: 0,
       });
     }
-    const entry = perComponentDebouncedSenders.get(selectedComponent)!;
+    const entry = perComponentDebounceTimers.get(selectedComponent)!;
     entry.refCount += 1;
 
     return () => {
       entry.refCount -= 1;
       if (entry.refCount === 0) {
-        entry.fn.cancel();
-        perComponentDebouncedSenders.delete(selectedComponent);
+        if (entry.timerId !== null) {
+          clearTimeout(entry.timerId);
+        }
+        perComponentDebounceTimers.delete(selectedComponent);
       }
     };
-    // formStateToStore is intentionally excluded: it closes over the latest
-    // values via refs/closures and must not cause the effect to re-run.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedComponent]);
 
   // Keep the per-instance debounce in sync for the non-shared path (scalar
@@ -330,17 +356,16 @@ export const InputBehaviorsComponentPropsForm = (
       components?.[selectedComponentType]?.source !== 'Code component' ||
       !['checkbox', 'radio'].includes(elementType as string);
     if (shouldDebounce) {
-      // Use the shared per-component debounced sender so that simultaneous
-      // changes from multiple inputs (e.g. N _weight fields updating at once
-      // during a multivalue reorder) are coalesced into a single request.
-      const sharedDebounce = perComponentDebouncedSenders.get(selectedComponent);
-      if (sharedDebounce) {
-        sharedDebounce.fn(newFormState, inputAndUiData);
-      } else {
-        // Fallback: the shared entry hasn't been registered yet (shouldn't
-        // normally happen, but be safe).
-        debounceFormStateToStore(newFormState, inputAndUiData);
-      }
+      // Use the shared per-component timer so that simultaneous changes from
+      // multiple inputs (e.g. N _weight fields updating at once during a
+      // multivalue reorder) are coalesced into a single request.
+      // Each call captures its own fresh formStateToStore closure so there is
+      // no risk of stale values from a different input's closure.
+      scheduleSharedDebounce(
+        selectedComponent,
+        () => formStateToStore(newFormState, inputAndUiData),
+        DEBOUNCE_TIMEOUT,
+      );
     } else {
       formStateToStore(newFormState, inputAndUiData);
     }
