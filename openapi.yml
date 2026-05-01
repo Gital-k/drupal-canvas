@@ -446,10 +446,11 @@ paths:
           description: Deleted individual Asset Library
   /canvas/api/v0/config/auto-save/{entityTypeId}/{configEntityId}:
     description: Auto-save endpoints
+    parameters:
+      - $ref: '#/components/parameters/entityTypeId'
+      - $ref: '#/components/parameters/configEntityId'
     get:
       summary: Gets an auto-save state
-      parameters:
-        - $ref: '#/components/parameters/configEntityId'
       responses:
         '200':
           description: Individual auto-save state
@@ -459,8 +460,6 @@ paths:
                 type: object
     patch:
       summary: Updates an auto-save state
-      parameters:
-        - $ref: '#/components/parameters/configEntityId'
       requestBody:
         description: Updates individual auto-save state
         content:
@@ -1352,6 +1351,13 @@ paths:
         '204':
           description: Content deleted successfully
   '/canvas/api/v0/content/{entity_type}':
+    parameters:
+      - name: entity_type
+        in: path
+        required: true
+        description: The entity type
+        schema:
+          type: string
     get:
       summary: Provides api for page listing.
       parameters:
@@ -1521,13 +1527,6 @@ paths:
                         href: /canvas/api/v0/content/canvas_page?page[offset]=0&page[limit]=50
     post:
       summary: Creates content for a specific entity type
-      parameters:
-        - name: entity_type
-          in: path
-          required: true
-          description: The entity type
-          schema:
-            type: string
       requestBody:
         description: Optional entity ID for duplication, or update a existing entity ID
         content:
@@ -1643,11 +1642,11 @@ paths:
           $ref: '#/components/responses/DrupalAjaxResponse'
   '/canvas/api/v0/form/content-entity/{entityTypeId}/{entityId}':
     description: TODO
+    parameters:
+      - $ref: '#/components/parameters/entityTypeId'
+      - $ref: '#/components/parameters/entityId'
     get:
       summary: Gets the entity form with the "default" form mode
-      parameters:
-        - $ref: '#/components/parameters/entityTypeId'
-        - $ref: '#/components/parameters/entityId'
       responses:
         '200':
           $ref: '#/components/responses/FormResponse'
@@ -1666,18 +1665,18 @@ paths:
                 description: A Drupal AJAX response.
   '/canvas/api/v0/form/content-entity/{entityTypeId}/{entityId}/{entityFormMode}':
     description: The form for editing a content entity.
+    parameters:
+      - $ref: '#/components/parameters/entityTypeId'
+      - $ref: '#/components/parameters/entityId'
+      - name: entityFormMode
+        in: path
+        required: true
+        description: The entity form mode of the form to retrieve
+        schema:
+          type: string
+        example: default
     get:
       summary: Gets the entity form with the specified form mode
-      parameters:
-        - $ref: '#/components/parameters/entityTypeId'
-        - $ref: '#/components/parameters/entityId'
-        - name: entityFormMode
-          in: path
-          required: true
-          description: The entity form mode of the form to retrieve
-          schema:
-            type: string
-          example: default
       responses:
         '200':
           $ref: '#/components/responses/FormResponse'
