@@ -198,4 +198,51 @@ describe('collectImports', () => {
     // Non-builtin alias should still be collected
     expect(result.aliasImports.has('@/lib/my-helper')).toBe(true);
   });
+
+  it('collects relative Vite-style image imports as deployable asset imports', async () => {
+    const entryFile = await writeFixture(
+      'components/card/index.tsx',
+      `
+        import heroImage from './hero.webp';
+        export default function Card() {
+          return <img src={heroImage} />;
+        }
+      `,
+    );
+    const imagePath = await writeFixture('components/card/hero.webp', 'image');
+
+    const result = await collectImports(
+      [entryFile],
+      path.join(tmpDir, 'components'),
+      tmpDir,
+    );
+
+    expect(result.assetImports).toEqual(
+      new Map([['@/components/card/hero.webp', imagePath]]),
+    );
+    expect(result.aliasImports.size).toBe(0);
+  });
+
+  it('collects alias image imports under components as asset imports', async () => {
+    const entryFile = await writeFixture(
+      'components/card/index.tsx',
+      `
+        import heroImage from '@/components/card/hero.webp';
+        export default function Card() {
+          return <img src={heroImage} />;
+        }
+      `,
+    );
+    const imagePath = await writeFixture('components/card/hero.webp', 'image');
+
+    const result = await collectImports(
+      [entryFile],
+      path.join(tmpDir, 'components'),
+      tmpDir,
+    );
+
+    expect(result.assetImports).toEqual(
+      new Map([['@/components/card/hero.webp', imagePath]]),
+    );
+  });
 });
