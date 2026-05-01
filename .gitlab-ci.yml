@@ -34,7 +34,7 @@ variables:
 
   # Enable Canvas contributors to change this from `true` to `false` to disable E2E (end-to-end) tests.
   # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
-  _CANVAS_E2E_TESTS: true
+  _CANVAS_E2E_TESTS: "true"
 
   DRUPAL_TEST_WEBSERVER_USER: www-data
 
@@ -107,13 +107,8 @@ variables:
       - ui/tests/fixtures/**/*
     when: on_success
 
-.e2e-tests-must-not-be-disabled-rule: &e2e-tests-must-not-be-disabled-rule
-  - if: $_CANVAS_E2E_TESTS == "false"
-    when: never
-
 # The rules to be used by all E2E CI jobs, to ensure they are triggered consistently.
 .e2e-ci-job-rules: &e2e-ci-job-rules
-  - *e2e-tests-must-not-be-disabled-rule
   - *is-push-rule
   - *backend-files-change-rule
   - *UI-files-change-rule
@@ -154,6 +149,9 @@ cache dependencies:
   stage: cache
   allow_failure: true
   needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - *manual-rule
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       paths:
@@ -232,19 +230,12 @@ phpcs-rules-match-drupal-core:
       DRUPAL_MAJOR=$(echo "$DRUPAL_CORE" | cut -d. -f1)
       DRUPAL_URL="https://git.drupalcode.org/project/drupal/-/raw/${DRUPAL_MAJOR}.x/core/phpcs.xml.dist?ref_type=heads"
       # Download the file from the Drupal repository
-      curl -o drupal_core_phpcs.xml.dist "$DRUPAL_URL"
+      curl --fail -o drupal_core_phpcs.xml.dist "$DRUPAL_URL"
 
-      # Check if the download was successful
-      if [ $? -ne 0 ]; then
-        echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
-        echo "Error: Failed to download $DRUPAL_URL"
-        exit 1
-      fi
-
-      # Compare the downloaded file with the local file using a subshell to prevent premature exit
+      # diff returns exit code 1 when files differ; `set -e` would abort the script
+      # before we can capture it, so wrap in a block with `|| true` to preserve it.
       echo "Comparing downloaded file with local file..."
-      # With uses the braces the job just ends here for some reason.
-       {
+      {
         diff drupal_core_phpcs.xml.dist core.phpcs.xml.dist
         DIFF_EXIT_CODE=$?
       } || true
@@ -390,7 +381,7 @@ phpunit (11.2 mariadb 10.6):
   services:
     - mariadb:10.6
   variables:
-    _FOR_EVERY_MR_COMMIT: false
+    _FOR_EVERY_MR_COMMIT: "false"
     SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
     MYSQL_DATABASE: drupal
     MYSQL_USER: drupal
@@ -402,7 +393,7 @@ phpunit (11.2 pgsql 16):
   services:
     - postgres:16
   variables:
-    _FOR_EVERY_MR_COMMIT: false
+    _FOR_EVERY_MR_COMMIT: "false"
     SIMPLETEST_DB: pgsql://drupal:drupal@127.0.0.1/drupal
     POSTGRES_DB: drupal
     POSTGRES_USER: drupal
@@ -413,7 +404,7 @@ phpunit (11.2 mysql 8):
   services:
     - mysql:8.0
   variables:
-    _FOR_EVERY_MR_COMMIT: false
+    _FOR_EVERY_MR_COMMIT: "false"
     SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
     MYSQL_DATABASE: drupal
     MYSQL_USER: drupal
@@ -426,7 +417,7 @@ vitest:
   needs: []
   rules:
     - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train") && ($_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null)
       changes:
         - ui/src/**/*
         - ui/tsconfig.json
@@ -479,7 +470,6 @@ vitest:
     DRUPAL_TEST_WEBDRIVER_BINARY_FLAGS: "--port=9515"
     DRUPAL_TEST_BASE_URL: http://localhost
     DRUPAL_TEST_DB_URL: sqlite://localhost/sites/default/files/.ht.sqlite
-    MINK_DRIVER_ARGSP: '["chrome", {"browserName":"chrome", "goog:chromeOptions":{"w3c": true, "args":["--no-sandbox","--ignore-certificate-errors", "--allow-insecure-localhost", "--headless", "--disable-dev-shm-usage", "--disable-gpu"]}}, "http://localhost:9515"]'
     MINK_DRIVER_ARGS_WEBDRIVER: '["chrome", {"browserName":"chrome", "goog:chromeOptions":{"w3c": true, "args":["--no-sandbox","--ignore-certificate-errors", "--allow-insecure-localhost", "--headless", "--disable-dev-shm-usage", "--disable-gpu"]}}, "http://localhost:9515"]'
     SIMPLETEST_BASE_URL: http://localhost
     SIMPLETEST_DB: sqlite://localhost/sites/default/files/.ht.sqlite
@@ -587,6 +577,11 @@ lint (node):
     - npm ci
     - npm run build --workspace=drupal-canvas
     - npm run lint
+    - |
+      if [ "$_CANVAS_E2E_TESTS" != "true" ]; then
+        echo "❌ _CANVAS_E2E_TESTS is '$_CANVAS_E2E_TESTS' — E2E tests must not be disabled when merging. Reset it to 'true'."
+        exit 1
+      fi
 
 playwright:
   stage: test
@@ -632,7 +627,6 @@ playwright:
 
 playwright-reports:
   stage: report
-  rules: *e2e-ci-job-rules
   needs:
     - playwright
   when: always
@@ -670,8 +664,9 @@ CLI Test:
   stage: test
   needs: []
   rules:
-    - *e2e-tests-must-not-be-disabled-rule
-    - changes:
+    - *is-push-rule
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train"
+      changes:
         - "packages/cli/**/*"
         - package.json
         - package-lock.json
