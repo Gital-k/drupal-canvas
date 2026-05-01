@@ -235,6 +235,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       // so not specifying the field definitions to generate StaticPropSources
       // is fine, unless it was exposed before, where we need to know the
       // required props as validation will happen on preview.
+      // @see \Drupal\canvas\Entity\Component
       'prop_field_definitions' => $existing_required_prop_definitions,
     ]);
     \assert($js_component_source instanceof JsComponent);

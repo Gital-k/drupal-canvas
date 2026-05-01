@@ -87,6 +87,7 @@ final class ContentTemplateHooks {
       // type + view mode, the original template will NOT be used anymore:
       // - not the view mode-specific one, such as `node--teaser.html.twig`
       // - not the generic one, such as `node.html.twig`
+      // @see \Drupal\canvas\Entity\Page
       // @todo Remove the restriction that this only works with nodes, after
       //   https://www.drupal.org/project/canvas/issues/3498525.
       if ($entity_type->entityClassImplements(FieldableEntityInterface::class) && $entity_type->id() === 'node') {

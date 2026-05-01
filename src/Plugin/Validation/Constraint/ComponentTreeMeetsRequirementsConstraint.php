@@ -23,6 +23,9 @@ use Symfony\Component\Validator\Exception\MissingOptionsException;
  *
  * Assumes valid component trees.
  *
+ * @see \Drupal\canvas\Entity\ContentTemplate
+ * @see \Drupal\canvas\Entity\PageRegion
+ * @see \Drupal\canvas\Entity\Pattern
  * @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraint
  * @phpstan-import-type PropSourceTypePrefix from \Drupal\canvas\PropSource\PropSourceBase
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component

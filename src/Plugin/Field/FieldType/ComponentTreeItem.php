@@ -236,6 +236,7 @@ class ComponentTreeItem extends FieldItemBase {
           //   exposed slot)
           // In the latter case, `slot` must match an exposed slot of the
           // associated `ContentTemplate`.
+          // @see \Drupal\canvas\Entity\ContentTemplate
           // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidParentAndSlotConstraintValidator
           'not null' => FALSE,
         ],

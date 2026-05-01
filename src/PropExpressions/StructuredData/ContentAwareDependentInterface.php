@@ -50,6 +50,7 @@ interface ContentAwareDependentInterface {
    *   ];
    *   @endcode
    *
+   * @see \Drupal\canvas\Entity\ContentTemplate
    * @see \Drupal\Component\Plugin\DependentPluginInterface
    * @see \Drupal\Core\Config\Entity\ConfigDependencyManager
    * @see \Drupal\Core\Entity\EntityInterface::getConfigDependencyName()

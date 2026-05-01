@@ -516,6 +516,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // to in order to correctly render the component instance.
       // Also note that this will NOT run anymore for a given prop once the
       // Content Creator has specified a value in the generated field widget.
+      // @see \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource
       if (PropSource::tryFrom($model['source'][$prop_name]['sourceType']) === PropSource::DefaultRelativeUrl) {
         // TRICKY: use the default static prop source as-is, with its default
         // value, because:
@@ -524,6 +525,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         //   empty by the field type)
         // - the server side MUST fall back to a `DefaultRelativeUrlPropSource`
         //   to be able to render the component at all
+        // @see \Drupal\canvas\PropSource\StaticPropSource
+        // @see \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource
         $model['source'][$prop_name] = $this->getDefaultStaticPropSource($prop_name, FALSE)
           ->toArray();
       }
@@ -1282,6 +1285,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       try {
         // TRICKY: this is always set, *except* in the case of an auto-saved
         // code component that just gained a new prop.
+        // @see \Drupal\canvas\PropSource\StaticPropSource
         $default_source_value = $this->configuration['prop_field_definitions'][$prop]['default_value'] ?? NULL;
 
         // Valueless prop, for the case where an example is provided that cannot
@@ -1310,6 +1314,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // In the first case, fall back to `DefaultRelativeUrlPropSource`.
         // In the second case (user explicitly removed the value), respect user
         // intent and do NOT fall back to the default for optional props.
+        // @see \Drupal\canvas\PropSource\StaticPropSource
         // @see \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource
         // @see ::exampleValueRequiresEntity()
         if ($default_source_value === [] && $is_static_prop_source) {
@@ -1413,6 +1418,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           // indeed enter the next branch, which would cause it to be skipped.
           // @todo Consider adding a new `GracefulDegradationPropSource` to
           // encapsulate this similarly to `DefaultRelativeUrlPropSource`.
+          // @see \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource
           \assert(!$source instanceof StaticPropSource || ($source->fieldItemList->count() > 0 && $source->fieldItemList->isEmpty()));
         }
         // 💡 Automatically inform developers of missing client-side transforms,
@@ -1531,6 +1537,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    *   are allowed to be the latter.
    *
    * @see ::uncollapse()
+   * @see \Drupal\canvas\PropSource\StaticPropSource
+   * @see \Drupal\canvas\PropSource\DynamicPropSource
+   * @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
    */
   private function collapse(PropSourceBase $source, string $prop_name): mixed {
     // @todo Simplify this to just `if ($source instanceof StaticPropSource && $source->hasSameShapeAs($this->getDefaultStaticPropSource($prop_name))) { return $source->getValue(); }` in https://www.drupal.org/project/canvas/issues/3532414

@@ -1267,6 +1267,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // Modify a Code Component correctly: 200.
     // ⚠️This is changing it from `internal` → `exposed`, for the first time,
     // this must trigger the creation a corresponding `Component` config entity.
+    // @see \Drupal\canvas\Entity\Component
     $this->assertNull(Component::load('js.test'));
     // @todo https://www.drupal.org/i/3500043 will disallow PATCHing this if > 0 uses of this component exist.
     $code_component_to_send['status'] = TRUE;
@@ -1300,6 +1301,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // `Component` config entity to continue to exist, but get its `status` to
     // change to `FALSE`, and cause it to be omitted from the list of available
     // components for the Content Creator.
+    // @see \Drupal\canvas\Entity\Component
     // @todo https://www.drupal.org/i/3500043 will disallow PATCHing this if > 0 uses of this component exist.
     $code_component_to_send['status'] = FALSE;
     $expected_component['status'] = FALSE;
