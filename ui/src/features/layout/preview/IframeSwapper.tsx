@@ -10,6 +10,7 @@ import clsx from 'clsx';
 
 import { useAppSelector } from '@/app/hooks';
 import { COMPONENT_PREVIEW_UPDATE_EVENT } from '@/components/form/formUtil';
+import { injectReducedMotionEmulation } from '@/features/layout/preview/reducedMotionEmulation';
 import { selectDragging } from '@/features/ui/uiSlice';
 
 import type { Dispatch, Ref, SetStateAction } from 'react';
@@ -54,42 +55,44 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
       return { activeIFrame, inactiveIFrame };
     }, []);
 
-    const swapIFrames = useCallback((e: Event) => {
-      // The event target is the iframe about to become active.
-      const iframe = e.target as HTMLIFrameElement | null;
-      if (!iframe?.srcdoc?.length) {
-        // The load event in some browsers (e.g., Safari) fires on page load if the srcdoc is empty, but we don't want to swap in that case.
-        return;
-      }
-
-      iframe.style.display = '';
-
-      const startTime = Date.now();
-      const checkIFrameContent = () => {
-        // Find all <template>s pending hydration by Astro. Once hydration is complete, there should be no pending templates remaining.
-        const pendingTemplates = iframe?.contentDocument?.querySelectorAll(
-          'template[data-astro-template]',
-        ).length;
-
-        // Ensure there are no pending templates (non-hydrated astro-islands) before swapping in the iframe.
-        if (pendingTemplates === 0) {
-          setWhichActive((current) => 1 - current);
-        } else if (Date.now() - startTime < 1000) {
-          // If the hydration still hasn't finished and 1 second hasn't yet elapsed, try again after the next animation frame.
-          requestAnimationFrame(checkIFrameContent);
-        } else {
-          // Fallback to ensure iframe is swapped after 1s in case the iframe content never loads (or is really slow).
-          console.warn(
-            'Astro hydration in iFrame did not complete within 1 second, swapping anyway.',
-          );
-          setWhichActive((current) => 1 - current);
+    const runSwapAfterInactivePreviewLoad = useCallback(
+      (iframe: HTMLIFrameElement) => {
+        if (!iframe.srcdoc?.length) {
+          // The load event in some browsers (e.g., Safari) fires on page load if the srcdoc is empty, but we don't want to swap in that case.
+          return;
         }
-      };
 
-      // Continuously monitor the iframe content for non-hydrated templates every 'tick'.
-      // Only swap the iframe once all templates are hydrated or 1 second has elapsed.
-      requestAnimationFrame(checkIFrameContent);
-    }, []);
+        iframe.style.display = '';
+
+        const startTime = Date.now();
+        const checkIFrameContent = () => {
+          // Find all <template>s pending hydration by Astro. Once hydration is complete, there should be no pending templates remaining.
+          const pendingTemplates =
+            iframe.contentDocument?.querySelectorAll(
+              'template[data-astro-template]',
+            )?.length ?? 0;
+
+          // Ensure there are no pending templates (non-hydrated astro-islands) before swapping in the iframe.
+          if (pendingTemplates === 0) {
+            setWhichActive((current) => 1 - current);
+          } else if (Date.now() - startTime < 1000) {
+            // If the hydration still hasn't finished and 1 second hasn't yet elapsed, try again after the next animation frame.
+            requestAnimationFrame(checkIFrameContent);
+          } else {
+            // Fallback to ensure iframe is swapped after 1s in case the iframe content never loads (or is really slow).
+            console.warn(
+              'Astro hydration in iFrame did not complete within 1 second, swapping anyway.',
+            );
+            setWhichActive((current) => 1 - current);
+          }
+        };
+
+        // Continuously monitor the iframe content for non-hydrated templates every 'tick'.
+        // Only swap the iframe once all templates are hydrated or 1 second has elapsed.
+        requestAnimationFrame(checkIFrameContent);
+      },
+      [],
+    );
 
     // Sync the whichActiveRef to the whichActive state and then set isReloading back to false.
     useEffect(() => {
@@ -137,11 +140,12 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
       // Important to change a state ensure parent re-renders (and re-calls hooks) once the iframe is swapped.
       setIsReloading(true);
       const { activeIFrame, inactiveIFrame } = getIFrames();
+      const srcWithReducedMotion = injectReducedMotionEmulation(srcDocument);
 
       // Initialize active iframe if not already initialized
       if (activeIFrame && !activeIFrame.srcdoc) {
         activeIFrame.style.display = 'block';
-        activeIFrame.srcdoc = srcDocument;
+        activeIFrame.srcdoc = srcWithReducedMotion;
       }
 
       // Immediately set the currently active iframe to not initialized
@@ -150,8 +154,12 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
       }
 
       // Set up load event listener and update content for inactive iframe. Once loaded, it will be swapped in.
+      const handleInactivePreviewLoad = () => {
+        runSwapAfterInactivePreviewLoad(inactiveIFrame);
+      };
+
       if (inactiveIFrame) {
-        inactiveIFrame.removeEventListener('load', swapIFrames);
+        inactiveIFrame.removeEventListener('load', handleInactivePreviewLoad);
         // There is a flicker in Chrome when swapping in an iframe by changing the css display from none to block but the
         // flicker does not occur when swapping opacity from 0 to 1.
         // Here, we set the inactive iframe's display to block before updating its srcdoc (but the stylesheet still
@@ -159,15 +167,20 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
         // Once the iframe loads, its opacity changes to 1, making it visible while the newly inactive iframe becomes display: none.
         // This means that when the swap occurs, both iframes are display: block; and we are just swapping the opacity from 0/1
         inactiveIFrame.style.display = 'block';
-        inactiveIFrame.addEventListener('load', swapIFrames);
-        inactiveIFrame.srcdoc = srcDocument;
+        inactiveIFrame.addEventListener('load', handleInactivePreviewLoad);
+        inactiveIFrame.srcdoc = srcWithReducedMotion;
       }
 
       return () => {
-        inactiveIFrame?.removeEventListener('load', swapIFrames);
-        activeIFrame?.removeEventListener('load', swapIFrames);
+        inactiveIFrame?.removeEventListener('load', handleInactivePreviewLoad);
+        activeIFrame?.removeEventListener('load', handleInactivePreviewLoad);
       };
-    }, [srcDocument, setIsReloading, swapIFrames, getIFrames]);
+    }, [
+      srcDocument,
+      setIsReloading,
+      runSwapAfterInactivePreviewLoad,
+      getIFrames,
+    ]);
 
     const commonIFrameProps = {
       className: clsx(styles.preview, {
