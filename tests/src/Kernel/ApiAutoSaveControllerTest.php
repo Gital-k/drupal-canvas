@@ -26,6 +26,8 @@ use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\image\ImageStyleInterface;
@@ -766,19 +768,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $response = $this->makePublishAllRequest();
     $json = json_decode($response->getContent() ?: '', TRUE);
     self::assertEquals(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
-    $errors[] = [
-      'detail' => 'This value should not be null.',
-      'source' => [
-        'pointer' => 'css.original',
-      ],
-      'meta' => [
-        'entity_type' => AssetLibrary::ENTITY_TYPE_ID,
-        'entity_id' => $library->id(),
-        // The label should not be updated if model validation failed.
-        'label' => $library->label(),
-        ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($library),
-      ],
-    ];
+    // Code component errors come first (phase 1), then other entities (phase 4).
     $errors[] = [
       'detail' => "In component canvas:test-component:\nUnable to find class/interface \"unknown\" specified in the prop \"mixed_up_prop\" for the component \"canvas:test-component\".",
       'source' => [
@@ -822,6 +812,19 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         // The label should not be updated if model validation failed.
         'label' => $code_component->label(),
         ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($code_component),
+      ],
+    ];
+    $errors[] = [
+      'detail' => 'This value should not be null.',
+      'source' => [
+        'pointer' => 'css.original',
+      ],
+      'meta' => [
+        'entity_type' => AssetLibrary::ENTITY_TYPE_ID,
+        'entity_id' => $library->id(),
+        // The label should not be updated if model validation failed.
+        'label' => $library->label(),
+        ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($library),
       ],
     ];
     // Before publishing empty string properties are unset to enforce the
@@ -1003,11 +1006,21 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     }
     $this->container->get('module_installer')->uninstall(['canvas_test_field_access']);
 
-    self::assertArrayHasKey(AutoSaveManager::getAutoSaveKey($template), $auto_save_data);
+    // The 2-pass publish flow saves config entities (pass 1) before checking
+    // content entity field access (pass 2). The failed access-denied attempt
+    // above consumed config entity auto-saves. Re-create them so the final
+    // publish has the full set.
+    $autoSave->saveEntity($code_component);
+    $autoSave->saveEntity($library);
+    $autoSave->saveEntity($template);
+
+    self::assertArrayHasKey(AutoSaveManager::getAutoSaveKey($template), $this->getAutoSaveStatesFromServer());
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $final_count = \count($auto_save_data);
     $response = $this->makePublishAllRequest();
     $json = json_decode($response->getContent() ?: '', TRUE);
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
-    self::assertEquals(['message' => \sprintf('Successfully published %d items.', $auto_save_count - 1)], $json);
+    self::assertEquals(['message' => \sprintf('Successfully published %d items.', $final_count)], $json);
 
     $this->assertSiteHomepage('/home');
 
@@ -1080,6 +1093,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       $node2_auto_save_key => $auto_save_data[$node2_auto_save_key],
     ]);
     $decoded = self::decodeResponse($response);
+    // TRICKY: in the 2-pass publish flow, node1 is saved before node2 is
+    // validated. So node2's unique title violation is caught during pass 2
+    // validation (which includes entity meta), not during ensureEntityIsValid
+    // (which in the original flow also included meta but formatted differently).
     $this->assertSame(
       [
         'errors' => [
@@ -1261,6 +1278,139 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertSame(
       ['error' => 'No auto-save data found for this entity.'],
       json_decode((string) $response->getContent(), TRUE)
+    );
+  }
+
+  /**
+   * Tests that discarding a JsComponent auto-save cascades.
+   *
+   * When a JsComponent auto-save is deleted, other auto-saves that
+   * reference the corresponding Component with
+   * component_version: 'auto_save' must be reverted to the real
+   * published version.
+   *
+   * @legacy-covers ::delete
+   */
+  public function testDeleteCascadesVersionRevert(): void {
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    $this->setUpCurrentUser(permissions: [
+      Page::EDIT_PERMISSION,
+      AutoSaveManager::PUBLISH_PERMISSION,
+      JavaScriptComponent::ADMIN_PERMISSION,
+    ]);
+
+    // Create a code component with one prop.
+    $code_component = JavaScriptComponent::create([
+      'machineName' => 'cascade-test',
+      'name' => 'Cascade Test',
+      'status' => TRUE,
+      'props' => [
+        'heading' => [
+          'type' => 'string',
+          'title' => 'Heading',
+          'examples' => ['Hello'],
+        ],
+      ],
+      'slots' => [],
+      'js' => [
+        'original' => 'console.log("test")',
+        'compiled' => 'console.log("test")',
+      ],
+      'css' => [
+        'original' => '',
+        'compiled' => '',
+      ],
+      'dataDependencies' => [],
+    ]);
+    self::assertSame(SAVED_NEW, $code_component->save());
+
+    $componentId = JsComponent::componentIdFromJavascriptComponentId($code_component->id());
+    $component = Component::load($componentId);
+    self::assertInstanceOf(Component::class, $component);
+    $publishedVersion = $component->getActiveVersion();
+    self::assertNotSame(JsComponent::AUTO_SAVE_VERSION, $publishedVersion);
+
+    // Create auto-save for the JsComponent with an extra prop.
+    $autoSaveJsComponent = JavaScriptComponent::create($code_component->toArray());
+    $autoSaveJsComponent->updateFromClientSide([
+      'props' => [
+        'heading' => [
+          'type' => 'string',
+          'title' => 'Heading',
+          'examples' => ['Hello'],
+        ],
+        'subtitle' => [
+          'type' => 'string',
+          'title' => 'Subtitle',
+          'examples' => ['World'],
+        ],
+      ],
+    ]);
+    $autoSave->saveEntity($autoSaveJsComponent);
+    self::assertFalse($autoSave->getAutoSaveEntity($code_component)->isEmpty());
+
+    // Create a page that references the component with
+    // 'auto_save' version.
+    $page = Page::create([
+      'title' => 'Cascade Test Page',
+      'status' => FALSE,
+      'components' => [
+        [
+          'uuid' => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          'component_id' => $componentId,
+          'component_version' => JsComponent::AUTO_SAVE_VERSION,
+          'inputs' => [
+            'heading' => 'Test heading',
+          ],
+        ],
+      ],
+    ]);
+    self::assertSame(SAVED_NEW, $page->save());
+    // Auto-save the page with auto_save version reference.
+    $page->set('title', 'Updated cascade page');
+    $autoSave->saveEntity($page);
+
+    // Verify the page auto-save has the auto_save version.
+    $pageAutoSave = $autoSave->getAutoSaveEntity($page);
+    self::assertFalse($pageAutoSave->isEmpty());
+    \assert($pageAutoSave->entity instanceof Page);
+    $tree = $pageAutoSave->entity->getComponentTree();
+    $firstItem = $tree->get(0);
+    self::assertInstanceOf(ComponentTreeItem::class, $firstItem);
+    self::assertSame(
+      JsComponent::AUTO_SAVE_VERSION,
+      $firstItem->getComponentVersion(),
+    );
+
+    // Delete the JsComponent auto-save.
+    $url = Url::fromRoute('canvas.api.auto-save.delete', [
+      'entity_type' => JavaScriptComponent::ENTITY_TYPE_ID,
+      'entity' => $code_component->id(),
+    ]);
+    $token_generator = $this->container->get(CsrfTokenGenerator::class);
+    $request = Request::create($url->toString(), 'DELETE', server: ['CONTENT_TYPE' => 'application/json']);
+    $session_configuration = $this->container->get(SessionConfigurationInterface::class)->getOptions($request);
+    $request->cookies->set($session_configuration['name'], 'ABCD');
+    $request->headers->set('X-CSRF-Token', $token_generator->get(CsrfRequestHeaderAccessCheck::TOKEN_KEY));
+    $response = $this->request($request);
+    self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+
+    // Verify the JsComponent auto-save was deleted.
+    self::assertTrue($autoSave->getAutoSaveEntity($code_component)->isEmpty());
+
+    // Verify the page auto-save was updated: auto_save version
+    // should be replaced with the real published version.
+    $pageAutoSave = $autoSave->getAutoSaveEntity($page);
+    self::assertFalse($pageAutoSave->isEmpty());
+    \assert($pageAutoSave->entity instanceof Page);
+    $tree = $pageAutoSave->entity->getComponentTree();
+    $firstItem = $tree->get(0);
+    self::assertInstanceOf(ComponentTreeItem::class, $firstItem);
+    self::assertSame(
+      $publishedVersion,
+      $firstItem->getComponentVersion(),
+      'auto_save version should be reverted to published version after discard',
     );
   }
 

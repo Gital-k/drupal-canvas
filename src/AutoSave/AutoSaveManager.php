@@ -347,9 +347,10 @@ class AutoSaveManager implements EventSubscriberInterface {
     if (!$auto_save_entity->isEmpty() && $auto_save_entity->entity instanceof CanvasHttpApiEligibleConfigEntityInterface) {
       BrandKit::clearAutoSaveFileUsage($auto_save_entity->entity, (string) $entity->id());
     }
-    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
     $key = $this->getAutoSaveKey($entity);
     $this->autoSaveStore->delete($key);
+    $this->cache->delete($key);
+    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
     $this->formViolationsStore->delete($key);
     if ($entity instanceof ContentEntityInterface) {
       $canvas_fields = \array_keys(
@@ -366,6 +367,27 @@ class AutoSaveManager implements EventSubscriberInterface {
       ], []);
       $this->componentInstanceFormViolationsStore->deleteMultiple(\array_unique($component_uuids));
     }
+  }
+
+  /**
+   * Gets the raw auto-save store entry for a given key.
+   *
+   * Used to snapshot entries before modification, enabling rollback.
+   */
+  public function getRawEntry(string $key): ?array {
+    $data = $this->autoSaveStore->get($key);
+    return \is_array($data) ? $data : NULL;
+  }
+
+  /**
+   * Restores a raw auto-save store entry, bypassing hash checks.
+   *
+   * Used to roll back auto-save modifications when publish fails.
+   */
+  public function setRawEntry(string $key, array $data): void {
+    $this->autoSaveStore->set($key, $data);
+    $this->cache->delete($key);
+    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
   }
 
   public function deleteAll(): void {

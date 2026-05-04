@@ -9,7 +9,9 @@ use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
 use Drupal\Core\Plugin\Component as ComponentPlugin;
@@ -21,11 +23,14 @@ use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\AutoSaveEntity;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\GlobalImports;
 use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 /**
  * Component source based on Canvas JavaScript Component config entities.
@@ -43,6 +48,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase implements UrlRewriteInterface {
 
   public const SOURCE_PLUGIN_ID = 'js';
+  public const AUTO_SAVE_VERSION = 'auto_save';
 
   public const EXAMPLE_VIDEO_HORIZONTAL = '/ui/assets/videos/mountain_wide.mp4';
   public const EXAMPLE_VIDEO_VERTICAL = '/ui/assets/videos/bird_vertical.mp4';
@@ -52,6 +58,9 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   protected FileUrlGeneratorInterface $fileUrlGenerator;
   protected ?JavaScriptComponent $jsComponent = NULL;
   protected GlobalImports $globalImports;
+  private ?array $autoSavePropFieldDefinitions = NULL;
+  private ?array $publishedPropFieldDefinitions = NULL;
+  private bool $autoSaveApplied = FALSE;
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
@@ -409,6 +418,165 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       $libraries = array_merge($libraries, $this->getDependencyLibraries($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));
     }
     return $libraries;
+  }
+
+  /**
+   * Applies auto-save state to this plugin instance, if available.
+   *
+   * Updates $this->jsComponent, resets derived caches, and recomputes
+   * prop_field_definitions from the auto-saved JavaScriptComponent.
+   * Called lazily on first form-related method invocation; no-ops thereafter.
+   */
+  private function ensureAutoSaveVersionExists(): void {
+    if ($this->autoSaveApplied) {
+      return;
+    }
+    $this->autoSaveApplied = TRUE;
+
+    try {
+      $published = $this->getJavaScriptComponent();
+    }
+    catch (ComponentNotFoundException) {
+      // The underlying JsComponent entity no longer exists (broken component).
+      return;
+    }
+    $autoSave = $this->autoSaveManager->getAutoSaveEntity($published);
+    if ($autoSave->isEmpty()) {
+      return;
+    }
+    \assert($autoSave->entity instanceof JavaScriptComponent);
+
+    // Swap to auto-save entity and reset all derived caches.
+    $this->jsComponent = $autoSave->entity;
+    $this->resetCachedPropState();
+
+    // Recompute prop_field_definitions from the auto-saved component.
+    try {
+      $ephemeralSdc = JsComponentDiscovery::buildEphemeralSdcPluginInstance($autoSave->entity);
+      $this->autoSavePropFieldDefinitions = self::getPropsForComponentPlugin($ephemeralSdc);
+    }
+    catch (\Exception) {
+      // Invalid auto-save schema: fall back to published version.
+      $this->jsComponent = $published;
+      $this->resetCachedPropState();
+      return;
+    }
+
+    // Update plugin configuration so parent::clientModelToInput() uses
+    // auto-save prop definitions.
+    $this->publishedPropFieldDefinitions = $this->configuration['prop_field_definitions'];
+    $this->configuration['prop_field_definitions'] = $this->autoSavePropFieldDefinitions;
+
+    // Also inject the auto_save version into the currently cached Component
+    // entity so code paths that load it via Component::load() see it.
+    $componentId = JsComponentDiscovery::getComponentConfigEntityId($this->getSourceSpecificComponentId());
+    $component = Component::load($componentId);
+    if ($component instanceof Component) {
+      $this->injectAutoSaveVersion($component);
+    }
+  }
+
+  /**
+   * Injects the 'auto_save' version into a Component entity.
+   *
+   * Makes loadVersion('auto_save'), getVersions(), and
+   * getSettings('auto_save') all work. Uses the public get/set API to modify
+   * the protected versioned_properties without changing the Component or
+   * VersionedConfigEntityBase classes.
+   */
+  private function injectAutoSaveVersion(Component $component): void {
+    if ($this->autoSavePropFieldDefinitions === NULL) {
+      return;
+    }
+    // If auto_save is already the active version (set by hook_entity_load),
+    // nothing more to do.
+    if ($component->getActiveVersion() === self::AUTO_SAVE_VERSION) {
+      return;
+    }
+    // Otherwise inject it as the active version.
+    $component->createVersion(self::AUTO_SAVE_VERSION);
+    $component->setSettings(['prop_field_definitions' => $this->autoSavePropFieldDefinitions]);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function clientModelToInput(string $component_instance_uuid, Component $component, array $client_model, ?FieldableEntityInterface $host_entity, ?ConstraintViolationListInterface $violations = NULL): array {
+    $this->ensureAutoSaveVersionExists();
+    return parent::clientModelToInput($component_instance_uuid, $component, $client_model, $host_entity, $violations);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function buildComponentInstanceForm(
+    array $form,
+    FormStateInterface $form_state,
+    Component $component,
+    string $component_instance_uuid = '',
+    array $inputValues = [],
+    ?EntityInterface $entity = NULL,
+    array $settings = [],
+  ): array {
+    $this->ensureAutoSaveVersionExists();
+    if ($this->autoSavePropFieldDefinitions !== NULL) {
+      $settings['prop_field_definitions'] = $this->autoSavePropFieldDefinitions;
+      // For new props that exist in auto-save but not in the published version
+      // and were not sent by the client: pre-populate with default values so
+      // the form renders with example values rather than empty fields.
+      foreach ($this->autoSavePropFieldDefinitions as $prop_name => $def) {
+        if (!\array_key_exists($prop_name, $inputValues)
+          && !\array_key_exists($prop_name, $this->publishedPropFieldDefinitions ?? [])
+          && $def['default_value'] !== NULL
+          && $def['default_value'] !== []) {
+          $inputValues[$prop_name] = $def['default_value'];
+        }
+      }
+    }
+    return parent::buildComponentInstanceForm($form, $form_state, $component, $component_instance_uuid, $inputValues, $entity, $settings);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
+    $this->ensureAutoSaveVersionExists();
+    return parent::getExplicitInput($uuid, $item, $host_entity);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function inputToClientModel(array $explicit_input): array {
+    $this->ensureAutoSaveVersionExists();
+    return parent::inputToClientModel($explicit_input);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function optimizeExplicitInput(array $values): array {
+    $this->ensureAutoSaveVersionExists();
+    return parent::optimizeExplicitInput($values);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
+    $this->ensureAutoSaveVersionExists();
+    return parent::validateComponentInput($inputValues, $component_instance_uuid, $entity);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getClientSideInfo(Component $component): array {
+    $this->ensureAutoSaveVersionExists();
+    // When auto_save is the active version (set by hook_entity_load),
+    // parent::getClientSideInfo naturally reads auto_save settings and
+    // normalizeForClientSide() naturally returns version: 'auto_save'.
+    return parent::getClientSideInfo($component);
   }
 
   public function setJavaScriptComponent(?JavaScriptComponent $jsComponent): static {

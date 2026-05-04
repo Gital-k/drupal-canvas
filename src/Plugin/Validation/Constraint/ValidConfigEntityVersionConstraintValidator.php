@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\Config\Schema\TypeResolver;
@@ -16,6 +17,7 @@ use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\InvalidOptionsException;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Exception\UnexpectedValueException;
+use Symfony\Component\Validator\Violation\ConstraintViolationBuilderInterface;
 
 /**
  * Validates the ValidConfigEntityVersionConstraint constraint.
@@ -94,14 +96,27 @@ final class ValidConfigEntityVersionConstraintValidator extends ConstraintValida
     }
 
     $available_versions = \array_unique($versioned_config_entity->getVersions());
+    // The 'auto_save' version is a virtual in-memory version for JsComponent-
+    // backed Components with pending auto-saves. We want to emit a validation
+    // error, but with a different violation code for identifying it on publish.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::AUTO_SAVE_VERSION
+    // @see \Drupal\canvas\Hook\ComponentAutoSaveVersionHooks
+    // @see \Drupal\canvas\Controller\ApiAutoSaveController::post
+    $version_violation = NULL;
     if (!\in_array($version, $available_versions, TRUE)) {
-      $this->context->buildViolation($constraint->message)
+      $version_violation = $this->context->buildViolation($constraint->message)
         ->setParameter('@version', $version)
         ->setParameter('@entity_type', (string) $versioned_config_entity->getEntityType()->getSingularLabel())
         ->setParameter('@entity_id', (string) $versioned_config_entity->id())
         ->setParameter('@available_versions', implode("', '", $available_versions))
-        ->setInvalidValue($version)
-        ->addViolation();
+        ->setInvalidValue($version);
+    }
+    if ($version === JsComponent::AUTO_SAVE_VERSION) {
+      \assert($version_violation instanceof ConstraintViolationBuilderInterface);
+      $version_violation->setCode(JsComponent::AUTO_SAVE_VERSION);
+    }
+    if ($version_violation !== NULL) {
+      $version_violation->addViolation();
     }
   }
 

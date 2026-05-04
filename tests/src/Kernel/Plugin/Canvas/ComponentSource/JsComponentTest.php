@@ -2540,15 +2540,17 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
   }
 
   /**
-   * Tests that validation always uses published prop definitions.
+   * Tests that validation uses auto-save props when an auto-save exists.
    *
-   * IMPORTANT: This test covers a scenario that is impossible to trigger with
-   * the Canvas UI. When a JavaScript component has an auto-save entry with
-   * different props than the published version, the validation MUST still use
-   * the published version's props, not the auto-save version's props.
+   * When a JsComponent has an auto-save with different props, validation at
+   * the source plugin level uses the auto-save props — not the published ones.
+   * This is needed for the editing flow: the UI renders forms and validates
+   * input against the auto-save version so new props are immediately usable.
    *
-   * This ensures that validation is consistent and predictable, regardless of
-   * whether an auto-save entry exists.
+   * Publish atomicity is not affected: ApiAutoSaveController::post() saves
+   * code components first (phase 2, making props "real" via discovery), then
+   * replaces 'auto_save' version references with real hashes (phase 3–4)
+   * before validating and saving content entities (phase 4–5).
    *
    * @param bool $auto_save_existing
    *   Whether an auto-save entry should exist for the test component.
@@ -2625,8 +2627,8 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $violations = $source->validateComponentInput($valid_input, $uuid, NULL);
     $this->assertCount(0, $violations, 'Valid published prop should pass validation');
 
-    // Test 2: Unexpected props are ALWAYS rejected, regardless of whether
-    // they exist in an auto-save entry. Validation must use published props only.
+    // Test 2: Props only in auto-save are accepted when auto-save exists
+    // (they'll be published together), but rejected when no auto-save exists.
     $input_with_new_prop = [
       'heading' => [
         'sourceType' => 'static:field_item:string',
@@ -2635,18 +2637,21 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       ],
       'newProp' => [
         'sourceType' => 'static:field_item:string',
-        'value' => [['value' => 'Should not be allowed']],
+        'value' => [['value' => 'Value for auto-saved prop']],
         'expression' => 'ℹ︎string␟value',
       ],
     ];
     $violations = $source->validateComponentInput($input_with_new_prop, $uuid, NULL);
-
-    // The 'newProp' should be rejected in BOTH cases:
-    // - When no auto-save exists: obvious - prop doesn't exist in published version
-    // - When auto-save exists with 'newProp': still rejected because validation
-    //   uses the published version, not the auto-save version.
-    $this->assertCount(1, $violations, 'Unexpected prop should be rejected regardless of auto-save existence');
-    $this->assertSame("Component `$uuid`: the `newProp` prop is not defined.", $violations->get(0)->getMessage());
+    if ($auto_save_existing) {
+      // When auto-save exists with 'newProp': accepted, because the auto-save
+      // JsComponent defines this prop and they'll be published together.
+      $this->assertCount(0, $violations, 'Auto-saved prop should be accepted when auto-save exists');
+    }
+    else {
+      // When no auto-save exists: rejected, prop doesn't exist anywhere.
+      $this->assertCount(1, $violations, 'Unknown prop should be rejected when no auto-save exists');
+      $this->assertSame("Component `$uuid`: the `newProp` prop is not defined.", $violations->get(0)->getMessage());
+    }
   }
 
   /**

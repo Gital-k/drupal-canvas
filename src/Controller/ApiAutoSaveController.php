@@ -24,13 +24,19 @@ use Drupal\Core\StringTranslation\PluralTranslatableMarkup;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Utility\Error;
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\AutoSavePublishAwareInterface;
 use Drupal\canvas\Entity\EntityConstraintViolationList;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\user\UserInterface;
@@ -61,6 +67,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
     #[Autowire(service: 'logger.channel.canvas')]
     private readonly LoggerInterface $logger,
     private readonly AccountInterface $currentUser,
+    private readonly ComponentSourceManager $componentSourceManager,
+    private readonly ComponentTreeLoader $componentTreeLoader,
   ) {}
 
   private static function validateExpectedAutoSaves(array $expected_auto_saves, array $all_auto_saves): ?JsonResponse {
@@ -248,131 +256,239 @@ final class ApiAutoSaveController extends ApiControllerBase {
       throw new CacheableAccessDeniedHttpException($access_error_cache, \sprintf('Unable to update entities: %s.', implode(', ', \array_map(fn(\Stringable|string|NULL $label) => $label ? "'$label'" : "''", $access_error_labels))));
     }
 
+    // Publishing happens in 5 phases:
+    //
+    // PHASE 1: Validate code components (JsComponents).
+    // PHASE 2: Save code components → triggers discovery, creating real
+    // Component versions. Track componentId → versionHash.
+    // PHASE 3: Replace 'auto_save' version refs with real hashes in
+    // non-published auto-saves (snapshot original for rollback).
+    // PHASE 4: Replace 'auto_save' refs in any entity with a component tree,
+    // validate all other entities (other config entities + content).
+    // PHASE 5: Save all validated non-code-component entities.
+    //
+    // Phases 2–3 are skipped if phase 1 finds violations, but
+    // phase 4 still runs to collect all errors (code component
+    // + other) in one response. If phase 4 finds violations,
+    // the DB transaction is rolled back and auto-save snapshots
+    // from phase 3 are restored.
+
+    // PHASE 1: Validate code components (JsComponents). These must be saved
+    // first to trigger discovery and create real Component versions.
+    $codeComponents = [];
+    $otherEntities = [];
     foreach ($loadedEntities as $entity) {
-      if ($entity instanceof ConfigEntityInterface) {
+      if ($entity instanceof JavaScriptComponent) {
         $violations = $entity->getTypedData()->validate();
         if ($violations->count() > 0) {
           $violationSets[] = new EntityConstraintViolationList($entity, $violations);
           continue;
         }
-        if ($entity instanceof AutoSavePublishAwareInterface) {
-          $entity->autoSavePublish();
-        }
+        $entity->enforceIsNew(FALSE);
+        $codeComponents[] = $entity;
       }
       else {
-        \assert($entity instanceof ContentEntityInterface);
+        // Defer everything else (other config entities + content entities) to
+        // phase 4.
+        $otherEntities[] = $entity;
+      }
+    }
+    $codeComponentsValid = empty($violationSets);
 
-        $fields = $entity->getFieldDefinitions();
-        $entity_definition = $entity->getEntityType();
-        \assert($entity_definition instanceof ContentEntityTypeInterface);
-        \assert(!\is_null($entity->id()));
-        $original_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
-        \assert($original_entity instanceof ContentEntityInterface);
-        foreach ($fields as $field_name => $field) {
-          $field_access = $entity->get($field_name)->access(operation: 'edit', return_as_object: TRUE);
-          $original_field = $original_entity->get($field_name);
+    // Tracks auto-save entries modified in phase 3, for rollback.
+    // The default key-value backend (DatabaseStorage) writes to the `key_value`
+    // table, so $transaction->rollBack() covers those writes automatically.
+    // However, if a site overrides the key-value backend to a non-database
+    // store (e.g. Redis, Memcache), rollBack() will NOT undo auto-save writes.
+    // In that case, restoreAutoSaveEntries() handles the restoration manually.
+    $originalAutoSaveEntries = [];
+    $lastEntityEvaluated = NULL;
+    // Maps Component config entity ID → real version hash.
+    $publishedVersionMap = [];
+    $transaction = $this->database->startTransaction();
+    try {
+      if ($codeComponentsValid) {
+        // PHASE 2: Save all code components. This triggers component discovery
+        // which creates real Component versions. Track the new version hash for
+        // each so phase 3 can replace 'auto_save' references by simple lookup.
+        foreach ($codeComponents as $entity) {
+          $lastEntityEvaluated = $entity;
+          self::ensureEntityIsValid($entity);
+          $entity->save();
+          $entities[] = $entity;
+          $componentId = JsComponentDiscovery::getComponentConfigEntityId($entity->id());
+          // The Component is already in static cache from discovery.
+          // The JsComponent auto-save was deleted by onCanvasConfigEntitySave()
+          // (because props changed), so entity_load won't inject 'auto_save'.
+          $component = Component::load($componentId);
+          \assert($component instanceof Component);
+          \assert($component->getActiveVersion() !== JsComponent::AUTO_SAVE_VERSION);
+          $publishedVersionMap[$componentId] = $component->getActiveVersion();
+        }
 
-          // We ignore those fields that didn't change. We also need to ignore
-          // field access for computed fields, because there
-          // is nothing to set, and some fields that will always deny access.
-          // We are protected because the entity validation will trigger errors
-          // if those were changed in an unexpected way.
-          // Status and published will be TRUE when publishing.
-          $ignore_field = $field->isComputed() || $original_field->equals($entity->get($field_name));
-          $keys = ['id', 'revision_id', 'uuid', 'langcode', 'status', 'published'];
-          $revision_keys = ['revision_created', 'revision_user'];
-          foreach ($keys as $key) {
-            $ignore_field |= $field_name === $entity_definition->getKey($key);
+        // PHASE 3: Replace 'auto_save' version references with real version
+        // hashes in non-published auto-saves that have component trees. This
+        // ensures they stay consistent when referenced code components get new
+        // versions. Published content entities are handled in phase 4.
+        $nonPublishedAutoSaves = \array_diff_key($all_auto_saves, $publish_auto_saves);
+        foreach ($nonPublishedAutoSaves as $autoSaveKey => ['entity' => $autoSaveEntity]) {
+          if (!$autoSaveEntity instanceof ContentEntityInterface) {
+            continue;
           }
-          foreach ($revision_keys as $revision_key) {
-            $ignore_field |= $field_name === $entity_definition->getRevisionMetadataKey($revision_key);
+          $originalEntry = $this->autoSaveManager->getRawEntry($autoSaveKey);
+          if ($originalEntry === NULL) {
+            continue;
           }
-          if (!$ignore_field && $field_access->isForbidden()) {
-            throw new CacheableAccessDeniedHttpException(
-              (new CacheableMetadata())->addCacheableDependency($field_access),
-              \sprintf('Unable to update field %s for entity "%s".', $field_name, $entity->label()),
-            );
+          if ($this->replaceAutoSaveVersionsInTree($autoSaveEntity, $publishedVersionMap)) {
+            // Snapshot before overwriting, so we can restore on rollback.
+            $originalAutoSaveEntries[$autoSaveKey] = $originalEntry;
+            $this->autoSaveManager->saveEntity($autoSaveEntity);
           }
-        }
-        $is_draft = AutoSaveManager::entityIsConsideredNew($original_entity);
-
-        // For draft entities automatically publish them when publishing
-        // changes.
-        // For non-draft unpublished entities, preserve the published status
-        // from the autosaved entity to allow unpublishing to work correctly.
-        if ($is_draft && $entity instanceof EntityPublishedInterface) {
-          $entity->setPublished();
-        }
-        // If the entity is new, the autosaved data is considered to be part
-        // of the first revision. Therefore, do not create a new revision
-        // for new entities.
-        if ($is_draft) {
-          $entity->setNewRevision(FALSE);
-        }
-        else {
-          // Reset the revision ID.
-          $entity->setNewRevision();
-          $revision_id_key = $entity_definition->getKey('revision');
-          \assert(\is_string($revision_id_key));
-          $entity->set($revision_id_key, NULL);
-        }
-        $entity->isDefaultRevision(TRUE);
-        // Always set the revision user to the current user. Even though we
-        // might not be creating a new revision, this would only be in the case
-        // where this entity should be considered new, which means it has never
-        // published before in Drupal Canvas.
-        // @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew()
-        if ($revision_user = $entity_definition->getRevisionMetadataKey('revision_user')) {
-          \assert(\is_string($revision_user));
-          $entity->set($revision_user, $this->currentUser->id());
-        }
-        // Even though we will validate each entity individually before it is
-        // saved to ensure the data is still valid after other entities have
-        // been saved, we should still validate here before we save any entities
-        // to avoid saving any entities if any are invalid. This is to avoid,
-        // when possible, any side effects of saving entities that cannot be
-        // undone by rolling back the database transaction, such as sending
-        // emails.
-        $violations = $entity->validate();
-        $form_violations = $this->autoSaveManager->getEntityFormViolations($entity);
-        foreach ($form_violations as $form_violation) {
-          // Add any form violations at this point.
-          // @todo Remove this in https://drupal.org/i/3505018
-          $violations->add($form_violation);
-        }
-        if ($violations->count() > 0) {
-          $violationSets[] = self::getViolationSetsFromPropertyPathsAndRoot($entity, $violations);
-          continue;
         }
       }
-      $entity->enforceIsNew(FALSE);
-      $entities[] = $entity;
-    }
-    if ($validation_errors_response = self::createJsonResponseFromViolationSets(...$violationSets)) {
-      return $validation_errors_response;
-    }
 
-    // Either everything must be published, or nothing at all.
-    $lastEntityEvaluated = NULL;
-    try {
-      $transaction = $this->database->startTransaction();
-      foreach ($entities as $entity) {
+      // PHASE 4: Validate all non-code-component entities (other config
+      // entities + content entities). Replace 'auto_save' version references
+      // first on any entity with a component tree (if code components were
+      // valid and saved in phase 2). This phase runs even if phase 1 found
+      // violations, to collect all errors.
+      $validOtherEntities = [];
+      foreach ($otherEntities as $entity) {
+        // Replace 'auto_save' version references in any entity with a
+        // component tree, regardless of whether it's a config or content
+        // entity.
+        if ($codeComponentsValid && $entity instanceof ComponentTreeEntityInterface) {
+          $this->replaceAutoSaveVersionsInTree($entity, $publishedVersionMap);
+        }
+
+        if ($entity instanceof ConfigEntityInterface) {
+          $violations = $entity->getTypedData()->validate();
+          if ($violations->count() > 0) {
+            $violationSets[] = new EntityConstraintViolationList($entity, $violations);
+            continue;
+          }
+          if ($entity instanceof AutoSavePublishAwareInterface) {
+            $entity->autoSavePublish();
+          }
+          $entity->enforceIsNew(FALSE);
+          $validOtherEntities[] = $entity;
+        }
+        else {
+          \assert($entity instanceof ContentEntityInterface);
+
+          $fields = $entity->getFieldDefinitions();
+          $entity_definition = $entity->getEntityType();
+          \assert($entity_definition instanceof ContentEntityTypeInterface);
+          \assert(!\is_null($entity->id()));
+          $original_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
+          \assert($original_entity instanceof ContentEntityInterface);
+          foreach ($fields as $field_name => $field) {
+            $field_access = $entity->get($field_name)->access(operation: 'edit', return_as_object: TRUE);
+            $original_field = $original_entity->get($field_name);
+
+            // We ignore those fields that didn't change. We also need to ignore
+            // field access for computed fields, because there is nothing to
+            // set, and some fields that will always deny access.
+            // We are protected because the entity validation will trigger
+            // errors if those were changed in an unexpected way.
+            // Status and published will be TRUE when publishing.
+            $ignore_field = $field->isComputed() || $original_field->equals($entity->get($field_name));
+            $keys = ['id', 'revision_id', 'uuid', 'langcode', 'status', 'published'];
+            $revision_keys = ['revision_created', 'revision_user'];
+            foreach ($keys as $key) {
+              $ignore_field |= $field_name === $entity_definition->getKey($key);
+            }
+            foreach ($revision_keys as $revision_key) {
+              $ignore_field |= $field_name === $entity_definition->getRevisionMetadataKey($revision_key);
+            }
+            if (!$ignore_field && $field_access->isForbidden()) {
+              throw new CacheableAccessDeniedHttpException(
+                (new CacheableMetadata())->addCacheableDependency($field_access),
+                \sprintf('Unable to update field %s for entity "%s".', $field_name, $entity->label()),
+              );
+            }
+          }
+          $is_draft = AutoSaveManager::entityIsConsideredNew($original_entity);
+
+          // For draft entities automatically publish them when publishing
+          // changes.
+          // For non-draft unpublished entities, preserve the published status
+          // from the autosaved entity to allow unpublishing to work correctly.
+          if ($is_draft && $entity instanceof EntityPublishedInterface) {
+            $entity->setPublished();
+          }
+          // If the entity is new, the autosaved data is considered to be part
+          // of the first revision. Therefore, do not create a new revision
+          // for new entities.
+          if ($is_draft) {
+            $entity->setNewRevision(FALSE);
+          }
+          else {
+            // Reset the revision ID.
+            $entity->setNewRevision();
+            $revision_id_key = $entity_definition->getKey('revision');
+            \assert(\is_string($revision_id_key));
+            $entity->set($revision_id_key, NULL);
+          }
+          $entity->isDefaultRevision(TRUE);
+          // Always set the revision user to the current user. Even though we
+          // might not be creating a new revision, this would only be in the
+          // case where this entity should be considered new, which means it
+          // has never published before in Drupal Canvas.
+          // @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew()
+          if ($revision_user = $entity_definition->getRevisionMetadataKey('revision_user')) {
+            \assert(\is_string($revision_user));
+            $entity->set($revision_user, $this->currentUser->id());
+          }
+          // Validate AFTER version replacement — tree items now reference real
+          // versions (not 'auto_save'), so validation uses correct prop
+          // definitions.
+          $violations = $entity->validate();
+          $form_violations = $this->autoSaveManager->getEntityFormViolations($entity);
+          foreach ($form_violations as $form_violation) {
+            // Add any form violations at this point.
+            // @todo Remove this in https://drupal.org/i/3505018
+            $violations->add($form_violation);
+          }
+          if ($violations->count() > 0) {
+            $violationSets[] = self::getViolationSetsFromPropertyPathsAndRoot($entity, $violations);
+            continue;
+          }
+          $validOtherEntities[] = $entity;
+        }
+      }
+      if ($validation_errors_response = self::createJsonResponseFromViolationSets(...$violationSets)) {
+        $transaction->rollBack();
+        $this->restoreAutoSaveEntries($originalAutoSaveEntries);
+        return $validation_errors_response;
+      }
+
+      // PHASE 5: Save all validated non-code-component entities.
+      foreach ($validOtherEntities as $entity) {
+        $entity->enforceIsNew(FALSE);
         $lastEntityEvaluated = $entity;
-        // Even though the entities are being validated before, there is a
-        // possibility where, when multiple entities are being saved together,
-        // the first entity collides with some of the following entities. So
-        // we need to validate right before saving the entity.
+        // Even though the entity was validated above, re-validate right before
+        // saving. When multiple entities are being saved together, the first
+        // entity may collide with following entities (e.g. unique title
+        // constraints only fail after the first is saved).
         self::ensureEntityIsValid($entity);
         $entity->save();
+        $entities[] = $entity;
       }
       foreach ($entities as $entity) {
         $this->autoSaveManager->delete($entity);
       }
     }
+    catch (CacheableAccessDeniedHttpException $e) {
+      // Re-throw access denied exceptions so Drupal's exception handler
+      // converts them to proper 403 responses.
+      $transaction->rollBack();
+      $this->restoreAutoSaveEntries($originalAutoSaveEntries);
+      throw $e;
+    }
     catch (ConstraintViolationException $e) {
-      if (isset($transaction)) {
-        $transaction->rollBack();
-      }
+      $transaction->rollBack();
+      $this->restoreAutoSaveEntries($originalAutoSaveEntries);
       $violationList = $e->getConstraintViolationList();
       \assert(count($violationList) > 0);
       $violationList = self::getViolationSetsFromPropertyPathsAndRoot($lastEntityEvaluated, $violationList);
@@ -381,9 +497,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
       return $violationsResponse;
     }
     catch (\Exception $e) {
-      if (isset($transaction)) {
-        $transaction->rollBack();
-      }
+      $transaction->rollBack();
+      $this->restoreAutoSaveEntries($originalAutoSaveEntries);
       Error::logException($this->logger, $e);
       return new JsonResponse(data: [
         'errors' => [
@@ -392,12 +507,12 @@ final class ApiAutoSaveController extends ApiControllerBase {
             'source' => [
               'pointer' => 'error',
             ],
-            'meta' => [
+            'meta' => $lastEntityEvaluated !== NULL ? [
               'entity_type' => $lastEntityEvaluated->getEntityTypeId(),
               'entity_id' => $lastEntityEvaluated->id(),
               'label' => $lastEntityEvaluated->label(),
               self::AUTO_SAVE_KEY => AutoSaveManager::getAutoSaveKey($lastEntityEvaluated),
-            ],
+            ] : [],
           ],
         ],
       ], status: 500);
@@ -406,11 +521,114 @@ final class ApiAutoSaveController extends ApiControllerBase {
     return new JsonResponse(data: ['message' => new PluralTranslatableMarkup(\count($publish_auto_saves), 'Successfully published 1 item.', 'Successfully published @count items.')], status: 200);
   }
 
+  /**
+   * Replaces 'auto_save' version references with real version hashes in a tree.
+   *
+   * @param \Drupal\canvas\Entity\ComponentTreeEntityInterface|\Drupal\Core\Entity\FieldableEntityInterface $entity
+   *   The entity whose component tree to update.
+   * @param array<string, string> $publishedVersionMap
+   *   Maps Component config entity ID → real version hash, built in phase 2.
+   *
+   * @return bool
+   *   TRUE if modifications were made to the entity's tree.
+   */
+  private function replaceAutoSaveVersionsInTree(ComponentTreeEntityInterface|FieldableEntityInterface $entity, array $publishedVersionMap): bool {
+    $tree = $this->componentTreeLoader->load($entity);
+    $treeModified = FALSE;
+    foreach ($tree as $item) {
+      \assert($item instanceof ComponentTreeItem);
+      if ($item->getComponentVersion() !== JsComponent::AUTO_SAVE_VERSION) {
+        continue;
+      }
+      $componentId = $item->getComponentId();
+      if (isset($publishedVersionMap[$componentId])) {
+        $targetVersion = $publishedVersionMap[$componentId];
+        $item->set('component_version', $targetVersion);
+        // Strip input values for props that don't exist in the
+        // target version. When reverting from 'auto_save' to the
+        // published version, the auto-save may have added props
+        // that the published version doesn't have.
+        $component = $item->getComponent();
+        if ($component !== NULL) {
+          $targetSettings = $component->getSettings($targetVersion);
+          $validProps = $targetSettings['prop_field_definitions'] ?? [];
+          $inputs = $item->getInputs();
+          if (\is_array($inputs) && \is_array($validProps)) {
+            $filtered = \array_intersect_key($inputs, $validProps);
+            if (\count($filtered) !== \count($inputs)) {
+              $item->setInput($filtered);
+            }
+          }
+        }
+        $treeModified = TRUE;
+      }
+    }
+    $treeModified = $this->componentSourceManager->updateComponentInstances($tree) || $treeModified;
+    if ($treeModified && $entity instanceof ComponentTreeEntityInterface) {
+      // TRICKY: use toArray() per item, NOT $tree->getValue().
+      // FieldItemBase::set() updates typed data properties but NOT
+      // $this->values. getValue() reads from $this->values (stale),
+      // while toArray() reads from properties (current state).
+      $treeValues = [];
+      foreach ($tree as $treeItem) {
+        \assert($treeItem instanceof ComponentTreeItem);
+        $treeValues[] = $treeItem->toArray();
+      }
+      // @phpstan-ignore argument.type (toArray returns generic array)
+      $entity->setComponentTree($treeValues);
+    }
+    return $treeModified;
+  }
+
+  /**
+   * Restores auto-save entries from snapshots taken before phase 3.
+   *
+   * Needed when the key-value store backend is not covered by the DB
+   * transaction (e.g. Redis, Memcache). For the default DatabaseStorage
+   * backend, the transaction rollback already covers these writes, making
+   * this a safe redundancy.
+   *
+   * @param array<string, array> $originalEntries
+   *   Map of auto-save keys to their original raw store data.
+   */
+  private function restoreAutoSaveEntries(array $originalEntries): void {
+    foreach ($originalEntries as $key => $data) {
+      $this->autoSaveManager->setRawEntry($key, $data);
+    }
+  }
+
   public function delete(EntityInterface $entity): JsonResponse {
     if ($this->autoSaveManager->getAutoSaveEntity($entity)->isEmpty()) {
       return new JsonResponse(data: ['error' => 'No auto-save data found for this entity.'], status: Response::HTTP_NOT_FOUND);
     }
     $this->autoSaveManager->delete($entity);
+
+    // When a JsComponent auto-save is discarded, other auto-saves
+    // may still reference its Component with
+    // component_version: 'auto_save'. Revert those to the real
+    // published version.
+    if ($entity instanceof JavaScriptComponent) {
+      $componentId = JsComponentDiscovery::getComponentConfigEntityId($entity->id());
+      // Reset static cache so hook_entity_load sees no auto-save
+      // and doesn't inject 'auto_save' as active version.
+      $componentStorage = $this->entityTypeManager->getStorage(Component::ENTITY_TYPE_ID);
+      $componentStorage->resetCache([$componentId]);
+      $component = $componentStorage->load($componentId);
+      if ($component instanceof Component) {
+        \assert($component->getActiveVersion() !== JsComponent::AUTO_SAVE_VERSION);
+        $publishedVersionMap = [$componentId => $component->getActiveVersion()];
+        $allAutoSaves = $this->autoSaveManager->getAllAutoSaveList(TRUE);
+        foreach ($allAutoSaves as ['entity' => $autoSaveEntity]) {
+          if (!$autoSaveEntity instanceof ContentEntityInterface && !$autoSaveEntity instanceof ComponentTreeEntityInterface) {
+            continue;
+          }
+          if ($this->replaceAutoSaveVersionsInTree($autoSaveEntity, $publishedVersionMap)) {
+            $this->autoSaveManager->saveEntity($autoSaveEntity);
+          }
+        }
+      }
+    }
+
     return new JsonResponse(data: ['message' => 'Auto-save data deleted successfully.'], status: Response::HTTP_NO_CONTENT);
   }
 

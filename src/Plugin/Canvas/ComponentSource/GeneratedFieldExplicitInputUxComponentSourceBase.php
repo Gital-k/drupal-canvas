@@ -102,6 +102,19 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   protected ?ComponentPlugin $componentPlugin = NULL;
   protected ?ComponentMetadata $metadata;
 
+  /**
+   * Resets all cached prop-derived state.
+   *
+   * Used when the underlying component definition changes in-memory (e.g.,
+   * applying auto-save state for form building).
+   */
+  protected function resetCachedPropState(): void {
+    $this->componentPlugin = NULL;
+    unset($this->metadata);
+    $this->defaultStaticPropSources = [];
+    $this->defaultRelativeUrlPropSources = [];
+  }
+
   public function __construct(
     array $configuration,
     string $plugin_id,
