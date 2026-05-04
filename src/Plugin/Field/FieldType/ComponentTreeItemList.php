@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Field\FieldType;
 
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\Component\Graph\Graph;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
@@ -243,6 +244,14 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           $component = Component::load($component_instance['component']);
           \assert($component instanceof Component);
           $source = $component->getComponentSource();
+          if (
+            $source instanceof JsComponent &&
+            ($component_instance['component_version'] ?? $component->getActiveVersion()) !== $component->getActiveVersion())
+          {
+            // If the rendered component_version is different than the active
+            // version, skip prop validation
+            $component_instance['skip_prop_validation'] = TRUE;
+          }
           $element = $source->renderComponent($component_instance, $component->getSlotDefinitions(), $component_instance_uuid, $isPreview);
 
           // A component instance provided by a
@@ -470,17 +479,18 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       \assert($component instanceof Component);
       $component->loadVersion($item->getComponentVersion());
 
-      // Rendering always happens using the live implementation of a component,
-      // so load the active version to determine the required props.
-      $required_props_with_default_values_in_current_implementation = $component
-        ->loadVersion($component->getActiveVersion())
-        ->getComponentSource()
-        ->getDefaultExplicitInput(only_required: TRUE);
-      // Avoid side effects.
-      $component->loadVersion($item->getComponentVersion());
-
-      $source = $component->getComponentSource();
       try {
+        // Rendering always happens using the live implementation of a
+        // component, so load the active version to determine the required
+        // props.
+        $required_props_with_default_values_in_current_implementation = $component
+          ->loadVersion($component->getActiveVersion())
+          ->getComponentSource()
+          ->getDefaultExplicitInput(only_required: TRUE);
+        // Avoid side effects.
+        $component->loadVersion($item->getComponentVersion());
+
+        $source = $component->getComponentSource();
         $explicit_input = $source->getExplicitInput($uuid, $item);
       }
       catch (\Throwable $e) {
@@ -501,6 +511,10 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
 
       $hydrated[$uuid] = [
         'component' => $component_id,
+        // Adding the version to the hydrated version to avoid the verification
+        // in case this version and the activeVersion mismatch and to avoid
+        // break the rendering.
+        'component_version' => $item->getComponentVersion(),
       ] + $source->hydrateComponent(
         $explicit_input,
         $component->getSlotDefinitions(),
