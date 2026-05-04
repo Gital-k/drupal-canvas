@@ -862,7 +862,10 @@ test.describe('Multivalue Prop Types', () => {
   });
 
   test.describe('Datetime (Unlimited)', () => {
-    test('no ghost row appears when deleting from bottom to top', async ({ page, canvas }) => {
+    test('no ghost row appears when deleting from bottom to top', async ({
+      page,
+      canvas,
+    }) => {
       // Find the DateTime (Unlimited) field - only appears with unlimited cardinality.
       const dateTimeUnlimitedField = page
         .locator('.field--type-datetime')
