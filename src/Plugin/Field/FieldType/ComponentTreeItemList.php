@@ -246,8 +246,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           $source = $component->getComponentSource();
           if (
             $source instanceof JsComponent &&
-            ($component_instance['component_version'] ?? $component->getActiveVersion()) !== $component->getActiveVersion())
-          {
+            ($component_instance['component_version'] ?? $component->getActiveVersion()) !== $component->getActiveVersion()) {
             // If the rendered component_version is different than the active
             // version, skip prop validation
             $component_instance['skip_prop_validation'] = TRUE;
