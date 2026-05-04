@@ -886,6 +886,7 @@ test.describe('Multivalue Prop Types', () => {
         await dateTimeUnlimitedField
           .getByRole('button', { name: '+ Add new' })
           .click();
+        // eslint-disable-next-line playwright/no-networkidle
         await page.waitForLoadState('networkidle');
       }
 
@@ -936,6 +937,7 @@ test.describe('Multivalue Prop Types', () => {
       const firstRemoveButton = popover.getByRole('button', { name: 'Remove' });
       await expect(firstRemoveButton).toBeEnabled();
       await firstRemoveButton.click();
+      // eslint-disable-next-line playwright/no-networkidle
       await page.waitForLoadState('networkidle');
 
       // After the first deletion the count must drop by exactly 1.
@@ -961,6 +963,7 @@ test.describe('Multivalue Prop Types', () => {
       });
       await expect(secondRemoveButton).toBeEnabled();
       await secondRemoveButton.click();
+      // eslint-disable-next-line playwright/no-networkidle
       await page.waitForLoadState('networkidle');
 
       // After the second deletion the count must drop by exactly 2 from the
