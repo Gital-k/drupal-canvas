@@ -447,7 +447,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   /**
    * Sets value for props.
    *
-   * @param array<string, array{type: string, format?: string, examples?: string|array<string>, title: string}> $props
+   * @param array<string, array{type: string, format?: string, examples?: string|array<mixed>, title: string}> $props
    *   Value for Props.
    */
   public function setProps(array $props): self {
