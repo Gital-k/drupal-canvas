@@ -900,7 +900,7 @@ test.describe('Multivalue Prop Types', () => {
       await canvas.editMultiValueDatetimeProp(
         'DateTime (Unlimited)',
         '2025-12-25',
-        '14:30:00',
+        '08:30:00',
         1,
       );
       await canvas.editMultiValueDatetimeProp(
@@ -923,13 +923,9 @@ test.describe('Multivalue Prop Types', () => {
       // Review changes: verify all values appear in preview frame.
       await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
         await expect(items).toHaveCount(initialRowCount);
-        // Datetime preview shows ISO format, so check for the date in the string
-        const text0 = await items.nth(0).textContent();
-        const text1 = await items.nth(1).textContent();
-        const text2 = await items.nth(2).textContent();
-        expect(text0).toMatch(/2025-12-24/);
-        expect(text1).toMatch(/2025-12-25/);
-        expect(text2).toMatch(/2025-12-26/);
+        await expect(items.nth(0)).toContainText('2025-12-24');
+        await expect(items.nth(1)).toContainText('2025-12-25');
+        await expect(items.nth(2)).toContainText('2025-12-26');
       });
 
       // Now proceed with deletion: Remove the last row (delete from bottom to top).
@@ -952,10 +948,8 @@ test.describe('Multivalue Prop Types', () => {
       // Verify the deleted row is no longer in preview
       await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
         await expect(items).toHaveCount(initialRowCount - 1);
-        const text0 = await items.nth(0).textContent();
-        const text1 = await items.nth(1).textContent();
-        expect(text0).toMatch(/2025-12-24/);
-        expect(text1).toMatch(/2025-12-25/);
+        await expect(items.nth(0)).toContainText('2025-12-24');
+        await expect(items.nth(1)).toContainText('2025-12-25');
       });
 
       // Remove the new last row (continuing bottom-to-top).
@@ -980,8 +974,7 @@ test.describe('Multivalue Prop Types', () => {
       // Verify final state in preview
       await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
         await expect(items).toHaveCount(initialRowCount - 2);
-        const text0 = await items.nth(0).textContent();
-        expect(text0).toMatch(/2025-12-24/);
+        await expect(items.nth(0)).toContainText('2025-12-24');
       });
     });
   });
