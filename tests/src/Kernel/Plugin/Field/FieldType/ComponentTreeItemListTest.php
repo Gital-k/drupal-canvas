@@ -2038,15 +2038,15 @@ HTML,
   }
 
   /**
-   * Tests incompatible JS component evolution is surfaced during hydration.
+   * Tests incompatible JS component evolution still renders gracefully.
    */
-  public function testHydrationRejectsIncompatibleActiveJsComponentVersion(): void {
+  public function testHydrationGracefullyRendersIncompatibleActiveJsComponentVersion(): void {
     // @see https://www.drupal.org/i/3587711
     // This covers an incompatible prop-type evolution: the component instance
     // stores a `string` value from an older component version, while the active
     // version has changed that prop to `integer`. Because this change is not
-    // auto-updatable, hydration must stop before the stale value reaches active
-    // version rendering and triggers prop validation there.
+    // auto-updatable, stale inputs graceful rendering behavior instead of
+    // failing preview rendering.
 
     $test_code_component_id = 'incompatible-evolution-test';
     $test_component_id = JsComponent::componentIdFromJavascriptComponentId($test_code_component_id);
@@ -2087,7 +2087,8 @@ HTML,
       ],
     ]);
     self::assertCount(0, $item_list->validate());
-    self::assertSame($original_version, $item_list->getValue()[0]['component_version']);
+    $stored_values = $item_list->getValue();
+    self::assertSame($original_version, $stored_values[0]['component_version']);
 
     $js_component = \Drupal::entityTypeManager()
       ->getStorage(JavaScriptComponent::ENTITY_TYPE_ID)
@@ -2108,6 +2109,10 @@ HTML,
     $this->assertInstanceOf(ComponentInterface::class, $component);
     $this->assertNotSame($original_version, $component->getActiveVersion());
 
+    // Load the stored component tree into a fresh item list to mirror real
+    // requests, which do not keep the pre-evolution in-memory caches around.
+    $item_list = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $item_list->setValue($stored_values);
     $hydrated_value = \Closure::bind(function () {
       return $this->getHydratedTree();
     }, $item_list, $item_list)();
@@ -2117,11 +2122,13 @@ HTML,
     $this->assertArrayHasKey($parent_uuid, $tree[ComponentTreeItemList::ROOT_UUID]);
     $hydrated_parent = $tree[ComponentTreeItemList::ROOT_UUID][$parent_uuid];
     $this->assertSame($test_component_id, $hydrated_parent['component']);
-    $this->assertArrayHasKey(
-      'hydration_exception',
-      $hydrated_parent,
-      'Hydration should stop before rendering an incompatible old component instance against the active JS component schema.',
-    );
+    $this->assertArrayNotHasKey('hydration_exception', $hydrated_parent);
+    $this->assertSame($original_version, $hydrated_parent['component_version']);
+
+    $entity = Page::create([])->enforceIsNew(FALSE);
+    $build = $item_list->toRenderable($entity, TRUE);
+    $this->render($build);
+    $this->assertNoText('Component failed to render, check logs for more detail.');
   }
 
 }
