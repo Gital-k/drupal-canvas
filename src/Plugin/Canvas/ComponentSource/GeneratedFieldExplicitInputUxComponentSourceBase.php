@@ -1173,17 +1173,22 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // field type.
     // @see `type: field.storage_settings.*`
     $static_prop_source = $storable_prop_shape->toStaticPropSource();
-    $example_assigned_to_field_item_list = $static_prop_source->withValue(
-      $is_required
-        // Example guaranteed to exist if a required prop.
-        ? $sdc_metadata->schema['properties'][$sdc_prop_name]['examples'][0]
-        // Example may exist if an optional prop.
-        : (
-          \array_key_exists('examples', $sdc_metadata->schema['properties'][$sdc_prop_name]) && \array_key_exists(0, $sdc_metadata->schema['properties'][$sdc_prop_name]['examples'])
-            ? $sdc_metadata->schema['properties'][$sdc_prop_name]['examples'][0]
-            : NULL
-        )
-    )->fieldItemList;
+    $example_value = $is_required
+      // Example guaranteed to exist if a required prop.
+      ? $sdc_metadata->schema['properties'][$sdc_prop_name]['examples'][0]
+      // Example may exist if an optional prop.
+      : (
+        \array_key_exists('examples', $sdc_metadata->schema['properties'][$sdc_prop_name]) && \array_key_exists(0, $sdc_metadata->schema['properties'][$sdc_prop_name]['examples'])
+          ? $sdc_metadata->schema['properties'][$sdc_prop_name]['examples'][0]
+          : NULL
+      );
+
+    $field_type = $storable_prop_shape->fieldTypeProp->getFieldType();
+    if (\is_float($example_value) && \in_array($field_type, ['integer', 'list_integer'], TRUE)) {
+      $example_value = (int) $example_value;
+    }
+
+    $example_assigned_to_field_item_list = $static_prop_source->withValue($example_value)->fieldItemList;
 
     return !$example_assigned_to_field_item_list->isEmpty()
       // The actual value in the field if there is one.
