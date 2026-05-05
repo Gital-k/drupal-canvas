@@ -7281,14 +7281,14 @@ HTML
     // Test case: SDC prop with title in schema
     yield 'sdc_prop_with_title' => [
       'component_id' => 'sdc.canvas_test_sdc.my-cta',
-      'prop_name' => 'text',
+      'key' => 'text',
       'expected_label' => 'Title',
     ];
 
     // Test case: SDC prop without title (fallback to ucfirst)
     yield 'sdc_prop_without_title_fallback' => [
       'component_id' => 'sdc.canvas_test_sdc.my-cta',
-      'prop_name' => 'attributes',
+      'key' => 'attributes',
       'expected_label' => 'Attributes',
     ];
   }

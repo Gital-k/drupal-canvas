@@ -981,10 +981,10 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    * @param string $expected_label
    *   The expected label for the prop.
    *
-   * @legacy-covers ::getLabelForExplicitInput
+   * @legacy-covers ::getLabelForExplicitInputKey
    */
-  #[DataProvider('providerGetLabelForExplicitInput')]
-  public function testGetLabelForExplicitInput(string $component_id, string $key, string $expected_label): void {
+  #[DataProvider('providerGetLabelForExplicitInputKey')]
+  public function testGetLabelForExplicitInputKey(string $component_id, string $key, string $expected_label): void {
     $this->generateComponentConfig();
     $component = Component::load($component_id);
     self::assertInstanceOf(ComponentInterface::class, $component);
@@ -993,11 +993,11 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   }
 
   /**
-   * Data provider for ::testGetLabelForExplicitInput().
+   * Data provider for ::testGetLabelForExplicitInputKey().
    *
-   * @return \Generator<string, array{component_id: string, prop_name: string, expected_label: string}>
+   * @return \Generator<string, array{component_id: string, key: string, expected_label: string}>
    */
-  abstract public static function providerGetLabelForExplicitInput(): \Generator;
+  abstract public static function providerGetLabelForExplicitInputKey(): \Generator;
 
   abstract protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface;
 
