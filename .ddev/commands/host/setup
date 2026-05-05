@@ -35,6 +35,9 @@ fi
 
 echo "Setting up Canvas development environment..."
 
+# Save original composer.json to restore after setup
+cp composer.json composer.json.original
+
 # Remove any environment-specific files
 ddev cleanup --force
 
@@ -73,6 +76,9 @@ ddev exec --dir /var/www/html/web/core npm install
 ddev composer run ui-build
 
 echo "Development environment ready!"
+
+# Restore original composer.json
+mv composer.json.original composer.json
 
 # Display a one time login link for user ID 1.
 ddev drush uli

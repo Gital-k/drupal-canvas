@@ -7,5 +7,13 @@
 set -eu -o pipefail
 
 cd ${DDEV_APPROOT}
+
+# Ensure the environment is set up
+if [[ ! -f vendor/autoload.php ]]; then
+  echo "Error: Development environment is not set up."
+  echo "Please run 'ddev setup' first."
+  exit 1
+fi
+
 npm ci
 DRUPAL_TEST_DRUPAL_ROOT=web npx playwright "$@"

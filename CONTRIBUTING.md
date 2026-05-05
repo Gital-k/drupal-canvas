@@ -85,8 +85,8 @@ If you press & hold the `V` key and then click on the iFrame (focusing into it),
 You can then click (focus) outside the iFrame and tap the `V` key once more to return the UI.
 
 ## 2. Always start from a fresh start
-1. Reinstall the site frequently (`ddev drupal-install`).
-2. If you're working with sqlite, delete the database frequently (`rm web/sites/default/.ht.sqlite`).
+1. Reinstall the site frequently (`ddev setup --force`).
+2. If you're working with sqlite, delete the database frequently (`rm web/sites/default/.ht.sqlite`). (This automatically occurs when using ddev)
 
 # Releases
 
