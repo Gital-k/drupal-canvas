@@ -8,7 +8,6 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\Component\Utility\Unicode;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
@@ -81,13 +80,6 @@ final class InvalidSlots extends ComponentSourceBase implements ComponentSourceW
    */
   public function getDefaultExplicitInput(bool $only_required = FALSE): array {
     return [];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getLabelForExplicitInputKey(string $key): string {
-    return Unicode::ucfirst($key);
   }
 
   /**

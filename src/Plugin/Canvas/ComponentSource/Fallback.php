@@ -93,13 +93,6 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     return [];
   }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function getLabelForExplicitInputKey(string $key): string {
-    return Unicode::ucfirst($key);
-  }
-
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
     return $item->getInputs() ?? [];
   }
