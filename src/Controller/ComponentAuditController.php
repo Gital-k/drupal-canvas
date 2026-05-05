@@ -286,18 +286,26 @@ final class ComponentAuditController {
         $bundle_label = $this->bundleInfo->getBundleInfo($entity_type_id)[$entity->bundle()]['label'];
 
         if (!isset($rows[$key])) {
+          $revision_id_value = ($entity_type->isRevisionable() && $entity instanceof \Drupal\Core\Entity\RevisionableInterface)
+            ? $entity->getRevisionId()
+            : '—';
           $rows[$key] = [
             'title' => ['data' => $entity->toLink()],
             'entity_type_id' => ['data' => $entity->getEntityType()->getLabel()],
             'bundle' => ['data' => $bundle_label],
             'id' => ['data' => $entity->id()],
-            'revision_id' => ['data' => $entity_type->isRevisionable() ? $entity->getRevisionId() : '—'],
+            'revision_id' => ['data' => $revision_id_value],
             'deleted_slots' => ['data' => \implode(', ', $deleted_slots)],
           ];
         }
       }
     }
 
+    $slots_list = \implode(', ', $deleted_slots);
+    $description_text = $this->t(
+      'The following content contains component tree items stored in slots that no longer exist in the active version of this component. Deleted slots: <code>@slots</code>',
+      ['@slots' => $slots_list]
+    );
     return [
       'title' => [
         '#type' => 'html_tag',
@@ -306,9 +314,7 @@ final class ComponentAuditController {
         '#value' => $this->t('Data in deleted slots'),
       ],
       'description' => [
-        '#markup' => '<p>' . $this->t('The following content contains component tree items stored in slots that no longer exist in the active version of this component. Deleted slots: <code>@slots</code>', [
-          '@slots' => \implode(', ', $deleted_slots),
-        ]) . '</p>',
+        '#markup' => '<p>' . $description_text . '</p>',
       ],
       'table' => [
         '#type' => 'table',
