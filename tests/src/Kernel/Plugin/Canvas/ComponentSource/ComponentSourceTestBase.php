@@ -972,7 +972,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   abstract public static function providerSymmetricallyTranslatableComponentInstanceScenarios(string $host_entity_type_id): \Generator;
 
   /**
-   * Tests getLabelForExplicitInput() returns correct labels.
+   * Tests getLabelForExplicitInputKey() returns correct labels.
    *
    * @param string $component_id
    *   The component config entity ID.

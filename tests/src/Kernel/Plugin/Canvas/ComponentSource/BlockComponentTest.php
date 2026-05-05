@@ -727,4 +727,9 @@ HTML,
     ];
   }
 
+  public static function providerGetLabelForExplicitInputKey(): \Generator {
+    // Nothing to test: reuses ComponentSourceBase::getLabelForExplicitInputKey.
+    yield from [];
+  }
+
 }

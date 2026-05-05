@@ -2693,7 +2693,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     ];
   }
 
-  public static function providerGetLabelForExplicitInput(): \Generator {
+  public static function providerGetLabelForExplicitInputKey(): \Generator {
     // Test case: prop with title in schema
     yield 'prop_with_title_in_schema' => [
       'component_id' => 'js.canvas_test_code_components_with_enums',

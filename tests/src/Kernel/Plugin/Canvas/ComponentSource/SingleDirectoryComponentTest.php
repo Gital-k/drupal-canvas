@@ -7277,7 +7277,7 @@ HTML
     ];
   }
 
-  public static function providerGetLabelForExplicitInput(): \Generator {
+  public static function providerGetLabelForExplicitInputKey(): \Generator {
     // Test case: SDC prop with title in schema
     yield 'sdc_prop_with_title' => [
       'component_id' => 'sdc.canvas_test_sdc.my-cta',
