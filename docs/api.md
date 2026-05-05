@@ -23,7 +23,7 @@ covering common use cases:
 - Overriding the widget for `enum` shapes.
 - Remapping `format: uri` to the `link` field type.
 - Adding support for a contrib `format: duration` field type.
-- Customising which media types are allowed for `image` object shapes.
+- Customizing which media types are allowed for `image` object shapes.
 
 Further background on how prop shape matching works is in
 [`docs/shape-matching.md`](shape-matching.md).
