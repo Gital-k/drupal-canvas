@@ -8,7 +8,11 @@ export const extractErrorMessageFromApiResponse = (error: any): string => {
   if (!errors || !errors.length) return fallbackMessage;
   // Handle simple string array errors
   if (typeof errors[0] === 'string') {
-    return errors.length > 1 ? errors.join('\n') : errors[0];
+    if (errors.length === 1) return DOMPurify.sanitize(errors[0]);
+    const items = errors
+      .map((msg: string) => `<li>${DOMPurify.sanitize(msg)}</li>`)
+      .join('');
+    return `<ul>${items}</ul>`;
   }
   // Get error messages, and sort them where details with a pointer (ex. machineName) come first.
   const errorMessages = [...errors]
@@ -21,10 +25,12 @@ export const extractErrorMessageFromApiResponse = (error: any): string => {
     )
     .map((err) => err.detail)
     .filter(Boolean);
-  const errorString = errorMessages.length
-    ? errorMessages.length > 1
-      ? errorMessages.join(`\n`)
-      : errorMessages[0]
-    : fallbackMessage;
-  return DOMPurify.sanitize(errorString);
+  if (!errorMessages.length) return fallbackMessage;
+  if (errorMessages.length === 1) {
+    return DOMPurify.sanitize(errorMessages[0]);
+  }
+  const items = errorMessages
+    .map((msg: string) => `<li>${DOMPurify.sanitize(msg)}</li>`)
+    .join('');
+  return `<ul>${items}</ul>`;
 };
