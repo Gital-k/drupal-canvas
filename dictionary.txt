@@ -47,6 +47,7 @@ drupalsettings
 druplicon
 endapply
 entityviewdisplay
+esque
 extralight
 extensionless
 fieldtext
@@ -76,6 +77,7 @@ JSONified
 jsxs
 langcode
 leftbar
+liftup
 lightningcss
 Linkit
 Mautic
@@ -205,3 +207,5 @@ videomedia
 Zencoder
 zencoder
 PKCE
+Catbro
+Minibro

@@ -235,18 +235,18 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       }
     }
 
-    if ($this->moduleHandler->moduleExists('canvas_dev_mode')) {
-      // Check if this is a multivalue field.
-      $field_definition = $context['items']->getFieldDefinition();
-      $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
+    // Check if this is a multivalue field.
+    $field_definition = $context['items']->getFieldDefinition();
+    $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
 
-      if ($is_multiple && $this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
-        // Get the field label to add to all input elements.
-        $field_label = $field_definition->getLabel();
-        // Mark all input elements within multivalue widgets and add field
-        // title.
-        $this->markMultivalueFormElements($widget, $field_label);
-      }
+    if ($is_multiple && $this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
+      // Get the field label to add to all input elements.
+      $field_label = $field_definition->getLabel();
+      // Get the field cardinality for limiting selections.
+      $cardinality = $field_definition->getFieldStorageDefinition()->getCardinality();
+      // Mark all input elements within multivalue widgets and add field
+      // title.
+      $this->markMultivalueFormElements($widget, $field_label, $cardinality);
     }
   }
 
@@ -257,14 +257,17 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    *   The form element to process.
    * @param string $field_label
    *   The field label to add to input elements.
+   * @param int $cardinality
+   *   The field cardinality (-1 for unlimited, or a positive integer).
    */
-  private function markMultivalueFormElements(array &$element, string $field_label): void {
+  private function markMultivalueFormElements(array &$element, string $field_label, int $cardinality): void {
     foreach (Element::children($element) as $key) {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
-          \in_array($element[$key]['#type'], ['textfield', 'number', 'url', 'entity_autocomplete'], TRUE)) {
+          \in_array($element[$key]['#type'], ['textfield', 'number', 'url', 'entity_autocomplete', 'submit', 'select'], TRUE)) {
         $element[$key]['#is_multivalue_form'] = TRUE;
         $element[$key]['#attributes']['data-field-label'] = $field_label;
+        $element[$key]['#attributes']['data-cardinality'] = $cardinality;
         // Hide the sub-field label for url and entity_autocomplete types so
         // that labels like "URL" are not shown in the multivalue table rows.
         if (\in_array($element[$key]['#type'], ['url', 'entity_autocomplete'], TRUE)) {
@@ -281,7 +284,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
       // Recursively process child elements.
       if (\is_array($element[$key])) {
-        $this->markMultivalueFormElements($element[$key], $field_label);
+        $this->markMultivalueFormElements($element[$key], $field_label, $cardinality);
       }
     }
   }
@@ -351,10 +354,15 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   public static function processTextFormat(array $element, FormStateInterface $form_state, array &$form): array {
     $form_id = $form['form_id']['#value'] ?? NULL;
 
-    // If we aren't in the component instance form, remove text formats that are
-    // exclusive to that form.
+    // If we aren't in the component instance or config translation form, remove
+    // text formats that are exclusive to Canvas.
     // @see \Drupal\canvas\Hook\ShapeMatchingHooks::filterFormatAccess()
-    if ($form_id !== ComponentInstanceForm::FORM_ID) {
+    $forms_with_static_prop_sources = [
+      ComponentInstanceForm::FORM_ID,
+      'config_translation_add_form',
+      'config_translation_edit_form',
+    ];
+    if (!\in_array($form_id, $forms_with_static_prop_sources, TRUE)) {
       // @see config/install/filter.format.canvas_html_block.yml
       unset($element['format']['format']['#options']['canvas_html_block']);
       // @see config/install/filter.format.canvas_html_inline.yml
@@ -367,7 +375,11 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     // Only proceed if this is a Canvas page data or component instance form.
     // This restructures the render array to simplify integration of the
     // CKEditor5 React component.
-    if (isset($element['#attributes']['data-form-id']) && \in_array($element['#attributes']['data-form-id'], [ComponentInstanceForm::FORM_ID, ModuleHooks::PAGE_DATA_FORM_ID], TRUE)) {
+    $relevant_forms = [
+      ComponentInstanceForm::FORM_ID,
+      ModuleHooks::PAGE_DATA_FORM_ID,
+    ];
+    if (isset($element['#attributes']['data-form-id']) && \in_array($element['#attributes']['data-form-id'], $relevant_forms, TRUE)) {
       $element['value']['#attributes']['data-form-id'] = $element['#attributes']['data-form-id'];
       // The data-editor-for attribute triggers a vanilla JS initialization of
       // CKEditor5. Rename the attribute so we can instead use a React-specific
@@ -389,7 +401,11 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         // Include the #name and #id render array properties as name and id
         // attributes.
         \assert(\is_iterable($element['format']['format']['#attributes']));
-        $element['value']['#attributes']['data-canvas-format-select-attributes'] = Json::encode([...$element['format']['format']['#attributes'], 'name' => $element['format']['format']['#name'], 'id' => $element['format']['format']['#id']]);
+        $element['value']['#attributes']['data-canvas-format-select-attributes'] = Json::encode([
+          ...$element['format']['format']['#attributes'],
+          'name' => $element['format']['format']['#name'],
+          'id' => $element['format']['format']['#id'],
+        ]);
         if (isset($element['format']['format']['#options'])) {
           // Serialize the list of available text formats to pass via attribute.
           $element['value']['#attributes']['data-canvas-available-formats'] = Json::encode($element['format']['format']['#options']);

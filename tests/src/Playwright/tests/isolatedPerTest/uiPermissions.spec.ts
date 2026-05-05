@@ -7,11 +7,11 @@ import { isolatedPerTest as test } from '../../fixtures/test.js';
  * with different roles. It first ensures that a user with admin permissions can see all the buttons and options in the UI,
  * then it checks that a user with minimal permissions can still access the UI but with limited functionality.
  */
+test.use({ modules: ['canvas_test_sdc'], enableTestExtensions: true });
+
 test.describe('Canvas UI Permissions', () => {
   test.beforeEach(async ({ drupal, canvas }) => {
-    await drupal.enableTestExtensions();
     await drupal.loginAsAdmin();
-    await drupal.installModules(['canvas_test_sdc']);
     await canvas.enableGlobalRegions();
     await drupal.logout();
   });
@@ -49,9 +49,14 @@ test.describe('Canvas UI Permissions', () => {
       page.getByTestId('canvas-navigation-new-button'),
     ).toBeAttached();
 
-    // Click the dropdown button with the aria-label
+    // Hover to reveal the per-page options button, then click it
+    await page
+      .getByTestId('canvas-navigation-content')
+      .getByRole('listitem')
+      .first()
+      .hover();
     const dropdownButton = page.getByLabel(/^Page options for /);
-    await dropdownButton.click({ force: true });
+    await dropdownButton.click();
 
     const contextMenu = page.locator('[role="menu"][data-state="open"]');
     await expect(contextMenu).toBeVisible();
@@ -78,9 +83,8 @@ test.describe('Canvas UI Permissions', () => {
     ).toBeVisible();
 
     // Close the dropdown
-    await page
-      .getByTestId('canvas-page-list-new-button')
-      .click({ force: true });
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu', { name: 'New' })).not.toBeAttached();
 
     // Make a change to the page
     await canvas.addComponent({ name: 'Hero' });
@@ -144,9 +148,14 @@ test.describe('Canvas UI Permissions', () => {
       page.getByTestId('canvas-navigation-new-button'),
     ).not.toBeAttached();
 
-    // Click the dropdown button with the aria-label
+    // Hover to reveal the per-page options button, then click it
+    await page
+      .getByTestId('canvas-navigation-content')
+      .getByRole('listitem')
+      .first()
+      .hover();
     const dropdownButton = page.getByLabel(/^Page options for /);
-    await dropdownButton.click({ force: true });
+    await dropdownButton.click();
 
     // Verify the dropdown menu is visible
     const contextMenu = page.getByRole('menu', {

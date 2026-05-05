@@ -166,7 +166,10 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     \assert(\array_key_exists('prop_field_definitions', $this->configuration));
     \assert(\is_array($this->configuration['prop_field_definitions']));
     $dependencies = [];
-    foreach ($this->configuration['prop_field_definitions'] as $prop_name => ['field_type' => $field_type, 'field_widget' => $field_widget]) {
+    foreach ($this->configuration['prop_field_definitions'] as $prop_name => [
+      'field_type' => $field_type,
+      'field_widget' => $field_widget,
+    ]) {
       $field_widget_definition = $this->fieldWidgetPluginManager->getDefinition($field_widget);
       $dependencies['module'][] = $field_widget_definition['provider'];
       $prop_source = $this->getDefaultStaticPropSource($prop_name, FALSE);
@@ -193,8 +196,10 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    *
    * @return \Drupal\canvas\PropSource\StaticPropSource
    *   The prop source object.
+   *
+   * @internal
    */
-  private function getDefaultStaticPropSource(string $prop_name, bool $validate_prop_name): StaticPropSource {
+  public function getDefaultStaticPropSource(string $prop_name, bool $validate_prop_name): StaticPropSource {
     if ($validate_prop_name && !\array_key_exists($prop_name, $this->getMetadata()->schema['properties'] ?? [])) {
       throw new \OutOfRangeException(\sprintf("'%s' is not a prop on the code powering the component '%s'.", $prop_name, $this->getComponentDescription()));
     }
@@ -631,6 +636,12 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           // @see \Drupal\canvas\PropSource\StaticPropSource::withValue(allow_empty: TRUE)
           // If a StaticPropSource's field item list is empty, consider it not
           // set at all.
+          // Note: this catch only fires when value contains items the field
+          // type considers empty (e.g. [10, NULL, 20]). A fully empty array
+          // (value: []) never reaches here — isMinimalRepresentation() passes
+          // it unchanged (before and after filterEmptyItems() both equal 0),
+          // so [] flows through to ComponentValidator and is validated against
+          // the JSON Schema directly.
           if ($source->isEmpty()) {
             unset($inputValues[$component_prop_name]);
             continue;
@@ -838,6 +849,19 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $description = $component_schema['properties'][$sdc_prop_name]['description'] ?? NULL;
       $widget = $source->getWidget($component->id(), $component->getLoadedVersion(), $sdc_prop_name, $label, $field_widget_plugin_id, $description);
       $is_required = $static_prop_source_field_definition['required'];
+      // For array props: JSON Schema `required: [prop]` means "the key must be
+      // present" — it does NOT enforce ≥1 items. Only `minItems: 1` does that.
+      // Drupal's setRequired(TRUE) enforces ≥1 value (displaying the required
+      // asterisk and preventing the user from removing the last item in the
+      // UI). Passing $is_required=TRUE for a required array without minItems: 1
+      // would over-enforce: the user couldn't remove all items even though the
+      // JSON Schema allows an empty array. So only mark array props as
+      // Drupal-required when minItems: 1 is explicitly set.
+      // @see https://www.drupal.org/project/canvas/issues/3516754
+      $prop_schema = $component_schema['properties'][$sdc_prop_name] ?? [];
+      if ($is_required && ($prop_schema['type'] ?? NULL) === 'array' && ($prop_schema['minItems'] ?? 0) < 1) {
+        $is_required = FALSE;
+      }
       $form[$sdc_prop_name] = $source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, $sdc_prop_name, $is_required, $entity_object_for_field_widget, $form, $form_state);
       $form[$sdc_prop_name]['#disabled'] = $disabled;
 
@@ -1391,7 +1415,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // string input, as they're thinking about what string they do want.
         // ⚠️ This won't work for components whose logic specifically checks for
         // an empty string and refuses to render then.
-        if ($is_required_prop && $evaluated === '' && $this->getExplicitInputDefinitions()['shapes'][$prop] === ['type' => 'string']) {
+        if ($is_required_prop && $evaluated === '' && PropShape::isPlainOrRichProse($this->getExplicitInputDefinitions()['shapes'][$prop])) {
           // Confirm that *if* this weren't special-cased, that this would
           // indeed enter the next branch, which would cause it to be skipped.
           // @todo Consider adding a new `GracefulDegradationPropSource` to

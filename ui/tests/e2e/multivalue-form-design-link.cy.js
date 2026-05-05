@@ -13,9 +13,6 @@ describe('Multivalue Form Design – Link Field', () => {
   before(() => {
     cy.drupalCanvasInstall([
       'canvas_test_article_fields',
-      // @todo remove once https://drupal.org/i/3577946 is fixed.
-      // Required for new multi-value form UI.
-      'canvas_dev_mode',
       'canvas_test_e2e_code_components',
     ]);
   });
@@ -40,38 +37,64 @@ describe('Multivalue Form Design – Link Field', () => {
    *   UI autocomplete dropdown (.ui-menu-item-wrapper) and clicks the matching
    *   suggestion. When false (default), commits the value by pressing Enter.
    */
+  /**
+   * Types a value into the first input of the currently open popover dialog,
+   * using select-all to replace any existing content without triggering a
+   * debounced commit of the intermediate empty value.
+   *
+   * @param {string} value - The value to type.
+   */
+  const typeInPopover = (value) => {
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input')
+      .first()
+      .type(`{selectall}${value}`);
+    cy.get('[role="dialog"][data-state="open"]').find('input').blur();
+  };
+
   const typeUrlInRow = (
     fieldAlias,
     rowIndex,
     title,
     useAutocomplete = false,
   ) => {
-    cy.get(fieldAlias)
-      .find('tbody tr')
-      .eq(rowIndex)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
-    cy.get('[role="dialog"][data-state="open"]').find('input').first().clear();
+    cy.openMultivaluePopover(fieldAlias, rowIndex);
     if (useAutocomplete) {
       cy.get('[role="dialog"][data-state="open"]')
         .find('input')
         .first()
-        .type(title);
+        .realType(title);
       // Wait for the autocomplete suggestion matching the title to appear, then
       // click it so the resolved URL is committed and propagated to the right panel.
-      cy.get('.ui-menu-item-wrapper')
-        .contains(title)
-        .should('be.visible')
-        .click();
+      cy.get('.ui-menu-item-wrapper').contains(title).should('be.visible');
+      cy.get('.ui-menu-item-wrapper').contains(title).click();
     } else {
-      // For plain URLs that don't trigger autocomplete, press Enter to commit.
-      cy.get('[role="dialog"][data-state="open"]')
-        .find('input')
-        .first()
-        .type(`${title}{enter}`);
+      // For plain URLs that don't trigger autocomplete,
+      typeInPopover(`${title}`);
+      cy.closeMultivaluePopover();
     }
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+  };
+
+  /**
+   * Types into a row and waits for the resulting preview update.
+   *
+   * Registers the intercept before typeUrlInRow so the preview POST triggered
+   * by the {enter} keypress (or the autocomplete selection) is reliably captured.
+   */
+  const typeUrlInRowAwaitPreview = (
+    fieldAlias,
+    rowIndex,
+    title,
+    useAutocomplete = false,
+  ) => {
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/*',
+      times: 1,
+      method: 'POST',
+    }).as('updatePreview');
+    typeUrlInRow(fieldAlias, rowIndex, title, useAutocomplete);
+    cy.wait('@updatePreview');
   };
 
   /**
@@ -186,55 +209,44 @@ describe('Multivalue Form Design – Link Field', () => {
       .as('relative-field');
 
     // Open the popover for the first row of the Relative field.
-    cy.get('@relative-field')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
+    cy.openMultivaluePopover('@relative-field', 0);
 
     // Type an invalid URI-reference value containing '>'.
     // Use select-all + type rather than .clear() to avoid triggering a
     // debounced commit of the intermediate empty value.
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .type('{selectall}invalid>value');
+    typeInPopover('invalid>value');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
     keyOutOfPopover();
 
+    cy.log('Validation should catch invalid>value on item 1.');
     // The popover should report a validation error.
     cy.get('[role="dialog"][data-state="open"]')
       .find('[data-prop-message="true"]')
       .should('contain.text', '❌ data/0 must match format "uri-reference"');
 
     // The list item text should be unchanged (error should not propagate).
-    cy.get('@relative-field')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .find('[class*="_itemText_"]')
-      .should('have.text', 'first-path');
+    // The display (and preview) only show the most recent valid value.
+    // The user typed "invalid>value", and it became invalid with the ">".
+    verifyUrlRowText('@relative-field', 0, 'invalid');
 
-    // Close the popover (discards the invalid value).
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click({ force: true });
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    // Attempt to close the popover, but it should remain open.
+    cy.closeMultivaluePopover(true);
 
-    // Wait 1000ms to ensure any in-flight requests have settled, then confirm
-    // the preview retains the original value.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(1000);
+    cy.log('Validation should accept quite-valid on item 1.');
+    // Enter a valid value.
+    typeInPopover('quite-valid');
+    keyOutOfPopover();
+
+    cy.log('Preview should accept quite-valid on item 1.');
     confirmFourLinksPreview(
-      'first-path',
+      'quite-valid',
       'another-first-path',
       'https://drupal.org',
       'https://github.com',
     );
 
+    cy.log('Set an autocomplete suggestion on item 1.');
     typeUrlInRow('@relative-field', 0, 'a block', true);
 
     // Confirm preview updated with the new valid value.
@@ -245,21 +257,13 @@ describe('Multivalue Form Design – Link Field', () => {
       'https://github.com',
     );
 
-    // Test validation on the second row of the Relative field.
-    cy.get('@relative-field')
-      .find('tbody tr')
-      .eq(1)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
+    cy.log('Test validation on the second row of the Relative field.');
+    cy.openMultivaluePopover('@relative-field', 0);
 
     // Type an invalid URI-reference value.
     // Use select-all + type rather than .clear() to avoid triggering a
     // debounced commit of the intermediate empty value.
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .type('{selectall}apple test');
+    typeInPopover('apple test');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
     keyOutOfPopover();
@@ -269,32 +273,16 @@ describe('Multivalue Form Design – Link Field', () => {
       .find('[data-prop-message="true"]')
       .should('contain.text', '❌ data/0 must match format "uri-reference"');
 
+    verifyUrlRowText('@relative-field', 0, 'apple');
     // The list item text should be unchanged (error should not propagate).
-    cy.get('@relative-field')
-      .find('tbody tr')
-      .eq(1)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .find('[class*="_itemText_"]')
-      .should('have.text', 'Empty');
+    cy.get('@relative-field').find('tbody tr').should('have.length', 1);
 
-    // Close the popover (discards the invalid value).
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click({ force: true });
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    // Attempt to close the popover (it will not close due to invalid value).
+    cy.closeMultivaluePopover(true);
 
-    // Wait 1000ms to ensure any in-flight requests have settled.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(1000);
-
-    // Confirm preview still shows the previously valid values.
-    confirmFourLinksPreview(
-      '/the-one-with-a-block',
-      'another-first-path',
-      'https://drupal.org',
-      'https://github.com',
-    );
+    // Change to a valid value.
+    typeInPopover('pear');
+    cy.closeMultivaluePopover();
 
     // Find the Absolute field wrapper.
     cy.get('@componentForm')
@@ -303,50 +291,31 @@ describe('Multivalue Form Design – Link Field', () => {
       .as('absolute-field');
 
     // Open the popover for the first row of the Absolute field.
-    cy.get('@absolute-field')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
+    cy.openMultivaluePopover('@absolute-field', 0);
 
     // Type a single-character value (not a valid absolute URI).
     // Use select-all + type rather than .clear() to avoid triggering a
     // debounced commit of the intermediate empty value.
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .type('{selectall}x');
+    typeInPopover('x');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
-    keyOutOfPopover();
 
     // The popover should report a uri validation error.
     cy.get('[role="dialog"][data-state="open"]')
       .find('[data-prop-message="true"]')
       .should('contain.text', '❌ data/0 must match format "uri"');
 
-    // The list item text should be unchanged (error should not propagate).
-    cy.get('@absolute-field')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .find('[class*="_itemText_"]')
-      .should('have.text', 'https://drupal.org');
+    cy.closeMultivaluePopover(true);
 
-    // Close the popover (discards the invalid value).
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click({ force: true });
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    // The list item text should be unchanged (error should not propagate).
+    verifyUrlRowText('@absolute-field', 0, 'https://drupal.org');
 
     // Wait 1000ms to ensure any in-flight requests have settled, then confirm
     // the preview has restored to the original value.
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(1000);
     confirmFourLinksPreview(
-      '/the-one-with-a-block',
+      'pear',
       'another-first-path',
       'https://drupal.org',
       'https://github.com',
@@ -357,22 +326,13 @@ describe('Multivalue Form Design – Link Field', () => {
     // we test valid edits on the absolute URL fields which accept plain input.)
 
     // Edit the Absolute field row 0: change to a new valid absolute URL.
-    cy.get('@absolute-field')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .type('{selectall}https://www.example.com');
+    typeInPopover('https://www.example.com');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
     keyOutOfPopover();
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
     confirmFourLinksPreview(
-      '/the-one-with-a-block',
+      'pear',
       'another-first-path',
       'https://www.example.com',
       'https://github.com',
@@ -383,22 +343,14 @@ describe('Multivalue Form Design – Link Field', () => {
       .findByRole('heading', { name: 'Absolute Two' })
       .parents('.js-form-wrapper')
       .as('absolute-two-field');
-    cy.get('@absolute-two-field')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .type('{selectall}https://www.cypress.io');
+    cy.openMultivaluePopover('@absolute-two-field', 0);
+    typeInPopover('https://www.cypress.io');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
     keyOutOfPopover();
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
     confirmFourLinksPreview(
-      '/the-one-with-a-block',
+      'pear',
       'another-first-path',
       'https://www.example.com',
       'https://www.cypress.io',
@@ -449,16 +401,8 @@ describe('Multivalue Form Design – Link Field', () => {
       .as('unlimited-link');
     cy.get('@unlimited-link').scrollIntoView();
 
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-
     // Populate the empty second row URL using the popover interface.
-    typeUrlInRow('@unlimited-link', 1, 'https://www.example.com');
-
-    cy.wait('@updatePreview');
+    typeUrlInRowAwaitPreview('@unlimited-link', 1, 'https://www.example.com');
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     // Verify the URL was set.
@@ -483,23 +427,8 @@ describe('Multivalue Form Design – Link Field', () => {
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
-    const interceptPreview = () => {
-      cy.intercept({
-        url: '**/canvas/api/v0/layout/node/2',
-        times: 1,
-        method: 'POST',
-      }).as('updatePreview');
-    };
-
-    const waitForPreview = () => {
-      cy.get(document.activeElement).blur();
-      cy.wait('@updatePreview');
-    };
-
-    // Register intercept before action, then populate the empty second item first.
-    interceptPreview();
-    typeUrlInRow('@unlimited-link', 1, 'https://www.example.com');
-    waitForPreview();
+    // Populate the empty second item first.
+    typeUrlInRowAwaitPreview('@unlimited-link', 1, 'https://www.example.com');
 
     // Verify the "+ Add new" button text.
     cy.get('@unlimited-link')
@@ -515,10 +444,8 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.get('@unlimited-link').find('tbody tr').should('have.length', 3);
 
-    // Register intercept before action, then populate the new item.
-    interceptPreview();
-    typeUrlInRow('@unlimited-link', 2, 'https://www.cypress.io');
-    waitForPreview();
+    // Populate the new item.
+    typeUrlInRowAwaitPreview('@unlimited-link', 2, 'https://www.cypress.io');
     cy.waitForAjax();
 
     confirmUrlInputs('@unlimited-link', [
@@ -540,23 +467,8 @@ describe('Multivalue Form Design – Link Field', () => {
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
-    const interceptPreview = () => {
-      cy.intercept({
-        url: '**/canvas/api/v0/layout/node/2',
-        times: 1,
-        method: 'POST',
-      }).as('updatePreview');
-    };
-
-    const waitForPreview = () => {
-      cy.get(document.activeElement).blur();
-      cy.wait('@updatePreview');
-    };
-
-    // Register intercept before action, then populate the empty second item.
-    interceptPreview();
-    typeUrlInRow('@unlimited-link', 1, 'https://www.example.com');
-    waitForPreview();
+    // Populate the empty second item.
+    typeUrlInRowAwaitPreview('@unlimited-link', 1, 'https://www.example.com');
 
     // Add a third item.
     cy.get('@unlimited-link')
@@ -565,10 +477,8 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
-    // Register intercept before action, then populate the third item.
-    interceptPreview();
-    typeUrlInRow('@unlimited-link', 2, 'https://www.cypress.io');
-    waitForPreview();
+    // Populate the third item.
+    typeUrlInRowAwaitPreview('@unlimited-link', 2, 'https://www.cypress.io');
     cy.waitForAjax();
 
     confirmUrlInputs('@unlimited-link', [
@@ -598,6 +508,20 @@ describe('Multivalue Form Design – Link Field', () => {
       .should('have.length', 3);
     cy.get('@unlimited-link').scrollIntoView({ offset: { top: -400 } });
 
+    // The drag-handle reorder does NOT submit a Drupal form AJAX POST (unlike
+    // typing into a popover, which posts to /canvas/api/v0/form/content-entity).
+    // It dispatches only through the preview pathway: POST
+    // /canvas/api/v0/layout/node/2 → ApiLayoutController::post →
+    // autoSaveManager->saveEntity(), which is what cy.reload() below reads.
+    //
+    // Multiple preview POSTs can fire around a drag (debounced updates from
+    // typing's tail end, intermediate drag-state updates, and the final
+    // reorder POST). We can't rely on "the first /layout/node/2 POST after
+    // realDnd" being the one with the reorder — it's often a stale POST from
+    // an earlier action. Instead, inspect every intercepted request body and
+    // assert that at least one carries the expected post-reorder sort order.
+    cy.intercept('POST', '**/canvas/api/v0/layout/node/2').as('previewUpdate');
+
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-link"] tr.draggable:nth-child(3) [title="Change order"]',
     ).realDnd(
@@ -605,25 +529,26 @@ describe('Multivalue Form Design – Link Field', () => {
       dndDefaults,
     );
 
+    cy.assertMultivalueReorder({
+      alias: 'previewUpdate',
+      fieldName: 'field_cvt_unlimited_link',
+      valueKey: 'uri',
+      expectedOrder: [
+        'https://drupal.org',
+        'https://www.cypress.io',
+        'https://www.example.com',
+      ],
+    });
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(1000);
-
-    // Wait for the DOM to reflect the new row order before asserting all values.
-    cy.get('@unlimited-link')
-      .find('tbody tr')
-      .eq(1)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .find('[class*="_itemText_"]')
-      .should('have.text', 'https://www.cypress.io');
-
     confirmUrlInputs('@unlimited-link', [
       'https://drupal.org',
       'https://www.cypress.io',
       'https://www.example.com',
     ]);
+    // Wait to ensure order is auto saved before reloading.
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(10000);
     // Refresh the page to ensure the update persists.
     cy.reload();
     confirmUrlInputs('@unlimited-link', [
@@ -646,23 +571,8 @@ describe('Multivalue Form Design – Link Field', () => {
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
-    const interceptPreview = () => {
-      cy.intercept({
-        url: '**/canvas/api/v0/layout/node/2',
-        times: 1,
-        method: 'POST',
-      }).as('updatePreview');
-    };
-
-    const waitForPreview = () => {
-      cy.get(document.activeElement).blur();
-      cy.wait('@updatePreview');
-    };
-
-    // Register intercept before action, then populate the empty second item.
-    interceptPreview();
-    typeUrlInRow('@unlimited-link', 1, 'https://www.example.com');
-    waitForPreview();
+    // Populate the empty second item.
+    typeUrlInRowAwaitPreview('@unlimited-link', 1, 'https://www.example.com');
 
     // Add a third item.
     cy.get('@unlimited-link')
@@ -671,10 +581,8 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
-    // Register intercept before action, then populate the third item.
-    interceptPreview();
-    typeUrlInRow('@unlimited-link', 2, 'https://www.cypress.io');
-    waitForPreview();
+    // Populate the third item.
+    typeUrlInRowAwaitPreview('@unlimited-link', 2, 'https://www.cypress.io');
     cy.waitForAjax();
 
     confirmUrlInputs('@unlimited-link', [
@@ -685,12 +593,7 @@ describe('Multivalue Form Design – Link Field', () => {
 
     cy.get('@unlimited-link').scrollIntoView();
     // Open the URL popover for the second item and click Remove.
-    cy.get('@unlimited-link')
-      .find('tbody tr')
-      .eq(1)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
+    cy.openMultivaluePopover('@unlimited-link', 1);
 
     cy.get('[role="dialog"][data-state="open"]').should('be.visible');
     cy.get('[role="dialog"][data-state="open"]')
@@ -718,12 +621,7 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('@unlimited-link').scrollIntoView();
 
     // Click the URL list item in the first row to open the popover.
-    cy.get('@unlimited-link')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
+    cy.openMultivaluePopover('@unlimited-link', 0);
 
     cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
@@ -746,13 +644,10 @@ describe('Multivalue Form Design – Link Field', () => {
       .should('exist');
 
     // Close the popover.
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click();
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    cy.closeMultivaluePopover();
   });
 
-  it('popover discards uncommitted changes when closed without Enter', () => {
+  it('popover propagates changes live as user types', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
 
@@ -761,29 +656,18 @@ describe('Multivalue Form Design – Link Field', () => {
       .as('unlimited-link');
     cy.get('@unlimited-link').scrollIntoView();
 
-    const originalUrl = 'https://drupal.org';
+    // Open the first row's popover.
+    cy.openMultivaluePopover('@unlimited-link', 0);
 
-    // Open the URL popover, type something, then close without pressing Enter.
-    cy.get('@unlimited-link')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
+    // Type a new value — row label should update immediately without Enter.
+    typeInPopover('https://updated.com');
 
-    cy.get('[role="dialog"][data-state="open"]').find('input').first().clear();
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .type('https://this-should-not-be-saved.com');
+    verifyUrlRowText('@unlimited-link', 0, 'https://updated.com');
 
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click();
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    // Close via the × button — value should not be reverted.
+    cy.closeMultivaluePopover();
 
-    // The original URL should be restored.
-    verifyUrlRowText('@unlimited-link', 0, originalUrl);
+    verifyUrlRowText('@unlimited-link', 0, 'https://updated.com');
   });
 
   it('maintains form state across multiple link popover interactions', () => {
@@ -797,31 +681,17 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('@unlimited-link').scrollIntoView();
 
     // Modify the first row's URL.
-    cy.get('@unlimited-link')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
+    cy.openMultivaluePopover('@unlimited-link', 0);
 
-    cy.get('[role="dialog"][data-state="open"]').find('input').first().clear();
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .type('https://modified-url.com{enter}');
-
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
-
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
+    typeInPopover('https://modified-url.com');
+    cy.closeMultivaluePopover();
 
     // Modify the second row's URL.
-    typeUrlInRow('@unlimited-link', 1, 'https://second-modified.com');
-
-    cy.wait('@updatePreview');
+    typeUrlInRowAwaitPreview(
+      '@unlimited-link',
+      1,
+      'https://second-modified.com',
+    );
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     // Verify both URL values are maintained.
@@ -877,12 +747,7 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('@limited-link').find('tbody tr').should('have.length', 2);
 
     // Open the popover for the first row.
-    cy.get('@limited-link')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
+    cy.openMultivaluePopover('@limited-link', 0);
 
     cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
@@ -898,18 +763,10 @@ describe('Multivalue Form Design – Link Field', () => {
       .should('be.disabled');
 
     // Close the popover.
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click();
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    cy.closeMultivaluePopover();
 
     // Open the popover for the second row and verify Remove button is disabled there too.
-    cy.get('@limited-link')
-      .find('tbody tr')
-      .eq(1)
-      .find('[class*="_listItem_"]')
-      .eq(0)
-      .click();
+    cy.openMultivaluePopover('@limited-link', 1);
 
     cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
@@ -917,10 +774,7 @@ describe('Multivalue Form Design – Link Field', () => {
       .findByRole('button', { name: /Remove/i })
       .should('be.disabled');
 
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click();
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    cy.closeMultivaluePopover();
   });
 
   it('can use relative URLs in field_cvt_uri_relative (Canvas URI Relative)', () => {
@@ -944,24 +798,9 @@ describe('Multivalue Form Design – Link Field', () => {
       .should('have.length', 2);
     verifyUrlRowText('@relative-link', 0, '/node/1');
 
-    const interceptPreview = (alias) => {
-      cy.intercept({
-        url: '**/canvas/api/v0/layout/node/2',
-        times: 1,
-        method: 'POST',
-      }).as(alias);
-    };
-
-    const waitForPreview = (alias) => {
-      cy.get(document.activeElement).blur();
-      cy.wait(`@${alias}`);
-      cy.findByLabelText('Loading Preview').should('not.exist');
-    };
-
-    // Register intercept before action, then edit the URL to a different relative path.
-    interceptPreview('updatePreview');
-    typeUrlInRow('@relative-link', 1, 'I am an empty node', true);
-    waitForPreview('updatePreview');
+    // Edit the URL to a different relative path.
+    typeUrlInRowAwaitPreview('@relative-link', 1, 'I am an empty node', true);
+    cy.findByLabelText('Loading Preview').should('not.exist');
 
     verifyUrlRowText('@relative-link', 1, 'I am an empty node (2)');
 
@@ -975,16 +814,15 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.get('@relative-link').find('tbody tr').should('have.length', 3);
 
-    // Register intercept before populating the new (empty) row – committing a
-    // value into an empty field reliably triggers the preview POST.
-    interceptPreview('updatePreview');
-    typeUrlInRow(
+    // Populate the new (empty) row – committing a value into an empty field
+    // reliably triggers the preview POST.
+    typeUrlInRowAwaitPreview(
       '@relative-link',
       2,
       'Canvas Needs This For The Time Being',
       true,
     );
-    waitForPreview('updatePreview');
+    cy.findByLabelText('Loading Preview').should('not.exist');
 
     verifyUrlRowText(
       '@relative-link',
