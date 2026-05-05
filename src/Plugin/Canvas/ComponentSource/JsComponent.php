@@ -244,7 +244,26 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     // canvas-island stays visible while the user corrects the value.
     // @see \Drupal\canvas\Element\RenderSafeComponentContainer::handleComponentException()
     // @see https://www.drupal.org/project/canvas/issues/3583639
-    \assert($this->componentValidator->validateProps($props, $this->getComponentPlugin()));
+    // Graceful degradation: skip validation when a required array prop with
+    // minItems >= 1 has an empty [] value — this happens when a content author
+    // removes all values from a required List prop. This is the array
+    // equivalent of how Canvas handles required string props that evaluate to
+    // '' (plain/rich prose), allowing the component to keep rendering while the
+    // author corrects the value, rather than crashing with an
+    // InvalidComponentException.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::clientModelToInput()
+    $schema_properties = $this->getComponentPlugin()->metadata->schema['properties'] ?? [];
+    $has_empty_required_array_prop = FALSE;
+    foreach ($schema_properties as $schema_prop_name => $schema_prop) {
+      if (($props[$schema_prop_name] ?? NULL) === []
+        && isset($schema_prop['minItems']) && $schema_prop['minItems'] >= 1) {
+        $has_empty_required_array_prop = TRUE;
+        break;
+      }
+    }
+    if (!$has_empty_required_array_prop) {
+      \assert($this->componentValidator->validateProps($props, $this->getComponentPlugin()));
+    }
     CacheableMetadata::createFromRenderArray($build)
       ->addCacheableDependency($component)
       ->addCacheableDependency($props_cacheability)
