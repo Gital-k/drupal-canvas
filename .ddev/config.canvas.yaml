@@ -30,5 +30,4 @@ web_extra_exposed_ports:
 hooks:
   post-start:
     - exec-host: |
-        rm -rf /var/www/html/.cache
         ddev setup
