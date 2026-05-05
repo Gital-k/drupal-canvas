@@ -246,9 +246,6 @@ final class PropShape {
    *   are blocked during discovery of components from ever making it into
    *   Canvas component trees.
    *
-   * Strings with format constraints that indicate structured data (uri,
-   * date-time, etc.) are not considered prose.
-   *
    * @param JsonSchema $prop_schema
    *   The JSON schema for a component prop.
    *
@@ -259,22 +256,6 @@ final class PropShape {
    */
   public static function isPlainOrRichProse(array $prop_schema): bool {
     $normalized = static::normalizePropSchema($prop_schema);
-
-    // Formats that indicate structured data, not prose.
-    $structured_formats = [
-      'uri',
-      'uri-reference',
-      'date',
-      'date-time',
-      'iri',
-      'iri-reference',
-    ];
-
-    // If the schema has a structured format, it's not prose.
-    if (\array_key_exists('format', $normalized) && \in_array($normalized['format'], $structured_formats, TRUE)) {
-      return FALSE;
-    }
-
     return $normalized === ['type' => 'string']
       || ($normalized['type'] === 'string'
         && \array_key_exists('contentMediaType', $normalized)
