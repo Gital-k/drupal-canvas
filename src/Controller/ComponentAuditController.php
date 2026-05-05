@@ -76,6 +76,7 @@ final class ComponentAuditController {
       'content templates' => $this->getContentTemplatesAudit($component),
       'regions' => $this->getRegionsAudit($component),
       'patterns' => $this->getPatternsAudit($component),
+      'deleted_slots' => $this->getDeletedSlotDataAudit($component),
     ];
   }
 
@@ -222,6 +223,101 @@ final class ComponentAuditController {
         $row['title']['data'] = $pattern->label();
         return $row;
       });
+  }
+
+  protected function getDeletedSlotDataAudit(Component $component): array {
+    $deleted_slots = $this->componentAudit->getDeletedSlots($component);
+
+    if (empty($deleted_slots)) {
+      return [
+        'title' => [
+          '#type' => 'html_tag',
+          '#tag' => 'h3',
+          '#attributes' => ['name' => 'deleted-slots'],
+          '#value' => $this->t('Data in deleted slots'),
+        ],
+        'message' => [
+          '#markup' => '<p>' . $this->t('This component has no deleted slots.') . '</p>',
+        ],
+      ];
+    }
+
+    $rows = [];
+    $header = [
+      'title' => $this->t('Title'),
+      'entity_type_id' => [
+        'data' => $this->t('Entity Type'),
+        'class' => [RESPONSIVE_PRIORITY_LOW],
+      ],
+      'bundle' => [
+        'data' => $this->t('Bundle'),
+        'class' => [RESPONSIVE_PRIORITY_LOW],
+      ],
+      'id' => [
+        'data' => $this->t('ID'),
+        'class' => [RESPONSIVE_PRIORITY_LOW],
+      ],
+      'revision_id' => [
+        'data' => $this->t('Revision ID'),
+        'class' => [RESPONSIVE_PRIORITY_LOW],
+      ],
+      'deleted_slots' => [
+        'data' => $this->t('Deleted slots with data'),
+        'class' => [RESPONSIVE_PRIORITY_MEDIUM],
+      ],
+    ];
+
+    $entity_ids = $this->componentAudit->getContentRevisionIdsWithDataInDeletedSlots($component);
+    foreach ($entity_ids as $entity_type_id => $ids) {
+      $storage = $this->entityTypeManager->getStorage($entity_type_id);
+      $entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
+
+      $revision_ids = \array_keys($ids);
+      if ($entity_type->isRevisionable()) {
+        \assert($storage instanceof \Drupal\Core\Entity\RevisionableStorageInterface);
+        $revisions = $storage->loadMultipleRevisions($revision_ids);
+      }
+      else {
+        $revisions = $storage->loadMultiple($ids);
+      }
+
+      foreach ($revisions as $entity) {
+        $key = "$entity_type_id:{$entity->id()}";
+        $bundle_label = $this->bundleInfo->getBundleInfo($entity_type_id)[$entity->bundle()]['label'];
+
+        if (!isset($rows[$key])) {
+          $rows[$key] = [
+            'title' => ['data' => $entity->toLink()],
+            'entity_type_id' => ['data' => $entity->getEntityType()->getLabel()],
+            'bundle' => ['data' => $bundle_label],
+            'id' => ['data' => $entity->id()],
+            'revision_id' => ['data' => $entity_type->isRevisionable() ? $entity->getRevisionId() : '—'],
+            'deleted_slots' => ['data' => \implode(', ', $deleted_slots)],
+          ];
+        }
+      }
+    }
+
+    return [
+      'title' => [
+        '#type' => 'html_tag',
+        '#tag' => 'h3',
+        '#attributes' => ['name' => 'deleted-slots'],
+        '#value' => $this->t('Data in deleted slots'),
+      ],
+      'description' => [
+        '#markup' => '<p>' . $this->t('The following content contains component tree items stored in slots that no longer exist in the active version of this component. Deleted slots: <code>@slots</code>', [
+          '@slots' => \implode(', ', $deleted_slots),
+        ]) . '</p>',
+      ],
+      'table' => [
+        '#type' => 'table',
+        '#header' => $header,
+        '#rows' => $rows,
+        '#empty' => $this->t('No orphaned data detected in deleted slots.'),
+        '#attributes' => ['name' => 'table-deleted-slots'],
+      ],
+    ];
   }
 
   public function createConfigTable(Component $component, string $config_entity_type_id, \Stringable $sectionTitle, \Stringable $emptyMessage, array $headers, callable $rowCallback): array {
