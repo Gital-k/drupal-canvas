@@ -902,6 +902,23 @@ describe('Prop types editing', () => {
         '[name$="[test_REQUIRED_string_format_date_time][0][value][date]"]';
       const dateTimeTimeSelector =
         '[name$="[test_REQUIRED_string_format_date_time][0][value][time]"]';
+      const emailSelector = 'String, format=email';
+      const emailPreviewSelector = '#test-string-format-email code';
+
+      // First prove that we can update the email. This will be attempted again
+      // at the end of the test.
+      cy.waitForElementContentInIframe(
+        '#test-string-format-email code',
+        'hello@example.com',
+      );
+      cy.findByLabelText(emailSelector).scrollIntoView();
+      cy.findByLabelText(emailSelector).clear({ force: true });
+      cy.findByLabelText(emailSelector).type('update1@example.com');
+      cy.findByLabelText(emailSelector).blur();
+      cy.waitForElementContentInIframe(
+        emailPreviewSelector,
+        'update1@example.com',
+      );
 
       // Clear date field.
       cy.get(dateSelector).scrollIntoView();
@@ -943,8 +960,17 @@ describe('Prop types editing', () => {
         '',
       );
 
-      // Assert no 500 error occurred.
-      cy.get('body').should('not.contain', '500');
+      // Clear the values above cause HTML validation errors so no PATCH request is made and thus no 500 error should
+      // occur. Update email field to trigger a PATCH request (bypasses HTML
+      // validation on required fields).
+      cy.findByLabelText(emailSelector).scrollIntoView();
+      cy.findByLabelText(emailSelector).clear({ force: true });
+      cy.findByLabelText(emailSelector).type('update2@example.com');
+      cy.findByLabelText(emailSelector).blur();
+      cy.waitForElementContentInIframe(
+        emailPreviewSelector,
+        'update2@example.com',
+      );
     },
   );
 
