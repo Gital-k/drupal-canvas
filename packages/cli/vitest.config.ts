@@ -17,6 +17,7 @@ export default defineConfig({
       '@drupal-canvas/vite-plugin': resolveWorkspaceSource(
         '../vite-plugin/src/index.ts',
       ),
+      '@drupal-canvas/ui': resolveWorkspaceSource('../../ui/src'),
     },
   },
   test: {
