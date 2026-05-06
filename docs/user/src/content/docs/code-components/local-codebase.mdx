@@ -40,25 +40,26 @@ use the default Canvas paths. You can set only the options you need.
 
 ```json
 {
-  "componentDir": "./code-components",
+  "componentDir": "./src/code-components",
   "pagesDir": "./pages",
   "aliasBaseDir": "src",
   "outputDir": "dist",
-  "globalCssPath": "./src/components/global.css"
+  "globalCssPath": "./src/global.css"
 }
 ```
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `componentDir` | Project root | Directory scanned for Code Components. The directory can have any name. |
+| `componentDir` | `src/components` | Directory scanned for Code Components. The directory can have any name, but must be inside `aliasBaseDir`. |
 | `pagesDir` | `./pages` | Directory scanned for page definitions. |
 | `aliasBaseDir` | `src` | Base directory for shared local imports that use `@/`. |
 | `outputDir` | `dist` | CLI build output directory. Workbench does not use this option. |
 | `globalCssPath` | `./src/components/global.css` | Global CSS entry used by the CLI and Workbench. |
 
 The `componentDir` option controls where local tools discover Code Components.
-The directory can have any name. Place each component directly inside
-`componentDir` instead of nesting component folders inside grouping folders.
+The directory can have any name, but it must be inside `aliasBaseDir`. Place
+each component directly inside `componentDir` instead of nesting component
+folders inside grouping folders.
 
 ```tsx
 import Card from '@/components/card';

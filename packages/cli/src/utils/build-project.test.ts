@@ -227,4 +227,28 @@ describe('buildCanvasProject', () => {
       fs.access(path.join(outputDir, 'canvas-manifest.json')),
     ).resolves.toBeUndefined();
   });
+
+  it('rejects componentDir outside aliasBaseDir', async () => {
+    await expect(
+      buildCanvasProject({
+        projectRoot: tmpDir,
+        componentDir: 'packages/widgets',
+        aliasBaseDir: 'src',
+        outputDir,
+        discoveryResult: {
+          componentRoot: path.join(tmpDir, 'packages/widgets'),
+          projectRoot: tmpDir,
+          components: [],
+          pages: [],
+          warnings: [],
+          stats: {
+            scannedFiles: 0,
+            ignoredFiles: 0,
+          },
+        } as DiscoveryResult,
+      }),
+    ).rejects.toThrow(
+      'Invalid Canvas config: componentDir "packages/widgets" must be inside aliasBaseDir "src".',
+    );
+  });
 });
