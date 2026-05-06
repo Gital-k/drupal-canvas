@@ -62,3 +62,13 @@
     opacity: 0;
   }
 }
+
+/*
+ * Subtle hairline separator between adjacent prop-group sections in the
+ * component instance form sidebar. Scoped to [data-canvas-prop-group] so it
+ * only applies to backend-emitted prop groups and never affects other
+ * collapsibles in the editor.
+ */
+[data-canvas-prop-group] + [data-canvas-prop-group] {
+  border-top: 1px solid var(--gray-a4);
+}

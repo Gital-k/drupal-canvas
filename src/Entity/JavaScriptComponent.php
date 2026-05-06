@@ -466,6 +466,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
         $definition['id'],
         $metadata,
         $definition['props']['required'] ?? [],
+        $definition['propGroups'] ?? [],
       );
     }
     catch (ComponentDoesNotMeetRequirementsException $e) {

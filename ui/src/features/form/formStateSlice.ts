@@ -4,11 +4,13 @@ import { FORM_TYPES } from '@/features/form/constants';
 
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '@/app/store';
+import type { PropGroup } from '@/types/Component';
 import type { InputMessage } from '@/types/Form';
 
 export interface FormState {
   values: Record<string, any>;
   errors: Record<string, InputMessage>;
+  openGroups: Record<string, boolean>;
 }
 
 export interface FormStateSliceFormsState {
@@ -20,9 +22,10 @@ export interface FormStateSliceState extends FormStateSliceFormsState {
   currentComponent: string | undefined;
 }
 
-const emptyFormState = {
+const emptyFormState: FormState = {
   values: {},
   errors: {},
+  openGroups: {},
 };
 
 export const initialState: FormStateSliceState = {
@@ -59,6 +62,22 @@ type SetFieldValuePayload = {
   updateSource?: boolean;
 };
 
+type SeedOpenGroupsPayload = {
+  formId: FormId;
+  groups: PropGroup[];
+};
+
+type SetGroupOpenPayload = {
+  formId: FormId;
+  groupId: string;
+  open: boolean;
+};
+
+type ForceOpenGroupsPayload = {
+  formId: FormId;
+  groupIds: string[];
+};
+
 export const formStateSlice = createSlice({
   name: 'formState',
   initialState,
@@ -67,13 +86,17 @@ export const formStateSlice = createSlice({
       (state, action: PayloadAction<ComponentId>) => ({
         ...state,
         currentComponent: action.payload,
-        [FORM_TYPES.COMPONENT_INSTANCE_FORM]: { errors: {}, values: {} },
+        [FORM_TYPES.COMPONENT_INSTANCE_FORM]: {
+          errors: {},
+          values: {},
+          openGroups: {},
+        },
       }),
     ),
     clearFieldValues: create.reducer(
       (state, action: PayloadAction<FormId>) => ({
         ...state,
-        [action.payload]: { errors: {}, values: {} },
+        [action.payload]: { errors: {}, values: {}, openGroups: {} },
       }),
     ),
     setFieldError: create.reducer(
@@ -159,6 +182,36 @@ export const formStateSlice = createSlice({
         };
       },
     ),
+    seedOpenGroups: create.reducer(
+      (state, action: PayloadAction<SeedOpenGroupsPayload>) => {
+        const { formId, groups } = action.payload;
+        const openGroups: Record<string, boolean> = {};
+        groups.forEach((group) => {
+          openGroups[group.id] = group.open;
+        });
+        state[formId].openGroups = openGroups;
+      },
+    ),
+    setGroupOpen: create.reducer(
+      (state, action: PayloadAction<SetGroupOpenPayload>) => {
+        const { formId, groupId, open } = action.payload;
+        if (!state[formId].openGroups) {
+          state[formId].openGroups = {};
+        }
+        state[formId].openGroups[groupId] = open;
+      },
+    ),
+    forceOpenGroups: create.reducer(
+      (state, action: PayloadAction<ForceOpenGroupsPayload>) => {
+        const { formId, groupIds } = action.payload;
+        if (!state[formId].openGroups) {
+          state[formId].openGroups = {};
+        }
+        groupIds.forEach((groupId) => {
+          state[formId].openGroups[groupId] = true;
+        });
+      },
+    ),
   }),
   selectors: {
     selectCurrentComponent: (state) => state.currentComponent,
@@ -195,6 +248,40 @@ export const selectFieldError = createSelector(
     formState[identifiers.formId]?.errors[identifiers.fieldName] || null,
 );
 
+export interface GroupIdentifier {
+  formId: FormId;
+  groupId: string;
+}
+
+export const selectGroupOpen = (identifier: GroupIdentifier) =>
+  (state: RootState): boolean | undefined =>
+    state.formState[identifier.formId]?.openGroups?.[identifier.groupId];
+
+export interface GroupsWithErrorsArgs {
+  formId: FormId;
+  propSources: Record<string, { group?: string | null }>;
+}
+
+const selectGroupsWithErrorsArgs = (
+  state: RootState,
+  args: GroupsWithErrorsArgs,
+) => args;
+
+export const selectGroupsWithErrors = createSelector(
+  [selectFormState, selectGroupsWithErrorsArgs],
+  (formState: FormStateSliceState, args: GroupsWithErrorsArgs): string[] => {
+    const errors = formState[args.formId]?.errors || {};
+    const groupIds = new Set<string>();
+    Object.keys(errors).forEach((fieldName) => {
+      const propSource = args.propSources[fieldName];
+      if (propSource && propSource.group) {
+        groupIds.add(propSource.group);
+      }
+    });
+    return Array.from(groupIds);
+  },
+);
+
 export const { selectCurrentComponent } = formStateSlice.selectors;
 
 export const {
@@ -204,4 +291,7 @@ export const {
   clearFieldError,
   clearFieldValues,
   removeFieldValue,
+  seedOpenGroups,
+  setGroupOpen,
+  forceOpenGroups,
 } = formStateSlice.actions;

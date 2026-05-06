@@ -75,6 +75,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
       $definition['id'],
       $component_plugin->metadata,
       $definition['props']['required'] ?? [],
+      $definition['propGroups'] ?? [],
     );
   }
 

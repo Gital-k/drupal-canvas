@@ -27,7 +27,15 @@ export interface FieldDataItem {
     maxItems?: number;
   };
   default_values: DefaultValues;
+  group?: string | null;
   [x: string | number | symbol]: unknown;
+}
+
+export interface PropGroup {
+  id: string;
+  title: string;
+  weight: number;
+  open: boolean;
 }
 
 interface BaseComponent {
@@ -65,6 +73,7 @@ export interface JSComponent extends BaseComponent {
 export interface PropSourceComponent extends BaseComponent {
   library: 'elements' | 'extension_components';
   propSources: FieldData;
+  propGroups?: PropGroup[];
   metadata: {
     slots?: {
       [key: string]: {

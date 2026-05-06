@@ -3682,6 +3682,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -3692,6 +3693,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.banner' => [
@@ -3707,6 +3709,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -3725,6 +3728,7 @@ HTML
               'contentMediaType' => 'text/html',
               'x-formatting-context' => 'block',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:text_long',
             'expression' => 'ℹ︎text_long␟processed',
             'sourceTypeSettings' => [
@@ -3776,6 +3780,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -3789,6 +3794,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.card' => [
@@ -3804,6 +3810,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -3820,6 +3827,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -3836,6 +3844,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -3853,6 +3862,7 @@ HTML
               'type' => 'string',
               'format' => 'date',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:datetime',
             'expression' => 'ℹ︎datetime␟value',
             'sourceTypeSettings' => [
@@ -3893,6 +3903,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -3910,6 +3921,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -3930,6 +3942,7 @@ HTML
                 1 => 'eager',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -3947,6 +3960,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.card-with-local-image' => [
@@ -3962,6 +3976,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -3978,6 +3993,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -3994,6 +4010,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4015,6 +4032,7 @@ HTML
               'x-allowed-schemes' => ['http', 'https'],
               'id' => 'json-schema-definitions://canvas.module/image-uri',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟src_with_alternate_widths',
             'default_values' => [
@@ -4027,6 +4045,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4047,6 +4066,7 @@ HTML
                 1 => 'eager',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4064,6 +4084,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.card-with-remote-image' => [
@@ -4079,6 +4100,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4095,6 +4117,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4111,6 +4134,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4132,6 +4156,7 @@ HTML
               'x-allowed-schemes' => ['http', 'https'],
               'id' => 'json-schema-definitions://canvas.module/image-uri',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟src_with_alternate_widths',
             'default_values' => [
@@ -4144,6 +4169,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4160,6 +4186,7 @@ HTML
             'jsonSchema' => [
               'type' => 'integer',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:integer',
             'expression' => 'ℹ︎integer␟value',
             'default_values' => [
@@ -4176,6 +4203,7 @@ HTML
             'jsonSchema' => [
               'type' => 'integer',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:integer',
             'expression' => 'ℹ︎integer␟value',
             'default_values' => [
@@ -4196,6 +4224,7 @@ HTML
                 1 => 'eager',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4213,6 +4242,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.card-with-stream-wrapper-image' => [
@@ -4228,6 +4258,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4244,6 +4275,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4260,6 +4292,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4281,6 +4314,7 @@ HTML
               'x-allowed-schemes' => ['public'],
               'id' => 'json-schema-definitions://canvas.module/stream-wrapper-image-uri',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟entity␜␜entity:file␝uri␞␟value',
             'default_values' => [
@@ -4293,6 +4327,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4313,6 +4348,7 @@ HTML
                 1 => 'eager',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4330,6 +4366,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.columns' => [
@@ -4380,6 +4417,7 @@ HTML
               'type' => 'integer',
               'enum' => [1, 2, 3, 4, 5, 6],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_integer',
             'expression' => 'ℹ︎list_integer␟value',
             'sourceTypeSettings' => [
@@ -4395,6 +4433,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
@@ -4416,6 +4455,7 @@ HTML
                 'contains.dots',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4439,6 +4479,7 @@ HTML
                 '3.14',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4454,6 +4495,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.component-mismatch-meta-enum-array-items' => [
@@ -4478,6 +4520,7 @@ HTML
                 ],
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4495,6 +4538,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.component-no-meta-enum' => [
@@ -4514,6 +4558,7 @@ HTML
                 'huge',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4529,6 +4574,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.crash' => [
@@ -4543,6 +4589,7 @@ HTML
             'jsonSchema' => [
               'type' => 'boolean',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:boolean',
             'expression' => 'ℹ︎boolean␟value',
             'default_values' => [
@@ -4553,6 +4600,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.date' => [
@@ -4568,6 +4616,7 @@ HTML
               'type' => 'string',
               'format' => 'date',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:datetime',
             'expression' => 'ℹ︎datetime␟value',
             'sourceTypeSettings' => [
@@ -4579,6 +4628,7 @@ HTML
           'caption' => [
             'required' => FALSE,
             'jsonSchema' => ['type' => 'string'],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4589,6 +4639,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.deprecated' => [
@@ -4604,6 +4655,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4614,6 +4666,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.druplicon' => [
@@ -4623,6 +4676,7 @@ HTML
         'source' => 'Module component',
         'metadata' => ['slots' => []],
         'propSources' => [],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.experimental' => [
@@ -4638,6 +4692,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4648,6 +4703,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.grid-container' => [
@@ -4676,6 +4732,7 @@ HTML
                 1 => 'vertical',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4691,6 +4748,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.heading' => [
@@ -4707,6 +4765,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -4727,6 +4786,7 @@ HTML
                 1 => 'secondary',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4759,6 +4819,7 @@ HTML
               ],
               'id' => 'json-schema-definitions://canvas.module/heading-element',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -4776,6 +4837,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.image' => [
@@ -4819,6 +4881,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -4832,6 +4895,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.image-gallery' => [
@@ -4848,6 +4912,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
           ],
@@ -4887,6 +4952,7 @@ HTML
               ],
               'minItems' => 1,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'sourceTypeSettings' => [
@@ -4917,6 +4983,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.image-optional-with-example' => [
@@ -4958,6 +5025,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -4971,6 +5039,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop' => [
@@ -4985,6 +5054,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
           ],
@@ -5020,6 +5090,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -5033,6 +5104,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.image-optional-without-example' => [
@@ -5072,10 +5144,12 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.image-required-with-example' => [
@@ -5117,6 +5191,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -5130,6 +5205,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.image-without-ref' => [
@@ -5171,6 +5247,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -5184,6 +5261,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.mixed-images-with-example' => [
@@ -5216,6 +5294,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -5249,6 +5328,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -5282,6 +5362,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -5295,6 +5376,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.multivalue-props' => [
@@ -5312,6 +5394,7 @@ HTML
                 'type' => 'string',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'sourceTypeSettings' => [
@@ -5341,6 +5424,7 @@ HTML
               ],
               'maxItems' => 3,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'sourceTypeSettings' => [
@@ -5370,6 +5454,7 @@ HTML
               ],
               'minItems' => 1,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'sourceTypeSettings' => [
@@ -5399,6 +5484,7 @@ HTML
                 'format' => 'uri',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:link',
             'expression' => 'ℹ︎link␟url',
             'sourceTypeSettings' => [
@@ -5435,6 +5521,7 @@ HTML
               ],
               'maxItems' => 3,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:link',
             'expression' => 'ℹ︎link␟url',
             'sourceTypeSettings' => [
@@ -5470,6 +5557,7 @@ HTML
                 'format' => 'uri-reference',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:link',
             'expression' => 'ℹ︎link␟url',
             'sourceTypeSettings' => [
@@ -5506,6 +5594,7 @@ HTML
               ],
               'maxItems' => 3,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:link',
             'expression' => 'ℹ︎link␟url',
             'sourceTypeSettings' => [
@@ -5540,6 +5629,7 @@ HTML
                 'type' => 'number',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:float',
             'expression' => 'ℹ︎float␟value',
             'sourceTypeSettings' => [
@@ -5569,6 +5659,7 @@ HTML
               ],
               'maxItems' => 3,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:float',
             'expression' => 'ℹ︎float␟value',
             'sourceTypeSettings' => [
@@ -5597,6 +5688,7 @@ HTML
                 'type' => 'integer',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:integer',
             'expression' => 'ℹ︎integer␟value',
             'sourceTypeSettings' => [
@@ -5626,6 +5718,7 @@ HTML
               ],
               'maxItems' => 3,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:integer',
             'expression' => 'ℹ︎integer␟value',
             'sourceTypeSettings' => [
@@ -5655,6 +5748,7 @@ HTML
                 'format' => 'date-time',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:datetime',
             'expression' => 'ℹ︎datetime␟value',
             'sourceTypeSettings' => [
@@ -5674,6 +5768,7 @@ HTML
               ],
               'maxItems' => 3,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:datetime',
             'expression' => 'ℹ︎datetime␟value',
             'sourceTypeSettings' => [
@@ -5692,6 +5787,7 @@ HTML
                 'format' => 'date',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:datetime',
             'expression' => 'ℹ︎datetime␟value',
             'sourceTypeSettings' => [
@@ -5711,6 +5807,7 @@ HTML
               ],
               'maxItems' => 3,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:datetime',
             'expression' => 'ℹ︎datetime␟value',
             'sourceTypeSettings' => [
@@ -5734,6 +5831,7 @@ HTML
                 ],
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -5765,6 +5863,7 @@ HTML
               ],
               'maxItems' => 3,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -5790,6 +5889,7 @@ HTML
                 'enum' => [10, 20, 30, 40],
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_integer',
             'expression' => 'ℹ︎list_integer␟value',
             'sourceTypeSettings' => [
@@ -5816,6 +5916,7 @@ HTML
               ],
               'maxItems' => 3,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_integer',
             'expression' => 'ℹ︎list_integer␟value',
             'sourceTypeSettings' => [
@@ -5833,6 +5934,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.my-cta' => [
@@ -5850,6 +5952,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -5867,6 +5970,7 @@ HTML
               'type' => 'string',
               'format' => 'uri',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:link',
             'expression' => 'ℹ︎link␟url',
             'sourceTypeSettings' => [
@@ -5894,6 +5998,7 @@ HTML
                 1 => '_blank',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -5903,6 +6008,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.my-hero' => [
@@ -5921,6 +6027,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -5937,6 +6044,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -5953,6 +6061,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -5970,6 +6079,7 @@ HTML
               'type' => 'string',
               'format' => 'uri-reference',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:link',
             'expression' => 'ℹ︎link␟url',
             'sourceTypeSettings' => [
@@ -5993,6 +6103,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -6005,6 +6116,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.my-section' => [
@@ -6022,6 +6134,7 @@ HTML
               'type' => 'string',
               'minLength' => 2,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -6034,6 +6147,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.one_column' => [
@@ -6061,6 +6175,7 @@ HTML
                 3 => 'narrow',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -6078,6 +6193,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.props-no-slots' => [
@@ -6094,6 +6210,7 @@ HTML
               'type' => 'string',
               'minLength' => 2,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -6104,6 +6221,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.props-slots' => [
@@ -6145,6 +6263,7 @@ HTML
               'type' => 'string',
               'minLength' => 2,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -6155,6 +6274,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.required-formatted-body' => [
@@ -6171,6 +6291,7 @@ HTML
               'contentMediaType' => 'text/html',
               'x-formatting-context' => 'block',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:text_long',
             'expression' => 'ℹ︎text_long␟processed',
             'sourceTypeSettings' => [
@@ -6191,6 +6312,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.required-integer' => [
@@ -6205,6 +6327,7 @@ HTML
             'jsonSchema' => [
               'type' => 'integer',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:integer',
             'expression' => 'ℹ︎integer␟value',
             'default_values' => [
@@ -6217,6 +6340,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.required-plain-string' => [
@@ -6231,6 +6355,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -6243,6 +6368,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.select-fields' => [
@@ -6264,6 +6390,7 @@ HTML
                 'large',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -6292,6 +6419,7 @@ HTML
                 ],
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -6309,6 +6437,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.shoe_badge' => [
@@ -6340,6 +6469,7 @@ HTML
                 4 => 'danger',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -6361,6 +6491,7 @@ HTML
             'jsonSchema' => [
               'type' => 'boolean',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:boolean',
             'expression' => 'ℹ︎boolean␟value',
             'default_values' => [
@@ -6377,6 +6508,7 @@ HTML
             'jsonSchema' => [
               'type' => 'boolean',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:boolean',
             'expression' => 'ℹ︎boolean␟value',
             'default_values' => [
@@ -6389,6 +6521,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.shoe_tab' => [
@@ -6405,6 +6538,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -6421,6 +6555,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -6437,6 +6572,7 @@ HTML
             'jsonSchema' => [
               'type' => 'boolean',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:boolean',
             'expression' => 'ℹ︎boolean␟value',
           ],
@@ -6445,6 +6581,7 @@ HTML
             'jsonSchema' => [
               'type' => 'boolean',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:boolean',
             'expression' => 'ℹ︎boolean␟value',
           ],
@@ -6453,10 +6590,12 @@ HTML
             'jsonSchema' => [
               'type' => 'boolean',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:boolean',
             'expression' => 'ℹ︎boolean␟value',
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.shoe_tab_group' => [
@@ -6488,6 +6627,7 @@ HTML
                 3 => 'end',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -6513,6 +6653,7 @@ HTML
                 1 => 'manual',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -6534,6 +6675,7 @@ HTML
             'jsonSchema' => [
               'type' => 'boolean',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:boolean',
             'expression' => 'ℹ︎boolean␟value',
             'default_values' => [
@@ -6546,6 +6688,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.shoe_tab_panel' => [
@@ -6570,6 +6713,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -6586,10 +6730,12 @@ HTML
             'jsonSchema' => [
               'type' => 'boolean',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:boolean',
             'expression' => 'ℹ︎boolean␟value',
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.sparkline' => [
@@ -6611,6 +6757,7 @@ HTML
               'maxItems' => 100,
               'minItems' => 1,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:integer',
             'expression' => 'ℹ︎integer␟value',
             'sourceTypeSettings' => [
@@ -6635,6 +6782,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.tags' => [
@@ -6654,6 +6802,7 @@ HTML
                 'type' => 'string',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'sourceTypeSettings' => [
@@ -6669,6 +6818,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.two_column' => [
@@ -6709,6 +6859,7 @@ HTML
               ],
               'id' => 'json-schema-definitions://canvas.module/column-width',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_integer',
             'expression' => 'ℹ︎list_integer␟value',
             'sourceTypeSettings' => [
@@ -6726,6 +6877,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.canvas_test_sdc.video' => [
@@ -6765,6 +6917,7 @@ HTML
               ],
               'id' => JsonSchemaObjectRef::Video->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:file',
             'expression' => 'ℹ︎file␟{src↝entity␜␜entity:file␝uri␞␟url}',
             'sourceTypeSettings' => [
@@ -6786,6 +6939,7 @@ HTML
               'type' => 'integer',
               'minimum' => 1,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:integer',
             'expression' => 'ℹ︎integer␟value',
             'sourceTypeSettings' => [
@@ -6796,6 +6950,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.sdc_theme_test.bar' => [
@@ -6805,6 +6960,7 @@ HTML
         'source' => 'Theme component',
         'metadata' => ['slots' => []],
         'propSources' => [],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.sdc_theme_test.lib-overrides' => [
@@ -6814,6 +6970,7 @@ HTML
         'source' => 'Theme component',
         'metadata' => ['slots' => []],
         'propSources' => [],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.sdc_theme_test.my-card' => [
@@ -6838,6 +6995,7 @@ HTML
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -6848,6 +7006,7 @@ HTML
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'sdc.sdc_theme_test_base.my-card-no-schema' => [
@@ -6857,6 +7016,7 @@ HTML
         'source' => 'Theme component',
         'metadata' => ['slots' => []],
         'propSources' => [],
+        'propGroups' => [],
         'transforms' => [],
       ],
     ];

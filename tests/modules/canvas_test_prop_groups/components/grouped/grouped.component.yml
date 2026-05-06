@@ -1,0 +1,59 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Grouped Button
+description: A test component exercising propGroups / x-prop-group sidebar grouping.
+propGroups:
+  - { id: content,  title: Content,  weight: 0,  open: true  }
+  - { id: styling,  title: Styling,  weight: 10, open: true  }
+  - { id: advanced, title: Advanced, weight: 20, open: false }
+props:
+  type: object
+  required:
+    - text
+  properties:
+    text:
+      type: string
+      title: Text
+      description: The button label.
+      x-prop-group: content
+      examples:
+        - Click me
+    url:
+      type: string
+      title: URL
+      format: uri-reference
+      description: Where the button links to.
+      x-prop-group: content
+      examples:
+        - https://example.com
+    variant:
+      type: string
+      title: Variant
+      enum:
+        - primary
+        - secondary
+      x-prop-group: styling
+      examples:
+        - primary
+    size:
+      type: string
+      title: Size
+      enum:
+        - small
+        - medium
+        - large
+      x-prop-group: styling
+      examples:
+        - medium
+    cssClass:
+      type: string
+      title: 'CSS class'
+      description: Additional CSS classes.
+      x-prop-group: advanced
+      examples:
+        - my-cta
+    legacyTooltip:
+      type: string
+      title: 'Legacy tooltip'
+      description: Renders ungrouped, above all groups.
+      examples:
+        - Click for more info

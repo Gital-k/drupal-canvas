@@ -14,16 +14,32 @@ const Details = ({
   children = null,
   attributes = {},
   summaryAttributes = {},
+  open: controlledOpen,
+  onOpenChange,
 }: {
   title: string;
   children: ReactNode;
   attributes: Attributes;
   summaryAttributes: object;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) => {
   const { open: openAttr, ...restAttributes } = attributes;
-  const [open, setOpen] = useState(Boolean(openAttr));
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(Boolean(openAttr));
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  const handleOpenChange = (next: boolean) => {
+    if (!isControlled) {
+      setUncontrolledOpen(next);
+    }
+    onOpenChange?.(next);
+  };
   return (
-    <Collapsible.Root open={open} onOpenChange={setOpen} {...restAttributes}>
+    <Collapsible.Root
+      open={open}
+      onOpenChange={handleOpenChange}
+      {...restAttributes}
+    >
       <Flex asChild justify="between" align="center" width="100%">
         <Collapsible.Trigger asChild className={styles.trigger}>
           <button>
