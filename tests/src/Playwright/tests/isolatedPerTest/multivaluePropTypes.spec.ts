@@ -8,7 +8,25 @@ test.use({
 });
 
 test.describe('Multivalue Prop Types', () => {
-  test.beforeEach(async ({ drupal, canvas }) => {
+  test.beforeEach(async ({ drupal, canvas, page }) => {
+    // Pin the site's default timezone to Australia/Sydney so wall-clock →
+    // UTC normalisation is deterministic in the datetime tests below. This
+    // mirrors what web/core/tests/bootstrap.php pins for PHPUnit.
+    await drupal.loginAsAdmin();
+    await page.goto('/admin/config/regional/settings');
+    await page
+      .locator('[data-drupal-selector="edit-date-default-timezone"]')
+      .selectOption('Australia/Sydney');
+    await page
+      .locator(
+        'form[data-drupal-selector="system-regional-settings"] [data-drupal-selector="edit-submit"]',
+      )
+      .click();
+    await expect(
+      page.locator('[data-drupal-selector="edit-date-default-timezone"]'),
+    ).toHaveValue('Australia/Sydney');
+    await drupal.logout();
+
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.createCanvas();
     await canvas.openLibraryPanel();
@@ -545,7 +563,7 @@ test.describe('Multivalue Prop Types', () => {
       1,
     );
 
-    // Drag row 1 (2025-12-26) before row 0 (2025-12-25).
+    // Drag row 1 (2025-12-25T23:00:00) before row 0 (2025-12-25T03:30:00).
     await canvas.reorderMultiValueProp('DateTime (Unlimited)', 1, 0);
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
       await expect(items.nth(0)).toContainText('2025-12-25T23:00:00');
