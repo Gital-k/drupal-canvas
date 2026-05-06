@@ -613,17 +613,23 @@ function EnumValuesForm({
                   />
                 </FormElement>
               </Box>
-              <Button
-                aria-label="Remove value"
-                data-testid={`canvas-prop-enum-value-delete-${propId}-${index}`}
-                size="1"
-                color="red"
-                variant="soft"
-                onClick={() => handleRemove(index)}
-                disabled={isDisabled}
+              <Box
+                style={{
+                  paddingTop: 'calc(var(--line-height-1) + var(--space-1))',
+                }}
               >
-                <TrashIcon />
-              </Button>
+                <Button
+                  aria-label="Remove value"
+                  data-testid={`canvas-prop-enum-value-delete-${propId}-${index}`}
+                  size="1"
+                  color="red"
+                  variant="soft"
+                  onClick={() => handleRemove(index)}
+                  disabled={isDisabled}
+                >
+                  <TrashIcon />
+                </Button>
+              </Box>
             </Flex>
             {invalidValueIndices[index] && (
               <Text color="red" size="1" id={duplicateErrorId}>
