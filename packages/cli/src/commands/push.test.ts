@@ -179,6 +179,65 @@ describe('Push artifacts', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('uploads duplicate manifest artifact files once and reuses the URI', async () => {
+    const outputDir = path.join(tmpDir, 'dist');
+    await fs.mkdir(path.join(outputDir, 'local'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(outputDir, 'local/hero-abc123.webp'),
+      'webp fixture',
+      'utf-8',
+    );
+
+    await generateManifest({
+      outputDir,
+      vendorImportMap: { imports: {} },
+      localImportMap: {
+        '@/components/card/hero.webp': './local/hero-abc123.webp',
+        '@/components/local-image-example/image-1.webp':
+          './local/hero-abc123.webp',
+      },
+      sharedChunks: [],
+    });
+
+    const uploadArtifact = vi.fn(async (filename: string) => ({
+      uri: `public://canvas/artifacts/${filename}`,
+      fid: 1,
+    }));
+    const syncManifest = vi.fn().mockResolvedValue({ ok: true });
+
+    const result = await syncManifestArtifacts(outputDir, {
+      apiService: { uploadArtifact, syncManifest },
+      createSpinner: () => ({
+        start: vi.fn(),
+        stop: vi.fn(),
+        message: vi.fn(),
+      }),
+      logInfo: vi.fn(),
+    });
+
+    expect(uploadArtifact).toHaveBeenCalledTimes(1);
+    expect(uploadArtifact).toHaveBeenCalledWith(
+      'hero-abc123.webp',
+      Buffer.from('webp fixture'),
+    );
+    expect(syncManifest).toHaveBeenCalledWith({
+      vendor: [],
+      local: [
+        {
+          name: '@/components/card/hero.webp',
+          uri: 'public://canvas/artifacts/hero-abc123.webp',
+        },
+        {
+          name: '@/components/local-image-example/image-1.webp',
+          uri: 'public://canvas/artifacts/hero-abc123.webp',
+        },
+      ],
+      shared: [],
+    });
+    expect(result.artifactCount).toBe(2);
+  });
+
   it('skips manifest sync when there are no artifacts to upload', async () => {
     const outputDir = path.join(tmpDir, 'dist');
     await fs.mkdir(outputDir, { recursive: true });

@@ -118,10 +118,14 @@ async function uploadAndBuildManifest(
   const uploadProgress = createProgressCallback(
     spinner,
     'Uploading artifacts',
-    files.length,
+    new Set(files.map((file) => file.filePath)).size,
   );
 
-  const results = await processInPool(files, async (file) => {
+  const uniqueFiles = Array.from(
+    new Map(files.map((file) => [file.filePath, file])).values(),
+  );
+
+  const results = await processInPool(uniqueFiles, async (file) => {
     const absolutePath = path.resolve(distDir, file.filePath);
     const fileBuffer = await fs.readFile(absolutePath);
     const filename = path.basename(file.filePath);
@@ -130,14 +134,22 @@ async function uploadAndBuildManifest(
       await apiService.uploadArtifact(filename, fileBuffer);
     uploadProgress();
 
-    return {
-      entry: {
-        name: file.name,
-        uri: uploadResult.uri,
-      } satisfies UploadedArtifact,
-      type: file.type,
-    };
+    return uploadResult;
   });
+
+  const uploadedByFilePath = new Map<string, UploadedArtifactResult>();
+  const errors: string[] = [];
+
+  for (const result of results) {
+    if (result.success && result.result) {
+      uploadedByFilePath.set(uniqueFiles[result.index].filePath, result.result);
+    } else {
+      const fileName = uniqueFiles[result.index]?.name || 'unknown';
+      errors.push(
+        `Failed to upload ${fileName}: ${result.error?.message || 'Unknown error'}`,
+      );
+    }
+  }
 
   const grouped: {
     vendor: UploadedArtifact[];
@@ -148,16 +160,16 @@ async function uploadAndBuildManifest(
     local: [],
     shared: [],
   };
-  const errors: string[] = [];
 
-  for (const result of results) {
-    if (result.success && result.result) {
-      grouped[result.result.type].push(result.result.entry);
-    } else {
-      const fileName = files[result.index]?.name || 'unknown';
-      errors.push(
-        `Failed to upload ${fileName}: ${result.error?.message || 'Unknown error'}`,
-      );
+  if (errors.length === 0) {
+    for (const file of files) {
+      const uploadResult = uploadedByFilePath.get(file.filePath);
+      if (uploadResult) {
+        grouped[file.type].push({
+          name: file.name,
+          uri: uploadResult.uri,
+        });
+      }
     }
   }
 
