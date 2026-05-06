@@ -434,6 +434,93 @@ describe('vite-compat', () => {
     ).toBe(componentEntry);
   });
 
+  it('resolves component imports through configured componentDir', async () => {
+    const hostRoot = await makeTempDir();
+    const componentEntry = path.join(hostRoot, 'app/widgets/button/index.jsx');
+    await fs.writeFile(
+      path.join(hostRoot, 'canvas.config.json'),
+      JSON.stringify({
+        aliasBaseDir: 'app',
+        componentDir: 'app/widgets',
+      }),
+      'utf-8',
+    );
+    await fs.mkdir(path.dirname(componentEntry), { recursive: true });
+    await fs.writeFile(
+      componentEntry,
+      'export default function Button() {}',
+      'utf-8',
+    );
+
+    const [resolverPlugin] = drupalCanvasCompat({
+      hostRoot,
+    });
+    const resolveId = getResolveIdHook(resolverPlugin);
+    expect(resolveId).not.toBeNull();
+
+    expect(
+      resolveId?.(
+        '@/components/button',
+        `${hostRoot}/app/widgets/card/index.jsx`,
+      ),
+    ).toBe(componentEntry);
+  });
+
+  it('maps relative component assets under configured componentDir to the components namespace', async () => {
+    const hostRoot = await makeTempDir();
+    const componentEntry = path.join(hostRoot, 'app/widgets/card/index.tsx');
+    const imagePath = path.join(hostRoot, 'app/widgets/card/hero.webp');
+    await fs.writeFile(
+      path.join(hostRoot, 'canvas.config.json'),
+      JSON.stringify({
+        aliasBaseDir: 'app',
+        componentDir: 'app/widgets',
+      }),
+      'utf-8',
+    );
+    await fs.mkdir(path.dirname(componentEntry), { recursive: true });
+    await fs.writeFile(imagePath, 'image', 'utf-8');
+
+    const result = rewriteCanvasAssetImports(
+      "import heroUrl from './hero.webp';",
+      {
+        filePath: componentEntry,
+        hostRoot,
+        hostAliasBaseDir: 'app',
+      },
+    );
+
+    expect(result.code).toContain(
+      'const heroUrl = import.meta.resolve("@/components/card/hero.webp");',
+    );
+    expect(result.assets).toEqual([
+      {
+        specifier: '@/components/card/hero.webp',
+        filePath: imagePath,
+      },
+    ]);
+  });
+
+  it('rejects componentDir outside aliasBaseDir', async () => {
+    const hostRoot = await makeTempDir();
+    await fs.writeFile(
+      path.join(hostRoot, 'canvas.config.json'),
+      JSON.stringify({
+        aliasBaseDir: 'app',
+        componentDir: 'packages/widgets',
+      }),
+      'utf-8',
+    );
+
+    expect(() =>
+      drupalCanvasCompat({
+        hostRoot,
+      }),
+    ).toThrow(
+      'Invalid Canvas config: componentDir "packages/widgets" must be inside aliasBaseDir "app".',
+    );
+  });
+
   it('does not intercept third-party imports', () => {
     const [resolverPlugin] = drupalCanvasCompat({
       hostRoot: '/tmp/host',

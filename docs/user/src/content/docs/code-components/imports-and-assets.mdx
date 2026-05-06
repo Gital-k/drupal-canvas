@@ -37,13 +37,14 @@ import Heading from '@/components/heading';
 ```
 
 This path is the Code Component import namespace. In a
-[local codebase](/code-components/local-codebase), the imported component must
-also exist at the filesystem path represented by that import. With the default
-`aliasBaseDir` of `src`, `@/components/heading` resolves to
+[local codebase](/code-components/local-codebase), `@/components/heading`
+resolves to the `heading` component directly inside the configured
+`componentDir`. If `componentDir` is `src/components`, the local path is
 `src/components/heading`.
 
-Local Code Component files must be inside the configured `componentDir`. Do not
-nest component folders inside other folders in `componentDir`.
+Local Code Component files must be inside the configured `componentDir`, and
+`componentDir` must be inside `aliasBaseDir`. Do not nest component folders
+inside other folders in `componentDir`.
 
 ```tsx
 // Do not use grouping folders in Code Component imports.
