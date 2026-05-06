@@ -30,8 +30,8 @@ export function removeJsPrefix(input: string): string {
 export function getComponentId(
   component: JSComponent | CodeComponentSerialized,
 ): string {
-  const raw = (component as any).id || (component as any).machineName;
-  return raw.startsWith('js.') ? raw : `js.${raw}`;
+  // JSComponent has id, CodeComponentSerialized has machineName
+  return (component as any).id || (component as any).machineName;
 }
 
 interface CodeComponentItemProps {
