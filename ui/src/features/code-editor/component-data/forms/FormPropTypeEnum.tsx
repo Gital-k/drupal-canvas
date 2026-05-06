@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import clsx from 'clsx';
 import { ChevronDownIcon, PlusIcon, TrashIcon } from '@radix-ui/react-icons';
 import {
   Box,
@@ -28,6 +29,7 @@ import {
   dispatchUpdateProp,
   hasNonEmptyArrayValue,
 } from '@/features/code-editor/utils/arrayPropUtils';
+import { getNumericInputError } from '@/features/code-editor/utils/numericInputUtils';
 import {
   VALUE_MODE_LIMITED,
   VALUE_MODE_UNLIMITED,
@@ -38,6 +40,12 @@ import type {
   CodeComponentPropEnumItem,
   ValueMode,
 } from '@/types/CodeComponent';
+
+import styles from '@/features/code-editor/component-data/FormElement.module.css';
+
+// Type guard for numeric types
+const isNumericType = (type: string): type is 'integer' | 'number' =>
+  type === 'integer' || type === 'number';
 
 const NONE_VALUE = '_none_';
 
@@ -366,6 +374,96 @@ export default function FormPropTypeEnum({
   );
 }
 
+function NumericEnumValue({
+  propId,
+  index,
+  value,
+  itemType,
+  isDisabled,
+  errorMessage,
+  invalidDuplicate,
+  duplicateErrorId,
+  onValueChange,
+  onErrorChange,
+}: {
+  propId: string;
+  index: number;
+  value: string | number;
+  itemType: 'integer' | 'number';
+  isDisabled: boolean;
+  errorMessage: string | null;
+  invalidDuplicate: boolean;
+  duplicateErrorId?: string;
+  onValueChange: (index: number, value: string | number) => void;
+  onErrorChange: (index: number, error: string | null) => void;
+}) {
+  const [displayValue, setDisplayValue] = useState(String(value ?? ''));
+  // Ref mirrors displayValue so the sync effect can compare against the current
+  // display string without being re-triggered on every keystroke (which would
+  // wipe in-progress input like "1." before the user finishes typing "1.5").
+  const displayValueRef = useRef(displayValue);
+  displayValueRef.current = displayValue;
+  const errorId = `numeric-error-${propId}-${index}`;
+
+  useEffect(() => {
+    const storedStr = String(value ?? '');
+    const displayNum =
+      displayValueRef.current !== '' ? Number(displayValueRef.current) : null;
+    const storedNum = storedStr !== '' ? Number(storedStr) : null;
+    if (displayNum !== storedNum) {
+      setDisplayValue(storedStr);
+    }
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.currentTarget.value;
+    setDisplayValue(raw);
+    const error = getNumericInputError(raw, itemType);
+    onErrorChange(index, error);
+    if (!error) {
+      onValueChange(index, raw === '' ? '' : Number(raw));
+    }
+  };
+
+  const describedBy = [
+    errorMessage ? errorId : null,
+    invalidDuplicate && duplicateErrorId ? duplicateErrorId : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <Box flexGrow="1" flexShrink="1">
+      <TextField.Root
+        autoComplete="off"
+        data-testid={`canvas-prop-enum-value-${propId}-${index}`}
+        id={`canvas-prop-enum-value-${propId}-${index}`}
+        type="number"
+        step={itemType === 'integer' ? 1 : 'any'}
+        value={displayValue}
+        size="1"
+        placeholder={
+          itemType === 'integer' ? 'Enter an integer' : 'Enter a number'
+        }
+        onChange={handleChange}
+        disabled={isDisabled}
+        color={invalidDuplicate && !errorMessage ? 'red' : undefined}
+        className={clsx({ [styles.error]: !!errorMessage })}
+        aria-invalid={!!errorMessage || invalidDuplicate}
+        aria-describedby={describedBy || undefined}
+        {...(errorMessage || invalidDuplicate
+          ? { 'data-invalid-prop-value': true }
+          : {})}
+      />
+      {errorMessage && (
+        <Text color="red" size="1" id={errorId}>
+          {errorMessage}
+        </Text>
+      )}
+    </Box>
+  );
+}
+
 function EnumValuesForm({
   propId,
   values = [],
@@ -382,27 +480,47 @@ function EnumValuesForm({
   // Keep track of which labels have been touched (manually edited) by the user.
   // If a label has not been touched, it will be auto-updated to match the value.
   const [touched, setTouched] = useState(values.map(({ label }) => !!label));
+  // Track validation errors for each value field; initialised to match values length.
+  const [valueErrors, setValueErrors] = useState<(string | null)[]>(() =>
+    values.map(() => null),
+  );
   const typeRef = React.useRef(type);
 
   useEffect(() => {
-    // If the type changes, the values are reset, so we need to reset the touched state.
+    // If the type changes, the values are reset, so we need to reset the touched state and errors.
     if (typeRef.current !== type && type !== undefined) {
       setTouched([false]);
+      setValueErrors([]);
     }
     typeRef.current = type;
   }, [type]);
 
   const invalidValueIndices = getDuplicateValueIndices(values);
 
+  const handleErrorChange = React.useCallback(
+    (idx: number, error: string | null) => {
+      setValueErrors((prev) => {
+        const next = [...prev];
+        next[idx] = error;
+        return next;
+      });
+    },
+    [],
+  );
+
   const handleAdd = () => {
     onChange([...values, { label: '', value: '' }]);
+    // Keep touched and error arrays in sync with the new row.
+    setTouched((prev) => [...prev, false]);
+    setValueErrors((prev) => [...prev, null]);
   };
 
   const handleRemove = (index: number) => {
     const newValues = [...values];
     newValues.splice(index, 1);
-    // Also remove the touched state for this index.
+    // Also remove the touched state and error state for this index.
     setTouched((prev) => prev.filter((_, i) => i !== index));
+    setValueErrors((prev) => prev.filter((_, i) => i !== index));
     onChange(newValues);
   };
 
@@ -426,75 +544,95 @@ function EnumValuesForm({
 
   return (
     <Flex mt="1" direction="column" gap="2" flexGrow="1" width="100%">
-      {values.map((item, index) => (
-        <React.Fragment key={index}>
-          <Flex gap="2" align="end" flexGrow="1" width="100%">
-            <Box flexGrow="1" flexShrink="1">
-              <FormElement>
-                <Label htmlFor={`canvas-prop-enum-value-${propId}-${index}`}>
-                  Value
-                </Label>
-                <TextField.Root
-                  autoComplete="off"
-                  data-testid={`canvas-prop-enum-value-${propId}-${index}`}
-                  id={`canvas-prop-enum-value-${propId}-${index}`}
-                  type={
-                    ['integer', 'number'].includes(type) ? 'number' : 'text'
-                  }
-                  step={type === 'integer' ? 1 : undefined}
-                  value={item.value}
-                  size="1"
-                  onChange={(e) => handleValueChange(index, e.target.value)}
-                  placeholder={
-                    {
-                      string: 'Enter a text value',
-                      integer: 'Enter an integer',
-                      number: 'Enter a number',
-                    }[type]
-                  }
-                  disabled={isDisabled}
-                  // Show as invalid if duplicate
-                  color={invalidValueIndices[index] ? 'red' : undefined}
-                />
-              </FormElement>
-            </Box>
-            <Box flexGrow="1" flexShrink="1">
-              <FormElement>
-                <Label htmlFor={`canvas-prop-enum-label-${propId}-${index}`}>
-                  Label
-                </Label>
-                <TextField.Root
-                  autoComplete="off"
-                  data-testid={`canvas-prop-enum-label-${propId}-${index}`}
-                  id={`canvas-prop-enum-label-${propId}-${index}`}
-                  type="text"
-                  value={item.label}
-                  size="1"
-                  onChange={(e) => handleLabelChange(index, e.target.value)}
-                  placeholder="Enter a label"
-                  disabled={isDisabled}
-                />
-              </FormElement>
-            </Box>
-            <Button
-              aria-label="Remove value"
-              data-testid={`canvas-prop-enum-value-delete-${propId}-${index}`}
-              size="1"
-              color="red"
-              variant="soft"
-              onClick={() => handleRemove(index)}
-              disabled={isDisabled}
-            >
-              <TrashIcon />
-            </Button>
-          </Flex>
-          {invalidValueIndices[index] && (
-            <Text color="red" size="1">
-              Value must be unique.
-            </Text>
-          )}
-        </React.Fragment>
-      ))}
+      {values.map((item, index) => {
+        const duplicateErrorId = `duplicate-error-${propId}-${index}`;
+        return (
+          <React.Fragment key={index}>
+            <Flex gap="2" align="start" flexGrow="1" width="100%">
+              <Box flexGrow="1" flexShrink="1">
+                <FormElement>
+                  <Label htmlFor={`canvas-prop-enum-value-${propId}-${index}`}>
+                    Value
+                  </Label>
+                  {isNumericType(type) ? (
+                    <NumericEnumValue
+                      propId={propId}
+                      index={index}
+                      value={item.value}
+                      itemType={type}
+                      isDisabled={isDisabled}
+                      errorMessage={valueErrors[index] ?? null}
+                      invalidDuplicate={invalidValueIndices[index]}
+                      duplicateErrorId={duplicateErrorId}
+                      onValueChange={handleValueChange}
+                      onErrorChange={handleErrorChange}
+                    />
+                  ) : (
+                    <TextField.Root
+                      autoComplete="off"
+                      data-testid={`canvas-prop-enum-value-${propId}-${index}`}
+                      id={`canvas-prop-enum-value-${propId}-${index}`}
+                      type="text"
+                      value={item.value}
+                      size="1"
+                      onChange={(e) => handleValueChange(index, e.target.value)}
+                      placeholder="Enter a text value"
+                      disabled={isDisabled}
+                      color={invalidValueIndices[index] ? 'red' : undefined}
+                      className={clsx({
+                        [styles.error]: invalidValueIndices[index],
+                      })}
+                      aria-invalid={invalidValueIndices[index]}
+                      aria-describedby={
+                        invalidValueIndices[index]
+                          ? duplicateErrorId
+                          : undefined
+                      }
+                      {...(invalidValueIndices[index]
+                        ? { 'data-invalid-prop-value': true }
+                        : {})}
+                    />
+                  )}
+                </FormElement>
+              </Box>
+              <Box flexGrow="1" flexShrink="1">
+                <FormElement>
+                  <Label htmlFor={`canvas-prop-enum-label-${propId}-${index}`}>
+                    Label
+                  </Label>
+                  <TextField.Root
+                    autoComplete="off"
+                    data-testid={`canvas-prop-enum-label-${propId}-${index}`}
+                    id={`canvas-prop-enum-label-${propId}-${index}`}
+                    type="text"
+                    value={item.label}
+                    size="1"
+                    onChange={(e) => handleLabelChange(index, e.target.value)}
+                    placeholder="Enter a label"
+                    disabled={isDisabled}
+                  />
+                </FormElement>
+              </Box>
+              <Button
+                aria-label="Remove value"
+                data-testid={`canvas-prop-enum-value-delete-${propId}-${index}`}
+                size="1"
+                color="red"
+                variant="soft"
+                onClick={() => handleRemove(index)}
+                disabled={isDisabled}
+              >
+                <TrashIcon />
+              </Button>
+            </Flex>
+            {invalidValueIndices[index] && (
+              <Text color="red" size="1" id={duplicateErrorId}>
+                Value must be unique.
+              </Text>
+            )}
+          </React.Fragment>
+        );
+      })}
       <Button size="1" variant="soft" onClick={handleAdd} disabled={isDisabled}>
         <Flex gap="1" align="center">
           <PlusIcon />
