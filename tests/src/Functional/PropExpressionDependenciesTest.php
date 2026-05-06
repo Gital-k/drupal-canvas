@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\PropShape\PersistentPropShapeRepository;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
@@ -17,6 +19,7 @@ use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\TestWith;
 
 /**
@@ -29,9 +32,9 @@ use PHPUnit\Framework\Attributes\TestWith;
  * coverage to keep the kernel tests "honest".
  *
  * @see \Drupal\Tests\canvas\Kernel\PropExpressionKernelTest::testCalculateDependencies()
- *
- * @group canvas
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 class PropExpressionDependenciesTest extends FunctionalTestBase {
 
   use EntityReferenceFieldCreationTrait;
@@ -96,7 +99,7 @@ class PropExpressionDependenciesTest extends FunctionalTestBase {
                 'alt' => 'Example image placeholder',
               ],
             ],
-            '$ref' => 'json-schema-definitions://canvas.module/image',
+            '$ref' => JsonSchemaObjectRef::Image->value,
           ],
         ],
         'required' => ['image'],

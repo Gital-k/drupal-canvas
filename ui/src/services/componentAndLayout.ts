@@ -29,6 +29,7 @@ type LayoutApiResponse = RootLayoutModel & {
   entity_form_fields: Record<string, any>;
   isNew: boolean;
   isPublished: boolean;
+  hasUnsavedStatusChange?: boolean;
   html: string;
   autoSaves: AutoSavesHash;
 };
@@ -103,6 +104,37 @@ export type ComponentUsageDetailsResponse = {
   }>;
 };
 
+/** Rebuilds component id → folder id map from folder records (matches `getFolders` transformResponse). */
+export function rebuildComponentIndexedFolders(
+  folders: Record<string, { items?: string[] }>,
+): Record<string, string> {
+  return Object.entries(folders).reduce(
+    (carry, [folderId, folderInfo]) => {
+      folderInfo?.items?.forEach((componentId: string) => {
+        carry[componentId] = folderId;
+      });
+      return carry;
+    },
+    {} as Record<string, string>,
+  );
+}
+
+/** Normalize folder API payloads (items as string[], stable id/weight). */
+function normalizeFolderFromApi(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object') {
+    return {};
+  }
+  const r = raw as Record<string, unknown>;
+  return {
+    ...r,
+    id: r.id != null ? String(r.id) : r.id,
+    items: Array.isArray(r.items) ? r.items : [],
+    weight: typeof r.weight === 'number' ? r.weight : Number(r.weight) || 0,
+    name: r.name,
+    type: r.type,
+  };
+}
+
 export const componentAndLayoutApi = createApi({
   reducerPath: 'componentAndLayoutApi',
   baseQuery: baseQueryWithAutoSaves,
@@ -140,9 +172,12 @@ export const componentAndLayoutApi = createApi({
     >({
       query: (id) => `/canvas/api/v0/usage/component/${id}/details`,
     }),
-    getPageLayout: builder.query<LayoutApiResponse, void>({
-      query: () => {
-        return `canvas/api/v0/layout/{entity_type}/{entity_id}`;
+    getPageLayout: builder.query<
+      LayoutApiResponse,
+      { entityId: string; entityType: string }
+    >({
+      query: ({ entityId, entityType }) => {
+        return `canvas/api/v0/layout/${entityType}/${entityId}`;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
@@ -159,9 +194,17 @@ export const componentAndLayoutApi = createApi({
         }
       },
     }),
-    getTemplateLayout: builder.query<LayoutApiResponse, void>({
-      query: () => {
-        return `canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}`;
+    getTemplateLayout: builder.query<
+      LayoutApiResponse,
+      {
+        entityType: string;
+        bundle: string;
+        viewMode: string;
+        previewEntityId: string;
+      }
+    >({
+      query: ({ bundle, viewMode, entityType, previewEntityId }) => {
+        return `canvas/api/v0/layout-content-template/${entityType}.${bundle}.${viewMode}/${previewEntityId}`;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
@@ -309,17 +352,147 @@ export const componentAndLayoutApi = createApi({
           type: body.type,
         },
       }),
-      invalidatesTags: [{ type: 'Folders', id: 'LIST' }],
+      transformResponse: (response: unknown) =>
+        normalizeFolderFromApi(response),
+      async onQueryStarted(body, { dispatch, queryFulfilled, getState }) {
+        // If weight is not explicitly provided, calculate it to place the folder at the top.
+        if (body.weight === undefined || body.weight === 0) {
+          const state = getState() as any;
+          const foldersData =
+            state.componentAndLayoutApi?.queries?.['getFolders(undefined)']
+              ?.data;
+
+          if (foldersData?.folders) {
+            const folders = Object.entries(foldersData.folders)
+              .filter(
+                ([folderKey]) => !folderKey.startsWith('optimistic-folder-'),
+              )
+              .map(([, folder]) => folder);
+            if (folders.length > 0) {
+              // Find the minimum weight among existing folders
+              const minWeight = Math.min(
+                ...folders.map((folder: any) => folder.weight || 0),
+              );
+              // Set new folder weight to be less than minimum to appear at top
+              body.weight = minWeight - 1;
+            }
+          }
+        }
+
+        try {
+          const { data } = await queryFulfilled;
+          const created = data as { id?: string };
+          const id =
+            created?.id != null && String(created.id).length > 0
+              ? String(created.id)
+              : null;
+
+          const foldersCache =
+            componentAndLayoutApi.endpoints.getFolders.select()(
+              getState() as any,
+            );
+
+          if (foldersCache.data && id) {
+            const normalized = normalizeFolderFromApi(data) as Record<
+              string,
+              unknown
+            >;
+            dispatch(
+              componentAndLayoutApi.util.updateQueryData(
+                'getFolders',
+                undefined,
+                (draft) => {
+                  draft.folders[id] = normalized;
+                  draft.componentIndexedFolders =
+                    rebuildComponentIndexedFolders(draft.folders);
+                },
+              ),
+            );
+            return;
+          }
+
+          dispatch(
+            componentAndLayoutApi.endpoints.getFolders.initiate(undefined, {
+              forceRefetch: true,
+              subscribe: false,
+            }),
+          );
+        } catch {
+          dispatch(
+            componentAndLayoutApi.util.invalidateTags([
+              { type: 'Folders', id: 'LIST' },
+            ]),
+          );
+        }
+      },
+      // Avoid loading the full folder list again: that briefly replaces cache and flickers the
+      // library. The POST response is merged into `getFolders` in onQueryStarted instead.
+      invalidatesTags: [],
     }),
-    updateFolder: builder.mutation<any, any>({
+    updateFolder: builder.mutation<
+      any,
+      { id: string; changes: any; skipFoldersOptimistic?: boolean }
+    >({
       query: ({ id, changes }) => ({
         url: `canvas/api/v0/config/folder/${id}`,
         method: 'PATCH',
         body: changes,
       }),
-      invalidatesTags: () => [
+      async onQueryStarted(
+        { id, changes, skipFoldersOptimistic },
+        { dispatch, queryFulfilled },
+      ) {
+        if (skipFoldersOptimistic) {
+          return;
+        }
+        const patchResult = dispatch(
+          componentAndLayoutApi.util.updateQueryData(
+            'getFolders',
+            undefined,
+            (draft) => {
+              const folderDraft = draft.folders[id];
+              if (!folderDraft) {
+                return;
+              }
+              if (changes.name !== undefined) {
+                folderDraft.name = changes.name;
+              }
+              if (changes.weight !== undefined) {
+                folderDraft.weight = changes.weight;
+              }
+              if (changes.items !== undefined) {
+                folderDraft.items = changes.items;
+              }
+              draft.componentIndexedFolders = rebuildComponentIndexedFolders(
+                draft.folders,
+              );
+            },
+          ),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+      invalidatesTags: (result, error, arg) => {
+        // Batched handler updates (move / reorder) set skipFoldersOptimistic and apply one
+        // optimistic cache patch; invalidating after each PATCH reloads the list from the server
+        // mid-operation and causes flicker. Those flows call invalidateTags once after all requests.
+        if (!error && arg.skipFoldersOptimistic) {
+          return [];
+        }
+        return [{ type: 'Folders', id: 'LIST' }, { type: 'Layout' }];
+      },
+    }),
+    deleteFolder: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `canvas/api/v0/config/folder/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: [
         { type: 'Folders', id: 'LIST' },
-        { type: 'Layout' },
+        { type: 'Components', id: 'LIST' },
       ],
     }),
     getFolders: builder.query<
@@ -332,24 +505,16 @@ export const componentAndLayoutApi = createApi({
       query: () => 'canvas/api/v0/config/folder',
       providesTags: () => [{ type: 'Folders', id: 'LIST' }],
       transformResponse: (response: any) => {
-        // Create a mapping of component IDs to folder IDs for quick access.
-        const componentIndexedFolders: Record<string, string> = Object.entries(
-          response,
-        ).reduce(
-          (
-            carry: Record<string, string>,
-            [folderId, folderInfo]: [string, any],
-          ) => {
-            folderInfo?.items.forEach((componentId: string) => {
-              carry[componentId] = folderId;
-            });
-            return carry;
-          },
-          {} as Record<string, string>,
+        const raw = response && typeof response === 'object' ? response : {};
+        const folders = Object.fromEntries(
+          Object.entries(raw).map(([id, folder]) => [
+            id,
+            normalizeFolderFromApi(folder),
+          ]),
         );
         return {
-          folders: response,
-          componentIndexedFolders,
+          folders,
+          componentIndexedFolders: rebuildComponentIndexedFolders(folders),
         };
       },
     }),
@@ -447,6 +612,7 @@ export const {
   useDeleteCodeComponentMutation,
   useCreateFolderMutation,
   useUpdateFolderMutation,
+  useDeleteFolderMutation,
   useGetFoldersQuery,
   useGetAutoSaveQuery,
   useUpdateAutoSaveMutation,

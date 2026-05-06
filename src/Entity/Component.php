@@ -75,7 +75,6 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     'source',
     'source_local_id',
     'provider',
-    'category',
     'active_version',
     'versioned_properties',
   ],
@@ -120,11 +119,6 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   protected ?string $provider;
 
   /**
-   * The human-readable category of the component.
-   */
-  protected string|TranslatableMarkup|null $category;
-
-  /**
    * Holds the plugin collection for the source plugin.
    */
   protected ?VersionedConfigurationSubsetSingleLazyPluginCollection $sourcePluginCollection = NULL;
@@ -150,13 +144,6 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    */
   public function id(): string {
     return $this->id;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getCategory(): string|TranslatableMarkup|null {
-    return $this->category;
   }
 
   /**
@@ -214,7 +201,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    *   @see \Drupal\Core\Theme\ComponentPluginManager::$defaults
    */
   public static function getClasses(array $ids): array {
-    return array_values(array_unique(array_filter(array_map(
+    return array_values(array_unique(array_filter(\array_map(
       static fn (Component $component): ?string => $component->getComponentSource()->getReferencedPluginClass(),
       Component::loadMultiple($ids)
     ))));
@@ -224,7 +211,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * Returns the source plugin collection.
    */
   private function sourcePluginCollection(): VersionedConfigurationSubsetSingleLazyPluginCollection {
-    if (is_null($this->sourcePluginCollection)) {
+    if (\is_null($this->sourcePluginCollection)) {
       $source_plugin_id = $this->getComponentSourcePluginId();
       $source_plugin_configuration = match ($source_plugin_id) {
         ComponentInterface::FALLBACK_VERSION => [
@@ -236,7 +223,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
           // TRICKY: race condition: when creating the fallback version, the
           // `last_active_version` setting won't exist yet.
           // @see ::setSettings()
-          'slots' => array_key_exists('last_active_version', $this->getSettings())
+          'slots' => \array_key_exists('last_active_version', $this->getSettings())
             ? $this->versioned_properties[$this->getSettings()['last_active_version']]['fallback_metadata']['slot_definitions']
             : [],
           ...$this->getSettings(),
@@ -279,7 +266,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * @see https://www.drupal.org/node/3353397
    */
   public static function providerExists(?string $provider): bool {
-    if (is_null($provider)) {
+    if (\is_null($provider)) {
       return TRUE;
     }
     $container = \Drupal::getContainer();
@@ -343,7 +330,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
       // It is possible that despite ComponentSourceInterface::isBroken() saying
       // the Component is not broken, it still crashes during rendering.
       // Consider this another form of brokenness.
-      $info['broken'] = array_key_exists('#render_crashed', $build);
+      $info['broken'] = \array_key_exists('#render_crashed', $build);
     }
     // Ensure a broken Component cannot break the Canvas HTTP API.
     else {
@@ -399,7 +386,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     $config = \Drupal::configFactory()->loadMultiple(['core.extension', 'system.theme']);
     $installed_modules = [
       'core',
-      ...array_keys($config['core.extension']->get('module')),
+      ...\array_keys($config['core.extension']->get('module')),
     ];
     // @see \Drupal\Core\Extension\ThemeHandler::getDefault()
     $default_theme = $config['system.theme']->get('default');
@@ -413,7 +400,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     }
 
     // 2. Is the component provided by a module?
-    if (in_array($this->provider, $installed_modules, TRUE)) {
+    if (\in_array($this->provider, $installed_modules, TRUE)) {
       return $this->provider === 'canvas'
         // 2.B Is the providing module Canvas?
         ? LibraryEnum::Elements
@@ -421,7 +408,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     }
 
     // 3. Is the component provided by the default theme (or its base theme)?
-    if (in_array($this->provider, $theme_with_ancestors, TRUE)) {
+    if (\in_array($this->provider, $theme_with_ancestors, TRUE)) {
       return LibraryEnum::PrimaryComponents;
     }
 
@@ -457,7 +444,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   public static function refineListQuery(QueryInterface &$query, RefinableCacheableDependencyInterface $cacheability): void {
     $container = \Drupal::getContainer();
     $theme_handler = $container->get(ThemeHandlerInterface::class);
-    $installed_themes = array_keys($theme_handler->listInfo());
+    $installed_themes = \array_keys($theme_handler->listInfo());
     $default_theme = $theme_handler->getDefault();
 
     // We need to get the hierarchy of base themes from the current theme.
@@ -496,18 +483,30 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     $container = \Drupal::getContainer();
     $theme_initialization = $container->get(ThemeInitializationInterface::class);
     $theme_object = $theme_initialization->getActiveThemeByName($default_theme);
-    $theme_ancestors = array_keys($theme_object->getBaseThemeExtensions());
+    $theme_ancestors = \array_keys($theme_object->getBaseThemeExtensions());
     return [...$theme_ancestors, $default_theme];
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getSettings(): array {
+  public function getSettings(?string $version = NULL): array {
+    if ($version !== NULL) {
+      self::assertVersionExists($version);
+      // The version key is the given version string, except in one case.
+      $version_key = $version === $this->active_version ? self::ACTIVE_VERSION : $version;
+      return $this->versioned_properties[$version_key]['settings'] ?? [];
+    }
     return $this->get('settings') ?? [];
   }
 
-  public function getSlotDefinitions(): array {
+  public function getSlotDefinitions(?string $version = NULL): array {
+    if ($version !== NULL) {
+      self::assertVersionExists($version);
+      // The version key is the given version string, except in one case.
+      $version_key = $version === $this->active_version ? self::ACTIVE_VERSION : $version;
+      return $this->versioned_properties[$version_key]['fallback_metadata']['slot_definitions'] ?? [];
+    }
     return $this->get('fallback_metadata')['slot_definitions'] ?? [];
   }
 
@@ -582,7 +581,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * @return void
    */
   private function populateFallbackMetadata(): void {
-    assert($this->isLoadedVersionActiveVersion());
+    \assert($this->isLoadedVersionActiveVersion());
     $source = $this->getComponentSource();
 
     if ($source instanceof Fallback) {
@@ -603,6 +602,8 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
       $this->getConfigUpdater()->updatePropFieldDefinitionsWithRequiredFlag($this);
       $this->getConfigUpdater()->updatePropFieldDefinitionsUsingTextValue($this);
       $this->getConfigUpdater()->updatePropOrder($this);
+      $this->getConfigUpdater()->unsetComponentCategoryProperty($this);
+      $this->getConfigUpdater()->updateMultiBundleReferencePropExpressionToMultiBranch($this);
     }
     parent::preSave($storage);
 
@@ -618,7 +619,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
       }
       // If a version was created and immediately deleted, it doesn't need any
       // fallback metadata.
-      if (!in_array($new_version, $this->getVersions())) {
+      if (!\in_array($new_version, $this->getVersions(), TRUE)) {
         continue;
       }
       $this->versioned_properties[$new_version]['fallback_metadata'] = $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata'];
@@ -640,12 +641,8 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
 
     // For new Components, auto-create Folders based on their category.
     if (!$update) {
-      $category = $this->getCategory();
+      $category = $this->getComponentSource()->determineDefaultFolder();
 
-      // If no category is set, there's no Folder to auto-create.
-      if ($category === NULL) {
-        return;
-      }
       $folder = Folder::loadByNameAndConfigEntityTypeId((string) $category, self::ENTITY_TYPE_ID);
       if (empty($folder)) {
         $folder = Folder::create([
@@ -663,10 +660,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     // If the Component is deleted, remove it from the Folder it was in.
     foreach ($entities as $entity) {
       /** @var \Drupal\canvas\Entity\Component $entity */
-      $category = $entity->getCategory();
-      if ($category !== NULL) {
-        Folder::loadByNameAndConfigEntityTypeId((string) $category, self::ENTITY_TYPE_ID)?->removeItem($entity->id())?->save();
-      }
+      Folder::loadByItemAndConfigEntityTypeId((string) $entity->id(), self::ENTITY_TYPE_ID)?->removeItem($entity->id())?->save();
     }
     parent::preDelete($storage, $entities);
   }
@@ -691,8 +685,8 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
 
     // @phpstan-ignore-next-line
     $component = $context->getObject()->getParent();
-    assert($component instanceof Mapping);
-    assert($component->getDataDefinition()->getDataType() === 'canvas.component.*');
+    \assert($component instanceof Mapping);
+    \assert($component->getDataDefinition()->getDataType() === 'canvas.component.*');
     // The version should be based on the source-specific settings for this
     // version, not on anything else (certainly not the fallback metadata.)
     $raw = $component->getValue();
@@ -702,7 +696,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
           'local_source_id' => $raw['source_local_id'],
           ...$raw['versioned_properties'][VersionedConfigEntityInterface::ACTIVE_VERSION]['settings'],
         ]);
-      assert($source instanceof ComponentSourceInterface);
+      \assert($source instanceof ComponentSourceInterface);
       $expected_version = $source->generateVersionHash();
     }
     catch (\Exception) {

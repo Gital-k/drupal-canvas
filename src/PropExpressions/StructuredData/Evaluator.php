@@ -10,11 +10,14 @@ use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\Plugin\DataType\EntityReference;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\TypedData\DataReferenceInterface;
 use Drupal\Core\TypedData\PrimitiveInterface;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeFieldItemList;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 
 /**
@@ -38,8 +41,8 @@ final class Evaluator {
       return $value;
     }
     // Unlike \Drupal\Core\Cache\CacheableMetadata::createFromObject(), when
-    // evaluating expressions against structured data (an entity or a dangling
-    // field item list), permanent cacheability must be assumed: expressions are
+    // evaluating expressions against structured data (an entity field or a
+    // conjured field), permanent cacheability must be assumed: expressions are
     // guaranteed to traverse all relevant objects and will accumulate the right
     // cacheability that way.
     return new CacheableMetadata();
@@ -54,12 +57,13 @@ final class Evaluator {
     // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItem::DATETIME_TYPE_DATETIME
     // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface::DATETIME_STORAGE_FORMAT
     // @see https://ijmacd.github.io/rfc3339-iso8601/
+    // @todo Remove this in https://www.drupal.org/project/canvas/issues/3573934.
     if ($expr instanceof FieldTypePropExpression &&
       $expr->fieldType === 'datetime' &&
       $entity_or_field instanceof FieldItemInterface &&
       $entity_or_field->getFieldDefinition()->getFieldStorageDefinition()->getSetting('datetime_type') === DateTimeItem::DATETIME_TYPE_DATETIME &&
-      is_string($result->value) &&
-      // Don't intervene if the result is already in iso8601 format - this
+      \is_string($result->value) &&
+      // Don't intervene if the result is already in iso8601 format: this
       // includes a trailing offset, or using the Z flag.
       !\preg_match('/(Z|[+-](?:2[0-3]|[01][0-9])(?::?[0-5][0-9])?)$/', $result->value)) {
 
@@ -69,8 +73,9 @@ final class Evaluator {
       // Use the cacheability carried by:
       // - the host entity: EntityInterface always implements
       //   CacheableDependencyInterface
-      // - the (dangling or not) field item list: some computed field types
-      //   implement CacheableDependencyInterface
+      // - the field item list (both when it is an entity field and a conjured
+      //   field): some computed field types implement
+      //   CacheableDependencyInterface
       $result,
       self::permanentCacheabilityUnlessSpecified($entity_or_field)
     );
@@ -107,7 +112,7 @@ final class Evaluator {
     // @see \Drupal\canvas\PropSource\StaticPropSource::evaluate()
     if ($entity_or_field instanceof FieldItemListInterface) {
       return new EvaluationResult(
-        array_map(
+        \array_map(
           fn (FieldItemInterface $item) => self::evaluate($item, $expr, $is_required),
           iterator_to_array($entity_or_field),
         ),
@@ -118,7 +123,7 @@ final class Evaluator {
     // @see \Drupal\canvas\PropSource\StaticPropSource::evaluate()
     elseif ($entity_or_field instanceof FieldItemInterface) {
       $field = $entity_or_field;
-      $result = match (get_class($expr)) {
+      $result = match ($expr::class) {
         FieldTypePropExpression::class => (function () use ($field, $expr) {
           $prop = $field->get($expr->propName);
           $prop_value = $prop instanceof PrimitiveInterface
@@ -132,97 +137,86 @@ final class Evaluator {
             self::permanentCacheabilityUnlessSpecified($prop->getValue())
           );
         })(),
-        FieldTypeObjectPropsExpression::class => array_filter(
-          array_combine(
-            array_keys($expr->objectPropsToFieldTypeProps),
-            array_map(
-              fn (FieldTypePropExpression|ReferenceFieldTypePropExpression $sub_expr) => self::evaluate($field, $sub_expr, $is_required),
-              $expr->objectPropsToFieldTypeProps
-            )
-          ),
-          // Omit optional props.
-          fn (EvaluationResult $r) => $r->value !== StructuredDataPropExpressionInterface::SYMBOL_OBJECT_MAPPED_OPTIONAL_PROP,
+        FieldTypeObjectPropsExpression::class => \array_map(
+          fn ((ScalarPropExpressionInterface&FieldTypeBasedPropExpressionInterface)|(ReferencePropExpressionInterface&FieldTypeBasedPropExpressionInterface) $sub_expr) => self::evaluate($field, $sub_expr, $is_required),
+          $expr->getObjectExpressions(),
         ),
-        ReferenceFieldTypePropExpression::class => self::evaluate(
-          $field->get($expr->referencer->propName)->getValue(),
-          $expr->referenced,
-          $is_required,
-        ),
+        ReferenceFieldTypePropExpression::class => (function () use ($field, $expr, $is_required) {
+          $reference_property = $field->get($expr->referencer->propName);
+          \assert($reference_property instanceof DataReferenceInterface);
+          \assert($reference_property instanceof EntityReference);
+
+          $referenced_entity = $reference_property->getValue();
+          \assert($referenced_entity === $reference_property->getTarget()?->getValue(), 'EntityReference::getTarget() returns an EntityAdapter that does not match.');
+          \assert($referenced_entity instanceof FieldableEntityInterface || $referenced_entity === NULL);
+
+          // If the field item is empty (it does not reference an entity), then
+          // the expression in $expr->referenced does not need evaluating: there
+          // is no entity to evaluate that expression against.
+          if ($referenced_entity === NULL) {
+            return NULL;
+          }
+
+          $referenced_expression = $expr->getTargetExpression(
+            $expr->targetsMultipleBundles() ? $referenced_entity : NULL
+          );
+          return self::evaluate(
+            $referenced_entity,
+            $referenced_expression,
+            $is_required,
+          );
+        })(),
         default => throw new \LogicException('Unhandled expression type. ' . (string) $expr),
       };
       return new EvaluationResult(
-        // Permanent cacheability because this is a dangling field instance;
-        // cacheability of a computed field property is handled in the `match`
-        // above; cacheability of a referenced entity is handled by traversing
-        // into that entity.
+        // Permanent cacheability because this is a conjured field; cacheability
+        // of a computed field property is handled in the `match` above;
+        // cacheability of a referenced entity is handled by traversing into
+        // that entity.
         // @see \Drupal\canvas\PropSource\StaticPropSource
         $result,
         self::permanentCacheabilityUnlessSpecified($result)
       );
     }
-    // 💡 This branch handles expressions used by DynamicPropSources.
-    // @see \Drupal\canvas\PropSource\DynamicPropSource::evaluate()
+    // 💡 This branch handles expressions used by EntityFieldPropSources.
+    // @see \Drupal\canvas\PropSource\EntityFieldPropSource::evaluate()
     else {
+      \assert($expr instanceof EntityFieldBasedPropExpressionInterface);
       $entity = $entity_or_field;
       // @todo support non-fieldable entities?
-      assert($entity instanceof FieldableEntityInterface);
+      \assert($entity instanceof FieldableEntityInterface);
       $entity_access = self::validateAccess($entity, $expr);
-      $field_name = match (get_class($expr)) {
-        FieldPropExpression::class => match (TRUE) {
-          is_string($expr->fieldName) => $expr->fieldName,
-          is_array($expr->fieldName) => $expr->fieldName[$entity->bundle()],
-        },
-        FieldObjectPropsExpression::class => $expr->fieldName,
-        ReferenceFieldPropExpression::class => match (TRUE) {
-          is_string($expr->referencer->fieldName) => $expr->referencer->fieldName,
-          is_array($expr->referencer->fieldName) => $expr->referencer->fieldName[$entity->bundle()],
-        },
-        default => throw new \LogicException('Unhandled expression type: ' . get_class($expr)),
-      };
-      $field_item_list = $entity->get($field_name);
-      assert($field_item_list instanceof FieldItemListInterface);
+      $field_item_list = $entity->get($expr->getFieldName());
+      \assert($field_item_list instanceof FieldItemListInterface);
+
+      $field_definition = $field_item_list->getFieldDefinition();
+      $cardinality = $field_definition->getFieldStorageDefinition()->getCardinality();
+      // If a specific delta is requested, validate it.
+      if ($expr->getDelta() !== NULL) {
+        if ($expr->getDelta() < 0) {
+          throw new \LogicException(\sprintf("Requested delta %d, but deltas must be positive integers.", $expr->getDelta()));
+        }
+        elseif ($cardinality === 1 && $expr->getDelta() !== 0) {
+          throw new \LogicException(\sprintf("Requested delta %d for single-cardinality field, must be either zero or omitted.", $expr->getDelta()));
+        }
+        elseif ($cardinality !== FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED && $expr->getDelta() >= $cardinality) {
+          throw new \LogicException(\sprintf("Requested delta %d for %d cardinality field, but must be in range [0, %d].", $expr->getDelta(), $cardinality, $cardinality - 1));
+        }
+        elseif (!$field_item_list->offsetExists($expr->getDelta())) {
+          throw new \LogicException(\sprintf("Requested delta %d for unlimited cardinality field, but only deltas [0, %d] exist.", $expr->getDelta(), $field_item_list->count() - 1));
+        }
+      }
+
       $field_access = self::validateAccess($field_item_list, $expr);
 
-      $result = match (get_class($expr)) {
-        FieldPropExpression::class => (function () use ($entity, $expr, $field_item_list, $is_required) {
-          $field_definition = $field_item_list->getFieldDefinition();
-          $cardinality = $field_definition->getFieldStorageDefinition()->getCardinality();
-          // If a specific delta is requested, validate it.
-          if ($expr->delta !== NULL) {
-            if ($expr->delta < 0) {
-              throw new \LogicException(sprintf("Requested delta %d, but deltas must be positive integers.", $expr->delta));
-            }
-            elseif ($cardinality === 1 && $expr->delta !== 0) {
-              throw new \LogicException(sprintf("Requested delta %d for single-cardinality field, must be either zero or omitted.", $expr->delta));
-            }
-            elseif ($cardinality !== FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED && $expr->delta >= $cardinality) {
-              throw new \LogicException(sprintf("Requested delta %d for %d cardinality field, but must be in range [0, %d].", $expr->delta, $cardinality, $cardinality - 1));
-            }
-            elseif (!$field_item_list->offsetExists($expr->delta)) {
-              throw new \LogicException(sprintf("Requested delta %d for unlimited cardinality field, but only deltas [0, %d] exist.", $expr->delta, $field_item_list->count() - 1));
-            }
-          }
+      $result = match ($expr::class) {
+        FieldPropExpression::class => (function () use ($expr, $field_item_list, $is_required, $cardinality) {
           $result = [];
           $raw_result = [];
           $result_cacheability = new CacheableMetadata();
           foreach ($field_item_list as $delta => $field_item) {
             if ($expr->delta === NULL || $expr->delta === $delta) {
-              assert(is_string($expr->propName) || (is_array($expr->propName) && is_array($expr->fieldName)));
-              $prop_name = match (TRUE) {
-                is_string($expr->propName) => $expr->propName,
-                // @see \Drupal\Tests\canvas\Unit\PropExpressionTest::testInvalidFieldPropExpressionDueToMultipleFieldPropNamesWithoutMultipleFieldNames()
-                // @phpstan-ignore-next-line offsetAccess.notFound
-                is_array($expr->propName) => $expr->propName[$expr->fieldName[$entity->bundle()]],
-              };
-              // TRICKY: when a FieldPropExpression targets multiple bundles of
-              // an entity type and a subset of those bundles' fields cannot
-              // provide the needed value, it is allowed to explicitly opt out
-              // using `␀`.
-              // @see \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct()
-              if ($prop_name === StructuredDataPropExpressionInterface::SYMBOL_OBJECT_MAPPED_OPTIONAL_PROP) {
-                return StructuredDataPropExpressionInterface::SYMBOL_OBJECT_MAPPED_OPTIONAL_PROP;
-              }
-              $prop = $field_item->get($prop_name);
+              $prop = $field_item->get($expr->getFieldPropertyName());
               if ($prop instanceof CacheableDependencyInterface) {
                 $result_cacheability->addCacheableDependency($prop);
               }
@@ -233,9 +227,26 @@ final class Evaluator {
             }
           }
 
+          // @see ::evaluate()
+          // @todo Remove this in https://www.drupal.org/project/canvas/issues/3573934.
+          if ($field_item_list instanceof DateTimeFieldItemList && $field_item_list->getSetting('datetime_type') === DateTimeItem::DATETIME_TYPE_DATETIME) {
+            foreach ($result as $delta => $value) {
+              // Nothing to do if NULL.
+              if ($value === NULL) {
+                continue;
+              }
+              // Don't intervene if the result is already in iso8601 format:
+              // this includes a trailing offset, or using the Z flag.
+              if (\preg_match('/(Z|[+-](?:2[0-3]|[01][0-9])(?::?[0-5][0-9])?)$/', $value)) {
+                continue;
+              }
+              $result[$delta] = $value . 'Z';
+            }
+          }
+
           // - Single-cardinality or delta requested ⇒ single value.
           // - Multiple-cardinality and no delta requested ⇒ multiple values.
-          if ($cardinality === 1 || is_int($expr->delta)) {
+          if ($cardinality === 1 || \is_int($expr->delta)) {
             $result = $result[$expr->delta ?? 0] ?? NULL;
             $raw_result = $raw_result[$expr->delta ?? 0] ?? NULL;
           }
@@ -252,7 +263,7 @@ final class Evaluator {
           // properties are computed and access checks prevent them from
           // returning the actual underlying value, to prevent information
           // disclosure vulnerabilities.
-          $required_yet_empty = match(is_array($result)) {
+          $required_yet_empty = match(\is_array($result)) {
             // Multiple-cardinality and no delta requested.
             TRUE => array_all($result, fn ($prop_value) => $prop_value === NULL),
             // Single-cardinality or delta requested
@@ -266,32 +277,65 @@ final class Evaluator {
 
           // Required and empty: evaluation failed; infer access was forbidden.
           $access_error_cache = new CacheableMetadata();
-          if (!is_array($result)) {
+          if (!\is_array($result)) {
             $access_error_cache->addCacheableDependency($raw_result);
           }
           else {
             array_walk($raw_result, $access_error_cache->addCacheableDependency(...));
           }
           throw new CacheableAccessDeniedHttpException(
-            $access_error_cache, sprintf(
+            $access_error_cache, \sprintf(
               'Required field property empty due to entity or field access while evaluating expression %s, reason: %s',
               $expr,
               $raw_result instanceof AccessResultReasonInterface ? $raw_result->getReason() : ''
             )
           );
         })(),
-        ReferenceFieldPropExpression::class => self::evaluate(
-          // @phpstan-ignore argument.type
-          self::evaluate($entity, $expr->referencer, $is_required)->value,
-          $expr->referenced,
-          $is_required
-        ),
-        FieldObjectPropsExpression::class => array_combine(
-          array_keys($expr->objectPropsToFieldProps),
-          array_map(
-            fn(FieldPropExpression|ReferenceFieldPropExpression $sub_expr) => self::evaluate($entity_or_field, $sub_expr, $is_required),
-            $expr->objectPropsToFieldProps
-          )
+        ReferenceFieldPropExpression::class => (function () use ($entity, $field_item_list, $expr, $is_required, $cardinality) {
+          \assert($field_item_list->getName() === $expr->referencer->getFieldName());
+          // Step 1: evaluate the referencer expression to get the referenced
+          // entities. This always is a FieldPropExpression, which also handles
+          // respecting the delta in the expression.
+          // Note: this EvaluationResult object carries cacheability (for e.g.
+          // entity access).
+          $referencer_result = self::evaluate($entity, $expr->referencer, $is_required);
+
+          // Step 2A: single-cardinality or single delta: result is a single
+          // value, not an array.
+          if ($cardinality === 1 || $expr->getDelta() !== NULL) {
+            $referenced_entity = $referencer_result->value;
+            \assert($referenced_entity instanceof FieldableEntityInterface || $referenced_entity === NULL);
+            if ($referenced_entity === NULL) {
+              // If required and empty, the FieldPropExpression evaluation would
+              // already have thrown a CacheableAccessDeniedHttpException.
+              \assert(!$is_required);
+              return new EvaluationResult(NULL, $referencer_result);
+            }
+            $referenced_expression = $expr->getTargetExpression(
+              $expr->targetsMultipleBundles() ? $referenced_entity : NULL
+            );
+            return self::evaluate($referenced_entity, $referenced_expression, $is_required);
+          }
+
+          // Step 2B: multiple-cardinality, no delta: result is an array of
+          // values.
+          // @phpstan-ignore identical.alwaysTrue
+          \assert(($cardinality > 1 || $cardinality === FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) && $expr->getDelta() === NULL);
+          $evaluated_references = [];
+          $referenced_entities = $referencer_result->value;
+          \assert(\is_array($referenced_entities));
+          foreach ($referenced_entities as $delta => $referenced_entity) {
+            \assert($referenced_entity instanceof FieldableEntityInterface);
+            $referenced_expression = $expr->getTargetExpression(
+              $expr->targetsMultipleBundles() ? $referenced_entity : NULL
+            );
+            $evaluated_references[$delta] = self::evaluate($referenced_entity, $referenced_expression, $is_required);
+          }
+          return new EvaluationResult($evaluated_references, $referencer_result);
+        })(),
+        FieldObjectPropsExpression::class => \array_map(
+          fn((ScalarPropExpressionInterface&EntityFieldBasedPropExpressionInterface)|(ReferencePropExpressionInterface&EntityFieldBasedPropExpressionInterface) $sub_expr): EvaluationResult => self::evaluate($entity_or_field, $sub_expr, $is_required),
+          $expr->getObjectExpressions(),
         ),
         default => throw new \LogicException('Unhandled expression type.'),
       };
@@ -308,7 +352,7 @@ final class Evaluator {
     if (!$access->isAllowed()) {
       $access_error_cache = CacheableMetadata::createFromObject($access);
       throw new CacheableAccessDeniedHttpException(
-        $access_error_cache, sprintf(
+        $access_error_cache, \sprintf(
           'Access denied to %s while evaluating expression, %s, reason: %s',
           $entity_or_field instanceof EntityInterface ? 'entity' : 'field',
           $expr,

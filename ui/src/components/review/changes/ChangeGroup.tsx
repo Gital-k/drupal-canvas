@@ -17,6 +17,10 @@ interface ChangeGroupProps {
   setSelectedChanges: (changes: UnpublishedChange[]) => void;
   onDiscardClick: (change: UnpublishedChange) => void;
   onViewClick?: (change: UnpublishedChange) => void;
+  pageStatusMap?: Record<
+    string,
+    { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
+  >;
 }
 
 const ChangeGroup = ({
@@ -27,6 +31,7 @@ const ChangeGroup = ({
   setSelectedChanges,
   onDiscardClick,
   onViewClick,
+  pageStatusMap,
 }: ChangeGroupProps) => {
   const isGroupSelected = useMemo(() => {
     const groupSelectionCount = changes.filter((change) =>
@@ -39,10 +44,13 @@ const ChangeGroup = ({
   }, [changes, selectedChanges]);
 
   const handleGroupSelection = useCallback(() => {
+    const groupPointers = changes.map((change) => change.pointer);
     // If the group is fully selected, deselect all changes in the group
     if (isGroupSelected === true) {
       setSelectedChanges(
-        selectedChanges.filter((c) => c.entity_type !== entityType),
+        selectedChanges.filter(
+          (change) => !groupPointers.includes(change.pointer),
+        ),
       );
       return;
     }
@@ -50,18 +58,13 @@ const ChangeGroup = ({
     setSelectedChanges([
       ...selectedChanges,
       ...changes.filter(
-        (c) =>
-          c.entity_type === entityType &&
-          !selectedChanges.some((selected) => selected.pointer === c.pointer),
+        (change) =>
+          !selectedChanges.some(
+            (selected) => selected.pointer === change.pointer,
+          ),
       ),
     ]);
-  }, [
-    isGroupSelected,
-    changes,
-    selectedChanges,
-    entityType,
-    setSelectedChanges,
-  ]);
+  }, [isGroupSelected, changes, selectedChanges, setSelectedChanges]);
 
   const groupLabel = getGroupLabel(entityType);
 
@@ -89,6 +92,7 @@ const ChangeGroup = ({
             setSelectedChanges={setSelectedChanges}
             onDiscardClick={onDiscardClick}
             onViewClick={onViewClick}
+            pageStatusMap={pageStatusMap}
           />
         ))}
       </ul>

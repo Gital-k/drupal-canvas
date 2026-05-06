@@ -4,24 +4,26 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\Labeler;
+use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
 use Drupal\file\Plugin\Field\FieldType\FileFieldItemList;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\media\Entity\Media;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
@@ -33,6 +35,8 @@ use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
+use PHPUnit\Framework\Attributes\IgnoreDeprecations;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests PropExpression functionality that cannot be tested in a unit test.
@@ -41,9 +45,12 @@ use Drupal\user\Entity\User;
  * test coverage.
  *
  * @see \Drupal\Tests\canvas\Unit\PropExpressionTest
- * @group canvas
  */
-class PropExpressionKernelTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+#[Group('canvas_data_model')]
+#[Group('canvas_data_model__prop_expressions')]
+class PropExpressionKernelTest extends CanvasKernelTestBase {
 
   use EntityReferenceFieldCreationTrait;
   use ImageFieldCreationTrait;
@@ -58,18 +65,8 @@ class PropExpressionKernelTest extends KernelTestBase {
   protected static $modules = [
     'field',
     'node',
-    'system',
     'taxonomy',
-    'text',
-    'filter',
-    'user',
-    'file',
-    'image',
-    'media',
-    'media_library',
-    'views',
-    // Ensure field type overrides are installed and hence testable.
-    'canvas',
+    'media_test_source',
   ];
 
   /**
@@ -87,14 +84,18 @@ class PropExpressionKernelTest extends KernelTestBase {
     parent::setUp();
     $this->installEntitySchema('file');
     $this->installEntitySchema('node');
+    $this->installEntitySchema('path_alias');
     $this->installEntitySchema('taxonomy_term');
     $this->installEntitySchema('user');
     $this->installSchema('file', 'file_usage');
     $this->installEntitySchema('media');
+    // @see core/modules/filter/config/install/filter.format.plain_text.yml
+    $this->installConfig(['filter']);
 
-    $this->createMediaType('image', ['id' => 'image']);
-    $this->createMediaType('image', ['id' => 'baby_photos']);
-    $this->createMediaType('image', ['id' => 'vacation_photos']);
+    $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
+    $this->createMediaType('image', ['id' => 'baby_photos', 'label' => 'Baby photos']);
+    $this->createMediaType('image', ['id' => 'vacation_photos', 'label' => 'Vacation photos']);
+    $this->createMediaType('test', ['id' => 'remote_image', 'label' => 'Remote image']);
 
     // `article` node type.
     NodeType::create([
@@ -125,7 +126,13 @@ class PropExpressionKernelTest extends KernelTestBase {
     ])->save();
     $this->createImageField('field_image', 'node', 'article');
     $this->createEntityReferenceField('node', 'article', 'yo_ho', 'Yo Ho', 'media', selection_handler_settings: [
-      'target_bundles' => ['image'],
+      // @see \Drupal\Tests\canvas\Unit\PropExpressionTest::EXPECTED_YO_HO_FIELD_CONFIG_DEPENDENCIES
+      'target_bundles' => [
+        'baby_photos',
+        'image',
+        'remote_image',
+        'vacation_photos',
+      ],
     ]);
 
     // `foo` node type.
@@ -236,7 +243,7 @@ class PropExpressionKernelTest extends KernelTestBase {
       'uuid' => 'baby-photos-media-uuid',
     ]);
     $baby_photos_media->save();
-    Node::create([
+    $node = Node::create([
       'uuid' => self::NODE_1_UUID,
       'title' => 'dummy_title',
       'type' => 'article',
@@ -261,7 +268,10 @@ class PropExpressionKernelTest extends KernelTestBase {
       'yo_ho' => [
         'target_id' => $image_media->id(),
       ],
-    ])->save();
+    ]);
+    $this->setUpCurrentUser(permissions: ['access content', 'view media', 'access user profiles']);
+    self::assertEntityIsValid($node);
+    $node->save();
 
     // `xyz` node type.
     NodeType::create([
@@ -280,19 +290,31 @@ class PropExpressionKernelTest extends KernelTestBase {
       'bundle' => 'xyz',
       'label' => 'The XYZ map field',
     ])->save();
-
-    $this->setUpCurrentUser(permissions: ['access content', 'view media', 'access user profiles']);
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\Labeler
+   * Tests label.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\Labeler
    */
+  #[IgnoreDeprecations]
   public function testLabel(): void {
     $labeler = \Drupal::service(Labeler::class);
+
+    $deprecations_for_3563451 = [PropExpressionTest::EXPECT_DEPRECATION_3563451, PropExpressionTest::EXPECT_DEPRECATION_3563451_REFERENCE, PropExpressionTest::EXPECT_DEPRECATION_3563451_OBJECT];
+
     foreach (PropExpressionTest::provider() as $test_case_label => $case) {
+      // Merely the unit test suffices for this expression: testing dependency
+      // calculation is pointless, because the update path would have updated
+      // this expression.
+      if (!empty(array_intersect((array) $case[2], $deprecations_for_3563451))) {
+        self::assertCount(3, $case, \sprintf("Test case `%s` tests a deprecated expression. The update path \canvas_post_update_0011_multi_bundle_reference_prop_expressions() guarantees it does not occur in any Component config entity anymore, so drop the additional expectations.", $test_case_label));
+        continue;
+      }
+
       $expression = $case[1];
-      $test_case_precise_label = sprintf("%s (%s)", $test_case_label, (string) $expression);
-      $expected_expression_label = $case[2];
+      $test_case_precise_label = \sprintf("%s (%s)", $test_case_label, (string) $expression);
+      $expected_expression_label = $case[3];
 
       try {
         // @phpstan-ignore-next-line argument.type
@@ -309,53 +331,93 @@ class PropExpressionKernelTest extends KernelTestBase {
           if ($expected_expression_label instanceof \Exception) {
             self::assertSame($expected_expression_label->getMessage(), $e->getMessage(), $test_case_precise_label);
           }
+          elseif ($expected_expression_label instanceof \TypeError) {
+            // TypeError thrown by Labeler contains line number and file path
+            // making this very fragile to test, so we have to check the error
+            // message partially.
+            self::assertStringContainsString($expected_expression_label->getMessage(), $e->getMessage(), $test_case_precise_label);
+          }
           continue;
         }
-        self::fail(sprintf('Unexpected exception `%s` with message `%s for case `%s`.', get_class($e), $e->getMessage(), $test_case_precise_label));
+        self::fail(\sprintf('Unexpected exception `%s` with message `%s for case `%s`.', get_class($e), $e->getMessage(), $test_case_precise_label));
       }
       self::assertSame($expected_expression_label, (string) $label, $test_case_precise_label);
     }
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression::calculateDependencies()
+   * Tests calculate dependencies.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::calculateDependencies
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression::calculateDependencies
    */
+  #[IgnoreDeprecations]
   public function testCalculateDependencies(): void {
     $host_entity = Node::load(1);
 
+    $deprecations_for_3563451 = [PropExpressionTest::EXPECT_DEPRECATION_3563451, PropExpressionTest::EXPECT_DEPRECATION_3563451_REFERENCE, PropExpressionTest::EXPECT_DEPRECATION_3563451_OBJECT];
+
     foreach (PropExpressionTest::provider() as $test_case_label => $case) {
+      // Merely the unit test suffices for this expression: testing dependency
+      // calculation is pointless, because the update path would have updated
+      // this expression.
+      if (!empty(array_intersect((array) $case[2], $deprecations_for_3563451))) {
+        self::assertCount(3, $case, \sprintf("Test case `%s` tests a deprecated expression. The update path \canvas_post_update_0011_multi_bundle_reference_prop_expressions() guarantees it does not occur in any Component config entity anymore, so drop the additional expectations.", $test_case_label));
+        continue;
+      }
+
       $expression = $case[1];
-      assert($expression instanceof StructuredDataPropExpressionInterface);
-      $expected_dependencies = $case[3];
-      // Almost always, the content-aware dependencies are the same as the
-      // content-unaware ones, just with the `content` key-value pair omitted,
-      // if any.
-      $expected_content_unaware_dependencies = $case[4] ?? (
-        is_array($expected_dependencies)
-          ? array_diff_key($expected_dependencies, array_flip(['content']))
-          : NULL
-      );
+      \assert($expression instanceof EntityFieldBasedPropExpressionInterface || $expression instanceof FieldTypeBasedPropExpressionInterface);
+      $expected_dependencies = $case[4];
+      // The content-aware dependencies MUST be the same as the content-unaware
+      // ones, just with the `content` key-value pair omitted, if any.
+      $expected_content_unaware_dependencies = \is_array($expected_dependencies)
+        ? array_diff_key($expected_dependencies, array_flip(['content']))
+        : [];
 
-      $test_case_precise_label = sprintf("%s (%s)", $test_case_label, (string) $expression);
+      $test_case_precise_label = \sprintf("%s (%s)", $test_case_label, (string) $expression);
 
-      $entity_or_field = match(get_class($expression)) {
-        FieldPropExpression::class, ReferenceFieldPropExpression::class, FieldObjectPropsExpression::class => $host_entity,
-        FieldTypePropExpression::class, ReferenceFieldTypePropExpression::class, FieldTypeObjectPropsExpression::class => (function () use ($expression) {
+      $entity_or_field = match(TRUE) {
+        $expression instanceof EntityFieldBasedPropExpressionInterface => $host_entity,
+        $expression instanceof FieldTypeBasedPropExpressionInterface => (function () use ($expression) {
           // For reference fields, ::randomizeValue() will point to incorrect
           // entities (defaulting to the `Node` entity type!) unless the storage
           // and instance settings passed to StaticPropSource are correct too.
           $storage_settings = [];
           $instance_settings = [];
-          if ($expression instanceof ReferenceFieldTypePropExpression) {
-            $target_entity_data_definition = $expression->referenced instanceof ReferenceFieldPropExpression
-              ? $expression->referenced->referencer->entityType
-              : $expression->referenced->entityType;
-            assert($target_entity_data_definition instanceof BetterEntityDataDefinition);
+          $target_entity_data_definition = NULL;
+          if ($expression instanceof ReferencePropExpressionInterface) {
+            if (!$expression->targetsMultipleBundles()) {
+              \assert($expression->referenced instanceof EntityFieldBasedPropExpressionInterface);
+              $target_entity_data_definition = $expression->referenced->getHostEntityDataDefinition();
+            }
+            else {
+              \assert($expression->referenced instanceof ReferencedBundleSpecificBranches);
+              $first_branch = \array_keys($expression->referenced->bundleSpecificReferencedExpressions)[0];
+              // TRICKY: the exact dependencies depend on the bundle of the
+              // entity that is referenced. To be able to test this with a
+              // single expectation rather than many, this test hardcodes the
+              // first branch. In the current test cases, this is always the
+              // "baby_photos" MediaType branch.
+              \assert($first_branch === 'entity:media:baby_photos');
+              $target_entity_data_definition = $expression->referenced
+                ->getBranch('media', 'baby_photos')
+                ->getHostEntityDataDefinition();
+            }
+          }
+          if ($expression instanceof ObjectPropExpressionInterface && $expression->getFieldType() === 'entity_reference') {
+            \assert($expression->objectPropsToFieldTypeProps['src'] instanceof ReferenceFieldTypePropExpression);
+            \assert(!$expression->objectPropsToFieldTypeProps['src']->referenced instanceof ReferencedBundleSpecificBranches);
+            $target_entity_data_definition = $expression->objectPropsToFieldTypeProps['src']->referenced->getHostEntityDataDefinition();
+            \assert($target_entity_data_definition instanceof BetterEntityDataDefinition);
+          }
+
+          if ($target_entity_data_definition !== NULL) {
+            \assert($target_entity_data_definition instanceof BetterEntityDataDefinition);
             $storage_settings['target_type'] = $target_entity_data_definition->getEntityTypeId();
             $target_bundles = $target_entity_data_definition->getBundles();
             if ($target_bundles) {
@@ -375,7 +437,7 @@ class PropExpressionKernelTest extends KernelTestBase {
             // Ensure that expected content dependencies always use the hardcoded
             // file entity UUID.
             // @see ::setUp()
-            assert($field_item_list[0] instanceof FieldItemInterface);
+            \assert($field_item_list[0] instanceof FieldItemInterface);
             $field_item_list[0]->get('target_id')->setValue(1);
           }
           return $field_item_list;
@@ -404,11 +466,56 @@ class PropExpressionKernelTest extends KernelTestBase {
       // `content` dependencies (if any) should be present, because it is
       // impossible for just an expression to reference content entities.
       // (This is the case when evaluating for example a prop expression used in
-      // a DynamicPropSource in a ContentTemplate: the content template applies
+      // a EntityFieldPropSource in a ContentTemplate: the content template applies
       // to many possible host entities, not any single one, so its
-      // DynamicPropSources cannot possibly depend on any content entities.)
+      // EntityFieldPropSources cannot possibly depend on any content entities.)
       self::assertSame($expected_content_unaware_dependencies, $expression->calculateDependencies(NULL), $test_case_precise_label);
     }
+  }
+
+  /**
+   * Tests an impossible-to-unit test ReferencedBundleSpecificBranches aspect.
+   *
+   * (Impossible because checking field cardinality requires services to be
+   * available and config entities to be saved. Neither is possible in a unit
+   * test, except through mocking. But mocking is brittle, and quickly ends up
+   * being stale.)
+   *
+   * Note this covers both the ReferenceFieldPropExpression and
+   * ReferenceFieldTypePropExpression prop expression classes' multi-bundle
+   * support, because they both use ReferencedBundleSpecificBranches in exactly
+   * the same way.
+   *
+   * @see \Drupal\Tests\canvas\Unit\PropExpressionTest::testInvalidReferencePropExpressionDueToMismatchedLeafExpressionCardinality()
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression
+   */
+  public function testInvalidReferencePropExpressionDueToMismatchedLeafExpressionCardinality(): void {
+    // @phpstan-ignore method.nonObject
+    self::assertSame(1, FieldStorageConfig::load('media.field_media_test')->getCardinality());
+    // @phpstan-ignore method.nonObject
+    self::assertSame(\SAVED_UPDATED, FieldStorageConfig::load("media.field_media_test")->setCardinality(5)->save());
+    // @phpstan-ignore staticMethod.impossibleType
+    self::assertSame(5, FieldStorageConfig::load('media.field_media_test')?->getCardinality());
+
+    // @phpstan-ignore method.notFound
+    self::assertSame(1, EntityDataDefinition::createFromDataType('entity:file')->getPropertyDefinition('uri')?->getCardinality());
+
+    $this->expectException(\InvalidArgumentException::class);
+    $this->expectExceptionMessage('Bundle-specific expressions have inconsistent leaf expressions: they must all must target fields of the same cardinality.');
+    new ReferenceFieldTypePropExpression(
+      referencer: new FieldTypePropExpression('entity_reference', 'entity'),
+      referenced: new ReferencedBundleSpecificBranches([
+        // Returns a FieldPropExpression with unlimited cardinality.
+        'entity:media:baby_photos' => new ReferenceFieldPropExpression(
+          referencer: new FieldPropExpression(BetterEntityDataDefinition::create('media', 'baby_photos'), 'field_media_image_1', NULL, 'entity'),
+          referenced: new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'value'),
+        ),
+        // Returns a FieldPropExpression with single cardinality.
+        'entity:media:remote_image' => new FieldPropExpression(BetterEntityDataDefinition::create('media', ['remote_image']), 'field_media_test', NULL, 'non_existent_computed_property'),
+      ]),
+    );
   }
 
 }

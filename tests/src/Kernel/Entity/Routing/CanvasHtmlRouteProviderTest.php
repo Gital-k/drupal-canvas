@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity\Routing;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Page;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Kernel\Traits\CanvasUiAssertionsTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * @group canvas
+ * Tests Canvas Html Route Provider.
  */
-final class CanvasHtmlRouteProviderTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+final class CanvasHtmlRouteProviderTest extends CanvasKernelTestBase {
 
   use PageTrait;
   use RequestTrait;
@@ -26,27 +30,12 @@ final class CanvasHtmlRouteProviderTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
     'entity_test',
     ...self::PAGE_TEST_MODULES,
-    'block',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'media',
-    'options',
-    'path',
-    'link',
-    'text',
-    'system',
-    'user',
   ];
 
   protected function setUp(): void {
     parent::setUp();
-    // Needed for date formats.
-    $this->installConfig(['system']);
     $this->installPageEntitySchema();
   }
 

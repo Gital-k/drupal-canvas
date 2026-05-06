@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\TypedData;
 
 use Drupal\canvas\Plugin\DataType\ComputedDataTypeWithCacheabilityTrait;
+use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Entity\Plugin\DataType\EntityReference;
 use Drupal\Core\File\FileUrlGeneratorInterface;
@@ -21,7 +22,7 @@ use Drupal\file\Entity\File;
  * @see https://tools.ietf.org/html/rfc6570
  * @internal
  */
-final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements CacheableDependencyInterface {
+final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements CacheableDependencyInterface, DependentPluginInterface {
 
   use ComputedDataTypeWithCacheabilityTrait {
     getValue as private traitGetValue;
@@ -55,7 +56,7 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
     if ($this->getParent() === NULL) {
       return NULL;
     }
-    assert($this->getParent() instanceof ImageItemOverride);
+    \assert($this->getParent() instanceof ImageItemOverride);
 
     $entity = $this->getParent()->get('entity');
 
@@ -63,23 +64,37 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
     if ($entity === NULL) {
       return NULL;
     }
-    assert($entity instanceof EntityReference);
+    \assert($entity instanceof EntityReference);
     $file = $entity->getTarget()?->getValue();
-    assert($file instanceof File);
+    \assert($file instanceof File);
 
-    assert(is_string($file->getFileUri()));
+    \assert(\is_string($file->getFileUri()));
+    // Because this image style is an enforced dependency of the Canvas module,
+    // it is possible to assume it always exists. Because this computed property
+    // is also only present when Canvas is installed.
+    // @see config/install/image.style.canvas_parametrized_width.yml
+    // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride::propertyDefinitions()
     $parametrized_image_style = $this->getParametrizedImageStyle();
     $url_template = $parametrized_image_style->buildUrlTemplate($file->getFileUri());
-    assert(str_contains($url_template, '{width}'));
+    \assert(str_contains($url_template, '{width}'));
 
     // Transform absolute to relative URL template.
     $file_url_generator = \Drupal::service(FileUrlGeneratorInterface::class);
-    assert($file_url_generator instanceof FileUrlGeneratorInterface);
+    \assert($file_url_generator instanceof FileUrlGeneratorInterface);
     $url_template = $file_url_generator->transformRelative($url_template);
-    assert(str_contains($url_template, '{width}'));
+    \assert(str_contains($url_template, '{width}'));
     return (new GeneratedUrl())->setGeneratedUrl($url_template)
       ->addCacheableDependency($parametrized_image_style)
       ->addCacheableDependency($file);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies() {
+    return [
+      'config' => [$this->getParametrizedImageStyle()->getConfigDependencyName()],
+    ];
   }
 
 }

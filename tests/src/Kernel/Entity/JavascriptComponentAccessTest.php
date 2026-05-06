@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\canvas\Audit\RevisionAuditEnum;
 use Drupal\canvas\AutoSave\AutoSaveManager;
@@ -14,34 +15,24 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests JavascriptComponent access.
  *
- * @group canvas
- * @covers \Drupal\canvas\Entity\JavaScriptComponent
- * @covers \Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler
+ * @legacy-covers \Drupal\canvas\Entity\JavaScriptComponent
+ * @legacy-covers \Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler
  */
-final class JavascriptComponentAccessTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+final class JavascriptComponentAccessTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;
 
-  protected static $modules = [
-    'canvas',
-    'user',
-    'system',
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'path_alias',
-    'link',
-    'media',
-  ];
+  private const string UUID_IN_ROOT = '84b672ce-cfca-44b6-a84d-477d13a1f6fb';
 
   /**
    * {@inheritdoc}
@@ -51,7 +42,6 @@ final class JavascriptComponentAccessTest extends KernelTestBase {
     $this->installEntitySchema('user');
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
     $this->installEntitySchema('path_alias');
-    $this->installConfig(['system']);
   }
 
   public function testAccess(): void {
@@ -79,7 +69,7 @@ final class JavascriptComponentAccessTest extends KernelTestBase {
       ],
       'dataDependencies' => [],
     ]);
-    self::assertCount(0, $js_component->getTypedData()->validate());
+    self::assertEntityIsValid($js_component);
     $js_component->save();
     $code_component_maintainer = $this->createUser([JavaScriptComponent::ADMIN_PERMISSION]);
     \assert($code_component_maintainer instanceof UserInterface);
@@ -98,13 +88,12 @@ final class JavascriptComponentAccessTest extends KernelTestBase {
     self::assertNotNull($component);
     self::assertTrue($component->status());
     self::assertContains($js_component->getConfigDependencyName(), $component->getDependencies()['config'] ?? []);
-    self::assertCount(0, $js_component->getTypedData()->validate());
+    self::assertEntityIsValid($js_component);
     // User should still have access to delete.
     self::assertEquals(
       AccessResult::allowed()->addCacheContexts(['user.permissions']),
       $js_component->access('delete', $code_component_maintainer, TRUE),
     );
-
     // Ensure >=1 component instance exists in a *content* entity.
     // @see \Drupal\canvas\Audit\ComponentAudit
     $page = Page::create([
@@ -122,10 +111,12 @@ final class JavascriptComponentAccessTest extends KernelTestBase {
       'created' => 0,
       'revision_created' => 0,
     ]);
-    self::assertCount(0, $page->validate());
+    self::assertEntityIsValid($page);
     $page->save();
     // Create some identical revisions.
     for ($i = 0; $i < 2; $i++) {
+      // Ensure the timestamps are never identical for testing purposes.
+      $page->setChangedTime($page->getChangedTime() + (1000 * $i));
       $page->setNewRevision(TRUE);
       $page->save();
     }
@@ -182,7 +173,12 @@ final class JavascriptComponentAccessTest extends KernelTestBase {
     $pattern = Pattern::create([
       'label' => $this->randomMachineName(),
       'component_tree' => [
-        ['uuid' => 'uuid-in-root', 'component_id' => $component_id, 'inputs' => []],
+        [
+          'uuid' => self::UUID_IN_ROOT,
+          'component_id' => $component->id(),
+          'component_version' => $component->getActiveVersion(),
+          'inputs' => [],
+        ],
       ],
     ]);
     $pattern->save();
@@ -204,7 +200,14 @@ final class JavascriptComponentAccessTest extends KernelTestBase {
 
     // If >=1 component instance exists in the auto-save for a config entity,
     // deletion is again forbidden.
-    $pattern->setComponentTree([['uuid' => 'uuid-in-root', 'component_id' => $component_id, 'inputs' => []]]);
+    $pattern->setComponentTree([
+      [
+        'uuid' => self::UUID_IN_ROOT,
+        'component_id' => $component->id(),
+        'component_version' => $component->getActiveVersion(),
+        'inputs' => [],
+      ],
+    ]);
     $auto_save_manager->saveEntity($pattern);
     $entity_type_manager->getAccessControlHandler(JavaScriptComponent::ENTITY_TYPE_ID)->resetCache();
     self::assertEquals(

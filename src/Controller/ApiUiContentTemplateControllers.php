@@ -59,7 +59,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     $this->validateRequest($content_entity_type_id, $bundle, $component_config_entity_id);
     // @phpstan-ignore-next-line
     $source = Component::load($component_config_entity_id)->getComponentSource();
-    assert($source instanceof GeneratedFieldExplicitInputUxComponentSourceBase);
+    \assert($source instanceof GeneratedFieldExplicitInputUxComponentSourceBase);
 
     $suggestions = $this->propSourceSuggester->suggest(
       $source->getSourceSpecificComponentId(),
@@ -89,11 +89,11 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     }
 
     if ($this->entityTypeManager->getDefinition($content_entity_type_id, FALSE) === NULL) {
-      throw new NotFoundHttpException(sprintf("The `%s` content entity type does not exist.", $content_entity_type_id));
+      throw new NotFoundHttpException(\sprintf("The `%s` content entity type does not exist.", $content_entity_type_id));
     }
 
-    if (!array_key_exists($bundle, $this->entityTypeBundleInfo->getBundleInfo($content_entity_type_id))) {
-      throw new NotFoundHttpException(sprintf("The `%s` content entity type does not have a `%s` bundle.", $content_entity_type_id, $bundle));
+    if (!\array_key_exists($bundle, $this->entityTypeBundleInfo->getBundleInfo($content_entity_type_id))) {
+      throw new NotFoundHttpException(\sprintf("The `%s` content entity type does not have a `%s` bundle.", $content_entity_type_id, $bundle));
     }
   }
 
@@ -108,7 +108,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     $entity_storage = $this->entityTypeManager->getStorage($entity_type_id);
 
     $entity_ids = $entity_query->execute();
-    assert(is_array($entity_ids));
+    \assert(\is_array($entity_ids));
     $entity_query_cacheability = (new CacheableMetadata())
       ->addCacheTags($entity_definition->getBundleListCacheTags($bundle))
       ->addCacheContexts($entity_storage->getEntityType()->getListCacheContexts());
@@ -124,7 +124,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
       return $access->isAllowed();
     });
 
-    $entities_data = array_map(fn (EntityInterface $entity) => [
+    $entities_data = \array_map(fn (EntityInterface $entity) => [
       'id' => $entity->id(),
       'label' => $entity->label(),
     ], $entities);
@@ -155,11 +155,11 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
         ->condition('content_entity_type_id', $entity_type_id)
         ->condition('content_entity_type_view_mode', $view_mode)
         ->execute();
-      foreach (array_keys($bundle_info) as $bundle) {
+      foreach (\array_keys($bundle_info) as $bundle) {
         $template_id = "$entity_type_id.$bundle.$view_mode";
         $data[$entity_type_id][$bundle][$view_mode] = [
           'label' => $view_mode_label,
-          'hasTemplate' => in_array($template_id, $template_keys, TRUE),
+          'hasTemplate' => \in_array($template_id, $template_keys, TRUE),
         ];
       }
     }

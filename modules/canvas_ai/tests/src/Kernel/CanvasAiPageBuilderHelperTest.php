@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel;
 
-use Drupal\KernelTests\KernelTestBase;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Symfony\Component\Yaml\Yaml;
 
 /**
  * Tests for the CanvasAiPageBuilderHelper.
- *
- * @group canvas_ai
  */
-final class CanvasAiPageBuilderHelperTest extends KernelTestBase {
+#[Group('canvas_ai')]
+final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
 
   /**
    * The CanvasAiPageBuilderHelper service.
@@ -26,9 +27,6 @@ final class CanvasAiPageBuilderHelperTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'system',
-    'user',
-    'canvas',
     'canvas_ai',
   ];
 
@@ -296,16 +294,15 @@ YAML;
           'page_title' => 'Untitled page',
           'page_description' => '',
         ],
-        'The user is currently working on a canvas_page entity. User has selected a component in the page with uuid f47ac10b-58cc-4372-a567-0e02b2c3d479. Page title is empty. GENERATE THE TITLE FOR THE PAGE. Page description is empty. GENERATE THE DESCRIPTION FOR THE PAGE.',
+        'The user is currently working on a canvas_page entity. User has selected a component in the page with uuid f47ac10b-58cc-4372-a567-0e02b2c3d479. Page title is empty. GENERATE THE TITLE FOR THE PAGE using canvas_title_generation_agent. This is a **CRITICAL** step to ensure that request is successful. Page description is empty. GENERATE THE DESCRIPTION FOR THE PAGE using canvas_metadata_generation_agent. This is a **CRITICAL** step to ensure that request is successful.',
       ],
     ];
   }
 
   /**
    * Tests the generateVerboseContextForOrchestrator method.
-   *
-   * @dataProvider generateVerboseContextProvider
    */
+  #[DataProvider('generateVerboseContextProvider')]
   public function testGenerateVerboseContextForOrchestrator(array $prompt, string $expected): void {
     $result = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
     $this->assertEquals($expected, $result);

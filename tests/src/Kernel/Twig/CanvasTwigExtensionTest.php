@@ -4,44 +4,26 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Twig;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\canvas\Element\AstroIsland;
 use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
  * Tests CanvasTwigExtension.
- *
- * @group canvas
- * @group Twig
  */
-final class CanvasTwigExtensionTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+#[Group('Twig')]
+final class CanvasTwigExtensionTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'canvas',
-    'canvas_test_sdc',
-    'user',
-    'system',
-    'block',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'media',
-    'options',
-    'path',
-    'link',
-    'text',
-    'filter',
-  ];
 
   /**
    * {@inheritdoc}
@@ -49,21 +31,22 @@ final class CanvasTwigExtensionTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('user');
-    $this->installConfig(['system']);
   }
 
   /**
-   * @covers \Drupal\canvas\Twig\CanvasTwigExtension
-   * @covers \Drupal\canvas\Twig\CanvasPropVisitor
-   * @dataProvider providerComponents
+   * Tests extension.
+   *
+   * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension
+   * @legacy-covers \Drupal\canvas\Twig\CanvasPropVisitor
    */
+  #[DataProvider('providerComponents')]
   public function testExtension(
     string $type,
     string $component_id,
     bool $props_handled_by_twig,
     string $slot_selector,
-    array $render_array_additions = [],
-    bool $is_preview = FALSE,
+    array $render_array_additions,
+    bool $is_preview,
   ): void {
     $heading = $this->randomMachineName();
     $uuid = $this->container->get(UuidInterface::class)->generate();
@@ -72,6 +55,7 @@ final class CanvasTwigExtensionTest extends KernelTestBase {
         'machineName' => $component_id,
         'name' => $this->getRandomGenerator()->sentences(5),
         'status' => TRUE,
+        'required' => [],
         'props' => [
           'heading' => [
             'type' => 'string',
@@ -88,8 +72,8 @@ final class CanvasTwigExtensionTest extends KernelTestBase {
             ],
           ],
         ],
-        'css' => [],
-        'js' => [],
+        'js' => ['original' => '', 'compiled' => ''],
+        'css' => ['original' => '', 'compiled' => ''],
         'dataDependencies' => [],
       ])->save(),
       default => fn() => NULL,

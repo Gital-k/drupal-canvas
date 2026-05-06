@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Update;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Component;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers canvas_post_update_0007_respect_prop_ordering()
- * @group canvas
+ * Tests Respect Prop Order Update.
+ *
+ * @legacy-covers \canvas_post_update_0007_respect_prop_ordering
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class RespectPropOrderUpdateTest extends CanvasUpdatePathTestBase {
 
   protected $defaultTheme = 'stark';
@@ -36,19 +41,19 @@ final class RespectPropOrderUpdateTest extends CanvasUpdatePathTestBase {
     ];
 
     $before = [];
-    foreach (array_keys($component_ids) as $component_id) {
+    foreach (\array_keys($component_ids) as $component_id) {
       $component = Component::load($component_id);
       self::assertNotNull($component);
-      $before[$component_id] = array_keys($component->getSettings()['prop_field_definitions']);
+      $before[$component_id] = \array_keys($component->getSettings()['prop_field_definitions']);
     }
 
     $this->runUpdates();
 
     $after = [];
-    foreach (array_keys($component_ids) as $component_id) {
+    foreach (\array_keys($component_ids) as $component_id) {
       $component = Component::load($component_id);
       self::assertNotNull($component);
-      $after[$component_id] = array_keys($component->getSettings()['prop_field_definitions']);
+      $after[$component_id] = \array_keys($component->getSettings()['prop_field_definitions']);
     }
 
     foreach ($component_ids as $component_id => $expectation) {

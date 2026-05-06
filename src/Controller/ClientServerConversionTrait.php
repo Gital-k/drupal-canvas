@@ -50,7 +50,11 @@ trait ClientServerConversionTrait {
       // @see https://www.drupal.org/project/canvas/issues/3525746#comment-16121437
       // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem::getClientSideRepresentation()
       // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::getClientSideRepresentation()
-      assert(in_array($component['nodeType'], ['component', ComponentSourceWithSwitchCasesInterface::SWITCH, ComponentSourceWithSwitchCasesInterface::CASE]));
+      \assert(\in_array($component['nodeType'], strict: TRUE, haystack: [
+        'component',
+        ComponentSourceWithSwitchCasesInterface::SWITCH,
+        ComponentSourceWithSwitchCasesInterface::CASE,
+      ]));
       $items = \array_merge($items, self::doClientComponentToServerTree($component, $model, ComponentTreeItemList::ROOT_UUID, NULL));
     }
     if ($validate) {
@@ -70,7 +74,7 @@ trait ClientServerConversionTrait {
    * @phpstan-return ComponentTreeItemListArray
    */
   private static function doClientSlotToServerTree(array $layout, array $model, string $parent_uuid): array {
-    assert(isset($layout['nodeType']));
+    \assert(isset($layout['nodeType']));
 
     // Regions have no name.
     $name = $layout['nodeType'] === 'slot' ? $layout['name'] : NULL;
@@ -89,7 +93,11 @@ trait ClientServerConversionTrait {
    */
   private static function doClientComponentToServerTree(array $layout, array $model, string $parent_uuid, ?string $parent_slot): array {
     \assert(\array_key_exists('nodeType', $layout));
-    assert(in_array($layout['nodeType'], ['component', ComponentSourceWithSwitchCasesInterface::SWITCH, ComponentSourceWithSwitchCasesInterface::CASE]));
+    \assert(\in_array($layout['nodeType'], strict: TRUE, haystack: [
+      'component',
+      ComponentSourceWithSwitchCasesInterface::SWITCH,
+      ComponentSourceWithSwitchCasesInterface::CASE,
+    ]));
 
     $uuid = $layout['uuid'] ?? NULL;
     $component_id = $layout['type'] ?? NULL;
@@ -139,7 +147,12 @@ trait ClientServerConversionTrait {
     if ($validate) {
       $violation_list = $entity ? new EntityConstraintViolationList($entity) : new ConstraintViolationList();
     }
-    foreach ($items as $delta => ['uuid' => $uuid, 'component_id' => $component_id, 'inputs' => $inputs, 'component_version' => $version]) {
+    foreach ($items as $delta => [
+      'uuid' => $uuid,
+      'component_id' => $component_id,
+      'inputs' => $inputs,
+      'component_version' => $version,
+    ]) {
       $component = $components[$component_id] ?? NULL;
       // If validation is requested, this has already been validated in
       // ::clientToServerTree
@@ -147,7 +160,7 @@ trait ClientServerConversionTrait {
       if (!$validate && !$component) {
         continue;
       }
-      assert($component instanceof ComponentInterface);
+      \assert($component instanceof ComponentInterface);
       $component->loadVersion($version);
       $source = $component->getComponentSource();
       $useFallback = $component->getComponentSource()->isBroken();

@@ -111,7 +111,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
       $props_array = Json::decode($props);
       $transformed_props = [];
       $required_props = [];
-      if (is_array($props_array)) {
+      if (\is_array($props_array)) {
         foreach ($props_array as $prop) {
           if (!empty($prop['id']) && !empty($prop['name']) && !empty($prop['type']) && !empty($prop['example'])) {
             $transformed = [
@@ -163,10 +163,11 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
       $this->logger->error($e->getMessage());
       // \Drupal\canvas_ai\Controller\CanvasBuilder::render() also YAML parsable output.
       // @see \Drupal\canvas_ai\Controller\CanvasBuilder::render()
-      $this->setOutput(Yaml::dump(['error' => sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
+      $this->setOutput(Yaml::dump(['error' => \sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
       return;
     }
     $this->setStructuredOutput(['component_structure' => $output]);
+    $this->setOutput('The component ' . $component_name . ' has been created successfully.');
   }
 
 }

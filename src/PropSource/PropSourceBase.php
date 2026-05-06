@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\ContentAwareDependentInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Core\Entity\FieldableEntityInterface;
 
@@ -11,7 +12,7 @@ use Drupal\Core\Entity\FieldableEntityInterface;
  * @internal
  *
  * @phpstan-type PropSourceTypePrefix 'static'|'dynamic'|'adapter'|'default-relative-url'
- * @phpstan-type PropSourceArray array{sourceType: string, expression: string, value?: mixed|array<string, mixed>, sourceTypeSettings?: array{instance?: array<string, mixed>, storage?: array<string, mixed>}}
+ * @phpstan-type PropSourceArray array{sourceType: string, expression: string, value?: mixed|array<string, mixed>, sourceTypeSettings?: array{instance?: array<string, mixed>, storage?: array<string, mixed>, adapter?: string}}
  * TRICKY: adapters can be chained/nested, PHPStan does not allow expressing
  * that.
  * @phpstan-type AdaptedPropSourceArray array{sourceType: string, adapterInputs: array<string, mixed>}

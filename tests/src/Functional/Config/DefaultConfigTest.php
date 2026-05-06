@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Config;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\Core\Config\FileStorage;
@@ -11,10 +12,13 @@ use Drupal\Core\Config\InstallStorage;
 use Drupal\Core\Config\StorageInterface;
 use Drupal\KernelTests\AssertConfigTrait;
 use Drupal\Tests\canvas\Functional\FunctionalTestBase;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
+ * Tests Default Config.
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 class DefaultConfigTest extends FunctionalTestBase {
 
   use AssertConfigTrait;
@@ -50,6 +54,10 @@ class DefaultConfigTest extends FunctionalTestBase {
    * @see \Drupal\Tests\demo_umami\Functional\DemoUmamiProfileTest::assertDefaultConfig()
    */
   public function testConfig(): void {
+    // @todo Remove this when 11.3 is the minimum supported version of core.
+    if (version_compare(\Drupal::VERSION, '11.3', '>=')) {
+      $this->markTestSkipped("Skipped on Drupal 11.3 or later because Canvas's default config does not yet include the `styles` option in its text editor configuration.");
+    }
     // Just connect directly to the config table so we don't need to worry about
     // the cache layer.
     $active_config_storage = $this->container->get('config.storage');

@@ -32,7 +32,7 @@ final class PropShape {
   ) {
     $normalized = self::normalizePropSchema($this->schema);
     if ($schema !== $normalized) {
-      throw new \InvalidArgumentException(sprintf("The passed in schema (%s) should be normalized (%s).", print_r($schema, TRUE), print_r($normalized, TRUE)));
+      throw new \InvalidArgumentException(\sprintf("The passed in schema (%s) should be normalized (%s).", print_r($schema, TRUE), print_r($normalized, TRUE)));
     }
     $this->resolvedSchema = self::resolveSchemaReferences($schema);
   }
@@ -55,7 +55,11 @@ final class PropShape {
     // Resolving alone is not enough, also normalize: otherwise no match may be
     // found due to frivolities such as `title` being present.
     $resolved_normalized = self::normalizePropSchema(self::resolveSchemaReferences($raw_sdc_prop_schema));
-    $well_known_prop_shape = array_search($resolved_normalized, self::getWellKnownPropShapes());
+    // TRICKY: specifically do NOT use strict comparisons here, because the
+    // props of an object-shaped prop may be ordered differently.
+    // @see tests/modules/canvas_test_sdc/components/image-without-ref/image-without-ref.component.yml
+    // @phpstan-ignore function.strict
+    $well_known_prop_shape = array_search($resolved_normalized, self::getWellKnownPropShapes(), FALSE);
 
     if ($well_known_prop_shape !== FALSE) {
       return PropShape::normalize([
@@ -66,9 +70,13 @@ final class PropShape {
 
     // If this is an array shape, try standardizing to an array of a well-known
     // shape. But make sure to keep `minItems`, `maxItems` etc!
-    if (JsonSchemaType::fromSdcPropJsonSchema($raw_sdc_prop_schema) === JsonSchemaType::Array && array_key_exists('items', $raw_sdc_prop_schema)) {
+    if (JsonSchemaType::fromSdcPropJsonSchema($raw_sdc_prop_schema) === JsonSchemaType::Array && \array_key_exists('items', $raw_sdc_prop_schema)) {
       $resolved_normalized_array_items = self::normalizePropSchema(self::resolveSchemaReferences($raw_sdc_prop_schema['items']));
-      $well_known_prop_shape = array_search($resolved_normalized_array_items, self::getWellKnownPropShapes());
+      // TRICKY: specifically do NOT use strict comparisons here, because the
+      // props of an object-shaped prop may be ordered differently.
+      // @see tests/modules/canvas_test_sdc/components/image-without-ref/image-without-ref.component.yml
+      // @phpstan-ignore function.strict
+      $well_known_prop_shape = array_search($resolved_normalized_array_items, self::getWellKnownPropShapes(), FALSE);
       if ($well_known_prop_shape !== FALSE) {
         $other_key_value_pairs = array_diff_key($resolved_normalized, array_flip(['type', 'items']));
         return PropShape::normalize([
@@ -115,7 +123,7 @@ final class PropShape {
 
     // Normalization is not (yet) possible when `$ref`s are still present.
     // @todo Once https://www.drupal.org/i/3352063 is fixed and Canvas requires it, convert this to a \LogicException instead, because it should not be possible to occur anymore.
-    if (!array_key_exists('type', $prop_schema) && array_key_exists('$ref', $prop_schema)) {
+    if (!\array_key_exists('type', $prop_schema) && \array_key_exists('$ref', $prop_schema)) {
       return $prop_schema;
     }
 
@@ -137,13 +145,13 @@ final class PropShape {
     $normalized_prop_schema['type'] = JsonSchemaType::from(
     // TRICKY: SDC always allowed `object` for Twig integration reasons.
     // @see \Drupal\sdc\Component\ComponentMetadata::parseSchemaInfo()
-      is_array($prop_schema['type']) ? $prop_schema['type'][0] : $prop_schema['type']
+      \is_array($prop_schema['type']) ? $prop_schema['type'][0] : $prop_schema['type']
     )->value;
 
     // If this is a `type: object` with not a `$ref` but `properties`, normalize
     // those too.
-    if ($normalized_prop_schema['type'] === JsonSchemaType::Object->value && array_key_exists('properties', $normalized_prop_schema)) {
-      $normalized_prop_schema['properties'] = array_map(
+    if ($normalized_prop_schema['type'] === JsonSchemaType::Object->value && \array_key_exists('properties', $normalized_prop_schema)) {
+      $normalized_prop_schema['properties'] = \array_map(
         fn (array $prop_schema) => self::normalizePropSchema($prop_schema),
         $normalized_prop_schema['properties'],
       );
@@ -179,24 +187,24 @@ final class PropShape {
     \assert(empty(array_intersect_key($installed_modules, $installed_themes)));
     $installed_extensions = $installed_modules + $installed_themes;
     foreach ($installed_extensions as $extension_name => $extension) {
-      \assert(is_string($extension_name));
+      \assert(\is_string($extension_name));
       $schema_json_path = $extension->getPath() . '/schema.json';
       if (!file_exists($schema_json_path)) {
         continue;
       }
       // @phpstan-ignore argument.type
       $json = json_decode(file_get_contents($schema_json_path), TRUE);
-      if (!is_array($json) || !array_key_exists('$defs', $json)) {
+      if (!\is_array($json) || !\array_key_exists('$defs', $json)) {
         continue;
       }
-      \assert(Inspector::assertAllStrings(array_keys($json['$defs'])));
-      $extension_type = array_key_exists($extension_name, $installed_modules) ? 'module' : 'theme';
+      \assert(Inspector::assertAllStrings(\array_keys($json['$defs'])));
+      $extension_type = \array_key_exists($extension_name, $installed_modules) ? 'module' : 'theme';
       $known_normalized += array_combine(
-        array_map(
+        \array_map(
           fn(string $def_name) => "json-schema-definitions://$extension_name.$extension_type/$def_name",
-          array_keys($json['$defs']),
+          \array_keys($json['$defs']),
         ),
-        array_map(
+        \array_map(
           fn(array $prop_schema) => self::normalizePropSchema(self::resolveSchemaReferences($prop_schema)),
           $json['$defs'],
         ),
@@ -204,14 +212,14 @@ final class PropShape {
     }
     // No 2 modules should provide the same definition; otherwise we won't know
     // whose was intended.
-    $unique_keys_as_values = array_map(
+    $unique_keys_as_values = \array_map(
       fn (array $schema) => self::normalize($schema)->uniquePropSchemaKey(),
       $known_normalized
     );
     if (count($known_normalized) > count(array_unique($unique_keys_as_values))) {
-      throw new \LogicException(sprintf(
+      throw new \LogicException(\sprintf(
         '🐛 Duplicate $ref definitions detected: %s.',
-        implode(',', array_keys(array_diff_key($known_normalized, array_unique($unique_keys_as_values))))
+        implode(',', \array_keys(array_diff_key($known_normalized, array_unique($unique_keys_as_values))))
       ));
     }
     return $known_normalized;
@@ -227,6 +235,31 @@ final class PropShape {
 
   private static function componentPluginManager(): ComponentPluginManager {
     return \Drupal::service(ComponentPluginManager::class);
+  }
+
+  /**
+   * Whether the given JSON schema for a prop is considered plain or rich prose.
+   *
+   * - Plain prose: `type: string`
+   * - Rich prose: `type: string, contentMediaType: text/html` — the
+   *   `x-formatting-context` does not matter. Invalid `x-formatting-contexts`
+   *   are blocked during discovery of components from ever making it into
+   *   Canvas component trees.
+   *
+   * @param JsonSchema $prop_schema
+   *   The JSON schema for a component prop.
+   *
+   * @return bool
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\StringSemanticsConstraint::PROSE
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\StringSemanticsConstraint::MARKUP
+   */
+  public static function isPlainOrRichProse(array $prop_schema): bool {
+    $normalized = static::normalizePropSchema($prop_schema);
+    return $normalized === ['type' => 'string']
+      || ($normalized['type'] === 'string'
+        && \array_key_exists('contentMediaType', $normalized)
+        && $normalized['contentMediaType'] === 'text/html');
   }
 
 }

@@ -16,7 +16,7 @@ use Symfony\Component\Validator\Exception\MissingOptionsException;
  *
  * Examples:
  * - content entities and ContentTypeTemplate config entities MAY use
- *   DynamicPropSources, but PageRegion and Pattern config entities MUST NOT
+ *   EntityFieldPropSources, but PageRegion and Pattern config entities MUST NOT
  * - content entities, ContentTypeTemplate and Pattern config entities MUST NOT
  *   use any "title" or "messages" blocks, but a PageRegion config entity MAY do
  *   so.
@@ -76,13 +76,13 @@ class ComponentTreeMeetsRequirementsConstraint extends SymfonyConstraint {
     $missing_nested_options = [];
     foreach (['tree', 'inputs'] as $option) {
       foreach (['absence', 'presence'] as $nested_option) {
-        if (!array_key_exists('absence', $this->$option)) {
+        if (!\array_key_exists('absence', $this->$option)) {
           $missing_nested_options[] = "$option.$nested_option";
         }
       }
     }
     if (!empty($missing_nested_options)) {
-      throw new MissingOptionsException(sprintf('The options "%s" must be set for constraint "%s".', implode('", "', array_keys($missing_nested_options)), static::class), array_keys($missing_nested_options));
+      throw new MissingOptionsException(\sprintf('The options "%s" must be set for constraint "%s".', implode('", "', \array_keys($missing_nested_options)), static::class), \array_keys($missing_nested_options));
     }
 
     // Verify sensible values are present for $this->inputs: an array of source
@@ -92,8 +92,8 @@ class ComponentTreeMeetsRequirementsConstraint extends SymfonyConstraint {
       if ($this->inputs[$nested_option] === NULL) {
         continue;
       }
-      if (!is_array($this->inputs[$nested_option])) {
-        throw new InvalidArgumentException(sprintf(
+      if (!\is_array($this->inputs[$nested_option])) {
+        throw new InvalidArgumentException(\sprintf(
           'The option "%s" must be an array of source type prefixes. Supported source type prefixes are: "%s".',
           "inputs.$nested_option",
           implode('", "', $supported_prop_source_types),
@@ -101,7 +101,7 @@ class ComponentTreeMeetsRequirementsConstraint extends SymfonyConstraint {
       }
       $invalid_values = array_diff($this->inputs[$nested_option], $supported_prop_source_types);
       if ($invalid_values) {
-        throw new InvalidArgumentException(sprintf(
+        throw new InvalidArgumentException(\sprintf(
           'The option "%s" specifies the invalid source type prefixes "%s". Supported source type prefixes are: "%s".',
           "inputs.$nested_option",
           implode('", "', $invalid_values),
@@ -116,8 +116,8 @@ class ComponentTreeMeetsRequirementsConstraint extends SymfonyConstraint {
       if ($this->tree[$nested_option] === NULL) {
         continue;
       }
-      if (!is_array($this->tree[$nested_option])) {
-        throw new InvalidArgumentException(sprintf(
+      if (!\is_array($this->tree[$nested_option])) {
+        throw new InvalidArgumentException(\sprintf(
           'The option "%s" must be an array of Component config entity IDs and/or Component (plugin) interfaces.',
           "tree.$nested_option",
         ));

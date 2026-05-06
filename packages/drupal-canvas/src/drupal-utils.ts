@@ -68,9 +68,21 @@ interface BreadcrumbLink {
   url: string;
 }
 
+interface EntityMetadata {
+  bundle: string;
+  entityTypeId: string;
+  uuid: string;
+}
+
 interface PageData {
   pageTitle: string;
   breadcrumbs: Array<BreadcrumbLink>;
+  mainEntity: EntityMetadata | null;
+}
+
+interface ThemeAssets {
+  logo: { url: string };
+  favicon: { url: string; mimeType: string };
 }
 
 interface SiteData {
@@ -80,12 +92,14 @@ interface SiteData {
     siteSlogan: string;
   };
   baseUrl: string;
+  themeAssets: ThemeAssets;
 }
 
 export const getPageData = (): PageData => {
   const pageData = {
     pageTitle: window.drupalSettings?.canvasData?.v0?.pageTitle || '',
     breadcrumbs: window.drupalSettings?.canvasData?.v0?.breadcrumbs || [],
+    mainEntity: window.drupalSettings?.canvasData?.v0?.mainEntity || null,
   };
   window.parent.postMessage({
     type: '_canvas_useswr_data_fetch',
@@ -103,6 +117,10 @@ export const getSiteData = (): SiteData => {
       siteSlogan: '',
     },
     baseUrl: window.drupalSettings?.canvasData?.v0?.baseUrl || '/',
+    themeAssets: window.drupalSettings?.canvasData?.v0?.themeAssets || {
+      logo: { url: '' },
+      favicon: { url: '', mimeType: '' },
+    },
   };
   window.parent.postMessage({
     type: '_canvas_useswr_data_fetch',

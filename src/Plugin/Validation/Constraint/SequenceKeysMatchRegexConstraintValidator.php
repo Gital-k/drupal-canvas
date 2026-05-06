@@ -21,14 +21,14 @@ final class SequenceKeysMatchRegexConstraintValidator extends RegexValidator {
     if ($value === NULL) {
       return;
     }
-    if (!is_array($value)) {
+    if (!\is_array($value)) {
       throw new UnexpectedTypeException($value, 'array');
     }
     if ($value && array_is_list($value)) {
       throw new UnexpectedTypeException($value, 'associative array');
     }
 
-    foreach (array_keys($value) as $key) {
+    foreach (\array_keys($value) as $key) {
       parent::validate($key, $constraint);
     }
   }

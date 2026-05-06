@@ -58,7 +58,7 @@ to one of us! 😊 🙏
 - `prop expression`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
 - `prop source`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
 - `static prop source`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
-- `dynamic prop source`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
+- `entity field prop source`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
 - `region node`: one of the node types in the UI data model, representing a `theme region`'s `component tree`
 - `slot node`: one of the node types in the UI data model, representing a `component instance`'s `component slot`
 - `Canvas field`: an instance of the `component tree field type`
@@ -101,15 +101,17 @@ See `\Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem` + its validation c
 Canvas defines a new `Canvas field type` with the following `field prop`s:
 - _uuid_ — A unique ID for this `component instance`
 - _component_id_ — This is the ID of the `Component config entity` this `component instance` references
+- _component_version_ — This is the version of the `Component config entity` this `component instance` uses.
 - _parent_uuid_ — If this `component instance` is placed inside another `component instance` in the tree, the UUID of the parent `component instance`
 - _slot_ — If this `component instance` is placed inside another `component instance` in the tree, the machine name of the `component slot` in which it is placed. This slot must exist in the parent `component instance`.
 - _inputs_ — see 3.2.2
 
 When _parent_uuid_ and _slot_ are empty, the `component instance` is at the root of the `component tree`.
 
-Additionally there are two computed `field prop`s:
+Additionally there are three computed `field prop`s:
 - _component_ - this is an entity reference to the `Component config entity` the `component instance` uses, meaning also the appropriate version will be loaded. Any methods on the `Component config entity` can be chained. E.g. `$item->get('component')?->getComponentSource()`.
 - _parent_item_ - this is a data reference to the sibling `\Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem` in the tree that represents the `component instance`'s parent `component instance` in the `component tree`. If the `component instance` has no parent, this will be NULL. Any methods on the parent `component instance` can be chained, e.g. `$item->get('parent_item')->getComponent()?->getComponentSource()?->getSlotDefinitions()`
+- _inputs_resolved_ - the resolved values for this `component instance`'s inputs. Resolves stored inputs (block plugin settings, `prop source`s) into their output values (e.g. booleans, prose strings, image URL strings), making them available to normalizers (JSON:API, REST). This is automatically invalidated when the `inputs`, `component_id` or `component_version` properties change. No convenience method exists because Canvas should not interact with this.
 
 Additionally, convenience methods for accessing/setting values on the `ComponentTreeItem` exist including:
 - `getParentUuid(): ?string` - gets the value of _parent_uuid_ if it exists
@@ -132,6 +134,22 @@ Storing these as separate `field prop`s simplifies supporting both symmetric and
   2. marked untranslatable for _symmetric translations_ (same `component tree` for all `content entity` translations)
 
 (Drupal's Content Translation module natively supports configuring this.)
+
+The same 6 `field prop`s are also stored for `component instance`s stored in config entities. This allows them to be
+loaded into `ComponentTreeItem` objects and then treated (validated etc) identically to `component instance`s stored in
+content entities.
+However, config entities have a few additional needs:
+1. they need to be exportable to YAML, which means the `field prop`s must be exportable to YAML. This is trivial for the
+   _tree_ column group (they are all strings), but the _inputs_ column group requires the JSON blob to be stored as a
+   string in YAML, and then JSON decoded when loaded into a `ComponentTreeItem` object
+2. that in turn is insufficient for Configuration Translation to be supported: `component tree`s stored in config
+   entities must _also_ be translatable, and this requires configuration schema to describe _which_ inputs are
+   translatable
+
+To make its `component instance`s translatable, a `Component Source Plugin` can specify an
+`inputs_config_schema_generator` class (see `\Drupal\canvas\ComponentSource\ComponentInstanceInputsConfigSchemaGeneratorInterface`).
+
+For content entities (stored in the `ComponentTreeItem` field type), the same generator determines which input keys are translatable via `ComponentTreeItem::getTranslatableInputKeys()`. This provides a single source of truth for translatability between config entity translation (configuration schema discovered by `config_translation`) and content entity translation (used by `content_translation` to validate and synchronize per-key overrides).
 
 #### 3.2.1 The columns (`field prop`s) storing the tree structure
 
@@ -214,7 +232,52 @@ Example: A simple tree showing a root item (`41595148-e5c1-4873-b373-be3ae6e2134
     // Note how much simpler the stored information is, because it uses the Block system's native input UX:
     'inputs' => [
       'label' => '',
-      'label_display' => FALSE,
+      'label_display' => '0',
+      'use_site_logo' => TRUE,
+      'use_site_name' => TRUE,
+      'use_site_slogan' => TRUE,
+    ],
+  ],
+],
+```
+
+The above is the _runtime_ representation.
+
+The _stored_ representation is optimized for compactness, and each `ComponentSource` is the authority for how to
+optimize the stored data. For example:
+- `ComponentSource`s whose explicit inputs are populated by `StaticPropSource`s can decide that all instances of some
+  `component version` must use the exact same `StaticPropSource`. That enables them to store only the value inside the
+  `StaticPropSource`, and load the metadata when needed. Result: see below.
+- The `Block` `ComponentSource` _could_ (but does not yet at the time of writing) choose to omit `label` and
+  `label_display` settings (which exist for _every_ block plugin), because it's forcing it to not have a label anyway.
+
+```php
+[
+  'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+  'component_id' => 'sdc.canvas_test_sdc.props-slots',
+  'component_version' => '85a5c0c7dd53e0bb',
+  'inputs' => [
+    // Note how much simpler this is compared to the runtime representation above.
+    'heading' => "Hello, world!",
+  ],
+],
+[
+  'uuid' => '3b305d86-86a7-4684-8664-7ef1fc2be070',
+  'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+  'component_version' => 'b1e991f726a2a266',
+  'parent_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+  'slot' => 'the_body',
+  'inputs' => [
+    // Note how much simpler this is compared to the runtime representation above.
+    'heading' => "It's me!",
+  ],
+  [
+    'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+    'component_id' => 'block.system_branding_block',
+    'component_version' => '247a23298360adb2',
+    'inputs' => [
+      'label' => '',
+      'label_display' => '0',
       'use_site_logo' => TRUE,
       'use_site_name' => TRUE,
       'use_site_slogan' => TRUE,
@@ -507,3 +570,39 @@ A complete example, with three `region node`s:
   }
 }
 ```
+
+### 3.5 Data Model: dealing with `component`s evolution
+
+The stored `component tree`s contain `component instance`s tied with specific versions of the associated `Component config entity`. But every `component` can evolve, which will result in new versions.
+
+Each `component source` is able to specify an updater class (see `\Drupal\canvas\ComponentSource\ComponentInstanceUpdaterInterface`).
+This updater will be responsible for:
+
+* Checking if a `component instance` is using the active version.
+* Deciding if a `component instance` not using the active version can be updated automatically without any data loss.
+* Performing that update.
+
+This update of the `component tree`'s`component instance`s will happen automatically
+as soon as we attempt to edit a component tree (see `\Drupal\canvas\Controller\ApiLayoutController::buildRegion()` and
+`\Drupal\canvas\Controller\ApiConfigControllers::normalize()`).
+
+For those `component source`s not providing an input UX (see [`Canvas Components` doc](components.md)), the scenarios
+where such an update is possible without any risk are:
+
+- Adding optional props
+- Adding slots
+- Changing props from required to optional
+- Changing a prop matched prop shape field widget (but only the widget!)
+- Changing default values in prop_field_definitions
+- Changing slot examples
+- Removing props (required or optional)
+- Removing slots
+- Adding a new required prop.
+- Changing props from optional to required
+
+Unsafe changes (that prevent auto-update) include:
+
+- Changing prop shapes
+
+See
+- `\Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater::canUpdate`

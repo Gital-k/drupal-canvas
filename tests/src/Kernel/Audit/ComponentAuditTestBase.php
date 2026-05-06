@@ -5,29 +5,17 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Audit;
 
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Page;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
-use Drupal\canvas\PropSource\StaticPropSource;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 
 /**
  * Defines a base class for component audit tests.
  */
-abstract class ComponentAuditTestBase extends KernelTestBase {
+abstract class ComponentAuditTestBase extends CanvasKernelTestBase {
 
   protected static $modules = [
-    'canvas',
-    'file',
-    'image',
-    'link',
-    'options',
-    'system',
-    'media',
-    'path',
-    'user',
-    'canvas_test_sdc',
-    'text',
-    'filter',
+    'node',
   ];
 
   protected array $tree = [];
@@ -39,19 +27,19 @@ abstract class ComponentAuditTestBase extends KernelTestBase {
     $this->installEntitySchema('user');
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
     $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $tested_component = Component::load('sdc.canvas_test_sdc.my-cta');
+    \assert($tested_component instanceof Component);
     $this->tree = [
       [
-        'uuid' => 'my-component',
-        'component_id' => 'sdc.canvas_test_sdc.my-cta',
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $tested_component->id(),
+        'component_version' => $tested_component->getActiveVersion(),
         'inputs' => [
-          'text' => StaticPropSource::generate(
-            expression: new FieldTypePropExpression('string', 'value'),
-            cardinality: 1,
-          )->withValue('Hey there')->toArray(),
-          'href' => StaticPropSource::generate(
-            expression: new FieldTypePropExpression('uri', 'value'),
-            cardinality: 1,
-          )->withValue('https://drupal.org/')->toArray(),
+          'text' => 'Hey there',
+          'href' => [
+            'uri' => 'https://drupal.org/',
+            'options' => [],
+          ],
         ],
       ],
     ];

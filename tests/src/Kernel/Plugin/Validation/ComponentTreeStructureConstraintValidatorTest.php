@@ -4,44 +4,34 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Validation;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraint;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @coversDefaultClass \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
- * @group canvas
+ * Tests Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator.
  */
-final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[CoversClass(ComponentTreeStructureConstraintValidator::class)]
+#[Group('canvas')]
+final class ComponentTreeStructureConstraintValidatorTest extends CanvasKernelTestBase {
 
   use ConstraintViolationsTestTrait;
   use GenerateComponentConfigTrait;
   use ComponentTreeItemListInstantiatorTrait;
 
-  protected static $modules = [
-    'canvas',
-    'canvas_test_sdc',
-    'block',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'media',
-    'options',
-    'path',
-    'link',
-    'text',
-    'filter',
-    'system',
-    'user',
-  ];
-
   /**
-   * @dataProvider providerValidation
-   */
+ * Tests validation.
+ */
+  #[DataProvider('providerValidation')]
   public function testValidation(array $items, array $expected_violations): void {
     $this->generateComponentConfig();
     $validator = \Drupal::service(BasicRecursiveValidatorFactory::class)->createValidator();
@@ -50,8 +40,9 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
   }
 
   /**
-   * @dataProvider providerValidationItemList
-   */
+ * Tests validation item list.
+ */
+  #[DataProvider('providerValidationItemList')]
   public function testValidationItemList(array $items, array $expected_violations): void {
     $this->generateComponentConfig();
     $item_list = $this->createDanglingComponentTreeItemList();
@@ -323,6 +314,33 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
         ],
         [
           'layout.1.slot' => 'Invalid component tree item with UUID <em class="placeholder">d823d3c9-be9f-4053-8bc9-ad36914c345c</em>. A slot name must be present if a parent uuid is provided.',
+        ],
+      ],
+      'INVALID: child references parent with invalid component_version' => [
+        [
+          [
+            'uuid' => '2886421e-4ede-4bfb-956c-8afcd4ee8103',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
+            'component_version' => 'bad-version',
+          ],
+          [
+            'uuid' => '80bf49ec-3d3f-4e76-98ed-2ce147397643',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+            'component_version' => 'b1e991f726a2a266',
+            'parent_uuid' => '2886421e-4ede-4bfb-956c-8afcd4ee8103',
+            'slot' => 'the_body',
+          ],
+          // No additional validation errors for the invalid version, no matter how many children that component instance contains.
+          [
+            'uuid' => '80bf49ec-3d3f-4e76-98ed-2ce147397644',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+            'component_version' => 'b1e991f726a2a266',
+            'parent_uuid' => '2886421e-4ede-4bfb-956c-8afcd4ee8103',
+            'slot' => 'the_body',
+          ],
+        ],
+        [
+          'layout.0.component_version' => "'bad-version' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-slots'. Available versions: '85a5c0c7dd53e0bb'.",
         ],
       ],
       'INVALID: valid tree, with unknown components' => [

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\TestWith;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Url;
 use Drupal\canvas\AutoSave\AutoSaveManager;
@@ -26,10 +28,12 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
+ * Tests Api Auto Save Controller.
+ *
  * @see \Drupal\Tests\canvas\Kernel\ApiAutoSaveControllerTest
- * @group canvas
- * @group canvas_personalization
  */
+#[Group('canvas')]
+#[Group('canvas_personalization')]
 final class ApiAutoSaveControllerTest extends KernelTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -58,6 +62,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installConfig('system');
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
   }
 
@@ -162,9 +167,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
   }
 
   /**
-   * @testWith [false, "The 'publish auto-saves' permission is required."]
-   *           [true, null]
-   */
+ * Tests post.
+ */
+  #[TestWith([FALSE, "The 'publish auto-saves' permission is required."])]
+  #[TestWith([TRUE, NULL])]
   public function testPost(bool $authorized, ?string $expected_403_message): void {
     $this->setUpImages();
     $entity_type_manager = $this->container->get('entity_type.manager');
@@ -265,7 +271,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     self::assertEquals($errors, $json['errors']);
     $stored_segment = $segment_storage->loadUnchanged($segment_id);
-    assert($stored_segment instanceof Segment);
+    \assert($stored_segment instanceof Segment);
     // Ensure the entity is not updated if is invalid.
     $this->assertEquals('New segment', $stored_segment->label());
 
@@ -328,7 +334,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertEquals(['message' => 'Successfully published 1 item.'], $json);
 
     $stored = $segment_storage->loadUnchanged($segment_id);
-    assert($stored instanceof Segment);
+    \assert($stored instanceof Segment);
     $this->assertSame($new_title, $stored->label());
     $this->assertSame($new_description, $stored->get('description'));
     $this->assertSame($data['rules'], $stored->get('rules'));

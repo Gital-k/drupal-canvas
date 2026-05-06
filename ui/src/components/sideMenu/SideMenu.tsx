@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import clsx from 'clsx';
 import { useParams } from 'react-router';
 import { useLocation } from 'react-router-dom';
+import BrandKitIcon from '@assets/icons/brand-kit.svg?react';
 import ExtensionIcon from '@assets/icons/extension-sm.svg?react';
 import TemplateIcon from '@assets/icons/template.svg?react';
 import {
@@ -18,6 +19,7 @@ import {
   setActivePanel,
   unsetActivePanel,
 } from '@/features/ui/primaryPanelSlice';
+import { getCanvasSettings } from '@/utils/drupal-globals';
 import { hasPermission } from '@/utils/permissions';
 
 import styles from './SideMenu.module.css';
@@ -56,25 +58,6 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
   const hasActiveEditorFrame =
     (segments.includes('editor') && params.entityId !== undefined) ||
     (segments.includes('template') && params.previewEntityId !== undefined);
-
-  /**
-   * Navigate to previously edited item when opening layers or library panel
-   */
-  // const previouslyEdited = useAppSelector(selectPreviouslyEdited);
-  // const navigate = useNavigate();
-  // useEffect(() => {
-  //   // This useEffect can immediately navigate to the previously edited item when the user clicks on the layers or library panel buttons.
-  //   // however this currently causes a page reload which is a bit disruptive.
-  //   if (
-  //     !hasActiveEditorFrame &&
-  //     (activePanel === 'layers' || activePanel === 'library') &&
-  //     previouslyEdited?.path
-  //   ) {
-  //     console.log('navigate to editor');
-  //     navigate(previouslyEdited.path);
-  //   }
-  // }, [activePanel, previouslyEdited, hasActiveEditorFrame, navigate]);
-  /** Re-add this block once we allow navigating between entities without a page load  */
 
   const handleMenuClick = useCallback(
     (panelId: string) => {
@@ -138,6 +121,14 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       label: 'Extensions',
       enabled: true,
       hidden: !hasExtensions,
+    },
+    {
+      type: 'button',
+      id: 'brandKit',
+      icon: <BrandKitIcon />,
+      label: 'Brand kit',
+      enabled: true,
+      hidden: !hasPermission('brandKit') || !getCanvasSettings()?.devMode,
     },
   ];
 

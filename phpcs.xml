@@ -5,6 +5,8 @@ $ ln -sv /PATH/TO/DRUPAL/ROOT/core/core/phpcs.xml.dist core.phpcs.xml.dist
 core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
 -->
 <ruleset name="canvas">
+  <arg name="cache" value=".cache/phpcs/.phpcs.cache" />
+  <exclude-pattern>.cache/*</exclude-pattern>
   <exclude-pattern>*/modules/canvas_vite/*</exclude-pattern>
   <!-- Drupal (core) uses stylelint: https://www.drupal.org/list-changes/drupal/published?keywords_description=stylelint-->
   <exclude-pattern>*.css$</exclude-pattern>
@@ -31,6 +33,10 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
       <include-pattern>*/tests/modules/*</include-pattern>
     </exclude>
   </rule>
+  <!-- … allow long-line array declarations where they are useful: in test expectations. -->
+  <rule ref="Drupal.Arrays.Array.LongLineDeclaration">
+    <exclude-pattern>*/tests/*</exclude-pattern>
+  </rule>
   <rule ref="Drupal.Files.EndFileNewline">
     <exclude-pattern>*/config/install/*\.yml$</exclude-pattern>
   </rule>
@@ -38,4 +44,22 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
   <rule ref="Drupal.Files.LineLength.TooLong">
     <exclude-pattern>*/canvas_ai/*</exclude-pattern>
   </rule>
+
+  <!-- Canvas' additional coding standards. -->
+  <rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes">
+    <properties>
+      <property name="spacesCountAroundEqualsSign" value="0"></property>
+    </properties>
+    <exclude-pattern>*.api.php</exclude-pattern>
+    <exclude-pattern>*/tests/fixtures/update/*</exclude-pattern>
+    <!-- @todo eventually apply stricter rules to canvas_ai, too. -->
+    <exclude-pattern>*/canvas_ai/*</exclude-pattern>
+  </rule>
+  <rule ref="SlevomatCodingStandard.Namespaces.FullyQualifiedGlobalFunctions">
+    <properties>
+      <!-- See https://github.com/php/php-src/blob/PHP-8.4.18/Zend/zend_compile.c#L4962 -->
+      <property name="include" type="array" value="assert,sprintf,array_map,array_keys,array_key_exists,is_array,is_bool,is_callable,is_countable,is_double,is_float,is_int,is_integer,is_iterable,is_long,is_null,is_numeric,is_object,is_resource,is_scalar,is_string,in_array" />
+    </properties>
+  </rule>
+  <rule ref="./coding_standards/Canvas" />
 </ruleset>

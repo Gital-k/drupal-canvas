@@ -37,17 +37,18 @@ import {
   selectEditorFrameContext,
   selectPreviouslyEdited,
 } from '@/features/ui/uiSlice';
-import useDebounce from '@/hooks/useDebounce';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useEntityTitle } from '@/hooks/useEntityTitle';
+import { usePaginatedContentList } from '@/hooks/usePaginatedContentList';
 import { useSmartRedirect } from '@/hooks/useSmartRedirect';
 import { useTemplateCaption } from '@/hooks/useTemplateCaption';
+import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import {
   useCreateContentMutation,
   useDeleteContentMutation,
-  useGetContentListQuery,
   useGetStagedConfigQuery,
   useSetStagedConfigMutation,
+  useUpdateContentMutation,
 } from '@/services/content';
 import { pageDataFormApi } from '@/services/pageDataForm';
 import { getCanvasSettings } from '@/utils/drupal-globals';
@@ -79,7 +80,7 @@ export const HOMEPAGE_CONFIG_ID = 'canvas_set_homepage';
 
 const PageInfo = () => {
   const { showBoundary } = useErrorBoundary();
-  const { setEditorEntity } = useEditorNavigation();
+  const { navigateToEditor } = useEditorNavigation();
   const { redirectToNextBestPage } = useSmartRedirect();
   const {
     regionId: focusedRegion = DEFAULT_REGION,
@@ -103,20 +104,18 @@ const PageInfo = () => {
   const templateCaption = useTemplateCaption();
 
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   // @todo: https://www.drupal.org/i/3513566 this needs to be generalized to check all content entity types.
   const canCreatePages =
     !!canvasSettings.contentEntityCreateOperations?.canvas_page?.canvas_page;
+  // @todo Generalize in https://www.drupal.org/i/3498525
   const {
-    data: pageItems,
+    items: pageItems,
     isLoading: isPageItemsLoading,
     error: pageItemsError,
     isSuccess: isGetPageItemsSuccess,
-  } = useGetContentListQuery({
-    // @todo Generalize in https://www.drupal.org/i/3498525
-    entityType: 'canvas_page',
-    search: debouncedSearchTerm,
-  });
+    hasMore,
+    handleLoadMore,
+  } = usePaginatedContentList('canvas_page', searchTerm);
 
   const [
     createContent,
@@ -138,11 +137,12 @@ const PageInfo = () => {
     });
   const [isCurrentPageHomepage, setIsCurrentPageHomepage] =
     useState<boolean>(false);
+  const [popoverOpen, setPopoverOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (isGetPageItemsSuccess) {
       // Check if the current page is the homepage.
-      const homepage = pageItems.find(
+      const homepage = pageItems?.find(
         (page) => page.internalPath === homepagePath,
       );
       setIsCurrentPageHomepage(
@@ -163,10 +163,13 @@ const PageInfo = () => {
     createContent({
       entity_type: 'canvas_page',
     });
+    setPopoverOpen(false);
   }
 
   const [deleteContent, { error: deleteContentError }] =
     useDeleteContentMutation();
+  const [updateContent, { error: updateContentError }] =
+    useUpdateContentMutation();
   const [setHomepage, { error: setHomepageError }] =
     useSetStagedConfigMutation();
 
@@ -192,11 +195,35 @@ const PageInfo = () => {
       entity_type: 'canvas_page',
       entity_id: String(item.id),
     });
+    setPopoverOpen(false);
   }
 
-  // @todo https://www.drupal.org/i/3498525 should generalize this to all eligible content entity types.
-  function handleOnSelect(item: ContentStub) {
-    setEditorEntity('canvas_page', String(item.id));
+  async function handleUnpublishPage(item: ContentStub) {
+    const pageToUnpublishId = String(item.id);
+    await updateContent({
+      entityType: 'canvas_page',
+      entityId: pageToUnpublishId,
+      status: false,
+    });
+
+    // If the current page is being unpublished, invalidate the layout cache to refetch with updated hasUnsavedStatusChange
+    if (entityType === 'canvas_page' && entityId === pageToUnpublishId) {
+      dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
+    }
+  }
+
+  async function handlePublishPage(item: ContentStub) {
+    const pageToPublishId = String(item.id);
+    await updateContent({
+      entityType: 'canvas_page',
+      entityId: pageToPublishId,
+      status: true,
+    });
+
+    // If the current page is being published, invalidate the layout cache to refetch with updated hasUnsavedStatusChange
+    if (entityType === 'canvas_page' && entityId === pageToPublishId) {
+      dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
+    }
   }
 
   function handleSetHomepage(item: ContentStub) {
@@ -222,12 +249,13 @@ const PageInfo = () => {
 
   useEffect(() => {
     if (isCreateContentSuccess) {
-      setEditorEntity(
+      setPopoverOpen(false);
+      navigateToEditor(
         createContentData.entity_type,
         createContentData.entity_id,
       );
     }
-  }, [isCreateContentSuccess, createContentData, setEditorEntity]);
+  }, [isCreateContentSuccess, createContentData, navigateToEditor]);
 
   useEffect(() => {
     if (createContentError) {
@@ -246,6 +274,12 @@ const PageInfo = () => {
       showBoundary(setHomepageError);
     }
   }, [setHomepageError, showBoundary]);
+
+  useEffect(() => {
+    if (updateContentError) {
+      showBoundary(updateContentError);
+    }
+  }, [updateContentError, showBoundary]);
 
   return (
     <Flex gap="2" align="center">
@@ -274,7 +308,7 @@ const PageInfo = () => {
         </NavLink>
       ) : null}
       {focusedRegion === DEFAULT_REGION ? (
-        <Popover.Root>
+        <Popover.Root open={popoverOpen} onOpenChange={setPopoverOpen}>
           <Popover.Trigger>
             <Button
               color="gray"
@@ -324,10 +358,14 @@ const PageInfo = () => {
                   showNew={canCreatePages}
                   onNewPage={handleNewPage}
                   onSearch={setSearchTerm}
-                  onSelect={handleOnSelect}
+                  onSelect={() => setPopoverOpen(false)}
                   onDuplicate={handleDuplication}
                   onSetHomepage={handleSetHomepage}
+                  onUnpublish={handleUnpublishPage}
+                  onPublish={handlePublishPage}
                   onDelete={handleDeletePage}
+                  hasMore={hasMore}
+                  onLoadMore={handleLoadMore}
                 />
               )}
               {pageItemsError && (

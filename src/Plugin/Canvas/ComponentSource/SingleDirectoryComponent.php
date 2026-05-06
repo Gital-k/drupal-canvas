@@ -27,6 +27,8 @@ use Symfony\Component\Filesystem\Path;
   label: new TranslatableMarkup('Single-Directory Components'),
   supportsImplicitInputs: FALSE,
   discovery: SingleDirectoryComponentDiscovery::class,
+  updater: GeneratedFieldExplicitInputUxComponentInstanceUpdater::class,
+  inputs_config_schema_generator: GeneratedFieldExplicitInputUxComponentInstanceInputsConfigSchemaGenerator::class,
   // @see \Drupal\Core\Theme\ComponentPluginManager::__construct()
   discoveryCacheTags: ['component_plugins'],
 )]
@@ -65,6 +67,16 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
     //   broken/invalid. See
     //   https://www.drupal.org/project/canvas/issues/3532514
     return FALSE;
+  }
+
+  public function determineDefaultFolder(): string {
+    $plugin_definition = $this->getComponentPlugin()->getPluginDefinition();
+    \assert(\is_array($plugin_definition));
+    // TRICKY: SDCs metadata specifies `group`, but gets exposed as `category`.
+    // @see \Drupal\Core\Theme\ComponentPluginManager::processDefinitionCategory()
+    \assert(!empty($plugin_definition['category']));
+
+    return (string) $plugin_definition['category'];
   }
 
   /**
@@ -173,12 +185,12 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
    */
   protected function getSourceLabel(): TranslatableMarkup {
     $component_plugin = $this->getComponentPlugin();
-    assert(is_array($component_plugin->getPluginDefinition()));
+    \assert(\is_array($component_plugin->getPluginDefinition()));
 
     // The 'extension_type' key is guaranteed to be set.
     // @see \Drupal\Core\Theme\ComponentPluginManager::alterDefinition()
     $extension_type = $component_plugin->getPluginDefinition()['extension_type'];
-    assert($extension_type instanceof ExtensionType);
+    \assert($extension_type instanceof ExtensionType);
     return match ($extension_type) {
       ExtensionType::Module => $this->t('Module component'),
       ExtensionType::Theme => $this->t('Theme component'),

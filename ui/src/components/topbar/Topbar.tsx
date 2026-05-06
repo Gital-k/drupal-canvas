@@ -11,9 +11,11 @@ import PreviewControls from '@/components/PreviewControls';
 import UnpublishedChanges from '@/components/review/UnpublishedChanges';
 import ContentPreviewSelector from '@/components/templates/ContentPreviewSelector';
 import UndoRedo from '@/components/UndoRedo';
+import NotificationBell from '@/features/notifications/NotificationBell';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout';
-import { getBaseUrl, getDrupalSettings } from '@/utils/drupal-globals';
+import { getDrupalSettings } from '@/utils/drupal-globals';
 
 import PageInfo from '../pageInfo/PageInfo';
 
@@ -24,13 +26,13 @@ const PREVIOUS_URL_STORAGE_KEY = 'CanvasPreviousURL';
 const Topbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { entityType, bundle, viewMode, previewEntityId } = useParams();
+  const { entityType, bundle, previewEntityId } = useParams();
   const isPreview = location.pathname.includes('/preview');
   const isEditor = location.pathname.includes('/editor');
   const isSegments = location.pathname.includes('/segments');
   const isTemplateEditorContext =
     useAppSelector(selectEditorFrameContext) === 'template';
-  const drupalBaseUrl = getBaseUrl();
+  const { setTemplatePreviewEntityId } = useEditorNavigation();
 
   let hasAiExtensionAvailable = false;
   let hasPersonalizeExtensionAvailable = false;
@@ -62,15 +64,7 @@ const Topbar = () => {
 
   // Handle preview entity selection change
   const handlePreviewEntityChange = (selectedEntityId: string) => {
-    if (entityType && bundle && viewMode) {
-      // @todo: Change to use navigate() when we can do full FE routing.
-      setTimeout(() => {
-        // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
-        // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
-        // the window.location.href is in progress.
-        window.location.href = `${drupalBaseUrl}canvas/template/${entityType}/${bundle}/${viewMode}/${selectedEntityId}`;
-      }, 100);
-    }
+    setTemplatePreviewEntityId(selectedEntityId);
   };
 
   const backHref =
@@ -164,6 +158,7 @@ const Topbar = () => {
             gap="2"
             width={leftRightColumnWidth}
           >
+            <NotificationBell />
             <PreviewControls isPreview={isPreview} />
             <UnpublishedChanges />
           </Flex>

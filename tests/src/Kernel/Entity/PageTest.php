@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
+ * Tests Page.
  */
-final class PageTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+final class PageTest extends CanvasKernelTestBase {
 
   use GenerateComponentConfigTrait;
   use MediaTypeCreationTrait;
@@ -25,18 +29,6 @@ final class PageTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'block',
-    'sdc',
-    'sdc_test',
-    'canvas_test_sdc',
-    // Modules providing field types + widgets for the SDC Components'
-    // `prop_field_definitions`.
-    'file',
-    'image',
-    'options',
-    'link',
-    'system',
     ...self::PAGE_TEST_MODULES,
   ];
 
@@ -125,7 +117,7 @@ final class PageTest extends KernelTestBase {
             'use_site_logo' => TRUE,
             'use_site_name' => TRUE,
             'use_site_slogan' => TRUE,
-            'label_display' => FALSE,
+            'label_display' => '0',
             'label' => '',
           ],
         ],
@@ -161,7 +153,7 @@ final class PageTest extends KernelTestBase {
               'use_site_logo' => TRUE,
               'use_site_name' => TRUE,
               'use_site_slogan' => TRUE,
-              'label_display' => FALSE,
+              'label_display' => '0',
               'label' => '',
             ],
           ],
@@ -171,7 +163,7 @@ final class PageTest extends KernelTestBase {
     );
     // See \Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType\ComponentTreeItemTest and
     // \Drupal\Tests\canvas\Unit\PropExpressionTest for extended test coverage,
-    // which combined with \Drupal\Tests\canvas\Kernel\PropSourceTest::testDynamicPropSource,
+    // which combined with \Drupal\Tests\canvas\Kernel\PropSource\EntityFieldPropSourceTest,
     // does already prove that this will work correctly for EVERYTHING.
     $dependencies = $components->calculateDependencies();
     $this->assertSame([

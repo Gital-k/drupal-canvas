@@ -33,7 +33,7 @@ class BetterEntityDataDefinition extends ComplexDataDefinitionBase implements En
       // EntityDeriver. In that case, this is a new definition and we'll just
       // create the definition from defaults by using an empty array.
       $values = \Drupal::typedDataManager()->getDefinition($data_type, FALSE);
-      $definition = new static(is_array($values) ? $values : []);
+      $definition = new static(\is_array($values) ? $values : []);
 
       // Set the EntityType constraint using the given entity type ID.
       $definition->setEntityTypeId($entity_type_id);
@@ -72,14 +72,14 @@ class BetterEntityDataDefinition extends ComplexDataDefinitionBase implements En
         // Return an empty array for entities that are not content entities.
         $entity_type = \Drupal::entityTypeManager()->getDefinition($entity_type_id);
         $entity_type_class = $entity_type->getClass();
-        if (!in_array('Drupal\Core\Entity\FieldableEntityInterface', class_implements($entity_type_class))) {
+        if (!\in_array('Drupal\Core\Entity\FieldableEntityInterface', class_implements($entity_type_class))) {
           $this->propertyDefinitions = [];
         }
         else {
           // @todo Add support for handling multiple bundles.
           // See https://www.drupal.org/node/2169813.
           $bundles = $this->getBundles();
-          $specific_bundle = (is_array($bundles) && count($bundles) == 1) ? reset($bundles) : NULL;
+          $specific_bundle = (\is_array($bundles) && count($bundles) == 1) ? reset($bundles) : NULL;
           if ($specific_bundle === NULL && !$entity_type->hasKey('bundle')) {
             $specific_bundle = $entity_type_id;
           }
@@ -145,7 +145,7 @@ class BetterEntityDataDefinition extends ComplexDataDefinitionBase implements En
    */
   public function getBundles() {
     $bundle = $this->definition['constraints']['Bundle'] ?? NULL;
-    return is_string($bundle) ? [$bundle] : $bundle;
+    return \is_string($bundle) ? [$bundle] : $bundle;
   }
 
   /**

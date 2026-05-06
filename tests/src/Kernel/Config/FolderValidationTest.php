@@ -8,13 +8,14 @@ use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\Tests\ConfigTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+#[Group('canvas')]
+#[RunTestsInSeparateProcesses]
 class FolderValidationTest extends BetterConfigEntityValidationTestBase {
-
-  use ConfigTestTrait;
 
   const FOLDER_NAME = 'Unique name';
 
@@ -27,6 +28,7 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
     // Canvas's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
+    'field',
     'image',
     'options',
     'path',
@@ -35,6 +37,7 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
     'filter',
     'ckeditor5',
     'editor',
+    'user',
   ];
 
   protected function setUp(): void {
@@ -216,9 +219,9 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
     $config_importer->import();
 
     $folder = Folder::loadByNameAndConfigEntityTypeId('Test Folder, please ignore 3', Component::ENTITY_TYPE_ID);
-    assert($folder instanceof Folder);
+    \assert($folder instanceof Folder);
     $folder = Folder::loadByNameAndConfigEntityTypeId('Test Folder, please ignore 4', Component::ENTITY_TYPE_ID);
-    assert($folder instanceof Folder);
+    \assert($folder instanceof Folder);
 
     $this->expectException(\RuntimeException::class);
     $this->expectExceptionMessage('It is impossible for an item to exist in multiple Folders.');

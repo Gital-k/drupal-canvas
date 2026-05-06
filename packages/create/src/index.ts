@@ -4,7 +4,9 @@ import { Command } from 'commander';
 import * as p from '@clack/prompts';
 
 import templates from '../templates.json' with { type: 'json' };
+import { agentsCommand } from './agents.js';
 import createApp from './create.js';
+import { parseAgentSelection } from './lib/agent-selection.js';
 import { getDescription, getName, getVersion } from './lib/meta-info.js';
 import validateName from './lib/validate-name.js';
 
@@ -16,6 +18,8 @@ process.on('SIGTERM', () => process.exit(0));
 
 interface CreateOptions {
   template?: string;
+  ref?: string;
+  agents?: string;
 }
 
 const program = new Command();
@@ -23,21 +27,50 @@ program
   .name(getName())
   .description(getDescription())
   .version(getVersion())
-  .argument('[app-name]', 'Name of the app to create')
+  .argument('[app-name]', 'name of the app to create')
   .option(
     '-t, --template <template>',
-    'Template to use when scaffolding the app',
+    'use template when scaffolding (predefined name or custom Git repository URL)',
+  )
+  .option(
+    '-r, --ref <ref>',
+    'use Git ref when cloning template repository (for example, branch name or tag)',
+  )
+  .option(
+    '-a, --agents <agents>',
+    'comma-separated list of additional agents to support, or "none" to skip compatibility symlinks',
   )
   .action(async (appNameArg: string | undefined, options: CreateOptions) => {
     p.intro(chalk.bold('Drupal Canvas Create'));
 
     try {
+      const selectedAgents = parseAgentSelection(options.agents);
+
       // Validate template flag if provided.
       if (options.template) {
         const template = (templates as Template[]).find(
           (t) => t.id === options.template,
         );
-        if (!template) {
+        const isCustomRepositoryUrl = [
+          // Remote repositories.
+          'https://',
+          'http://',
+          'git@',
+          // Local repositories.
+          '../',
+          './',
+          '/',
+        ].some((prefix) => options.template?.startsWith(prefix));
+        if (!template && isCustomRepositoryUrl) {
+          templates.push({
+            id: options.template,
+            label: options.template,
+            repository: {
+              url: options.template,
+              ref: 'HEAD',
+            },
+          });
+        } else if (!template) {
           p.log.error(`Template "${options.template}" not found`);
           process.exit(1);
         }
@@ -83,9 +116,9 @@ program
         } else {
           const selected = await p.select({
             message: 'Select a template',
-            options: (templates as Template[]).map((t) => ({
+            options: (templates as Template[]).map((t, index) => ({
               value: t.id,
-              label: t.label,
+              label: index === 0 ? `${t.label} (Recommended)` : t.label,
             })),
           });
 
@@ -103,11 +136,16 @@ program
         (t) => t.id === templateId,
       ) as Template;
 
+      // Set the ref if provided via flag.
+      if (options.ref) {
+        template.repository.ref = options.ref;
+      }
+
       // Display the template and app name.
       p.note(`Template: ${template.label}\nApp name: ${appName}`);
 
       // Create the app.
-      await createApp({ template, appName });
+      await createApp({ template, appName, selectedAgents });
     } catch (error) {
       if (error instanceof Error) {
         p.log.error(`Error: ${error.message}`);
@@ -117,6 +155,8 @@ program
       process.exit(1);
     }
   });
+
+agentsCommand(program);
 
 // Handle errors.
 program.showHelpAfterError();

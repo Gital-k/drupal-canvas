@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use Drupal\Component\Datetime\Time;
 use Drupal\Core\Config\ConfigManagerInterface;
+use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ClientDataToEntityConverter;
 use Drupal\canvas\Controller\ApiLayoutController;
@@ -19,26 +22,27 @@ use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Render\PreviewEnvelope;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Symfony\Component\Validator\ConstraintViolation;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
- * @coversDefaultClass \Drupal\canvas\AutoSave\AutoSaveManager
- * @group canvas.
+ * Tests Drupal\canvas\AutoSave\AutoSaveManager.
  */
-class AutoSaveManagerTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[CoversClass(AutoSaveManager::class)]
+#[Group('canvas')]
+class AutoSaveManagerTest extends CanvasKernelTestBase {
 
   use CanvasFieldCreationTrait;
   use CanvasFieldTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
   use ContentTypeCreationTrait;
   use MediaTypeCreationTrait;
@@ -46,23 +50,9 @@ class AutoSaveManagerTest extends KernelTestBase {
   private const string UUID_IN_ROOT = '78c73c1d-4988-4f9b-ad17-f7e337d40c29';
 
   protected static $modules = [
-    'canvas_test_sdc',
-    'system',
-    'canvas',
-    'file',
-    'image',
-    'link',
-    'path',
-    'path_alias',
-    'media',
-    'user',
-    'text',
-    'options',
+    'language',
     'node',
-    'filter',
     'field',
-    'editor',
-    'ckeditor5',
   ];
 
   private static function recursiveReverseSort(array $data): array {
@@ -71,7 +61,7 @@ class AutoSaveManagerTest extends KernelTestBase {
       $data = array_reverse($data, TRUE);
     }
     foreach ($data as $key => $value) {
-      if (is_array($value)) {
+      if (\is_array($value)) {
         $data[$key] = self::recursiveReverseSort($value);
       }
     }
@@ -81,11 +71,19 @@ class AutoSaveManagerTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
+  public function register(ContainerBuilder $container): void {
+    parent::register($container);
+
+    $container->getDefinition('datetime.time')
+      ->setClass(AutoSaveManagerTestTime::class);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
     $this->config('system.theme')->set('default', 'stark')->save();
-    $this->installConfig('canvas');
     // URLs are generated during some of these kernel tests. Canvas depends on
     // the `path` module, so the PathAlias entity type must be installed. URL
     // generation fails without this.
@@ -120,7 +118,7 @@ class AutoSaveManagerTest extends KernelTestBase {
 
   private function assertAutoSaveCreated(EntityInterface $entity, array $matching_client_data, array $updated_client_data): void {
     $autoSave = $this->container->get(AutoSaveManager::class);
-    assert($autoSave instanceof AutoSaveManager);
+    \assert($autoSave instanceof AutoSaveManager);
     $autoSaveEntity = $this->convertClientData($entity, $matching_client_data);
     $autoSave->saveEntity($autoSaveEntity);
     self::assertTrue($autoSave->getAutoSaveEntity($entity)->isEmpty());
@@ -190,12 +188,15 @@ class AutoSaveManagerTest extends KernelTestBase {
       'title' => '5 amazing uses for old toothbrushes',
       'components' => [],
     ]);
-    self::assertCount(0, iterator_to_array($canvas_page->validate()));
+    self::assertEntityIsValid($canvas_page);
     self::assertSame(SAVED_NEW, $canvas_page->save());
 
     $envelope = \Drupal::classResolver(ApiLayoutController::class)->get($canvas_page);
     \assert($envelope instanceof PreviewEnvelope);
-    $matching_client_data = \array_intersect_key($envelope->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
+    $matching_client_data = \array_intersect_key(
+      $envelope->additionalData,
+      \array_flip(['layout', 'model', 'entity_form_fields'])
+    );
     $new_title_client_data = $matching_client_data;
     $new_title_client_data['entity_form_fields']['title[0][value]'] = '5 MORE amazing uses for old toothbrushes';
     $this->assertAutoSaveCreated($canvas_page, $matching_client_data, $new_title_client_data);
@@ -211,6 +212,102 @@ class AutoSaveManagerTest extends KernelTestBase {
       'slots' => [],
     ];
     $this->assertAutoSaveCreated($canvas_page, $matching_client_data, $new_component_client_data);
+  }
+
+  /**
+   * Tests that auto-saves for different Page translations are stored independently.
+   *
+   * Verifies that:
+   * - Auto-saves for different translations use distinct keys.
+   * - Saving/loading auto-saves in different languages doesn't interfere with each other
+   */
+  public function testPageAutoSaveTranslationBehavior(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $this->installConfig(['language']);
+
+    // Create French language.
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+
+    $auto_save_manager = $this->container->get(AutoSaveManager::class);
+    \assert($auto_save_manager instanceof AutoSaveManager);
+
+    // Create the English page (default language).
+    $page_en = Page::create([
+      'title' => 'English page title',
+      'langcode' => 'en',
+      'components' => [],
+    ]);
+    self::assertEntityIsValid($page_en);
+    self::assertSame(SAVED_NEW, $page_en->save());
+
+    // Add French translation.
+    $page_fr = $page_en->addTranslation('fr', [
+      'title' => 'Titre de la page en français',
+    ]);
+    $page_fr->save();
+
+    // Verify auto-save keys are different for each translation.
+    $key_en = AutoSaveManager::getAutoSaveKey($page_en);
+    $key_fr = AutoSaveManager::getAutoSaveKey($page_fr);
+    self::assertNotEquals($key_en, $key_fr);
+
+    // Confirm no auto-saves exist initially.
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+
+    // Make a change to the English page and save auto-save.
+    $page_en->set('title', 'Modified English title');
+    $auto_save_manager->saveEntity($page_en);
+
+    // Verify English auto-save exists and French is unaffected.
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+
+    // Verify only English auto-save is in the list.
+    $list = $auto_save_manager->getAllAutoSaveList();
+    self::assertEquals([$key_en], \array_keys($list));
+    self::assertEquals('Modified English title', $list[$key_en]['label']);
+
+    // Make a change to the French page and save auto-save.
+    $page_fr->set('title', 'This is the French title');
+    $auto_save_manager->saveEntity($page_fr);
+
+    // Verify both auto-saves exist independently.
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+
+    // Verify both auto-saves are in the list with correct labels.
+    $list = $auto_save_manager->getAllAutoSaveList();
+    $keys = \array_keys($list);
+    asort($keys);
+    self::assertEquals([$key_en, $key_fr], $keys);
+    self::assertEquals('Modified English title', $list[$key_en]['label']);
+    self::assertEquals('This is the French title', $list[$key_fr]['label']);
+
+    // Verify language codes are stored correctly.
+    self::assertEquals('en', $list[$key_en]['langcode']);
+    self::assertEquals('fr', $list[$key_fr]['langcode']);
+
+    // Delete the English auto-save by restoring original title.
+    $page_en->set('title', 'English page title');
+    $auto_save_manager->saveEntity($page_en);
+
+    // Verify English auto-save is gone but French remains.
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+
+    $list = $auto_save_manager->getAllAutoSaveList();
+    self::assertEquals([$key_fr], \array_keys($list));
+
+    // Delete the French auto-save.
+    $auto_save_manager->delete($page_fr);
+
+    // Verify all auto-saves are gone.
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+    self::assertEmpty($auto_save_manager->getAllAutoSaveList());
   }
 
   public function testPageRegion(): void {
@@ -277,9 +374,8 @@ class AutoSaveManagerTest extends KernelTestBase {
   }
 
   public function testAssetLibrary(): void {
-    $this->installConfig('canvas');
     $asset_library = AssetLibrary::load('global');
-    assert($asset_library instanceof AssetLibrary);
+    \assert($asset_library instanceof AssetLibrary);
     $asset_library_matching_client_data = $asset_library->normalizeForClientSide()->values;
     $non_matching_asset_library_client_data = $asset_library_matching_client_data;
     $non_matching_asset_library_client_data['label'] = 'Slightly less boring label';
@@ -295,7 +391,6 @@ class AutoSaveManagerTest extends KernelTestBase {
     $this->installEntitySchema('media');
     $this->installSchema('file', 'file_usage');
     $this->installConfig('node');
-    $this->installConfig('system');
     $this->createContentType(['type' => 'article']);
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
     $this->createComponentTreeField('node', 'article', 'field_component_tree');
@@ -311,12 +406,15 @@ class AutoSaveManagerTest extends KernelTestBase {
         'summary' => '',
       ],
     ]);
-    self::assertCount(0, $node->validate());
+    self::assertEntityIsValid($node);
     $this->assertSame(SAVED_NEW, $node->save());
 
     $envelope = \Drupal::classResolver(ApiLayoutController::class)->get($node);
     \assert($envelope instanceof PreviewEnvelope);
-    $matching_client_data = \array_intersect_key($envelope->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
+    $matching_client_data = \array_intersect_key(
+      $envelope->additionalData,
+      \array_flip(['layout', 'model', 'entity_form_fields'])
+    );
     $new_title_client_data = $matching_client_data;
     $new_title_client_data['entity_form_fields']['title[0][value]'] = '5 MORE amazing uses for old toothbrushes';
     $this->assertAutoSaveCreated($node, $matching_client_data, $new_title_client_data);
@@ -333,8 +431,6 @@ class AutoSaveManagerTest extends KernelTestBase {
   }
 
   public function testStagedConfigUpdate(): void {
-    $this->installConfig(['system']);
-
     $sut = $this->container->get(AutoSaveManager::class);
     self::assertInstanceOf(AutoSaveManager::class, $sut);
     StagedConfigUpdate::createFromClientSide([
@@ -411,7 +507,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     // On config delete, auto-saved staged config updates targeting that config
     // should be deleted. In the current state, that's everything.
     $config_manager = $this->container->get(ConfigManagerInterface::class);
-    assert($config_manager instanceof ConfigManagerInterface);
+    \assert($config_manager instanceof ConfigManagerInterface);
     $config_manager->getConfigFactory()->getEditable('system.site')->delete();
     $list = $sut->getAllAutoSaveList();
     self::assertEmpty($list);
@@ -451,9 +547,81 @@ class AutoSaveManagerTest extends KernelTestBase {
         ],
       ],
     ]);
+    self::assertEntityIsValid($page);
     $auto_save_manager->delete($page);
     $violations = $auto_save_manager->getComponentInstanceFormViolations($uuid);
     self::assertCount(0, $violations);
+  }
+
+  /**
+   * Tests that auto-save entries do not expire.
+   *
+   * Verifies that auto-save entries stored in the key-value store remain
+   * accessible over extended periods of time.
+   *
+   * @legacy-covers ::saveEntity
+   * @legacy-covers ::getAutoSaveEntity
+   * @legacy-covers ::getAllAutoSaveList
+   */
+  public function testAutoSaveDoesNotExpire(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+
+    $auto_save_manager = $this->container->get(AutoSaveManager::class);
+    \assert($auto_save_manager instanceof AutoSaveManager);
+
+    // Create a page entity.
+    $page = Page::create([
+      'title' => 'Test page for persistence',
+      'components' => [],
+    ]);
+    self::assertSame(SAVED_NEW, $page->save());
+
+    // Make a change to trigger an auto-save.
+    $page->set('title', 'Updated title');
+    $auto_save_manager->saveEntity($page);
+
+    // Verify the auto-save exists.
+    $auto_save_key = AutoSaveManager::getAutoSaveKey($page);
+    $list = $auto_save_manager->getAllAutoSaveList();
+    self::assertCount(1, $list);
+    self::assertArrayHasKey($auto_save_key, $list);
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page)->isEmpty());
+    self::assertEquals('Updated title', $list[$auto_save_key]['label']);
+
+    $tempstore_expire = \Drupal::getContainer()->getParameter('tempstore.expire');
+    self::assertIsInt($tempstore_expire);
+    // Advance time so the tempstore has expired.
+    AutoSaveManagerTestTime::$offset = $tempstore_expire + 24 * 60;
+
+    // Verify the auto-save entry still persists after the tempstore has expired.
+    $list = $auto_save_manager->getAllAutoSaveList();
+    self::assertCount(1, $list);
+    self::assertArrayHasKey($auto_save_key, $list);
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page)->isEmpty());
+    self::assertEquals('Updated title', $list[$auto_save_key]['label']);
+  }
+
+}
+
+/**
+ * Test time service that allows time offset for testing.
+ */
+class AutoSaveManagerTestTime extends Time {
+
+  /**
+   * An offset to add to the request time.
+   *
+   * @var int
+   */
+  public static $offset = 0;
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getRequestTime() {
+    return parent::getRequestTime() + static::$offset;
   }
 
 }

@@ -29,7 +29,7 @@
     <dt>test_string</dt>
     <dd id="test-string"><code>{{ test_string }}</code></dd>
     <dt>test_string_multiline</dt>
-    <dd id="test-string-multiline"><code>{{ test_string_multiline }}</code></dd>
+    <dd id="test-string-multiline"><pre><code>{{ test_string_multiline }}</code></pre></dd>
     <dt>test_string_enum</dt>
     <dd id="test-string-enum"><code>{{ test_string_enum }}</code></dd>
     <dt>test_integer_enum</dt>
@@ -58,6 +58,12 @@
     <dd id="test-string-format-uri"><code>{{ test_string_format_uri }}</code></dd>
     <dt>test_string_format_uri_image</dt>
     <dd id="test-string-format-uri-image"><code>{{ test_string_format_uri_image }}</code></dd>
+    <dt>test_string_format_uri_image_using_ref</dt>
+    <dd id="test-string-format-uri-image-using-ref"><code>{{ test_string_format_uri_image_using_ref }}</code></dd>
+    <dt>test_string_format_uri_public_stream_wrapper</dt>
+    <dd id="test-string-format-uri-public-stream-wrapper"><code>{{ test_string_format_uri_public_stream_wrapper }}</code></dd>
+    <dt>test_string_format_uri_public_stream_wrapper_using_ref</dt>
+    <dd id="test-string-format-uri-image-public-stream-wrapper-using-ref"><code>{{ test_string_format_uri_public_stream_wrapper_using_ref }}</code></dd>
     <dt>test_string_format_uri_reference</dt>
     <dd id="test-string-format-uri-reference"><code>{{ test_string_format_uri_reference }}</code></dd>
     <dt>test_REQUIRED_string_format_uri</dt>
@@ -89,17 +95,17 @@
   <h2>HTML content shapes</h2>
   <dl>
     <dt>test_string_html_inline</dt>
-    <dd id="test-string-html-inline">{{ test_string_html_inline|raw }}</dd>
+    <dd id="test-string-html-inline">{{ test_string_html_inline }}</dd>
     <dt>test_string_html_block</dt>
-    <dd id="test-string-html-block">{{ test_string_html_block|raw }}</dd>
+    <dd id="test-string-html-block">{{ test_string_html_block }}</dd>
     <dt>test_string_html</dt>
-    <dd id="test-string-html">{{ test_string_html|raw }}</dd>
+    <dd id="test-string-html">{{ test_string_html }}</dd>
     <dt>test_REQUIRED_string_html_inline</dt>
-    <dd id="test-required-string-html-inline">{{ test_REQUIRED_string_html_inline|raw }}</dd>
+    <dd id="test-required-string-html-inline">{{ test_REQUIRED_string_html_inline }}</dd>
     <dt>test_REQUIRED_string_html_block</dt>
-    <dd id="test-required-string-html-block">{{ test_REQUIRED_string_html_block|raw }}</dd>
+    <dd id="test-required-string-html-block">{{ test_REQUIRED_string_html_block }}</dd>
     <dt>test_REQUIRED_string_html</dt>
-    <dd id="test-required-string-html">{{ test_REQUIRED_string_html|raw }}</dd>
+    <dd id="test-required-string-html">{{ test_REQUIRED_string_html }}</dd>
   </dl>
   <h2>Object shapes</h2>
   <dl>
@@ -144,6 +150,15 @@
       <ul>
         <li id="test_array_integer_maxItems--0">0: <code>{{ test_array_integer_maxItems[0] }}</code>
         <li id="test_array_integer_maxItems--1">1: <code>{{ test_array_integer_maxItems[1] }}</code>
+      </ul>
+    </dd>
+    <dt>test_array_string</dt>
+    <dd id="test-array-string">
+      <div>{{ test_array_string|length }} of unlimited</div>
+      <ul>
+        {% for key,value in test_array_string %}
+        <li id="test_array_string--{{ key }}">{{ key }}: <code>{{ value }}</code>
+        {% endfor %}
       </ul>
     </dd>
   </dl>

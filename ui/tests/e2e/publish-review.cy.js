@@ -33,12 +33,6 @@ describe('Publish review functionality', () => {
 
       cy.findByText('Review 1 change').click();
 
-      // Delete the image that uses an adapted source. This node (1) includes prop
-      // sources that make use of adapters, we need to delete the adapted source
-      // image in order to publish.
-      cy.clickComponentInPreview('Test SDC Image', 1);
-      cy.realType('{del}');
-
       cy.visit('/node/1');
 
       cy.findByText('hello, world! updated').should('not.exist');
@@ -82,6 +76,33 @@ describe('Publish review functionality', () => {
       cy.findByText('hello, world! updated').should('exist');
     },
   );
+
+  it('Discarding a pending change updates in-place without a full page reload', () => {
+    cy.loadURLandWaitForCanvasLoaded();
+    cy.location('pathname').as('originalPath');
+
+    cy.clickComponentInPreview('Hero');
+    cy.findByTestId(/^canvas-component-form-.*/)
+      .findByLabelText('Heading')
+      .type(' discard me');
+
+    cy.intercept('DELETE', '**/canvas/api/v0/auto-saves/**').as(
+      'discardPendingChange',
+    );
+    cy.findByText('Review 1 change').click();
+    cy.findByTestId('canvas-publish-reviews-content').within(() => {
+      cy.findByLabelText('More options').click();
+    });
+    cy.findByRole('menuitem', { name: 'Discard changes' }).click();
+    cy.wait('@discardPendingChange');
+
+    cy.location('pathname').then((pathname) => {
+      cy.get('@originalPath').should('eq', pathname);
+    });
+    cy.findByTestId('canvas-topbar')
+      .findByText('No changes', { selector: 'button' })
+      .should('exist');
+  });
 
   it(
     'User without "publish auto-saves" permission cannot publish changes',

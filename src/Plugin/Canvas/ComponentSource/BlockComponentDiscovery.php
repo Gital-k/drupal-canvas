@@ -19,6 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
+ * @see \Drupal\canvas\Block\BlockManagerDecorator
  * @internal
  */
 final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInterface {
@@ -86,11 +87,11 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
    * {@inheritdoc}
    */
   public function checkRequirements(string $source_specific_id): void {
-    \assert(in_array($source_specific_id, self::EXPLICITLY_IGNORED_BLOCKS, TRUE) || array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\in_array($source_specific_id, self::EXPLICITLY_IGNORED_BLOCKS, TRUE) || \array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
 
     // @todo is this not going to become a performance bottleneck on BlockPlugin heavy sites?
     $block = $this->blockManager->createInstance($source_specific_id);
-    assert($block instanceof BlockPluginInterface);
+    \assert($block instanceof BlockPluginInterface);
     $settings = $block->defaultConfiguration();
     $data_definition = $this->typedConfigManager->createFromNameAndData('block.settings.' . $block->getPluginId(), $settings);
     // We currently support only block plugins with no settings, or if they do
@@ -109,7 +110,7 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
     }
 
     $plugin_definition = $block->getPluginDefinition();
-    assert(is_array($plugin_definition));
+    \assert(\is_array($plugin_definition));
     $required_contexts = array_filter(
       $plugin_definition['context_definitions'],
       fn (ContextDefinitionInterface $definition): bool => $definition->isRequired(),
@@ -127,7 +128,7 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
    * {@inheritdoc}
    */
   public function computeComponentSettings(string $source_specific_id): array {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
     $definition = $this->discover()[$source_specific_id];
     $block = $this->blockManager->createInstance($source_specific_id);
     \assert($block instanceof BlockPluginInterface);
@@ -156,7 +157,7 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
    * {@inheritdoc}
    */
   public function computeInitialComponentProvider(string $source_specific_id): ?string {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
     return $this->blockManager->getDefinition($source_specific_id)['provider'];
   }
 
@@ -164,8 +165,8 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
    * {@inheritdoc}
    */
   public function computeInitialComponentStatus(string $source_specific_id): bool {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
-    $all_installed_core_extensions = array_keys(array_filter(
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    $all_installed_core_extensions = \array_keys(array_filter(
       $this->moduleExtensionList->getAllInstalledInfo(),
       fn (array $info): bool => ($info['package'] ?? NULL) === 'Core',
     ));
@@ -173,7 +174,7 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
     // By default, disable blocks provided by core, unless specifically named.
     $status = TRUE;
     $definition = $this->blockManager->getDefinition($source_specific_id);
-    if (in_array($definition['provider'], ['core', ...$all_installed_core_extensions], TRUE) && !in_array($source_specific_id, self::BLOCKS_TO_KEEP_ENABLED, TRUE)) {
+    if (\in_array($definition['provider'], ['core', ...$all_installed_core_extensions], TRUE) && !\in_array($source_specific_id, self::BLOCKS_TO_KEEP_ENABLED, TRUE)) {
       $status = FALSE;
       // Special case for view blocks that are tagged with "default" are
       // disabled as they are likely created by core.
@@ -183,8 +184,8 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
           if (str_starts_with($dependency, 'views.view.')) {
             $config_id = substr($dependency, strlen('views.view.'));
             $view = View::load($config_id);
-            assert(!is_null($view));
-            $status = !in_array('default', array_map('trim', explode(',', $view->get('tag'))), TRUE);
+            \assert(!\is_null($view));
+            $status = !\in_array('default', \array_map('trim', explode(',', $view->get('tag'))), TRUE);
           }
         }
       }
@@ -197,11 +198,10 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
    * {@inheritdoc}
    */
   public function computeCurrentComponentMetadata(string $source_specific_id): array {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
     $definition = $this->blockManager->getDefinition($source_specific_id);
     return [
       'label' => (string) $definition['admin_label'],
-      'category' => (string) $definition['category'],
     ];
   }
 
@@ -209,7 +209,7 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
    * {@inheritdoc}
    */
   public static function getComponentConfigEntityId(string $source_specific_component_id): string {
-    return sprintf('%s.%s',
+    return \sprintf('%s.%s',
       BlockComponent::SOURCE_PLUGIN_ID,
       str_replace(PluginBase::DERIVATIVE_SEPARATOR, '.', $source_specific_component_id),
     );
@@ -220,7 +220,7 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
    */
   public static function getSourceSpecificComponentId(string $component_id): string {
     $prefix = BlockComponent::SOURCE_PLUGIN_ID . '.';
-    \assert(str_starts_with($prefix, $component_id));
+    \assert(str_starts_with($component_id, $prefix));
     return str_replace('.', PluginBase::DERIVATIVE_SEPARATOR, substr($component_id, strlen($prefix)));
   }
 

@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 use Drupal\Core\Entity\Entity\EntityFormDisplay;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\link\LinkItemInterface;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface;
 use Drupal\editor\Entity\Editor;
 use Drupal\field\Entity\FieldConfig;
@@ -306,6 +307,54 @@ function canvas_test_article_fields_install(): void {
         ],
       ],
     ],
+    'field_cvt_unlimited_link' => [
+      'type' => 'link',
+      'label' => 'Canvas Unlimited Link',
+      'settings' => [
+        'title' => 0,
+        'link_type' => LinkItemInterface::LINK_EXTERNAL,
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'link_default',
+        'weight' => -996,
+        'settings' => [
+          'placeholder_url' => '',
+        ],
+      ],
+      'default_value' => [
+        [
+          'uri' => 'https://drupal.org',
+          'options' => [],
+        ],
+      ],
+    ],
+    'field_cvt_limited_link' => [
+      'type' => 'link',
+      'label' => 'Canvas Limited Link',
+      'settings' => [
+        'title' => 0,
+        'link_type' => LinkItemInterface::LINK_EXTERNAL,
+      ],
+      'cardinality' => 2,
+      'widget' => [
+        'type' => 'link_default',
+        'weight' => -995,
+        'settings' => [
+          'placeholder_url' => '',
+        ],
+      ],
+      'default_value' => [
+        [
+          'uri' => 'https://drupal.org',
+          'options' => [],
+        ],
+        [
+          'uri' => 'https://www.drupal.org/project/canvas',
+          'options' => [],
+        ],
+      ],
+    ],
     'field_cvt_uri' => [
       'type' => 'uri',
       'label' => 'Canvas URI',
@@ -321,13 +370,33 @@ function canvas_test_article_fields_install(): void {
         ['value' => 'http://drupal.org'],
       ],
     ],
+    'field_cvt_uri_relative' => [
+      'type' => 'link',
+      'label' => 'Canvas URI (Relative)',
+      'settings' => [
+        'title' => 0,
+        'link_type' => 1,
+      ],
+      'cardinality' => -1,
+      'required' => FALSE,
+      'widget' => [
+        'type' => 'link_default',
+        'weight' => 0,
+        'settings' => [],
+      ],
+      'default_value' => [
+        [
+          'uri' => 'internal:/node/1',
+        ],
+      ],
+    ],
     'field_cvt_unlimited_text' => [
       'type' => 'string',
       'label' => 'Canvas Unlimited Text',
       'settings' => [],
       'cardinality' => -1,
       'widget' => [
-        'type' => 'text_textfield',
+        'type' => 'string_textfield',
         // Ensure this is at the top of the form to increase drag and drop reliability in e2e test.
         'weight' => -1000,
         'settings' => [
@@ -339,6 +408,241 @@ function canvas_test_article_fields_install(): void {
       ],
       'default_value' => [
         ['value' => 'Marshmallow Coast'],
+      ],
+    ],
+    'field_cvt_unlimited_datetime' => [
+      'type' => 'datetime',
+      'label' => 'Canvas Unlimited DateTime',
+      'settings' => [
+        'datetime_type' => 'datetime',
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'datetime_default',
+        'weight' => -996,
+        'settings' => [],
+      ],
+      'default_value' => [],
+    ],
+    'field_cvt_unlimited_date' => [
+      'type' => 'datetime',
+      'label' => 'Canvas Unlimited Date',
+      'settings' => [
+        'datetime_type' => 'date',
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'datetime_default',
+        'weight' => -995,
+        'settings' => [],
+      ],
+      'default_value' => [],
+    ],
+    'field_cvt_required_datetime' => [
+      'type' => 'datetime',
+      'label' => 'Canvas Required DateTime',
+      'settings' => [
+        'datetime_type' => 'datetime',
+      ],
+      'cardinality' => -1,
+      'required' => TRUE,
+      'widget' => [
+        'type' => 'datetime_default',
+        'weight' => -994,
+        'settings' => [],
+      ],
+      // A non-empty default value is required so that existing article nodes
+      // (e.g. "I am an empty node") pass required-field validation when
+      // published by unrelated tests such as ckeditor5.cy.js and
+      // publish-validation.cy.js.
+      'default_value' => [
+        \array_intersect_key($date_range_default_value[0], \array_flip([
+          'default_date_type',
+          'default_date',
+        ])),
+      ],
+    ],
+    'field_cvt_unlimited_media' => [
+      'type' => 'entity_reference',
+      'label' => 'Canvas Unlimited Media',
+      'settings' => [
+        'target_type' => 'media',
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => [
+            'image' => 'image',
+            'video' => 'video',
+          ],
+          'sort' => ['field' => '_none'],
+          'auto_create' => FALSE,
+          'auto_create_bundle' => '',
+        ],
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'media_library_widget',
+        'weight' => -999,
+        'settings' => [
+          'media_types' => [],
+        ],
+      ],
+    ],
+    'field_cvt_limited_media' => [
+      'type' => 'entity_reference',
+      'label' => 'Canvas Limited Media',
+      'settings' => [
+        'target_type' => 'media',
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => [
+            'image' => 'image',
+            'video' => 'video',
+          ],
+          'sort' => ['field' => '_none'],
+          'auto_create' => FALSE,
+          'auto_create_bundle' => '',
+        ],
+      ],
+      'cardinality' => 2,
+      'widget' => [
+        'type' => 'media_library_widget',
+        'weight' => -998,
+        'settings' => [
+          'media_types' => [],
+        ],
+      ],
+    ],
+    'field_cvt_unlimited_number' => [
+      'type' => 'float',
+      'label' => 'Canvas Unlimited Number',
+      'settings' => [],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'number',
+        'weight' => -999,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 3],
+      ],
+    ],
+    'field_cvt_unlimited_int' => [
+      'type' => 'integer',
+      'label' => 'Canvas Unlimited Integer',
+      'settings' => [],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'number',
+        'weight' => -998,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 10],
+      ],
+    ],
+    'field_cvt_required_number' => [
+      'type' => 'float',
+      'label' => 'Canvas Required Number',
+      'settings' => [],
+      'cardinality' => -1,
+      'required' => TRUE,
+      'widget' => [
+        'type' => 'number',
+        'weight' => -997,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 42],
+      ],
+    ],
+    'field_cvt_unlimited_list_string' => [
+      'type' => 'list_string',
+      'label' => 'Canvas Unlimited List (Text)',
+      'settings' => [
+        'allowed_values' => [
+          'one' => 'One',
+          'two' => 'Two',
+          'three' => 'Three',
+          'four' => 'Four',
+          'five' => 'Five',
+        ],
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'options_select',
+        'weight' => -989,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 'one'],
+      ],
+    ],
+    'field_cvt_limited_list_string' => [
+      'type' => 'list_string',
+      'label' => 'Canvas Limited List (Text)',
+      'settings' => [
+        'allowed_values' => [
+          'one' => 'One',
+          'two' => 'Two',
+          'three' => 'Three',
+          'four' => 'Four',
+          'five' => 'Five',
+        ],
+      ],
+      'cardinality' => 3,
+      'widget' => [
+        'type' => 'options_select',
+        'weight' => -988,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 'one'],
+        ['value' => 'two'],
+      ],
+    ],
+    'field_cvt_unlimited_list_integer' => [
+      'type' => 'list_integer',
+      'label' => 'Canvas Unlimited List (Integer)',
+      'settings' => [
+        'allowed_values' => [
+          1 => '1',
+          2 => '2',
+          3 => '3',
+          4 => '4',
+          5 => '5',
+        ],
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'options_select',
+        'weight' => -987,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 1],
+      ],
+    ],
+    'field_cvt_limited_list_integer' => [
+      'type' => 'list_integer',
+      'label' => 'Canvas Limited List (Integer)',
+      'settings' => [
+        'allowed_values' => [
+          1 => '1',
+          2 => '2',
+          3 => '3',
+          4 => '4',
+          5 => '5',
+        ],
+      ],
+      'cardinality' => 3,
+      'widget' => [
+        'type' => 'options_select',
+        'weight' => -986,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 1],
+        ['value' => 2],
       ],
     ],
     'field_cvt_boolean_checkbox' => [
@@ -407,6 +711,11 @@ function canvas_test_article_fields_install(): void {
         'label' => $field_info['label'],
         'settings' => $field_info['settings'],
       ];
+
+      // Add required property if set
+      if (isset($field_info['required'])) {
+        $field_config['required'] = $field_info['required'];
+      }
 
       // Only add default_value if it's explicitly set
       if (isset($field_info['default_value'])) {
@@ -547,8 +856,59 @@ function canvas_test_article_fields_install(): void {
       }
       $node->set($field_name, $default_value);
     }
+    // Seed the unlimited media field with the first two image media entities.
+    if ($node->hasField('field_cvt_unlimited_media')) {
+      $media_entities = \Drupal::entityTypeManager()
+        ->getStorage('media')
+        ->loadByProperties(['bundle' => 'image']);
+      $media_ids = \array_slice(\array_keys($media_entities), 0, 2);
+      if (!empty($media_ids)) {
+        $node->set('field_cvt_unlimited_media', \array_map(
+          static fn($id) => ['target_id' => $id],
+          $media_ids,
+        ));
+      }
+    }
+    // Seed the limited media field (cardinality 2) with the same two image
+    // media entities.
+    if ($node->hasField('field_cvt_limited_media')) {
+      $media_entities = \Drupal::entityTypeManager()
+        ->getStorage('media')
+        ->loadByProperties(['bundle' => 'image']);
+      $media_ids = \array_slice(\array_keys($media_entities), 0, 2);
+      if (!empty($media_ids)) {
+        $node->set('field_cvt_limited_media', \array_map(
+          static fn($id) => ['target_id' => $id],
+          $media_ids,
+        ));
+      }
+    }
     $node->save();
   }
+
+  if (!FieldStorageConfig::loadByName('node', 'field_canvas_demo')) {
+    $field_storage = FieldStorageConfig::create([
+      'field_name' => 'field_canvas_demo',
+      'entity_type' => 'node',
+      'type' => 'component_tree',
+      'settings' => [],
+    ]);
+    $field_storage->save();
+    FieldConfig::create([
+      'field_storage' => $field_storage,
+      'bundle' => 'article',
+    ])->save();
+  }
+
+  // View display config for the component field.
+  \Drupal::service('entity_display.repository')
+    ->getViewDisplay('node', 'article')
+    ->setComponent('field_canvas_demo', [
+      'label' => 'hidden',
+      'type' => 'canvas_naive_render_sdc_tree',
+      'weight' => -2,
+    ])
+    ->save();
 }
 
 /**

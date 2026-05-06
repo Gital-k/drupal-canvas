@@ -1,5 +1,9 @@
 parameters:
+  tmpDir: .cache/phpstan
   level: 8
+  strictRules:
+    allRules: false
+    strictFunctionCalls: true
   fileExtensions:
     - php
     - module
@@ -12,10 +16,15 @@ parameters:
     # Sometimes npm packages include PHP files
     - '**/node_modules/**'
     # These are 1:1 copies from Drupal core, with trivial additions that cannot have significant PHPStan impact. PHPStan compliance should happen upstream.
+    - src/CoreBugFix/**
     - src/Plugin/Field/FieldTypeOverride
     - src/TypedData/BetterEntityDataDefinition.php
     # This trait decorates core's \Drupal\Core\Test\FunctionalTestSetupTrait::prepareSettings(), which itself triggers a PHPStan warning that core ignores. Match that.
     - tests/src/Traits/ContribStrictConfigSchemaTestTrait.php
+    # PHPCS rules are not executed in production, no need to comply.
+    - coding_standards/**
+    # PHPStan rules are not Drupal module code; only scanned for autoloading.
+    - phpstan_rules/**
   treatPhpDocTypesAsCertain: false
   drupal:
     entityMapping:
@@ -36,56 +45,53 @@ parameters:
   ignoreErrors:
     - identifier: missingType.iterableValue
     - identifier: missingType.generics
-    # Ignore invalid phpunit methods/covers
-    # @todo Remove in https://drupal.org/i/3533845
-    - identifier: phpunit.coversMethod
-    - identifier: phpunit.covers
+    # PHPStan finds many false positives for this, specifically when using the DIC or Typed Data.
+    - identifier: varTag.type
+    -
+      message: '#^Method Drupal\\canvas\\Plugin\\Field\\FieldType\\ComponentTreeItemList\:\:get\(\) has parameter \$index with no type specified\.$#'
+      identifier: missingType.parameter
+      count: 1
+      path: src/Plugin/Field/FieldType/ComponentTreeItemList.php
     -
       message: "#^Class .* extends @internal class#"
       count: 1
       path: src/MediaLibraryCanvasPropOpener.php
     -
-      message: "#^Access to an undefined property#"
+      message: "#^Method Drupal\\\\canvas\\\\Entity\\\\ComponentTreeConfigEntityBase\\:\\:preCreate\\(\\) has no return type specified\\.$#"
+      identifier: missingType.return
       count: 1
-      path: src/PropSource/StaticPropSource.php
+      path: src/Entity/ComponentTreeConfigEntityBase.php
+    -
+      message: '#^Method Drupal\\canvas\\Entity\\ComponentTreeConfigEntityBase\:\:preSave\(\) has no return type specified\.$#'
+      identifier: missingType.return
+      count: 1
+      path: src/Entity/ComponentTreeConfigEntityBase.php
     -
       message: "#^Method Drupal\\\\canvas\\\\Entity\\\\Pattern\\:\\:preCreate\\(\\) has no return type specified\\.$#"
       count: 1
       path: src/Entity/Pattern.php
-    # The following ignores can be removed when we depend on Drupal 11.3 or later.
     -
-      message: "#^Class Drupal\\\\Core\\\\DefaultContent\\\\PreExportEvent not found\\.$#"
+      message: '#^Method Drupal\\canvas\\ConfigTranslation\\CanvasComponentTreeItemInputsMappingFormElement\:\:setConfig\(\) has no return type specified\.$#'
+      identifier: missingType.return
       count: 1
-      path: src/EventSubscriber/DefaultContentSubscriber.php
-    -
-      message: "#^Parameter \\$event of method Drupal\\\\canvas\\\\EventSubscriber\\\\DefaultContentSubscriber\\:\\:preExport\\(\\) has invalid type Drupal\\\\Core\\\\DefaultContent\\\\PreExportEvent\\.$#"
-      count: 1
-      path: src/EventSubscriber/DefaultContentSubscriber.php
-    -
-      message: "#^Call to method setCallback\\(\\) on an unknown class Drupal\\\\Core\\\\DefaultContent\\\\PreExportEvent\\.$#"
-      count: 1
-      path: src/EventSubscriber/DefaultContentSubscriber.php
-    -
-      message: "#^Parameter \\$metadata of anonymous function has invalid type Drupal\\\\Core\\\\DefaultContent\\\\ExportMetadata\\.$#"
-      count: 1
-      path: src/EventSubscriber/DefaultContentSubscriber.php
-    -
-      message: "#^Call to method addDependency\\(\\) on an unknown class Drupal\\\\Core\\\\DefaultContent\\\\ExportMetadata\\.$#"
-      count: 1
-      path: src/EventSubscriber/DefaultContentSubscriber.php
-    -
-      message: "#^Class Drupal\\\\Core\\\\DefaultContent\\\\PreEntityImportEvent not found\\.$#"
-      count: 1
-      path: src/EventSubscriber/DefaultContentSubscriber.php
-    -
-      message: "#^Parameter \\$event of method Drupal\\\\canvas\\\\EventSubscriber\\\\DefaultContentSubscriber\\:\\:preEntityImport\\(\\) has invalid type Drupal\\\\Core\\\\DefaultContent\\\\PreEntityImportEvent\\.$#"
-      count: 1
-      path: src/EventSubscriber/DefaultContentSubscriber.php
-    -
-      message: "#^Access to property \\$metadata on an unknown class Drupal\\\\Core\\\\DefaultContent\\\\PreEntityImportEvent\\.$#"
-      count: 4
-      path: src/EventSubscriber/DefaultContentSubscriber.php
-    -
-      message: "#^Access to property \\$data on an unknown class Drupal\\\\Core\\\\DefaultContent\\\\PreEntityImportEvent\\.$#"
-      count: 1
-      path: src/EventSubscriber/DefaultContentSubscriber.php
+      path: src/ConfigTranslation/CanvasComponentTreeItemInputsMappingFormElement.php
+# Canvas' custom PHPStan rules.
+rules:
+  - Canvas\PHPStan\Rules\DisallowDrupalFlushAllCachesRule
+  - Canvas\PHPStan\Rules\DisallowHookSchemaRule
+  - Canvas\PHPStan\Rules\NoDuplicateTraitUseRule
+  - Canvas\PHPStan\Rules\KernelTestsMustUseAssertEntityIsValidRule
+  - Canvas\PHPStan\Rules\NoOptionalParametersInDataProviderTestsRule
+  - mglaman\PHPStanDrupal\Rules\Drupal\TodoCommentWithIssueUrlRule
+# Run `composer run phpstan-regenerate-ignores-for-11.3-and-higher` to update this list of ignores for Drupal >=11.3.
+includes:
+  - phpstan-11.3-and-higher-ignores.neon
+services:
+  -
+    class: Canvas\PHPStan\Architecture\Layers
+    tags:
+      - phpat.test
+  -
+    class: Canvas\PHPStan\Architecture\Tests
+    tags:
+      - phpat.test

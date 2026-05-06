@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\media\Entity\Media;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\file\FileInterface;
-use Drupal\image\Entity\ImageStyle;
-use Drupal\image\ImageStyleInterface;
 use Drupal\media\MediaInterface;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
@@ -25,13 +29,17 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * @covers \Drupal\canvas\Controller\ApiLayoutController::patch()
- * @group canvas
- * @group #slow
+ * Tests Api Layout Controller Patch.
+ *
+ * @legacy-covers \Drupal\canvas\Controller\ApiLayoutController::patch
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+#[Group('#slow')]
 final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
 
   use CanvasFieldTrait;
@@ -55,8 +63,9 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * @dataProvider providerEntityTypes
-   */
+ * Tests entity access required.
+ */
+  #[DataProvider('providerEntityTypes')]
   public function testEntityAccessRequired(string $entity_type): void {
     $this->setUpCurrentUser([], [
       'administer url aliases',
@@ -99,24 +108,12 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'component_id' => 'sdc.canvas_test_sdc.my-hero',
         'component_version' => 'a681ae184a8f6b7f',
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'hello, world!',
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'subheading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'this is a subheading',
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'cta1href' => [
-            'sourceType' => 'static:field_item:uri',
-            'value' => 'https://drupal.org',
-            'expression' => 'ℹ︎uri␟value',
-          ],
+          'heading' => 'hello, world!',
+          'subheading' => 'this is a subheading',
+          'cta1href' => ['uri' => 'https://drupal.org'],
         ],
       ],
-      // Add a component with a pre-existing dynamic property source to ensure
+      // Add a component with a pre-existing entity field prop source to ensure
       // it also is rendered and resolved correctly.
       [
         'uuid' => $uuid2,
@@ -124,7 +121,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'component_version' => '8c01a2bdb897a810',
         'inputs' => [
           'text' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
           'element' => 'h1',
@@ -161,15 +158,15 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     self::assertIsArray($data['model']);
     $new_model = $data['model'][$uuid1];
     $new_model['source']['heading'] = [
-      'sourceType' => 'dynamic',
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
     ];
     $new_model['source']['subheading'] = [
-      'sourceType' => 'dynamic',
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:node:article␝revision_log␞␟value',
     ];
-    // The client should set the `resolved` value of a dynamic prop sources to
-    // NULL because it cannot resolve them.
+    // The client should set the `resolved` value of a entity field prop sources
+    // to NULL because it cannot resolve them.
     $new_model['resolved']['subheading'] = NULL;
     $new_model['resolved']['heading'] = NULL;
     $updatedHeroClientData = [
@@ -192,7 +189,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     self::assertIsArray($data['model']);
     $new_model = $data['model'][$uuid1];
     $new_model['source']['subheading'] = [
-      'sourceType' => 'dynamic',
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
     ];
     $new_model['resolved']['subheading'] = NULL;
@@ -207,9 +204,11 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
   }
 
   /**
+   * Tests invalid.
+   *
    * @param class-string<\Throwable> $exception
-   * @dataProvider providerInvalid
    */
+  #[DataProvider('providerInvalid')]
   public function testInvalid(string $message, string $exception, array $content): void {
     $this->expectException($exception);
     $this->expectExceptionMessage($message);
@@ -241,7 +240,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       BadRequestHttpException::class,
       [
         'componentInstanceUuid' => 'e8c95423-4f22-4210-8707-08bade75ff22',
-        'componentType' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+        'componentType' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
       ],
     ];
     yield 'No such component in model' => [
@@ -249,7 +248,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       NotFoundHttpException::class,
       [
         'componentInstanceUuid' => 'e8c95423-4f22-4210-8707-08bade75ff22',
-        'componentType' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+        'componentType' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
         'model' => [],
         'autoSaves' => [],
         'clientInstanceId' => 'sample-client-id',
@@ -291,9 +290,10 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * @dataProvider providerValid
-   */
-  public function test(string $entity_type, bool $withAutoSave = FALSE, bool $withGlobal = FALSE): void {
+ * Tests .
+ */
+  #[DataProvider('providerValid')]
+  public function test(string $entity_type, bool $withAutoSave, bool $withGlobal): void {
     $entity = $this->getTestEntity($entity_type);
     $url = $this->getLayoutUrl($entity)->toString();
     $this->setUpCurrentUser([], [
@@ -367,7 +367,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'title[0][value]',
         'langcode[0][value]',
         'revision',
-      ], array_keys($data['entity_form_fields']));
+      ], \array_keys($data['entity_form_fields']));
     }
 
     $model = $data['model'];
@@ -401,7 +401,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $new_model['source']['image']['value'] = $media->id();
     $updateImageClientData = [
       'model' => $new_model,
-      'componentType' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+      'componentType' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
       'componentInstanceUuid' => CanvasTestSetup::UUID_STATIC_IMAGE,
     ] + $this->getPatchContentsDefaults([$entity]);
     $response = $this->request(Request::create($url, method: 'PATCH', content: \json_encode($updateImageClientData, JSON_THROW_ON_ERROR)));
@@ -413,7 +413,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $file = $media->get('field_media_image')->entity;
     \assert($file instanceof FileInterface);
     $fileUri = $file->getFileUri();
-    \assert(is_string($fileUri));
+    \assert(\is_string($fileUri));
     $image = $media->get('field_media_image')->get(0);
     \assert($image instanceof ImageItemOverride);
     $image_url = $image->get('src_with_alternate_widths');
@@ -445,17 +445,14 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       self::assertSame(\array_keys($model), \array_merge($contentElements, $globalElements));
     }
 
-    // There should be two images, one should reference the media item direct
-    // (static-image-udf7d) and one should reference the thumbnail style
-    // (static-image-static-imageStyle-something7d) because it uses an adapter.
-    // @see \Drupal\canvas\Plugin\Adapter\ImageAndStyleAdapter
+    // There should be two images originating from media items.
     $images = (new Crawler($data['html']))->filter('img')->extract(['src']);
-    $thumbnail = ImageStyle::load('thumbnail');
-    \assert($thumbnail instanceof ImageStyleInterface);
-    self::assertCount(2, $images);
     self::assertEquals([
-      $image_url->getValue()->getGeneratedUrl(),
-      $thumbnail->buildUrl($fileUri),
+      // @see \Drupal\Tests\canvas\TestSite\CanvasTestSetup::UUID_STATIC_IMAGE
+      Media::load(3)?->field_media_image->src_with_alternate_widths->getGeneratedUrl(),
+      // @see \Drupal\Tests\canvas\TestSite\CanvasTestSetup::UUID_STATIC_IMAGE2
+      // @see \Drupal\Tests\canvas\TestSite\CanvasTestSetup::UUID_MEDIA_IMAGE4
+      Media::load(4)?->field_media_image->src_with_alternate_widths->getGeneratedUrl(),
     ], $images);
 
     unset($updateImageClientData['clientInstanceId']);
@@ -470,10 +467,11 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'model' => [
           'resolved' => [
             'label' => $new_label,
-            'label_display' => '',
+            'label_display' => '0',
           ],
         ],
-        'componentType' => 'block.system_messages_block@b92f802cf68eb83e',
+        // The component version may vary depending on upstream changes in core.
+        'componentType' => 'block.system_messages_block@' . Component::load('block.system_messages_block')?->getActiveVersion(),
         'componentInstanceUuid' => $globalComponentUuid,
       ] + $this->getPatchContentsDefaults([$entity]);
       $response = $this->request(Request::create($url, method: 'PATCH', content: \json_encode($updateRegionClientData, JSON_THROW_ON_ERROR)));
@@ -510,7 +508,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
 
   public static function providerValid(): iterable {
     foreach (['node', ContentTemplate::ENTITY_TYPE_ID] as $entity_type) {
-      yield "$entity_type: fresh state, no global" => [$entity_type];
+      yield "$entity_type: fresh state, no global" => [$entity_type, FALSE, FALSE];
       yield "$entity_type: fresh state, global" => [$entity_type, FALSE, TRUE];
       yield "$entity_type: existing auto-save, no global" => [$entity_type, TRUE, FALSE];
       yield "$entity_type: existing auto-save, global" => [$entity_type, TRUE, TRUE];
@@ -518,8 +516,9 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * @dataProvider providerEntityTypes
-   */
+ * Tests without page region permission.
+ */
+  #[DataProvider('providerEntityTypes')]
   public function testWithoutPageRegionPermission(string $entity_type): void {
     $entity = $this->getTestEntity($entity_type);
     $this->setUpCurrentUser([], [
@@ -560,12 +559,287 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       'model' => [
         'resolved' => [
           'label' => $new_label,
-          'label_display' => '',
+          'label_display' => '0',
         ],
       ],
-      'componentType' => 'block.system_messages_block@b92f802cf68eb83e',
+      // The component version may vary depending on upstream changes in core.
+      'componentType' => 'block.system_messages_block@' . Component::load('block.system_messages_block')?->getActiveVersion(),
       'componentInstanceUuid' => $globalComponentUuid,
     ] + $this->getPatchContentsDefaults([$entity], FALSE), JSON_THROW_ON_ERROR)));
+  }
+
+  /**
+   * Tests PATCH with component evolution cleaning up orphaned children.
+   *
+   * When a component has slots removed from its definition and a published
+   * page has children in those slots, a PATCH request should clean up orphaned
+   * children before saving the auto-save data.
+   *
+   * This test creates a component with 2 slots and tests:
+   * 1. Removing one slot (2 slots → 1 slot) - one child should be removed
+   * 2. Removing the remaining slot (1 slot → 0 slots) - remaining child removed
+   *
+   * This reproduces the scenario where:
+   * 1. Page is published with component version A (has slots) + children in slots
+   * 2. Component definition is updated - slot is removed (creates version B)
+   * 3. User opens Canvas, auto-update of instances occur, and user makes a prop edit, triggering PATCH
+   * 4. Orphaned slot children have to be cleaned up
+   * 5. Publishing succeeds
+   */
+  public function testPatchCleansUpOrphanedChildrenOnComponentEvolution(): void {
+    $this->setUpCurrentUser([], [
+      'edit any article content',
+      JavaScriptComponent::ADMIN_PERMISSION,
+      AutoSaveManager::PUBLISH_PERMISSION,
+    ]);
+
+    // Create a JS component with TWO slots: 'description' and 'sidebar'.
+    $code_component = JavaScriptComponent::create([
+      'machineName' => 'test-patch-slot-removal',
+      'name' => 'Test Patch Slot Removal',
+      'status' => TRUE,
+      'props' => [
+        'title' => [
+          'type' => 'string',
+          'title' => 'Title',
+          'examples' => ['Example title'],
+        ],
+      ],
+      'slots' => [
+        'description' => [
+          'title' => 'Description',
+          'examples' => ['<p>Example description</p>'],
+        ],
+        'sidebar' => [
+          'title' => 'Sidebar',
+          'examples' => ['<p>Example sidebar</p>'],
+        ],
+      ],
+      'js' => [
+        'original' => 'console.log("Test")',
+        'compiled' => 'console.log("Test")',
+      ],
+      'css' => [
+        'original' => '',
+        'compiled' => '',
+      ],
+      'dataDependencies' => [],
+    ]);
+    self::assertCount(0, $code_component->getTypedData()->validate());
+    self::assertSame(SAVED_NEW, $code_component->save());
+
+    // Get the version from the Component entity.
+    $component = Component::load('js.test-patch-slot-removal');
+    \assert($component instanceof Component);
+    $version_with_two_slots = $component->getActiveVersion();
+
+    // Create a published node with the component and children in BOTH slots.
+    $parent_uuid = 'a1b2c3d4-e5f6-4890-abcd-ef1234567890';
+    $child_in_description_uuid = 'f0e1d2c3-b4a5-4789-8fed-cba987654321';
+    $child_in_sidebar_uuid = 'c3d4e5f6-a7b8-4901-bcde-f23456789012';
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Test Node with Component',
+      'status' => TRUE,
+      'field_canvas_demo' => [
+        [
+          'uuid' => $parent_uuid,
+          'component_id' => 'js.test-patch-slot-removal',
+          'component_version' => $version_with_two_slots,
+          'inputs' => [
+            'title' => 'Parent component title',
+          ],
+        ],
+        [
+          'uuid' => $child_in_description_uuid,
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
+          'inputs' => [
+            'heading' => 'Child in description slot',
+          ],
+          'parent_uuid' => $parent_uuid,
+          'slot' => 'description',
+        ],
+        [
+          'uuid' => $child_in_sidebar_uuid,
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
+          'inputs' => [
+            'heading' => 'Child in sidebar slot',
+          ],
+          'parent_uuid' => $parent_uuid,
+          'slot' => 'sidebar',
+        ],
+      ],
+    ]);
+    self::assertCount(0, $node->getTypedData()->validate());
+    $node->save();
+
+    // Verify node is published with 3 components (parent + 2 children).
+    self::assertTrue($node->isPublished());
+    $tree = $node->get('field_canvas_demo')->getValue();
+    self::assertCount(3, $tree, 'Published node should have parent and two children');
+
+    $url = $this->getLayoutUrl($node)->toString();
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    \assert($autoSave instanceof AutoSaveManager);
+
+    // Remove the 'description' slot, keeping 'sidebar'.
+    $code_component->set('slots', [
+      'sidebar' => [
+        'title' => 'Sidebar',
+        'examples' => ['<p>Example sidebar</p>'],
+      ],
+    ]);
+    self::assertCount(0, $code_component->getTypedData()->validate());
+    self::assertSame(SAVED_UPDATED, $code_component->save());
+
+    // Reload to get the new version.
+    $component = Component::load('js.test-patch-slot-removal');
+    \assert($component instanceof Component);
+    $version_with_one_slot = $component->getActiveVersion();
+    self::assertNotSame($version_with_two_slots, $version_with_one_slot);
+
+    // Verify no auto-save exists before GET.
+    self::assertTrue($autoSave->getAutoSaveEntity($node)->isEmpty(), 'No auto-save should exist before GET');
+
+    // GET to retrieve the model structure.
+    // This should create an auto-save because the tree was modified (orphaned
+    // child in description slot removed).
+    $response = $this->request(Request::create($url));
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+    $data = self::decodeResponse($response);
+
+    // Verify auto-save was created during GET (due to component evolution).
+    self::assertFalse($autoSave->getAutoSaveEntity($node)->isEmpty(), 'Auto-save should be created during GET when tree is modified');
+    self::assertArrayHasKey('autoSaves', $data, 'Response should include autoSaves data');
+    $nodeAutoSaveKey = AutoSaveManager::getAutoSaveKey($node);
+    self::assertArrayHasKey($nodeAutoSaveKey, $data['autoSaves'], 'autoSaves should include the node');
+
+    // Verify the auto-save created during GET has the orphan removed.
+    $autoSavedNodeFromGet = $autoSave->getAutoSaveEntity($node)->entity;
+    \assert($autoSavedNodeFromGet instanceof Node);
+    $getAutoSaveTree = $autoSavedNodeFromGet->get('field_canvas_demo')->getValue();
+    self::assertCount(2, $getAutoSaveTree, 'Auto-save from GET should have parent + sidebar child (description child removed)');
+    $getUuids = array_column($getAutoSaveTree, 'uuid');
+    self::assertContains($parent_uuid, $getUuids);
+    self::assertContains($child_in_sidebar_uuid, $getUuids);
+    self::assertNotContains($child_in_description_uuid, $getUuids, 'Child in description slot should be removed by GET');
+
+    // PATCH with the new version.
+    self::assertArrayHasKey($parent_uuid, $data['model']);
+    $new_model = $data['model'][$parent_uuid];
+    $new_model['source']['title']['value'] = 'Title after removing description slot';
+    $new_model['resolved']['title'] = 'Title after removing description slot';
+
+    // Use the autoSaves from the GET response since an auto-save now exists.
+    $patchData = [
+      'model' => $new_model,
+      'componentType' => "js.test-patch-slot-removal@{$version_with_one_slot}",
+      'componentInstanceUuid' => $parent_uuid,
+      'autoSaves' => $data['autoSaves'],
+      'clientInstanceId' => 'test-client-id',
+    ];
+
+    $response = $this->request(Request::create($url, method: 'PATCH', content: \json_encode($patchData, JSON_THROW_ON_ERROR)));
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    // Verify auto-save still has 2 components (parent + sidebar child).
+    // The description child should remain removed.
+    self::assertFalse($autoSave->getAutoSaveEntity($node)->isEmpty());
+    $autoSavedNode = $autoSave->getAutoSaveEntity($node)->entity;
+    \assert($autoSavedNode instanceof Node);
+    $autoSaveTree = $autoSavedNode->get('field_canvas_demo')->getValue();
+    self::assertCount(2, $autoSaveTree, 'Auto-save should have parent + sidebar child after removing description slot');
+    $uuids = array_column($autoSaveTree, 'uuid');
+    self::assertContains($parent_uuid, $uuids);
+    self::assertContains($child_in_sidebar_uuid, $uuids);
+    self::assertNotContains($child_in_description_uuid, $uuids, 'Child in description slot should be removed');
+
+    // Publish and verify.
+    $response = $this->makePublishAllRequest();
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode(), \sprintf(
+      'Phase 1 publish failed. Response: %s',
+      $response->getContent()
+    ));
+    self::assertNotNull($node->id());
+    $updatedNode = $this->container->get('entity_type.manager')
+      ->getStorage('node')
+      ->loadUnchanged($node->id());
+    \assert($updatedNode instanceof Node);
+    $finalTree = $updatedNode->get('field_canvas_demo')->getValue();
+    self::assertCount(2, $finalTree, 'Published node should have parent + sidebar child');
+    self::assertCount(0, $updatedNode->getTypedData()->validate());
+
+    // Remove all remaining slots.
+    $code_component->set('slots', []);
+    self::assertCount(0, $code_component->getTypedData()->validate());
+    self::assertSame(SAVED_UPDATED, $code_component->save());
+
+    // Reload to get the new version.
+    $component = Component::load('js.test-patch-slot-removal');
+    \assert($component instanceof Component);
+    $version_with_no_slots = $component->getActiveVersion();
+    self::assertNotSame($version_with_one_slot, $version_with_no_slots);
+
+    // GET to retrieve the model structure.
+    // This should update the auto-save because the tree was modified again
+    // (orphaned child in sidebar slot removed).
+    $response = $this->request(Request::create($url));
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+    $data = self::decodeResponse($response);
+
+    // Verify auto-save was updated during GET (due to component evolution).
+    self::assertFalse($autoSave->getAutoSaveEntity($node)->isEmpty(), 'Auto-save should exist after GET');
+    $autoSavedNodeFromGet2 = $autoSave->getAutoSaveEntity($node)->entity;
+    \assert($autoSavedNodeFromGet2 instanceof Node);
+    $get2AutoSaveTree = $autoSavedNodeFromGet2->get('field_canvas_demo')->getValue();
+    self::assertCount(1, $get2AutoSaveTree, 'Auto-save from GET should have only parent (sidebar child removed)');
+    self::assertSame($parent_uuid, $get2AutoSaveTree[0]['uuid']);
+
+    // PATCH with the new version.
+    self::assertArrayHasKey($parent_uuid, $data['model']);
+    $new_model = $data['model'][$parent_uuid];
+    $new_model['source']['title']['value'] = 'Title after removing all slots';
+    $new_model['resolved']['title'] = 'Title after removing all slots';
+
+    // Use the autoSaves from the GET response since an auto-save exists.
+    $patchData = [
+      'model' => $new_model,
+      'componentType' => "js.test-patch-slot-removal@{$version_with_no_slots}",
+      'componentInstanceUuid' => $parent_uuid,
+      'autoSaves' => $data['autoSaves'],
+      'clientInstanceId' => 'test-client-id-phase2',
+    ];
+
+    $response = $this->request(Request::create($url, method: 'PATCH', content: \json_encode($patchData, JSON_THROW_ON_ERROR)));
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    // Verify auto-save still has only 1 component (parent only).
+    // The sidebar child should remain removed.
+    self::assertFalse($autoSave->getAutoSaveEntity($node)->isEmpty());
+    $autoSavedNode = $autoSave->getAutoSaveEntity($node)->entity;
+    \assert($autoSavedNode instanceof Node);
+    $autoSaveTree = $autoSavedNode->get('field_canvas_demo')->getValue();
+    self::assertCount(1, $autoSaveTree, 'Auto-save should only have parent after removing all slots');
+    self::assertSame($parent_uuid, $autoSaveTree[0]['uuid']);
+    self::assertSame('js.test-patch-slot-removal', $autoSaveTree[0]['component_id']);
+
+    // Publish and verify.
+    $response = $this->makePublishAllRequest();
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode(), \sprintf(
+      'Phase 2 publish failed. Response: %s',
+      $response->getContent()
+    ));
+    self::assertNotNull($node->id());
+    $updatedNode = $this->container->get('entity_type.manager')
+      ->getStorage('node')
+      ->loadUnchanged($node->id());
+    \assert($updatedNode instanceof Node);
+    $finalTree = $updatedNode->get('field_canvas_demo')->getValue();
+    self::assertCount(1, $finalTree, 'Published node should only have parent after all slots removed');
+    self::assertSame($parent_uuid, $finalTree[0]['uuid']);
+    self::assertCount(0, $updatedNode->getTypedData()->validate());
   }
 
 }

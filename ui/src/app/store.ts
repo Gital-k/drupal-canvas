@@ -11,9 +11,11 @@ import { extensionsSlice } from '@/features/extensions/extensionsSlice';
 import { formStateSlice } from '@/features/form/formStateSlice';
 import {
   layoutModelReducer,
+  setInitialized,
   setInitialLayoutModel,
   setUpdatePreview,
 } from '@/features/layout/layoutModelSlice';
+import { notificationsSlice } from '@/features/notifications/notificationsSlice';
 import {
   pageDataReducer,
   setInitialPageData,
@@ -24,16 +26,19 @@ import { codeComponentDialogSlice } from '@/features/ui/codeComponentDialogSlice
 import { dialogSlice } from '@/features/ui/dialogSlice';
 import { primaryPanelSlice } from '@/features/ui/primaryPanelSlice';
 import {
+  clearUndoRedoHistory,
   performUndoOrRedo,
   pushUndo,
   setLatestUndoRedoActionId,
   uiSlice,
 } from '@/features/ui/uiSlice';
 import { assetLibraryApi } from '@/services/assetLibrary';
+import { brandKitApi } from '@/services/brandKit';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import { componentInstanceFormApi } from '@/services/componentInstanceForm';
 import { contentApi } from '@/services/content';
 import { extensionsApi } from '@/services/extensions';
+import { notificationsApi } from '@/services/notificationsApi';
 import { pageDataFormApi } from '@/services/pageDataForm';
 import { patternApi } from '@/services/patterns';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
@@ -103,6 +108,7 @@ const rootReducer = combineSlices(
       undoable(layoutModelReducer, {
         undoType: '@@redux-undo/layoutModel_UNDO',
         redoType: '@@redux-undo/layoutModel_REDO',
+        clearHistoryType: '@@redux-undo/layoutModel_CLEAR_HISTORY',
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
           return (
@@ -121,6 +127,7 @@ const rootReducer = combineSlices(
       undoable(pageDataReducer, {
         undoType: '@@redux-undo/pageData_UNDO',
         redoType: '@@redux-undo/pageData_REDO',
+        clearHistoryType: '@@redux-undo/pageData_CLEAR_HISTORY',
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
           return (
@@ -134,6 +141,7 @@ const rootReducer = combineSlices(
   },
   patternApi,
   assetLibraryApi,
+  brandKitApi,
   personalizationApi,
   componentAndLayoutApi,
   previewApi,
@@ -147,6 +155,8 @@ const rootReducer = combineSlices(
   uiSlice,
   formStateSlice,
   extensionsSlice,
+  notificationsApi,
+  notificationsSlice,
   pendingChangesApi,
   publishReviewSlice,
   contentApi,
@@ -164,10 +174,10 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
     const type = (action as Action).type;
     // If the action being performed is an UNDO or REDO action we need to move
     // items between the undo and redo stacks.
-    const matches = type.match(/@@redux-undo\/[^_]+_(UNDO|REDO)/);
-    if (matches && matches.length === 2) {
+    const matchesUndoRedo = type.match(/@@redux-undo\/[^_]+_(UNDO|REDO)/);
+    if (matchesUndoRedo && matchesUndoRedo.length === 2) {
       const id = uuidv4();
-      const [, undoOrRedo] = matches;
+      const [, undoOrRedo] = matchesUndoRedo;
       store.dispatch(performUndoOrRedo(undoOrRedo === 'UNDO'));
       store.dispatch(setLatestUndoRedoActionId(id));
       return next({
@@ -177,10 +187,18 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
         },
       });
     }
+    // If the action being performed is a CLEAR_HISTORY action we need to clear
+    // the undo and redo stacks and reset the latestUndoRedoActionId in the uiSlice.
+    const matchesClear = type.match(/@@redux-undo\/[^_]+_CLEAR_HISTORY/);
+    if (matchesClear && matchesClear.length === 1) {
+      store.dispatch(clearUndoRedoHistory());
+      return next(action);
+    }
     if (
       type === setUpdatePreview.type ||
       type === setInitialLayoutModel.type ||
-      type === setInitialPageData.type
+      type === setInitialPageData.type ||
+      type === setInitialized.type
     ) {
       // Ignore initial actions that set the state of the model or page data
       // from the return of API responses. The user should not be able to undo
@@ -219,12 +237,14 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
       return getDefaultMiddleware().concat(
         patternApi.middleware,
         assetLibraryApi.middleware,
+        brandKitApi.middleware,
         personalizationApi.middleware,
         componentAndLayoutApi.middleware,
         previewApi.middleware,
         componentInstanceFormApi.middleware,
         pageDataFormApi.middleware,
         extensionsApi.middleware,
+        notificationsApi.middleware,
         undoRedoActionIdMiddleware,
         pendingChangesApi.middleware,
         contentApi.middleware,

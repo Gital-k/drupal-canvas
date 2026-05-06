@@ -9,11 +9,13 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Asset\AttachedAssetsInterface;
 use Drupal\Core\Asset\LibraryDependencyResolverInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\canvas\CodeComponentDataProvider;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Route;
@@ -35,14 +37,17 @@ readonly final class ComponentSourceHooks {
     private ThemeManagerInterface $themeManager,
     private ConfigFactoryInterface $configFactory,
     private RequestStack $requestStack,
+    private ThemeInstallerInterface $themeInstaller,
   ) {}
 
   const ASSET_LIBRARY_METHOD_MAPPING = [
     'canvas/canvasData.v0.baseUrl' => 'getCanvasDataBaseUrlV0',
     'canvas/canvasData.v0.branding' => 'getCanvasDataBrandingV0',
     'canvas/canvasData.v0.breadcrumbs' => 'getCanvasDataBreadcrumbsV0',
-    'canvas/canvasData.v0.pageTitle' => 'getCanvasDataPageTitleV0',
     'canvas/canvasData.v0.jsonapiSettings' => 'getCanvasDataJsonApiSettingsV0',
+    'canvas/canvasData.v0.mainEntity' => 'getCanvasDataMainEntityV0',
+    'canvas/canvasData.v0.pageTitle' => 'getCanvasDataPageTitleV0',
+    'canvas/canvasData.v0.themeAssets' => 'getCanvasDataThemeAssetsV0',
   ];
 
   /**
@@ -58,6 +63,14 @@ readonly final class ComponentSourceHooks {
    */
   #[Hook('modules_installed')]
   public function modulesInstalled(array $modules, bool $is_syncing): void {
+    // Canvas needs canvas_stark in order to work, so *always* install it
+    // regardless of whether config is syncing. The theme installer is smart
+    // enough to return early if canvas_stark is already installed.
+    // @see \Drupal\canvas\Theme\CanvasThemeNegotiator
+    // @see \Drupal\Core\Theme\ThemeNegotiator::determineActiveTheme()
+    if (\in_array('canvas', $modules, TRUE)) {
+      $this->themeInstaller->install(['canvas_stark']);
+    }
     if ($is_syncing) {
       return;
     }
@@ -93,7 +106,7 @@ readonly final class ComponentSourceHooks {
     }
 
     $route = $this->routeMatch->getRouteObject();
-    assert($route instanceof Route);
+    \assert($route instanceof Route);
     $is_preview = $route->getOption('_canvas_use_template_draft') === TRUE;
     // TRICKY: the `route` cache context varies also by route parameters, that
     // is unnecessary here, because this only varies by route definition.
@@ -103,6 +116,10 @@ readonly final class ComponentSourceHooks {
     // against the most obscure edge cases. (Also: tests do simulate that!)
     if ($asset_library) {
       $page['#attached']['library'][] = $asset_library->getAssetLibrary($is_preview);
+    }
+    $brand_kit = BrandKit::load(BrandKit::GLOBAL_ID);
+    if ($brand_kit) {
+      $page['#attached']['library'][] = $brand_kit->getAssetLibrary($is_preview);
     }
   }
 
@@ -120,35 +137,47 @@ readonly final class ComponentSourceHooks {
     $request = $this->requestStack->getCurrentRequest();
     \assert($request instanceof Request);
 
-    $all = in_array('canvas/canvasData.v0', $all_attached_asset_libraries, TRUE);
-    if ($all || in_array('canvas/canvasData.v0.baseUrl', $all_attached_asset_libraries, TRUE)) {
+    $all = \in_array('canvas/canvasData.v0', $all_attached_asset_libraries, TRUE);
+    if ($all || \in_array('canvas/canvasData.v0.baseUrl', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'baseUrl']) === NULL) {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.baseUrl'));
       }
     }
-    if ($all || in_array('canvas/canvasData.v0.branding', $all_attached_asset_libraries, TRUE)) {
+    if ($all || \in_array('canvas/canvasData.v0.branding', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'branding', 'homeUrl']) === NULL) {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.branding'));
       }
     }
-    if ($all || in_array('canvas/canvasData.v0.breadcrumbs', $all_attached_asset_libraries, TRUE)) {
+    if ($all || \in_array('canvas/canvasData.v0.breadcrumbs', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'breadcrumbs']) === NULL) {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.breadcrumbs'));
       }
     }
-    if ($all || in_array('canvas/canvasData.v0.pageTitle', $all_attached_asset_libraries, TRUE)) {
+    if ($all || \in_array('canvas/canvasData.v0.pageTitle', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'pageTitle']) === NULL) {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.pageTitle'));
       }
     }
-    if ($all || in_array('canvas/canvasData.v0.jsonapiSettings', $all_attached_asset_libraries, TRUE)) {
+    if ($all || \in_array('canvas/canvasData.v0.mainEntity', $all_attached_asset_libraries, TRUE)) {
+      // Allow overrides: only set if still NULL.
+      if (NestedArray::getValue($settings, [...$path, 'mainEntity']) === NULL) {
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.mainEntity'));
+      }
+    }
+    if ($all || \in_array('canvas/canvasData.v0.jsonapiSettings', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'jsonapiSettings']) === NULL) {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.jsonapiSettings'));
+      }
+    }
+    if ($all || \in_array('canvas/canvasData.v0.themeAssets', $all_attached_asset_libraries, TRUE)) {
+      // Allow overrides: only set if still NULL.
+      if (NestedArray::getValue($settings, [...$path, 'themeAssets', 'logo', 'url']) === NULL) {
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.themeAssets'));
       }
     }
     if (!empty($canvasData)) {
@@ -163,7 +192,7 @@ readonly final class ComponentSourceHooks {
    * @see \Drupal\canvas\CodeComponentDataProvider
    */
   private function memoize(Request $request, string $asset_library): array {
-    assert(str_starts_with($asset_library, 'canvas/canvasData.v0.'));
+    \assert(str_starts_with($asset_library, 'canvas/canvasData.v0.'));
 
     static $cached;
     if (!isset($cached)) {
@@ -174,7 +203,7 @@ readonly final class ComponentSourceHooks {
     }
     if (!isset($cached[$asset_library][$request])) {
       $method = self::ASSET_LIBRARY_METHOD_MAPPING[$asset_library];
-      assert(method_exists($this->codeComponentDataProvider, $method));
+      \assert(method_exists($this->codeComponentDataProvider, $method));
       $cached[$asset_library][$request] = $this->codeComponentDataProvider->$method();
     }
 

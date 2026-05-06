@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Render\MainContent;
 
 use Drupal\Component\Utility\NestedArray;
@@ -63,7 +65,7 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
    *   Array of all dependencies, including nested ones.
    */
   private function resolveLibraryDependencies(string $library, array &$collected_dependencies = []): array {
-    if (in_array($library, $collected_dependencies)) {
+    if (\in_array($library, $collected_dependencies, TRUE)) {
       return [];
     }
 
@@ -79,7 +81,7 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
 
     $dependencies = [];
     foreach ($library_info['dependencies'] as $dependency) {
-      if (!in_array($dependency, $collected_dependencies)) {
+      if (!\in_array($dependency, $collected_dependencies, TRUE)) {
         $collected_dependencies[] = $dependency;
         $dependencies[] = $dependency;
         $nested_dependencies = $this->resolveLibraryDependencies($dependency, $collected_dependencies);
@@ -128,7 +130,7 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
       'core/drupal.dialog.ajax' => 'canvas/canvas.drupal.dialog.ajax',
     ];
     foreach ($libraries_replace as $original => $replacement) {
-      if ($index = array_search($original, $assets->libraries)) {
+      if ($index = array_search($original, $assets->libraries, TRUE)) {
         $assets->libraries[$index] = $replacement;
       }
     }
@@ -144,9 +146,9 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
     // The first time (and perhaps other times?) this renderer runs, the
     // libraries query parameter is compressed. We decompress anything requiring
     // it here.
-    if (isset($ajax_page_state['libraries']) && !is_array($ajax_page_state['libraries'])) {
-      if (is_array($ajax_page_state['libraries'])) {
-        $ajax_page_state['libraries'] = array_map(
+    if (isset($ajax_page_state['libraries']) && !\is_array($ajax_page_state['libraries'])) {
+      if (\is_array($ajax_page_state['libraries'])) {
+        $ajax_page_state['libraries'] = \array_map(
           fn($item) => str_contains($item, '/') ? $item : UrlHelper::uncompressQueryParameter($item),
           $ajax_page_state['libraries'],
         );
@@ -176,7 +178,11 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
       $dependencies_of_the_potential_conflicts = array_merge($dependencies_of_the_potential_conflicts, $dependencies);
     }
 
-    $already_loaded_libraries = array_unique([...$already_loaded_libraries, ...$potentially_conflicting_libraries_added_on_canvas_load, ...$dependencies_of_the_potential_conflicts]);
+    $already_loaded_libraries = array_unique([
+      ...$already_loaded_libraries,
+      ...$potentially_conflicting_libraries_added_on_canvas_load,
+      ...$dependencies_of_the_potential_conflicts,
+    ]);
     $assets
       ->setAlreadyLoadedLibraries($already_loaded_libraries);
 
@@ -184,13 +190,13 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
     // response so the client can add them to the page using Drupal.Ajax()
     $get_css = $this->assetResolver->getCssAssets($assets, FALSE);
     $css_array = $this->cssCollectionRenderer->render($get_css);
-    $css_for_ajax = array_map(fn($item) =>
+    $css_for_ajax = \array_map(fn($item) =>
       array_diff_key($item['#attributes'], ['rel' => 'rel']), $css_array);
 
     [$head_assets, $foot_assets] = $this->assetResolver->getJsAssets($assets, FALSE);
     $head_array = $this->jsCollectionRenderer->render($head_assets);
     $foot_array = $this->jsCollectionRenderer->render($foot_assets);
-    $js_for_ajax = array_map(
+    $js_for_ajax = \array_map(
       fn($item) => array_diff_key($item['#attributes'], ['rel' => 'rel']),
       [...$head_array, ...$foot_array]
     );
