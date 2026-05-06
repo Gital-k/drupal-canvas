@@ -532,6 +532,12 @@ test.describe('Multivalue Prop Types', () => {
     await dateTimeUnlimitedField
       .getByRole('button', { name: '+ Add new' })
       .click();
+    // Wait for the Add-new's AJAX rebuild + autosave PATCH to settle before
+    // editing, so editMultiValueDatetimeProp's autoSavePromise catches the
+    // edit's PATCH and not the still-in-flight Add-new PATCH.
+    await expect(dateTimeUnlimitedField.locator('tr.draggable')).toHaveCount(2);
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
     await canvas.editMultiValueDatetimeProp(
       'DateTime (Unlimited)',
       '2025-12-26',
@@ -659,6 +665,12 @@ test.describe('Multivalue Prop Types', () => {
 
     // Add a new item and reorder.
     await dateUnlimitedField.getByRole('button', { name: '+ Add new' }).click();
+    // Wait for the Add-new's AJAX rebuild + autosave PATCH to settle before
+    // editing, so editMultiValueDateProp's autoSavePromise catches the edit's
+    // PATCH and not the still-in-flight Add-new PATCH.
+    await expect(dateUnlimitedField.locator('tr.draggable')).toHaveCount(2);
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
     await canvas.editMultiValueDateProp('Date (Unlimited)', '2026-05-01', 1);
 
     // Drag row 1 (2026-05-01) before row 0 (2026-04-28).
