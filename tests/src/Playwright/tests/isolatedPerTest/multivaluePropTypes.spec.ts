@@ -10,7 +10,7 @@ test.use({
 test.describe('Multivalue Prop Types', () => {
   test.beforeEach(async ({ drupal, canvas, page }) => {
     // Pin the site's default timezone to Australia/Sydney so wall-clock →
-    // UTC normalisation is deterministic in the datetime tests below. This
+    // UTC normalization is deterministic in the datetime tests below. This
     // mirrors what web/core/tests/bootstrap.php pins for PHPUnit.
     await drupal.loginAsAdmin();
     await page.goto('/admin/config/regional/settings');
@@ -550,9 +550,6 @@ test.describe('Multivalue Prop Types', () => {
     await dateTimeUnlimitedField
       .getByRole('button', { name: '+ Add new' })
       .click();
-    // Wait for the Add-new's AJAX rebuild + autosave PATCH to settle before
-    // editing, so editMultiValueDatetimeProp's autoSavePromise catches the
-    // edit's PATCH and not the still-in-flight Add-new PATCH.
     await expect(dateTimeUnlimitedField.locator('tr.draggable')).toHaveCount(2);
     // eslint-disable-next-line playwright/no-networkidle
     await page.waitForLoadState('networkidle');
@@ -683,9 +680,6 @@ test.describe('Multivalue Prop Types', () => {
 
     // Add a new item and reorder.
     await dateUnlimitedField.getByRole('button', { name: '+ Add new' }).click();
-    // Wait for the Add-new's AJAX rebuild + autosave PATCH to settle before
-    // editing, so editMultiValueDateProp's autoSavePromise catches the edit's
-    // PATCH and not the still-in-flight Add-new PATCH.
     await expect(dateUnlimitedField.locator('tr.draggable')).toHaveCount(2);
     // eslint-disable-next-line playwright/no-networkidle
     await page.waitForLoadState('networkidle');
