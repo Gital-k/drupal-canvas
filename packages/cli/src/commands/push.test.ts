@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildComponent } from '../utils/build-component';
 import { generateManifest } from '../utils/generate-manifest';
-import { buildAndPushComponents } from '../utils/prepare-push';
+import {
+  buildAndPushComponents,
+  pushBuiltComponents,
+} from '../utils/prepare-push';
 import { processComponentFiles } from '../utils/process-component-files';
 import { syncManifestArtifacts } from './push';
 
@@ -26,6 +29,10 @@ vi.mock('@clack/prompts', () => ({
 vi.mock('@drupal-canvas/ui/features/code-editor/utils/ast-utils', () => ({
   getDataDependenciesFromAst: vi.fn(() => ({})),
   getImportsFromAst: vi.fn(() => []),
+}));
+
+vi.mock('tailwindcss-in-browser', () => ({
+  compilePartialCss: vi.fn(async (source: string) => source),
 }));
 
 vi.mock('../utils/build-tailwind', () => ({
@@ -290,6 +297,57 @@ describe('Push components', () => {
         success: true,
         details: [{ content: 'Deleted' }],
       },
+    ]);
+  });
+
+  it('uploads built component payloads in dependency order', async () => {
+    const api = mockApiService();
+    vi.mocked(api.listComponents).mockResolvedValue({});
+    vi.mocked(api.createComponent).mockResolvedValue({} as never);
+
+    const results = await pushBuiltComponents(
+      [
+        {
+          machineName: 'card',
+          componentName: 'card',
+          importedJsComponents: ['button'],
+          componentPayload: {
+            machineName: 'card',
+            name: 'card',
+            sourceCodeJs: "import Button from '@/components/button';",
+            compiledJs: "import Button from '@/components/button';",
+          } as never,
+        },
+        {
+          machineName: 'button',
+          componentName: 'button',
+          importedJsComponents: [],
+          componentPayload: {
+            machineName: 'button',
+            name: 'button',
+            sourceCodeJs: 'export default function Button() {}',
+            compiledJs: 'export default function Button() {}',
+          } as never,
+        },
+      ],
+      api,
+      'Pushing',
+    );
+
+    expect(api.createComponent).toHaveBeenCalledTimes(2);
+    expect(api.createComponent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ machineName: 'button' }),
+      true,
+    );
+    expect(api.createComponent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ machineName: 'card' }),
+      true,
+    );
+    expect(results.map((result) => result.itemName)).toEqual([
+      'card',
+      'button',
     ]);
   });
 

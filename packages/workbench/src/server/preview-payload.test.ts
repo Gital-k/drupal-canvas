@@ -422,16 +422,21 @@ describe('preview-payload', () => {
       path.join(root, 'src/components/asset-card/index.tsx'),
       [
         "import logoUrl from './logo.png';",
+        "import { label } from '@/lib/labels';",
         '',
         'export default function AssetCard() {',
         '  return (',
         "    <div style={{ fontFamily: 'DemoFont' }}>",
         '      <img alt="logo" src={logoUrl} />',
-        '      <p>Asset card</p>',
+        '      <p>{label}</p>',
         '    </div>',
         '  );',
         '}',
       ].join('\n'),
+    );
+    await writeFile(
+      path.join(root, 'src/lib/labels.ts'),
+      "export const label = 'Asset card';",
     );
 
     const bundled = await bundleInteractivePreview({
@@ -457,6 +462,7 @@ describe('preview-payload', () => {
 
     expect(bundled.css).toContain('data:font/woff2;base64');
     expect(bundled.js).toContain('data:image/png;base64');
+    expect(bundled.js).toContain('Asset card');
   });
 
   it('bundles jsx components without requiring an explicit React import', async () => {
