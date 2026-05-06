@@ -22,10 +22,33 @@ const componentCardDir = resolve(process.cwd(), 'src/components/card');
 // Mock fs to test isComponentDir used in component-imports rule.
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
+  readFileSync: vi.fn((filePath) => {
+    if (filePath === '/custom/canvas.config.json') {
+      return JSON.stringify({
+        aliasBaseDir: 'src',
+        componentDir: 'code-components',
+      });
+    }
+
+    return JSON.stringify({
+      aliasBaseDir: 'src',
+      componentDir: 'src/components',
+    });
+  }),
   readdirSync: vi.fn((dir) => {
     const dirs: Record<string, string[]> = {
       '/components/button': ['component.yml', 'index.jsx', 'index.css'],
       [componentCardDir]: ['component.yml', 'index.tsx', 'index.css'],
+      '/custom/code-components/button': [
+        'component.yml',
+        'index.jsx',
+        'index.css',
+      ],
+      '/custom/code-components/card': [
+        'component.yml',
+        'index.tsx',
+        'index.css',
+      ],
       '/src/utils': ['utils.js'],
     };
     return dirs[dir] ?? [];
@@ -52,6 +75,15 @@ testRunner.run('component-imports rule', rule, {
         const Card = ({ title }) => {
           return <img src={imageUrl} alt={title} />;
         };
+        export default Card;
+      `,
+      filename: '/components/button/index.jsx',
+    },
+    {
+      name: 'should pass when component imports a relative SVG React component',
+      code: `
+        import Icon from './icon.svg?react';
+        const Card = () => <Icon aria-hidden />;
         export default Card;
       `,
       filename: '/components/button/index.jsx',
@@ -145,7 +177,7 @@ testRunner.run('component-imports rule', rule, {
       errors: [
         {
           message:
-            "Relative imports are not supported. Use '@/...' alias instead of '../icon' to import other components or helpers/utilities from shared locations outside component dir.",
+            "Relative JavaScript and TypeScript module imports are not supported. Use '@/...' alias instead of '../icon' to import other components or helpers/utilities from shared locations outside component directories.",
           line: 2,
         },
       ],
@@ -397,3 +429,46 @@ testRunner.run('component-imports rule', rule, {
     },
   ],
 });
+
+const cwd = vi.spyOn(process, 'cwd');
+
+cwd.mockReturnValue('/custom');
+const customComponentDirTestRunner = new RuleTester({
+  languageOptions: {
+    ecmaVersion: 2022,
+    sourceType: 'module',
+    parserOptions: {
+      ecmaFeatures: {
+        jsx: true,
+      },
+    },
+  },
+});
+
+customComponentDirTestRunner.run(
+  'component-imports rule - custom componentDir',
+  rule,
+  {
+    valid: [],
+    invalid: [
+      {
+        name: 'should fail when importing util/helper from a configured component directory',
+        code: `
+        import { helper } from "@/components/card/utils";
+        export default ({ title }) => {
+          return <button>{title}</button>;
+        };
+      `,
+        filename: '/custom/code-components/button/index.jsx',
+        errors: [
+          {
+            message:
+              'Importing "@/components/card/utils" from a component directory is not supported. ' +
+              'Use "@/" alias to import other components or helpers/utilities from shared locations outside component directories.',
+            line: 2,
+          },
+        ],
+      },
+    ],
+  },
+);
