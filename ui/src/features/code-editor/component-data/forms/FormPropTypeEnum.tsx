@@ -480,7 +480,7 @@ function EnumValuesForm({
   // Keep track of which labels have been touched (manually edited) by the user.
   // If a label has not been touched, it will be auto-updated to match the value.
   const [touched, setTouched] = useState(values.map(({ label }) => !!label));
-  // Track validation errors for each value field; initialised to match values length.
+  // Track validation errors for each value field; initialized to match values length.
   const [valueErrors, setValueErrors] = useState<(string | null)[]>(() =>
     values.map(() => null),
   );
