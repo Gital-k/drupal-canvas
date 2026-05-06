@@ -16,9 +16,10 @@ import {
 import PermissionCheck from '@/components/PermissionCheck';
 import ReviewErrors from '@/components/review/ReviewErrors';
 import { getReviewGroupKey } from '@/components/review/utils';
+import { isConflictUxEnabled } from '@/features/conflict/conflictUtils';
 import { Divider } from '@/features/code-editor/component-data/FormElement';
-
 import ChangeList from './changes/ChangeList';
+import ConflictBanner from './ConflictBanner';
 
 import type { ErrorResponse } from '@/services/pendingChangesApi';
 import type {
@@ -37,10 +38,10 @@ interface PublishReviewProps {
   onPublishClick: (selectedChanges: UnpublishedChange[]) => void;
   onDiscardClick: (selectedChange: UnpublishedChange) => void;
   onViewClick?: (change: UnpublishedChange) => void;
+  onResolveConflict?: (change?: UnpublishedChange) => void;
   onOpenChangeCallback: (open: boolean) => void;
   isPublishing: boolean;
   isDiscarding: boolean;
-  isFetching: boolean; // indicates if the list of autosaved changes is being fetched
   isUpdating: boolean; // indicates if the preview is being updated
   pageStatusMap?: Record<
     string,
@@ -55,18 +56,19 @@ const PublishReview: React.FC<PublishReviewProps> = ({
   onPublishClick,
   onDiscardClick,
   onViewClick,
+  onResolveConflict,
   onOpenChangeCallback,
   isPublishing = false,
   isDiscarding = false,
-  isFetching = false,
   isUpdating = false,
   pageStatusMap,
 }) => {
+  const conflictUxEnabled = isConflictUxEnabled();
   // State to manage the open/close state of the popover
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   // Single source to determine if something is happening
-  const isBusy = isUpdating || isPublishing || isDiscarding || isFetching;
+  const isBusy = isUpdating || isPublishing || isDiscarding;
 
   // State to manage selected changes
   const [selectedChanges, setSelectedChanges] = useState<UnpublishedChange[]>(
@@ -74,10 +76,20 @@ const PublishReview: React.FC<PublishReviewProps> = ({
   );
 
   // Memoize the selected changes to avoid unnecessary re-renders
+  const selectableChanges = useMemo(
+    () =>
+      conflictUxEnabled
+        ? changes.filter((change) => !change.hasConflict)
+        : changes,
+    [changes, conflictUxEnabled],
+  );
+
   const allSelected = useMemo(() => {
-    if (!changes?.length) return false;
-    return selectedChanges?.length === changes?.length ? true : 'indeterminate';
-  }, [changes, selectedChanges]);
+    if (!selectableChanges?.length) return false;
+    return selectedChanges?.length === selectableChanges?.length
+      ? true
+      : 'indeterminate';
+  }, [selectableChanges, selectedChanges]);
 
   // Used to display the `Published` state, which resets on new selections
   const [hasPublished, setHasPublished] = useState<boolean>(false);
@@ -92,6 +104,20 @@ const PublishReview: React.FC<PublishReviewProps> = ({
       setHasPublished(false);
     }
   }, [selectedChanges.length]);
+
+  useEffect(() => {
+    if (!conflictUxEnabled) {
+      return;
+    }
+    const conflictedPointers = new Set(
+      changes
+        .filter((change) => change.hasConflict)
+        .map((change) => change.pointer),
+    );
+    setSelectedChanges((existing) =>
+      existing.filter((change) => !conflictedPointers.has(change.pointer)),
+    );
+  }, [changes, conflictUxEnabled]);
 
   // The trigger button text changes based on the pending changes
   const triggerButtonText = useMemo(() => {
@@ -128,7 +154,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
     if (allSelected === true) {
       setSelectedChanges([]);
     } else {
-      setSelectedChanges(changes);
+      setSelectedChanges(selectableChanges);
     }
   };
 
@@ -147,11 +173,22 @@ const PublishReview: React.FC<PublishReviewProps> = ({
   };
 
   const onOpenChangeHandler = (open: boolean): void => {
-    if (isFetching) return;
     setHasPublished(false);
     setIsOpen(open);
     onOpenChangeCallback(open);
   };
+
+  const handleResolveConflict = () => {
+    onResolveConflict?.();
+  };
+
+  const conflictCount = useMemo(
+    () =>
+      conflictUxEnabled
+        ? changes.filter((change) => change.hasConflict).length
+        : 0,
+    [changes, conflictUxEnabled],
+  );
 
   return (
     <Popover.Root open={isOpen} onOpenChange={onOpenChangeHandler}>
@@ -221,6 +258,15 @@ const PublishReview: React.FC<PublishReviewProps> = ({
                     : 'All changes published!'}
                 </Text>
               </Box>
+              {conflictCount > 0 && (
+                <Box px="4" pt="4">
+                  <ConflictBanner
+                    conflictCount={conflictCount}
+                    onResolveClick={handleResolveConflict}
+                    disabled={isBusy}
+                  />
+                </Box>
+              )}
               <Box px="4" pt="4">
                 {changes?.length > 0 && (
                   <>
@@ -231,6 +277,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
                       setSelectedChanges={setSelectedChanges}
                       onDiscardClick={handleDiscardClick}
                       onViewClick={onViewClick}
+                      onResolveConflict={(change) => onResolveConflict?.(change)}
                       pageStatusMap={pageStatusMap}
                     />
                   </>

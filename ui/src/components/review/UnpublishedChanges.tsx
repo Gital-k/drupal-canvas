@@ -15,6 +15,12 @@ import {
   resetCodeEditor,
   setForceRefresh,
 } from '@/features/code-editor/codeEditorSlice';
+import {
+  getConflictContextKey,
+  getConflictNotificationId,
+  isConflictUxEnabled,
+} from '@/features/conflict/conflictUtils';
+import { markConflictNotificationRead } from '@/features/conflict/conflictUiSlice';
 import { FORM_TYPES } from '@/features/form/constants';
 import { clearFieldValues } from '@/features/form/formStateSlice';
 import {
@@ -85,6 +91,7 @@ const UnpublishedChanges = () => {
     entityType: 'canvas_page',
   });
   const pageItems = contentListData?.items;
+  const conflictUxEnabled = isConflictUxEnabled();
 
   // If either the selected component or the preview layout is being updated, disable the Publish button.
   const isUpdating = isUpdatingComponent || isUpdatingPreview;
@@ -104,6 +111,11 @@ const UnpublishedChanges = () => {
         }))
         .sort((a, b) => b.updated - a.updated),
     [changes],
+  );
+
+  const changesWithConflicts: UnpublishedChange[] = useMemo(
+    () => unpublishedChanges,
+    [unpublishedChanges],
   );
 
   useEffect(() => {
@@ -280,7 +292,7 @@ const UnpublishedChanges = () => {
     }
   };
 
-  if (!isFetching && conflicts && conflicts.length) {
+  if (conflictUxEnabled && !isFetching && conflicts && conflicts.length) {
     window.setTimeout(() => {
       conflicts.forEach((conflict) => {
         if (conflict.code === CONFLICT_CODE.UNEXPECTED) {
@@ -336,18 +348,34 @@ const UnpublishedChanges = () => {
   }, [pageItems]);
 
   return (
-    <PublishReview
-      isUpdating={isUpdating}
-      isFetching={isFetching}
-      changes={unpublishedChanges}
-      errors={errorResponse}
-      onOpenChangeCallback={onOpenChangeHandler}
-      onPublishClick={onPublishClick}
-      onDiscardClick={onDiscardClick}
-      isPublishing={isPublishing}
-      isDiscarding={isDiscarding}
-      pageStatusMap={pageStatusMap}
-    />
+    <>
+      <PublishReview
+        isUpdating={isUpdating}
+        changes={changesWithConflicts}
+        errors={errorResponse}
+        onOpenChangeCallback={onOpenChangeHandler}
+        onPublishClick={onPublishClick}
+        onDiscardClick={onDiscardClick}
+        onResolveConflict={(change) => {
+          if (change && conflictUxEnabled) {
+            dispatch(
+              markConflictNotificationRead({
+                contextKey: getConflictContextKey(
+                  change.entity_type,
+                  change.entity_id,
+                ),
+                id: getConflictNotificationId(
+                  getConflictContextKey(change.entity_type, change.entity_id),
+                ),
+              }),
+            );
+          }
+        }}
+        isPublishing={isPublishing}
+        isDiscarding={isDiscarding}
+        pageStatusMap={pageStatusMap}
+      />
+    </>
   );
 };
 

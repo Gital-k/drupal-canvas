@@ -5,6 +5,7 @@ import { setupListeners } from '@reduxjs/toolkit/query';
 
 import { publishReviewSlice } from '@/components/review/PublishReview.slice';
 import codeEditorSlice from '@/features/code-editor/codeEditorSlice';
+import { conflictUiSlice } from '@/features/conflict/conflictUiSlice';
 import { configurationSlice } from '@/features/configuration/configurationSlice';
 import { queryErrorSlice } from '@/features/error-handling/queryErrorSlice';
 import { extensionsSlice } from '@/features/extensions/extensionsSlice';
@@ -161,6 +162,7 @@ const rootReducer = combineSlices(
   publishReviewSlice,
   contentApi,
   codeEditorSlice,
+  conflictUiSlice,
   previewSlice,
   queryErrorSlice,
   personalizationSlice,

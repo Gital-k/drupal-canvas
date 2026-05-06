@@ -25,6 +25,7 @@ export interface PendingChange {
   label: string;
   updated: number;
   hasConflict?: boolean;
+  conflict?: ConflictMetadata;
 }
 
 export type PendingChanges = {
@@ -41,12 +42,90 @@ export interface ConflictError {
   source: {
     pointer: string;
   };
-  meta?: {
-    entity_type: string;
-    entity_id: string | number;
-    label: string;
-  };
+  meta?: ConflictErrorMeta;
 }
+
+export interface ConflictMetadata {
+  status: boolean;
+  conflictId: string;
+  timestamp: number;
+}
+
+export interface ConflictErrorMeta {
+  entity_type?: string;
+  entity_id?: string | number;
+  label?: string;
+  api_auto_save_key?: string;
+  conflict?: ConflictMetadata;
+  resolvable?: boolean;
+}
+
+export interface PendingChangesResponse {
+  data: PendingChanges;
+  errors?: ConflictError[];
+}
+
+type PendingChangesApiResponse = PendingChanges | PendingChangesResponse;
+
+const isPendingChangesResponse = (
+  response: PendingChangesApiResponse,
+): response is PendingChangesResponse => {
+  const data = (response as { data?: unknown }).data;
+  return typeof data === 'object' && data !== null && !('owner' in data);
+};
+
+const normalizeConflictTimestamp = (timestamp?: number): number | undefined => {
+  if (typeof timestamp !== 'number') {
+    return undefined;
+  }
+  return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
+};
+
+const normalizePendingChangesResponse = (
+  response: PendingChangesApiResponse,
+): PendingChangesResponse => {
+  if (isPendingChangesResponse(response)) {
+    return response;
+  }
+
+  return {
+    data: response,
+  };
+};
+
+const applyConflictStateFromResponse = (
+  response: PendingChangesApiResponse,
+): PendingChanges => {
+  const normalizedResponse = normalizePendingChangesResponse(response);
+  const byPointer = new Map<string, ConflictError>();
+  for (const error of normalizedResponse.errors ?? []) {
+    byPointer.set(error.source.pointer, error);
+  }
+
+  return Object.fromEntries(
+    Object.entries(normalizedResponse.data ?? {}).map(([pointer, change]) => {
+      const conflictError = byPointer.get(pointer);
+      const conflictMeta = conflictError?.meta;
+      const conflict = conflictMeta?.conflict
+        ? {
+            ...conflictMeta.conflict,
+            timestamp:
+              normalizeConflictTimestamp(conflictMeta.conflict.timestamp) ??
+              Date.now(),
+          }
+        : undefined;
+
+      return [
+        pointer,
+        {
+          ...change,
+          hasConflict: !!conflictError,
+          conflict,
+        },
+      ];
+    }),
+  );
+};
 
 export interface ErrorResponse {
   errors: Array<ConflictError>;
@@ -73,9 +152,18 @@ export const pendingChangesApi = createApi({
   tagTypes: ['PendingChanges'],
   endpoints: (builder) => ({
     getAllPendingChanges: builder.query<PendingChanges, void>({
-      query: () => `/canvas/api/v0/auto-saves/pending`,
-      transformResponse: (response: { data: PendingChanges }) => response.data,
+      query: () => ({
+        url: `/canvas/api/v0/auto-saves/pending`,
+        // Treat HTTP 409 (conflict) as a successful response, not an error
+        // This prevents the error boundary from triggering when conflicts are detected
+        validateStatus: (response, result) => {
+          // Accept both 200 (success) and 409 (conflict) as valid responses
+          return response.status === 200 || response.status === 409;
+        },
+      }),
       providesTags: () => [{ type: 'PendingChanges', id: 'LIST' }],
+      transformResponse: (response: PendingChangesApiResponse) =>
+        applyConflictStateFromResponse(response),
     }),
     publishAllPendingChanges: builder.mutation<
       SuccessResponse | ErrorResponse,
@@ -170,7 +258,11 @@ export const pendingChangesApi = createApi({
                     error?.error?.data?.message ??
                     'Failed to discard pending change',
                   source: { pointer: '' },
-                  meta: change,
+                  meta: {
+                    entity_type: change.entity_type,
+                    entity_id: change.entity_id,
+                    label: change.label,
+                  },
                 },
               ],
             }),
