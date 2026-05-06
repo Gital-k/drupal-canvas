@@ -11,6 +11,7 @@ import {
   buildCanvasLocalArtifacts,
   buildCanvasVendorArtifacts,
   createCanvasDependencyMetadata,
+  validateCanvasImportRoots,
 } from '@drupal-canvas/vite-compat';
 
 import { transformCss } from '../lib/transform-css';
@@ -287,6 +288,12 @@ function emptyVendorResult(): CanvasVendorArtifactBuildResult {
 export async function buildCanvasProject(
   options: CanvasProjectBuildOptions,
 ): Promise<CanvasProjectBuildResult> {
+  validateCanvasImportRoots({
+    hostRoot: options.projectRoot,
+    aliasBaseDir: options.aliasBaseDir,
+    componentDir: options.componentDir,
+  });
+
   const outputDir = path.resolve(options.outputDir);
   if (options.cleanOutputDir) {
     await fs.rm(outputDir, { recursive: true, force: true });

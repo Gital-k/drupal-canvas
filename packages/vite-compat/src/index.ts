@@ -41,9 +41,16 @@ export interface CanvasViteCompatOptions {
   hostAliasBaseDir?: string;
 }
 
+export interface CanvasImportRootValidationOptions {
+  hostRoot: string;
+  aliasBaseDir: string;
+  componentDir: string;
+}
+
 const WORKBENCH_HOST_GLOBAL_CSS_VIRTUAL_URL =
   '/@id/virtual:canvas-host-global.css';
 const hostAliasPrefix = '@/';
+const componentAliasPrefix = 'components/';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null
@@ -121,6 +128,60 @@ function resolveHostAliasPath(
   }
 
   return `${unresolvedTarget}${suffixQuery}`;
+}
+
+function hasHostCanvasConfig(hostRoot: string): boolean {
+  return existsSync(path.resolve(hostRoot, 'canvas.config.json'));
+}
+
+export function validateCanvasImportRoots(
+  options: CanvasImportRootValidationOptions,
+): void {
+  const aliasRoot = path.resolve(options.hostRoot, options.aliasBaseDir);
+  const componentRoot = path.resolve(options.hostRoot, options.componentDir);
+  const relativeComponentRoot = path.relative(aliasRoot, componentRoot);
+
+  if (
+    relativeComponentRoot === '' ||
+    relativeComponentRoot.startsWith('..') ||
+    path.isAbsolute(relativeComponentRoot)
+  ) {
+    throw new Error(
+      `Invalid Canvas config: componentDir "${options.componentDir}" must be inside aliasBaseDir "${options.aliasBaseDir}".`,
+    );
+  }
+}
+
+function resolveHostImportPath(
+  hostRoot: string,
+  hostAliasBaseDir: string,
+  sourceSuffix: string,
+): string {
+  const cleanSourceSuffix = stripQueryAndHash(sourceSuffix);
+  const isComponentImport =
+    cleanSourceSuffix === 'components' ||
+    cleanSourceSuffix.startsWith(componentAliasPrefix);
+
+  if (!hasHostCanvasConfig(hostRoot) || !isComponentImport) {
+    return resolveHostAliasPath(hostRoot, hostAliasBaseDir, sourceSuffix);
+  }
+
+  const canvasConfig = resolveCanvasConfig({ hostRoot });
+  validateCanvasImportRoots({
+    hostRoot,
+    aliasBaseDir: hostAliasBaseDir,
+    componentDir: canvasConfig.componentDir,
+  });
+  const componentSuffix =
+    cleanSourceSuffix === 'components'
+      ? ''
+      : sourceSuffix.slice(componentAliasPrefix.length);
+
+  return resolveHostAliasPath(
+    hostRoot,
+    canvasConfig.componentDir,
+    componentSuffix,
+  );
 }
 
 function isPathWithinRoot(filePath: string, rootPath: string): boolean {
@@ -326,7 +387,7 @@ function toCanvasAssetSpecifier(options: {
 
   const aliasRoot = path.resolve(options.hostRoot, options.hostAliasBaseDir);
   const resolvedPath = options.source.startsWith(hostAliasPrefix)
-    ? resolveHostAliasPath(
+    ? resolveHostImportPath(
         options.hostRoot,
         options.hostAliasBaseDir,
         options.source.slice(hostAliasPrefix.length),
@@ -340,15 +401,41 @@ function toCanvasAssetSpecifier(options: {
   }
 
   const cleanResolvedPath = stripQueryAndHash(resolvedPath);
-  const relativePath = path.relative(aliasRoot, cleanResolvedPath);
-  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-    return null;
+  if (hasHostCanvasConfig(options.hostRoot)) {
+    const canvasConfig = resolveCanvasConfig({ hostRoot: options.hostRoot });
+    validateCanvasImportRoots({
+      hostRoot: options.hostRoot,
+      aliasBaseDir: options.hostAliasBaseDir,
+      componentDir: canvasConfig.componentDir,
+    });
+    const componentRoot = path.resolve(
+      options.hostRoot,
+      canvasConfig.componentDir,
+    );
+    const componentRelativePath = path.relative(
+      componentRoot,
+      cleanResolvedPath,
+    );
+    if (
+      !componentRelativePath.startsWith('..') &&
+      !path.isAbsolute(componentRelativePath)
+    ) {
+      return {
+        specifier: `${hostAliasPrefix}components/${normalizePath(componentRelativePath)}`,
+        filePath: cleanResolvedPath,
+      };
+    }
   }
 
-  return {
-    specifier: `${hostAliasPrefix}${normalizePath(relativePath)}`,
-    filePath: cleanResolvedPath,
-  };
+  const relativePath = path.relative(aliasRoot, cleanResolvedPath);
+  if (!relativePath.startsWith('..') && !path.isAbsolute(relativePath)) {
+    return {
+      specifier: `${hostAliasPrefix}${normalizePath(relativePath)}`,
+      filePath: cleanResolvedPath,
+    };
+  }
+
+  return null;
 }
 
 export function rewriteCanvasAssetImports(
@@ -437,7 +524,7 @@ export function createCanvasDependencyMetadataPlugin(options: {
         }
 
         const cleanSource = stripQueryAndHash(source);
-        const resolvedPath = resolveHostAliasPath(
+        const resolvedPath = resolveHostImportPath(
           options.hostRoot,
           options.hostAliasBaseDir,
           source.slice(hostAliasPrefix.length),
@@ -501,7 +588,7 @@ export async function buildCanvasComponentEntry(options: {
 
     if (source.startsWith(hostAliasPrefix)) {
       const cleanSource = stripQueryAndHash(source);
-      const resolvedPath = resolveHostAliasPath(
+      const resolvedPath = resolveHostImportPath(
         options.projectRoot,
         options.aliasBaseDir,
         source.slice(hostAliasPrefix.length),
@@ -843,6 +930,13 @@ export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
   const canvasConfig = resolveCanvasConfig(options);
   const hostAliasBaseDir =
     options.hostAliasBaseDir ?? canvasConfig.aliasBaseDir;
+  if (hasHostCanvasConfig(options.hostRoot)) {
+    validateCanvasImportRoots({
+      hostRoot: options.hostRoot,
+      aliasBaseDir: hostAliasBaseDir,
+      componentDir: canvasConfig.componentDir,
+    });
+  }
   const hostComponentDir = path.resolve(
     options.hostRoot,
     canvasConfig.componentDir,
@@ -867,7 +961,7 @@ export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
       }
 
       const suffix = source.slice(hostAliasPrefix.length);
-      return resolveHostAliasPath(options.hostRoot, hostAliasBaseDir, suffix);
+      return resolveHostImportPath(options.hostRoot, hostAliasBaseDir, suffix);
     },
   };
 
