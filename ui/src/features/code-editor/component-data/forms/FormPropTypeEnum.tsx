@@ -421,7 +421,7 @@ function NumericEnumValue({
     const error = getNumericInputError(raw, itemType);
     onErrorChange(index, error);
     if (!error) {
-      onValueChange(index, raw === '' ? '' : Number(raw));
+      onValueChange(index, raw);
     }
   };
 
