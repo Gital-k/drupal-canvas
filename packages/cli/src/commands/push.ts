@@ -11,22 +11,20 @@ import {
   pushFonts,
 } from '../lib/fonts/font-push.js';
 import { createApiService, ensureAuthConfig } from '../services/api.js';
-import { analyzeAndBundleImports } from '../utils/analyze-and-bundle-imports';
-import { buildTailwindForComponents } from '../utils/build-tailwind';
+import { buildCanvasProject } from '../utils/build-project';
 import {
   parseBooleanOption,
   pluralize,
   pluralizeComponent,
   updateConfigFromOptions,
 } from '../utils/command-helpers';
-import { generateManifest } from '../utils/generate-manifest';
 import {
   collectPageResults,
   preparePages,
   pushPages,
 } from '../utils/prepare-pages-push';
 import {
-  buildAndPushComponents,
+  pushBuiltComponents,
   uploadGlobalAssetLibrary,
 } from '../utils/prepare-push';
 import { reportResults } from '../utils/report-results';
@@ -459,74 +457,53 @@ export function pushCommand(program: Command): void {
 
         await apiService.signalPushStart();
 
-        // Step 2: Build Tailwind CSS + Global CSS
+        // Step 2: Build components, global CSS, and manifest artifacts.
         const s2 = p.spinner();
-        s2.start('Building Tailwind CSS');
-        const tailwindResult = await buildTailwindForComponents(
-          components,
-          true,
+        s2.start('Building project');
+        const canvasBuild = await buildCanvasProject({
+          projectRoot: process.cwd(),
+          componentDir,
+          aliasBaseDir,
           outputDir,
-        );
-        s2.stop(
-          chalk.green(
-            `Processed Tailwind CSS classes from ${components.length} selected local ${pluralizeComponent(components.length)} and all online components`,
-          ),
-        );
-        reportResults([tailwindResult], 'Built assets', 'Asset');
-        if (!tailwindResult.success) {
-          throw new Error(
-            'Tailwind build failed, global assets upload aborted. Nothing was pushed.',
+          discoveryResult,
+          cleanOutputDir: true,
+          buildTailwind: true,
+          requireJsEntries: true,
+          useLocalGlobalCss: true,
+        });
+        s2.stop(chalk.green('Built project'));
+
+        if (canvasBuild.componentResults.some((r) => !r.success)) {
+          reportResults(
+            canvasBuild.componentResults,
+            'Built components',
+            'Component',
           );
+          throw new Error('Component build failed. Nothing was pushed.');
         }
 
-        // Step 3: Analyze and bundle imports (vendor + local) and generate canvas-manifest.json
-        const entryFiles = components
-          .filter((c) => c.jsEntryPath)
-          .map((c) => c.jsEntryPath as string);
+        if (canvasBuild.tailwindResult) {
+          reportResults([canvasBuild.tailwindResult], 'Built assets', 'Asset');
+          if (!canvasBuild.tailwindResult.success) {
+            throw new Error(
+              'Tailwind build failed, global assets upload aborted. Nothing was pushed.',
+            );
+          }
+        }
 
-        if (entryFiles.length > 0) {
-          p.log.info('Analyzing and bundling imports');
-
-          const { imports, vendorResult, localResult, sharedChunks } =
-            await analyzeAndBundleImports({
-              entryFiles,
-              componentDir,
-              aliasBaseDir,
-              outputDir,
-            });
-          const vendorImportMap = vendorResult.importMap;
-          const localImportMap = localResult.localImportMap;
+        if (canvasBuild.vendorImportCount > 0) {
           p.log.info(
             chalk.green(
-              `Analyzed imports: ${imports.thirdPartyPackages.size} vendor, ${imports.aliasImports.size + imports.assetImports.size} local`,
+              `Bundled ${canvasBuild.vendorImportCount} vendor ${pluralize(canvasBuild.vendorImportCount, 'package')} → ${outputDir}/vendor/`,
             ),
           );
-          if (vendorResult.success) {
-            const vendorImportCount = vendorResult.bundledPackages.length;
-            if (vendorImportCount > 0)
-              p.log.info(
-                chalk.green(
-                  `Bundled ${vendorImportCount} vendor ${pluralize(vendorImportCount, 'package')} → ${outputDir}/vendor/`,
-                ),
-              );
-          }
-          if (localResult.success) {
-            const bundledLocalImportCount = Object.keys(localImportMap).length;
-            if (bundledLocalImportCount > 0) {
-              p.log.info(
-                chalk.green(
-                  `Bundled ${bundledLocalImportCount} local ${pluralize(bundledLocalImportCount, 'import')} → ${outputDir}/local/`,
-                ),
-              );
-            }
-          }
-          // Generate manifest for the bundled imports
-          await generateManifest({
-            outputDir,
-            vendorImportMap,
-            localImportMap,
-            sharedChunks,
-          });
+        }
+        if (canvasBuild.localImportCount > 0) {
+          p.log.info(
+            chalk.green(
+              `Bundled ${canvasBuild.localImportCount} local ${pluralize(canvasBuild.localImportCount, 'import')} → ${outputDir}/local/`,
+            ),
+          );
         }
 
         let componentResults: Result[] = [];
@@ -535,15 +512,14 @@ export function pushCommand(program: Command): void {
 
         // Build and push components
         if (components.length > 0) {
-          componentResults = await buildAndPushComponents(
-            components,
+          componentResults = await pushBuiltComponents(
+            canvasBuild.builtComponents,
             apiService,
-            true,
             'Pushing',
           );
           if (componentResults.some((r) => !r.success)) {
-            reportResults(componentResults, 'Built components', 'Component');
-            throw new Error('Component build failed. Nothing was pushed.');
+            reportResults(componentResults, 'Pushed components', 'Component');
+            throw new Error('Component push failed. Push aborted.');
           }
           reportResults(componentResults, 'Pushed components', 'Component');
         }
