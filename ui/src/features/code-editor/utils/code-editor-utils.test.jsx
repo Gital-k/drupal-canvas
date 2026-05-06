@@ -604,10 +604,10 @@ describe('Prop/slot schema keys and round-trip (machine name)', () => {
       examples: ['<p>x</p>'],
     });
 
-    const [deser] = deserializeSlots(serialized);
-    expect(deser.name).toBe('Body copy');
-    expect(deser.machineName).toBe('body_copy');
-    expect(deser.example).toBe('<p>x</p>');
+    const [deserializedSlot] = deserializeSlots(serialized);
+    expect(deserializedSlot.name).toBe('Body copy');
+    expect(deserializedSlot.machineName).toBe('body_copy');
+    expect(deserializedSlot.example).toBe('<p>x</p>');
   });
 });
 
