@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { resolveCanvasConfig } from '@drupal-canvas/discovery';
 
 import {
+  buildCanvasComponentEntry,
+  buildCanvasLocalArtifacts,
+  createCanvasViteBuildConfig,
   drupalCanvasCompat,
   drupalCanvasCompatServer,
   ensureHostGlobalCssExists,
@@ -12,6 +15,7 @@ import {
   extractFirstExamplePropsFromComponentYaml,
   getWorkbenchHostGlobalCssVirtualUrl,
   resolveHostGlobalCssPath,
+  rewriteCanvasAssetImports,
 } from './index';
 
 const tempDirs: string[] = [];
@@ -250,6 +254,144 @@ describe('vite-compat', () => {
         '/tmp/host/components/carousel/index.tsx',
       ),
     ).toBe('/tmp/host/src/utils/styles/carousel.css');
+  });
+
+  it('preserves Vite query suffixes when resolving host aliases', () => {
+    const [resolverPlugin] = drupalCanvasCompat({
+      hostRoot: '/tmp/host',
+    });
+    const resolveId = getResolveIdHook(resolverPlugin);
+    expect(resolveId).not.toBeNull();
+
+    expect(
+      resolveId?.(
+        '@/icons/logo.svg?react',
+        '/tmp/host/src/components/card.tsx',
+      ),
+    ).toBe('/tmp/host/src/icons/logo.svg?react');
+  });
+
+  it('rewrites deployable asset imports to Canvas import map lookups', async () => {
+    const hostRoot = await makeTempDir();
+    const componentEntry = path.join(hostRoot, 'src/components/card/index.tsx');
+    const imagePath = path.join(hostRoot, 'src/lib/cafe.webp');
+    await fs.mkdir(path.dirname(componentEntry), { recursive: true });
+    await fs.mkdir(path.dirname(imagePath), { recursive: true });
+    await fs.writeFile(imagePath, 'image', 'utf-8');
+
+    const result = rewriteCanvasAssetImports(
+      [
+        "import cafeUrl from '../../lib/cafe.webp';",
+        "import Icon from '../../lib/icon.svg?react';",
+      ].join('\n'),
+      {
+        filePath: componentEntry,
+        hostRoot,
+        hostAliasBaseDir: 'src',
+      },
+    );
+
+    expect(result.code).toContain(
+      'const cafeUrl = import.meta.resolve("@/lib/cafe.webp");',
+    );
+    expect(result.code).toContain(
+      "import Icon from '../../lib/icon.svg?react'",
+    );
+    expect(result.assets).toEqual([
+      {
+        specifier: '@/lib/cafe.webp',
+        filePath: imagePath,
+      },
+    ]);
+  });
+
+  it('builds relative SVG React component imports as component code', async () => {
+    const hostRoot = await makeTempDir();
+    const componentEntry = path.join(hostRoot, 'src/components/card/index.tsx');
+    const outputDir = path.join(hostRoot, 'dist/components/card');
+    await fs.mkdir(path.dirname(componentEntry), { recursive: true });
+    await fs.writeFile(
+      path.join(path.dirname(componentEntry), 'icon.svg'),
+      '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" /></svg>',
+      'utf-8',
+    );
+    await fs.writeFile(
+      componentEntry,
+      [
+        "import Icon from './icon.svg?react';",
+        'export default function Card() {',
+        '  return <Icon aria-hidden />;',
+        '}',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    await buildCanvasComponentEntry({
+      projectRoot: hostRoot,
+      aliasBaseDir: 'src',
+      entry: {
+        entryPath: componentEntry,
+        outputDir,
+        outputBaseName: 'index',
+      },
+    });
+
+    const output = await fs.readFile(path.join(outputDir, 'index.js'), 'utf-8');
+    expect(output).toContain('"svg"');
+    expect(output).toContain('"circle"');
+    expect(output).not.toContain('data:image/svg+xml');
+  });
+
+  it('creates a shared Canvas Vite config with host compatibility plugins', () => {
+    const config = createCanvasViteBuildConfig({
+      hostRoot: '/tmp/host',
+      hostAliasBaseDir: 'src',
+    });
+
+    expect(config.root).toBe('/tmp/host');
+    expect(config.esbuild).toEqual({ jsx: 'automatic' });
+    const pluginNames = (config.plugins ?? []).flatMap((plugin) => {
+      if (plugin && typeof plugin === 'object' && 'name' in plugin) {
+        return [plugin.name];
+      }
+      return [];
+    });
+
+    expect(pluginNames).toEqual(
+      expect.arrayContaining([
+        'canvas-vite-compat-host-alias',
+        'drupal-canvas',
+      ]),
+    );
+  });
+
+  it('emits direct local assets without duplicating them as shared chunks', async () => {
+    const hostRoot = await makeTempDir();
+    const outputDir = path.join(hostRoot, 'dist');
+    const imagePath = path.join(hostRoot, 'src/lib/cafe.jpg');
+    await fs.mkdir(path.dirname(imagePath), { recursive: true });
+    await fs.writeFile(imagePath, 'image', 'utf-8');
+
+    const result = await buildCanvasLocalArtifacts({
+      projectRoot: hostRoot,
+      aliasBaseDir: 'src',
+      outputDir,
+      localImports: new Map(),
+      assetImports: new Map([['@/lib/cafe.jpg', imagePath]]),
+    });
+
+    expect(result.localImportMap['@/lib/cafe.jpg']).toMatch(
+      /^\.\/local\/cafe-[\w-]+\.jpg$/,
+    );
+    expect(result.sharedChunks).toEqual([]);
+    await expect(
+      fs.access(
+        path.join(
+          outputDir,
+          result.localImportMap['@/lib/cafe.jpg'].replace('./', ''),
+        ),
+      ),
+    ).resolves.toBeUndefined();
   });
 
   it('supports overriding host alias base dir', () => {
