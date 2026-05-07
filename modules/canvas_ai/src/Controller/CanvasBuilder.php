@@ -8,7 +8,11 @@ use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai\OperationType\GenericType\ImageFile;
 use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
+use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusUpdateInterface;
+use Drupal\ai_agents\Service\AgentStatus\Storages\PrivateTempStatusStorage;
 use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
+use Drupal\canvas_ai\AgentStatus\AiPromptStatusUpdate;
+use Drupal\canvas_ai\Event\CanvasAiLogEvents;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface;
 use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Component\Serialization\Json;
@@ -24,6 +28,9 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Drupal\canvas_ai\Event\PrepareAiLogEvent;
+use Drupal\canvas_ai\Event\LogAiPromptEvent;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Renders the Drupal Canvas AI calls.
@@ -41,6 +48,8 @@ final class CanvasBuilder extends ControllerBase {
     protected CanvasAiTempStore $canvasAiTempStore,
     protected FileSystemInterface $fileSystem,
     protected AiAgentStatusPollerServiceInterface $poller,
+    protected EventDispatcherInterface $event_dispatcher,
+    protected PrivateTempStatusStorage $agentStatusStorage,
   ) {}
 
   /**
@@ -55,6 +64,8 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('canvas_ai.tempstore'),
       $container->get('file_system'),
       $container->get('ai_agents.agent_status_poller'),
+      $container->get('event_dispatcher'),
+      $container->get('ai_agents.private_temp_status_storage'),
     );
   }
 
@@ -194,6 +205,9 @@ final class CanvasBuilder extends ControllerBase {
       AiAgentStatusItemTypes::Started,
       AiAgentStatusItemTypes::TextGenerated,
       AiAgentStatusItemTypes::Finished,
+      AiAgentStatusItemTypes::Request,
+      AiAgentStatusItemTypes::Response,
+      AiAgentStatusItemTypes::ToolSelected,
     ]);
     $default = $this->providerService->getDefaultProviderForOperationType('chat');
     if (!\is_array($default) || empty($default['provider_id']) || empty($default['model_id'])) {
@@ -230,13 +244,36 @@ final class CanvasBuilder extends ControllerBase {
       'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
       'custom_libraries' => $this->getSupportedLibraries(),
     ]);
+    $solvability = NULL;
+    $error_message = NULL;
     try {
       $solvability = $agent->determineSolvability();
     }
     catch (\Exception $e) {
+      $error_message = $e->getMessage();
+    }
+
+    if ($config->get('enable_logging')) {
+      $agent_status_update = $this->agentStatusStorage->loadStatusUpdate($prompt['request_id']);
+      if ($agent_status_update instanceof AiAgentStatusUpdateInterface) {
+        $ai_prompt_status_update = AiPromptStatusUpdate::fromArray($agent_status_update->toArray());
+        if ($error_message) {
+          $ai_prompt_status_update->setMessage($error_message);
+          $ai_prompt_status_update->setStatus(FALSE);
+        }
+        $event = new PrepareAiLogEvent($ai_prompt_status_update);
+        $this->event_dispatcher->dispatch($event, CanvasAiLogEvents::PREPARE_LOGS);
+        $logs = $event->getLogs();
+        $log_data_event = new LogAiPromptEvent($logs);
+        $this->event_dispatcher->dispatch($log_data_event, CanvasAiLogEvents::LOG);
+      }
+    }
+
+    // Return error response if there was an exception.
+    if ($error_message) {
       return new JsonResponse([
         'status' => FALSE,
-        'message' => $e->getMessage(),
+        'message' => $error_message,
       ]);
     }
     $status = FALSE;

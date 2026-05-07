@@ -13,3 +13,17 @@ services:
       - '@Drupal\Core\Validation\BasicRecursiveValidatorFactory'
       - '@uuid'
   Drupal\canvas_ai\CanvasAiTempStore: '@canvas_ai.tempstore'
+  logger.channel.canvas_ai:
+    parent: logger.channel_base
+    arguments: [ 'canvas_ai' ]
+  canvas_ai.logs.prepare_data_subscriber:
+    class: 'Drupal\canvas_ai\EventSubscriber\AiRequestLogGeneratorSubscriber'
+    arguments: ['@current_user', '@config.factory']
+    tags:
+      - { name: event_subscriber }
+  canvas_ai.logs.log_data_subscriber:
+    class: 'Drupal\canvas_ai\EventSubscriber\LogDataSubscriber'
+    calls:
+        - [ setLogger, [ '@logger.channel.canvas_ai' ] ]
+    tags:
+      - { name: event_subscriber }
