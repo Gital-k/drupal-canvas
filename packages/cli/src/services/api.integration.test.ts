@@ -164,6 +164,143 @@ describe.runIf(isConfigured)('api service integration', () => {
     expect(response).toBeDefined();
   });
 
+  describe('page operations', () => {
+    let createdPageIds: number[] = [];
+
+    afterEach(async () => {
+      if (createdPageIds.length === 0) return;
+      const apiService = await createApiService();
+      for (const id of createdPageIds) {
+        // @ts-expect-error allow accessing client directly in the test.
+        await apiService.client.delete(`/canvas/api/v0/content/canvas_page/${id}`);
+      }
+      createdPageIds = [];
+    });
+
+    it('should create a page with a path alias', async () => {
+      const apiService = await createApiService();
+      const page = await apiService.createPage({
+        title: 'Integration Test Page',
+        description: 'Created by integration test',
+        status: false,
+        path: '/integration-test-page',
+        components: [],
+      });
+      createdPageIds.push(page.id);
+
+      expect(page.uuid).toBeDefined();
+      expect(page.title).toBe('Integration Test Page');
+      expect(page.path).toBe('/integration-test-page');
+      expect(page.status).toBe(false);
+    });
+
+    it('should list pages including newly created pages', async () => {
+      const apiService = await createApiService();
+      const page = await apiService.createPage({
+        title: 'List Test Page',
+        description: '',
+        status: false,
+        path: '/list-test-page',
+        components: [],
+      });
+      createdPageIds.push(page.id);
+
+      const pages = await apiService.listPages();
+      const listed = pages[page.uuid];
+      expect(listed).toBeDefined();
+      expect(listed.path).toBe('/list-test-page');
+    });
+
+    it('should get a page with its component tree', async () => {
+      const apiService = await createApiService();
+      const created = await apiService.createPage({
+        title: 'Get Test Page',
+        description: 'Get test description',
+        status: false,
+        path: '/get-test-page',
+        components: [],
+      });
+      createdPageIds.push(created.id);
+
+      const fetched = await apiService.getPage(created.id);
+      expect(fetched.uuid).toBe(created.uuid);
+      expect(fetched.path).toBe('/get-test-page');
+      expect(fetched.description).toBe('Get test description');
+      expect(Array.isArray(fetched.components)).toBe(true);
+    });
+
+    it('should preserve path alias when updating a page', async () => {
+      const apiService = await createApiService();
+      const page = await apiService.createPage({
+        title: 'Path Preservation Test',
+        description: '',
+        status: false,
+        path: '/path-preservation-test',
+        components: [],
+      });
+      createdPageIds.push(page.id);
+
+      const updated = await apiService.updatePage(page.id, {
+        title: 'Path Preservation Test (Updated)',
+        description: '',
+        status: page.status,
+        path: '/path-preservation-test',
+        components: [],
+      });
+      expect(updated.path).toBe('/path-preservation-test');
+      expect(updated.title).toBe('Path Preservation Test (Updated)');
+    });
+
+    it('should preserve status when updating a page', async () => {
+      const apiService = await createApiService();
+      const page = await apiService.createPage({
+        title: 'Status Preservation Test',
+        description: '',
+        status: false,
+        path: '/status-preservation-test',
+        components: [],
+      });
+      createdPageIds.push(page.id);
+      expect(page.status).toBe(false);
+
+      const updated = await apiService.updatePage(page.id, {
+        title: page.title,
+        description: page.description,
+        status: page.status,
+        path: page.path,
+        components: [],
+      });
+      expect(updated.status).toBe(false);
+    });
+
+    it('clears path alias when updatePage is called with empty string path', async () => {
+      // Regression test for the bug introduced in commit 28245af6:
+      // Old spec files (pulled before path/description were added) have no `path` field.
+      // preparePages defaults: spec.path ?? '' === ''
+      // pushPages then calls updatePage(id, { path: '' }) which clears the URL alias.
+      const apiService = await createApiService();
+      const page = await apiService.createPage({
+        title: 'Homepage Alias Regression',
+        description: '',
+        status: false,
+        path: '/homepage-alias-regression',
+        components: [],
+      });
+      createdPageIds.push(page.id);
+      expect(page.path).toBe('/homepage-alias-regression');
+
+      const updated = await apiService.updatePage(page.id, {
+        title: page.title,
+        description: page.description,
+        status: page.status,
+        path: '',
+        components: [],
+      });
+      // Sending path: '' clears the alias — this is the root cause of the reported bug.
+      expect(updated.path).not.toBe('/homepage-alias-regression');
+    });
+  });
+
   it('should allow updating the global asset library', async () => {
     const apiService = await createApiService();
     const assetLibrary = await apiService.getGlobalAssetLibrary();
