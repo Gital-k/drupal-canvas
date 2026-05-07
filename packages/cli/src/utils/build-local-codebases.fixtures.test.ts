@@ -249,6 +249,9 @@ describe('buildCanvasProject fixture projects', () => {
       'import.meta.resolve("@/components/static-assets-example/hero.webp")',
     );
     await expect(componentJs('static-assets-example')).resolves.toContain(
+      'import.meta.resolve("@/assets/poster.webp")',
+    );
+    await expect(componentJs('static-assets-example')).resolves.toContain(
       'import.meta.resolve("@/assets/intro.mp4")',
     );
     await expect(componentJs('svg-url-example')).resolves.toContain(
@@ -268,6 +271,9 @@ describe('buildCanvasProject fixture projects', () => {
     expect(buildResult.manifest.local).toEqual({
       '@/assets/intro.mp4': expect.stringMatching(
         /^\.\/local\/intro-[\w-]+\.mp4$/,
+      ),
+      '@/assets/poster.webp': expect.stringMatching(
+        /^\.\/local\/poster-[\w-]+\.webp$/,
       ),
       '@/components/static-assets-example/hero.webp': expect.stringMatching(
         /^\.\/local\/hero-[\w-]+\.webp$/,
