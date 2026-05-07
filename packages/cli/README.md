@@ -62,7 +62,7 @@ properties:
 
 | Property        | Default                         | Description                                                                                                               |
 | --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `componentDir`  | `process.cwd()`                 | Directory where Code Components are stored in the filesystem. It must be inside `aliasBaseDir` for local builds.          |
+| `componentDir`  | `"src/components"`              | Directory where Code Components are stored in the filesystem. It must be inside `aliasBaseDir` for local builds.          |
 | `aliasBaseDir`  | `"src"`                         | Base directory for module resolution when using path aliases in your components. Tied to your project's import structure. |
 | `outputDir`     | `"dist"`                        | Build output directory (similar to Vite's `build.outDir`). Defines where compiled assets are generated.                   |
 | `globalCssPath` | `"./src/components/global.css"` | Path to the global CSS file.                                                                                              |

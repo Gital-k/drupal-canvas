@@ -228,7 +228,7 @@ describe('buildCanvasProject', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('allows componentDir outside aliasBaseDir when it stays in the project root', async () => {
+  it('rejects componentDir outside aliasBaseDir', async () => {
     await expect(
       buildCanvasProject({
         projectRoot: tmpDir,
@@ -247,34 +247,8 @@ describe('buildCanvasProject', () => {
           },
         } as DiscoveryResult,
       }),
-    ).resolves.toEqual(
-      expect.objectContaining({
-        componentResults: [],
-      }),
-    );
-  });
-
-  it('rejects componentDir outside the project root', async () => {
-    await expect(
-      buildCanvasProject({
-        projectRoot: tmpDir,
-        componentDir: '../widgets',
-        aliasBaseDir: 'src',
-        outputDir,
-        discoveryResult: {
-          componentRoot: path.resolve(tmpDir, '../widgets'),
-          projectRoot: tmpDir,
-          components: [],
-          pages: [],
-          warnings: [],
-          stats: {
-            scannedFiles: 0,
-            ignoredFiles: 0,
-          },
-        } as DiscoveryResult,
-      }),
     ).rejects.toThrow(
-      'Invalid Canvas config: componentDir "../widgets" must be inside the project root.',
+      'Invalid Canvas config: componentDir "components" must be inside aliasBaseDir "src".',
     );
   });
 });
