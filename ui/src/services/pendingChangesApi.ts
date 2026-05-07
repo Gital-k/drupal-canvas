@@ -37,7 +37,7 @@ interface SuccessResponse {
 }
 
 export interface ConflictError {
-  code: number;
+  code?: number;
   detail: string;
   source: {
     pointer: string;
@@ -74,12 +74,31 @@ const isPendingChangesResponse = (
   return typeof data === 'object' && data !== null && !('owner' in data);
 };
 
-const normalizeConflictTimestamp = (timestamp?: number): number | undefined => {
+export const normalizeConflictTimestamp = (
+  timestamp?: number,
+): number | undefined => {
   if (typeof timestamp !== 'number') {
     return undefined;
   }
   return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
 };
+
+export const normalizeConflictMetadata = (
+  conflict?: ConflictMetadata,
+): ConflictMetadata | undefined => {
+  if (!conflict) {
+    return undefined;
+  }
+
+  return {
+    ...conflict,
+    timestamp: normalizeConflictTimestamp(conflict.timestamp) ?? Date.now(),
+  };
+};
+
+export const getAutoSaveKeyFromError = (
+  error: ConflictError,
+): string | undefined => error.meta?.api_auto_save_key || error.source.pointer;
 
 const normalizePendingChangesResponse = (
   response: PendingChangesApiResponse,
@@ -93,33 +112,29 @@ const normalizePendingChangesResponse = (
   };
 };
 
-const applyConflictStateFromResponse = (
+export const applyConflictStateFromResponse = (
   response: PendingChangesApiResponse,
 ): PendingChanges => {
   const normalizedResponse = normalizePendingChangesResponse(response);
   const byPointer = new Map<string, ConflictError>();
   for (const error of normalizedResponse.errors ?? []) {
-    byPointer.set(error.source.pointer, error);
+    const pointer = getAutoSaveKeyFromError(error);
+    if (pointer) {
+      byPointer.set(pointer, error);
+    }
   }
 
   return Object.fromEntries(
     Object.entries(normalizedResponse.data ?? {}).map(([pointer, change]) => {
       const conflictError = byPointer.get(pointer);
       const conflictMeta = conflictError?.meta;
-      const conflict = conflictMeta?.conflict
-        ? {
-            ...conflictMeta.conflict,
-            timestamp:
-              normalizeConflictTimestamp(conflictMeta.conflict.timestamp) ??
-              Date.now(),
-          }
-        : undefined;
+      const conflict = normalizeConflictMetadata(conflictMeta?.conflict);
 
       return [
         pointer,
         {
           ...change,
-          hasConflict: !!conflictError,
+          hasConflict: !!conflict,
           conflict,
         },
       ];
@@ -143,6 +158,7 @@ export enum STATUS_CODE {
 export enum CONFLICT_CODE {
   UNEXPECTED = 1,
   EXPECTED = 2,
+  DETECTED = 4,
 }
 
 // Define a service using a base URL and expected endpoints
@@ -201,6 +217,7 @@ export const pendingChangesApi = createApi({
             componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]),
           );
           dispatch(setPreviousPendingChanges());
+          dispatch(setConflicts());
           dispatch(setErrors());
         } catch (error: any) {
           dispatch(setErrors(error.error?.data));
