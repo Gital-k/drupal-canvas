@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'path';
 import { compilePartialCss } from 'tailwindcss-in-browser';
 
+import { getConfig } from '../config';
 import { compileJS } from '../lib/compile-js';
 import { transformCss } from '../lib/transform-css';
 import { getGlobalCss } from './build-tailwind';
@@ -16,6 +17,7 @@ export async function buildComponent(
   outputDir: string = 'dist',
 ): Promise<Result> {
   const { name, kind, jsEntryPath, cssEntryPath } = component;
+  const { aliasBaseDir } = getConfig();
 
   // For 'index' kind: output files are index.js / index.css / component.yml
   // For 'named' kind: output files are [component-name].js / [component-name].css / [component-name].component.yml.
@@ -71,7 +73,10 @@ export async function buildComponent(
   if (jsEntryPath) {
     try {
       const jsSource = await fs.readFile(jsEntryPath, 'utf-8');
-      const jsCompiled = compileJS(jsSource);
+      const jsCompiled = compileJS(jsSource, {
+        filePath: jsEntryPath,
+        aliasBaseDir,
+      });
       await fs.writeFile(
         path.join(distDir, `${outputBaseName}.js`),
         jsCompiled,
