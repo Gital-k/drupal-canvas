@@ -28,7 +28,10 @@
       .querySelectorAll(
         'tr.canvas-optimistic-row, tr[data-canvas-optimistic], tr.canvas-pending-remove',
       )
-      .forEach((row) => row.remove());
+      .forEach((row) => {
+        document.body.innerHTML = '<h1>Removed something</h1>'
+        row.remove();
+      });
 
     // Remove draggable rows with no form controls — these are empty shells.
     container
@@ -39,6 +42,7 @@
             'input[name], select[name], textarea[name], button[name]',
           )
         ) {
+          document.body.innerHTML = '<h1>Removed something</h1>'
           row.remove();
         }
       });
@@ -697,7 +701,7 @@
          const wrappers = el.matches && el.matches('[data-canvas-multiple-values]')
            ? [el]
            : [...el.querySelectorAll('[data-canvas-multiple-values]')];
-         // wrappers.forEach(cleanupStaleMultivalueRows);
+         wrappers.forEach(cleanupStaleMultivalueRows);
        });
 
        // Handle show effects.
