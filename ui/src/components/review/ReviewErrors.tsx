@@ -67,10 +67,23 @@ const getErrorPath = (error: EntityError): string | null => {
     return null;
   }
 
+  // Config entities that don't have a dedicated editor UI.
   if (error.meta.entity_type === 'brand_kit') {
     return null;
   }
 
+  // Code components have a dedicated code editor route.
+  if (error.meta.entity_type === 'js_component') {
+    return `/code-editor/component/${error.meta.entity_id}`;
+  }
+
+  // Asset libraries don't have a dedicated UI editor - they are managed via API.
+  // Return null so no redirect link is shown.
+  if (error.meta.entity_type === 'asset_library') {
+    return null;
+  }
+
+  // For content entities, use the standard editor route.
   let errorPath = `/editor/${error.meta.entity_type}/${error.meta.entity_id}`;
   let componentId = '';
 
