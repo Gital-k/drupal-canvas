@@ -244,12 +244,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     // canvas-island stays visible while the user corrects the value.
     // @see \Drupal\canvas\Element\RenderSafeComponentContainer::handleComponentException()
     // @see https://www.drupal.org/project/canvas/issues/3583639
-    // When rendering a component instance that still points at an older
-    // Component version, skip render-time prop validation and preserve the
-    // pre-#3574120 graceful rendering behavior for stale inputs.
-    if (!($inputs['skip_prop_validation'] ?? FALSE)) {
-      \assert($this->componentValidator->validateProps($props, $this->getComponentPlugin()));
-    }
+    \assert($this->componentValidator->validateProps($props, $this->getComponentPlugin()));
     CacheableMetadata::createFromRenderArray($build)
       ->addCacheableDependency($component)
       ->addCacheableDependency($props_cacheability)

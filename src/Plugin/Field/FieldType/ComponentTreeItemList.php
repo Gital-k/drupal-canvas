@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Field\FieldType;
 
-use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\Component\Graph\Graph;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
@@ -249,13 +248,6 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           $component = Component::load($component_instance['component']);
           \assert($component instanceof Component);
           $source = $component->getComponentSource();
-          if (
-            $source instanceof JsComponent &&
-            ($component_instance['component_version'] ?? $component->getActiveVersion()) !== $component->getActiveVersion()) {
-            // If the rendered component_version is different than the active
-            // version, skip prop validation
-            $component_instance['skip_prop_validation'] = TRUE;
-          }
           $element = $source->renderComponent($component_instance, $component->getSlotDefinitions(), $component_instance_uuid, $isPreview);
 
           // A component instance provided by a
@@ -515,10 +507,6 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
 
       $hydrated[$uuid] = [
         'component' => $component_id,
-        // Adding the version to the hydrated version to avoid the verification
-        // in case this version and the activeVersion mismatch and to avoid
-        // break the rendering.
-        'component_version' => $item->getComponentVersion(),
       ] + $source->hydrateComponent(
         $explicit_input,
         $component->getSlotDefinitions(),
