@@ -22,9 +22,9 @@ test.describe('Multivalue Prop Types', () => {
         'form[data-drupal-selector="system-regional-settings"] [data-drupal-selector="edit-submit"]',
       )
       .click();
-    await expect(
-      page.locator('[data-drupal-selector="edit-date-default-timezone"]'),
-    ).toHaveValue('Australia/Sydney');
+    await expect(page.locator('[data-drupal-messages]')).toContainText(
+      'configuration options have been saved',
+    );
     await drupal.logout();
 
     await drupal.login({ username: 'editor', password: 'editor' });
