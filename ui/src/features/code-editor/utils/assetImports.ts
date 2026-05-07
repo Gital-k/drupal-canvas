@@ -56,6 +56,10 @@ function normalizeRelativeAssetPath(source: string): string {
   return parts.join('/');
 }
 
+function hasParentDirectoryTraversal(source: string): boolean {
+  return stripQueryAndHash(source).split('/').includes('..');
+}
+
 function toCanvasAssetSpecifier(
   source: string,
   options: RewriteAssetImportsOptions,
@@ -95,7 +99,7 @@ function toCanvasAssetSpecifier(
     return expectedSpecifier;
   }
 
-  if (expectedSpecifier) {
+  if (expectedSpecifier && !hasParentDirectoryTraversal(source)) {
     return null;
   }
 

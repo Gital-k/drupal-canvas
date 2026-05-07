@@ -56,4 +56,16 @@ describe('rewriteAssetImportsForCanvas', () => {
       }),
     ).toBe(`import Icon from './icon.svg?react';`);
   });
+
+  it('rewrites relative assets outside the component folder when the manifest has one match', () => {
+    expect(
+      rewriteAssetImportsForCanvas(
+        `import cafeImage from '../../lib/cafe.webp';`,
+        {
+          componentId: 'card',
+          manifestAssetNames: ['@/lib/cafe.webp'],
+        },
+      ),
+    ).toBe(`const cafeImage = import.meta.resolve("@/lib/cafe.webp");`);
+  });
 });
