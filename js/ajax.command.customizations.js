@@ -29,7 +29,7 @@
         'tr.canvas-optimistic-row, tr[data-canvas-optimistic], tr.canvas-pending-remove',
       )
       .forEach((row) => {
-        document.body.innerHTML = '<h1>Removed something</h1>'
+        document.body.innerHTML = `<h1>Removed something optimistic</h1><code>${row.outerHTML}</code>`
         row.remove();
       });
 
@@ -42,7 +42,7 @@
             'input[name], select[name], textarea[name], button[name]',
           )
         ) {
-          document.body.innerHTML = '<h1>Removed something</h1>'
+          document.body.innerHTML = `<h1>Removed something empty</h1><code>${row.outerHTML}</code>`
           row.remove();
         }
       });
