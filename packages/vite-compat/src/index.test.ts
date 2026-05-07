@@ -501,13 +501,31 @@ describe('vite-compat', () => {
     ]);
   });
 
-  it('rejects componentDir outside aliasBaseDir', async () => {
+  it('allows componentDir outside aliasBaseDir when it stays in the project root', async () => {
     const hostRoot = await makeTempDir();
     await fs.writeFile(
       path.join(hostRoot, 'canvas.config.json'),
       JSON.stringify({
         aliasBaseDir: 'app',
-        componentDir: 'packages/widgets',
+        componentDir: 'components',
+      }),
+      'utf-8',
+    );
+
+    expect(() =>
+      drupalCanvasCompat({
+        hostRoot,
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects componentDir outside the project root', async () => {
+    const hostRoot = await makeTempDir();
+    await fs.writeFile(
+      path.join(hostRoot, 'canvas.config.json'),
+      JSON.stringify({
+        aliasBaseDir: 'app',
+        componentDir: '../widgets',
       }),
       'utf-8',
     );
@@ -517,7 +535,7 @@ describe('vite-compat', () => {
         hostRoot,
       }),
     ).toThrow(
-      'Invalid Canvas config: componentDir "packages/widgets" must be inside aliasBaseDir "app".',
+      'Invalid Canvas config: componentDir "../widgets" must be inside the project root.',
     );
   });
 
