@@ -137,16 +137,17 @@ function hasHostCanvasConfig(hostRoot: string): boolean {
 export function validateCanvasImportRoots(
   options: CanvasImportRootValidationOptions,
 ): void {
-  const hostRoot = path.resolve(options.hostRoot);
+  const aliasRoot = path.resolve(options.hostRoot, options.aliasBaseDir);
   const componentRoot = path.resolve(options.hostRoot, options.componentDir);
-  const relativeComponentRoot = path.relative(hostRoot, componentRoot);
+  const relativeComponentRoot = path.relative(aliasRoot, componentRoot);
 
   if (
+    relativeComponentRoot === '' ||
     relativeComponentRoot.startsWith('..') ||
     path.isAbsolute(relativeComponentRoot)
   ) {
     throw new Error(
-      `Invalid Canvas config: componentDir "${options.componentDir}" must be inside the project root.`,
+      `Invalid Canvas config: componentDir "${options.componentDir}" must be inside aliasBaseDir "${options.aliasBaseDir}".`,
     );
   }
 }
