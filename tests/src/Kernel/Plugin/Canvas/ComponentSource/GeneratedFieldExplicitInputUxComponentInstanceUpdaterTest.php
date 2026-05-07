@@ -47,7 +47,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
     'field',
   ];
 
-  private JavaScriptComponent $jsComponent;
+  protected JavaScriptComponent $jsComponent;
 
   protected const string COMPONENT_INSTANCE_UUID = '2c6e91ae-23ac-433d-9bb8-687144464b34';
   protected const string ORIGINAL_VERSION_HASH = '00706dc2aa3d68d1';
@@ -468,7 +468,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
     $this->assertSame($component->getActiveVersion(), $component_instance->getComponentVersion());
   }
 
-  private static function generateComponentTree(array $component_tree_value): ComponentTreeItemList {
+  protected static function generateComponentTree(array $component_tree_value): ComponentTreeItemList {
     $component_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
     $component_tree->setValue($component_tree_value);
     self::assertCount(0, $component_tree->validate(), (string) $component_tree->validate());
