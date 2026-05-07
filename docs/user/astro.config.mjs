@@ -70,6 +70,13 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Site Building',
+          items: [
+            { label: 'Introduction', slug: 'site-building' },
+            { label: 'Global regions', slug: 'site-building/global-regions' },
+          ],
+        },
+        {
           label: 'AI assistant',
           items: [
             { label: 'Introduction', slug: 'ai-assistant' }

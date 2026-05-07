@@ -887,7 +887,7 @@ pages-mr:
     expire_in: 1 month
   environment:
     name: pages/mr-$CI_MERGE_REQUEST_IID
-    url: $CI_PAGES_URL
+    url: https://project.pages.drupalcode.org/$CI_PARENT_PROJECT_NAME/mr-$CI_MERGE_REQUEST_IID/
     on_stop: stop-pages-mr
 
 stop-pages-mr:
