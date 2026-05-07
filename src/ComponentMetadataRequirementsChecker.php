@@ -28,15 +28,11 @@ final class ComponentMetadataRequirementsChecker {
    *   Component metadata.
    * @param string[] $required_props
    *   Array of required prop names.
-   * @param array<string, string> $forbidden_key_characters
-   *   Array of forbidden key characters as keys and replacements as values.
-   *   For example, component metadata stored as Configuration entities does not
-   *   allow dots.
    *
    * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
    *   When the component does not meet requirements.
    */
-  public static function check(string $component_id, ComponentMetadata $metadata, array $required_props, array $forbidden_key_characters): void {
+  public static function check(string $component_id, ComponentMetadata $metadata, array $required_props): void {
     $messages = [];
 
     if ($metadata->group == 'Elements') {
@@ -141,33 +137,6 @@ final class ComponentMetadataRequirementsChecker {
       if (!isset($prop['title'])) {
         $messages[] = \sprintf('Prop "%s" must have title', $prop_name);
       }
-
-      $enum_container = \in_array('array', $prop['type'], TRUE) ?
-        $prop['items'] ?? [] :
-        $prop;
-      if (isset($enum_container['enum'], $enum_container['meta:enum']) && !empty($forbidden_key_characters)) {
-        foreach ($enum_container['meta:enum'] as $meta_key => $meta_value) {
-          $meta_key_with_replacements = str_replace(
-            \array_keys($forbidden_key_characters),
-            array_values($forbidden_key_characters),
-            (string) $meta_key,
-          );
-          if ((string) $meta_key !== $meta_key_with_replacements) {
-            $messages[] = \sprintf('The "meta:enum" keys for the "%s" prop enum cannot contain a dot. Offending key: "%s"', $prop_name, $meta_key);
-          }
-        }
-
-        // Ensure we replace dots with underscores when checking meta:enums.
-        $meta_enum_valid_keys = \array_map(fn($key) => str_replace(
-          \array_keys($forbidden_key_characters),
-          array_values($forbidden_key_characters),
-          (string) $key,
-        ), $enum_container['enum']);
-        $enum_keys_diff = \array_diff($meta_enum_valid_keys, \array_keys($enum_container['meta:enum']));
-        if (!empty($enum_keys_diff)) {
-          $messages[] = \sprintf('The values for the "%s" prop enum must be defined in "meta:enum". Missing keys: "%s"', $prop_name, \implode(', ', $enum_keys_diff));
-        }
-      }
     }
 
     // Do not try computing any StorablePropShape if one or more fundamentals
@@ -176,17 +145,35 @@ final class ComponentMetadataRequirementsChecker {
       throw new ComponentDoesNotMeetRequirementsException($messages);
     }
 
-    // Every prop must have a StorablePropShape.
+    // Every prop must have a StorablePropShape. If an example is provided, it
+    // must be considered non-empty by the field type that will power it.
     $props_for_metadata = GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($component_id, $metadata);
     /** @var \Drupal\canvas\PropShape\PropShapeRepositoryInterface $prop_shape_repository */
     $prop_shape_repository = \Drupal::service(EphemeralPropShapeRepository::class);
     foreach ($props_for_metadata as $cpe => $prop_shape) {
+      $prop_name = ComponentPropExpression::fromString($cpe)->propName;
       $storable_prop_shape = $prop_shape_repository->getStorablePropShape($prop_shape);
-      if ($storable_prop_shape instanceof StorablePropShape) {
+      if (!$storable_prop_shape instanceof StorablePropShape) {
+        $messages[] = \sprintf('Drupal Canvas does not know of a field type/widget to allow populating the <code>%s</code> prop, with the shape <code>%s</code>.', $prop_name, json_encode($prop_shape->schema, JSON_UNESCAPED_SLASHES));
         continue;
       }
-      $messages[] = \sprintf('Drupal Canvas does not know of a field type/widget to allow populating the <code>%s</code> prop, with the shape <code>%s</code>.', ComponentPropExpression::fromString($cpe)->propName, json_encode($prop_shape->schema, JSON_UNESCAPED_SLASHES));
+      // Entity-referencing props skip the StaticPropSource pipeline at runtime,
+      // so don't trial them here either.
+      if (GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity($storable_prop_shape)) {
+        continue;
+      }
+      $example = $metadata->schema['properties'][$prop_name]['examples'][0] ?? NULL;
+      if ($example === NULL) {
+        continue;
+      }
+      try {
+        $storable_prop_shape->toStaticPropSource()->withValue($example);
+      }
+      catch (\LogicException) {
+        $messages[] = \sprintf('Prop "%s" example value `%s` cannot be used as a default.', $prop_name, \json_encode($example));
+      }
     }
+
     if (!empty($messages)) {
       throw new ComponentDoesNotMeetRequirementsException($messages);
     }

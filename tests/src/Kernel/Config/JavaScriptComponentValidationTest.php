@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -542,10 +543,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       [
         'type' => 'array',
         'title' => 'Images',
-        'items' => [
-          'type' => 'object',
-          '$ref' => 'json-schema-definitions://canvas.module/image',
-        ],
+        'items' => JsonSchemaObjectRef::Image->asPropShapeArray(),
         'examples' => [
           [
             [
@@ -570,10 +568,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       [
         'type' => 'array',
         'title' => 'Images',
-        'items' => [
-          'type' => 'object',
-          '$ref' => 'json-schema-definitions://canvas.module/image',
-        ],
+        'items' => JsonSchemaObjectRef::Image->asPropShapeArray(),
         'examples' => [
           [
             [
@@ -590,6 +585,33 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         'props.array_prop_name.examples.0.0.url' => "'url' is not a supported key.",
       ],
     ];
+
+    yield 'Invalid: object array with a relative image src example' => [
+      [
+        'type' => 'array',
+        'title' => 'Images',
+        'items' => [
+          'type' => 'object',
+          '$ref' => 'json-schema-definitions://canvas.module/image',
+        ],
+        'examples' => [
+          [
+            [
+              'src' => 'https://example.com/cat.jpg',
+              'alt' => 'A valid example.',
+            ],
+            [
+              'src' => './hero.jpg',
+              'alt' => 'A relative path that JsComponent cannot resolve.',
+            ],
+          ],
+        ],
+      ],
+      [
+        '' => 'Image prop "array_prop_name" example src "./hero.jpg" must be a fully-qualified URL with both scheme and host. Use a placeholder URL such as https://placehold.co/600x400.',
+      ],
+    ];
+
     // `type: object` without `$ref` fails at the config schema level because
     // $ref is required in canvas.json_schema.item.object, matching the same
     // requirement as canvas.json_schema.prop_shape.object.
@@ -613,9 +635,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
    */
   public function testObjectPropDefinition(): void {
     $this->entity->set('props', [
-      'some_object' => [
-        'type' => 'object',
-        '$ref' => 'json-schema-definitions://canvas.module/image',
+      'some_object' => JsonSchemaObjectRef::Image->asPropShapeArray() + [
         'title' => $this->randomString(),
         'enum' => [NULL],
         'meta:enum' => [NULL => 'Test'],
@@ -641,11 +661,11 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
             'width' => 1200,
           ],
           [
-            // Valid (although basically nonsensical) relative path.
+            // Relative path: rejected because JsComponent cannot resolve them.
             'src' => 'path/to/image.png',
           ],
           [
-            // Valid root-relative URL.
+            // Root-relative URL: rejected because it has no scheme/host.
             'src' => '/root/relative/path/to/image.png',
           ],
           [
@@ -656,7 +676,12 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       ],
     ]);
     $this->assertValidationErrors([
-      '' => 'Prop "some_object" has invalid example value: [src] The property src is required',
+      '' => [
+        'Prop "some_object" has invalid example value: [src] The property src is required',
+        'Image prop "some_object" example src "hi mum, this is not a url" must be a fully-qualified URL with both scheme and host. Use a placeholder URL such as https://placehold.co/600x400.',
+        'Image prop "some_object" example src "path/to/image.png" must be a fully-qualified URL with both scheme and host. Use a placeholder URL such as https://placehold.co/600x400.',
+        'Image prop "some_object" example src "/root/relative/path/to/image.png" must be a fully-qualified URL with both scheme and host. Use a placeholder URL such as https://placehold.co/600x400.',
+      ],
       'props.some_object.enum.0' => 'This value should not be null.',
       'props.some_object.examples.0' => [
         "'src' is a required key.",
@@ -666,6 +691,24 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       'props.some_object.examples.4.src' => 'This value should be a valid URI reference.',
       'props.some_object.examples.5' => "'src' is a required key.",
       'props.some_object.examples.8.src' => "'public' is not allowed, must be one of the allowed schemes: http, https.",
+    ]);
+  }
+
+  /**
+   * Tests that an empty-string example for a string prop is rejected.
+   *
+   * @see https://www.drupal.org/i/3587211
+   */
+  public function testEmptyStringExampleRejected(): void {
+    $this->entity->set('props', [
+      'delta' => [
+        'type' => 'string',
+        'title' => 'Delta',
+        'examples' => [''],
+      ],
+    ]);
+    $this->assertValidationErrors([
+      '' => 'Prop "delta" example value `""` cannot be used as a default.',
     ]);
   }
 
@@ -956,10 +999,8 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
           'machineName' => 'image-prop-no-slots',
           'name' => 'Test',
           'props' => [
-            'image' => [
+            'image' => JsonSchemaObjectRef::Image->asPropShapeArray() + [
               'title' => 'Image title',
-              'type' => 'object',
-              '$ref' => "json-schema-definitions://canvas.module/image",
               'examples' => [
                 [
                   'src' => 'https://example.com/image.png',
@@ -991,10 +1032,8 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
             'image',
           ],
           'props' => [
-            'image' => [
+            'image' => JsonSchemaObjectRef::Image->asPropShapeArray() + [
               'title' => 'Image title',
-              'type' => 'object',
-              '$ref' => "json-schema-definitions://canvas.module/image",
             ],
           ],
           'slots' => [],
@@ -1017,10 +1056,8 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
           'machineName' => 'image-prop-no-slots-no-examples',
           'name' => 'Test',
           'props' => [
-            'image' => [
+            'image' => JsonSchemaObjectRef::Image->asPropShapeArray() + [
               'title' => 'Image title',
-              'type' => 'object',
-              '$ref' => "json-schema-definitions://canvas.module/image",
             ],
           ],
           'slots' => [],
