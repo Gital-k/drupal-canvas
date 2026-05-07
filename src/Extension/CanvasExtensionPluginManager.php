@@ -8,6 +8,7 @@ use Drupal\canvas\Exception\ExtensionValidationException;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Plugin\Discovery\YamlDiscovery;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Drupal\Core\Plugin\DefaultPluginManager;
 use Drupal\Core\Plugin\Factory\ContainerFactory;
 use Drupal\Core\Url;
@@ -41,7 +42,11 @@ final class CanvasExtensionPluginManager extends DefaultPluginManager implements
   /**
    * Constructs the object.
    */
-  public function __construct(CacheBackendInterface $cache_backend, ModuleHandlerInterface $module_handler) {
+  public function __construct(
+    #[Autowire(service: 'cache.discovery')]
+    CacheBackendInterface $cache_backend,
+    ModuleHandlerInterface $module_handler,
+  ) {
     // Skip calling the parent constructor, since that assumes annotation-based
     // discovery.
     $this->moduleHandler = $module_handler;

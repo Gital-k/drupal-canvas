@@ -20,6 +20,7 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Plugin\DefaultPluginManager;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\Core\Update\UpdateKernel;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Defines a plugin manager for component source plugins.
@@ -51,6 +52,7 @@ final class ComponentSourceManager extends DefaultPluginManager {
     private readonly ComponentIncompatibilityReasonRepository $reasonRepository,
     private readonly ClassResolverInterface $classResolver,
     private readonly ConfigInstallerInterface $configInstaller,
+    #[Autowire(service: 'kernel')]
     DrupalKernel $kernel,
   ) {
     parent::__construct(

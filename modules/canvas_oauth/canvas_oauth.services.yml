@@ -5,7 +5,6 @@ services:
     tags:
       - { name: event_subscriber }
   Drupal\canvas_oauth\Authentication\Provider\CanvasOauthAuthenticationProvider:
-    arguments: ['@simple_oauth.authentication.simple_oauth']
     tags:
       # The `oauth2` provider by the Simple OAuth module uses a priority of 35.
       # Setting our module's priority higher ensures our provider is called

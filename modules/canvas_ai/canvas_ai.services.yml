@@ -9,7 +9,4 @@ services:
   Drupal\Core\Cache\CacheBackendInterface: '@cache.default'
   canvas_ai.response_validator:
     class: Drupal\canvas_ai\AiResponseValidator
-    arguments:
-      - '@Drupal\Core\Validation\BasicRecursiveValidatorFactory'
-      - '@uuid'
   Drupal\canvas_ai\CanvasAiTempStore: '@canvas_ai.tempstore'

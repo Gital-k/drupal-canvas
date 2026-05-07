@@ -12,6 +12,7 @@ use League\OpenAPIValidation\PSR7\Exception\ValidationFailed;
 use League\OpenAPIValidation\PSR7\ValidatorBuilder;
 use Psr\Log\LoggerInterface;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
@@ -40,10 +41,12 @@ abstract class ApiMessageValidatorBase implements EventSubscriberInterface {
   private ?ValidatorBuilder $validatorBuilder = NULL;
 
   public function __construct(
+    #[Autowire(service: 'logger.channel.canvas')]
     private readonly LoggerInterface $logger,
     private readonly ModuleHandlerInterface $moduleHandler,
     private readonly RouteMatchInterface $currentRouteMatch,
     protected readonly HttpMessageFactoryInterface $httpMessageFactory,
+    #[Autowire(param: 'app.root')]
     private readonly string $appRoot,
   ) {}
 

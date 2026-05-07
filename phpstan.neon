@@ -89,6 +89,12 @@ includes:
   - phpstan-11.3-and-higher-ignores.neon
 services:
   -
+    class: Canvas\PHPStan\Rules\NoExplicitServiceArgumentsRule
+    arguments:
+      servicesYmlRootDir: %currentWorkingDirectory%
+    tags:
+      - phpstan.rules.rule
+  -
     class: Canvas\PHPStan\Architecture\Layers
     tags:
       - phpat.test
