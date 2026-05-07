@@ -1,16 +1,19 @@
 ---
-title: Code components - Prop schemas
+title: Code Components - Component metadata
 ---
 
-When working with code components outside of Canvas, `component.yml` files are
-used to define component metadata, including props. These files follow the same
-schema as SDC `component.yml` files, but the available prop schemas are limited to
-those supported by the in-browser code editor of Canvas.
+When working with Code Components in a local codebase, `component.yml` files
+define component metadata. This follows the same metadata model as SDC
+`component.yml` files.
 
-This page documents all supported prop types for code components. Each type
-corresponds to a specific JSON Schema definition.
+Code Component metadata can define props, slots, and examples. Prop schemas are
+limited to the types supported by the in-browser code editor.
 
-## Text
+## Prop metadata
+
+Each prop corresponds to a JSON Schema definition.
+
+### Text
 
 Basic text input. Stored as a string value.
 
@@ -20,7 +23,7 @@ examples:
   - Hello, world!
 ```
 
-## Formatted text
+### Formatted text
 
 Rich text content with HTML formatting support, displayed in a block context.
 
@@ -32,7 +35,7 @@ examples:
   - <p>This is <strong>formatted</strong> text with HTML.</p>
 ```
 
-## Link
+### Link
 
 URL or URI reference for links to internal or external resources.
 
@@ -43,12 +46,14 @@ examples:
   - https://example.com
 ```
 
-**Note:** The format can be either `uri` (accepts only absolute URLs) or `uri-reference` (accepts both absolute and relative URLs).
+The format can be either `uri`, which accepts only absolute URLs, or
+`uri-reference`, which accepts both absolute and relative URLs.
 
-## Image
+### Image
 
 Reference to an image object with metadata like alt text, dimensions, and file
-URL. Only the file URL is required to exist, all other metadata is always optional.
+URL. Only the file URL is required to exist; all other metadata is always
+optional.
 
 ```yaml
 type: object
@@ -61,9 +66,10 @@ examples:
     height: 1180
 ```
 
-## Video
+### Video
 
-Reference to a video object with metadata like dimensions and file URL. Only the file URL is required to exist, all other metadata is always optional.
+Reference to a video object with metadata like dimensions and file URL. Only the
+file URL is required to exist; all other metadata is always optional.
 
 ```yaml
 type: object
@@ -73,7 +79,7 @@ examples:
     poster: https://example.com/600x400.png
 ```
 
-## Boolean
+### Boolean
 
 True or false value.
 
@@ -83,7 +89,7 @@ examples:
   - false
 ```
 
-## Integer
+### Integer
 
 Whole number value without decimal places.
 
@@ -93,7 +99,7 @@ examples:
   - 42
 ```
 
-## Number
+### Number
 
 Numeric value that can include decimal places.
 
@@ -103,7 +109,7 @@ examples:
   - 3.14
 ```
 
-## List: text
+### List: text
 
 A predefined list of text options that the user can select from.
 
@@ -125,9 +131,9 @@ The `meta:enum` property provides user-friendly labels for each enum value. The
 keys match the enum values, and the values are the display labels shown in the
 UI.
 
-**Note:** Enum values cannot contain dots.
+Enum values cannot contain dots.
 
-## List: integer
+### List: integer
 
 A predefined list of integer options that the user can select from.
 
@@ -149,4 +155,19 @@ The `meta:enum` property provides user-friendly labels for each enum value. The
 keys match the enum values, and the values are the display labels shown in the
 UI.
 
-**Note:** Enum values cannot contain dots.
+Enum values cannot contain dots.
+
+## Slot metadata
+
+Slots are defined under the `slots` key. Each slot key becomes the slot name
+passed to the Code Component. The `title` is shown in Canvas, and `examples`
+provide preview content.
+
+```yaml
+slots:
+  content:
+    title: Content
+    description: Content to display below the greeting.
+    examples:
+      - <div>Example slot content</div>
+```
