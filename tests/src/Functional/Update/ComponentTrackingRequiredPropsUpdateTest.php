@@ -6,13 +6,18 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Update;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers canvas_post_update_0001_track_props_have_required_flag_in_components()
- * @group canvas
+ * Tests Component Tracking Required Props Update.
+ *
+ * @legacy-covers \canvas_post_update_0001_track_props_have_required_flag_in_components
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class ComponentTrackingRequiredPropsUpdateTest extends CanvasUpdatePathTestBase {
 
   use ComponentTreeItemListInstantiatorTrait;
@@ -44,10 +49,10 @@ final class ComponentTrackingRequiredPropsUpdateTest extends CanvasUpdatePathTes
   private function assertExpectedVersionsAndRequiredness(string $component_id, array $expected_info): void {
     $before = Component::load($component_id);
     self::assertInstanceOf(Component::class, $before);
-    self::assertSame(array_keys($expected_info), $before->getVersions(), $component_id);
+    self::assertSame(\array_keys($expected_info), $before->getVersions(), $component_id);
     foreach ($before->getVersions() as $version) {
       $before->loadVersion($version);
-      $has_required_key = array_key_exists('required', $before->getSettings()['prop_field_definitions']['title']);
+      $has_required_key = \array_key_exists('required', $before->getSettings()['prop_field_definitions']['title']);
       self::assertSame($expected_info[$version], $has_required_key, $component_id);
     }
   }

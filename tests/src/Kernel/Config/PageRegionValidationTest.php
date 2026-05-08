@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\DataProvider;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\TestTools\Random;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
+ * Tests Page Region Validation.
  */
+#[Group('canvas')]
+#[RunTestsInSeparateProcesses]
 class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
 
   use BetterConfigDependencyManagerTrait;
@@ -30,18 +38,10 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
+    ...CanvasKernelTestBase::CANVAS_KERNEL_TEST_MINIMAL_MODULES,
+    // Test components.
     'block',
-    'canvas',
     'canvas_test_sdc',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'link',
-    'text',
-    'filter',
   ];
 
   /**
@@ -56,6 +56,7 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installConfig(['canvas']);
     $this->generateComponentConfig();
     $generate_static_prop_source = function (string $label): array {
       return [
@@ -88,19 +89,19 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
         [
           'uuid' => '93af433a-8ab0-4dd9-912a-73a99c882347',
           'component_id' => 'block.page_title_block',
-          'component_version' => '62af221149ae4887',
+          'component_version' => Component::load('block.page_title_block')?->getActiveVersion(),
           'inputs' => [
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
         [
           'uuid' => '5f1c5361-5658-467e-9c53-b0015d57945d',
           'component_id' => 'block.system_messages_block',
-          'component_version' => 'b92f802cf68eb83e',
+          'component_version' => Component::load('block.system_messages_block')?->getActiveVersion(),
           'inputs' => [
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
       ],
@@ -200,8 +201,9 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @dataProvider providerInvalidComponentTree
-   */
+ * Tests invalid component tree.
+ */
+  #[DataProvider('providerInvalidComponentTree')]
   public function testInvalidComponentTree(array $component_tree, array $expected_messages): void {
     \assert($this->entity instanceof PageRegion);
     $this->entity->setComponentTree($component_tree);
@@ -209,7 +211,7 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   public static function providerInvalidComponentTree(): \Generator {
-    yield "using DynamicPropSource" => [
+    yield "using EntityFieldPropSource" => [
       'component_tree' => [
         [
           'uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
@@ -217,14 +219,14 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
           'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
         ],
       ],
       'expected_messages' => [
-        'component_tree' => "The 'dynamic' prop source type must be absent.",
+        'component_tree' => "The 'entity-field' prop source type must be absent.",
       ],
     ];
 
@@ -239,7 +241,7 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
               'value' => 'Visit sunny Vienna',
             ],
             'href' => [
-              'sourceType' => 'host-entity-url',
+              'sourceType' => PropSource::HostEntityUrl->value,
               'absolute' => TRUE,
             ],
           ],
@@ -300,7 +302,7 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       ],
     ];
 
-    yield "invalid slot" => [
+    yield "invalid slot (integer sequence keys as the client might send — prove the specified keys are respected)" => [
       'component_tree' => [
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
@@ -323,6 +325,32 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       ],
       'expected_messages' => [
         'component_tree.1.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">banana</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
+      ],
+    ];
+
+    yield "invalid slot (deterministic sequence keys as the server generates — prove the specified keys are respected)" => [
+      'component_tree' => [
+        'fa9ff0a8-e23a-492a-ab14-5460611fa2c1' => [
+          'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
+          'inputs' => [
+            'heading' => 'And we laugh like soft, mad children',
+          ],
+        ],
+        'e303dd88-9409-4dc7-8a8b-a31602884a94' => [
+          'uuid' => 'e303dd88-9409-4dc7-8a8b-a31602884a94',
+          'slot' => 'banana',
+          'parent_uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
+          'inputs' => [
+            'heading' => ' Smug in the wooly cotton brains of infancy',
+          ],
+        ],
+      ],
+      'expected_messages' => [
+        'component_tree.e303dd88-9409-4dc7-8a8b-a31602884a94.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">banana</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
       ],
     ];
 
@@ -384,7 +412,6 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
    * {@inheritdoc}
    */
   public function testRequiredPropertyValuesMissing(?array $additional_expected_validation_errors_when_missing = NULL): void {
-    // @phpstan-ignore-next-line
     parent::testRequiredPropertyValuesMissing([
       'theme' => [
         'id' => 'This validation constraint is configured to inspect the properties <em class="placeholder">%parent.theme, %parent.region</em>, but some do not exist: <em class="placeholder">%parent.theme</em>.',
@@ -396,11 +423,20 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @dataProvider providerForAutoSaveData
-   */
+ * Tests for auto save data.
+ */
+  #[DataProvider('providerForAutoSaveData')]
   public function testForAutoSaveData(array $autoSaveData, array $expected_errors): void {
+    // Block component versions may vary due to upstream changes in core, so
+    // load the current version dynamically.
+    // @see \Drupal\Tests\canvas\Traits\DataProviderWithCoreSpecificComponentActiveVersionTrait
+    foreach ($autoSaveData['layout'] as &$node) {
+      if (isset($node['type']) && str_starts_with($node['type'], 'block.') && str_ends_with($node['type'], '@')) {
+        $node['type'] .= Component::load(rtrim($node['type'], '@'))?->getActiveVersion();
+      }
+    }
     try {
-      assert($this->entity instanceof PageRegion);
+      \assert($this->entity instanceof PageRegion);
       $this->entity->forAutoSaveData($autoSaveData, validate: TRUE);
       $this->assertSame([], $expected_errors);
     }
@@ -448,14 +484,14 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
           [
             "nodeType" => "component",
             "slots" => [],
-            "type" => "block.page_title_block@62af221149ae4887",
+            "type" => "block.page_title_block@",
             "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
           ],
         ],
         'model' => [
           'c3f3c22c-c22e-4bb6-ad16-635f069148e4' => [
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
       ],

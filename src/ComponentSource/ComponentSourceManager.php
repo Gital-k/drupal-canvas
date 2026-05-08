@@ -9,6 +9,8 @@ use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\VersionedConfigEntityBase;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Config\ConfigInstallerInterface;
@@ -25,6 +27,8 @@ use Drupal\Core\Update\UpdateKernel;
  * @see \Drupal\canvas\Attribute\ComponentSource
  * @see \Drupal\canvas\ComponentSource\ComponentSourceInterface
  * @see \Drupal\canvas\ComponentSource\ComponentSourceBase
+ *
+ * @phpstan-import-type ComponentSourceSpecificId from \Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface
  */
 final class ComponentSourceManager extends DefaultPluginManager {
 
@@ -64,9 +68,17 @@ final class ComponentSourceManager extends DefaultPluginManager {
   /**
    * Generates Component config entities for all eligible discovered components.
    *
+   * @param string|null $source_id
+   *   (optional) A ComponentSource plugin ID. If omitted, will (re)generate
+   *   Component config entities for all ComponentSource plugins.
+   * @param list<string>|null $source_specific_ids
+   *   (optional) A list of source-specific IDs in the given $source_id. If
+   *   omitted, will (re)generate Component config entities for all components.
+   *
    * @return $this
    */
-  public function generateComponents(): self {
+  public function generateComponents(?string $source_id = NULL, ?array $source_specific_ids = NULL): self {
+    \assert($source_specific_ids === NULL || \array_is_list($source_specific_ids));
     if ($this->isUpdateKernel) {
       return $this;
     }
@@ -77,24 +89,62 @@ final class ComponentSourceManager extends DefaultPluginManager {
     if ($this->configInstaller->isSyncing()) {
       return $this;
     }
+    // @todo Fix upstream core bug in Recipes: it inconsistently claims to be
+    // syncing when installing modules, but not when installing configuration.
+    // Even though it is listed under `import`, and that should hence match the
+    // behavior of the /admin/config/development/configuration/single/import UI.
+    if (\in_array('installRecipeConfig', array_column(debug_backtrace(), 'function'), TRUE)) {
+      // Assert the bug is still present. This will start failing as soon as the
+      // upstream bug is fixed.
+      // @phpstan-ignore-next-line function.alreadyNarrowedType
+      \assert(!$this->configInstaller->isSyncing());
+      return $this;
+    }
+
+    $source_definitions = $this->getDefinitions();
+    if ($source_id !== NULL) {
+      // Filter the set of definitions down to just the one that was asked for,
+      // if any.
+      $source_definitions = array_filter($source_definitions, fn($key) => $key === $source_id, ARRAY_FILTER_USE_KEY);
+    }
 
     $existing_components = Component::loadMultiple();
     \assert(Inspector::assertAllObjects($existing_components, Component::class));
-    foreach ($this->getDefinitions() as $source_id => $definition) {
+    foreach ($source_definitions as $source_definition_id => $definition) {
       if ($definition['discovery'] === FALSE) {
         continue;
       }
       // @todo use static cache
       $discovery = $this->classResolver->getInstanceFromDefinition($definition['discovery']);
       \assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
-      $this->generateComponentsForSource($source_id, $discovery, $existing_components);
+      $this->generateComponentsForSource($source_definition_id, $discovery, $existing_components, $source_specific_ids);
     }
     return $this;
   }
 
-  private function generateComponentsForSource(string $source_id, ComponentCandidatesDiscoveryInterface $discovery, array $existing_components): void {
+  /**
+   * Generates a new Component entity or new version on it if it already exists.
+   *
+   * @param string $source_id
+   *   A ComponentSource plugin ID.
+   * @param \Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface $discovery
+   *   The discovery object for this component source plugin.
+   * @param array<Component> $existing_components
+   *   The already existing Component entities, keyed by ID, so we know when we
+   *   create a new one or a new version for an existing one.
+   * @param list<ComponentSourceSpecificId>|null $source_specific_ids
+   *   (optional) A list of source-specific IDs in the given $source_id. If
+   *   omitted, will (re)generate Component config entities for all components.
+   */
+  private function generateComponentsForSource(string $source_id, ComponentCandidatesDiscoveryInterface $discovery, array $existing_components, ?array $source_specific_ids = NULL): void {
+    \assert($source_specific_ids === NULL || \array_is_list($source_specific_ids));
     // Discover and check requirements.
-    $component_ids = array_keys($discovery->discover());
+    $component_ids = \array_keys($discovery->discover());
+    if ($source_specific_ids !== NULL) {
+      // Filter the discovered component IDs down to just those that were asked
+      // for, if any.
+      $component_ids = array_intersect($component_ids, $source_specific_ids);
+    }
     $eligible_component_ids = [];
     foreach ($component_ids as $source_specific_component_id) {
       try {
@@ -141,18 +191,17 @@ final class ComponentSourceManager extends DefaultPluginManager {
         'local_source_id' => $source_specific_component_id,
         ...$source_specific_settings,
       ]);
-      assert($source instanceof ComponentSourceBase);
+      \assert($source instanceof ComponentSourceBase);
       $version = $source->generateVersionHash();
 
       // Compute more trivial Component config entity metadata that may change,
       // but typically changes rarely:
       // - label
-      // - category
       // - (optional) status
       $current_metadata = $discovery->computeCurrentComponentMetadata($source_specific_component_id);
 
       // 1. Create a Component config entity if it does not exist yet.
-      if (!array_key_exists($component_id, $existing_components)) {
+      if (!\array_key_exists($component_id, $existing_components)) {
         // Only the initial `status` can be specified by the source: the site
         // owner can modify the status of Component config entities, so it must
         // remain unchanged. (Except if the component stops meeting the
@@ -176,6 +225,7 @@ final class ComponentSourceManager extends DefaultPluginManager {
       }
 
       $component = $existing_components[$component_id];
+      // @phpstan-ignore-next-line booleanNot.alwaysTrue, function.alreadyNarrowedType
       \assert($component instanceof ComponentInterface);
       $needs_update = FALSE;
 
@@ -202,6 +252,41 @@ final class ComponentSourceManager extends DefaultPluginManager {
         $component->save();
       }
     }
+  }
+
+  /**
+   * Updates component instances to the active (aka latest) version if possible.
+   *
+   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList $component_tree
+   *   The component tree containing instances to update.
+   *
+   * @return bool
+   *   TRUE if any component instance was updated, FALSE otherwise.
+   */
+  public function updateComponentInstances(ComponentTreeItemList $component_tree): bool {
+    $wasModified = FALSE;
+    foreach ($component_tree as $item) {
+      \assert($item instanceof ComponentTreeItem);
+      $component = $item->getComponent();
+      if ($component === NULL) {
+        // If the component is missing, there's nothing to update.
+        continue;
+      }
+      $component_source = $component->getComponentSource();
+      $updater_class = $component_source->getPluginDefinition()['updater'] ?? FALSE;
+      if (!$updater_class) {
+        continue;
+      }
+      $updater = $this->classResolver->getInstanceFromDefinition($updater_class);
+      \assert($updater instanceof ComponentInstanceUpdaterInterface);
+      // Check if update is needed and safe, then perform the update.
+      if ($updater->isUpdateNeeded($item) && $updater->canUpdate($item)) {
+        $update_result = $updater->update($item);
+        \assert($update_result === ComponentInstanceUpdateAttemptResult::Latest);
+        $wasModified = TRUE;
+      }
+    }
+    return $wasModified;
   }
 
 }

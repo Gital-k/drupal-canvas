@@ -1,8 +1,8 @@
 {
   "name": "@drupal-canvas/eslint-config",
-  "version": "0.0.1",
+  "version": "0.4.0",
   "description": "ESLint config for validating Drupal Canvas Code Components",
-  "license": "GPL-2.0-or-later",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://git.drupalcode.org/project/canvas.git",
@@ -31,9 +31,12 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-yml": "^1.19.0",
-    "lodash-es": "^4.17.21"
+    "globals": "^16.5.0",
+    "lodash-es": "^4.17.21",
+    "typescript-eslint": "^8.56.1"
   },
   "devDependencies": {
+    "@drupal-canvas/discovery": "*",
     "@types/eslint-plugin-jsx-a11y": "^6.5.6",
     "@types/lodash-es": "^4.17.12",
     "tsup": "^8.5.1",

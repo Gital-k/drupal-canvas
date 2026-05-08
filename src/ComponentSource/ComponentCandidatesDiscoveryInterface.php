@@ -9,13 +9,11 @@ use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 /**
  * Defines an interface for component source plugins to discover components.
  *
- * - Handles all discovery concerns, the results of which are tracked in Canvas'
- *   Component config entities. Changes that affect current or future instances
- *   of this component are reflected in versions of the Component config entity.
- * - ComponentSourceInterface handles all other concerns. That is: all instance
- *   concerns.
+ * Handles all discovery concerns, the results of which are tracked in Canvas'
+ * Component config entities. Changes that affect current or future instances
+ * of this component are reflected in versions of the Component config entity.
  *
- * @see \Drupal\canvas\Attribute\ComponentSource
+ * @see \Drupal\canvas\Attribute\ComponentSource::__construct(discovery)
  * @see \Drupal\canvas\ComponentSource\ComponentSourceInterface
  *
  * Corresponds to `type: canvas.component_source_local_id.*` in config schema:
@@ -93,19 +91,17 @@ interface ComponentCandidatesDiscoveryInterface extends ContainerInjectionInterf
   public function computeInitialComponentStatus(string $source_specific_id): bool;
 
   /**
-   * Computes Component metadata that can change over time: label, category.
+   * Computes Component metadata that can change over time: label.
    *
    * @param ComponentSourceSpecificId $source_specific_id
    *
-   * @return array{'label': string, 'category': ?string, 'status'?: bool}
+   * @return array{'label': string, 'status'?: bool}
    *   Returns:
    *   - `label`: string
-   *   - `category`: string or NULL if no category
    *   - (optional) `status`: boolean — for ComponentSource plugins that need to
    *     be able to automatically disable components
    *
    * @see \Drupal\canvas\Entity\ComponentInterface::label()
-   * @see \Drupal\canvas\Entity\ComponentInterface::getCategory()
    * @see \Drupal\canvas\Entity\ComponentInterface::status()
    */
   public function computeCurrentComponentMetadata(string $source_specific_id): array;

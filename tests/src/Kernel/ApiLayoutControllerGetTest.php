@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\Storage\ComponentTreeLoader;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\ParamConverter\ParamNotConvertedException;
 use Drupal\Core\Url;
@@ -27,21 +31,27 @@ use Drupal\user\Entity\User;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
- * @covers \Drupal\canvas\Controller\ApiLayoutController::get()
- * @group canvas
- * @group #slow
+ * Tests Api Layout Controller Get.
+ *
+ * @legacy-covers \Drupal\canvas\Controller\ApiLayoutController::get
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+#[Group('#slow')]
 class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
+
+  use ConstraintViolationsTestTrait;
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
     // Allows format=uri to be stored using URI field type.
-    'canvas_test_storage_prop_shape_alter',
+    'canvas_test_storable_prop_shape_alter',
     'sdc_test',
   ];
 
@@ -56,8 +66,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * @dataProvider providerEntityTypes
-   */
+ * Tests empty.
+ */
+  #[DataProvider('providerEntityTypes')]
   public function testEmpty(string $entity_type): void {
     $entity = $this->getTestEntity($entity_type);
     $this->setUpCurrentUser([], [self::getAdminPermission($entity)]);
@@ -75,7 +86,6 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * @covers ::get
    * @see \Drupal\canvas\Entity\ContentTemplate
    */
   public function testRenderDynamic(): void {
@@ -84,7 +94,8 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
     $top_level_component_uuid = '5f71027b-d9d3-4f3d-8990-a6502c0ba676';
     $nested_component_uuid = '8caf6e23-8fb4-4524-bdb6-f57a2a6e7859';
-    // Add a heading populated by a dynamic prop source using the `title` field.
+    // Add a heading populated by an entity field prop source using the `title`
+    // field.
     $components = [
       [
         'uuid' => $top_level_component_uuid,
@@ -92,7 +103,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         'component_version' => '85a5c0c7dd53e0bb',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
         ],
@@ -103,7 +114,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         'component_version' => 'b1e991f726a2a266',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
         ],
@@ -120,7 +131,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // Local helper to check these are in sync/contain the expected title:
     // - entity label
     // - `model` in API response
-    // - `html` in API
+    // - `html` in API.
     $title_matches_resolved_and_html = function (string $expected_title, JsonResponse $response) use ($top_level_component_uuid, $nested_component_uuid) {
       // Current preview entity label MUST match the expected title.
       self::assertSame($expected_title, $this->previewEntity?->label());
@@ -137,13 +148,13 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       self::assertSame($expected_title, (string) $this->cssSelect('[data-component-id="canvas_test_sdc:props-slots"] [data-component-id="canvas_test_sdc:props-no-slots"] > h1')[0]);
     };
 
-    // Assert the original resolved dynamic prop source + resulting HTML.
+    // Assert the original resolved entity field prop source + resulting HTML.
     $response = $this->request($get_layout_api_request);
     self::assertInstanceOf(JsonResponse::class, $response);
     $title_matches_resolved_and_html('Canvas Needs This For The Time Being', $response);
 
     // Updating the title of the preview entity must propagate throughout.
-    assert($this->previewEntity instanceof Node);
+    \assert($this->previewEntity instanceof Node);
     $this->previewEntity->set('title', 'New title for preview')->save();
     $response = $this->request($get_layout_api_request);
     self::assertInstanceOf(JsonResponse::class, $response);
@@ -151,8 +162,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * @dataProvider providerEntityTypes
-   */
+ * Tests .
+ */
+  #[DataProvider('providerEntityTypes')]
   public function test(string $entity_type): void {
     // By default, there is only the "content" region in the client-side
     // representation.
@@ -188,7 +200,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         [
           "nodeType" => "component",
           "slots" => [],
-          "type" => "block.page_title_block@62af221149ae4887",
+          "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
           "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         ],
       ],
@@ -225,7 +237,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         "nodeType" => "component",
         "slots" => [],
-        "type" => "block.page_title_block@62af221149ae4887",
+        "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
         "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         'name' => NULL,
       ],
@@ -233,30 +245,19 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
     $original_entity = $entity::load($entity->id());
     \assert($original_entity instanceof $entity);
-    // Remove the adapted image.
-    $tree_loader = $this->container->get(ComponentTreeLoader::class);
-    \assert($tree_loader instanceof ComponentTreeLoader);
-    $tree = $tree_loader->load($original_entity);
-    $delta = $tree->getComponentTreeDeltaByUuid(CanvasTestSetup::UUID_ADAPTED_IMAGE);
-    \assert($delta !== NULL);
-    $tree->removeItem($delta);
     // Update the title.
     if ($original_entity instanceof Node) {
       $new_title = $this->getRandomGenerator()->sentences(10);
       $original_entity->setTitle($new_title);
       // Note we use a string here.
       $original_entity->set('status', '1');
-    }
-    else {
-      \assert($original_entity instanceof ComponentTreeEntityInterface);
-      $original_entity->setComponentTree($tree->getValue());
+      $autoSave->saveEntity($original_entity);
     }
 
-    $autoSave->saveEntity($original_entity);
     $response = $this->request(Request::create($url->toString()));
     $this->assertResponseAutoSaves($response, [$original_entity], TRUE);
 
-    // Extract HTML from JSON response for title assertion
+    // Extract HTML from JSON response for title assertion.
     $expected_title = match(TRUE) {
       ContentTemplate::ENTITY_TYPE_ID === $entity_type && $this->previewEntity instanceof ContentEntityInterface => $this->previewEntity->label(),
       default => $original_entity->label(),
@@ -274,7 +275,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         "nodeType" => "component",
         "slots" => [],
-        "type" => "block.page_title_block@62af221149ae4887",
+        "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
         "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         'name' => NULL,
       ],
@@ -302,7 +303,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         "nodeType" => "component",
         "slots" => [],
-        "type" => "block.page_title_block@62af221149ae4887",
+        "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
         'name' => NULL,
       ],
     ],
@@ -313,10 +314,80 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // Test that saving the exact values as the stored/live node, no auto-saves
     // remain.
     $original_entity = $entity::load($entity->id());
-    assert($original_entity instanceof $entity);
+    \assert($original_entity instanceof $entity);
     $autoSave->saveEntity($original_entity);
     $response = $this->request(Request::create($url->toString()));
     $this->assertResponseAutoSaves($response, [$original_entity], TRUE);
+  }
+
+  /**
+   * Global regions are hidden when editing a content template for non-full view mode.
+   */
+  public function testNonFullContentTemplateHidesGlobalRegions(): void {
+    // Ensure the teaser view mode exists (node module provides it by default).
+    $view_mode = $this->container->get('entity_type.manager')
+      ->getStorage('entity_view_mode')
+      ->load('node.teaser');
+    if ($view_mode === NULL) {
+      EntityViewMode::create([
+        'id' => 'node.teaser',
+        'label' => 'Teaser',
+        'targetEntityType' => 'node',
+      ])->save();
+    }
+
+    ContentTemplate::create([
+      'id' => 'node.article.teaser',
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'teaser',
+      'component_tree' => [
+        [
+          'uuid' => 'e1f6fbca-e331-4506-9dba-5734194c1e59',
+          'component_id' => 'sdc.canvas_test_sdc.my-hero',
+          'component_version' => 'a681ae184a8f6b7f',
+          'inputs' => [
+            'heading' => 'Canvas is large and in charge!',
+            'subheading' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:article␝created␞␟value',
+              'adapter' => 'unix_to_date',
+            ],
+            'cta1' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
+            ],
+            'cta1href' => [
+              'sourceType' => PropSource::HostEntityUrl->value,
+            ],
+          ],
+        ],
+      ],
+    ])->save();
+
+    $this->previewEntity = Node::load(1);
+    self::assertInstanceOf(ContentEntityInterface::class, $this->previewEntity);
+    $entity = ContentTemplate::load('node.article.teaser');
+    self::assertInstanceOf(ContentTemplate::class, $entity);
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, PageRegion::ADMIN_PERMISSION]);
+    $this->enableGlobalRegions();
+
+    $url = $this->getLayoutUrl($entity);
+    $response = $this->request(Request::create($url->toString()));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+
+    $json = static::decodeResponse($response);
+    self::assertArrayHasKey('layout', $json);
+    self::assertCount(1, $json['layout'], 'Non-full content template must expose only the content region.');
+    self::assertSame(CanvasPageVariant::MAIN_CONTENT_REGION, $json['layout'][0]['id']);
+
+    $this->assertResponseAutoSaves($response, [$entity], FALSE);
+
+    self::assertArrayHasKey('html', $json);
+    $this->setRawContent($json['html']);
+    self::assertNotNull($this->getRegion('content'), 'Content region must be present in preview HTML.');
+    self::assertNull($this->getRegion('header'), 'Global regions must not appear in preview HTML for non-full view mode.');
+    self::assertNull($this->getRegion('highlighted'), 'Global regions must not appear in preview HTML for non-full view mode.');
   }
 
   protected function assertRegions(int $count, EntityInterface $entity): NodeInterface {
@@ -347,7 +418,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
             "nodeType" => "component",
             'name' => NULL,
             "slots" => [],
-            "type" => "block.page_title_block@62af221149ae4887",
+            // The component version may vary depending on upstream changes in
+            // core.
+            "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
           ],
         ],
           // Filter out the UUID as that is added randomly by creating the block
@@ -361,7 +434,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         $this->assertSame([
           [
             "nodeType" => "component",
-            "type" => "block.system_messages_block@b92f802cf68eb83e",
+            // The component version may vary depending on upstream changes in
+            // core.
+            "type" => "block.system_messages_block@" . Component::load('block.system_messages_block')?->getActiveVersion(),
             'name' => NULL,
             "slots" => [],
           ],
@@ -391,7 +466,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
                 [
                   'uuid' => CanvasTestSetup::UUID_STATIC_IMAGE,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+                  'type' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
                   'name' => NULL,
                   'slots' => [],
                 ],
@@ -445,9 +520,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
                   'slots' => [],
                 ],
                 [
-                  'uuid' => CanvasTestSetup::UUID_ADAPTED_IMAGE,
+                  'uuid' => CanvasTestSetup::UUID_STATIC_IMAGE2,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+                  'type' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
                   'name' => 'Magnificent image!',
                   'slots' => [],
                 ],
@@ -473,7 +548,6 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         'heading' => [
           'sourceType' => 'static:field_item:string',
           'expression' => 'ℹ︎string␟value',
-
         ],
         'cta1href' => [
           'sourceType' => 'static:field_item:link',
@@ -497,43 +571,134 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
   public function testStatusFlags(): void {
     $this->setUpCurrentUser(permissions: [Page::CREATE_PERMISSION, Page::EDIT_PERMISSION]);
 
-    $request = Request::create('/canvas/api/v0/content/canvas_page', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([], JSON_THROW_ON_ERROR));
+    $request = Request::create('/canvas/api/v0/content/canvas_page', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], json_encode(['clientInstanceId' => 'test-123'], JSON_THROW_ON_ERROR));
     $content = $this->parentRequest($request)->getContent();
 
     self::assertIsString($content);
     $entity_id = (int) json_decode($content, TRUE)['entity_id'];
     $entity = Page::load($entity_id);
     self::assertInstanceOf(Page::class, $entity);
-    $this->assertStatusFlags($entity, TRUE, FALSE);
+    $this->assertStatusFlags($entity, TRUE, FALSE, FALSE);
 
     $entity->set('title', 'Here we go')->save();
-    $this->assertStatusFlags($entity, FALSE, FALSE);
+    $this->assertStatusFlags($entity, FALSE, FALSE, FALSE);
 
     $entity->setPublished()->save();
-    $this->assertStatusFlags($entity, FALSE, TRUE);
+    $this->assertStatusFlags($entity, FALSE, TRUE, FALSE);
 
     $contentTemplate = $this->getTestEntity(ContentTemplate::ENTITY_TYPE_ID);
     \assert($contentTemplate instanceof ContentTemplate);
     self::assertFalse($contentTemplate->status());
     $this->setUpCurrentUser([], [self::getAdminPermission($contentTemplate)]);
-    $this->assertStatusFlags($contentTemplate, TRUE, NULL);
+    $this->assertStatusFlags($contentTemplate, TRUE, NULL, NULL);
 
     $contentTemplate->setStatus(TRUE)->save();
-    $this->assertStatusFlags($contentTemplate, FALSE, NULL);
+    $this->assertStatusFlags($contentTemplate, FALSE, NULL, NULL);
   }
 
-  private function assertStatusFlags(EntityInterface $entity, bool $isNew, ?bool $isPublished): void {
+  /**
+   * Tests hasUnsavedStatusChange flag for unpublish/publish operations.
+   */
+  public function testHasUnsavedStatusChange(): void {
+    $this->setUpCurrentUser(permissions: [Page::CREATE_PERMISSION, Page::EDIT_PERMISSION]);
+    $autoSaveManager = $this->container->get(AutoSaveManager::class);
+    \assert($autoSaveManager instanceof AutoSaveManager);
+
+    // Published page unpublished via auto-save.
+    $published_page = Page::create([
+      'title' => 'Published Page',
+      'status' => TRUE,
+    ]);
+    $published_page->save();
+    $this->assertStatusFlags($published_page, FALSE, TRUE, FALSE);
+
+    // Unpublish the published page via auto-save.
+    $published_page->setUnpublished();
+    $autoSaveManager->saveEntity($published_page);
+    // isNew=FALSE (not a draft), isPublished=FALSE (auto-saved unpublished),
+    // hasUnsavedStatusChange=TRUE (auto-save has different status than original).
+    $this->assertStatusFlags($published_page, FALSE, FALSE, TRUE);
+
+    // Reverting unpublish operation.
+    $published_page->setPublished();
+    $autoSaveManager->saveEntity($published_page);
+    // hasUnsavedStatusChange should be FALSE when auto-save matches original.
+    $this->assertStatusFlags($published_page, FALSE, TRUE, FALSE);
+
+    // Unpublished page (published then unpublished).
+    $unpublished_page = Page::create([
+      'title' => 'Unpublished Page',
+      'status' => TRUE,
+    ]);
+    $unpublished_page->save();
+    $unpublished_page->setNewRevision(TRUE);
+    $unpublished_page->setUnpublished();
+    $unpublished_page->save();
+    // Unpublished page without auto-save should not have unsaved status change.
+    $this->assertStatusFlags($unpublished_page, FALSE, FALSE, FALSE);
+
+    // Publishing unpublished page via auto-save.
+    $unpublished_page->setPublished();
+    $autoSaveManager->saveEntity($unpublished_page);
+    // isNew=FALSE (not a draft, was published before),
+    // isPublished=TRUE (auto-saved published),
+    // hasUnsavedStatusChange=TRUE (auto-save has different status than original).
+    $this->assertStatusFlags($unpublished_page, FALSE, TRUE, TRUE);
+
+    // Non-status field changes don't trigger hasUnsavedStatusChange.
+    $test_page = Page::create([
+      'title' => 'Test Page',
+      'status' => TRUE,
+    ]);
+    $test_page->save();
+    $this->assertStatusFlags($test_page, FALSE, TRUE, FALSE);
+
+    // Change only the title via auto-save (no status change).
+    $test_page->set('title', 'Updated Title');
+    $autoSaveManager->saveEntity($test_page);
+    // hasUnsavedStatusChange should still be FALSE.
+    $this->assertStatusFlags($test_page, FALSE, TRUE, FALSE);
+
+    // Clearing auto-save resets hasUnsavedStatusChange.
+    $test_page->setUnpublished();
+    $autoSaveManager->saveEntity($test_page);
+    $this->assertStatusFlags($test_page, FALSE, FALSE, TRUE);
+
+    $autoSaveManager->delete($test_page);
+    $this->assertStatusFlags($test_page, FALSE, TRUE, FALSE);
+
+    // Draft page with auto-saved published status.
+    $draft_page = Page::create([
+      'title' => self::NEW_PAGE_TITLE,
+      'status' => FALSE,
+    ]);
+    $draft_page->save();
+    $this->assertStatusFlags($draft_page, TRUE, FALSE, FALSE);
+
+    // Set published status in auto-save for draft.
+    $draft_page->setPublished();
+    $autoSaveManager->saveEntity($draft_page);
+    // isNew=TRUE (still a draft, never truly published),
+    // isPublished=TRUE (auto-saved published),
+    // hasUnsavedStatusChange=TRUE (auto-save has different status than original).
+    $this->assertStatusFlags($draft_page, TRUE, TRUE, TRUE);
+  }
+
+  private function assertStatusFlags(EntityInterface $entity, bool $isNew, ?bool $isPublished, ?bool $hasUnsavedStatusChange = NULL): void {
     $content = $this->parentRequest(Request::create($this->getLayoutUrl($entity)->toString()))->getContent();
     self::assertIsString($content);
     $json = json_decode($content, TRUE);
     self::assertSame($isNew, $json['isNew']);
     self::assertSame($isPublished, $json['isPublished'] ?? NULL);
+    if ($hasUnsavedStatusChange !== NULL) {
+      self::assertSame($hasUnsavedStatusChange, $json['hasUnsavedStatusChange'] ?? FALSE);
+    }
   }
 
   /**
    * Tests that auto-save entries with inaccessible fields do not cause errors.
    *
-   * @covers \Drupal\canvas\Controller\ApiLayoutController::buildPreviewRenderable
+   * @legacy-covers \Drupal\canvas\Controller\ApiLayoutController::buildPreviewRenderable
    */
   public function testInaccessibleFieldsInAutoSave(): void {
     // Create a node to work with.
@@ -546,12 +711,12 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // Set up the current user without access to path field.
     $authenticated_role = $this->createRole(['edit any article content']);
     $limited_user = $this->createUser([], NULL, FALSE, ['roles' => [$authenticated_role]]);
-    assert($limited_user instanceof User);
+    \assert($limited_user instanceof User);
     $this->setCurrentUser($limited_user);
 
     // Create an auto-save entry with a value for a field that the user doesn't have access to.
     $autoSave = $this->container->get(AutoSaveManager::class);
-    assert($autoSave instanceof AutoSaveManager);
+    \assert($autoSave instanceof AutoSaveManager);
 
     $node->set('path', ['alias' => '/test-path']);
     $autoSave->saveEntity($node);
@@ -653,9 +818,8 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
   /**
    * Tests field access for the Drupal Canvas API layout.
-   *
-   * @dataProvider fieldAccessProvider
    */
+  #[DataProvider('fieldAccessProvider')]
   public function testFieldAccess(array $permissions, ?string $exception_message): void {
     $this->container->get('module_installer')->install(['canvas_test_field_access']);
     $this->setUpCurrentUser([], $permissions);
@@ -670,15 +834,12 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
           'uuid' => CanvasTestSetup::UUID_COMPONENT_SDC,
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'Welcome to the site!',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => 'Welcome to the site!',
           ],
         ],
       ],
     ]);
+    self::assertSame([], self::violationsToArray($page->validate()));
     $page->save();
 
     $url = Url::fromRoute('canvas.api.layout.get', [
@@ -698,7 +859,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\Routing\ContentTemplatePreviewEntityConverter
+   * Tests preview entity validation.
+   *
+   * @legacy-covers \Drupal\canvas\Routing\ContentTemplatePreviewEntityConverter
    */
   public function testPreviewEntityValidation(): void {
     $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION]);

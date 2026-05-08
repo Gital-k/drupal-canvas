@@ -1,4 +1,5 @@
 /* cspell:ignore Mycomponentname HelloWorldexample */
+/* eslint-disable vitest/expect-expect */
 import { describe, expect, it } from 'vitest';
 import { parse } from '@babel/parser';
 import fixtureProps from '@tests/fixtures/code-component-props.json';
@@ -60,12 +61,10 @@ function matchDeserializedProps(received, propIndices) {
 
   // Compare the rest of the props by removing IDs first
   const actualWithoutIds = received.map((prop) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, ...rest } = prop;
     return rest;
   });
   const expectedWithoutIds = expected.map((prop) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, ...rest } = prop;
     return rest;
   });
@@ -151,6 +150,39 @@ describe('Code editor utilities', () => {
         'formattedTextWithExampleValue',
       ]);
     });
+
+    it('of type date', () => {
+      const result = serializeProps([
+        deserializedPropsFixture[24],
+        deserializedPropsFixture[25],
+      ]);
+      matchSerializedProps(result, [
+        'dateWithNoExampleValue',
+        'dateWithExampleValue',
+      ]);
+    });
+
+    it('of type dateTime', () => {
+      const result = serializeProps([
+        deserializedPropsFixture[26],
+        deserializedPropsFixture[27],
+      ]);
+      matchSerializedProps(result, [
+        'dateTimeWithNoExampleValue',
+        'dateTimeWithExampleValue',
+      ]);
+    });
+
+    it('of type video gallery (multi-value)', () => {
+      const result = serializeProps([
+        deserializedPropsFixture[28],
+        deserializedPropsFixture[29],
+      ]);
+      matchSerializedProps(result, [
+        'videoGalleryWithNoExampleValue',
+        'videoGalleryWithExampleValue',
+      ]);
+    });
   });
 
   describe('deserialize props', () => {
@@ -226,6 +258,14 @@ describe('Code editor utilities', () => {
       matchDeserializedProps(result, [22, 23]);
     });
 
+    it('of type video gallery (multi-value)', () => {
+      const result = deserializeProps([
+        serializedPropsFixture.videoGalleryWithNoExampleValue,
+        serializedPropsFixture.videoGalleryWithExampleValue,
+      ]);
+      matchDeserializedProps(result, [28, 29]);
+    });
+
     it('of type link', () => {
       const result = deserializeProps([
         serializedPropsFixture.relativePathLinkWithNoExampleValue,
@@ -234,6 +274,124 @@ describe('Code editor utilities', () => {
         serializedPropsFixture.fullUrlLinkWithExampleValue,
       ]);
       matchDeserializedProps(result, [16, 17, 18, 19]);
+    });
+
+    it('of type date', () => {
+      const result = deserializeProps([
+        serializedPropsFixture.dateWithNoExampleValue,
+        serializedPropsFixture.dateWithExampleValue,
+      ]);
+      matchDeserializedProps(result, [24, 25]);
+    });
+
+    it('of type dateTime', () => {
+      const result = deserializeProps([
+        serializedPropsFixture.dateTimeWithNoExampleValue,
+        serializedPropsFixture.dateTimeWithExampleValue,
+      ]);
+      matchDeserializedProps(result, [26, 27]);
+    });
+
+    describe('backwards compatibility: clears stale formattedText fields on type switch', () => {
+      // Before the fix in https://www.drupal.org/i/3583386, switching away from
+      // 'formattedText' did not clear contentMediaType / x-formatting-context.
+      // Those stale fields were saved to config and caused props to incorrectly
+      // re-derive as 'formattedText' on reload. The tests below verify that
+      // deserializeProps repairs that corrupted data.
+      it.each([
+        {
+          label: 'date (format: date)',
+          serialized: {
+            title: 'Publish Date',
+            type: 'string',
+            format: 'date',
+            contentMediaType: 'text/html',
+            'x-formatting-context': 'block',
+          },
+          expectedDerivedType: 'date',
+          expectedFormat: 'date',
+        },
+        {
+          label: 'date (format: date-time)',
+          serialized: {
+            title: 'Created At',
+            type: 'string',
+            format: 'date-time',
+            contentMediaType: 'text/html',
+            'x-formatting-context': 'block',
+          },
+          expectedDerivedType: 'date',
+          expectedFormat: 'date-time',
+        },
+        {
+          label: 'link (format: uri-reference)',
+          serialized: {
+            title: 'Homepage',
+            type: 'string',
+            format: 'uri-reference',
+            contentMediaType: 'text/html',
+            'x-formatting-context': 'block',
+          },
+          expectedDerivedType: 'link',
+          expectedFormat: 'uri-reference',
+        },
+        {
+          label: 'link (format: uri)',
+          serialized: {
+            title: 'External Link',
+            type: 'string',
+            format: 'uri',
+            contentMediaType: 'text/html',
+            'x-formatting-context': 'block',
+          },
+          expectedDerivedType: 'link',
+          expectedFormat: 'uri',
+        },
+        {
+          label: 'list: text (non-empty enum)',
+          serialized: {
+            title: 'Status',
+            type: 'string',
+            enum: ['active', 'inactive'],
+            'meta:enum': { active: 'Active', inactive: 'Inactive' },
+            contentMediaType: 'text/html',
+            'x-formatting-context': 'block',
+          },
+          expectedDerivedType: 'listText',
+          expectedFormat: undefined,
+        },
+      ])('$label', ({ serialized, expectedDerivedType, expectedFormat }) => {
+        const [result] = deserializeProps([serialized]);
+
+        expect(result.derivedType).toBe(expectedDerivedType);
+        expect(result.contentMediaType).toBeUndefined();
+        expect(result['x-formatting-context']).toBeUndefined();
+        if (expectedFormat) {
+          expect(result.format).toBe(expectedFormat);
+        }
+      });
+
+      it('multi-value prop: clears stale fields from items and re-derives correctly', () => {
+        const [result] = deserializeProps([
+          {
+            title: 'Event Dates',
+            type: 'array',
+            items: {
+              type: 'string',
+              format: 'date',
+              contentMediaType: 'text/html',
+              'x-formatting-context': 'block',
+            },
+          },
+        ]);
+
+        expect(result.derivedType).toBe('date');
+        expect(result.contentMediaType).toBeUndefined();
+        expect(result['x-formatting-context']).toBeUndefined();
+        expect(result.items?.contentMediaType).toBeUndefined();
+        expect(result.items?.['x-formatting-context']).toBeUndefined();
+        expect(result.items?.format).toBe('date');
+      });
     });
   });
 
@@ -298,6 +456,21 @@ describe('Code editor preview utilities', () => {
         src: '/modules/contrib/canvas/ui/assets/videos/mountain_wide.mp4',
         poster: 'https://placehold.co/1920x1080.png?text=Horizontal',
       },
+      dateWithNoExampleValue: '',
+      dateWithExampleValue: '2026-01-15',
+      dateTimeWithNoExampleValue: '',
+      dateTimeWithExampleValue: '2026-01-15T12:34:56.789Z',
+      videoGalleryWithNoExampleValue: [],
+      videoGalleryWithExampleValue: [
+        {
+          src: '/modules/contrib/canvas/ui/assets/videos/mountain_wide.mp4',
+          poster: 'https://placehold.co/1920x1080.png?text=Widescreen',
+        },
+        {
+          src: '/modules/contrib/canvas/ui/assets/videos/bird_vertical.mp4',
+          poster: 'https://placehold.co/1080x1920.png?text=Vertical',
+        },
+      ],
     });
   });
 
@@ -376,6 +549,7 @@ describe('getDataDependenciesFromAst', () => {
         'v0.branding',
         'v0.breadcrumbs',
         'v0.pageTitle',
+        'v0.mainEntity',
       ],
     });
   });

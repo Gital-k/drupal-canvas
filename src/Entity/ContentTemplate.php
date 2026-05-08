@@ -70,8 +70,6 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 )]
 final class ContentTemplate extends ComponentTreeConfigEntityBase implements CanvasHttpApiEligibleConfigEntityInterface, EntityViewDisplayInterface, AutoSavePublishAwareInterface {
 
-  use ConfigUpdaterAwareEntityTrait;
-
   public const string ENTITY_TYPE_ID = 'content_template';
 
   public const string ADMIN_PERMISSION = 'administer content templates';
@@ -152,7 +150,6 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   public function preSave(EntityStorageInterface $storage): void {
     $this->id = $this->id();
     parent::preSave($storage);
-    self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
     if ($this->isSyncing() && self::getConfigUpdater()->needsIntermediateDependenciesComponentUpdate($this)) {
       // We might need to update dependencies even on import.
       // @see \canvas_post_update_0002_intermediate_component_dependencies_in_content_templates()
@@ -166,7 +163,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   public function label(): TranslatableMarkup {
     $entity_type = $this->entityTypeManager()
       ->getDefinition($this->getTargetEntityTypeId());
-    assert($entity_type instanceof EntityTypeInterface);
+    \assert($entity_type instanceof EntityTypeInterface);
 
     $bundle_info = \Drupal::service(EntityTypeBundleInfoInterface::class)
       ->getBundleInfo($entity_type->id());
@@ -195,7 +192,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     $view_mode = $this->entityTypeManager()
       ->getStorage('entity_view_mode')
       ->load($this->getTargetEntityTypeId() . '.' . $this->getMode());
-    assert($view_mode instanceof EntityViewModeInterface);
+    \assert($view_mode instanceof EntityViewModeInterface);
     return $view_mode;
   }
 
@@ -227,7 +224,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
    * {@inheritdoc}
    */
   public function getComponentTree(?FieldableEntityInterface $parent = NULL): ComponentTreeItemList {
-    $item = $this->createDanglingComponentTreeItemList($parent);
+    $item = $this->createDanglingComponentTreeItemList($parent ?? $this);
     $item->setValue(\array_values($this->component_tree ?? []));
     return $item;
   }
@@ -304,14 +301,14 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     $entity_type_manager = \Drupal::entityTypeManager();
     $storage = $entity_type_manager->getStorage($this->getTargetEntityTypeId());
     $content_entity_type = $entity_type_manager->getDefinition($this->getTargetEntityTypeId());
-    assert($content_entity_type instanceof ContentEntityTypeInterface);
+    \assert($content_entity_type instanceof ContentEntityTypeInterface);
 
     $empty_target_entity = $content_entity_type->hasKey('bundle')
       ? $storage->create([
         $content_entity_type->getKey('bundle') => $this->getTargetBundle(),
       ])
       : $storage->create();
-    assert($empty_target_entity instanceof FieldableEntityInterface);
+    \assert($empty_target_entity instanceof FieldableEntityInterface);
 
     return $empty_target_entity;
   }
@@ -362,7 +359,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
 
     // @todo Prior to supporting multiple exposed slots, https://www.drupal.org/i/3526189
     //   must be investigated and a decision needs to be made.
-    assert(count($this->getExposedSlots()) === 1);
+    \assert(count($this->getExposedSlots()) === 1);
     $canvas_field_name = \Drupal::service(ComponentTreeLoader::class)
       ->getCanvasFieldName($entity);
     $sub_tree_item_list = $entity->get($canvas_field_name);
@@ -376,7 +373,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
    * {@inheritdoc}
    */
   public function buildMultiple(array $entities): array {
-    return array_map($this->build(...), $entities);
+    return \array_map($this->build(...), $entities);
   }
 
   /**
@@ -417,17 +414,6 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   /**
    * {@inheritdoc}
    */
-  public function set($property_name, $value): self {
-    if ($property_name === 'component_tree') {
-      // Ensure predictable order of tree items.
-      $value = self::generateComponentTreeKeys($value);
-    }
-    return parent::set($property_name, $value);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function autoSavePublish(): self {
     $this->setStatus(TRUE);
     return $this;
@@ -435,6 +421,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
 
   public function normalizeForClientSide(): ClientSideRepresentation {
     $entity_type_manager = $this->entityTypeManager();
+    \assert(\is_string($this->content_entity_type_id));
     $content_entity_type = $entity_type_manager->getDefinition($this->content_entity_type_id);
     $storage = $entity_type_manager->getStorage($this->getTargetEntityTypeId());
 
@@ -501,21 +488,16 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     $entity_definition = $entity_type_manager->getDefinition($entity_type_id);
 
     $id_key = $entity_definition->getKey('id');
-    assert(is_string($id_key));
+    \assert(\is_string($id_key));
     $entity_query = $entity_type_manager->getStorage($entity_type_id)->getQuery()
       ->accessCheck(TRUE)
       ->range(0, $limit);
     if ($entity_definition->hasKey('bundle')) {
       $bundle_key = $entity_definition->getKey('bundle');
-      assert(is_string($bundle_key));
+      \assert(\is_string($bundle_key));
       $entity_query->condition($bundle_key, $bundle);
     }
-    // @todo Remove conditionality in https://www.drupal.org/i/3498525
-    if ($entity_definition->hasKey('published')) {
-      $published_key = $entity_definition->getKey('published');
-      assert(is_string($published_key));
-      $entity_query->condition($published_key, TRUE);
-    }
+
     // @todo Remove conditionality in https://www.drupal.org/i/3498525
     if ($entity_definition->entityClassImplements(EntityChangedInterface::class)) {
       $entity_query->sort('changed', 'DESC');
@@ -527,7 +509,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   }
 
   private function getSuggestedPreviewEntity(): ?ContentEntityInterface {
-    assert($this->content_entity_type_id !== NULL);
+    \assert($this->content_entity_type_id !== NULL);
 
     $query = self::getPreviewSuggestionQuery(
       $this->getTargetEntityTypeId(),
@@ -535,7 +517,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       1
     );
     $results = $query->execute();
-    assert(is_array($results));
+    \assert(\is_array($results));
 
     if (empty($results)) {
       return NULL;
@@ -544,7 +526,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     $entity = $this->entityTypeManager()
       ->getStorage($this->getTargetEntityTypeId())
       ->load(reset($results));
-    assert($entity instanceof ContentEntityInterface);
+    \assert($entity instanceof ContentEntityInterface);
     return $entity;
   }
 

@@ -10,7 +10,6 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\Core\Plugin\ContextAwarePluginTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
 use Drupal\canvas\Attribute\ComponentSource;
@@ -55,7 +54,6 @@ final class Personalization extends ComponentSourceBase implements
   ComponentSourceWithSwitchCasesInterface,
   ContainerFactoryPluginInterface {
 
-  use ContextAwarePluginTrait;
   use ConstraintPropertyPathTranslatorTrait;
 
   public const string SOURCE_PLUGIN_ID = 'p13n';
@@ -69,7 +67,7 @@ final class Personalization extends ComponentSourceBase implements
     array $plugin_definition,
     private readonly BasicRecursiveValidatorFactory $validatorFactory,
   ) {
-    assert(array_key_exists('local_source_id', $configuration));
+    \assert(\array_key_exists('local_source_id', $configuration));
     parent::__construct($configuration, $plugin_id, $plugin_definition);
   }
 
@@ -163,9 +161,9 @@ final class Personalization extends ComponentSourceBase implements
     // @todo Evaluate this `case` component instance's `segments` explicit input against the given contexts (aka from the Drupal context system), and remove this hardcoded logic in https://www.drupal.org/project/canvas/issues/3525797
     // @phpstan-ignore-next-line globalDrupalDependencyInjection.useDependencyInjection
     if (str_contains(\Drupal::request()->getRequestUri(), 'HALLOWEEN')) {
-      return in_array('halloween', $inputs['segments']);
+      return \in_array('halloween', $inputs['segments'], TRUE);
     }
-    return in_array(Segment::DEFAULT_ID, $inputs['segments']);
+    return \in_array(Segment::DEFAULT_ID, $inputs['segments'], TRUE);
   }
 
   public function requiresExplicitInput(): bool {
@@ -184,13 +182,13 @@ final class Personalization extends ComponentSourceBase implements
     }
   }
 
-  public function hydrateComponent(array $explicit_input, array $slot_definitions): array {
+  public function hydrateComponent(array $explicit_input, array $slot_definitions, array $active_required_explicit_inputs): array {
     $hydrated = $explicit_input;
     // Set the slots.
     if (!empty($slot_definitions)) {
       // Use the first example defined in the components metadata, which we
       // guarantee it exists.
-      $hydrated['slots'] = array_map(fn($slot) => $slot['examples'][0], $slot_definitions);
+      $hydrated['slots'] = \array_map(fn($slot) => $slot['examples'][0], $slot_definitions);
     }
     return $hydrated;
   }
@@ -235,7 +233,7 @@ final class Personalization extends ComponentSourceBase implements
     $segment_id_constraints = new Sequentially([
       new Type('string'),
       new NotBlank(),
-      new ConfigExistsConstraint(['prefix' => sprintf('canvas_personalization.%s.', Segment::ENTITY_TYPE_ID)]),
+      new ConfigExistsConstraint(['prefix' => \sprintf('canvas_personalization.%s.', Segment::ENTITY_TYPE_ID)]),
     ]);
 
     $component_constraints = match ($this->getType()) {
@@ -286,7 +284,7 @@ final class Personalization extends ComponentSourceBase implements
    * @return PersonalizationInputArray
    * @phpstan-ignore-next-line method.childReturnType
    */
-  public function getDefaultExplicitInput(): array {
+  public function getDefaultExplicitInput(bool $only_required = FALSE): array {
     return match($this->getType()) {
       self::SWITCH => [
         'variants' => [Segment::DEFAULT_ID],
@@ -399,7 +397,7 @@ final class Personalization extends ComponentSourceBase implements
 
   public function setSlots(array &$build, array $slots): void {
     // @see ::getSlotDefinitions()
-    assert(array_keys($slots) === ['content']);
+    \assert(\array_keys($slots) === ['content']);
     $build += $slots;
   }
 

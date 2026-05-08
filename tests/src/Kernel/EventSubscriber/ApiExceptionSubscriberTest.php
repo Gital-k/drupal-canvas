@@ -4,36 +4,31 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\EventSubscriber;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\Routing\RouteMatch;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\canvas\EventSubscriber\ApiExceptionSubscriber;
 use Drupal\Tests\canvas\Doubles\TestVerboseException;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\user\Entity\User;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Routing\Route;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
+ * Tests Api Exception Subscriber.
  */
-class ApiExceptionSubscriberTest extends KernelTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'canvas',
-    'system',
-    'user',
-  ];
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+class ApiExceptionSubscriberTest extends CanvasKernelTestBase {
 
   /**
    * Tests the response for an HTTP 500 error.
-   *
-   * @dataProvider providerTest500Response
    */
+  #[DataProvider('providerTest500Response')]
   public function test500Response(string $exception_class, array $exception_arguments, string $expected_message): void {
     $sut = new ApiExceptionSubscriber(
       new RouteMatch('canvas.api.test', new Route('/test-path')),
@@ -56,9 +51,9 @@ class ApiExceptionSubscriberTest extends KernelTestBase {
 
     // Assert on the response.
     $response = $event->getResponse();
-    assert($response instanceof Response);
+    \assert($response instanceof Response);
     $content = $response->getContent();
-    assert(is_string($content));
+    \assert(\is_string($content));
     $content = json_decode($content, TRUE, 512, JSON_THROW_ON_ERROR);
     self::assertEquals(500, $response->getStatusCode(), 'Response status code is 500.');
     self::assertArrayHasKey('message', $content, 'Response contains correct message.');

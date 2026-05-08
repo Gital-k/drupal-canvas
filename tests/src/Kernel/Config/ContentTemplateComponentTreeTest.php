@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use Drupal\canvas\Entity\PageRegion;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests the component tree aspects of the ContentTemplate config entity type.
- *
- * @group canvas
- * @coversDefaultClass \Drupal\canvas\Entity\PageRegion
  */
+#[RunTestsInSeparateProcesses]
+#[CoversClass(PageRegion::class)]
+#[Group('canvas')]
+#[Group('canvas_config_management')]
 final class ContentTemplateComponentTreeTest extends ConfigWithComponentTreeTestBase {
 
   use ContentTypeCreationTrait;
@@ -31,16 +36,10 @@ final class ContentTemplateComponentTreeTest extends ConfigWithComponentTreeTest
   /**
    * {@inheritdoc}
    */
-  protected static $expectedViolations = [];
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('node');
     $this->installConfig('node');
-    $this->installConfig('canvas');
     $this->createContentType(['type' => 'alpha']);
     FieldStorageConfig::create([
       'field_name' => 'field_test',

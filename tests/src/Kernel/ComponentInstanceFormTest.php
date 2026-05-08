@@ -4,35 +4,46 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Form\ComponentInstanceForm;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\Core\Form\FormState;
 use Drupal\Core\Url;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
+use Drupal\Tests\system\Functional\Form\StubForm;
+use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\DomCrawler\Crawler;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * @coversClass \Drupal\canvas\Form\ComponentInstanceForm
- * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildConfigurationForm()
- * @group canvas
+ * Tests Component Instance Form.
+ *
+ * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildComponentInstanceForm
+ * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetCompleteFormAlter
  */
+#[CoversClass(ComponentInstanceForm::class)]
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
 
   use CiModulePathTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use NodeCreationTrait;
 
   /**
@@ -44,6 +55,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $this->container->get('module_installer')->install(['system', 'canvas_test_sdc', 'canvas_test_block']);
     $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
 
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
     $this->setUpCurrentUser(permissions: ['edit any article content', 'administer themes', Page::EDIT_PERMISSION]);
   }
@@ -68,8 +80,8 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
   #[DataProvider('providerOptionalImages')]
   public function testOptionalImageAndHeading(string $component, array $values_to_set, array $expected_form_canvas_props): void {
     $actual_form_canvas_props = $this->getFormCanvasPropsForComponent($component);
-    foreach (array_keys($actual_form_canvas_props['resolved']) as $sdc_prop_name) {
-      if (array_key_exists($sdc_prop_name, $values_to_set)) {
+    foreach (\array_keys($actual_form_canvas_props['resolved']) as $sdc_prop_name) {
+      if (\array_key_exists($sdc_prop_name, $values_to_set)) {
         $actual_form_canvas_props['resolved'][$sdc_prop_name] = $values_to_set[$sdc_prop_name]['resolved'];
         $actual_form_canvas_props['source'][$sdc_prop_name]['value'] = $values_to_set[$sdc_prop_name]['source'];
       }
@@ -94,7 +106,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'image' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -130,7 +142,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'image' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -171,7 +183,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'image' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -221,7 +233,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'images' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -277,7 +289,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'images' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -296,23 +308,25 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
   }
 
   private static function findSuggestionByLabel(string|array $label, string $prop, array $suggestions): array {
-    $is_final_level = is_string($label) || count($label) === 1;
-    $needle = is_array($label) ? reset($label) : $label;
+    $is_final_level = \is_string($label) || count($label) === 1;
+    $needle = \is_array($label) ? reset($label) : $label;
     // When recursing, the $prop key won't exist.
-    $haystack = array_key_exists($prop, $suggestions) ? $suggestions[$prop] : $suggestions;
-    assert(array_is_list($haystack));
+    $haystack = \array_key_exists($prop, $suggestions) ? $suggestions[$prop] : $suggestions;
+    \assert(array_is_list($haystack));
     foreach ($haystack as $suggestion) {
       if ($suggestion['label'] === $needle) {
         if ($is_final_level) {
-          assert(array_key_exists('id', $suggestion));
-          assert(array_key_exists('source', $suggestion));
-          assert(array_key_exists('label', $suggestion));
+          \assert(\array_key_exists('id', $suggestion));
+          \assert(\array_key_exists('source', $suggestion));
+          \assert(\array_key_exists('label', $suggestion));
           return $suggestion;
         }
+        \assert(\is_array($label));
+        \assert(\array_key_exists('items', $suggestion) && \is_array($suggestion['items']));
         return self::findSuggestionByLabel(array_slice($label, 1), $prop, $suggestion['items']);
       }
     }
-    throw new \LogicException(sprintf('No suggestion found for prop %s with label %s', $prop, $needle));
+    throw new \LogicException(\sprintf('No suggestion found for prop %s with label %s', $prop, $needle));
   }
 
   public function testDynamicProps(): void {
@@ -353,11 +367,11 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     )->toString();
 
     $crawler = $this->getCrawlerForFormRequest($form_url, $component_entity, $form_canvas_props);
-    // Confirm the `heading` and `subheading` props are not yet linked to DynamicPropSources.
+    // Confirm the `heading` and `subheading` props are not yet linked to EntityFieldPropSources.
     self::assertCount(0, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-heading-"]'));
     self::assertCount(0, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-subheading-"]'));
 
-    // Second request: with a valid expression in DynamicPropSource.
+    // Second request: with a valid expression in EntityFieldPropSource.
     // 💡 These are the ones provided by the API response at the start of the
     // test (…/suggestions/prop-sources/…).
     $form_canvas_props['source']['heading'] = self::findSuggestionByLabel('Title', 'heading', $fieldSuggestions)['source'];
@@ -373,10 +387,12 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     self::assertNull(Evaluator::evaluate($node, expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['subheading']['expression']), is_required: FALSE)->value);
     $crawler = $this->getCrawlerForFormRequest($form_url, $component_entity, $form_canvas_props);
     // Confirm the linked prop fields are rendered.
-    self::assertCount(2, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-heading-"]'));
-    self::assertCount(2, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-subheading-"]'));
+    self::assertCount(1, $crawler->filter('.canvas-linked-prop-label-wrapper[data-drupal-selector*="-heading-"]'));
+    self::assertCount(1, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-heading-"]'));
+    self::assertCount(1, $crawler->filter('.canvas-linked-prop-label-wrapper[data-drupal-selector*="-subheading-"]'));
+    self::assertCount(1, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-subheading-"]'));
 
-    // Third request: with an invalid expression in DynamicPropSource.
+    // Third request: with an invalid expression in EntityFieldPropSource.
     // ⚠️ This cannot happen in the UI, but component trees could be manipulated
     // outside the UI. This shows what would happen when editing such
     // out-of-band manipulated component trees in the Canvas UI.
@@ -499,6 +515,62 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     self::assertSame('Component is missing. Fix the component or copy values to a new component. Previously stored input []', $response->text());
   }
 
+  /**
+   * Tests that the `multiple` flag is injected into every transform entry.
+   *
+   * The PHP side reads cardinality from `$static_prop_source_field_definition`
+   * and spreads `'multiple' => true/false` into each transform in the chain
+   * via array_map(). This test verifies that the JSON response carries the
+   * correct value for both a multi-cardinality prop (image-gallery, unlimited)
+   * and a single-cardinality prop (image-gallery-nonsensical, maxItems=1).
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildComponentInstanceForm()
+   */
+  public function testTransformsMultipleFlagReflectsCardinality(): void {
+    $node = $this->createNode(['type' => 'article', 'title' => 'Test node']);
+    $node->save();
+
+    $unlimited_component_id = 'sdc.canvas_test_sdc.image-gallery';
+    $form_canvas_props = $this->getFormCanvasPropsForComponent($unlimited_component_id);
+    $unlimited_component = Component::load($unlimited_component_id);
+    \assert($unlimited_component instanceof ComponentInterface);
+    $json = self::decodeResponse($this->request(Request::create(
+      '/canvas/api/v0/form/component-instance/node/' . $node->id(),
+      'PATCH',
+      [
+        'form_canvas_tree' => json_encode([
+          'nodeType' => 'component',
+          'slots' => [],
+          'type' => "{$unlimited_component_id}@{$unlimited_component->getActiveVersion()}",
+          'uuid' => '5f18db31-fa2f-4f4e-a377-dc0c6a0b7dc4',
+        ], JSON_THROW_ON_ERROR),
+        'form_canvas_props' => json_encode($form_canvas_props, JSON_THROW_ON_ERROR),
+        'form_canvas_selected' => '5f18db31-fa2f-4f4e-a377-dc0c6a0b7dc4',
+      ],
+    )));
+
+    self::assertArrayHasKey('transforms', $json);
+    self::assertSame([
+      'caption' => [
+        'mainProperty' => [
+          'multiple' => FALSE,
+        ],
+      ],
+      'images' => [
+        'mediaSelection' => [
+          'multiple' => TRUE,
+        ],
+        'mainProperty' => [
+          'name' => 'target_id',
+          'multiple' => TRUE,
+        ],
+      ],
+    ],
+      $json['transforms']
+    );
+
+  }
+
   private function getCrawlerForFormRequest(string $form_url, ComponentInterface $component_entity, ?array $form_canvas_props): Crawler {
     // `$form_canvas_props` is nullable, so we can simulate the request having
     // `undefined` as value, which happens when the inputs are empty on a
@@ -549,6 +621,48 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
       ]));
     }
     return $form_canvas_props;
+  }
+
+  /**
+   * Tests media_library_widget component prop name behavior.
+   *
+   * When a media library widget is rendered inside ComponentInstanceForm,
+   * #component_prop_name must be set so that the DefaultImagePreview React
+   * component can identify which prop to manage and enable "Remove default"
+   * for optional image props. When rendered outside ComponentInstanceForm,
+   * #component_prop_name must NOT be set.
+   *
+   * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetCompleteFormAlter
+   */
+  public function testMediaLibraryWidgetSetsComponentPropName(): void {
+    $prop_shape_repository = $this->container->get(PropShapeRepositoryInterface::class);
+    $image_prop_shape = JsonSchemaObjectRef::Image->asPropShape();
+    $storable_prop_shape = $prop_shape_repository->getStorablePropShape($image_prop_shape);
+    $this->assertNotNull($storable_prop_shape, 'Expected a storable prop shape for the image prop shape.');
+    $this->assertSame('media_library_widget', $storable_prop_shape->fieldWidget);
+
+    $prop_source = $storable_prop_shape->toStaticPropSource();
+    $widget = $prop_source->getWidget('irrelevant-for-this-test', 'irrelevant-for-this-test', 'some-prop-name', $this->randomString(), $storable_prop_shape->fieldWidget);
+
+    // When the widget is rendered outside the ComponentInstanceForm, e.g. in a
+    // generic form, #component_prop_name must NOT be set.
+    // @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetCompleteFormAlter()
+    $form = ['#parents' => [$this->randomMachineName()]];
+    $form_state = new FormState();
+    $form_state->setFormObject(new StubForm('some_other_form_id', $form));
+    $rendered_form = $prop_source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, 'some-prop-name', FALSE, User::create([]), $form, $form_state);
+    $this->assertArrayNotHasKey('#component_prop_name', $rendered_form);
+
+    // When the same widget is rendered inside the ComponentInstanceForm,
+    // #component_prop_name MUST be set.
+    // Get a widget whose field definition name is 'some-prop-name', so the
+    // hook sets #component_prop_name to 'some-prop-name'.
+    $widget_for_ci = $prop_source->getWidget('irrelevant-for-this-test', 'irrelevant-for-this-test', 'some-prop-name', $this->randomString(), $storable_prop_shape->fieldWidget);
+    $form_ci = ['#parents' => [$this->randomMachineName()]];
+    $form_state_ci = new FormState();
+    $form_state_ci->setFormObject(new StubForm(ComponentInstanceForm::FORM_ID, $form_ci));
+    $rendered_form_ci = $prop_source->formTemporaryRemoveThisExclamationExclamationExclamation($widget_for_ci, 'some-prop-name', FALSE, User::create([]), $form_ci, $form_state_ci);
+    $this->assertSame('some-prop-name', $rendered_form_ci['#component_prop_name']);
   }
 
 }

@@ -9,7 +9,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
@@ -50,7 +50,6 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
   public const string ENTITY_TYPE_ID = 'page_region';
   public const string ADMIN_PERMISSION = 'administer page template';
   use ClientServerConversionTrait;
-  use ConfigUpdaterAwareEntityTrait;
 
   /**
    * ID, composed of theme + region.
@@ -73,9 +72,9 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
    * {@inheritdoc}
    */
   public function __construct(array $values, $entity_type) {
-    $non_existent_properties = array_keys(array_diff_key($values, get_class_vars(__CLASS__)));
+    $non_existent_properties = \array_keys(array_diff_key($values, get_class_vars(__CLASS__)));
     if (!empty($non_existent_properties)) {
-      throw new \LogicException(sprintf(
+      throw new \LogicException(\sprintf(
         'Trying to set non-existent config entity properties: %s.',
         implode(', ', $non_existent_properties),
       ));
@@ -87,7 +86,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
    * {@inheritdoc}
    */
   public function label(): TranslatableMarkup {
-    assert(is_string($this->theme));
+    \assert(\is_string($this->theme));
     $regions = system_region_list($this->theme);
     return new TranslatableMarkup('@region region', [
       '@region' => $regions[$this->get('region')],
@@ -133,9 +132,9 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
    * {@inheritdoc}
    */
   public function getComponentTree(): ComponentTreeItemList {
-    assert(is_array($this->component_tree));
+    \assert(\is_array($this->component_tree));
 
-    $field_items = $this->createDanglingComponentTreeItemList();
+    $field_items = $this->createDanglingComponentTreeItemList($this);
     $field_items->setValue(\array_values($this->component_tree ?? []));
 
     return $field_items;
@@ -180,7 +179,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
   public static function loadForActiveThemeByClientSideId(): array {
     $regions = self::loadForActiveTheme();
     return array_combine(
-      array_map(fn(PageRegion $r) => $r->get('region'), $regions),
+      \array_map(fn(PageRegion $r) => $r->get('region'), $regions),
       $regions,
     );
   }
@@ -201,7 +200,6 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
       throw new \LogicException('Attempted to save a PageRegion targeting the main content region, which is not allowed. (This means it bypassed validation.)');
     }
     parent::preSave($storage);
-    self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
     if ($this->isSyncing() && self::getConfigUpdater()->needsIntermediateDependenciesComponentUpdate($this)) {
       // We might need to update dependencies even on import.
       // @see \canvas_post_update_0002_intermediate_component_dependencies_in_page_regions()
@@ -224,16 +222,20 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
   public static function createFromBlockLayout(string $theme): array {
     $theme_info = \Drupal::service('theme_handler')->getTheme($theme);
     $region_names = array_filter(
-      array_keys($theme_info->info['regions']),
+      \array_keys($theme_info->info['regions']),
       // No PageRegion config entity is allowed for the `content` region.
       fn ($s) => $s !== CanvasPageVariant::MAIN_CONTENT_REGION,
     );
 
-    $blocks = \Drupal::service('entity_type.manager')->getStorage('block')->loadByProperties(['theme' => $theme]);
+    $blocks = \Drupal::service('entity_type.manager')->getStorage('block')
+      ->loadByProperties([
+        'theme' => $theme,
+        'status' => TRUE,
+      ]);
 
     $regions = [];
     foreach ($blocks as $block) {
-      $component_id = BlockComponent::componentIdFromBlockPluginId($block->getPluginId());
+      $component_id = BlockComponentDiscovery::getComponentConfigEntityId($block->getPluginId());
       if (!Component::load($component_id)) {
         // This block isn't supported by Canvas.
         // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::checkRequirements()
@@ -262,7 +264,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
     foreach ($region_names as $region_name) {
       $items = [];
       if (isset($regions[$region_name])) {
-        $items = array_map(
+        $items = \array_map(
           static fn(array $block) => \array_intersect_key($block, \array_flip([
             'component_id',
             'component_version',
@@ -277,22 +279,11 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
         'region' => $region_name,
         'component_tree' => $items,
       ]);
-      assert([] === iterator_to_array($page_region->getTypedData()->validate()));
+      \assert([] === iterator_to_array($page_region->getTypedData()->validate()));
       $region_instances[$page_region->id()] = $page_region;
     }
 
     return $region_instances;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function set($property_name, $value): self {
-    if ($property_name === 'component_tree') {
-      // Ensure predictable order of tree items.
-      $value = self::generateComponentTreeKeys($value);
-    }
-    return parent::set($property_name, $value);
   }
 
 }

@@ -1,10 +1,12 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
+import clsx from 'clsx';
 import { useParams } from 'react-router';
 import { useLocation } from 'react-router-dom';
+import BrandKitIcon from '@assets/icons/brand-kit.svg?react';
 import ExtensionIcon from '@assets/icons/extension-sm.svg?react';
 import TemplateIcon from '@assets/icons/template.svg?react';
 import {
-  Component1Icon,
+  CodeIcon,
   FileTextIcon,
   LayersIcon,
   PlusIcon,
@@ -17,6 +19,7 @@ import {
   setActivePanel,
   unsetActivePanel,
 } from '@/features/ui/primaryPanelSlice';
+import { getCanvasSettings } from '@/utils/drupal-globals';
 import { hasPermission } from '@/utils/permissions';
 
 import styles from './SideMenu.module.css';
@@ -47,26 +50,14 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
   }
   const hasExtensions =
     drupalSettings.canvas.extensionsAvailable || hasLegacyExtensions;
+  const dispatch = useAppDispatch();
+
   const { pathname } = useLocation();
   const params = useParams();
   const segments = pathname.split('/').filter(Boolean); // removes empty strings
-
   const hasActiveEditorFrame =
     (segments.includes('editor') && params.entityId !== undefined) ||
     (segments.includes('template') && params.previewEntityId !== undefined);
-
-  const dispatch = useAppDispatch();
-
-  useEffect(() => {
-    // This use effect is a safeguard to ensure that the layers and library panels won't be shown when the editorFrame isn't loaded.
-    // If there is nothing being edited then the layers and library panels are not available so close the panel.
-    if (
-      !hasActiveEditorFrame &&
-      (activePanel === 'layers' || activePanel === 'library')
-    ) {
-      dispatch(unsetActivePanel());
-    }
-  }, [activePanel, dispatch, hasActiveEditorFrame]);
 
   const handleMenuClick = useCallback(
     (panelId: string) => {
@@ -84,26 +75,27 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       type: 'button',
       id: 'library',
       icon: <PlusIcon />,
-      label: 'Add',
+      label: 'Library',
       enabled: true,
-      hidden: !hasActiveEditorFrame,
+      hidden: false,
     },
     {
       type: 'button',
       id: 'layers',
       icon: <LayersIcon />,
       label: 'Layers',
-      enabled: true,
-      hidden: !hasActiveEditorFrame,
+      enabled: hasActiveEditorFrame,
+      hidden: false,
     },
-    { type: 'separator', hidden: !hasActiveEditorFrame },
+    { type: 'separator', hidden: false },
+
     {
       type: 'button',
-      id: 'manageLibrary',
-      icon: <Component1Icon />,
-      label: 'Manage library',
+      id: 'code',
+      icon: <CodeIcon />,
+      label: 'Code',
       enabled: true,
-      hidden: false,
+      hidden: !hasPermission('codeComponents'),
     },
     {
       type: 'button',
@@ -130,6 +122,14 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       enabled: true,
       hidden: !hasExtensions,
     },
+    {
+      type: 'button',
+      id: 'brandKit',
+      icon: <BrandKitIcon />,
+      label: 'Brand kit',
+      enabled: true,
+      hidden: !hasPermission('brandKit') || !getCanvasSettings()?.devMode,
+    },
   ];
 
   return (
@@ -144,8 +144,13 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
               <Button
                 variant="ghost"
                 color="gray"
+                highContrast={true}
                 disabled={!item.enabled}
-                className={`${styles.menuItem} ${item.enabled ? '' : styles.disabled} ${activePanel === item.id ? styles.active : ''}`}
+                className={clsx(
+                  styles.menuItem,
+                  !item.enabled && styles.disabled,
+                  activePanel === item.id && styles.active,
+                )}
                 onClick={
                   item.enabled ? () => handleMenuClick(item.id) : undefined
                 }

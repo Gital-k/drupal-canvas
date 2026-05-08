@@ -47,3 +47,52 @@
     transform: rotate(90deg);
   }
 }
+
+.isOver {
+  border-radius: var(--radius-2);
+  background: var(--blue-3);
+  * {
+    pointer-events: none;
+  }
+}
+
+.isDragging {
+  cursor: grabbing;
+  opacity: 0.5;
+}
+
+.emptyDropZone {
+  min-height: var(--space-6);
+}
+
+.dropIndicatorAbove {
+  position: relative;
+}
+
+.dropIndicatorAbove::before {
+  position: absolute;
+  z-index: 10;
+  top: -4px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  content: '';
+  border-radius: 1px;
+  background-color: var(--blue-9);
+}
+
+.dropIndicatorBelow {
+  position: relative;
+}
+
+.dropIndicatorBelow::after {
+  position: absolute;
+  z-index: 10;
+  right: 0;
+  bottom: -4px;
+  left: 0;
+  height: 2px;
+  content: '';
+  border-radius: 1px;
+  background-color: var(--blue-9);
+}

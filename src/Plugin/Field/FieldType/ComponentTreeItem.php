@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Field\FieldType;
 
+use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Block\MessagesBlockPluginInterface;
@@ -23,7 +25,8 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\MissingComponentInputsException;
 use Drupal\canvas\Plugin\DataType\ConfigEntityVersionAdapter;
-use Drupal\canvas\PropSource\ContentAwareDependentInterface;
+use Drupal\canvas\Plugin\DataType\ResolvedComponentInputs;
+use Drupal\canvas\PropExpressions\StructuredData\ContentAwareDependentInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -37,7 +40,7 @@ use Symfony\Component\Validator\ConstraintViolationList;
  *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  * @phpstan-import-type ConfigDependenciesArray from \Drupal\canvas\Entity\VersionedConfigEntityInterface
- * @phpstan-type ComponentTreeItemPropName 'uuid'|'inputs'|'component_id'|'component'|'parent_item'|'slot'|'parent_uuid'|'label'|'component_version'
+ * @phpstan-type ComponentTreeItemPropName 'uuid'|'inputs'|'inputs_resolved'|'component_id'|'component'|'parent_item'|'slot'|'parent_uuid'|'label'|'component_version'
  *
  * @property \Drupal\canvas\HydratedTree $hydrated
  */
@@ -56,16 +59,19 @@ use Symfony\Component\Validator\ConstraintViolationList;
   constraints: [
     'ValidComponentTreeItem' => [],
     'ComponentTreeMeetRequirements' => [
-      // Only StaticPropSources may be used, because using DynamicPropSources or
-      // HostEntityUrlPropSources a decision that should be made at the Content
-      // Template level by a Site Builder, not by each Content Creator.
+      // Only StaticPropSources may be used, because using
+      // EntityFieldPropSources or HostEntityUrlPropSources is a decision that
+      // should be made at the Content Template level by a Site Builder, not by
+      // each Content Creator.
       // @see https://www.drupal.org/project/canvas/issues/3455629
       'inputs' => [
         'absence' => [
-          'dynamic',
-          'host-entity-url',
+          PropSource::EntityField->value,
+          PropSource::HostEntityUrl->value,
           // @todo Allow adapters that consume a single shape and output that same single shape in https://www.drupal.org/project/canvas/issues/3536115
-          'adapter',
+          PropSource::Adapter->value,
+          // @todo Remove before Canvas 2.0, see https://www.drupal.org/node/3566701
+          PropSource::Dynamic->value,
         ],
         'presence' => NULL,
       ],
@@ -114,6 +120,9 @@ class ComponentTreeItem extends FieldItemBase {
 
   public const string PLUGIN_ID = 'component_tree';
 
+  // @todo Decide what the best location is for this constant.
+  public const string VIOLATION_CODE_GARBAGE_INPUT = 'garbage';
+
   use ComponentTreeItemListInstantiatorTrait;
 
   // phpcs:disable Drupal.Commenting.DataTypeNamespace.DataTypeNamespace
@@ -125,6 +134,7 @@ class ComponentTreeItem extends FieldItemBase {
    * @return ($name is 'parent_item' ? \Drupal\canvas\Plugin\DataType\ParentComponentReference : ($name is 'inputs' ? \Drupal\canvas\Plugin\DataType\ComponentInputs : ($name is 'component' ? \Drupal\Core\Entity\Plugin\DataType\EntityReference : \Drupal\Core\TypedData\Plugin\DataType\StringData)))
    */
   // phpcs:enable Drupal.Commenting.DataTypeNamespace.DataTypeNamespace
+  // @phpstan-ignore-next-line method.childParameterType
   public function get($name) {
     // @phpstan-ignore-next-line
     return parent::get($name);
@@ -137,7 +147,7 @@ class ComponentTreeItem extends FieldItemBase {
    *
    * @see \Drupal\Component\Plugin\DependentPluginInterface
    */
-  public function calculateFieldItemValueDependencies(?FieldableEntityInterface $host_entity = NULL): array {
+  public function calculateFieldItemValueDependencies(FieldableEntityInterface|ComponentTreeEntityInterface|null $host_entity = NULL): array {
     // Every field property that has dependencies on config or extensions must
     // implement DependentPluginInterface to ensure accurate dependency (i.e.
     // usage) tracking.
@@ -151,7 +161,8 @@ class ComponentTreeItem extends FieldItemBase {
         $dependencies = NestedArray::mergeDeep($dependencies, $property->calculateDependencies());
       }
       elseif ($property instanceof ContentAwareDependentInterface) {
-        $dependencies = NestedArray::mergeDeep($dependencies, $property->calculateDependencies($host_entity));
+        $fieldable_host_entity = $host_entity instanceof FieldableEntityInterface ? $host_entity : NULL;
+        $dependencies = NestedArray::mergeDeep($dependencies, $property->calculateDependencies($fieldable_host_entity));
       }
     }
 
@@ -349,7 +360,7 @@ class ComponentTreeItem extends FieldItemBase {
       ->addConstraint('EntityType', ['type' => Component::ENTITY_TYPE_ID]);
 
     $properties['inputs'] = DataDefinition::create('component_inputs')
-      ->setLabel(new TranslatableMarkup('Input values for each component in the component tree'))
+      ->setLabel(new TranslatableMarkup('The stored input values for each component in the component tree'))
       ->setRequired(TRUE);
 
     $properties['label'] = DataDefinition::create('string')
@@ -357,6 +368,16 @@ class ComponentTreeItem extends FieldItemBase {
       ->setSetting('max_length', 255)
       ->addConstraint('Length', ['max' => 255])
       ->setRequired(FALSE);
+
+    $properties['inputs_resolved'] = DataDefinition::create('any')
+      ->setLabel(new TranslatableMarkup('Resolved component inputs'))
+      ->setDescription(new TranslatableMarkup('The resolved input values for this component instance.'))
+      ->setComputed(TRUE)
+      ->setReadOnly(TRUE)
+      ->setClass(ResolvedComponentInputs::class)
+      // Computed properties default to internal (excluded from normalization).
+      // Override to expose resolved values via JSON:API/REST normalizers.
+      ->setInternal(FALSE);
 
     return $properties;
   }
@@ -382,6 +403,12 @@ class ComponentTreeItem extends FieldItemBase {
   public function onChange(mixed $property_name, $notify = TRUE): void {
     if ($property_name === 'inputs') {
       $this->values[$property_name] = $this->get($property_name)->getValue();
+    }
+    // Invalidate the resolved computed property when its source data changes.
+    if (\in_array($property_name, ['inputs', 'component_id', 'component_version'], TRUE)) {
+      $inputs_resolved = $this->get('inputs_resolved');
+      \assert($inputs_resolved instanceof ResolvedComponentInputs);
+      $inputs_resolved->invalidateComputedValue();
     }
     $pairs = [
       ['component_id', 'component'],
@@ -426,8 +453,9 @@ class ComponentTreeItem extends FieldItemBase {
   /**
    * {@inheritdoc}
    */
+  // @phpstan-ignore-next-line method.childParameterType
   public function setValue($values, $notify = TRUE): void {
-    if (is_array($values)) {
+    if (\is_array($values)) {
       parent::setValue($values, FALSE);
       $pairs = [
         ['component_id', 'component'],
@@ -435,13 +463,13 @@ class ComponentTreeItem extends FieldItemBase {
       ];
       foreach ($pairs as $pair) {
         [$property1, $property2] = $pair;
-        if (array_key_exists($property1, $values) && !isset($values[$property2])) {
+        if (\array_key_exists($property1, $values) && !isset($values[$property2])) {
           $this->onChange($property1, FALSE);
         }
-        if (!array_key_exists($property1, $values) && isset($values[$property2])) {
+        if (!\array_key_exists($property1, $values) && isset($values[$property2])) {
           $this->onChange($property2, FALSE);
         }
-        if (array_key_exists($property1, $values) && isset($values[$property2])) {
+        if (\array_key_exists($property1, $values) && isset($values[$property2])) {
           // If both properties are passed, verify the passed values match.
           $reference = $this->get($property2);
           \assert($reference instanceof DataReferenceInterface);
@@ -464,7 +492,7 @@ class ComponentTreeItem extends FieldItemBase {
     // if there already is a validation error for a missing key, another
     // validation error for an invalid value is not helpful.
     // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
-    if (!is_array($values) || !array_key_exists('inputs', $values)) {
+    if (!\is_array($values) || !\array_key_exists('inputs', $values)) {
       $this->getProperties()['inputs']->applyDefaultValue(FALSE);
     }
 
@@ -533,12 +561,13 @@ class ComponentTreeItem extends FieldItemBase {
   }
 
   /**
-   * @todo This belongs in a normalizer */
+   * @todo Move this into a normalizer at https://www.drupal.org/i/3499632
+   */
   public function getClientSideRepresentation(): array {
     return [
       'uuid' => $this->getUuid(),
       'nodeType' => 'component',
-      'type' => sprintf('%s@%s', $this->getComponentId(), $this->getComponentVersion()),
+      'type' => \sprintf('%s@%s', $this->getComponentId(), $this->getComponentVersion()),
       // TRICKY: the client-side representation uses `name`, the server-side
       // representation uses `label`, due to TypedData limitations.
       // @see \Drupal\Core\TypedData\TypedData::$name
@@ -593,7 +622,7 @@ class ComponentTreeItem extends FieldItemBase {
     // constraints because it does not validate user input: it only helps ensure
     // that the logic of this field type is correct.
     if ($input_values === NULL && $source->requiresExplicitInput()) {
-      throw new \LogicException(sprintf('Missing input for component instance with UUID %s', $component_instance_uuid));
+      throw new \LogicException(\sprintf('Missing input for component instance with UUID %s', $component_instance_uuid));
     }
     $this->optimizeInputs();
     // @todo Omit defaults that are stored at the content type template level, e.g. in core.entity_view_display.node.article.default.yml
@@ -610,7 +639,7 @@ class ComponentTreeItem extends FieldItemBase {
     // Re-run the validation logic now that fields that are required on this
     // entity are guaranteed to exist (i.e. the entity is no longer new, because
     // it already was saved).
-    assert($this->getEntity()->isNew() === FALSE);
+    \assert($this->getEntity()->isNew() === FALSE);
     // Because the entity is now guaranteed to not be new, a slightly stricter
     // validation is performed — if it fails, then an exception is thrown and
     // the entity saving database transaction is rolled back, and an error
@@ -651,7 +680,15 @@ class ComponentTreeItem extends FieldItemBase {
   }
 
   public function optimizeInputs(): void {
-    $source = $this->getComponent()?->getComponentSource();
+    $component = $this->getComponent();
+    // We avoid getComponentVersion() to not handle the exception here.
+    // It will be triggered with config schema validation instead.
+    // @see \Drupal\canvas\Entity\Component::save()
+    $version = $this->get('component_version')->getValue();
+    if ($version && \in_array($version, $component?->getVersions() ?? [], TRUE)) {
+      $component?->loadVersion($version);
+    }
+    $source = $component?->getComponentSource();
     if ($source === NULL) {
       // This could be running against data that has not been validated, in
       // which case there is nothing we can do without a valid component or

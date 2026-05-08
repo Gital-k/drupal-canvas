@@ -63,7 +63,11 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
   // contain logic and perform e.g. database queries that fetch data to present.
   supportsImplicitInputs: TRUE,
   discovery: BlockComponentDiscovery::class,
+  updater: FALSE,
+  inputs_config_schema_generator: BlockComponentInstanceInputsConfigSchemaGenerator::class,
   // @see \Drupal\Core\Block\BlockManager::__construct()
+  // @see \Drupal\canvas\Block\BlockManagerDecorator
+  // @todo Update after https://www.drupal.org/project/drupal/issues/3001284 lands
   discoveryCacheTags: [],
 )]
 final class BlockComponent extends ComponentSourceBase implements ContainerFactoryPluginInterface {
@@ -99,7 +103,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     private readonly PluginFormFactoryInterface $pluginFormFactory,
     private readonly AutoSaveManager $autoSaveManager,
   ) {
-    assert(array_key_exists('local_source_id', $configuration));
+    \assert(\array_key_exists('local_source_id', $configuration));
     parent::__construct($configuration, $plugin_id, $plugin_definition);
   }
 
@@ -127,11 +131,12 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     return $this->getBlockPlugin() instanceof Broken;
   }
 
-  /**
-   * @todo Remove in https://www.drupal.org/project/canvas/issues/3561267.
-   */
-  public static function componentIdFromBlockPluginId(string $pluginId): string {
-    return BlockComponentDiscovery::getComponentConfigEntityId($pluginId);
+  public function determineDefaultFolder(): string {
+    $plugin_definition = $this->getBlockPlugin()->getPluginDefinition();
+    \assert(\is_array($plugin_definition));
+    \assert(!empty($plugin_definition['category']));
+
+    return (string) $plugin_definition['category'];
   }
 
   /**
@@ -152,7 +157,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   protected function getBlockPlugin(): BlockPluginInterface {
     // @todo this should probably use DefaultSingleLazyPluginCollection
     $block = $this->blockManager->createInstance($this->configuration['local_source_id'], $this->configuration);
-    assert($block instanceof BlockPluginInterface);
+    \assert($block instanceof BlockPluginInterface);
     return $block;
   }
 
@@ -168,7 +173,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
    */
   public function getComponentDescription(): TranslatableMarkup {
     $pluginDefinition = $this->getBlockPlugin()->getPluginDefinition() ?? [];
-    assert(is_array($pluginDefinition));
+    \assert(\is_array($pluginDefinition));
     return new TranslatableMarkup('Block: %name', [
       '%name' => $pluginDefinition['admin_label'] ?? new TranslatableMarkup('Invalid/broken'),
     ]);
@@ -222,7 +227,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // @see \Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant::build()
     if ($block instanceof TitleBlockPluginInterface || $block instanceof MessagesBlockPluginInterface) {
       if (\Fiber::getCurrent() === NULL) {
-        throw new \LogicException(sprintf('The %s block plugin does not support previews.', $block->getPluginId()));
+        throw new \LogicException(\sprintf('The %s block plugin does not support previews.', $block->getPluginId()));
       }
       \Fiber::suspend($block);
     }
@@ -235,7 +240,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     $cacheable_metadata = CacheableMetadata::createFromObject($block);
     $cacheable_metadata->applyTo($build);
 
-    assert($build['#access'] instanceof AccessResultInterface);
+    \assert($build['#access'] instanceof AccessResultInterface);
     if (!$build['#access']->isAllowed()) {
       return $build;
     }
@@ -272,10 +277,16 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   private static function removeConfigSchemaLabels(array $config_schema): array {
     $normalized = [];
     foreach ($config_schema as $key => $value) {
+      // TRICKY: this is being omitted despite
+      // https://www.drupal.org/project/canvas/issues/3572850. In a way, it
+      // makes sense: every block plugin has this due to `type: block_settings`,
+      // so it is kinda pointless to compute the version hash. However, then
+      // `label_display` should also have been omitted.
+      // @todo Change this in https://www.drupal.org/project/canvas/issues/3572850.
       if ($key === 'label') {
         continue;
       }
-      if (is_array($value)) {
+      if (\is_array($value)) {
         $value = self::removeConfigSchemaLabels($value);
       }
       $normalized[$key] = $value;
@@ -293,8 +304,28 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   /**
    * {@inheritdoc}
    */
-  public function getDefaultExplicitInput(): array {
+  public function getDefaultExplicitInput(bool $only_required = FALSE): array {
+    // @todo implement $only_required handling after https://www.drupal.org/i/3521221.
+    // @todo handle requiredness per component version: https://www.drupal.org/project/canvas/issues/3558531
+    // @todo Expose `label` input in https://www.drupal.org/project/canvas/issues/3572850
+    // (Until this is implemented, block component instances are "unforgiving":
+    // they will fail to pass validation unless all explicit inputs are
+    // specified, including `label` and `label_display`. These two are hidden
+    // from the Content Creator, but Canvas requires them to be stored. Consider
+    // introducing a similar "optimizeInputs()" implementation for blocks as for
+    // SDCs, because for most block instances storing these two is pointless,
+    // and until these are exposed to the Content Creator, it is pointless for
+    // all block component instances.)
     return $this->getBlockPlugin()->defaultConfiguration();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getResolvedExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
+    $hydrated_inputs = parent::getResolvedExplicitInput($uuid, $item, $host_entity);
+    \assert(\array_key_exists(self::EXPLICIT_INPUT_NAME, $hydrated_inputs));
+    return $hydrated_inputs[self::EXPLICIT_INPUT_NAME];
   }
 
   /**
@@ -308,7 +339,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     catch (MissingComponentInputsException) {
       // There is no input for this component. That should only be the case for
       // block plugins without any settings.
-      assert(!$this->requiresExplicitInput());
+      \assert(!$this->requiresExplicitInput());
       return [];
     }
   }
@@ -316,7 +347,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   /**
    * {@inheritdoc}
    */
-  public function hydrateComponent(array $explicit_input, array $slot_definitions): array {
+  public function hydrateComponent(array $explicit_input, array $slot_definitions, array $active_required_explicit_inputs): array {
     return [self::EXPLICIT_INPUT_NAME => $explicit_input];
   }
 
@@ -475,7 +506,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     $typed_data = $this->typedConfigManager->createFromNameAndData('block.settings.' . $plugin_id, $inputValues);
     $violations = $typed_data->validate();
     $violations->addAll($form_violations);
-    return $this->translateConstraintPropertyPathsAndRoot(['' => \sprintf('inputs.%s.', $component_instance_uuid)], $violations);
+    return $this->translateConstraintPropertyPathsAndRoot(['' => 'inputs.'], $violations);
   }
 
   protected function submitBlockConfigurationForm(

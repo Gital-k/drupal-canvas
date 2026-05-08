@@ -1,6 +1,3 @@
-/**
- * ⚠️ This is highly experimental and *will* be refactored.
- */
 import { useEffect } from 'react';
 import clsx from 'clsx';
 import { Cross2Icon } from '@radix-ui/react-icons';
@@ -9,16 +6,18 @@ import { Box, Button, Flex, Heading, ScrollArea } from '@radix-ui/themes';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ErrorBoundary from '@/components/error/ErrorBoundary';
 import ExtensionsList from '@/components/extensions/ExtensionsList';
+import Code from '@/components/sidePanel/Code';
 import Library from '@/components/sidePanel/Library';
-import ManageLibrary from '@/components/sidePanel/ManageLibrary';
 import Pages from '@/components/sidePanel/Pages';
 import Templates from '@/components/sidePanel/Templates';
+import BrandKitPanel from '@/features/brandKit/BrandKitPanel';
 import Layers from '@/features/layout/layers/Layers';
 import {
   selectActivePanel,
   unsetActivePanel,
 } from '@/features/ui/primaryPanelSlice';
 import useHidePanelClasses from '@/hooks/useHidePanelClasses';
+import { getCanvasSettings } from '@/utils/drupal-globals';
 import { hasPermission } from '@/utils/permissions';
 
 import AiWizard from '../aiExtension/AiWizard';
@@ -34,12 +33,19 @@ export const PrimaryPanel = () => {
     if (activePanel === 'templates' && !hasPermission('contentTemplates')) {
       dispatch(unsetActivePanel());
     }
+    if (
+      activePanel === 'brandKit' &&
+      (!hasPermission('brandKit') || !getCanvasSettings()?.devMode)
+    ) {
+      dispatch(unsetActivePanel());
+    }
   }, [activePanel, dispatch]);
 
   const panelMap: Record<string, string> = {
     library: 'Library',
     layers: 'Layers',
-    manageLibrary: 'Manage library',
+    brandKit: 'Brand kit',
+    code: 'Code',
     extensions: 'Extensions',
     aiWizard: 'AI',
     templates: 'Templates',
@@ -74,21 +80,28 @@ export const PrimaryPanel = () => {
           <Box flexGrow="1" className={styles.scrollArea}>
             <ScrollArea scrollbars="vertical">
               <Box p="4" className="primaryPanelContent">
-                {activePanel === 'layers' && (
-                  <ErrorBoundary>
-                    <Layers />
-                  </ErrorBoundary>
-                )}
                 {activePanel === 'library' && (
                   <ErrorBoundary>
                     <Library />
                   </ErrorBoundary>
                 )}
-                {activePanel === 'manageLibrary' && (
+                {activePanel === 'layers' && (
                   <ErrorBoundary>
-                    <ManageLibrary />
+                    <Layers />
                   </ErrorBoundary>
                 )}
+                {activePanel === 'code' && (
+                  <ErrorBoundary>
+                    <Code />
+                  </ErrorBoundary>
+                )}
+                {activePanel === 'brandKit' &&
+                  hasPermission('brandKit') &&
+                  getCanvasSettings()?.devMode && (
+                    <ErrorBoundary>
+                      <BrandKitPanel />
+                    </ErrorBoundary>
+                  )}
                 {activePanel === 'pages' && (
                   <ErrorBoundary>
                     <Pages />

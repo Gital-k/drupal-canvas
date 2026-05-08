@@ -17,12 +17,14 @@ export interface FieldDataItem {
   sourceTypeSettings?: {
     storage?: object;
     instance?: object;
+    cardinality?: number;
   };
   jsonSchema?: {
     type: 'number' | 'integer' | 'string' | 'boolean' | 'array' | 'object';
     properties?: object;
     enum?: any[];
     format?: string;
+    maxItems?: number;
   };
   default_values: DefaultValues;
   [x: string | number | symbol]: unknown;
@@ -38,9 +40,8 @@ interface BaseComponent {
   js_header: string;
   js_footer: string;
   version: string;
-  // @todo Move to PropSourceComponent in https://www.drupal.org/project/canvas/issues/3521041
-  propSources: FieldData;
   broken: boolean;
+  metadata?: { [key: string]: any };
 }
 
 export type libraryTypes =
@@ -61,7 +62,6 @@ export interface JSComponent extends BaseComponent {
   transforms: any[];
 }
 
-// PropSourceComponent Interface
 export interface PropSourceComponent extends BaseComponent {
   library: 'elements' | 'extension_components';
   propSources: FieldData;
@@ -111,18 +111,35 @@ export type FolderInList = {
 export type FoldersInList = FolderInList[];
 
 /**
- * Type predicate.
+ * Type predicate to check if a component is a PropSourceComponent.
  *
  * @param {CanvasComponent | undefined} component
  *   Component to test.
  *
  * @return boolean
- *   TRUE if the component has field data.
- *
- * @todo rename this to componentHasPropSources in https://www.drupal.org/project/canvas/issues/3504421
+ *   TRUE if the component is a PropSourceComponent (has propSources).
  */
-export const componentHasFieldData = (
+export const isPropSourceComponent = (
   component: CanvasComponent | undefined,
 ): component is PropSourceComponent => {
   return component !== undefined && 'propSources' in component;
+};
+
+/**
+ * Type predicate to check if a component has slot definitions.
+ *
+ * Slots can exist on any component that implements ComponentSourceWithSlotsInterface.
+ *
+ * @param {CanvasComponent | undefined} component
+ *   Component to test.
+ *
+ * @return boolean
+ *   TRUE if the component has slot definitions in its metadata.
+ */
+export const hasSlotDefinitions = (
+  component: CanvasComponent | undefined,
+): component is CanvasComponent & {
+  metadata: { slots: Record<string, { title: string }> };
+} => {
+  return typeof component?.metadata?.slots === 'object';
 };

@@ -24,21 +24,21 @@ import {
 } from '@/features/layout/layoutModelSlice';
 import { findComponentByUuid } from '@/features/layout/layoutUtils';
 import {
-  selectEditorFrameContext,
   selectLatestUndoRedoActionId,
   selectSelectedComponentUuid,
 } from '@/features/ui/uiSlice';
 import { useDrupalBehaviors } from '@/hooks/useDrupalBehaviors';
+import useInputUIData from '@/hooks/useInputUIData';
 import hyperscriptify from '@/local_packages/hyperscriptify';
 import propsify from '@/local_packages/hyperscriptify/propsify/standard/index.js';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import { useGetComponentInstanceFormQuery } from '@/services/componentInstanceForm';
 import {
   selectUpdateComponentLoadingState,
-  useUpdateComponentMutation,
+  usePatchComponent,
 } from '@/services/preview';
 import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
-import { componentHasFieldData } from '@/types/Component';
+import { isPropSourceComponent } from '@/types/Component';
 import parseHyperscriptifyTemplate from '@/utils/parse-hyperscriptify-template';
 
 import type {
@@ -58,7 +58,7 @@ export const useComponentTransforms = () => {
 };
 
 interface ComponentInstanceFormRendererProps {
-  dynamicStaticCardQueryString: string;
+  queryString: string;
 }
 interface ComponentInstanceFormProps {}
 
@@ -68,10 +68,15 @@ const ComponentInstanceFormRenderer: React.FC<
   const formState = useAppSelector((state) =>
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
-  const { dynamicStaticCardQueryString } = props;
+  const { queryString } = props;
   const { showBoundary } = useErrorBoundary();
-  const selectedComponent = useAppSelector(selectSelectedComponentUuid);
-  const editorFrameContext = useAppSelector(selectEditorFrameContext);
+  const inputAndUiData: InputUIData = useInputUIData();
+  const {
+    selectedComponentType,
+    selectedComponent,
+    editorFrameContext,
+    components,
+  } = inputAndUiData;
 
   const [jsxFormContent, setJsxFormContent] =
     useState<React.ReactElement | null>(null);
@@ -85,30 +90,13 @@ const ComponentInstanceFormRenderer: React.FC<
   );
   const { currentData, error, originalArgs, isFetching } =
     useGetComponentInstanceFormQuery(
-      { queryString: dynamicStaticCardQueryString, type: editorFrameContext },
+      { queryString: queryString, type: editorFrameContext },
       {
         skip,
       },
     );
-  const model = useAppSelector(selectModel);
-  const { data: components } = useGetComponentsQuery();
-  const layout = useAppSelector(selectLayout);
-  const node = findComponentByUuid(layout, selectedComponentId);
-  const [selectedComponentType, version] = (
-    node ? (node.type as string) : 'noop'
-  ).split('@');
-  const inputAndUiData: InputUIData = {
-    selectedComponent: selectedComponentId,
-    components,
-    selectedComponentType,
-    layout,
-    node,
-    model,
-    version,
-  };
-  const [patchComponent] = useUpdateComponentMutation({
-    fixedCacheKey: selectedComponentId,
-  });
+
+  const patchComponent = usePatchComponent();
 
   useEffect(() => {
     if (error) {
@@ -167,7 +155,7 @@ const ComponentInstanceFormRenderer: React.FC<
       // Wrapping the constructed `ReactElement` for the form so we can add a
       // key which tells React when to re-render this subtree. The component ID
       // is granular enough. Using the entire value of
-      // `dynamicStaticCardQueryString` would cause the form to re-render while
+      // `queryString` would cause the form to re-render while
       // prop values are being updated by the user in the contextual panel,
       // causing the form to lose focus.
       // A `<div>` is used instead of `React.Fragment` so a test ID can be added.
@@ -195,10 +183,11 @@ const ComponentInstanceFormRenderer: React.FC<
       // We only care about the component instance form, not the entity form.
       if (formId === 'component_instance_form') {
         // Apply transforms for form state.
+        const transforms = persistentTransforms.current ?? {};
         const { propsValues: values, selectedModel } = getPropsValues(
           updates,
           inputAndUiData,
-          currentData ? currentData.transforms : {},
+          transforms,
         );
 
         if (Object.keys(values).length === 0) {
@@ -214,7 +203,7 @@ const ComponentInstanceFormRenderer: React.FC<
             ...inputAndUiData,
             model: { [selectedComponentId]: selectedModel },
           },
-          currentData ? currentData.transforms : {},
+          transforms,
         );
 
         // And then send data to backend - this will:
@@ -229,29 +218,19 @@ const ComponentInstanceFormRenderer: React.FC<
 
         const component = components?.[selectedComponentType];
         if (isEvaluatedComponentModel(selectedModel) && component) {
-          patchComponent({
-            type: editorFrameContext,
-            componentInstanceUuid: selectedComponentId,
-            componentType: `${selectedComponentType}@${version}`,
-            model: {
-              source: syncPropSourcesToResolvedValues(
-                selectedModel.source,
-                component,
-                resolved,
-              ),
+          patchComponent(inputAndUiData, {
+            source: syncPropSourcesToResolvedValues(
+              selectedModel.source,
+              component,
               resolved,
-            },
+            ),
+            resolved,
           });
           return;
         }
-        patchComponent({
-          type: editorFrameContext,
-          componentInstanceUuid: selectedComponentId,
-          componentType: `${selectedComponentType}@${version}`,
-          model: {
-            ...selectedModel,
-            resolved,
-          },
+        patchComponent(inputAndUiData, {
+          ...selectedModel,
+          resolved,
         });
       }
     };
@@ -270,7 +249,7 @@ const ComponentInstanceFormRenderer: React.FC<
   // Any time this form changes, process it through Drupal behaviors the same
   // way it would be if it were added to the DOM by Drupal AJAX. This allows
   // Drupal functionality like Autocomplete work in this React-rendered form.
-  useDrupalBehaviors(formRef, jsxFormContent);
+  useDrupalBehaviors(formRef, jsxFormContent, isFetching);
 
   return (
     <Spinner
@@ -307,17 +286,22 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
 
-  const [dynamicStaticCardQueryString, setDynamicStaticCardQueryString] =
-    useState('');
+  const [formQueryString, setFormQueryString] = useState('');
   const [emptyProp, setEmptyProp] = useState(false);
   const [componentSource, setComponentSource] = useState('');
+  const [renderComponentId, setRenderComponentId] = useState<string | null>(
+    null,
+  );
+  const previousModelRef = useRef<EvaluatedComponentModel | null>(null);
+  const previousSelectedComponentRef = useRef<string | null>(null);
+  const previousLatestUndoRedoActionIdRef = useRef<string | null>(null);
 
   const buildPreparedModel = (
     model: ComponentModel,
     component: CanvasComponent,
-  ): ComponentModel => {
-    if (!componentHasFieldData(component)) {
-      return model;
+  ): EvaluatedComponentModel => {
+    if (!isPropSourceComponent(component)) {
+      return model as EvaluatedComponentModel;
     }
     // The prepared model combines prop values from the model and prop metadata
     // from the SDC definition.
@@ -365,30 +349,77 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     // This is metadata about the props of the SDC being edited. This is specific
     // to the SDC *type* but unconcerned with this SDC *instance*.
     const component = components[selectedComponentType];
-    const selectedComponentFieldData: FieldData = componentHasFieldData(
+    const selectedComponentFieldData: FieldData = isPropSourceComponent(
       component,
     )
       ? component.propSources
       : {};
 
     // Check if this component has any props or not.
-    if (Object.keys(selectedComponentFieldData).length === 0) {
-      setDynamicStaticCardQueryString('');
+    if (
+      isPropSourceComponent(component) &&
+      Object.keys(selectedComponentFieldData).length === 0
+    ) {
+      setFormQueryString('');
       setEmptyProp(true);
     } else {
       setEmptyProp(false);
     }
 
-    const preparedModel = buildPreparedModel(selectedModel, component);
+    const builtPreparedModel = buildPreparedModel(selectedModel, component);
+    const prevModel = previousModelRef.current;
+    const prevSelectedComponent = previousSelectedComponentRef.current;
+    const prevLatestUndoRedoActionId =
+      previousLatestUndoRedoActionIdRef.current;
 
-    const tree = findComponentByUuid(layout, selectedComponent);
-    const query = new URLSearchParams({
-      form_canvas_tree: JSON.stringify(tree),
-      form_canvas_props: JSON.stringify(preparedModel),
-      form_canvas_selected: selectedComponent,
-      latestUndoRedoActionId,
-    });
-    setDynamicStaticCardQueryString(`?${query.toString()}`);
+    // Check if source actually changed (handle components without source like blocks)
+    const sourceChanged = (() => {
+      const prevSource = prevModel?.source;
+      const currentSource = builtPreparedModel.source;
+
+      // If neither has source (e.g., block components), no source change
+      if (!prevSource && !currentSource) {
+        return false;
+      }
+
+      // If one has source and the other doesn't, it changed
+      if (!prevSource || !currentSource) return true;
+
+      // Both have source, compare them
+      return JSON.stringify(prevSource) !== JSON.stringify(currentSource);
+    })();
+
+    // Only build and update formQueryString if:
+    // - First render (!prevModel)
+    // - Component changed (user selected different component)
+    // - Undo/redo occurred (latestUndoRedoActionId changed)
+    // - Source changed
+    const shouldUpdate =
+      !prevModel ||
+      prevSelectedComponent !== selectedComponent ||
+      prevLatestUndoRedoActionId !== latestUndoRedoActionId ||
+      sourceChanged;
+
+    if (shouldUpdate) {
+      // Build the query string only when needed
+      const tree = findComponentByUuid(layout, selectedComponent);
+      const query = new URLSearchParams({
+        form_canvas_tree: JSON.stringify(tree),
+        form_canvas_props: JSON.stringify(builtPreparedModel),
+        form_canvas_selected: selectedComponent,
+        latestUndoRedoActionId,
+      });
+      const queryString = `?${query.toString()}`;
+      setFormQueryString(queryString);
+      setRenderComponentId(selectedComponent);
+    }
+
+    // Always update refs after the shouldUpdate check, so they track what we've processed
+    // This allows subsequent runs to detect if the model actually changed
+    previousModelRef.current = builtPreparedModel;
+    previousSelectedComponentRef.current = selectedComponent;
+    previousLatestUndoRedoActionIdRef.current = latestUndoRedoActionId;
+
     setComponentSource(components?.[selectedComponentType]?.source || '');
   }, [
     components,
@@ -399,13 +430,11 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     layout,
     model,
   ]);
-
   return (
-    dynamicStaticCardQueryString && (
+    formQueryString &&
+    renderComponentId === selectedComponent && (
       <>
-        <ComponentInstanceFormRenderer
-          dynamicStaticCardQueryString={dynamicStaticCardQueryString}
-        />
+        <ComponentInstanceFormRenderer queryString={formQueryString} />
         {componentSource === 'Module component' && emptyProp ? (
           <Text size="4">This component has no props.</Text>
         ) : (

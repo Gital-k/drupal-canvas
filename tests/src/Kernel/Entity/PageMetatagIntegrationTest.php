@@ -4,24 +4,29 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RequiresFunction;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\EntityFormController;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\file\Entity\File;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\media\Entity\Media;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
- * @group canvas
- * @requires function Drupal\metatag\MetatagManager::tagsFromEntity
+ * Tests Page Metatag Integration.
  */
-final class PageMetatagIntegrationTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[RequiresFunction('Drupal\\metatag\\MetatagManager::tagsFromEntity')]
+#[Group('canvas')]
+final class PageMetatagIntegrationTest extends CanvasKernelTestBase {
 
   use MediaTypeCreationTrait;
   use PageTrait;
@@ -31,24 +36,11 @@ final class PageMetatagIntegrationTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'block',
-    'sdc',
-    'sdc_test',
-    'canvas_test_sdc',
-    // Modules providing field types + widgets for the SDC Components'
-    // `prop_field_definitions`.
-    'file',
-    'image',
-    'options',
-    'link',
-    'system',
     ...self::PAGE_TEST_MODULES,
   ];
 
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig(['system']);
     $this->installPageEntitySchema();
     $this->installEntitySchema('file');
     $this->installSchema('file', 'file_usage');
@@ -157,7 +149,7 @@ final class PageMetatagIntegrationTest extends KernelTestBase {
     ]);
     self::assertSaveWithoutViolations($page);
     $themeHandler = $this->container->get('theme_handler');
-    assert($themeHandler instanceof ThemeHandlerInterface);
+    \assert($themeHandler instanceof ThemeHandlerInterface);
     $sut = new EntityFormController($this->container->get(AutoSaveManager::class), $this->container->get(RequestStack::class), $themeHandler);
     $form = $sut->form(Page::ENTITY_TYPE_ID, $page, 'default');
     self::assertArrayHasKey('image', $form['seo_settings']);

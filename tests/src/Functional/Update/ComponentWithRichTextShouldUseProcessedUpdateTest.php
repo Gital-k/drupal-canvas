@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Update;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Component;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers canvas_post_update_0004_use_processed_for_text_props_in_components()
- * @group canvas
+ * Tests Component With Rich Text Should Use Processed Update.
+ *
+ * @legacy-covers \canvas_post_update_0005_use_processed_for_text_props_in_components
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class ComponentWithRichTextShouldUseProcessedUpdateTest extends CanvasUpdatePathTestBase {
 
   protected $defaultTheme = 'stark';
@@ -76,7 +81,8 @@ final class ComponentWithRichTextShouldUseProcessedUpdateTest extends CanvasUpda
           ],
           'after' => [
             // New versions: one for each upgrade path that runs.
-            'a67a545f44684571',
+            '5bfcfeb80ef248ae',
+            '523708be2aeffd2a',
             '44ce4837d1471050',
             'aab57a17fac1fac6',
             // Same as before.

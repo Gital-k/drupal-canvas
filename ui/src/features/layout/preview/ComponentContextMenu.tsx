@@ -1,5 +1,4 @@
 import { useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ContextMenu } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -8,18 +7,21 @@ import { UnifiedMenu } from '@/components/UnifiedMenu';
 import {
   deleteNode,
   duplicateNode,
+  selectLayout,
   shiftNode,
 } from '@/features/layout/layoutModelSlice';
 import ComponentContextMenuMoveInto from '@/features/layout/preview/ComponentContextMenuMoveInto';
 import ComponentContextMenuRegions from '@/features/layout/preview/ComponentContextMenuRegions';
 import { setDialogOpen } from '@/features/ui/dialogSlice';
 import {
+  DEFAULT_REGION,
   selectEditorViewPortScale,
   selectSelectedComponentUuid,
   unsetHoveredComponent,
 } from '@/features/ui/uiSlice';
 import useComponentSelection from '@/hooks/useComponentSelection';
 import useCopyPasteComponents from '@/hooks/useCopyPasteComponents';
+import useEditorNavigation from '@/hooks/useEditorNavigation';
 import useGetComponentName from '@/hooks/useGetComponentName';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 
@@ -39,16 +41,18 @@ export const ComponentContextMenuContent: React.FC<
   }
 > = ({ component, menuType = 'context' }) => {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
+  const layout = useAppSelector(selectLayout);
   const { data: components } = useGetComponentsQuery();
   const componentName = useGetComponentName(component);
   const editorViewPortScale = useAppSelector(selectEditorViewPortScale);
+  const hasGlobalRegions = layout.some((r) => r.id !== DEFAULT_REGION);
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const { setSelectedComponent, unsetSelectedComponent } =
     useComponentSelection();
   const componentUuid = component.uuid;
   const { copySelectedComponent, pasteAfterSelectedComponent } =
     useCopyPasteComponents();
+  const { navigateToCodeEditor } = useEditorNavigation();
 
   // Check if this is a code component
   const [componentType] = (component.type || '').split('@');
@@ -142,10 +146,10 @@ export const ComponentContextMenuContent: React.FC<
       if (component.type && component.type.startsWith('js.')) {
         const machineNameAndVersion = component.type.substring(3);
         const [machineName] = machineNameAndVersion.split('@');
-        navigate(`/code-editor/component/${machineName}`);
+        navigateToCodeEditor(machineName);
       }
     },
-    [component.type, navigate],
+    [component.type, navigateToCodeEditor],
   );
 
   const closeContextMenu = () => {
@@ -218,9 +222,11 @@ export const ComponentContextMenuContent: React.FC<
           )}
         </UnifiedMenu.SubContent>
       </UnifiedMenu.Sub>
-      <PermissionCheck hasPermission="globalRegions">
-        <ComponentContextMenuRegions component={component} />
-      </PermissionCheck>
+      {hasGlobalRegions && (
+        <PermissionCheck hasPermission="globalRegions">
+          <ComponentContextMenuRegions component={component} />
+        </PermissionCheck>
+      )}
       <UnifiedMenu.Separator />
       <UnifiedMenu.Item shortcut="⌫" color="red" onClick={handleDeleteClick}>
         Delete

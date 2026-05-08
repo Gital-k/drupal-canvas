@@ -11,6 +11,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '@/app/store';
 import type {
   AssetLibrary,
+  BrandKit,
   CodeComponent,
   CodeComponentProp,
   CodeComponentSerialized,
@@ -21,8 +22,13 @@ interface CodeEditorState {
   status: CodeEditorStatusOptions;
   codeComponent: CodeComponent;
   globalAssetLibrary: AssetLibrary;
+  brandKit: BrandKit;
   previewCompiledJsForSlots: string;
   forceRefresh: boolean;
+  // IDs of all props/slots that exist when the component is first loaded from the backend.
+  // Newly added props/slots are not added here until the next reload.
+  initialPropIds: string[];
+  initialSlotIds: string[];
 }
 
 interface CodeEditorStatusOptions {
@@ -70,8 +76,15 @@ export const initialState: CodeEditorState = {
       compiled: '',
     },
   },
+  brandKit: {
+    id: 'global',
+    label: 'Global brand kit',
+    fonts: null,
+  },
   previewCompiledJsForSlots: '',
   forceRefresh: false,
+  initialPropIds: [],
+  initialSlotIds: [],
 };
 
 export const codeEditorSlice = createSlice({
@@ -85,6 +98,7 @@ export const codeEditorSlice = createSlice({
         action: PayloadAction<{
           codeComponent: CodeComponent;
           globalAssetLibrary: AssetLibrary;
+          brandKit: BrandKit;
           status?: Partial<CodeEditorStatusOptions>;
         }>,
       ) => ({
@@ -110,10 +124,20 @@ export const codeEditorSlice = createSlice({
             compiled: '',
           },
         },
+        brandKit: {
+          ...initialState.brandKit,
+          ...action.payload.brandKit,
+        },
         status: {
           ...initialState.status,
           ...action.payload.status,
         },
+        initialPropIds: action.payload.codeComponent.props.map(
+          (prop) => prop.id,
+        ),
+        initialSlotIds: action.payload.codeComponent.slots.map(
+          (slot) => slot.id,
+        ),
       }),
     ),
 
@@ -350,6 +374,27 @@ export const codeEditorSlice = createSlice({
       }),
     ),
 
+    setBrandKitFonts: create.reducer(
+      (
+        state,
+        action: PayloadAction<
+          | [BrandKit['fonts']]
+          | [BrandKit['fonts'], Partial<CodeEditorStatusOptions>]
+        >,
+      ) => ({
+        ...state,
+        brandKit: {
+          ...state.brandKit,
+          fonts: action.payload[0],
+        },
+        status: {
+          ...state.status,
+          needsAutoSave: false,
+          ...(action.payload[1] && action.payload[1]),
+        },
+      }),
+    ),
+
     setPreviewCompiledJsForSlots: create.reducer(
       (state, action: PayloadAction<string>) => ({
         ...state,
@@ -447,11 +492,28 @@ export const selectGlobalAssetLibraryProperty =
       AssetLibrary[(typeof properties)[0]][(typeof properties)[1]]
     >(state, properties);
 
+export const selectBrandKit = <T = BrandKit>(
+  state: RootState,
+  property?: keyof BrandKit,
+): T => {
+  if (!property) {
+    return state.codeEditor.brandKit as T;
+  }
+
+  return state.codeEditor.brandKit[property] as T;
+};
+
 export const selectPreviewCompiledJsForSlots = (state: RootState) =>
   state.codeEditor.previewCompiledJsForSlots;
 
 export const selectForceRefresh = (state: RootState) =>
   state.codeEditor.forceRefresh;
+
+export const selectSavedPropIds = (state: RootState) =>
+  state.codeEditor.initialPropIds;
+
+export const selectInitialSlotIds = (state: RootState) =>
+  state.codeEditor.initialSlotIds;
 
 export const {
   initializeCodeEditor,
@@ -459,6 +521,7 @@ export const {
   setStatus,
   setCodeComponentProperty,
   setGlobalAssetLibraryProperty,
+  setBrandKitFonts,
   addProp,
   updateProp,
   removeProp,

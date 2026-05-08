@@ -2,11 +2,8 @@ import type {
   ComponentModels,
   LayoutNode,
 } from '@/features/layout/layoutModelSlice';
+import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ComponentsList } from '@/types/Component';
-
-export interface PropsValues {
-  [key: string]: any;
-}
 
 export interface InputMessage {
   type: 'error' | 'warning' | 'info';
@@ -21,4 +18,5 @@ export interface InputUIData {
   model?: ComponentModels;
   node?: LayoutNode | null;
   version: string;
+  editorFrameContext: EditorFrameContext;
 }

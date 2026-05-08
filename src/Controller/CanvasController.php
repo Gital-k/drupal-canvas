@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\GlobalImports;
+use Drupal\canvas\Config\ThemeSettingsDiscovery;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Extension\CanvasExtensionPluginManager;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
@@ -30,6 +33,7 @@ use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\AssetRenderer;
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageRegion;
@@ -55,12 +59,15 @@ final class CanvasController {
     private readonly EntityTypeBundleInfoInterface $entityTypeBundleInfo,
     private readonly UrlGeneratorInterface $urlGenerator,
     private readonly CanvasExtensionPluginManager $extensionPluginManager,
+    private readonly ThemeSettingsDiscovery $themeSettingsDiscovery,
+    private readonly GlobalImports $globalImports,
   ) {}
 
   private const HTML = <<<HTML
 <!doctype html>
 <html {{ html_attributes }}>
 <head>
+  <head-placeholder token="HEAD-HERE-PLEASE">
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
@@ -97,7 +104,7 @@ HTML;
 
   public function __invoke(?string $entity_type, ?EntityInterface $entity) : HtmlResponse {
     // @phpstan-ignore-next-line function.alreadyNarrowedType
-    assert($this->validateTransformAssetLibraries());
+    \assert($this->validateTransformAssetLibraries());
     // List of libraries to load in the preview iframe.
     $preview_libraries = [
       'system/base',
@@ -112,6 +119,7 @@ HTML;
 
     $canvas_module_path = $this->moduleHandler->getModule('canvas')->getPath();
     $dev_mode = $this->moduleHandler->moduleExists('canvas_dev_mode');
+    $dev_translation_mode = $this->moduleHandler->moduleExists('canvas_dev_translation');
     // ⚠️ This is highly experimental and *will* be refactored.
     $ai_extension_available = $this->moduleHandler->moduleExists('canvas_ai');
     // ⚠️ This is highly experimental and *will* be refactored.
@@ -124,7 +132,7 @@ HTML;
         $entity_types_with_keys[$entity_type_id] = $entity_type_definition->getKeys();
         if ($entity_type_definition->getBundleEntityType()) {
           $bundles = $this->entityTypeBundleInfo->getBundleInfo($entity_type_id);
-          $entity_type_labels[$entity_type_id] = array_map(fn($bundle) => $bundle['label'], $bundles);
+          $entity_type_labels[$entity_type_id] = \array_map(fn($bundle) => $bundle['label'], $bundles);
         }
         else {
           $entity_type_labels[$entity_type_id] = $entity_type_definition->getLabel();
@@ -132,6 +140,11 @@ HTML;
       }
     }
     $extensions = $this->extensionPluginManager->getDefinitions();
+
+    // Get theme-level Canvas settings from the default theme.
+    $theme_config = $this->configFactory->get('system.theme');
+    $default_theme_name = $theme_config->get('default');
+    $theme_settings = $this->themeSettingsDiscovery->getSettings($default_theme_name);
 
     $all_content_entity_create_links = $this->getAllContentEntityCreateLinks();
     // From the "content entity create" link collection, construct a nested
@@ -170,6 +183,7 @@ HTML;
             'entityTypeKeys' => $entity_types_with_keys,
             'entityTypeLabels' => $entity_type_labels,
             'devMode' => $dev_mode,
+            'devTranslationMode' => $dev_translation_mode,
             'extensionsAvailable' => count($extensions) > 0,
             'aiExtensionAvailable' => $ai_extension_available,
             'personalizationExtensionAvailable' => $personalization_extension_available,
@@ -185,13 +199,16 @@ HTML;
             'permissions' => [
               'globalRegions' => $this->currentUser->hasPermission(PageRegion::ADMIN_PERMISSION),
               'patterns' => $this->currentUser->hasPermission(Pattern::ADMIN_PERMISSION),
+              'brandKit' => $this->currentUser->hasPermission(BrandKit::ADMIN_PERMISSION),
               'codeComponents' => $this->currentUser->hasPermission(JavaScriptComponent::ADMIN_PERMISSION),
               'contentTemplates' => $this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION),
               'publishChanges' => $this->currentUser->hasPermission(AutoSaveManager::PUBLISH_PERMISSION),
+              'folders' => $this->currentUser->hasPermission(Folder::ADMIN_PERMISSION),
             ],
             'contentEntityCreateOperations' => $content_entity_create_operations,
             'homepagePath' => $system_site_config->get('page.front'),
             'loginUrl' => $this->urlGenerator->generateFromRoute('user.login'),
+            'viewports' => $theme_settings['viewports'] ?? [],
           ],
           // Override actual `canvasData` with dummy data for code component
           // editor development purposes.
@@ -210,15 +227,21 @@ HTML;
                   'url' => \base_path() . 'user',
                 ],
               ],
+              // Set to NULL since there is no associated entity when a code
+              // component is open in the code editor.
+              // (Nor when e.g. on the /user/login route.)
+              'mainEntity' => NULL,
             ],
           ],
         ],
         // Note: the tokens here are under our control, and this accepts no user
         // input. Hence these hardcoded tokens are fine.
         'html_response_attachment_placeholders' => [
+          'head' => '<head-placeholder token="HEAD-HERE-PLEASE">',
           'styles' => '<css-placeholder token="CSS-HERE-PLEASE">',
           'scripts' => '<js-placeholder token="JS-HERE-PLEASE">',
         ],
+        'import_maps' => $this->globalImports->getImportMap(),
       ]);
   }
 
@@ -299,7 +322,7 @@ HTML;
       $module_transforms = \array_filter(\array_keys($this->libraryDiscovery->getLibrariesByExtension($module)), static fn (string $library_name) => \str_starts_with($library_name, 'canvas.transform.'));
       $libraries = [
         ...$libraries,
-        ...array_map(fn ($lib_name) => "$module/$lib_name", $module_transforms),
+        ...\array_map(fn ($lib_name) => "$module/$lib_name", $module_transforms),
       ];
     }
     return $libraries;
@@ -312,21 +335,21 @@ HTML;
     // Find all used client-side transforms.
     $transforms = [];
     foreach ($this->fieldWidgetPluginManager->getDefinitions() as $definition) {
-      if (!isset($definition['canvas']['transforms']) || !is_array($definition['canvas']['transforms'])) {
+      if (!isset($definition['canvas']['transforms']) || !\is_array($definition['canvas']['transforms'])) {
         continue;
       }
-      $transforms = [...$transforms, ...array_keys($definition['canvas']['transforms'])];
+      $transforms = [...$transforms, ...\array_keys($definition['canvas']['transforms'])];
     }
     $transforms = array_unique($transforms);
 
     // Detect used client-side transforms without a corresponding asset library.
-    $encountered_transform_asset_libraries = array_map(
+    $encountered_transform_asset_libraries = \array_map(
       fn (string $asset_library): string => substr($asset_library, strpos($asset_library, '/') + strlen('/canvas.transform.')),
       $this->getTransformAssetLibraries(),
     );
     $missing = array_diff($transforms, $encountered_transform_asset_libraries);
     if (!empty($missing)) {
-      throw new \LogicException(sprintf("Client-side transforms '%s' encountered without corresponding asset libraries.", implode("', '", $missing)));
+      throw new \LogicException(\sprintf("Client-side transforms '%s' encountered without corresponding asset libraries.", implode("', '", $missing)));
     }
 
     return TRUE;

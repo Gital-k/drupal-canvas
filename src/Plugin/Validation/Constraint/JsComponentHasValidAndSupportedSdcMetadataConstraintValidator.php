@@ -1,13 +1,11 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
-use Drupal\canvas\ComponentMetadataRequirementsChecker;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Render\Component\Exception\InvalidComponentException;
-use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Theme\Component\ComponentValidator;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\Entity\JavaScriptComponent;
@@ -55,7 +53,7 @@ final class JsComponentHasValidAndSupportedSdcMetadataConstraintValidator extend
     $equivalent_sdc_definition = $data->toSdcDefinition();
     try {
       $result = $this->componentValidator->validateDefinition($equivalent_sdc_definition, TRUE);
-      assert($result === TRUE);
+      \assert($result === TRUE);
     }
     catch (InvalidComponentException $e) {
       $this->context->addViolation($e->getMessage());
@@ -65,19 +63,24 @@ final class JsComponentHasValidAndSupportedSdcMetadataConstraintValidator extend
     // The JavaScriptComponent has *valid* SDC metadata, but does it also meet
     // Canvas's additional requirements? Only then is it supported by Canvas.
     try {
-      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery::checkRequirements()
-      ComponentMetadataRequirementsChecker::check(
-        $equivalent_sdc_definition['id'],
-        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery::buildEphemeralSdcPluginInstance()
-        new ComponentMetadata($equivalent_sdc_definition, app_root: '', enforce_schemas: TRUE),
-        $equivalent_sdc_definition['props']['required'] ?? [],
-        forbidden_key_characters: ['.' => '_'],
-      );
+      $data->checkRequirements();
     }
     catch (ComponentDoesNotMeetRequirementsException $e) {
       foreach ($e->getMessages() as $message) {
         $this->context->addViolation($message);
       }
+    }
+
+    // Entity reference props (those with dataDependencies.entityFields entries)
+    // must not be marked as required: they must accept NULL (no entity selected
+    // yet, entity deleted, etc.).
+    $entity_field_props = \array_keys($data->get('dataDependencies')['entityFields'] ?? []);
+    $required_entity_field_props = \array_intersect($data->get('required') ?? [], $entity_field_props);
+    foreach ($required_entity_field_props as $prop_name) {
+      $this->context->buildViolation('The prop %prop_name has entity field data dependencies and therefore cannot be required: referenced entities may disappear, and this code component should not crash when they do.')
+        ->setParameter('%prop_name', $prop_name)
+        ->atPath('required')
+        ->addViolation();
     }
   }
 

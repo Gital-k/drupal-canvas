@@ -18,12 +18,15 @@ import Toast from '@/components/Toast';
 import Topbar from '@/components/topbar/Topbar';
 import useExtensions from '@/features/extensions/useExtensions';
 import DragEventsHandler from '@/features/layout/previewOverlay/DragEventsHandler';
+import NotificationToastManager from '@/features/notifications/NotificationToastManager';
+import useNavigationListener from '@/hooks/useNavigationListener';
 import useRouteSync from '@/hooks/useRouteSync';
+import { getCanvasSettings } from '@/utils/drupal-globals';
 
 import type React from 'react';
 import type { CollisionDetection } from '@dnd-kit/core';
 
-import styles from '@/features/editor/Editor.module.css';
+import styles from '@/features/editor/App.module.css';
 
 // This uses the suggested composition here https://docs.dndkit.com/api-documentation/context-provider/collision-detection-algorithms#composition-of-existing-algorithms
 // the collision will use the mouse cursor's position, but if the mouse cursor is not in a valid dropzone it will fallback
@@ -51,6 +54,7 @@ function customCollisionDetectionAlgorithm(
 const App: React.FC = () => {
   useRouteSync();
   useExtensions();
+  useNavigationListener();
 
   const pointerSensor = useSensor(PointerSensor, {
     // Require the mouse to move by 3 pixels before activating - without this you can't click to select a component
@@ -98,6 +102,7 @@ const App: React.FC = () => {
             {import.meta.env.DEV && <DevTools />}
             <SavingOverlay />
             <Toast />
+            {getCanvasSettings()?.devMode && <NotificationToastManager />}
           </DndContext>
         </ErrorBoundary>
       </div>

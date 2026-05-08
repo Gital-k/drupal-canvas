@@ -45,7 +45,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
    * {@inheritdoc}
    */
   public function checkRequirements(string $source_specific_id): void {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
 
     // Special case exception for 'all-props' SDC.
     // (This is used to develop support for more prop shapes.)
@@ -61,7 +61,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
 
     $component_plugin = $this->componentPluginManager->createInstance($source_specific_id);
 
-    if (isset($component_plugin->metadata->noUi) && $component_plugin->metadata->noUi === TRUE) {
+    if (property_exists($component_plugin->metadata, 'noUi') && $component_plugin->metadata->noUi === TRUE) {
       throw new ComponentDoesNotMeetRequirementsException(['Component flagged "noUi".']);
     }
     // The above only works on Drupal core >=11.3.
@@ -75,7 +75,6 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
       $definition['id'],
       $component_plugin->metadata,
       $definition['props']['required'] ?? [],
-      forbidden_key_characters: [],
     );
   }
 
@@ -83,7 +82,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
    * {@inheritdoc}
    */
   public function computeComponentSettings(string $source_specific_id): array {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
     $component_plugin = $this->componentPluginManager->createInstance($source_specific_id);
     // @see `type: canvas.component_source_settings.sdc`
     return [
@@ -95,7 +94,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
    * {@inheritdoc}
    */
   public function computeInitialComponentProvider(string $source_specific_id): ?string {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
     $definition = $this->componentPluginManager->getDefinition($source_specific_id);
     return $definition['provider'];
   }
@@ -104,11 +103,11 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
    * {@inheritdoc}
    */
   public function computeInitialComponentStatus(string $source_specific_id): bool {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
     $component_plugin = $this->componentPluginManager->createInstance($source_specific_id);
     // Disabled if obsolete or flagged with noUi.
     $initial_status = !(
-      (isset($component_plugin->metadata->noUi) && $component_plugin->metadata->noUi === TRUE)
+      (property_exists($component_plugin->metadata, 'noUi') && $component_plugin->metadata->noUi === TRUE)
       // The above only works on Drupal core >=11.3.
       // @todo Remove in https://www.drupal.org/i/3537695
       // @phpstan-ignore offsetAccess.nonOffsetAccessible
@@ -125,7 +124,6 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
     $definition = $this->componentPluginManager->getDefinition($source_specific_id);
     return [
       'label' => (string) ($definition['name'] ?? $definition['machineName']),
-      'category' => (string) $definition['category'],
     ];
   }
 
@@ -141,7 +139,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
    */
   public static function getComponentConfigEntityId(string $source_specific_component_id): string {
     \assert(str_contains($source_specific_component_id, ':'));
-    return sprintf('%s.%s',
+    return \sprintf('%s.%s',
       SingleDirectoryComponent::SOURCE_PLUGIN_ID,
       str_replace(':', '.', $source_specific_component_id),
     );
@@ -152,7 +150,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
    */
   public static function getSourceSpecificComponentId(string $component_id): string {
     $prefix = SingleDirectoryComponent::SOURCE_PLUGIN_ID . '.';
-    \assert(str_starts_with($prefix, $component_id));
+    \assert(str_starts_with($component_id, $prefix));
     return str_replace('.', ':', substr($component_id, strlen($prefix)));
   }
 

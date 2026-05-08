@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\ParametrizedImageStyle;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\image\Functional\ImageStyleDownloadAccessControlTest;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
- * @covers \Drupal\canvas\Routing\ParametrizedImageStyleConverter
- * @covers \Drupal\canvas\Entity\ParametrizedImageStyle
+ * Tests Parametrized Image Style Download Access Control.
+ *
+ * @legacy-covers \Drupal\canvas\Routing\ParametrizedImageStyleConverter
+ * @legacy-covers \Drupal\canvas\Entity\ParametrizedImageStyle
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 class ParametrizedImageStyleDownloadAccessControlTest extends ImageStyleDownloadAccessControlTest {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -45,25 +50,25 @@ class ParametrizedImageStyleDownloadAccessControlTest extends ImageStyleDownload
     foreach ($invalid as $width) {
       $this->drupalGet(str_replace('{width}', (string) $width, $parametrized_image_style_url));
       $this->assertSession()->statusCodeEquals(404);
-      $this->assertFileDoesNotExist("public://styles/canvas_parametrized_width--$width/public/cat.png.webp");
+      $this->assertFileDoesNotExist("public://styles/canvas_parametrized_width--$width/public/cat.png.avif");
     }
 
     // Allowed values for {width}.
     $allowed = [640, 750, 828, 1080, 1200, 1920, 2048, 3840];
     self::assertEquals($allowed, \array_intersect($allowed, ParametrizedImageStyleConverter::ALLOWED_WIDTHS));
     foreach ($allowed as $width) {
-      $this->assertFileDoesNotExist("public://styles/canvas_parametrized_width--$width/public/cat.png.webp");
+      $this->assertFileDoesNotExist("public://styles/canvas_parametrized_width--$width/public/cat.png.avif");
       $this->drupalGet(str_replace('{width}', (string) $width, $parametrized_image_style_url));
       $this->assertSession()->statusCodeEquals(200);
-      $this->assertFileExists("public://styles/canvas_parametrized_width--$width/public/cat.png.webp");
+      $this->assertFileExists("public://styles/canvas_parametrized_width--$width/public/cat.png.avif");
     }
 
     // Even the regular flush works (when the underlying ImageStyle config
     // entity is modified) thanks to `hook_image_style_flush()`.
     // @see \Drupal\canvas\Hook\ImageStyleHooks::imageStyleFlush()
-    $this->assertFileExists('public://styles/canvas_parametrized_width--640/public/cat.png.webp');
+    $this->assertFileExists('public://styles/canvas_parametrized_width--640/public/cat.png.avif');
     ImageStyle::load('canvas_parametrized_width')?->flush();
-    $this->assertFileDoesNotExist('public://styles/canvas_parametrized_width--640/public/cat.png.webp');
+    $this->assertFileDoesNotExist('public://styles/canvas_parametrized_width--640/public/cat.png.avif');
   }
 
 }

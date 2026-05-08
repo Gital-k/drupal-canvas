@@ -38,7 +38,7 @@ final class ComponentTreeMeetsRequirementsConstraintValidator extends Constraint
    * {@inheritdoc}
    */
   public function validate(mixed $value, Constraint $constraint): void {
-    assert($constraint instanceof ComponentTreeMeetsRequirementsConstraint);
+    \assert($constraint instanceof ComponentTreeMeetsRequirementsConstraint);
     if ($value === NULL) {
       return;
     }
@@ -50,23 +50,27 @@ final class ComponentTreeMeetsRequirementsConstraintValidator extends Constraint
       $value instanceof ComponentTreeItemList => static fn ($value): ComponentTreeItemList => $value,
       // A single content-defined component tree item.
       $value instanceof ComponentTreeItem => function ($value): ComponentTreeItemList {
-        $list = $this->createDanglingComponentTreeItemList();
+        $host_entity = $value->getParent()?->getParent()?->getEntity();
+        $list = $this->createDanglingComponentTreeItemList($host_entity);
         $list->setValue([$value->toArray()]);
         return $list;
       },
       // A multi-value config-defined component tree.
-      is_array($value) && $this->context->getObject() instanceof Sequence => function ($value): ComponentTreeItemList {
+      \is_array($value) && $this->context->getObject() instanceof Sequence => function ($value): ComponentTreeItemList {
         $list = $this->createDanglingComponentTreeItemList();
-        $list->setValue($value);
+        // Config-defined component trees have sequence keys; drop them in favor
+        // of integers prior to converting to a ComponentTreeItemList.
+        // @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::asDeterministicallyAndTranslatableKeyedComponentTreeSequence()
+        $list->setValue(\array_values($value));
         return $list;
       },
       // A single config-defined component tree.
-      is_array($value) => function ($value): ComponentTreeItemList {
+      \is_array($value) => function ($value): ComponentTreeItemList {
         $list = $this->createDanglingComponentTreeItemList();
         $list->setValue([$value]);
         return $list;
       },
-      default => throw new \UnexpectedValueException(sprintf('The value must be a ComponentTreeItem object, an array representing a single component tree, found %s.', gettype($value)))
+      default => throw new \UnexpectedValueException(\sprintf('The value must be a ComponentTreeItem object, an array representing a single component tree, found %s.', gettype($value)))
     };
     $component_tree_item_list = $component_tree_item_list_factory($value);
 

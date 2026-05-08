@@ -9,22 +9,21 @@ use Drupal\canvas\Extension\CanvasExtension;
 use Drupal\canvas\Extension\CanvasExtensionPluginManager;
 use Drupal\canvas\Extension\CanvasExtensionTypeEnum;
 use Drupal\Component\Assertion\Inspector;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 #[Group('canvas')]
 #[CoversClass(CanvasExtensionPluginManager::class)]
-class CanvasExtensionPluginManagerTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class CanvasExtensionPluginManagerTest extends CanvasKernelTestBase {
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'system',
-    'user',
     'canvas_test_extension',
   ];
 
@@ -34,7 +33,7 @@ class CanvasExtensionPluginManagerTest extends KernelTestBase {
     $extension_manager = $this->container->get(CanvasExtensionPluginManager::class);
     $definitions = $extension_manager->getDefinitions();
     $this->assertCount(1, $definitions);
-    assert(Inspector::assertAllObjects($definitions, CanvasExtension::class));
+    \assert(Inspector::assertAllObjects($definitions, CanvasExtension::class));
 
     /** @var \Drupal\canvas\Extension\CanvasExtensionInterface $canvas_extension */
     $canvas_extension = $extension_manager->getDefinition('canvas_test_extension');
@@ -58,7 +57,7 @@ class CanvasExtensionPluginManagerTest extends KernelTestBase {
     $extension_manager = $this->container->get(CanvasExtensionPluginManager::class);
     $definitions = $extension_manager->getDefinitions();
     $this->assertCount(3, $definitions);
-    assert(Inspector::assertAllObjects($definitions, CanvasExtension::class));
+    \assert(Inspector::assertAllObjects($definitions, CanvasExtension::class));
 
     /** @var \Drupal\canvas\Extension\CanvasExtensionInterface $first_extension */
     $first_extension = $definitions['canvas_test_extension_multiple'];

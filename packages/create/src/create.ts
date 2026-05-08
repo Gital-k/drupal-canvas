@@ -3,40 +3,49 @@ import { join } from 'node:path';
 import chalk from 'chalk';
 import spawn from 'cross-spawn';
 import { rimraf } from 'rimraf';
-import { simpleGit } from 'simple-git';
 import * as p from '@clack/prompts';
 
+import { setupAgentSkills } from './lib/agent-skills-setup.js';
 import detectPackageManager from './lib/detect-package-manager.js';
 import { getName, getVersion } from './lib/meta-info.js';
+import useGit from './lib/use-git.js';
 
-import type { SimpleGit } from 'simple-git';
+import type { TaskOptions } from 'simple-git';
 import type { Context } from './types/context.js';
 
 export default async function createApp(ctx: Context) {
-  const { template, appName } = ctx;
+  const { template, appName, selectedAgents } = ctx;
+  const projectDir = `${process.cwd()}/${appName}`;
 
   try {
     // Step 1: Fetch initial codebase.
     const s1 = p.spinner();
     s1.start('Fetching initial codebase');
 
-    // Clone repository.
-    const git: SimpleGit = simpleGit();
-    await git.clone(template.repository.url, appName, {
-      '--depth': 1,
-    });
+    const hasCommitSHARef = /^[a-f0-9]{40}$/i.test(template.repository.ref);
 
-    // Checkout ref.
-    const gitAppDir: SimpleGit = simpleGit({
-      baseDir: `${process.cwd()}/${appName}`,
-    });
-    await gitAppDir.checkout(template.repository.ref);
+    // Clone repository.
+    const git = useGit();
+    const options: TaskOptions = {
+      '--depth': 1,
+    };
+    if (template.repository.ref !== 'HEAD' && !hasCommitSHARef) {
+      options['--branch'] = template.repository.ref;
+    }
+    await git.clone(template.repository.url, appName, options);
+
+    // Checkout commit if SHA is provided.
+    const gitAppDir = useGit(projectDir);
+    if (hasCommitSHARef) {
+      await gitAppDir.fetch('origin', template.repository.ref);
+      await gitAppDir.checkout(template.repository.ref);
+    }
 
     // Delete .git directory.
-    await rimraf(`${process.cwd()}/${appName}/.git`);
+    await rimraf(`${projectDir}/.git`);
 
     // Update package.json name field.
-    const packageJsonPath = join(process.cwd(), appName, 'package.json');
+    const packageJsonPath = join(projectDir, 'package.json');
     const packageJsonContent = await readFile(packageJsonPath, 'utf-8');
     const packageJson = JSON.parse(packageJsonContent);
     packageJson.name = appName;
@@ -46,6 +55,12 @@ export default async function createApp(ctx: Context) {
     );
 
     s1.stop(chalk.green('Fetched initial codebase'));
+
+    // Set up compatibility symlinks for additional agent skills directories.
+    await setupAgentSkills(projectDir, {
+      selectedAgents,
+      interactive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    });
 
     // Step 2: Install dependencies.
     const s2 = p.spinner();

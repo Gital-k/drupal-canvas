@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Adapter;
 
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
@@ -13,7 +14,7 @@ use Drupal\image\Entity\ImageStyle;
 use Drupal\image\ImageStyleInterface;
 
 #[Adapter(
-  id: 'image_apply_style',
+  id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Apply image style'),
   inputs: [
     'image' => [
@@ -42,11 +43,13 @@ use Drupal\image\ImageStyleInterface;
     'imageStyle' => ['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/config-entity-id'],
   ],
   requiredInputs: ['image'],
-  output: ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'],
+  output: ['type' => 'object', '$ref' => JsonSchemaObjectRef::Image->value],
 )]
 final class ImageAndStyleAdapter extends AdapterBase implements ContainerFactoryPluginInterface {
 
   use EntityTypeManagerDependentAdapterTrait;
+
+  public const string PLUGIN_ID = 'image_apply_style';
 
   /**
    * @var array{src:string, alt: string, width:integer, height:integer}

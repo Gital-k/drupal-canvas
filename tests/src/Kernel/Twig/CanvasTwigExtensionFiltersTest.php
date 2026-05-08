@@ -4,37 +4,29 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Twig;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\Image\ImageFactory;
 use Drupal\Core\Image\ImageInterface;
-use Drupal\Core\Site\Settings;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Drupal\file\FileInterface;
-use Drupal\image\Entity\ImageStyle;
-use Drupal\KernelTests\KernelTestBase;
-use Symfony\Component\Yaml\Yaml;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use Drupal\Tests\canvas\Kernel\Traits\PredictableImageStyleItokTestTrait;
 
 // cspell:ignore itok
-
 /**
  * Tests Twig filter functionality.
  *
- * @group canvas
- * @covers \Drupal\canvas\Twig\CanvasTwigExtension::toSrcSet
+ * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::toSrcSet
  */
-class CanvasTwigExtensionFiltersTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
 
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'system',
-    'file',
-    'image',
-    'user',
-    'canvas',
-  ];
+  use PredictableImageStyleItokTestTrait;
 
   /**
    * @var \Drupal\canvas\Twig\CanvasTwigExtension
@@ -46,49 +38,37 @@ class CanvasTwigExtensionFiltersTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->setupPredictableItok();
 
-    ImageStyle::create(
-      Yaml::parseFile(__DIR__ . '/../../../../config/install/image.style.canvas_parametrized_width.yml')
-    )->save();
-
-    // Fixate the private key & hash salt to get predictable `itok`.
-    $this->container->get('state')->set('system.private_key', 'dynamic_image_style_private_key');
-    $settings_class = new \ReflectionClass(Settings::class);
-    $instance_property = $settings_class->getProperty('instance');
-    $settings = new Settings([
-      'hash_salt' => 'dynamic_image_style_hash_salt',
-    ]);
-    $instance_property->setValue(NULL, $settings);
-
-    // Mock File entity
+    // Mock File entity.
     $file = $this->createMock(FileInterface::class);
     $file->method('getFileUri')->willReturn('public://balloons.png');
     $file->method('id')->willReturn('123');
 
-    // Mock Image
+    // Mock Image.
     $image = $this->createMock(ImageInterface::class);
     $image->method('getWidth')->willReturn(640);
     $image->method('getHeight')->willReturn(427);
     $image->method('isValid')->willReturn(TRUE);
 
-    // Configure mocks
+    // Configure mocks.
     $imageFactory = $this->createMock(ImageFactory::class);
     $imageFactory->method('get')->with('public://balloons.png')->willReturn($image);
     $streamWrapperManager = $this->createMock(StreamWrapperManagerInterface::class);
     $streamWrapperManager->method('isValidUri')->willReturn(TRUE);
     $fileUrlGenerator = $this->container->get('file_url_generator');
+    $renderer = $this->container->get('renderer');
 
     // Create the extension instance
-    $this->canvasTwigExtension = new CanvasTwigExtension($streamWrapperManager, $imageFactory, $fileUrlGenerator);
-
+    $this->canvasTwigExtension = new CanvasTwigExtension($streamWrapperManager, $imageFactory, $fileUrlGenerator, $renderer);
     $test_base_url = 'http://localhost/sites/default/files';
     $this->setSetting('file_public_base_url', $test_base_url);
   }
 
   /**
-   * @covers       CanvasTwigExtension::toSrcSet
-   * @dataProvider providerToSrcSet
-   */
+ * Tests to src set.
+ */
+  #[DataProvider('providerToSrcSet')]
   public function testToSrcSet(string $src, ?int $intrinsicImageWidth, ?string $expected): void {
     $actual = $this->canvasTwigExtension->toSrcSet($src, $intrinsicImageWidth);
     $this->assertSame($expected, $actual);
@@ -134,8 +114,8 @@ class CanvasTwigExtensionFiltersTest extends KernelTestBase {
    * Generate expected srcset for balloons.png.
    */
   private static function generateExpectedSrcSet(array $widths): string {
-    return implode(', ', array_map(
-      fn ($width) => "/sites/default/files/styles/canvas_parametrized_width--$width/public/balloons.png.webp?itok=uQqtnjV1 {$width}w",
+    return implode(', ', \array_map(
+      fn ($width) => "/sites/default/files/styles/canvas_parametrized_width--$width/public/balloons.png.avif?itok=TeB392qG {$width}w",
       $widths
     ));
   }

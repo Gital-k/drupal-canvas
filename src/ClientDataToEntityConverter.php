@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas;
 
 use Drupal\Component\Render\PlainTextOutput;
@@ -54,10 +56,10 @@ class ClientDataToEntityConverter {
 
     $item_list = $this->componentTreeLoader->load($entity);
     try {
-      assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], array_keys($layout))) === 4);
-      assert($layout['nodeType'] === 'region');
-      assert($layout['id'] === 'content');
-      assert(is_array($layout['components']));
+      \assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], \array_keys($layout))) === 4);
+      \assert($layout['nodeType'] === 'region');
+      \assert($layout['id'] === 'content');
+      \assert(\is_array($layout['components']));
       $item_list->setValue(self::convertClientToServer($layout['components'], $model, $entity, $validate));
     }
     catch (ConstraintViolationException $e) {
@@ -367,13 +369,13 @@ class ClientDataToEntityConverter {
       $entity->set($name, $new_value);
     }
 
-    assert(!is_null($entity->id()));
+    \assert(!\is_null($entity->id()));
     $original_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
-    assert($original_entity instanceof FieldableEntityInterface);
+    \assert($original_entity instanceof FieldableEntityInterface);
     // Filter out form_build_id, form_id and form_token.
     $entity_form_fields = array_filter(
       $entity_form_fields,
-      static fn (string|int $key): bool => is_string($key) && $entity->hasField($key),
+      static fn (string|int $key): bool => \is_string($key) && $entity->hasField($key),
       ARRAY_FILTER_USE_KEY,
     );
     // Copied from

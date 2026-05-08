@@ -22,7 +22,6 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * Drupal Canvas: `stark` defines no templates, and hence relies on all
  * default templates only.
  *
- * @see themes/engines/semi_coupled/README.md
  * @see ui/src/components/form/twig-to-jsx-component-map.js
  * @see ui/src/components/form/inputBehaviors.tsx
  */
@@ -49,7 +48,7 @@ final class CanvasThemeNegotiator implements ThemeNegotiatorInterface {
    * {@inheritdoc}
    */
   public function determineActiveTheme(RouteMatchInterface $route_match) {
-    $triggering_element_value = $this->requestStack->getCurrentRequest()?->get('_triggering_element_value');
+    $triggering_element_value = $this->requestStack->getCurrentRequest()?->request->get('_triggering_element_value');
     $still_in_media_library = $triggering_element_value !== (string) $this->t('Insert selected');
 
     if ($this->requestStack->getCurrentRequest()?->query->has('use_admin_theme') && $still_in_media_library) {

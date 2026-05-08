@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\canvas\Entity\PageRegion;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests the component tree aspects of the PageRegion config entity type.
- *
- * @group canvas
- * @coversDefaultClass \Drupal\canvas\Entity\PageRegion
  */
+#[RunTestsInSeparateProcesses]
+#[CoversClass(PageRegion::class)]
+#[Group('canvas')]
+#[Group('canvas_config_management')]
 final class PageRegionComponentTreeTest extends ConfigWithComponentTreeTestBase {
 
   /**

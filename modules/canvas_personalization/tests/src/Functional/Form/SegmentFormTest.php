@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Functional\Form;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Tests\BrowserTestBase;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
@@ -17,10 +18,9 @@ use Symfony\Component\HttpFoundation\Response;
  * ⚠️ This is highly experimental and *will* be refactored or even removed.
  *
  * @todo Revisit in https://www.drupal.org/i/3527086
- *
- * @group canvas
- * @group canvas_personalization
  */
+#[Group('canvas')]
+#[Group('canvas_personalization')]
 final class SegmentFormTest extends BrowserTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -56,7 +56,7 @@ final class SegmentFormTest extends BrowserTestBase {
       'administer site configuration',
       Segment::ADMIN_PERMISSION,
     ]);
-    assert($admin_user instanceof AccountInterface);
+    \assert($admin_user instanceof AccountInterface);
     $this->drupalLogin($admin_user);
     $this->drupalGet('/admin/structure/segment/add');
     $this->assertSession()->elementExists('xpath', '//table[@id="rules-id"]//td[text() = "No rules added yet."]');
@@ -137,7 +137,7 @@ final class SegmentFormTest extends BrowserTestBase {
     $this->assertSession()->elementTextContains('xpath', '//table[@id="rules-id"]', "UTM Parameters");
 
     $segment = Segment::load('my_segment');
-    assert($segment instanceof Segment);
+    \assert($segment instanceof Segment);
     $this->assertEquals([
       'user_role' => [
         'id' => 'user_role',

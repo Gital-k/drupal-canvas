@@ -1,16 +1,92 @@
-
 # Drupal Canvas's Shape Matching
 
 In the rest of this document, `Drupal Canvas` will be written as `Canvas`.
 
 This builds on top of the [`Canvas Components` doc](components.md). Please read that first.
 
-**Also see the [diagram](diagrams/data-model.md).**
+**Also see the [diagram](diagrams/shape-matching.md).**
+
+## Shape Matching: The Shape Sorter Toy Analogy
+Imagine a toddler with a classic shape-sorting toy — a box with different shaped holes (circle, square, triangle, oval, heart, star) and corresponding blocks in each shape.
+
+Given a block, find the hole(s) it fits into. But there's complexity to challenge our toddler! 🧒
+
+- There are **many kinds of holes**: not just basic shapes, but also variations, e.g. square hole with one curved edge
+- There's blocks of different **materials**: wood, plastic, metal, cardboard.
+- A **square block** fits only the **square hole**, regardless of material (objective)
+- A **square block with one curved edge** fits only the **square hole with the same curvature**, regardless of material
+  (objective)
+- But if you're a parent watching your toddler, you might shake things up by asking your toddler to ignore the orange
+  blocks and put the remaining blocks in the order of the colors of the rainbow.
+
+### Canvas Shape Matching
+Replace:
+
+- **Holes** = Component props (the component needs a `title` string, an `image` object, etc. — and there are subtle variants for some, such as a `string` that must be a URI vs a regular `string`)
+- **Materials** = types of PropSources (entity fields, entity URLs, adapters, etc.)
+- **Blocks** = the specific PropSources (node title field, user name field, the node's canonical URL, a UNIX timestamp field adapted to a YYYY-MM-DD string)
+- **Shape of the hole** = PropShape (the JSON schema: `type=string`, `type=object&$ref=image`, etc.)
+- **Shape of the block** = Validation constraints restricting the structured data (e.g. only local file URIs allowed)
+
+### The Two Phases
+
+#### Phase 1: Matchers (Objective)
+**"Does this square block fit this square hole?"**
+The three matcher services (three materials!) ask objectively:
+
+- **EntityFieldPropSourceMatcher**: "Does this entity field produce the right shape?" (e.g. "Does the 'title' field produce a `type=string&` (square)?") → YES or NO
+- **HostEntityUrlPropSourceMatcher**: "Does the host entity's URL produce the right shape?" (e.g. "Does a URL produce `type=string&format=uri` (square)?") → YES or NO
+- **AdaptedPropSourceMatcher**: "Does this adapter transform data into the right shape?" (e.g. "Does the image adapter produce an `image` (heart)?") → YES or NO
+  These matchers find *all* valid fits — like checking every hole to see which ones the block actually fits through.
+
+#### Phase 2: Suggester (Subjective)
+**"Which of the square blocks from phase 1 is preferable??"**
+After the matchers identify *all* valid fits, the `PropSourceSuggester` applies context:
+
+- **Filter**: "Some blocks are irrelevant in this context" — parent asked to ignore the orange blocks (e.g. the `revision log message` field never makes sense to show on the live site)
+- **Order**: "Some blocks are more obvious than others"  — parent asked to insert them in rainbow order (e.g., suggest the obvious `author` square block before the obscure `revision author` square block)
+
+### Why This Matters
+If the matchers and suggester weren't separated:
+
+- **Without separation**: The toddler toy is a *single black box*. You don't know which blocks it considered, why some disappeared, or why it suggested a tricky shape when easy ones exist. (This was the old `PropSourceSuggester` — too complex to understand.)
+- **With separation**:
+  - The **matchers** are clear, testable, focused: "Does this block's shape match this hole's shape?" New materials (matchers) can be added. ✓
+  - The **suggester** is also clear: "Given these valid shape matches, which are most helpful right now?" ✓
+  - You can *verify* all valid blocks exist and match correctly (matcher tests)
+  - You can *tune* the suggestion heuristics independently — which blocks to hide, which order to present them (suggester filtering/ordering)
+
+### In Code Terms
+
+```
+PropSourceSuggester.suggest(component, host_entity)
+  ↓
+  FOR each prop in component.props:
+    ↓
+    EntityFieldPropSourceMatcher.match(prop_shape)      → square_field1, square_field2, square_field3
+    HostEntityUrlPropSourceMatcher.match(prop_shape)    → none
+    AdaptedPropSourceMatcher.match(prop_shape)          → square_adapter1
+    ↓ (all matches combined — all fit the square block)
+    square_field1, square_field2, square_field3, square_adapter1
+    ↓ (suggester filters: remove irrelevant blocks)
+    square_field1, square_field3, square_adapter1  ← blocked square_field2 (irrelevant in this context)
+    ↓ (suggester orders: rainbow order)
+    square_field1, square_adapter1, square_field3  ← reordered: obvious before obscure
+    ↓
+  RETURN filtered & ordered suggestions
+```
+
+### Result
+
+The toddler picks blocks that:
+
+1. ✅ Fit the block's shape (matched by matchers = objectively correct)
+2. ✅ In the expected order (ordered by suggester = subjectively helpful)
 
 ## Finding issues 🐛, code 🤖 & people 👯‍♀️
 Related Canvas issue queue components:
 - [Shape matching](https://www.drupal.org/project/issues/canvas?component=Shape+matching) (see section
-   3.1.2 below, and specifically 3.1.2.a)
+   3.1.2 below, and specifically 3.1.2.b and 3.1.2.c)
 - [Redux-integrated field widgets](https://www.drupal.org/project/issues/canvas?component=Redux-integrated+field+widgets)
 - [Data model](https://www.drupal.org/project/issues/canvas?component=Data+model)
 
@@ -24,11 +100,12 @@ to one of us! 😊 🙏
 ### 1.1 Existing Drupal Terminology that is crucial for Canvas
 
 - `computed field prop`: not every `field prop` has their value _stored_, some may have their value _computed_ (for example: the `file_uri` field type's `url` prop)
-- `base field`: a `field instance` that exists for _all_ bundles of an entity type, typically defined in code
+- `base field`: an `entity field` that exists for _all_ bundles of an entity type, typically defined in code
 - `bundle field`: a `field instance` that exists for _some_ bundles of an entity type, typically defined in config
 - `content entity`: an entity that can be created by a Content Creator, containing various `field`s of a particular entity type (e.g. "node")
 - `content type`: a definition for content entities of a certain entity type and bundle, and hence every `content entity` of this bundle is guaranteed to contain the same `bundle field`s
 - `data type`: Drupal's smallest unit of representing data, defines semantics and typically comes with validation logic and convenience methods for interacting with the data it represents ⚠️ Not all data types in Drupal core do what they say, see `\Drupal\canvas\Plugin\DataTypeOverride\UriOverride` for example. ⚠️
+- `entity field`: a definition on the entity type or bundle level for creating a `field instance` on such an entity — see `base field` and `bundle field`
 - `field`: synonym of `field item list`
 - `field prop`: a property defined by a `field type`, with a value for that property on such a `field item`, represented by a `data type`. Often a single prop exists (typically: `value`), but not always (for example: the `image` field type: `target_id`, `entity`, `alt`, `title`, `width`, `height` — with `entity` a `computed field prop`)
 - `field instance`: a definition for instantiating a `field type` into a `field item list` containing >=1 `field item`
@@ -49,9 +126,11 @@ to one of us! 😊 🙏
 - `prop shape`: a normalized representation of the schema for a `component input`, without metadata that does not affect the _shape_: a title or description does not affect what values _fit into this shape_; only necessary for `Component Source Plugins` that DO NOT provide their own input UX.
 - `prop source`: a source for retrieving a prop value
   - `static prop source`: a `prop source` powered by a `conjured field` (i.e. `unstructured data`)
-  - `dynamic prop source`: a `prop source` powered by a `base field` or `bundle field` (i.e. `structured data`)
+  - `entity field prop source`: a `prop source` powered by a `base field` or `bundle field` (i.e. `structured data`)
   - `host entity URL prop source`: a `prop source` that generates various URLs for the `content entity` that contains it (e.g., the entity's canonical URL)
   - TBD: `remote prop source`: a `prop source` powered by a remote source ("external data"), i.e. data stored outside Drupal
+- `prop source matcher`: one per prop source type (except `static prop source`), responsible for _objectively_ all possible `prop source`s of that type (entity field, adapter …) that match a given `prop shape`
+- `prop source suggester`: combines the results of all `prop source matcher`s and subjectively decides which results should be presented to the Site Builder/Content Creator and in what order
 - `structured data`: the data model defined by a Site Builder in a `content type`, and whose smallest units are `field props` — queryable by Views
 - `unstructured data`: the ad-hoc data used to populate `component input`s that are not populated using `unstructured data` — NOT queryable by Views, this should be minimized/discouraged
 - `well-known prop shape`: a `prop shape` that is _named_: one that is defined in a module's or theme's `/schema.json` file and is then referenced (`$ref`) from the JSON schema for that `component input`.
@@ -87,7 +166,7 @@ range). That primitive type plus additional restrictions identifies a unique `pr
 
 Some `prop source`s only support particular `prop shape`s, others may be able to support virtually any `prop shape`.
 
-#### 3.1.2 Finding fitting `field type`: `conjured field`s and `field instance`s
+#### 3.1.2 Finding fitting `field type`: `conjured field`s and `entity fields`s
 
 Per the product requirements, existing `field type`s and `field widget`s MUST be used, and ideally `structured data`
 SHOULD be used.  But `field type`s can be configured, and depending on the configured settings, they may support rather
@@ -110,55 +189,36 @@ ask. Because:
 - in other words: `component input`s should be populated by `structured data` if they contain _semantical_ information,
   otherwise it is _presentational_ information and hence `unstructured data` is more appropriate
 
-##### 3.1.2.a `structured data` → matching `field instance`s ⇒ `dynamic prop source`
+There are two main scenarios for populating a `component input` with `unstructured data` versus `structured data`:
+1. initially, every `component instance` is created with `unstructured data` (and prepopulated with thd defaults
+   specified in the `component`'s metadata): this allows it to be rendered _immediately_. What field type gets used for
+   that is _computed_: we don't want to burden the Content Author with that choice. See 3.1.2.a below for details.
+2. when a Site Builder or Content Author edits a `component instance`, they can choose to switch from `unstructured data`
+   to `structured data` (or the other way around) for each `component input` — assuming the entity that contains that
+   `component instance` _can_ be associated with structured data. A `Pattern` for example is stand-alone (so it can't),
+   but a `ContentTemplate` is tied to a particular type of `content entity`, so it can. See 3.1.2.b and later.
 
-See:
-- `\Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher`
-- `\Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::toDataTypeShapeRequirements()`
-
-All `structured data` in every `content entity` in Drupal is found in `base field`s and `bundle field`s. These already
-have field settings defined. Hence `Canvas` must **match** a `field instance` for a given `prop shape`.
-
-How can this reliably be matched? Drupal's validation constraints for `field type`s and `data type`s determine the
-precise shapes of values that are allowed … exactly like a `prop shape` (i.e. the JSON schema for a `component input`)!
-
-Hence the matching works like this:
-1. transform the JSON schema of a `prop shape` to the equivalent primitive `data type` + validation constraints (see
-   `JsonSchemaType::toDataTypeShapeRequirements()`)
-2. iterate over all `field instance`s in the site, and compare the previous step's `data type` + validation constraints
-   to find a match
-
-Finally, while the `prop shape` may be the same for many `component input`s, that same `prop shape` may be required for
-one `component`'s `component input`, but optional for another. So an additional filtering step is required for optional
-versus required occurrences of a `prop shape`:
-3. if a `component input` is required, the matching `field instance`s must also be marked as required
-
-The found `field instance` can then be used in a `dynamic prop source`, that can be _evaluated_ to retrieve the stored
-value that fits in the `prop shape`.
-
-See `\Drupal\canvas\PropSource\DynamicPropSource`.
-
-⚠️ **Multiple** bits of `structured data` may be able to fit into a given `prop shape`. All viable choices are
-suggested by `\Drupal\canvas\ShapeMatcher\PropSourceSuggester`, with irrelevant choices omitted (such as the
-"Default translation" boolean, or the "Revision log message" prose string). The Content Creator or Site Builder will
-choose one.
-
-ℹ️ The completeness of this is tested by `\Drupal\Tests\canvas\Kernel\EcosystemSupport\FieldTypeSupportTest`.
-
-##### 3.1.2.b `unstructured data` → generating `conjured field`s ⇒ `static prop source`
+##### 3.1.2.a `unstructured data` → generating `conjured field`s ⇒ `static prop source`
 
 See:
 - `\Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()`
 - `\Drupal\canvas\PropShape\StorablePropShape`
+- `\Drupal\canvas\PropShape\CandidateStorablePropShape`
 - `\Drupal\canvas\PropShape\PropShape::standardize()`
-- `hook_storage_prop_shape_alter()`
+- `hook_canvas_storable_prop_shape_alter()`
+- `\Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface`
+- `\Drupal\canvas\PropSource\StaticPropSource`
 
 For any `unstructured data`, no field settings exist yet, so the appropriate settings for a `prop shape` must be
 generated. `JsonSchemaType::computeStorablePropShape()` contains logic to that relies only on `field type`s
 available in Drupal core. Unlike for `structured data`, no additional complexity is necessary for required versus
 optional `component input`s.
 
-Contributed modules can implement `hook_storage_prop_shape_alter()` to make different choices.
+Contributed modules can implement `hook_canvas_storable_prop_shape_alter()` to make different choices. Such hooks
+receive a `\Drupal\canvas\PropShape\CandidateStorablePropShape` value object, which contains:
+- the precise storage decision: field type, storage settings, instance settings and cardinality
+- the corresponding UX decision: field widget
+- the cacheability that led to this decision — e.g. the presence of certain config
 
 Any `component input` whose `prop shape` corresponds to a `well-known prop shape` may cause _two_ invocations of that
 alter hook:
@@ -171,38 +231,133 @@ value that fits in the `prop shape`.
 
 See `\Drupal\canvas\PropSource\StaticPropSource`.
 
+💡 Whenever the cacheability that led to a decision is invalidated (e.g. some config was saved), these hooks are executed
+again, to ensure an up-to-date decision for how to store props of the given `prop shape`.
+Note: if the result is  different, a [new version is added to the `Component config entity`](config-management.md#3.1).
+
 ⚠️ When choosing to use `unstructured data` to populate a `component input`, Canvas decides
 using the aforementioned logic what `field type`, `field widget` et cetera to use. Only when using `structured data`,
-there is a need for an additional choice (see the `PropSourceSuggester` mentioned in 3.1.2.a).
+there is a need for an additional choice (see the `PropSourceSuggester` mentioned in 3.1.2.b).
 
-#### 3.1.3 `prop expression`s: evaluating a `dynamic prop source` or `static prop source`
+##### 3.1.2.b `structured data` → matching `entity field`s ⇒ `entity field prop source`
+
+See:
+- `\Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher`
+- `\Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::toDataTypeShapeRequirements()`
+- `\Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface`
+- `\Drupal\canvas\PropSource\EntityFieldPropSource`
+
+All `structured data` in every `content entity` in Drupal is found in an `entity field` (a `base field`s or
+`bundle field`). These already have field settings defined. Hence `Canvas` must **match** a `field instance` for a given
+`prop shape`.
+
+How can this reliably be matched? Drupal's validation constraints for `field type`s and `data type`s determine the
+precise shapes of values that are allowed … exactly like a `prop shape` (i.e. the JSON schema for a `component input`)!
+
+Hence the matching works like this:
+1. transform the JSON schema of a `prop shape` to the equivalent primitive `data type` + validation constraints (see
+   `JsonSchemaType::toDataTypeShapeRequirements()`)
+2. iterate over all `entity field`s in the site, and compare the previous step's `data type` + validation constraints
+   to find a match
+
+Finally, while the `prop shape` may be the same for many `component input`s, that same `prop shape` may be required for
+one `component`'s `component input`, but optional for another. So an additional filtering step is required for optional
+versus required occurrences of a `prop shape`:
+3. if a `component input` is required, the matching `entity field`s must also be marked as required
+
+The found `entity field`s can then be used in a `entity field prop source`, that can be _evaluated_ to retrieve the
+stored value that fits in the `prop shape`.
+ℹ️ An `entity field prop source` may specify a single "adapter" plugin (which must take a single input), which allows
+Canvas to suggest field properties that _conceptually_ fit perfectly, but don't _technically_ fit, a particular `prop shape`.
+For example: "timestamp" fields (which contain UNIX timestamps) can be made available to props that have the
+`type: string, format: date` shape, by using the `unix_to_date` adapter plugin.
+
+See `\Drupal\canvas\PropSource\EntityFieldPropSource`.
+
+ℹ️ The completeness of this is tested by `\Drupal\Tests\canvas\Kernel\EcosystemSupport\FieldInstanceSupportTest`.
+
+### 3.1.2.c `structured data` that aren't `entity field`s: `host entity URL prop source` et cetera
+
+3.1.2.b covered `entity field`s in particular. It's the most common source of `structured data`, but it's not the only
+one.
+
+In fact, **multiple** kinds of `structured data` may be able to fit into a given `prop shape`. All viable choices
+are suggested by `\Drupal\canvas\ShapeMatcher\PropSourceSuggester`, with irrelevant choices omitted (such as the
+"Default translation" boolean, or the "Revision log message" prose string). The Content Creator or Site Builder will
+choose one.
+
+The suggester relies on multiple `prop source matcher`s, each responsible for a particular `prop source` type. The
+matchers are objective, the suggesters are subjective: they filter and change order.
+
+There may be additional `prop source`s that may be offered as suggestions to Site Builders and/or Content Authors to
+populate `component input`s:
+- For the various URI `prop shape`s (see also [3.2.2](#3.2.2)!), there is the `host entity URL prop source`, which is
+  able to generate various URIs that point to the host entity (i.e. the containing `content entity`).
+- @todo <https://www.drupal.org/project/canvas/issues/3573831> will add a `HostEntityPropSource`
+- TBD: there may be more, such as a `remote prop source` that can retrieve data from remote sources ("external data")
+
+See:
+- `\Drupal\canvas\ShapeMatcher\PropSourceSuggester`
+- `\Drupal\canvas\PropSource\HostEntityUrlPropSource`
+- `\Drupal\canvas\ShapeMatcher\HostEntityUrlPropSourceMatcher`
+
+
+#### 3.1.3 `prop expression`s: evaluating a `entity field prop source` or `static prop source`
+
+`prop expression`s are one of the lowest level building block of how Canvas works: it's similar to Drupal core's "token"
+system, but more precise (it can return non-string values) and powerful (they can be chained).
+
+Only developers of field types ever have to understand them in detail. Site Builders and Content Creators only interact
+with them  indirectly: Site Builders choose `entity field prop source`s or `static prop source`s to populate
+`component input`s, and those `prop source`s contain `prop expression`s that define how to retrieve the actual value(s).
+
+So, _if_ you're going to implement `hook_canvas_storable_prop_shape_alter()`, you will need to have at least a basic
+understanding of `prop expression`s, because you may need to read or modify them. The classes and tests mentioned below
+should help with that.
 
 See
 - `\Drupal\canvas\PropExpressions\StructuredData\Labeler`
 - `\Drupal\canvas\PropExpressions\StructuredData\Evaluator`
-- `\Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface`
-- `\Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression`
-- `\Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression`
-- `\Drupal\Tests\canvas\Unit\PropExpressionTest`
+- `\Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface`
+- `\Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface`
+- `\Drupal\canvas\PropExpressions\StructuredData\ScalarPropExpressionInterface`
+- `\Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface`
+- `\Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface`
+- `\Drupal\Tests\canvas\Unit\PropExpressionTest::testFromString()`
+- `\Drupal\Tests\canvas\Unit\PropExpressionTest::testToString()`
+- `\Drupal\Tests\canvas\Kernel\PropExpressionKernelTest::testLabel()`
+- `\Drupal\Tests\canvas\Kernel\PropExpressionKernelTest::testCalculateDependencies()`
 
 Many `field type`s contain a single `field prop` (typically named "value"), but not all. Most `field type`s have one
 required "main prop", many have additional optional props or even computed props.
 
-To reliable retrieve the value from a `static prop source` or `dynamic prop source`, the `field item` alone is
+To reliable retrieve the value from a `static prop source` or `entity field prop source`, the `field item` alone is
 insufficient: `Canvas` needs to know exactly which `field prop`(s) to retrieve from a `field item`. Plus, it may need to
 arrange those retrieved values in a particular layout (for `prop shape`s that use the "object" primitive type the right
 key-value pairs must be assembled).
 
 To express that, `prop expression`s exist, which define:
 
-1. what context they need:
-  - `field item` or `field item list` of a certain `field type`
-  - or a `content entity` of a certain `content type` (which then contains a `field
-2. optionally: specify a delta to determine which `field item` from a `field item list` to use. The absence of a delta
-   is interpreted as "everything please". For a `field item list` configured for single cardinality that would be a
-   single value, versus an array of values for multiple cardinality.
-3. what `field prop`s they must retrieve in that context, possibly following entity reference
-4. what the resulting shape is: either a single value (typically) or a list of key-value pairs — in the latter case the
+- what context they need as a starting point (**Starting point** column), either:
+  - `field item` or `field item list` of a certain `field type`: field type-based prop expressions
+  - or a `content entity` of a certain `content type` containing a particular `entity field`: entity field-based prop
+    expressions
+2. optionally for `entity field`s: specify a delta to determine which `field item` from a `field item list` to use. The
+   absence of a delta  is interpreted as "everything please". For a `field item list` configured for single cardinality
+   that would be a single value, versus an array of values for multiple cardinality.
+3. what `field prop`s they must retrieve in that context, possibly following entity references (**Reference** column)
+4. what the **evaluation result shape** is: either
+   - a single scalar value (most common), or a list ("array") of scalar values
+   - or a list of key-value pairs: an "object", or a list ("array") of such key-value pairs
+
+| prop expression class                | starting point | reference | evaluation result shape |
+|--------------------------------------|:--------------:|:---------:|:-----------------------:|
+| `FieldPropExpression`                | entity field   |    ❌    |         scalar          |
+| `FieldObjectPropExpression`          | entity field   |    ❌    |         object          |
+| `ReferenceFieldPropExpression`       | entity field   |    ✅    |            ❌           |
+| `FieldTypePropExpression`            | field type     |    ❌    |         scalar          |
+| `FieldTypeObjectPropExpression`      | field type     |    ❌    |         object          |
+| `ReferenceFieldTypePropExpression`   | field type     |    ✅    |            ❌           |
 
 `prop expression`s have 2 representations:
 
@@ -218,26 +373,22 @@ Examples:
   markers such as `␞` are never shown to the end user.
 - `ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt}` declares it evaluates an "image" `field item`, has no
   corresponding label (because it is for a `static prop source` and hence never needs to be explained/presented to a
-  Canvas user), and returns
-  two key-value pairs:
+  Canvas user), and returns two key-value pairs:
   - the first one being "src" for which the first "url" `field prop` of the "uri" `field` on the "file"
     `content entity` that is referenced by the "image" `field type`
   - the second one being "alt", which can be retrieved directly from the "image" `field item`.
+- `ℹ︎entity_reference␟entity␜[␜entity:media:image␝field_media_image␞␟src_with_alternate_widths][␜entity:media:remote_image␝field_media_oembed_image␞␟remote_image_web_uri]`
+  declares it evaluates an entity reference `field item`, has no corresponding label (same reason as above), branches
+  based on the bundle of the referenced `Media` `content entity`:
+  - if it is of the "image" media type, it fetches the "src_with_alternate_widths" field property
+  - if it is of the "remote_image" media type, it fetches the "remote_image_web_uri" field property
+  - … but in either case, it returns a single value: an HTTP(S) URI pointing to an image
 
-For more examples, see `\Drupal\Tests\canvas\Unit\PropExpressionTest`.
-
-
-#### 3.1.4 Non-structured data `prop source`: `host entity URL prop source`
-
-There may be additional `prop source`s that may be offered as suggestions to Site Builders and/or Content Authors to
-populate `component input`s.
-
-For the various URI `prop shape`s (see also [3.2.2](#3.2.2)!), there is the `host entity URL prop source`, which is able
-to generate various URIs that point to the host entity (i.e. the containing `content entity`).
-
-See:
-- `\Drupal\canvas\PropSource\HostEntityUrlPropSource`
-- `\Drupal\canvas\ShapeMatcher\PropSourceSuggester::matchHostEntityUrlPropSources()`
+For more examples, see `\Drupal\Tests\canvas\Unit\PropExpressionTest`. To gain a deeper understanding of how these work,
+put a breakpoint in its `::testFromString()` and `::testToString()` methods.
+Note that their functionality that requires a working kernel has its test logic in
+`\Drupal\Tests\canvas\Kernel\PropExpressionKernelTest`, but reuses the same test cases as the unit test. It is split to
+keep maximally benefit from unit test speed when working on this. This improves maintainability/DX.
 
 
 ### 3.2 Additional functionality overlaid on top of the SDC JSON Schema

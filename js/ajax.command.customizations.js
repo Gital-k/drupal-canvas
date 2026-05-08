@@ -4,7 +4,46 @@
  */
 
 /* global csstree */
-(function (Drupal, csstree, drupalSettings) {
+(function (Drupal, csstree, drupalSettings, $) {
+  /**
+   * Remove stale multivalue-field rows from a DOM subtree.
+   *
+   * Targets only rows explicitly tagged during add/remove AJAX operations:
+   * - `.canvas-optimistic-row` / `[data-canvas-optimistic]` — skeleton rows
+   *   injected by DrupalMultivalueSubmit for perceived performance.
+   * - `.canvas-pending-remove` — rows hidden immediately on remove that may
+   *   linger until the AJAX response completes.
+   *
+   * Also removes any draggable row that lacks form controls (no named
+   * input/select/textarea), which catches residual empty `<tr>` elements.
+   *
+   * @param {Element} container
+   *   A `[data-canvas-multiple-values]` wrapper element to clean.
+   */
+  const cleanupStaleMultivalueRows = (container) => {
+    if (!container) return;
+
+    // Remove explicitly tagged rows.
+    container
+      .querySelectorAll(
+        'tr.canvas-optimistic-row, tr[data-canvas-optimistic], tr.canvas-pending-remove',
+      )
+      .forEach((row) => row.remove());
+
+    // Remove draggable rows with no form controls — these are empty shells.
+    container
+      .querySelectorAll('table.field-multiple-table tbody tr.draggable')
+      .forEach((row) => {
+        if (
+          !row.querySelector(
+            'input[name], select[name], textarea[name], button[name]',
+          )
+        ) {
+          row.remove();
+        }
+      });
+  };
+
   // Keeps track of shorthand properties and their corresponding longhand
   // properties.
   const shorthands = {
@@ -423,7 +462,6 @@
       if (beginsWithTopLevel.length) {
         const selector = beginsWithTopLevel[0].match(/[^\s]+/);
         return (
-          // eslint-disable-next-line prefer-template
           cssText.replace(selector, `@scope(${selector}) { ${scopeSelector}`) +
           ' } '
         );
@@ -435,7 +473,6 @@
 
     // Make the dialog-scoped CSS the contents of the style element.
     styleElement.innerHTML = [...stylesheet.cssRules].reduce(
-      // eslint-disable-next-line prefer-template
       (accumulated, rule) => accumulated + processRule(rule) + ' ',
       '',
     );
@@ -598,4 +635,171 @@
       { once: true }
     );
   }
-})(Drupal, csstree, drupalSettings);
+
+  /**
+   * Replaces $wrapper with $newContent after React has hydrated it, preventing
+   * pre-hydration flicker. The element is inserted into the real DOM immediately
+   * (visibility:hidden) so Drupal AJAX behaviors have correct form ancestry,
+   * then revealed as soon as an outerHTML change is detected or the fallback
+   * timeout expires.
+   *
+   * @param {jQuery} $wrapper - The element to replace.
+   * @param {jQuery} $newContent - The already-parsed, themed replacement content.
+   * @param {object} settings - Drupal settings object.
+   * @param {object} effect - Effect object from ajax.getEffect().
+   * @param {number} [hydrationDelayMs=150] - Max ms to wait before revealing as fallback.
+   */
+  const replaceWithAfterHydration = ($wrapper, $newContent, settings, effect, hydrationDelayMs = 150) => {
+    // Hide the new content and insert it as a sibling AFTER $wrapper so the
+    // old content stays visible during hydration. Inserting as a sibling (not
+    // replacing yet) means attachBehaviors has correct form ancestry while
+    // avoiding any visible flash of un-hydrated markup.
+    $newContent.each((i, el) => {
+      if (el.nodeType === Node.ELEMENT_NODE) {
+        el.style.display = 'none';
+      }
+    });
+    $wrapper.after($newContent);
+
+    // Attach behaviors now that $newContent is live in the real DOM as a
+    // sibling of $wrapper. React hydrates here; form context is correct for
+    // AJAX rebinding because the parent <form> is an ancestor of both.
+    $newContent.each((index, el) => {
+      if (el.nodeType === Node.ELEMENT_NODE) {
+        Drupal.attachBehaviors(el, settings);
+       }
+     });
+
+     // Snapshot the elements so we can poll their outerHTML for hydration completion.
+     const snapshots = [];
+     $newContent.each((i, el) => {
+       if (el.nodeType === Node.ELEMENT_NODE) {
+         snapshots.push(el);
+       }
+     });
+
+     const reveal = () => {
+       // Now that React has hydrated, detach behaviors from the outgoing
+       // element, remove it, and show the new content in its place.
+       Drupal.detachBehaviors($wrapper.get(0), settings);
+       $wrapper.remove();
+
+       $newContent.each((i, el) => {
+         if (el.nodeType === Node.ELEMENT_NODE) {
+           el.style.display = '';
+         }
+       });
+
+       // Clean up stale multivalue rows (optimistic skeletons, pending
+       // removes, empty shells) so ghost rows don't persist after deletion.
+       $newContent.each((i, el) => {
+         if (el.nodeType !== Node.ELEMENT_NODE) return;
+         const wrappers = el.matches && el.matches('[data-canvas-multiple-values]')
+           ? [el]
+           : [...el.querySelectorAll('[data-canvas-multiple-values]')];
+         wrappers.forEach(cleanupStaleMultivalueRows);
+       });
+
+       // Handle show effects.
+       if (effect.showEffect !== 'show') {
+         $newContent.hide();
+       }
+       const $ajaxNewContent = $newContent.find('.ajax-new-content');
+       if ($ajaxNewContent.length) {
+         $ajaxNewContent.hide();
+         $newContent.show();
+         $ajaxNewContent[effect.showEffect](0);
+       } else if (effect.showEffect !== 'show') {
+         $newContent.show();
+       }
+     };
+
+     // Check if element tree contains un-hydrated React placeholders by looking
+     // for custom elements with tagName starting with 'drupal-canvas-'.
+     const hasUnhydratedCustomEls = (el) => {
+       if (!el || !el.querySelectorAll) return false;
+       return [...el.querySelectorAll('*')].some(
+         (n) => n.tagName && n.tagName.toLowerCase().startsWith('drupal-canvas-'),
+       );
+     };
+
+    const intervalMs = 16;
+    let elapsed = 0;
+    const pollInterval = setInterval(() => {
+      elapsed += intervalMs;
+      const hydrated = snapshots.every(
+        (el) => !hasUnhydratedCustomEls(el),
+      );
+      if (hydrated) {
+        clearInterval(pollInterval);
+        setTimeout(reveal);
+      } else if (elapsed >= hydrationDelayMs) {
+        clearInterval(pollInterval);
+        reveal();
+      }
+    }, intervalMs);
+  };
+
+  const originalInsert = Drupal.AjaxCommands.prototype.insert;
+
+  Drupal.AjaxCommands.prototype.insert = function (...args) {
+    const [ajax, command] = args;
+    const { callback, element } = ajax;
+
+    // When a media library fieldset is replaced, skip the default AJAX replace
+    // and instead send the new markup with a custom event. This is done to
+    // ensure the replacement is placed in the correct location within the DOM
+    // AND within the React component tree. Without this, media library item
+    // sorting will not work properly when the items are a mix of pre-existing
+    // and newly added.
+    if (command.method === 'replaceWith' && command?.selector && document.querySelector(`${command.selector}[data-canvas-media-library-fieldset] `)) {
+      const mediaItems = document.querySelector(`${command.selector}[data-canvas-media-library-fieldset]`).closest('[data-canvas-ml-ajax-target]')
+      const event = new CustomEvent('canvas:updateMediaWidget', {
+        detail: { data: command.data },
+        bubbles: true,
+      });
+      mediaItems.dispatchEvent(event);
+      return;
+    }
+
+    // Replicate the resolved method exactly as the original does:
+    // response.method takes precedence over ajax.method.
+    const method = command.method || ajax.method;
+
+    // For addMoreAjax replaceWith on a multivalue element, place the new
+    // content into the real DOM immediately (so Drupal AJAX behaviors have
+    // correct form ancestry for serialization), but keep it visually hidden
+    // until React has had time to hydrate, avoiding pre-hydration flicker.
+    if (
+      method === 'replaceWith' &&
+      ['addMoreAjax', 'deleteAjax'].includes(callback?.[1]) &&
+      !!element.closest('[data-canvas-multiple-values]')
+    ) {
+      // Mirror the original: resolve wrapper and settings.
+      const $wrapper = command.selector ? $(command.selector) : $(ajax.wrapper);
+      const settings = command.settings || ajax.settings || drupalSettings;
+      const effect = ajax.getEffect(command);
+
+      // Mirror the original: parse response.data and apply the ajaxWrapperNewContent theme.
+      const parseHTML = (htmlString) => {
+        const fragment = document.createDocumentFragment();
+        const template = fragment.appendChild(document.createElement('template'));
+        template.innerHTML = htmlString;
+        return template.content.childNodes;
+      };
+      let $newContent = $(parseHTML(command.data));
+      $newContent = Drupal.theme('ajaxWrapperNewContent', $newContent, ajax, command);
+
+      // Mirror the original: detach behaviors from the element being replaced.
+      // Note: detachBehaviors is deferred to reveal() inside replaceWithAfterHydration
+      // so the old element stays live in the DOM during hydration.
+      replaceWithAfterHydration($wrapper, $newContent, settings, effect);
+
+      return;
+    }
+
+    // Default insert behavior for all other cases.
+    originalInsert.apply(this, args);
+  };
+
+})(Drupal, csstree, drupalSettings, jQuery);

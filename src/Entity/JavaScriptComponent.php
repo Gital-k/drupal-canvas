@@ -4,9 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\ComponentMetadataRequirementsChecker;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
+use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
@@ -97,6 +105,20 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   protected ?array $dataDependencies;
 
   /**
+   * Shared instance of the ComponentSource plugin manager, for previews.
+   *
+   * @see ::buildPreview()
+   */
+  private static ComponentSourceManager $componentSourceManagerForPreviews;
+
+  /**
+   * Shared instance of the AutoSaveManager, for previews.
+   *
+   * @see ::buildPreview()
+   */
+  private static AutoSaveManager $autoSaveManagerForPreviews;
+
+  /**
    * {@inheritdoc}
    */
   public function id(): string {
@@ -112,7 +134,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     ];
     foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
       $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
-      assert($access instanceof AccessResult);
+      \assert($access instanceof AccessResult);
       if ($access->isAllowed()) {
         $route_params = [
           'canvas_config_entity_type_id' => self::ENTITY_TYPE_ID,
@@ -141,8 +163,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     // TRICKY: config entity properties may allow NULL, but only valid, saved
     // config entities are ever normalized: those that have passed validation
     // against config schema.
-    assert(is_array($this->js));
-    assert(is_array($this->css));
+    \assert(\is_array($this->js));
+    \assert(\is_array($this->css));
     $linkCollection = $this->getEntityOperations();
     return ClientSideRepresentation::create(
       values: [
@@ -160,11 +182,112 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
         // @see https://jsonapi.org/format/#document-links
         'links' => $linkCollection->asArray(),
       ],
-      preview: [
-        '#markup' => '@todo Make something 🆒 in https://www.drupal.org/project/canvas/issues/3498889',
-      ],
+      preview: $this->buildPreview(),
     )->addCacheableDependency($this)
       ->addCacheableDependency($linkCollection);
+  }
+
+  /**
+   * Renders a preview of a (saved) code component, regardless of `status`.
+   *
+   * Reuses the render infrastructure of the JsComponent ComponentSource plugin.
+   *
+   * @return array
+   *   A render array.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+   */
+  private function buildPreview(): array {
+    // TRICKY: config entity properties may allow NULL, but only valid, saved
+    // config entities are ever normalized: those that have passed validation
+    // against config schema.
+    \assert(\is_array($this->props));
+    \assert(\is_array($this->slots));
+    \assert(\is_string($this->uuid));
+
+    // If there's an auto-saved version of this code component, load that
+    // instead to generate the preview. JsComponent::renderComponent() *already*
+    // does this for the auto-saved JS + CSS; this ensures the auto-saved props
+    // and slots are used, too.
+    self::$autoSaveManagerForPreviews ??= \Drupal::service(AutoSaveManager::class);
+    $autoSavedIfAny = self::$autoSaveManagerForPreviews->getAutoSaveEntity($this)->entity;
+    \assert($autoSavedIfAny === NULL || $autoSavedIfAny instanceof JavaScriptComponent);
+
+    $existing_component = Component::load(JsComponent::componentIdFromJavascriptComponentId($this->id()));
+    $existing_required_prop_definitions = [];
+    if ($existing_component) {
+      \assert($existing_component instanceof Component);
+      $published_settings = $existing_component->getSettings(Component::ACTIVE_VERSION);
+      \assert(\array_key_exists('prop_field_definitions', $published_settings));
+      $existing_required_prop_definitions = $published_settings['prop_field_definitions'] ?? [];
+      $existing_required_prop_definitions = \array_filter($existing_required_prop_definitions, fn(array $prop_field_definition) => $prop_field_definition['required'] === TRUE);
+    }
+
+    // Instantiate a minimally viable JsComponent source plugin instance subset.
+    // This only needs required props if this component has ever been exposed.
+    self::$componentSourceManagerForPreviews ??= \Drupal::service(ComponentSourceManager::class);
+    $js_component_source = self::$componentSourceManagerForPreviews->createInstance(JsComponent::SOURCE_PLUGIN_ID, [
+      'local_source_id' => $this->id(),
+      // 💡This code is instantiating the JS ComponentSource plugin to be able
+      // to call its `::renderComponent()` method, to provide an accurate
+      // preview of the code component, even if it might never have been exposed
+      // (and hence has no `Component` config entity). As rendering triggers
+      // validation, if it exists already we need to ensure the required props
+      // are present.
+      // IOW: the sole purpose here is to render a preview of a code component,
+      // so not specifying the field definitions to generate StaticPropSources
+      // is fine, unless it was exposed before, where we need to know the
+      // required props as validation will happen on preview.
+      'prop_field_definitions' => $existing_required_prop_definitions,
+    ]);
+    \assert($js_component_source instanceof JsComponent);
+
+    // Retrieve all props' example values, prefer auto-saved ones.
+    $example_inputs = array_filter(\array_map(
+      // Note that an example is optional!
+      // @see `type: canvas.json_schema.prop.*`
+      fn (array $prop_definition) : null|bool|int|float|string|\Stringable|array => $prop_definition['examples'][0] ?? NULL,
+      $autoSavedIfAny->props ?? $this->props,
+    ));
+    $inputs = [
+      JsComponent::EXPLICIT_INPUT_NAME => \array_map(
+        fn (bool|int|float|string|\Stringable|array $v) => new EvaluationResult($v),
+        $example_inputs,
+      ),
+    ];
+    // If the component was published already, rendering the preview triggers
+    // validation of its props. If there were required props that we just
+    // deleted, we need to ensure those are present in the inputs to avoid a
+    // validation error.
+    if ($existing_component) {
+      $existing_required_inputs = $existing_component->getComponentSource()
+        ->getDefaultExplicitInput(only_required: TRUE);
+      foreach ($existing_required_inputs as $prop_name => $prop_source) {
+        if (!isset($inputs[JsComponent::EXPLICIT_INPUT_NAME][$prop_name])) {
+          \assert(\array_key_exists('value', $prop_source));
+          $inputs[JsComponent::EXPLICIT_INPUT_NAME][$prop_name] = new EvaluationResult($prop_source['value']);
+        }
+      }
+    }
+
+    // TRICKY: unlike \Drupal\canvas\Entity\Component::normalizeForClientSide(),
+    // this is not getting wrapped in a render-safe container, because the only
+    // failure modes for code components at the server-side rendering stage are:
+    // 1. the code component's config entity does not exist. But this is a
+    //    method on that config entity type, so that cannot happen.
+    // 2. the code props' example values may violate the JSON schema for props:
+    //    core's `ComponentValidator` would then trigger an exception … except
+    //    that JsComponent::renderComponent() does not perform validation.
+    // So, no render-safe container is necessary here: the only crash that can
+    // happen is on the client side, a validation error because of a missing
+    // required prop now removed as described above, or if there's a logic bug.
+    $build = $js_component_source->renderComponent(
+      inputs: $inputs,
+      slot_definitions: $autoSavedIfAny->slots ?? $this->slots,
+      componentUuid: $this->uuid,
+      isPreview: TRUE,
+    );
+    return $build;
   }
 
   /**
@@ -199,8 +322,23 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     ])) as $key => $value) {
       $this->set($key, $value);
     }
+    // Enforce minItems
+    if (\is_array($this->props)) {
+      $required_prop_names = $this->required ?? [];
+      foreach (\array_keys($this->props) as $prop_name) {
+        if (\in_array($prop_name, $required_prop_names, TRUE) && $this->props[$prop_name]['type'] === 'array') {
+          // Only required array props can have `minItems` set to 1. Other
+          // values are unsupported.
+          // @see \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
+          $this->props[$prop_name]['minItems'] = 1;
+        }
+        else {
+          unset($this->props[$prop_name]['minItems']);
+        }
+      }
+    }
 
-    if (array_key_exists('sourceCodeCss', $data) || array_key_exists('compiledCss', $data)) {
+    if (\array_key_exists('sourceCodeCss', $data) || \array_key_exists('compiledCss', $data)) {
       $this->set('css', [
         'original' => $data['sourceCodeCss'] ?? '',
         'compiled' => $data['compiledCss'] ?? '',
@@ -208,8 +346,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     }
 
     $violation_list = new EntityConstraintViolationList($this);
-    if (array_key_exists('sourceCodeJs', $data) || array_key_exists('compiledJs', $data)) {
-      if (!array_key_exists('importedJsComponents', $data)) {
+    if (\array_key_exists('sourceCodeJs', $data) || \array_key_exists('compiledJs', $data)) {
+      if (!\array_key_exists('importedJsComponents', $data)) {
         $violation_list->add(new ConstraintViolation(
           "The 'importedJsComponents' field is required when 'sourceCodeJs' or 'compiledJs' is provided",
           "The 'importedJsComponents' field is required when 'sourceCodeJs' or 'compiledJs' is provided",
@@ -310,6 +448,115 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   }
 
   /**
+   * Checks this code component meets Canvas's metadata requirements.
+   *
+   * Combines the shape/schema requirements that apply to all component sources,
+   * via `ComponentMetadataRequirementsChecker::check()` and JS-specific
+   * contracts (e.g. relative URLs cannot be resolved).
+   *
+   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
+   *   When this component does not meet requirements.
+   */
+  public function checkRequirements(): void {
+    $definition = $this->toSdcDefinition();
+    $metadata = new ComponentMetadata($definition, app_root: '', enforce_schemas: TRUE);
+    $messages = [];
+    try {
+      ComponentMetadataRequirementsChecker::check(
+        $definition['id'],
+        $metadata,
+        $definition['props']['required'] ?? [],
+      );
+    }
+    catch (ComponentDoesNotMeetRequirementsException $e) {
+      $messages = $e->getMessages();
+    }
+
+    // Per-prop checks specific to code components.
+    foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
+      // Code component metadata is persisted as a Drupal config entity, so
+      // `meta:enum` keys cannot contain dots.
+      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+      array_push($messages, ...self::checkPropMetaEnumKeys($prop_name, $prop));
+
+      // Image src in any example must satisfy JsComponent's runtime URL
+      // contract, which does not resolve relative paths.
+      foreach (self::imagesInExamples($prop) as $src) {
+        try {
+          JsComponent::validateExampleUrl($src);
+        }
+        catch (\InvalidArgumentException) {
+          $messages[] = \sprintf('Image prop "%s" example src "%s" must be a fully-qualified URL with both scheme and host. Use a placeholder URL such as https://placehold.co/600x400.', $prop_name, $src);
+        }
+      }
+    }
+
+    if (!empty($messages)) {
+      throw new ComponentDoesNotMeetRequirementsException($messages);
+    }
+  }
+
+  /**
+   * Validates `meta:enum` keys for a prop against config storage constraints.
+   *
+   * @param string $prop_name
+   *   Prop name (for error messages).
+   * @param array<string, mixed> $prop
+   *   The prop's JSON Schema.
+   *
+   * @return list<string>
+   *   Error messages, or an empty list if no issues found.
+   */
+  private static function checkPropMetaEnumKeys(string $prop_name, array $prop): array {
+    $enum_container = \in_array('array', (array) ($prop['type'] ?? []), TRUE)
+      ? $prop['items'] ?? []
+      : $prop;
+    if (!isset($enum_container['enum'], $enum_container['meta:enum'])) {
+      return [];
+    }
+    $messages = [];
+    foreach (\array_keys($enum_container['meta:enum']) as $meta_key) {
+      if (\str_contains((string) $meta_key, '.')) {
+        $messages[] = \sprintf('The "meta:enum" keys for the "%s" prop enum cannot contain a dot. Offending key: "%s"', $prop_name, $meta_key);
+      }
+    }
+    $expected_keys = \array_map(
+      static fn($value): string => \str_replace('.', '_', (string) $value),
+      $enum_container['enum'],
+    );
+    $missing_keys = \array_diff($expected_keys, \array_keys($enum_container['meta:enum']));
+    if (!empty($missing_keys)) {
+      $messages[] = \sprintf('The values for the "%s" prop enum must be defined in "meta:enum". Missing keys: "%s"', $prop_name, \implode(', ', $missing_keys));
+    }
+    return $messages;
+  }
+
+  /**
+   * Yields image src values for each `examples` entry matching $schema.
+   *
+   * @param array<string, mixed> $schema
+   *   The (sub-)schema (still containing `$ref` references).
+   *
+   * @return \Generator<int, string>
+   */
+  private static function imagesInExamples(array $schema): \Generator {
+    $is_image = ($schema['$ref'] ?? NULL) === 'json-schema-definitions://canvas.module/image';
+    foreach ($schema['examples'] ?? [] as $value) {
+      if (!\is_array($value)) {
+        continue;
+      }
+      if ($is_image) {
+        if (isset($value['src']) && \is_string($value['src'])) {
+          yield $value['src'];
+        }
+      }
+      elseif (isset($schema['items']) && \is_array($schema['items'])) {
+        yield from self::imagesInExamples($schema['items'] + ['examples' => $value]);
+      }
+    }
+  }
+
+  /**
    * Sets value for props.
    *
    * @param array<string, array{type: string, format?: string, examples?: string|array<string>, title: string}> $props
@@ -317,6 +564,11 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    */
   public function setProps(array $props): self {
     $this->props = $props;
+    // If a required prop was removed, we need to remove it from the list of
+    // required props.
+    if (!\is_null($this->required)) {
+      $this->required = \array_intersect(\array_keys($props), $this->required);
+    }
     return $this;
   }
 
@@ -364,6 +616,27 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies(): static {
+    parent::calculateDependencies();
+
+    // Every entity field expression declared under
+    // `dataDependencies.entityFields` references field/bundle/module config
+    // that must be tracked by Drupal's config dependency manager, so that
+    // cascading deletes, config export/import order and cache invalidation
+    // work correctly.
+    foreach ($this->dataDependencies['entityFields'] ?? [] as $expressions) {
+      foreach ($expressions as $expression_string) {
+        $expression = StructuredDataPropExpression::fromString($expression_string);
+        $this->addDependencies($expression->calculateDependencies());
+      }
+    }
+
+    return $this;
+  }
+
+  /**
    * Add the imported Javascript components as enforced dependencies.
    *
    * Enforced dependencies are not reset during dependency calculation.
@@ -394,7 +667,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     if ($violation_list->count() > 0) {
       throw new ConstraintViolationException($violation_list);
     }
-    $imported_js_component_dependency_names = array_values(array_map(
+    $imported_js_component_dependency_names = array_values(\array_map(
       fn(string $component_name) => $this->getConfigPrefix() . ".$component_name",
       $imported_js_components
     ));
@@ -418,7 +691,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
 
   protected function getConfigPrefix(): string {
     $entity_type = $this->getEntityType();
-    assert($entity_type instanceof ConfigEntityTypeInterface);
+    \assert($entity_type instanceof ConfigEntityTypeInterface);
     return $entity_type->getConfigPrefix();
   }
 
@@ -461,14 +734,14 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       $instance->getDependencies()['config'] ?? [],
       static fn(string $dependency) => \str_starts_with($dependency, $instance->getConfigPrefix())
     );
-    $js_component_ids = array_map(fn($dependency) => mb_substr($dependency, mb_strlen($this->getConfigPrefix()) + 1), $js_dependencies);
+    $js_component_ids = \array_map(fn($dependency) => mb_substr($dependency, mb_strlen($this->getConfigPrefix()) + 1), $js_dependencies);
     return self::loadMultiple($js_component_ids);
   }
 
   public function getCacheTags() {
     $cache_tags = parent::getCacheTags();
     if ($dependencies = $this->getDependencies()) {
-      $cache_tags = array_merge($cache_tags, array_map(fn($dependency) => "config:$dependency", $dependencies['config'] ?? []));
+      $cache_tags = array_merge($cache_tags, \array_map(fn($dependency) => "config:$dependency", $dependencies['config'] ?? []));
     }
     return \array_values($cache_tags);
   }

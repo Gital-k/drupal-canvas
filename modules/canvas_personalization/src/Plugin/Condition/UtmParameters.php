@@ -147,11 +147,11 @@ final class UtmParameters extends ConditionPluginBase {
     $request = \Drupal::request();
     $result = TRUE;
     foreach ($this->configuration['parameters'] as $parameter) {
-      $requestParamValue = $request->get($parameter['key'], NULL);
+      $requestParamValue = $request->query->getString($parameter['key']);
       $result &= match($parameter['matching']) {
         'exact' => $parameter['value'] === $requestParamValue,
         'starts_with' => str_starts_with($requestParamValue, $parameter['value']),
-        default => throw new \LogicException(sprintf('Unknown matching for condition %s', $this->pluginId)),
+        default => throw new \LogicException(\sprintf('Unknown matching for condition %s', $this->pluginId)),
       };
     }
     return (bool) ($this->configuration['negate'] ? !$result : $result);
@@ -169,8 +169,6 @@ final class UtmParameters extends ConditionPluginBase {
 
   /**
    * {@inheritdoc}
-   *
-   * @phpstan-return array<string>
    */
   public function getCacheContexts(): array {
     $contexts = parent::getCacheContexts();

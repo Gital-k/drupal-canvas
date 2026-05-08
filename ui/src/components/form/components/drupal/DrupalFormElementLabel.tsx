@@ -13,17 +13,13 @@ interface PropLinkData extends Omit<PropLinkerProps, 'propName'> {
 }
 
 const DrupalFormElementLabel = ({
-  title = { '#markup': '' },
+  title = '',
   titleDisplay = '',
   required = '',
   attributes = {},
   directLinkerData = undefined,
 }: {
-  title:
-    | {
-        '#markup': string;
-      }
-    | string;
+  title: string;
   titleDisplay?: string;
   required?: string;
   attributes?: Attributes;
@@ -47,14 +43,17 @@ const DrupalFormElementLabel = ({
       )}
       className={classes}
     >
-      {typeof title === 'string' ? title : title['#markup']}
+      {title}
     </FormElementLabel>
   );
   const getTheLabel = () => {
     // If there is prop link data, render the PropLinker next to the label.
     // We wrap the label in a div so they can appear next to each other without
     // the linker appearing inside the <label> tag.
-    if (attributes?.prop_link_data || directLinkerData) {
+    if (
+      titleDisplay !== 'invisible' &&
+      (attributes?.prop_link_data || directLinkerData)
+    ) {
       const propLinkData: PropLinkData = directLinkerData
         ? directLinkerData
         : (attributes.prop_link_data as PropLinkData);

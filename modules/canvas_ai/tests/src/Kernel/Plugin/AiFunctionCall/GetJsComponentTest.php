@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel\Plugin\AiFunctionCall;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\TestWith;
 use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\Tests\user\Traits\UserCreationTrait;
@@ -13,10 +15,9 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * Tests for the GetJsComponent function call plugin.
- *
- * @group canvas_ai
  */
-final class GetJsComponentTest extends KernelTestBase {
+#[Group('canvas_ai')]
+final class GetJsComponentTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;
 
@@ -33,11 +34,6 @@ final class GetJsComponentTest extends KernelTestBase {
   protected static $modules = [
     'ai',
     'ai_agents',
-    'media',
-    'path',
-    'canvas',
-    'system',
-    'user',
     'canvas_ai',
   ];
 
@@ -46,6 +42,7 @@ final class GetJsComponentTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installEntitySchema('path_alias');
     $this->functionCallManager = $this->container->get('plugin.manager.ai.function_calls');
     // Needs access to Canvas, permission to create code components is enough.
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION]);
@@ -53,10 +50,9 @@ final class GetJsComponentTest extends KernelTestBase {
 
   /**
    * Test getting JS component returns expected JS and CSS.
-   *
-   * @testWith [false]
-   *            [true]
    */
+  #[TestWith([FALSE])]
+  #[TestWith([TRUE])]
   public function testGetJsComponent(bool $with_auto_save = FALSE): void {
     $tool = $this->functionCallManager->createInstance('ai_agent:get_js_component');
     $this->assertInstanceOf(ExecutableFunctionCallInterface::class, $tool);

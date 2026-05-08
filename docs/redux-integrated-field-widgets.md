@@ -5,8 +5,7 @@ In the rest of this document, `Drupal Canvas` will be written as `Canvas`.
 ## Finding issues 🐛, code 🤖 & people 👯‍♀️
 Related Canvas issue queue components:
 1. [Redux-integrated field widgets](https://www.drupal.org/project/issues/canvas?component=Redux-integrated+field+widgets)
-2. [Semi-Coupled theme engine](https://www.drupal.org/project/issues/canvas?component=Semi-Coupled+theme+engine)
-3. [Shape matching](https://www.drupal.org/project/issues/canvas?component=Shape+matching)
+2. [Shape matching](https://www.drupal.org/project/issues/canvas?component=Shape+matching)
 
 ## 1. Terminology
 
@@ -24,7 +23,6 @@ Related Canvas issue queue components:
 This uses _most_ of the Canvas terminology in the:
 - [`Canvas Components` doc](components.md)
 - [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
-- [`Canvas Semi-Coupled theme engine` doc](semi-coupled-theme-engine.md)
 
 ## 2. Product requirements
 
@@ -68,7 +66,7 @@ intermediary concepts (`field widget`, `field type`, `field prop`, etc.) into a 
  previews.**
 
 ### 3.2 How?
-The `Semi-Coupled theme engine` makes it possible to process Drupal `render element`s with `React component`s  instead of `Twig`. See the [`Canvas Semi-Coupled theme engine` doc](semi-coupled-theme-engine.md) for more details.
+The forms use Drupal's Form API but ultimately render `React component`s  instead of `Twig`. See the [`Twig to React in the Canvas_Stark theme` doc](twig-to-react-in-canvas-stark.md) for more details.
 
 To redux-sync a `React`-rendered `HTML form control element`, it should be wrapped by `inputBehaviors`:
 
@@ -229,10 +227,11 @@ See [`canvas_field_widget_info_alter`](../canvas.redux_integrated_field_widgets.
 If your module provides a custom widget, you should implement this hook and add the transforms required in a similar fashion.
 
 Built-in transforms include:
-- `mainProperty` - which takes configuration of the `name` and an optional `list` boolean
+- `mainProperty` - which takes configuration of the `name` and an optional `multiple` boolean (see [3.4.2 Multi-value support](#342-multi-value-support))
 - `firstRecord` - which will return all child values for the first record in a list
 - `mediaSelection` - which will return 'selection' from input form values
 - `dateTime` - which will combine child `date` and `time` fields into a valid ISO-8601 datetime string
+- `dateRange` - which will combine start/end date parts into `value` and `end_value`
 
 ℹ️ The completeness of this is tested by `\Drupal\Tests\canvas\Kernel\EcosystemSupport\FieldWidgetSupportTest`.
 
@@ -262,27 +261,6 @@ function hook_field_widget_info_alter(array &$info): void {
   $info['trousers']['canvas']['transforms'] = [
     'mainProperty' => [
       'name' => 'lizard',
-    ]
-  ];
-}
-```
-
-If however, your input does not contain a list like so:
-
-```json
-{
-   "zipper[lizard]": "the user entered value"
-}
-```
-
-you could pass `false` for the `list` option to this transform
-
-```php
-function hook_field_widget_info_alter(array &$info): void {
-  $info['trousers']['canvas']['transforms'] = [
-    'mainProperty' => [
-      'name' => 'lizard',
-      'list' => FALSE,
     ]
   ];
 }
@@ -359,15 +337,62 @@ function hook_field_widget_info_alter(array &$info): void {
   ];
 }
 ```
+#### 3.4.2 Multi-value support
+
+All built-in transforms accept a `multiple` option via `BaseTransformOptions`. This option controls whether the transform returns a single value or an array of values and is essential for supporting multi-cardinality fields (i.e. SDC props with `type: array`).
+
+**How `multiple` is injected**
+
+The `multiple` flag is automatically injected server-side by [`GeneratedFieldExplicitInputUxComponentSourceBase::buildComponentInstanceForm()`](../src/Plugin/Canvas/ComponentSource/GeneratedFieldExplicitInputUxComponentSourceBase.php) based on the field's cardinality:
+
+```php
+$cardinality = $static_prop_source_field_definition['cardinality'] ?? NULL;
+$transforms[$sdc_prop_name] = \array_map(
+  static fn (array $transform): array =>
+    [
+      ...$transform,
+      'multiple' => $cardinality !== NULL && $cardinality !== 1,
+    ],
+  $widget_definition['canvas']['transforms']);
+```
+
+This means:
+- Single-cardinality fields (`cardinality = 1` or `NULL`) get `multiple: false` — transforms return a single value.
+- Multi-cardinality fields (`cardinality = -1` for unlimited, or `> 1`) get `multiple: true` — transforms return an array of values.
+
+**Why this is needed**
+
+Form data parsed by `qs.parse` represents multi-value fields as objects with string numeric keys rather than arrays:
+
+```json
+{
+  "0": { "target_id": "2" },
+  "1": { "target_id": "3" }
+}
+```
+
+Without the `multiple` flag, transforms cannot distinguish between a single-value object field (e.g. a link with `{ uri, title }`) and a multi-value field. The `multiple` flag tells the transform to iterate over all entries and return an array.
+
+**Weight-based ordering**
+
+When `multiple: true`, the `mainProperty` transform also supports weight-based ordering. If entries contain a `weight` or `_weight` field (e.g. from `tabledrag` or the media library widget,...), entries are sorted by weight before values are extracted:
+
+```js
+// Input (objects with weights)
+{ "0": { target_id: "5", weight: "0" }, "1": { target_id: "3", weight: "1" } }
+// Output (sorted by weight)
+["5", "3"]
+```
+
 ### 3.5 Limitations / Tradeoffs
 We've already established this system makes it possible to render Drupal render arrays with React. This makes it possible to use existing Drupal core functionality as if it were rendered by Twig. As powerful as this is, this isn't a 100% seamless solution. There are some limitations to be aware of:
 
 #### 3.5.1 CKEditor 5 (and perhaps anything with existing support for use in React.)
-CKSource maintains a  [CKEditor 5 React component](https://www.npmjs.com/package/@ckeditor/ckeditor5-react). While it is _possible_ to leverage Drupal core's Vanilla JS implementation of CKEditor 5, we have opted to use the version explicitly built to work in React. To accomplish this without considerable front end complexity, some theme-level extensibility was sacrificed. Most notably, the `text_format` _render element_ never makes it to the Drupal Canvas UI. The information necessary to render the text format `<select>` is instead passed to (and rendered by) the text area itself. 
+CKSource maintains a  [CKEditor 5 React component](https://www.npmjs.com/package/@ckeditor/ckeditor5-react). While it is _possible_ to leverage Drupal core's Vanilla JS implementation of CKEditor 5, we have opted to use the version explicitly built to work in React. To accomplish this without considerable front end complexity, some theme-level extensibility was sacrificed. Most notably, the `text_format` _render element_ never makes it to the Drupal Canvas UI. The information necessary to render the text format `<select>` is instead passed to (and rendered by) the text area itself.
 
 In other words, we surrender a bit of render array purity to take advantage of some well maintained open source software specifically created for use in this context. It also eliminates the need for complex workarounds to get the core approach working with Radix.
 
-When React optimized alternatives to core functionality are available, the tradeoffs of using them will be evaluated on a case by case basis. The CKEditor 5 example is a good one because it is a well maintained open source project that is already built to work in React. The CKEditor 5 example above may or may not be representative of how similar situations will be approached in the future. 
+When React optimized alternatives to core functionality are available, the tradeoffs of using them will be evaluated on a case by case basis. The CKEditor 5 example is a good one because it is a well maintained open source project that is already built to work in React. The CKEditor 5 example above may or may not be representative of how similar situations will be approached in the future.
 
 #### 3.5.2 Vanilla JS that causes reflows or has perceptible load times
 As to be expected with React, there is a great deal of re-rendering happening, much of the time occurring invisible. At minimum, a React-controlled form element will re-render any time its value changes, and in the case of Canvas managed forms, these elements rerender when *any* element in the form has a value change.

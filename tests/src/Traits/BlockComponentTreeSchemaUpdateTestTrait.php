@@ -21,15 +21,32 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
    *   - The expected values [violations and text] for each component instance.
    */
   public static function getValidTreesForASchemaUpdate(): \Generator {
+    // We need this test to pass both in 11.2.x and 11.3.x and above. Component versions hashes are influenced by their
+    // config schema, and for blocks that means depending on the block.settings.*. As block_settings.label_display
+    // changed between 11.2 and 11.3, that means there is no single block where we can have the same hash on 11.2.x and
+    // above. So we need to hardcode these per version.
+    // @see \Drupal\canvas\ComponentSource\ComponentSourceBase::generateVersionHash()
+    $canvas_test_block_input_none_version = match(TRUE) {
+      // The 11.3.x version
+      version_compare(\Drupal::VERSION, "11.3", '>=') => "cc3a0b22af30e414",
+      // The 11.2.10 version
+      default => "f91f8d4aff4aba7c",
+    };
+    $canvas_test_block_input_schema_change_poc_versions = match(TRUE) {
+      // The 11.3.x version
+      version_compare(\Drupal::VERSION, "11.3", '>=') => ["dbe845f73dc45b04", "0b5af0d270d99618"],
+      // The 11.2.10 version
+      default => ["88c370526c14d185", "7cc894b85e93a7d8"],
+    };
     yield 'tree with no blocks with update' => [
       [
         [
           'uuid' => self::UUID_INPUT_NONE,
           'component_id' => 'block.canvas_test_block_input_none',
-          'component_version' => 'f91f8d4aff4aba7c',
+          'component_version' => $canvas_test_block_input_none_version,
           'inputs' => [
             'label' => 'Test block with no settings.',
-            'label_display' => '',
+            'label_display' => '0',
           ],
         ],
       ],
@@ -50,13 +67,14 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
         [
           'uuid' => self::UUID_INPUT_NONE,
           'component_id' => 'block.canvas_test_block_input_none',
-          'component_version' => 'f91f8d4aff4aba7c',
+          'component_version' => $canvas_test_block_input_none_version,
           'inputs' => [
             'label' => 'Test block with no settings.',
-            'label_display' => '',
+            'label_display' => '0',
           ],
         ],
       ],
+      FALSE,
     ];
 
     yield 'tree with double block with update' => [
@@ -64,30 +82,30 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
         [
           'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE,
           'component_id' => 'block.canvas_test_block_input_schema_change_poc',
-          'component_version' => '7cc894b85e93a7d8',
+          'component_version' => $canvas_test_block_input_schema_change_poc_versions[1],
           'inputs' => [
-            'label' => 'Block schema change POC 1.',
-            'label_display' => '',
             'foo' => 'bar',
+            'label' => 'Block schema change POC 1.',
+            'label_display' => '0',
           ],
         ],
         [
           'uuid' => self::UUID_INPUT_NONE,
           'component_id' => 'block.canvas_test_block_input_none',
-          'component_version' => 'f91f8d4aff4aba7c',
+          'component_version' => $canvas_test_block_input_none_version,
           'inputs' => [
             'label' => 'Test block with no settings.',
-            'label_display' => '',
+            'label_display' => '0',
           ],
         ],
         [
           'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO,
           'component_id' => 'block.canvas_test_block_input_schema_change_poc',
-          'component_version' => '7cc894b85e93a7d8',
+          'component_version' => $canvas_test_block_input_schema_change_poc_versions[1],
           'inputs' => [
-            'label' => 'Block schema change POC 2.',
-            'label_display' => '',
             'foo' => 'baz',
+            'label' => 'Block schema change POC 2.',
+            'label_display' => '0',
           ],
         ],
       ],
@@ -112,13 +130,13 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
         self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO => 'Modified block! Current foo value: 1. Change … is necessary.',
       ],
       [
-        '0.inputs.' . self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE . '.' => "'change' is a required key.",
-        '0.inputs.' . self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE . '.foo' => [
+        '0.inputs' => "'change' is a required key.",
+        '0.inputs.foo' => [
           'The value you selected is not a valid choice.',
           'This value should be of the correct primitive type.',
         ],
-        '2.inputs.' . self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO . '.' => "'change' is a required key.",
-        '2.inputs.' . self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO . '.foo' => [
+        '2.inputs' => "'change' is a required key.",
+        '2.inputs.foo' => [
           'The value you selected is not a valid choice.',
           'This value should be of the correct primitive type.',
         ],
@@ -127,10 +145,47 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
         [
           'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE,
           'component_id' => 'block.canvas_test_block_input_schema_change_poc',
-          'component_version' => '88c370526c14d185',
+          'component_version' => $canvas_test_block_input_schema_change_poc_versions[0],
+          'inputs' => [
+            // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentInputsEvolutionTest::blockUpdatePathSampleForCoreIssue3521221()
+            'foo' => 2,
+            'label' => 'Block schema change POC 1.',
+            'label_display' => '0',
+            'change' => 'is necessary',
+          ],
+        ],
+        [
+          'uuid' => self::UUID_INPUT_NONE,
+          'component_id' => 'block.canvas_test_block_input_none',
+          'component_version' => $canvas_test_block_input_none_version,
+          'inputs' => [
+            'label' => 'Test block with no settings.',
+            'label_display' => '0',
+          ],
+        ],
+        [
+          'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO,
+          'component_id' => 'block.canvas_test_block_input_schema_change_poc',
+          'component_version' => $canvas_test_block_input_schema_change_poc_versions[0],
+          'inputs' => [
+            // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentInputsEvolutionTest::blockUpdatePathSampleForCoreIssue3521221()
+            'foo' => 1,
+            'label' => 'Block schema change POC 2.',
+            'label_display' => '0',
+            'change' => 'is necessary',
+          ],
+        ],
+      ],
+      // Config-defined component trees conform to the order in block plugins'
+      // config schema.
+      [
+        [
+          'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE,
+          'component_id' => 'block.canvas_test_block_input_schema_change_poc',
+          'component_version' => $canvas_test_block_input_schema_change_poc_versions[0],
           'inputs' => [
             'label' => 'Block schema change POC 1.',
-            'label_display' => '',
+            'label_display' => '0',
             // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentInputsEvolutionTest::blockUpdatePathSampleForCoreIssue3521221()
             'foo' => 2,
             'change' => 'is necessary',
@@ -139,19 +194,19 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
         [
           'uuid' => self::UUID_INPUT_NONE,
           'component_id' => 'block.canvas_test_block_input_none',
-          'component_version' => 'f91f8d4aff4aba7c',
+          'component_version' => $canvas_test_block_input_none_version,
           'inputs' => [
             'label' => 'Test block with no settings.',
-            'label_display' => '',
+            'label_display' => '0',
           ],
         ],
         [
           'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO,
           'component_id' => 'block.canvas_test_block_input_schema_change_poc',
-          'component_version' => '88c370526c14d185',
+          'component_version' => $canvas_test_block_input_schema_change_poc_versions[0],
           'inputs' => [
             'label' => 'Block schema change POC 2.',
-            'label_display' => '',
+            'label_display' => '0',
             // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentInputsEvolutionTest::blockUpdatePathSampleForCoreIssue3521221()
             'foo' => 1,
             'change' => 'is necessary',

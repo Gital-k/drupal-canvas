@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\Depends;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -14,15 +15,17 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests JavascriptComponentStorage.
  *
- * @covers \Drupal\canvas\EntityHandlers\JavascriptComponentStorage
- * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery
- * @group JavaScriptComponents
- * @group canvas
+ * @legacy-covers \Drupal\canvas\EntityHandlers\JavascriptComponentStorage
+ * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery
  */
+#[RunTestsInSeparateProcesses]
+#[Group('JavaScriptComponents')]
+#[Group('canvas')]
 final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
 
   use UserCreationTrait;
@@ -32,36 +35,15 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
   /**
    * {@inheritdoc}
    */
-  protected static $modules = [
-    'canvas',
-    'user',
-    'system',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'link',
-    'text',
-    'filter',
-    'ckeditor5',
-    'editor',
-  ];
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('user');
-    $this->installConfig(['system']);
-    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
-    $this->installConfig(['canvas']);
   }
 
   /**
-   * @covers \Drupal\canvas\EntityHandlers\CanvasAssetStorage::generateFiles()
+   * Tests generated files.
+   *
+   * @legacy-covers \Drupal\canvas\EntityHandlers\CanvasAssetStorage::generateFiles
    */
   public function testGeneratedFiles(): void {
     $js_component = JavaScriptComponent::create([
@@ -84,9 +66,6 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     $this->assertGeneratedFiles($js_component);
   }
 
-  /**
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::createConfigEntity()
-   */
   public function testComponentEntityCreation(): array {
     $js_component_id = $this->randomMachineName();
     $component_id = JsComponent::componentIdFromJavascriptComponentId($js_component_id);
@@ -129,7 +108,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     // Make it pass validation by adding the missing `examples`, and save it.
     $props['title']['examples'] = ['Title'];
     $js_component->setProps($props);
-    $this->assertSame([], self::violationsToArray($js_component->getTypedData()->validate()));
+    self::assertEntityIsValid($js_component);
     $js_component->save();
 
     // No Component config entity is ever created for JavaScript Components not
@@ -151,10 +130,10 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     ], self::violationsToArray($js_component->getTypedData()->validate()));
     // @see the `Choice` constraints on `type: canvas.js_component.*`'s for prop `type`.
     unset($props['title']['format']);
-    $props['title']['type'] = 'array';
+    $props['title']['type'] = 'null';
     $js_component->setProps($props);
     $this->assertSame([
-      '' => 'Prop "title" has invalid example value: [] String value found, but an array or an object is required',
+      '' => 'Prop "title" has invalid example value: [] String value found, but a null or an object is required',
       'props.title.type' => 'The value you selected is not a valid choice.',
     ], self::violationsToArray($js_component->getTypedData()->validate()));
 
@@ -194,13 +173,15 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
   }
 
   /**
+   * Tests component entity update.
+   *
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery::computeCurrentComponentMetadata()
-   * @depends testComponentEntityCreation
    */
+  #[Depends('testComponentEntityCreation')]
   public function testComponentEntityUpdate(array $js_component_values): void {
     $js_component = JavaScriptComponent::create($js_component_values);
     $js_component->save();
-    assert(is_string($js_component->id()));
+    \assert(\is_string($js_component->id()));
     $component_id = JsComponent::componentIdFromJavascriptComponentId($js_component->id());
 
     // Name should carry over.

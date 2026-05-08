@@ -11,6 +11,7 @@ import {
   initialState as codeEditorInitialState,
   removeProp,
   removeSlot,
+  setBrandKitFonts,
   setCodeComponentProperty,
   updateProp,
   updateSlot,
@@ -22,6 +23,11 @@ import {
   useUpdateAutoSaveMutation as useUpdateAutoSaveMutationAssetLibrary,
 } from '@/services/assetLibrary';
 import {
+  useGetAutoSaveQuery as useGetAutoSaveQueryBrandKit,
+  useGetBrandKitQuery,
+  useUpdateAutoSaveMutation as useUpdateAutoSaveMutationBrandKit,
+} from '@/services/brandKit';
+import {
   useGetAutoSaveQuery as useGetAutoSaveQueryCodeComponent,
   useGetCodeComponentQuery,
   useGetCodeComponentsQuery,
@@ -29,6 +35,9 @@ import {
 } from '@/services/componentAndLayout';
 
 import type { AppStore } from '@/app/store';
+
+const FONT_ASSET_BASE_URI = 'public://canvas/assets/';
+const FONT_ASSET_BASE_URL = '/sites/default/files/canvas/assets/';
 
 vi.mock('@/services/componentAndLayout', async () => {
   const originalModule = await vi.importActual('@/services/componentAndLayout');
@@ -48,6 +57,25 @@ vi.mock('@/services/assetLibrary', async () => {
     useGetAssetLibraryQuery: vi.fn(),
     useGetAutoSaveQuery: vi.fn(),
     useUpdateAutoSaveMutation: vi.fn(),
+  };
+});
+
+vi.mock('@/services/brandKit', async () => {
+  const originalModule = await vi.importActual('@/services/brandKit');
+  return {
+    ...originalModule,
+    useGetBrandKitQuery: vi.fn(),
+    useGetAutoSaveQuery: vi.fn(),
+    useUpdateAutoSaveMutation: vi.fn(),
+  };
+});
+
+vi.mock('@/utils/drupal-globals', async () => {
+  const originalModule = await vi.importActual('@/utils/drupal-globals');
+  return {
+    ...originalModule,
+    getCanvasPermissions: vi.fn().mockReturnValue({ brandKit: true }),
+    getCanvasSettings: vi.fn().mockReturnValue({ devMode: true }),
   };
 });
 
@@ -150,6 +178,26 @@ describe('useCodeEditor hook', () => {
       vi.fn(),
       { isLoading: false, isError: false, isSuccess: true },
     ]);
+    (
+      useGetBrandKitQuery as unknown as ReturnType<typeof vi.fn>
+    ).mockReturnValue({
+      currentData: codeEditorInitialState.brandKit,
+      error: null,
+      isFetching: false,
+      isSuccess: true,
+    });
+    (useGetAutoSaveQueryBrandKit as ReturnType<typeof vi.fn>).mockReturnValue({
+      currentData: null,
+      error: null,
+      isFetching: false,
+      isSuccess: true,
+    });
+    (
+      useUpdateAutoSaveMutationBrandKit as ReturnType<typeof vi.fn>
+    ).mockReturnValue([
+      vi.fn(),
+      { isLoading: false, isError: false, isSuccess: true },
+    ]);
   });
 
   afterEach(() => {
@@ -162,8 +210,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -195,8 +243,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -235,8 +283,8 @@ describe('useCodeEditor hook', () => {
           wrapper: ({ children }) => (
             <AppWrapper
               store={store}
-              location="/code-editor/code/test_component"
-              path="/code-editor/code/:codeComponentId"
+              location="/code-editor/component/test_component"
+              path="/code-editor/component/:codeComponentId"
             >
               {children}
             </AppWrapper>
@@ -247,7 +295,7 @@ describe('useCodeEditor hook', () => {
     await act(async () => {
       vi.advanceTimersByTime(1500);
     });
-    // We started on /code-editor/code/test_component.
+    // We started on /code-editor/component/test_component.
     expect(store.getState().codeEditor.codeComponent.machineName).toBe(
       'test_component',
     );
@@ -266,9 +314,9 @@ describe('useCodeEditor hook', () => {
       isSuccess: true,
     });
 
-    // Navigate away to /code-editor/code/test_component_2.
+    // Navigate away to /code-editor/component/test_component_2.
     await act(async () => {
-      navigate('/code-editor/code/test_component_2');
+      navigate('/code-editor/component/test_component_2');
     });
 
     await act(async () => {
@@ -286,8 +334,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -323,8 +371,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -380,8 +428,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -432,8 +480,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -473,8 +521,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -539,8 +587,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -592,5 +640,51 @@ describe('useCodeEditor hook', () => {
 
     // Verify auto-save was called after slot is removed.
     expect(updateAutoSaveMutation).toHaveBeenCalledOnce();
+  });
+
+  it('does not include brand kit fonts in asset-library auto-save payloads', async () => {
+    const [updateAutoSaveMutation] = useUpdateAutoSaveMutationAssetLibrary();
+
+    await act(async () => {
+      renderHook(() => useCodeEditor(), {
+        wrapper: ({ children }) => (
+          <AppWrapper
+            store={store}
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
+          >
+            {children}
+          </AppWrapper>
+        ),
+      });
+    });
+
+    (updateAutoSaveMutation as ReturnType<typeof vi.fn>).mockClear();
+
+    await act(async () => {
+      store.dispatch(
+        setBrandKitFonts([
+          [
+            {
+              id: 'font-1',
+              family: 'Mona Sans',
+              uri: `${FONT_ASSET_BASE_URI}mona-sans.woff2`,
+              url: `${FONT_ASSET_BASE_URL}mona-sans.woff2`,
+              format: 'woff2',
+              variantType: 'static',
+              weight: '400',
+              style: 'normal',
+              axes: null,
+            },
+          ],
+        ]),
+      );
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(2500);
+    });
+
+    expect(updateAutoSaveMutation).not.toHaveBeenCalled();
   });
 });

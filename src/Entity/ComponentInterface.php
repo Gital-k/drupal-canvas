@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\canvas\Entity;
 
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
-use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
 
 /**
@@ -18,19 +17,6 @@ interface ComponentInterface extends VersionedConfigEntityInterface, EntityWithP
   public const string FALLBACK_VERSION = 'fallback';
 
   /**
-   * Gets the human-readable category of the component, if any.
-   *
-   * Determine which Folder this Component will be placed in, if any.
-   *
-   * @return string|\Drupal\Core\StringTranslation\TranslatableMarkup|null
-   *   The human-readable category of the component.
-   *
-   * @see \Drupal\canvas\Entity\Component::postSave()
-   * @todo Remove in https://www.drupal.org/i/3549726
-   */
-  public function getCategory(): string|TranslatableMarkup|null;
-
-  /**
    * Gets the component source plugin.
    *
    * @return \Drupal\canvas\ComponentSource\ComponentSourceInterface
@@ -41,12 +27,26 @@ interface ComponentInterface extends VersionedConfigEntityInterface, EntityWithP
   /**
    * Gets component settings.
    *
+   * @param string|null $version
+   *   The version of the component we want the settings for. If omitted,
+   *   defaults to the currently loaded version.
+   *
    * @return array
    *   Component Settings.
    */
-  public function getSettings(): array;
+  public function getSettings(?string $version = NULL): array;
 
-  public function getSlotDefinitions(): array;
+  /**
+   * Gets component slot definitions.
+   *
+   * @param string|null $version
+   *   The version of the component we want the slot definitions for. If
+   *   omitted, defaults to the currently loaded version.
+   *
+   * @return array
+   *   Slot definitions.
+   */
+  public function getSlotDefinitions(?string $version = NULL): array;
 
   /**
    * Sets component settings.

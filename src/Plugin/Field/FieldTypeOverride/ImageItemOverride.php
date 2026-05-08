@@ -6,8 +6,6 @@ namespace Drupal\canvas\Plugin\Field\FieldTypeOverride;
 
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
-use Drupal\Component\Utility\NestedArray;
-use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString;
 use Drupal\canvas\Plugin\DataType\UriTemplate;
@@ -49,8 +47,12 @@ class ImageItemOverride extends ImageItem {
    */
   public static function propertyDefinitions(FieldStorageDefinitionInterface $field_definition) {
     $properties = parent::propertyDefinitions($field_definition);
-    $properties['alt']->addConstraint('StringSemantics', StringSemanticsConstraint::PROSE);
-    $properties['title']->addConstraint('StringSemantics', StringSemanticsConstraint::PROSE);
+    $properties['alt']->addConstraint('StringSemantics', [
+      'semantic' => StringSemanticsConstraint::PROSE,
+    ]);
+    $properties['title']->addConstraint('StringSemantics', [
+      'semantic' => StringSemanticsConstraint::PROSE,
+    ]);
     // A computed URI template to populate `<img srcset>` using a parametrized
     // width.
     // @see https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/srcset#value
@@ -95,26 +97,12 @@ class ImageItemOverride extends ImageItem {
       // The ComputedFileUrl data type generates a browser-accessible URL (root-
       // relative, absolute using HTTP, absolute using HTTPs or relative).
       ->addConstraint(UriConstraint::PLUGIN_ID, ['allowReferences' => TRUE])
-      ->addConstraint(UriSchemeConstraint::PLUGIN_ID, ['http', 'https'])
+      ->addConstraint(UriSchemeConstraint::PLUGIN_ID, [
+        'allowedSchemes' => ['http', 'https'],
+      ])
       ->setClass(ComputedUrlWithQueryString::class);
 
     return $properties;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function calculateDependencies(FieldDefinitionInterface $field_definition) {
-    return NestedArray::mergeDeep(
-      parent::calculateDependencies($field_definition),
-      // @see \Drupal\canvas\TypedData\ImageDerivativeWithParametrizedWidth
-      // @see config/install/image.style.canvas_parametrized_width.yml
-      [
-        'config' => [
-          'image.style.canvas_parametrized_width',
-        ],
-      ],
-    );
   }
 
 }

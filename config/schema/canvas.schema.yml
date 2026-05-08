@@ -77,17 +77,6 @@ canvas.component.*:
           - block
     source_local_id:
       type: canvas.component_source_local_id.[%parent.source]
-    # Determines which Folder this Component will be placed in.
-    # @see \Drupal\canvas\Entity\Component::postSave()
-    # @todo Remove in https://www.drupal.org/i/3549726
-    category:
-      type: required_label
-      label: 'Category'
-      nullable: true
-      constraints:
-        # `""` is not allowed, but `null` is.
-        NotBlank:
-          allowNull: true
     versioned_properties:
       sequence:
         # There are 3 possible shapes for each sequence element:
@@ -183,6 +172,7 @@ canvas.js_component.*:
         label: 'Prop'
         # This MUST be one of the keys available at %parent.props. Rather than repeating that validation logic here, let
         # the JsComponentHasValidAndSupportedSdcMetadata constraint take care of that.
+        # Entity reference props cannot be required: validated by JsComponentHasValidAndSupportedSdcMetadata.
         constraints: {}
     # See core/assets/schemas/v1/metadata-full.schema.json#properties.props
     props:
@@ -234,11 +224,51 @@ canvas.js_component.*:
             label: 'Canvas Drupal settings needed by the component'
             constraints:
               Choice:
+                - v0.baseUrl
                 - v0.branding
                 - v0.breadcrumbs
-                - v0.pageTitle
                 - v0.jsonapiSettings
-                - v0.baseUrl
+                - v0.mainEntity
+                - v0.pageTitle
+                - v0.themeAssets
+        entityFields:
+          # Should be omitted when there's no entity field data dependencies.
+          requiredKey: false
+          type: sequence
+          orderby: key
+          constraints:
+            # There must be >=1 entity reference prop; otherwise the key should be omitted.
+            NotBlank:
+              message: "There must be >=1 entity reference prop; otherwise the 'entityFields' key should be omitted."
+            # Each key must be a prop name from the component's props.
+            SequenceKeysMustMatch:
+              matchType: subset
+              # @todo allow filtering to the subset that are actually "entity reference" props, rather than all props.
+              propertyPathToSequence: props
+          sequence:
+            type: sequence
+            orderby: value
+            constraints:
+              # There must be >=1 entity field expression.
+              NotBlank:
+                message: 'There must be >=1 entity field expression; otherwise the entity reference prop should be deleted.'
+              # All expressions must target the same entity type and bundle.
+              EntityFieldExpressionsSameTarget: ~
+            sequence:
+              type: string
+              label: 'Entity field prop expression'
+              constraints:
+                # 💡 Crucially, this also will ensure that every expression for every entity field for every
+                # version of this JavaScriptComponent config entity is valid against the current set of supported
+                # expressions: any exception thrown during validation will prevent saving.
+                ValidStructuredDataPropExpression:
+                  choices:
+                    - FieldPropExpression
+                    - FieldObjectPropsExpression
+                    - ReferenceFieldPropExpression
+                  message: 'The expression is valid, but not one of the allowed types: %choices.'
+                # Validate that the expression targets an existing entity type and bundle.
+                ExpressionTargetEntityBundleExists: ~
 
 canvas.page_region.*:
   type: config_entity
@@ -291,21 +321,26 @@ canvas.page_region.*:
 
 # The config equivalent of a ComponentTreeItemList, validated by the same constraints.
 # This is a list of component items in a tree, one item per component instance.
+# @see `ComponentTreeItemKeyedSequence` in ComponentTreeConfigEntityBase
 canvas.component_tree:
   type: sequence
   label: 'Config-Defined Component Tree'
-  # @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait::generateComponentTreeKeys()
-  orderby: key
+  # Sequence keys are component instance UUIDs. Necessary for reliable translations. Note these are transformed at
+  # export time to improve DX (and the reverse is done at import time).
+  # @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::asDeterministicallyAndTranslatableKeyedComponentTreeSequence
+  # @see \Drupal\canvas\EventSubscriber\ComponentTreeConfigEntityTransformer
+  orderby: ~
   constraints:
     ComponentTreeStructure: []
     ComponentTreeMeetRequirements:
       # By default, only StaticPropSources may be used in config-defined component trees.
       inputs:
         absence:
-          # DynamicPropSources retrieve structured data from a content entity of a specific entity type and bundle. This
+          # EntityFieldPropSources retrieve structured data from a content entity of a specific entity type and bundle. This
           # is typically the content entity that contains the component tree, but could also be a dynamically loaded
           # content entity. A config entity typically is not associated with any content entity, so require its absence
           # by default.
+          - entity-field
           - dynamic
           - host-entity-url
           # Not yet supported by the Canvas UI.
@@ -318,6 +353,8 @@ canvas.component_tree:
   sequence:
     # @todo Ensure the component instances appear in a predictable order in the exported YAML in https://www.drupal.org/i/3526127
     type: canvas.component_tree_node
+  # Ensure a decent config translation UX: only 'inputs' is translatable, so simplify the form.
+  form_element_class: '\Drupal\canvas\ConfigTranslation\CanvasComponentTreeItemListFormElement'
 
 # The config equivalent of a ComponentTreeItem, validated by the same constraint.
 canvas.component_tree_node:
@@ -369,8 +406,11 @@ canvas.component_tree_node:
       constraints: { }
     # @see \Drupal\canvas\Plugin\DataType\ComponentInputs
     inputs:
-      type: ignore
+      type: mapping
+      class: '\Drupal\canvas\Config\Schema\ComponentInputsMapping'
       label: 'Input values for each component in the component tree'
+      # Omitted optional inputs must also be translatable. Config Translation's default UI prevents this.
+      form_element_class: '\Drupal\canvas\ConfigTranslation\CanvasComponentTreeItemInputsMappingFormElement'
     label:
       # This is entirely optional; provides more context for content authors.
       requiredKey: false
@@ -424,7 +464,6 @@ canvas.component_source_settings.sdc:
     prop_field_definitions:
       constraints:
         KeyForEverySdcProp: "%parent.%parent.%parent.%parent.source_local_id"
-        NotNullValueForEveryRequiredSdcProp: '%parent.%parent.%parent.%parent.source_local_id'
 
 # Every ComponentSource plugin MUST define two config schema types:
 # 1. One for the ComponentSource-specific per-Component config entity local/intra-source ID: typically a plugin ID or a
@@ -477,6 +516,8 @@ canvas.generated_field_explicit_input_ux:
           required:
             type: boolean
             label: 'Required prop'
+            constraints:
+              MatchesComponentPropRequiredness: ~
           field_type:
             type: string
             label: 'Default field type'
@@ -529,13 +570,18 @@ canvas.generated_field_explicit_input_ux:
             label: 'Default values'
             sequence:
               type: field.value.[%parent.%parent.field_type]
-            # @todo Add validation constraint because this is only *conditionally* nullable: if the SDC prop is optional
+            # TRICKY: this is *conditionally* nullable: if the component prop itself is optional.
             nullable: true
+            constraints:
+              NotNullIfRequiredComponentProp: ~
           # The default value must be retrievable
           expression:
             type: string
             label: 'The expression that contains the field evaluation instructions'
             constraints:
+              # 💡 Crucially, this also will ensure that every expression for every prop field definition for every
+              # version of this Component config entity is valid against the current set of supported expressions: any
+              # exception thrown during validation will prevent saving the Component config entity.
               ValidStructuredDataPropExpression:
                 choices:
                   - FieldTypePropExpression
@@ -623,6 +669,7 @@ field.value.component_tree:
       inputs:
         absence:
           - dynamic
+          - entity-field
           - host-entity-url
           - adapter
         presence: ~
@@ -660,6 +707,7 @@ canvas.pattern.*:
           inputs:
             absence:
               - dynamic
+              - entity-field
               - host-entity-url
               - adapter
             presence: ~
@@ -682,7 +730,7 @@ canvas.asset_library.*:
       label: 'Asset library ID'
       constraints:
         Regex:
-          # ℹ️ Initially, only one such config entity is allowed. Later, one per theme. Later still, additional ones. Details TBD.
+          # ℹ️ Initially, only one such config entity is allowed. Later, one per theme. Later still, additional ones. Details TBD. When/if this happens, update ConfigEntityAssetLibrariesTest and AssetLibraryStorageTest.
           pattern: '/^global$/'
           message: "The %value machine name is not valid."
     label:
@@ -702,6 +750,138 @@ canvas.asset_library.*:
       label: 'JS'
       # The asset library may contain only CSS, no JS.
       nullable: true
+    imports:
+      type: sequence
+      label: 'Import manifest entries'
+      requiredKey: false
+      orderby: value
+      constraints:
+        # There must be >=1 import; otherwise the key should be omitted.
+        NotBlank: ~
+      sequence:
+        type: canvas.asset_library_manifest_entry
+    assets:
+      type: sequence
+      label: 'Asset manifest entries'
+      requiredKey: false
+      orderby: value
+      constraints:
+        # There must be >=1 import; otherwise the key should be omitted.
+        NotBlank: ~
+      sequence:
+        type: canvas.asset_library_manifest_entry
+    shared:
+      type: sequence
+      label: 'Shared chunk manifest entries'
+      requiredKey: false
+      orderby: value
+      constraints:
+        # There must be >=1 import; otherwise the key should be omitted.
+        NotBlank: ~
+      sequence:
+        type: canvas.asset_library_manifest_entry
+
+canvas.asset_library_manifest_entry:
+  type: mapping
+  label: 'Asset library manifest entry'
+  mapping:
+    name:
+      type: string
+      label: 'Name'
+      constraints:
+        NotBlank: []
+    uri:
+      type: uri
+      label: 'Managed file URI'
+      constraints:
+        NotBlank: []
+        UriScheme: ['public']
+
+canvas.brand_kit.*:
+  type: config_entity
+  constraints:
+    FullyValidatable: ~
+  mapping:
+    id:
+      type: machine_name
+      label: 'Brand kit ID'
+      constraints:
+        Regex:
+          pattern: '/^global$/'
+          message: "The %value machine name is not valid."
+    label:
+      type: required_label
+      label: 'Human-readable label'
+    fonts:
+      type: sequence
+      label: 'Font entries'
+      nullable: true
+      orderby: value
+      # Should be omitted when there are no fonts.
+      requiredKey: false
+      constraints:
+        # There must be >=1 font file; otherwise the key should be omitted.
+        NotBlank: ~
+        Unique:
+          fields: [id]
+          errorPath: id
+          message: 'Font IDs must be unique.'
+          stopOnFirstError: false
+        Callback:
+          callback: ['\Drupal\canvas\Entity\BrandKit', validateFonts]
+      sequence:
+        type: mapping
+        label: 'Uploaded font file'
+        mapping:
+          id:
+            type: uuid
+            label: 'Font ID'
+          family:
+            type: string
+            label: 'Font family'
+          uri:
+            type: string
+            label: 'Managed file URI'
+          format:
+            type: string
+            label: 'Font format'
+          weight:
+            type: string
+            label: 'Font weight'
+          style:
+            type: string
+            label: 'Font style'
+          axes:
+            type: sequence
+            label: 'Font variation axes'
+            requiredKey: false
+            nullable: true
+            constraints:
+              Unique:
+                fields: [tag]
+                errorPath: tag
+                message: 'Axis tags must be unique within a font entry.'
+                stopOnFirstError: false
+            sequence:
+              type: mapping
+              label: 'Font variation axis'
+              mapping:
+                tag:
+                  type: string
+                  label: 'Axis tag'
+                name:
+                  type: string
+                  label: 'Axis name'
+                  requiredKey: false
+                min:
+                  type: float
+                  label: 'Minimum axis value'
+                max:
+                  type: float
+                  label: 'Maximum axis value'
+                default:
+                  type: float
+                  label: 'Default axis value'
 
 canvas.compilable_code:
   type: mapping
@@ -775,8 +955,8 @@ canvas.content_template.*.*.*:
           inputs:
             absence:
               - adapter
-            # The only Canvas component tree that allows `dynamic` and `host-entity-url`!
-            # @see \Drupal\canvas\PropSource\DynamicPropSource
+            # The only Canvas component tree that allows `entity-field` and `host-entity-url`!
+            # @see \Drupal\canvas\PropSource\EntityFieldPropSource
             # @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
             presence: ~
           tree:
@@ -917,3 +1097,18 @@ canvas.folder.*:
             configEntityTypeId: '%parent.%parent.configEntityTypeId'
       constraints:
         Unique: ~
+
+# Search API processor configuration
+plugin.plugin_configuration.search_api_processor.canvas_component_tree_inputs:
+  type: search_api.default_processor_configuration
+  label: 'Component Tree Hydrated processor configuration'
+  constraints:
+    FullyValidatable: ~
+  mapping:
+    ignored_prop_names:
+      type: sequence
+      label: 'Prop names to ignore during extraction'
+      orderby: value
+      sequence:
+        type: string
+        label: 'Prop name'

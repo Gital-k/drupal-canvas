@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Traits;
 
+use Drupal\canvas\PropSource\PropSource;
+
 /**
  * Any test using these test cases must install the `canvas_test_sdc` module.
  */
@@ -79,7 +81,7 @@ trait SingleDirectoryComponentTreeTestTrait {
 
   protected static function getInvalidTreeTestCases(): array {
     return [
-      'invalid values using dynamic inputs' => [
+      'prop source type disallowed in this component tree: EntityFieldPropSource' => [
         [
           [
             'uuid' => 'd0aee529-89d9-4a47-8d59-7deb1817f952',
@@ -87,7 +89,7 @@ trait SingleDirectoryComponentTreeTestTrait {
             'component_version' => '85a5c0c7dd53e0bb',
             'inputs' => [
               'heading' => [
-                'sourceType' => 'dynamic',
+                'sourceType' => PropSource::EntityField->value,
                 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
               ],
             ],
@@ -99,7 +101,7 @@ trait SingleDirectoryComponentTreeTestTrait {
           ['uuid' => 'other-uuid'],
         ],
       ],
-      'missing components, using dynamic inputs' => [
+      'missing components, using entity field prop sources' => [
         [
           [
             'uuid' => self::UUID_DYNAMIC_STATIC_CARD_2,
@@ -107,7 +109,7 @@ trait SingleDirectoryComponentTreeTestTrait {
             'component_version' => 'irrelevant',
             'inputs' => [
               'heading' => [
-                'sourceType' => 'dynamic',
+                'sourceType' => PropSource::EntityField->value,
                 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
               ],
             ],
@@ -118,7 +120,7 @@ trait SingleDirectoryComponentTreeTestTrait {
             'component_version' => 'irrelevant',
             'inputs' => [
               'heading' => [
-                'sourceType' => 'dynamic',
+                'sourceType' => PropSource::EntityField->value,
                 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
               ],
             ],
@@ -129,14 +131,14 @@ trait SingleDirectoryComponentTreeTestTrait {
             'component_version' => '85a5c0c7dd53e0bb',
             'inputs' => [
               'heading' => [
-                'sourceType' => 'dynamic',
+                'sourceType' => PropSource::EntityField->value,
                 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
               ],
             ],
           ],
         ],
       ],
-      'missing components, using only static inputs' => [
+      'missing components, using only static prop sources' => [
         [
           [
             'uuid' => '6f0df1b5-cb78-4bfc-b403-400d24c4d655',
@@ -156,7 +158,7 @@ trait SingleDirectoryComponentTreeTestTrait {
           ],
         ],
       ],
-      'inputs invalid, using dynamic inputs' => [
+      'inputs invalid, using entity field prop sources' => [
         [
           [
             'uuid' => self::UUID_DYNAMIC_STATIC_CARD_2,
@@ -164,7 +166,7 @@ trait SingleDirectoryComponentTreeTestTrait {
             'component_version' => '85a5c0c7dd53e0bb',
             'inputs' => [
               'heading-2' => [
-                'sourceType' => 'dynamic',
+                'sourceType' => PropSource::EntityField->value,
                 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
               ],
             ],
@@ -175,7 +177,7 @@ trait SingleDirectoryComponentTreeTestTrait {
             'component_version' => '85a5c0c7dd53e0bb',
             'inputs' => [
               'heading-1' => [
-                'sourceType' => 'dynamic',
+                'sourceType' => PropSource::EntityField->value,
                 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
               ],
             ],
@@ -186,14 +188,14 @@ trait SingleDirectoryComponentTreeTestTrait {
             'component_version' => '85a5c0c7dd53e0bb',
             'inputs' => [
               'heading' => [
-                'sourceType' => 'dynamic',
+                'sourceType' => PropSource::EntityField->value,
                 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
               ],
             ],
           ],
         ],
       ],
-      'inputs invalid, using only static inputs' => [
+      'inputs invalid, using only static prop sources' => [
         [
           [
             'uuid' => self::UUID_DYNAMIC_STATIC_CARD_2,
@@ -201,6 +203,27 @@ trait SingleDirectoryComponentTreeTestTrait {
             'component_version' => 'b1e991f726a2a266',
             'inputs' => [
               'heading-x' => [
+                'sourceType' => 'static:field_item:link',
+                'value' => [
+                  'uri' => 'https://drupal.org',
+                  'title' => NULL,
+                  'options' => [],
+                ],
+                'expression' => 'ℹ︎link␟url',
+              ],
+            ],
+          ],
+        ],
+      ],
+      'inputs invalid, using only static inputs with a StaticPropSource deviating from that defined in the referenced Component entity version' => [
+        [
+          [
+            'uuid' => self::UUID_DYNAMIC_STATIC_CARD_2,
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+            'component_version' => 'b1e991f726a2a266',
+            'inputs' => [
+              'heading' => [
+                // Prop `heading` expects a `static:field_item:string` instead.
                 'sourceType' => 'static:field_item:link',
                 'value' => [
                   'uri' => 'https://drupal.org',

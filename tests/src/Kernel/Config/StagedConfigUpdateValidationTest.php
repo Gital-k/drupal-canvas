@@ -6,7 +6,12 @@ namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\canvas\Entity\StagedConfigUpdate;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+#[Group('canvas')]
+#[Group('canvas_update_path')]
+#[RunTestsInSeparateProcesses]
 class StagedConfigUpdateValidationTest extends BetterConfigEntityValidationTestBase {
 
   /**
@@ -14,6 +19,7 @@ class StagedConfigUpdateValidationTest extends BetterConfigEntityValidationTestB
    */
   protected static $modules = [
     'canvas',
+    'file',
   ];
 
   /**

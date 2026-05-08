@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Recipe\Recipe;
@@ -18,11 +19,14 @@ use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\canvas_personalization\Entity\Segment;
 
 /**
+ * @legacy-covers \Drupal\canvas\EventSubscriber\RecipeSubscriber
  * @see \Drupal\Tests\canvas\Kernel\ApiAutoSaveControllerTest
- * @group canvas
- * @group canvas_personalization
- * @covers \Drupal\canvas\EventSubscriber\RecipeSubscriber
+ *
+ * Note this cannot use CanvasKernelTestBase because that would pre-install the
+ * Canvas module: this test is installing Canvas via a recipe.
  */
+#[Group('canvas')]
+#[Group('canvas_personalization')]
 final class RecipeTest extends KernelTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -40,8 +44,7 @@ final class RecipeTest extends KernelTestBase {
     // Demo content should have been created.
     $this->assertSame([
       1 => ['Personalization demo', '/personalization-test'],
-    ], array_map(
-      // @phpstan-ignore-next-line
+    ], \array_map(
       fn (Page $page) => [$page->label(), $page->get('path')->alias],
       Page::loadMultiple()
     ));
@@ -51,10 +54,10 @@ final class RecipeTest extends KernelTestBase {
       ->loadEntityByUuid('canvas_page', 'f6ab99d8-0d6f-48ed-97f3-04f08cf705d1');
     $this->assertInstanceOf(FieldableEntityInterface::class, $page);
     $components_field = $page->get('components');
-    assert($components_field instanceof ComponentTreeItemList);
+    \assert($components_field instanceof ComponentTreeItemList);
     $switch_component = $components_field
       ->getComponentTreeItemByUuid('8e28dfca-c1b1-4aa2-8c19-b8a0c13e9bf4');
-    assert($switch_component instanceof ComponentTreeItem);
+    \assert($switch_component instanceof ComponentTreeItem);
     $this->assertIsArray($switch_component->getInputs());
     $this->assertEquals([
       'variants' => [
@@ -65,7 +68,7 @@ final class RecipeTest extends KernelTestBase {
 
     $halloween_case = $components_field
       ->getComponentTreeItemByUuid('5e9d5b61-595c-4785-8af6-b78317e52c64');
-    assert($halloween_case instanceof ComponentTreeItem);
+    \assert($halloween_case instanceof ComponentTreeItem);
     $this->assertIsArray($halloween_case->getInputs());
     $this->assertEquals([
       'variant_id' => 'halloween',
@@ -77,7 +80,7 @@ final class RecipeTest extends KernelTestBase {
 
     $default_case = $components_field
       ->getComponentTreeItemByUuid('1c29b6e6-02c5-4bfc-99e0-88894609390e');
-    assert($default_case instanceof ComponentTreeItem);
+    \assert($default_case instanceof ComponentTreeItem);
     $this->assertIsArray($default_case->getInputs());
     $this->assertEquals([
       'variant_id' => 'default',

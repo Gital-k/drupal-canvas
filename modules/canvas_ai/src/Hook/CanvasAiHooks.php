@@ -79,9 +79,17 @@ class CanvasAiHooks {
             'name' => $this->t('JSON API Module status'),
             'description' => $this->t('Returns the status of JSON API module.'),
           ],
+          'available_regions' => [
+            'name' => $this->t('Available Regions'),
+            'description' => $this->t('Returns the available regions.'),
+          ],
           'verbose_context_for_orchestrator' => [
             'name' => $this->t('Verbose Context for Orchestrator'),
             'description' => $this->t('Returns a detailed context summary for the AI Orchestrator.'),
+          ],
+          'custom_libraries' => [
+            'name' => $this->t('Custom libraries in Canvas.'),
+            'description' => $this->t('Returns the custom libraries in Canvas.'),
           ],
         ],
       ],
@@ -115,7 +123,11 @@ class CanvasAiHooks {
             break;
 
           case 'layout':
-            $replacements[$original] = $data['layout'] ?? NULL;
+            // Apostrophes in layout content break YAML parsing when this
+            // token is replaced into default_information_tools.
+            // Fix: double them, since '' is YAML's escape for a literal apostrophe.
+            // @todo Revert this after https://www.drupal.org/project/ai_agents/issues/3584463 gets fixed.
+            $replacements[$original] = isset($data['layout']) ? str_replace("'", "''", $data['layout']) : NULL;
             break;
 
           case 'derived_proptypes':
@@ -123,11 +135,12 @@ class CanvasAiHooks {
             break;
 
           case 'page_title':
-            $replacements[$original] = $data['page_title'] ?? NULL;
+            // Same apostrophe escaping as layout — see comment above.
+            $replacements[$original] = isset($data['page_title']) ? str_replace("'", "''", $data['page_title']) : NULL;
             break;
 
           case 'page_description':
-            $replacements[$original] = $data['page_description'] ?? NULL;
+            $replacements[$original] = isset($data['page_description']) ? str_replace("'", "''", $data['page_description']) : NULL;
             break;
 
           case 'active_component_uuid':
@@ -142,8 +155,16 @@ class CanvasAiHooks {
             $replacements[$original] = $data['json_api_module_status'];
             break;
 
+          case 'available_regions':
+            $replacements[$original] = !empty($data['available_regions']) ? $data['available_regions'] : NULL;
+            break;
+
           case 'verbose_context_for_orchestrator':
             $replacements[$original] = !empty($data['verbose_context_for_orchestrator']) ? $data['verbose_context_for_orchestrator'] : NULL;
+            break;
+
+          case 'custom_libraries':
+            $replacements[$original] = $data['custom_libraries'];
             break;
         }
       }

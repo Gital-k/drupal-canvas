@@ -9,6 +9,7 @@ use Drupal\Core\Asset\LibraryDiscoveryInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Hook\Order\OrderAfter;
 use Drupal\Core\Security\TrustedCallbackInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Url;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
@@ -27,6 +28,8 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * @see docs/redux-integrated-field-widgets.md
  */
 class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
+
+  use StringTranslationTrait;
 
   public function __construct(
     private readonly ModuleHandlerInterface $moduleHandler,
@@ -114,13 +117,18 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
       // Most hidden fields are read only. Add an attribute that allows it to be
       // updated and tracked in Redux form state.
-      if (isset($form['selection'][0]['target_id'])) {
-        $form['selection'][0]['target_id']['#attributes']['data-track-hidden-value'] = 'true';
-      }
-
       $selections = $form['selection'] ?? [];
+      $is_multiple = $context['items']->getFieldDefinition()->getFieldStorageDefinition()->isMultiple();
       foreach (Element::children($selections) as $key) {
+        if (isset($form['selection'][$key]['target_id'])) {
+          $form['selection'][$key]['target_id']['#attributes']['data-track-hidden-value'] = 'true';
+        }
+        if (isset($form['selection'][$key]['weight'])) {
+          $form['selection'][$key]['weight']['#attributes']['data-track-hidden-value'] = 'true';
+          $form['selection'][$key]['weight']['#attributes']['data-canvas-media-weight'] = 'true';
+        }
         $form['selection'][$key]['remove_button']['#attributes']['data-canvas-media-remove-button'] = 'true';
+        $form['selection'][$key]['#attributes']['data-is-multiple'] = $is_multiple ? 'true' : 'false';
       }
 
     }
@@ -176,13 +184,120 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   }
 
   /**
+   * Implements hook_field_widget_complete_form_alter().
+   *
+   * Marks elements within multivalue forms to enable specialized rendering.
+   * This allows the DrupalInputMultivalueForm component to handle inputs
+   * specifically within multivalue widgets.
+   *
+   * For media library widgets in the component instance form, we also set
+   * #component_prop_name so that the DefaultImagePreview React component can
+   * identify which prop to manage. This enables the "Remove default"
+   * functionality for optional image props.
+   *
+   * @see themes/canvas_stark/templates/media_library/fieldset--media-library-widget.html.twig
+   * @see ui/src/components/form/components/DefaultImagePreview.tsx
+   * @see \Drupal\canvas\Form\ComponentInstanceForm
+   */
+  #[Hook('field_widget_complete_form_alter')]
+  public function fieldWidgetCompleteFormAlter(array &$widget, FormStateInterface $form_state, array $context): void {
+    // Provide additional context to be used by
+    // canvas_theme_suggestions_alter().
+    $widget_type = $context['widget']->getPluginId();
+    // Set #widget-type so themeSuggestionsAlter() can add widget-specific
+    // theme suggestions (e.g. fieldset__widget_media_library_widget).
+    $widget['#widget-type'] = $widget_type;
+    if (isset($widget['widget']) && \is_array($widget["widget"])) {
+      $widget["widget"]['#widget-type'] = $widget_type;
+      foreach (Element::children($widget['widget']) as $key) {
+        $widget['widget'][$key]['#widget-type'] = $widget_type;
+        foreach (Element::children($widget['widget'][$key]) as $child_key) {
+          $widget['widget'][$key][$child_key]['#widget-type'] = $widget_type;
+        }
+      }
+    }
+
+    // For media library widgets in ComponentInstanceForm, propagate
+    // #component_prop_name so DefaultImagePreview can identify the prop,
+    // show the default image preview, and enable "Remove default" for
+    // optional image props.
+    $form_object = $form_state->getFormObject();
+    $is_component_instance_form = $form_object !== NULL && $form_object->getFormId() === ComponentInstanceForm::FORM_ID;
+    if ($widget_type === 'media_library_widget' && $is_component_instance_form) {
+      $field_name = $context['items']->getFieldDefinition()->getName();
+      $widget['#component_prop_name'] = $field_name;
+
+      if (isset($widget['widget'])) {
+        $widget['widget']['#component_prop_name'] = $field_name;
+        foreach (Element::children($widget['widget']) as $key) {
+          $widget['widget'][$key]['#component_prop_name'] = $field_name;
+        }
+      }
+    }
+
+    // Check if this is a multivalue field.
+    $field_definition = $context['items']->getFieldDefinition();
+    $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
+
+    if ($is_multiple && $this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
+      // Get the field label to add to all input elements.
+      $field_label = $field_definition->getLabel();
+      // Get the field cardinality for limiting selections.
+      $cardinality = $field_definition->getFieldStorageDefinition()->getCardinality();
+      // Mark all input elements within multivalue widgets and add field
+      // title.
+      $this->markMultivalueFormElements($widget, $field_label, $cardinality);
+    }
+  }
+
+  /**
+   * Recursively marks form elements as part of a multivalue form.
+   *
+   * @param array &$element
+   *   The form element to process.
+   * @param string $field_label
+   *   The field label to add to input elements.
+   * @param int $cardinality
+   *   The field cardinality (-1 for unlimited, or a positive integer).
+   */
+  private function markMultivalueFormElements(array &$element, string $field_label, int $cardinality): void {
+    foreach (Element::children($element) as $key) {
+      // Mark input elements.
+      if (isset($element[$key]['#type']) &&
+          \in_array($element[$key]['#type'], ['textfield', 'number', 'url', 'entity_autocomplete', 'submit', 'select'], TRUE)) {
+        $element[$key]['#is_multivalue_form'] = TRUE;
+        $element[$key]['#attributes']['data-field-label'] = $field_label;
+        $element[$key]['#attributes']['data-cardinality'] = $cardinality;
+        // Hide the sub-field label for url and entity_autocomplete types so
+        // that labels like "URL" are not shown in the multivalue table rows.
+        if (\in_array($element[$key]['#type'], ['url', 'entity_autocomplete'], TRUE)) {
+          $element[$key]['#title_display'] = 'invisible';
+        }
+      }
+
+      // Skip recursion into datetime elements since they are handled as a unit
+      // by the DrupalDatetimeMultivalueForm component.
+      if (isset($element[$key]['#type']) && $element[$key]['#type'] === 'datetime') {
+        $element[$key]['#multivalue_field_label'] = $field_label;
+        continue;
+      }
+
+      // Recursively process child elements.
+      if (\is_array($element[$key])) {
+        $this->markMultivalueFormElements($element[$key], $field_label, $cardinality);
+      }
+    }
+  }
+
+  /**
    * Implements hook_field_widget_info_alter().
    */
   #[Hook('field_widget_info_alter')]
   public function fieldWidgetInfoAlter(array &$info): void {
     $map = [
-      'boolean_checkbox' => ['mainProperty' => ['list' => \FALSE]],
+      'boolean_checkbox' => ['mainProperty' => []],
       'datetime_default' => ['mainProperty' => [], 'dateTime' => []],
+      'daterange_default' => ['dateRange' => []],
       'email_default' => ['mainProperty' => []],
       'file_generic' => ['mainProperty' => ['name' => 'fids']],
       'image_image' => ['mainProperty' => ['name' => 'fids']],
@@ -239,10 +354,15 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   public static function processTextFormat(array $element, FormStateInterface $form_state, array &$form): array {
     $form_id = $form['form_id']['#value'] ?? NULL;
 
-    // If we aren't in the component instance form, remove text formats that are
-    // exclusive to that form.
+    // If we aren't in the component instance or config translation form, remove
+    // text formats that are exclusive to Canvas.
     // @see \Drupal\canvas\Hook\ShapeMatchingHooks::filterFormatAccess()
-    if ($form_id !== ComponentInstanceForm::FORM_ID) {
+    $forms_with_static_prop_sources = [
+      ComponentInstanceForm::FORM_ID,
+      'config_translation_add_form',
+      'config_translation_edit_form',
+    ];
+    if (!\in_array($form_id, $forms_with_static_prop_sources, TRUE)) {
       // @see config/install/filter.format.canvas_html_block.yml
       unset($element['format']['format']['#options']['canvas_html_block']);
       // @see config/install/filter.format.canvas_html_inline.yml
@@ -255,7 +375,11 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     // Only proceed if this is a Canvas page data or component instance form.
     // This restructures the render array to simplify integration of the
     // CKEditor5 React component.
-    if (isset($element['#attributes']['data-form-id']) && in_array($element['#attributes']['data-form-id'], [ComponentInstanceForm::FORM_ID, ModuleHooks::PAGE_DATA_FORM_ID])) {
+    $relevant_forms = [
+      ComponentInstanceForm::FORM_ID,
+      ModuleHooks::PAGE_DATA_FORM_ID,
+    ];
+    if (isset($element['#attributes']['data-form-id']) && \in_array($element['#attributes']['data-form-id'], $relevant_forms, TRUE)) {
       $element['value']['#attributes']['data-form-id'] = $element['#attributes']['data-form-id'];
       // The data-editor-for attribute triggers a vanilla JS initialization of
       // CKEditor5. Rename the attribute so we can instead use a React-specific
@@ -277,7 +401,11 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         // Include the #name and #id render array properties as name and id
         // attributes.
         \assert(\is_iterable($element['format']['format']['#attributes']));
-        $element['value']['#attributes']['data-canvas-format-select-attributes'] = Json::encode([...$element['format']['format']['#attributes'], 'name' => $element['format']['format']['#name'], 'id' => $element['format']['format']['#id']]);
+        $element['value']['#attributes']['data-canvas-format-select-attributes'] = Json::encode([
+          ...$element['format']['format']['#attributes'],
+          'name' => $element['format']['format']['#name'],
+          'id' => $element['format']['format']['#id'],
+        ]);
         if (isset($element['format']['format']['#options'])) {
           // Serialize the list of available text formats to pass via attribute.
           $element['value']['#attributes']['data-canvas-available-formats'] = Json::encode($element['format']['format']['#options']);

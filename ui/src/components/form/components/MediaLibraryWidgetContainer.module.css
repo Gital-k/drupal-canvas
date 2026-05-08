@@ -15,7 +15,7 @@
       /* The float is intentional, it's the only way a legend element can
         not consume 100% width within flex. */
       float: left;
-      margin: 0;
+      margin: 0 0 var(--space-2);
       color: var(--slate-11);
     }
   }
@@ -81,13 +81,15 @@
     border-width: 1px;
     border-style: solid;
     border-color: var(--gray-5);
-    border-radius: 8px;
+    border-radius: 4px;
     gap: 9px;
 
 
     [data-canvas-media-library-open-button] {
       position: relative;
       height: 32px;
+      /* Support for browsers that don't support @scope */
+      padding: revert;
       white-space: wrap;
       color: var(--blue-11);
       border-width: 1px;
@@ -105,11 +107,11 @@
 
     /* Prevent interacting with the open button until ajax is ready */
     [data-canvas-media-library-open-button]:not([data-once="drupal-ajax"]) {
+      cursor: wait;
       pointer-events: none;
       color: var(--slate-11);
       border-color: var(--slate-1);
       background-color: var(--slate-3);
-      cursor: wait;
     }
 
     /* Hide this div when there is no selection so it doesn't take up space */
@@ -191,9 +193,19 @@
       }
     }
   }
+
+  /* Drag cursor for media library items */
+  :global(.js-media-library-item-preview) {
+    cursor: grab;
+  }
+
+  :global(.js-media-library-item-preview:active) {
+    cursor: grabbing;
+  }
+
   :global(.canvas-media-preview-label) {
     margin-right: 20px;
-    word-break: break-word;
+    overflow-wrap: break-word;
     color: var(--slate-11);
   }
 }
