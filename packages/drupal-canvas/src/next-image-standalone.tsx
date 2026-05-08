@@ -25,9 +25,12 @@ export default function Image(
           'alternateWidths',
         );
         if (!result) {
-          throw new Error(
-            'Responsive image generation requires an `alternateWidths` query parameter in the image URL.',
+          console.warn(
+            'Image does not have an `alternateWidths` query parameter. ' +
+              'Responsive image generation is disabled. Using original src.',
+            { src },
           );
+          return src;
         }
         result = result.replace('{width}', width.toString());
 
