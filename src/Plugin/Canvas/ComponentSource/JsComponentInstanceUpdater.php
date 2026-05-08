@@ -136,7 +136,7 @@ final class JsComponentInstanceUpdater implements ComponentInstanceUpdaterInterf
       $component_tree_list = $component_instance->getParent();
       \assert($component_tree_list instanceof ComponentTreeItemList);
       $component_tree_list->filter(
-        static function(ComponentTreeItem $item) use (
+        static function (ComponentTreeItem $item) use (
           $component_uuid,
           $removed_slot_names
         ): bool {
