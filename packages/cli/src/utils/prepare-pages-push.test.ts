@@ -187,6 +187,40 @@ describe('pushPages', () => {
     expect(api.createPage).not.toHaveBeenCalled();
   });
 
+  it('sends empty path when spec has no path field (old spec format regression)', async () => {
+    // Spec files pulled before commit 28245af6 have no `path` field.
+    // preparePages defaults spec.path ?? '' to ''. pushPages then calls
+    // updatePage with path: '', which clears the Drupal URL alias for the page.
+    const filePath = path.join(tmpDir, 'home.json');
+    await fs.writeFile(
+      filePath,
+      // Old format: no `path` or `description` field
+      JSON.stringify({ uuid: 'page-uuid-1', title: 'Home', elements: {} }),
+      'utf-8',
+    );
+
+    const pages = [mockDiscoveredPage('home', 'page-uuid-1', filePath)];
+    const { valid } = await preparePages(pages, new Map(), emptyDiscoveryResult);
+    expect(valid[0].result.path).toBe('');
+
+    const remoteByUuid = new Map([
+      ['page-uuid-1', mockPageListItem(1, 'page-uuid-1', 'Home', '/home')],
+    ]);
+
+    const api = {
+      updatePage: vi.fn().mockResolvedValue({}),
+      createPage: vi.fn(),
+    } as unknown as Pick<ApiService, 'createPage' | 'updatePage'>;
+
+    await pushPages(valid, remoteByUuid, api);
+
+    // Falls back to remote path instead of sending '' and clearing the alias.
+    expect(api.updatePage).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ path: '/home' }),
+    );
+  });
+
   it('should create new pages and write UUID back', async () => {
     const filePath = path.join(tmpDir, 'new.json');
     await fs.writeFile(

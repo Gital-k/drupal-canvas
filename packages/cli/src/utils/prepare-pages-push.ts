@@ -129,7 +129,7 @@ export async function pushPages(
         title: page.title,
         description: page.description,
         status: remotePage.status,
-        path: page.path,
+        path: page.path || remotePage.path,
         components: page.components,
       });
       return { title: page.title, operation: 'Updated' as const };
