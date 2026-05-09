@@ -176,11 +176,9 @@ const CodeEditorUi = () => {
         height="calc(100% - 52px)"
         style={{ position: 'relative' }}
       >
-        {activeTab === 'js' && <JavaScriptEditor isLoading={isLoading} />}
-        {activeTab === 'css' && <CssEditor isLoading={isLoading} />}
-        {activeTab === 'global-css' && (
-          <GlobalCssEditor isLoading={isLoading} />
-        )}
+        {activeTab === 'js' && <JavaScriptEditor />}
+        {activeTab === 'css' && <CssEditor />}
+        {activeTab === 'global-css' && <GlobalCssEditor />}
       </Flex>
     </Flex>
   );

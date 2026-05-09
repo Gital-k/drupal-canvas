@@ -110,9 +110,6 @@ export const codeEditorSlice = createSlice({
         codeComponent: {
           ...initialState.codeComponent,
           ...action.payload.codeComponent,
-          // Do not use previously compiled code. It will be re-compiled.
-          compiledCss: '',
-          compiledJs: '',
         },
         globalAssetLibrary: {
           ...initialState.globalAssetLibrary,
@@ -120,8 +117,6 @@ export const codeEditorSlice = createSlice({
           css: {
             ...initialState.globalAssetLibrary.css,
             ...action.payload.globalAssetLibrary.css,
-            // Do not use previously compiled CSS. It will be re-compiled.
-            compiled: '',
           },
         },
         brandKit: {

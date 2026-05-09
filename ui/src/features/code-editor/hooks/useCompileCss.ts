@@ -6,7 +6,7 @@
  * @see https://www.npmjs.com/package/tailwindcss-in-browser
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   compilePartialCss,
   compileCss as compileTailwindCss,
@@ -14,9 +14,11 @@ import {
   transformCss,
 } from 'tailwindcss-in-browser';
 
+import { useAppDispatch } from '@/app/hooks';
+import { setWasmStatus } from '@/features/ui/uiSlice';
+
 const useCompileCss = (): {
   extractClassNameCandidates: (markup: string) => string[];
-  transformCss: (css: string) => Promise<string>;
   buildTailwindCssFromClassNameCandidates: (
     classNameCandidates: string[],
     configurationCss: string,
@@ -25,22 +27,20 @@ const useCompileCss = (): {
     componentCss: string,
     configurationCss: string,
   ) => Promise<{ css: string; error?: string }>;
-} => ({
-  /**
-   * Extracts class names candidates from markup.
-   *
-   * They can be used to build CSS with Tailwind CSS.
-   */
-  extractClassNameCandidates,
+} => {
+  const dispatch = useAppDispatch();
 
-  /**
-   * The transformCss() function transforms modern CSS syntax into
-   * browser-compatible code.
-   *
-   * It uses Lightning CSS under the hood with the same configuration
-   * as Tailwind CSS does internally to transform CSS syntax.
-   */
-  transformCss,
+  useEffect(() => {
+    const initializeLightningCss = async () => {
+      try {
+        await transformCss('/* canvas-css-wasm-init */', { minify: false });
+        dispatch(setWasmStatus({ isCssWasmAvailable: true }));
+      } catch (error) {
+        console.error('Failed to initialize LightningCss:', error);
+      }
+    };
+    initializeLightningCss();
+  }, [dispatch]);
 
   /**
    * Builds CSS with Tailwind CSS using class name candidates.
@@ -50,7 +50,7 @@ const useCompileCss = (): {
    *
    * @see https://www.npmjs.com/package/tailwindcss-in-browser#tailwind-css-4-configuration
    */
-  buildTailwindCssFromClassNameCandidates: useCallback(
+  const buildTailwindCssFromClassNameCandidates = useCallback(
     async (classNameCandidates: string[], configurationCss: string) => {
       try {
         const compiledCss = await compileTailwindCss(
@@ -103,7 +103,7 @@ const useCompileCss = (): {
       }
     },
     [],
-  ),
+  );
 
   /**
    * Builds Component CSS with Tailwind CSS resolving @apply directives.
@@ -113,23 +113,33 @@ const useCompileCss = (): {
    *
    * @see https://www.npmjs.com/package/tailwindcss-in-browser#tailwind-css-4-configuration
    */
-  buildComponentCss: useCallback(async (componentCss, configurationCss) => {
-    try {
-      const compiledComponentCss = await compilePartialCss(
-        componentCss,
-        configurationCss,
-      );
-      // The CSS syntax needs to be transformed.
-      const transformedComponentCss = await transformCss(compiledComponentCss);
-      return { css: transformedComponentCss };
-    } catch (error) {
-      console.error('Failed to compile component CSS:', error);
-      return {
-        css: '/*! Compiling component CSS failed. */',
-        error: `Failed to compile component CSS:', ${error}`,
-      };
-    }
-  }, []),
-});
+  const buildComponentCss = useCallback(
+    async (componentCss: string, configurationCss: string) => {
+      try {
+        const compiledComponentCss = await compilePartialCss(
+          componentCss,
+          configurationCss,
+        );
+        // The CSS syntax needs to be transformed.
+        const transformedComponentCss =
+          await transformCss(compiledComponentCss);
+        return { css: transformedComponentCss };
+      } catch (error) {
+        console.error('Failed to compile component CSS:', error);
+        return {
+          css: '/*! Compiling component CSS failed. */',
+          error: `Failed to compile component CSS:', ${error}`,
+        };
+      }
+    },
+    [],
+  );
+
+  return {
+    extractClassNameCandidates,
+    buildTailwindCssFromClassNameCandidates,
+    buildComponentCss,
+  };
+};
 
 export default useCompileCss;

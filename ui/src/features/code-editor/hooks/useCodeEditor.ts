@@ -55,7 +55,13 @@ const useCodeEditor: () => {
     skip: requestedComponentId === loadedComponentId,
   });
 
-  // Initialize the code editor with the data.
+  // Initialize the code editor as soon as the data is loaded. We deliberately
+  // do NOT wait for the WASM compilers (SWC and Lightning CSS) here so that the
+  // source code shows up in the editors immediately. The WASM-ready guard lives
+  // in `useSourceCode` (no compilation runs before WASM is ready) and in
+  // `useAutoSave` (no auto-save fires before WASM is ready), which together
+  // prevent persisting empty `compiledJs` / `compiledCss` if the user navigates
+  // away before the compilers finish initializing.
   useEffect(() => {
     if (
       isLoading ||

@@ -10,16 +10,14 @@ import {
 
 import styles from '@/features/code-editor/CanvasCodeMirror.module.css';
 
-const CssEditor = ({ isLoading }: { isLoading: boolean }) => {
+const CssEditor = () => {
   const dispatch = useAppDispatch();
   const value = useAppSelector(selectCodeComponentProperty('sourceCodeCss'));
 
   function onChangeHandler(value: string) {
     dispatch(setCodeComponentProperty(['sourceCodeCss', value]));
   }
-  if (isLoading) {
-    return null;
-  }
+
   return (
     <CodeMirror
       className={styles.canvasCodeMirrorEditor}

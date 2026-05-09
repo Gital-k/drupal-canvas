@@ -6,9 +6,11 @@
  * @see https://swc.rs/docs/usage/wasm
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import initSwc, { transformSync } from '@swc/wasm-web';
 
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { selectWasmStatus, setWasmStatus } from '@/features/ui/uiSlice';
 import { getBaseUrl, getCanvasSettings } from '@/utils/drupal-globals';
 
 import type { Options as SwcOptions } from '@swc/wasm-web';
@@ -48,13 +50,13 @@ import { jsx as _jsx } from "react/jsx-runtime";
 `;
 
 const useCompileJavaScript = (): {
-  isJavaScriptCompilerReady: boolean;
   compileJavaScript: (
     code: string,
     fallbackContentMessage?: string,
   ) => { code: string; error?: string };
 } => {
-  const [isSwcInitialized, setIsSwcInitialized] = useState(false);
+  const dispatch = useAppDispatch();
+  const { isJsWasmAvailable } = useAppSelector(selectWasmStatus);
 
   useEffect(() => {
     const initializeSwc = async () => {
@@ -66,20 +68,20 @@ const useCompileJavaScript = (): {
         } else {
           await initSwc();
         }
-        setIsSwcInitialized(true);
+        dispatch(setWasmStatus({ isJsWasmAvailable: true }));
       } catch (error) {
         console.error('Failed to initialize SWC:', error);
       }
     };
     initializeSwc();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const compileJavaScript = useCallback(
     (
       code: string,
       fallbackContentMessage?: string,
     ): { code: string; error?: string } => {
-      if (!isSwcInitialized) {
+      if (!isJsWasmAvailable) {
         return { code: '', error: 'JavaScript compiler is not initialized' };
       }
       try {
@@ -95,10 +97,10 @@ const useCompileJavaScript = (): {
         };
       }
     },
-    [isSwcInitialized],
+    [isJsWasmAvailable],
   );
 
-  return { isJavaScriptCompilerReady: isSwcInitialized, compileJavaScript };
+  return { compileJavaScript };
 };
 
 export default useCompileJavaScript;

@@ -17,6 +17,7 @@ import {
   serializeProps,
   serializeSlots,
 } from '@/features/code-editor/utils/utils';
+import { selectWasmStatus } from '@/features/ui/uiSlice';
 import { useUpdateAutoSaveMutation as updateGlobalAssetLibraryMutation } from '@/services/assetLibrary';
 import { useUpdateAutoSaveMutation as updateCodeComponentMutation } from '@/services/componentAndLayout';
 
@@ -34,6 +35,16 @@ const useAutoSave = (requestedComponentId: string): void => {
   const prevIsUpdatingCodeComponentRef = useRef(false);
   const prevIsUpdatingGlobalAssetLibraryRef = useRef(false);
 
+  // The WASM compilers (SWC for JS, Lightning CSS for CSS) drive `compiledJs`
+  // and `compiledCss`. If a save completes while WASM is still loading, the
+  // payload necessarily carried the previously-known-good compiled output
+  // rather than freshly-compiled output for the user's latest source. We must
+  // keep `hasUnsavedChanges` true in that case so the SavingOverlay continues
+  // to block navigation until the upcoming compile-and-save cycle completes.
+  const { isCssWasmAvailable, isJsWasmAvailable } =
+    useAppSelector(selectWasmStatus);
+  const isWasmReady = isCssWasmAvailable && isJsWasmAvailable;
+
   useEffect(() => {
     const isSaving = isUpdatingCodeComponent || isUpdatingGlobalAssetLibrary;
     dispatch(
@@ -44,14 +55,23 @@ const useAutoSave = (requestedComponentId: string): void => {
     const wasSaving =
       prevIsUpdatingCodeComponentRef.current ||
       prevIsUpdatingGlobalAssetLibraryRef.current;
-    // Only reset the hasUnsavedChanges flag after a save operation completes and is currently not saving.
-    if (wasSaving && !isSaving) {
+    // Only reset the hasUnsavedChanges flag after a save operation completes
+    // and is currently not saving — and only once the WASM compilers are
+    // ready, since otherwise the payload that just landed on the server pairs
+    // the latest source with the previously-known-good compiled output and a
+    // follow-up save with the freshly-compiled output is still pending.
+    if (wasSaving && !isSaving && isWasmReady) {
       dispatch(setStatus({ hasUnsavedChanges: false }));
     }
     // Update previous state references
     prevIsUpdatingCodeComponentRef.current = isUpdatingCodeComponent;
     prevIsUpdatingGlobalAssetLibraryRef.current = isUpdatingGlobalAssetLibrary;
-  }, [isUpdatingCodeComponent, isUpdatingGlobalAssetLibrary, dispatch]);
+  }, [
+    isUpdatingCodeComponent,
+    isUpdatingGlobalAssetLibrary,
+    isWasmReady,
+    dispatch,
+  ]);
 
   const componentId = useAppSelector(
     selectCodeComponentProperty('machineName'),
@@ -194,8 +214,8 @@ const useAutoSave = (requestedComponentId: string): void => {
       });
     }, 1000);
     return () => {
-      if (lastInvocationCodeComponentTimeoutRef.current) {
-        clearTimeout(lastInvocationCodeComponentTimeoutRef.current);
+      if (lastInvocationGlobalCssTimeoutRef.current) {
+        clearTimeout(lastInvocationGlobalCssTimeoutRef.current);
       }
     };
   }, [

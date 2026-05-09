@@ -25,6 +25,7 @@ import {
   getPropValuesForPreview,
   getSlotNamesForPreview,
 } from '@/features/code-editor/utils/utils';
+import { selectWasmStatus } from '@/features/ui/uiSlice';
 import { useGetCodeComponentsQuery } from '@/services/componentAndLayout';
 import {
   getBaseUrl,
@@ -70,7 +71,17 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const previewCompiledJsForSlots = useAppSelector(
     selectPreviewCompiledJsForSlots,
   );
-  const { compilationError } = useAppSelector(selectStatus);
+  const { compilationError, isCompiling, hasUnsavedChanges } =
+    useAppSelector(selectStatus);
+  const { isCssWasmAvailable, isJsWasmAvailable } =
+    useAppSelector(selectWasmStatus);
+  const isWasmReady = isCssWasmAvailable && isJsWasmAvailable;
+  // The preview iframe renders the compiled output, so it is stale whenever the
+  // user has typed but the source has not yet been (re)compiled — either
+  // because compilation is currently running or because the WASM compilers
+  // haven't finished initializing yet. Surface that as a loading state so it's
+  // clear the iframe doesn't reflect the latest source.
+  const isPreviewStale = hasUnsavedChanges && (isCompiling || !isWasmReady);
   const props = useAppSelector(selectCodeComponentProperty('props'));
   const slots = useAppSelector(selectCodeComponentProperty('slots'));
   const [isDefaultExportMissingError, setIsDefaultExportMissingError] =
@@ -338,7 +349,7 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     .map(([key]) => key);
 
   return (
-    <Spinner loading={isLoading}>
+    <Spinner loading={isPreviewStale}>
       <div className={styles.iframeContainer} ref={parentRef}>
         {activeErrors.length > 0 && (
           <ScrollArea>
