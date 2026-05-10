@@ -366,14 +366,15 @@ paths:
               $ref: '#/components/schemas/NewAssetLibrary'
             examples:
               example of a global library:
-                id: "global"
-                label: "Global Asset Library"
-                css:
-                  original: "body { background-color: #fff; }"
-                  compiled: "body{background-color:#fff}"
-                js:
-                  original: "console.log('Hello, world!');"
-                  compiled: "console.log('Hello, world!');"
+                value:
+                  id: "global"
+                  label: "Global Asset Library"
+                  css:
+                    original: "body { background-color: #fff; }"
+                    compiled: "body{background-color:#fff}"
+                  js:
+                    original: "console.log('Hello, world!');"
+                    compiled: "console.log('Hello, world!');"
       responses:
         '201':
           description: Created entity successfully
@@ -449,10 +450,11 @@ paths:
           description: Deleted individual Asset Library
   /canvas/api/v0/config/auto-save/{entityTypeId}/{configEntityId}:
     description: Auto-save endpoints
+    parameters:
+      - $ref: '#/components/parameters/entityTypeId'
+      - $ref: '#/components/parameters/configEntityId'
     get:
       summary: Gets an auto-save state
-      parameters:
-        - $ref: '#/components/parameters/configEntityId'
       responses:
         '200':
           description: Individual auto-save state
@@ -462,8 +464,6 @@ paths:
                 type: object
     patch:
       summary: Updates an auto-save state
-      parameters:
-        - $ref: '#/components/parameters/configEntityId'
       requestBody:
         description: Updates individual auto-save state
         content:
@@ -702,9 +702,10 @@ paths:
               $ref: '#/components/schemas/NewContentTemplate'
             examples:
               new content template:
-                entityType: 'node'
-                bundle: 'article'
-                viewMode: 'full'
+                value:
+                  entityType: 'node'
+                  bundle: 'article'
+                  viewMode: 'full'
       responses:
         '201':
           description: Created entity successfully
@@ -714,14 +715,15 @@ paths:
                 $ref: '#/components/schemas/ContentTemplate'
               examples:
                 newly created content template:
-                  entityType: 'node'
-                  bundle: 'article'
-                  viewMode: 'full'
-                  status: false
-                  id: 'node.article.full'
-                  suggestedPreviewEntityId: NULL
-                  viewModeLabel: 'Full content'
-                  label: 'article content items — Full content view'
+                  value:
+                    entityType: 'node'
+                    bundle: 'article'
+                    viewMode: 'full'
+                    status: false
+                    id: 'node.article.full'
+                    suggestedPreviewEntityId: NULL
+                    viewModeLabel: 'Full content'
+                    label: 'article content items — Full content view'
   /canvas/api/v0/config/content_template/{configEntityId}:
     description: Specific ContentTemplate endpoints.
     get:
@@ -766,10 +768,11 @@ paths:
               $ref: '#/components/schemas/NewFolder'
             examples:
               example with one folder:
-                name: Test folder
-                type: component
-                weight: 0
-                items: [ ]
+                value:
+                  name: Test folder
+                  type: component
+                  weight: 0
+                  items: [ ]
       responses:
         '201':
           description: Successful save of Folder
@@ -777,11 +780,12 @@ paths:
             application/json:
               examples:
                 example with one component type folder:
-                  id: 75144f9b-1bfc-4874-b848-b5889f066222
-                  name: Test Folder
-                  type: component
-                  weight: 0
-                  items: [ ]
+                  value:
+                    id: 75144f9b-1bfc-4874-b848-b5889f066222
+                    name: Test Folder
+                    type: component
+                    weight: 0
+                    items: [ ]
               schema:
                 $ref: '#/components/schemas/ExistingFolder'
         '409':
@@ -859,17 +863,18 @@ paths:
               $ref: '#/components/schemas/NewCodeComponent'
             examples:
               a simple js component with no slots or props, and no imports:
-                machineName: test_component
-                name: Test Component
-                status: FALSE
-                props: []
-                slots: []
-                sourceCodeJs: 'console.log("Test");'
-                sourceCodeCss: '.test{ display:none; }'
-                compiledJs: 'console.log("Test");'
-                compiledCss: '.test{display:none;}'
-                importedJsComponents: []
-                dataDependencies: []
+                value:
+                  machineName: test_component
+                  name: Test Component
+                  status: FALSE
+                  props: []
+                  slots: []
+                  sourceCodeJs: 'console.log("Test");'
+                  sourceCodeCss: '.test{ display:none; }'
+                  compiledJs: 'console.log("Test");'
+                  compiledCss: '.test{display:none;}'
+                  importedJsComponents: []
+                  dataDependencies: []
       responses:
         '201':
           description: Successful creation of individual Code Component
@@ -970,25 +975,26 @@ paths:
               $ref: '#/components/schemas/NewPattern'
             examples:
               example with one pattern:
-                name: Pattern
-                layout:
-                  -
-                    uuid: 0b755464-281c-4487-82a0-ece34a9b1121
-                    nodeType: component
-                    type: sdc.canvas_test_sdc.my-section@b277cb81a83a977f
-                    slots: [ ]
-                model:
-                  0b755464-281c-4487-82a0-ece34a9b1121:
-                    resolved:
-                      text:
-                        value: >-
-                          Our mission is to deliver the best products and
-                          services to our customers. We strive to exceed
-                          expectations and continuously improve our offerings.
-                    source:
-                      text:
-                        sourceType: static:field_item:string,
-                        expression: 'ℹ︎string␟value'
+                value:
+                  name: Pattern
+                  layout:
+                    -
+                      uuid: 0b755464-281c-4487-82a0-ece34a9b1121
+                      nodeType: component
+                      type: sdc.canvas_test_sdc.my-section@b277cb81a83a977f
+                      slots: [ ]
+                  model:
+                    0b755464-281c-4487-82a0-ece34a9b1121:
+                      resolved:
+                        text:
+                          value: >-
+                            Our mission is to deliver the best products and
+                            services to our customers. We strive to exceed
+                            expectations and continuously improve our offerings.
+                      source:
+                        text:
+                          sourceType: static:field_item:string,
+                          expression: 'ℹ︎string␟value'
       responses:
         '201':
           description: Successful save of Pattern
@@ -1126,24 +1132,25 @@ paths:
               $ref: '#/components/schemas/Segment'
             examples:
               new_segment:
-                id: "new_segment"
-                label: "My new Segment"
-                description: "<p>My new Segment description</p>"
-                rules:
-                  utm_parameters:
-                    id: "utm_parameters"
-                    parameters:
-                      -
-                        "key": "utm_source"
-                        "value": "my-source-id"
-                        "matching": "exact"
-                      -
-                        "key": "utm_campaign"
-                        "value": "HALLOWEEN"
-                        "matching": "starts_with"
-                    negate: false
-                    all: true
-                weight: 0
+                value:
+                  id: "new_segment"
+                  label: "My new Segment"
+                  description: "<p>My new Segment description</p>"
+                  rules:
+                    utm_parameters:
+                      id: "utm_parameters"
+                      parameters:
+                        -
+                          "key": "utm_source"
+                          "value": "my-source-id"
+                          "matching": "exact"
+                        -
+                          "key": "utm_campaign"
+                          "value": "HALLOWEEN"
+                          "matching": "starts_with"
+                      negate: false
+                      all: true
+                  weight: 0
       responses:
         '201':
           description: Created entity successfully
@@ -1192,23 +1199,24 @@ paths:
                 $ref: '#/components/schemas/Segment'
               examples:
                 example:
-                  id: "new_segment"
-                  label: "My new Segment"
-                  rules:
-                    utm_parameters:
-                      id: "utm_parameters"
-                      parameters:
-                        -
-                          "key": "utm_source"
-                          "value": "my-source-id"
-                          "matching": "exact"
-                        -
-                          "key": "utm_campaign"
-                          "value": "HALLOWEEN"
-                          "matching": "starts_with"
-                      negate: false
-                      all: true
-                  weight: 0
+                  value:
+                    id: "new_segment"
+                    label: "My new Segment"
+                    rules:
+                      utm_parameters:
+                        id: "utm_parameters"
+                        parameters:
+                          -
+                            "key": "utm_source"
+                            "value": "my-source-id"
+                            "matching": "exact"
+                          -
+                            "key": "utm_campaign"
+                            "value": "HALLOWEEN"
+                            "matching": "starts_with"
+                        negate: false
+                        all: true
+                    weight: 0
     patch:
       summary: Updates a specific Asset Library.
       requestBody:
@@ -1355,6 +1363,13 @@ paths:
         '204':
           description: Content deleted successfully
   '/canvas/api/v0/content/{entity_type}':
+    parameters:
+      - name: entity_type
+        in: path
+        required: true
+        description: The entity type
+        schema:
+          type: string
     get:
       summary: Provides api for page listing.
       parameters:
@@ -1497,6 +1512,8 @@ paths:
                         autoSaveLabel: Homer
                         autoSavePath: /updated-path
                         internalPath: /page/1
+                        isNew: false
+                        hasUnsavedStatusChange: false
                         links:
                           edit-form: /canvas/editor/canvas_page/1
                       - id: 2
@@ -1507,6 +1524,8 @@ paths:
                         autoSaveLabel: About who?
                         autoSavePath: /page/1
                         internalPath: /page/2
+                        isNew: false
+                        hasUnsavedStatusChange: true
                         links:
                           edit-form: /canvas/editor/canvas_page/2
                     meta:
@@ -1520,13 +1539,6 @@ paths:
                         href: /canvas/api/v0/content/canvas_page?page[offset]=0&page[limit]=50
     post:
       summary: Creates content for a specific entity type
-      parameters:
-        - name: entity_type
-          in: path
-          required: true
-          description: The entity type
-          schema:
-            type: string
       requestBody:
         description: Optional entity ID for duplication, or update a existing entity ID
         content:
@@ -1541,6 +1553,7 @@ paths:
                 summary: "Duplicate existing page"
                 value:
                   entity_id: "1"
+                  clientInstanceId: "8a1f1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b"
               "An empty page":
                 summary: A page with no components
                 value:
@@ -1641,11 +1654,11 @@ paths:
           $ref: '#/components/responses/DrupalAjaxResponse'
   '/canvas/api/v0/form/content-entity/{entityTypeId}/{entityId}':
     description: TODO
+    parameters:
+      - $ref: '#/components/parameters/entityTypeId'
+      - $ref: '#/components/parameters/entityId'
     get:
       summary: Gets the entity form with the "default" form mode
-      parameters:
-        - $ref: '#/components/parameters/entityTypeId'
-        - $ref: '#/components/parameters/entityId'
       responses:
         '200':
           $ref: '#/components/responses/FormResponse'
@@ -1664,18 +1677,18 @@ paths:
                 description: A Drupal AJAX response.
   '/canvas/api/v0/form/content-entity/{entityTypeId}/{entityId}/{entityFormMode}':
     description: The form for editing a content entity.
+    parameters:
+      - $ref: '#/components/parameters/entityTypeId'
+      - $ref: '#/components/parameters/entityId'
+      - name: entityFormMode
+        in: path
+        required: true
+        description: The entity form mode of the form to retrieve
+        schema:
+          type: string
+        example: default
     get:
       summary: Gets the entity form with the specified form mode
-      parameters:
-        - $ref: '#/components/parameters/entityTypeId'
-        - $ref: '#/components/parameters/entityId'
-        - name: entityFormMode
-          in: path
-          required: true
-          description: The entity form mode of the form to retrieve
-          schema:
-            type: string
-          example: default
       responses:
         '200':
           $ref: '#/components/responses/FormResponse'
@@ -1761,9 +1774,7 @@ paths:
                     type: array
                     description: Layout regions
                     items:
-                      type: object
-                      schema:
-                        $ref: '#/components/schemas/LayoutSlot'
+                      $ref: '#/components/schemas/LayoutSlot'
                   model:
                     $ref: '#/components/schemas/Model'
                   isNew:
@@ -1804,9 +1815,7 @@ paths:
                     type: array
                     description: Layout regions
                     items:
-                      type: object
-                      schema:
-                        $ref: '#/components/schemas/LayoutSlot'
+                      $ref: '#/components/schemas/LayoutSlot'
                   model:
                     $ref: '#/components/schemas/Model'
                   autoSaves:
@@ -1977,9 +1986,7 @@ paths:
                     type: array
                     description: Layout regions
                     items:
-                      type: object
-                      schema:
-                        $ref: '#/components/schemas/LayoutSlot'
+                      $ref: '#/components/schemas/LayoutSlot'
                   model:
                     $ref: '#/components/schemas/Model'
                   entity_form_fields:
@@ -2033,9 +2040,7 @@ paths:
                     type: array
                     description: Layout regions
                     items:
-                      type: object
-                      schema:
-                        $ref: '#/components/schemas/LayoutSlot'
+                      $ref: '#/components/schemas/LayoutSlot'
                   model:
                     $ref: '#/components/schemas/Model'
                   entity_form_fields:
@@ -2565,38 +2570,39 @@ paths:
                             description: Boolean flag indicating if ContentTemplate for this Entity View Display exists
               examples:
                 node:
-                  article:
-                    rss:
-                      label: RSS
-                      hasTemplate: false
-                    search_index:
-                      label: Search index
-                      hasTemplate: false
-                    search_result:
-                      label: Search result highlighting input
-                      hasTemplate: false
-                    full:
-                      label: Full content
-                      hasTemplate: true
-                    teaser:
-                      label: Teaser
-                      hasTemplate: false
-                  page:
-                    rss:
-                      label: RSS
-                      hasTemplate: false
-                    search_index:
-                      label: Search index
-                      hasTemplate: false
-                    search_result:
-                      label: Search result highlighting input
-                      hasTemplate: false
-                    full:
-                      label: Full content
-                      hasTemplate: true
-                    teaser:
-                      label: Teaser
-                      hasTemplate: true
+                  value:
+                    article:
+                      rss:
+                        label: RSS
+                        hasTemplate: false
+                      search_index:
+                        label: Search index
+                        hasTemplate: false
+                      search_result:
+                        label: Search result highlighting input
+                        hasTemplate: false
+                      full:
+                        label: Full content
+                        hasTemplate: true
+                      teaser:
+                        label: Teaser
+                        hasTemplate: false
+                    page:
+                      rss:
+                        label: RSS
+                        hasTemplate: false
+                      search_index:
+                        label: Search index
+                        hasTemplate: false
+                      search_result:
+                        label: Search result highlighting input
+                        hasTemplate: false
+                      full:
+                        label: Full content
+                        hasTemplate: true
+                      teaser:
+                        label: Teaser
+                        hasTemplate: true
   /canvas/api/v0/usage/component:
     get:
       summary: Get all components to see if they are in use.
@@ -2868,10 +2874,10 @@ components:
             properties:
               title:
                 type: string
-                label: Title
+                title: Title
               description:
                 type: string
-                label: Description
+                title: Description
               examples:
                 type: array
                 items:
@@ -2888,7 +2894,7 @@ components:
           type: string
         dataDependencies:
           type: object
-          schema:
+          properties:
             urls:
               type: array
               items:
@@ -3034,9 +3040,7 @@ components:
           type: array
           description: Layout regions
           items:
-            type: object
-            schema:
-              $ref: '#/components/schemas/LayoutSlot'
+            $ref: '#/components/schemas/LayoutSlot'
         model:
           $ref: '#/components/schemas/Model'
         autoSaves:
