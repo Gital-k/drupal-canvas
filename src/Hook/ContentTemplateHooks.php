@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
@@ -16,11 +17,14 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\Url;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\Core\Url;
 
 /**
  * @see \Drupal\canvas\Entity\ContentTemplate
@@ -28,10 +32,14 @@ use Drupal\Core\Url;
  */
 final class ContentTemplateHooks {
 
+  use StringTranslationTrait;
+
   public function __construct(
     private readonly RouteMatchInterface $routeMatch,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityFieldManagerInterface $entityFieldManager,
+    private readonly AccountProxyInterface $currentUser,
+    private readonly RendererInterface $renderer,
   ) {
   }
 
@@ -96,6 +104,40 @@ final class ContentTemplateHooks {
       }
     }
   }
+
+  /**
+   * Implements hook_contextual_links_view_alter().
+   */
+  #[Hook('contextual_links_view_alter')]
+  public function linksAlter(array &$element, array $items): void {
+    // Extract and validate the node ID from route parameters.
+    $route_parameters = $items['entity.node.edit_form']['route_parameters'] ?? [];
+    if (!isset($route_parameters['node'])) {
+      return;
+    }
+    $node = $this->entityTypeManager->getStorage('node')->load($route_parameters['node']);
+    if (!$node instanceof FieldableEntityInterface) {
+      return;
+    }
+    $view_mode = $route_parameters['view_mode'] ?? 'full';
+    $bundle = $node->bundle();
+
+    $template = $this->entityTypeManager
+      ->getStorage(ContentTemplate::ENTITY_TYPE_ID)
+      ->load("node.$bundle.$view_mode");
+
+    if (!$template || !$this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION)) {
+      return;
+    }
+
+    $node_id = $node->id();
+    $element['#links']['node_canvas_template_editor'] = [
+      'title' => $this->t('Edit Content Template'),
+      'url' => Url::fromUri("base:canvas/template/node/$bundle/$view_mode/$node_id"),
+      'weight' => 11,
+    ];
+  }
+
 
   /**
    * Alters menu local tasks to add cache invalidation for content templates.
@@ -179,6 +221,32 @@ final class ContentTemplateHooks {
 
     // Attach library for menu icon styling.
     $variables['link']['#attached']['library'][] = 'canvas/menu-icons';
+  }
+
+  /**
+   * Implements hook_node_view_alter().
+   *
+   * Adds contextual links to node types that have an enabled Canvas content
+   * template.
+   *
+   * This hook checks if a node has an associated content template and ensures
+   * that contextual links are properly attached to the node's render array.
+   * The contextual links allow editors to quickly access template editing
+   * functionality directly from the rendered node view.
+   */
+  #[Hook('node_view_alter')]
+  public function nodeViewAlter(array &$build, FieldableEntityInterface $entity, EntityViewDisplayInterface $display): void {
+    // Contextual links are added to node only if a
+    // template exists and is enabled.
+    if ($entity->getEntityTypeId() === 'node') {
+      // Check if a content template exists for this entity and view mode.
+      // If it exists, then only add contextual links to the render array.
+      $template = ContentTemplate::loadForEntity($entity, $display->getMode());
+      if ($template) {
+        $build['#contextual_links']['node']['route_parameters']['view_mode'] = $display->getMode();
+        $this->renderer->addCacheableDependency($build, $template);
+      }
+    }
   }
 
 }
