@@ -23,6 +23,7 @@ import {
 } from '../utils/command-helpers';
 import { contentTemplateToAuthored } from '../utils/content-templates';
 import { ensureTailwindImportAtTop } from '../utils/ensure-global-css-tailwind-import';
+import { regionToAuthoredSpec } from '../utils/regions';
 import { pageToAuthoredSpec } from '../utils/pages';
 import { reportResults } from '../utils/report-results';
 
@@ -30,6 +31,7 @@ import type {
   DiscoveredComponent,
   DiscoveredContentTemplate,
   DiscoveredPage,
+  DiscoveredRegion,
 } from '@drupal-canvas/discovery';
 import type { Command } from 'commander';
 import type { ApiService } from '../services/api';
@@ -37,6 +39,7 @@ import type { Component } from '../types/Component';
 import type { ContentTemplateListItem } from '../types/ContentTemplate';
 import type { Metadata } from '../types/Metadata';
 import type { PageListItem } from '../types/Page';
+import type { Region, RegionListItem } from '../types/Region';
 import type { Result } from '../types/Result';
 
 interface PullOptions {
@@ -472,6 +475,110 @@ export function createContentTemplatesPullTask(
   };
 }
 
+export function createRegionsPullTask(
+  apiService: ApiService,
+  regionsDir: string,
+  skipOverwrite: boolean,
+): PullTask {
+  let regions: Record<string, RegionListItem> = {};
+  const localRegionMap = new Map<string, DiscoveredRegion>();
+
+  return {
+    async prepare(): Promise<PullTaskPrepareResult> {
+      const [fetched, discoveryResult] = await Promise.all([
+        apiService.listRegions(),
+        discoverCanvasProject({ regionsRoot: regionsDir }),
+      ]);
+
+      regions = fetched;
+      for (const discovered of discoveryResult.regions) {
+        localRegionMap.set(discovered.region, discovered);
+      }
+
+      const total = Object.keys(regions).length;
+      if (total === 0) return { summaryLines: [], localOnlyCount: 0 };
+
+      const existingCount = Object.values(regions).filter((r) =>
+        localRegionMap.has(r.region),
+      ).length;
+      const newCount = total - existingCount;
+
+      return {
+        summaryLines: [
+          formatSummaryLine('global region', total, newCount, existingCount),
+        ],
+        localOnlyCount: 0,
+      };
+    },
+
+    async execute(): Promise<PullTaskResult> {
+      const results: Result[] = [];
+
+      for (const region of Object.values(regions) as Region[]) {
+        try {
+          const discovered = localRegionMap.get(region.region);
+          if (discovered && skipOverwrite) {
+            results.push({
+              itemName: region.id,
+              success: true,
+              details: [{ content: 'Skipped (already exists)' }],
+            });
+            continue;
+          }
+
+          const nonJsComponents = region.component_tree.filter(
+            (c) => !c.component_id.startsWith('js.'),
+          );
+          if (nonJsComponents.length > 0) {
+            const unsupported = [
+              ...new Set(nonJsComponents.map((c) => c.component_id)),
+            ].join(', ');
+            results.push({
+              itemName: region.id,
+              success: false,
+              details: [
+                {
+                  content: `Skipped: contains unsupported components (${unsupported}). Only code components are supported.`,
+                },
+              ],
+            });
+            continue;
+          }
+
+          const localData = regionToAuthoredSpec(region);
+          const filePath =
+            discovered?.path ??
+            path.join(regionsDir, `${region.region}.json`);
+          await fs.mkdir(path.dirname(filePath), { recursive: true });
+          await fs.writeFile(
+            filePath,
+            JSON.stringify(localData, null, 2) + '\n',
+            'utf-8',
+          );
+
+          results.push({ itemName: region.id, success: true });
+        } catch (error) {
+          results.push({
+            itemName: region.id,
+            success: false,
+            details: [
+              {
+                content: error instanceof Error ? error.message : String(error),
+              },
+            ],
+          });
+        }
+      }
+
+      return {
+        results,
+        title: 'Pulled global regions',
+        label: 'Global region',
+      };
+    },
+  };
+}
+
 export function createAssetsPullTask(
   apiService: ApiService,
   globalCssPath: string,
@@ -698,6 +805,11 @@ export function pullCommand(program: Command): void {
             createPagesPullTask(
               apiService,
               config.pagesDir,
+              options.skipOverwrite ?? false,
+            ),
+            createRegionsPullTask(
+              apiService,
+              config.regionsDir,
               options.skipOverwrite ?? false,
             ),
           );
