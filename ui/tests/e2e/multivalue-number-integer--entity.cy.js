@@ -1,17 +1,4 @@
 /**
- * Comprehensive tests for multi-value form design for number and integer fields.
- *
- * This test covers the popover-based multi-value form UI for:
- * - Number (float) fields
- * - Integer fields
- *
- * The design features:
- * - Collapsed list items showing numeric previews.
- * - Popover-based editing (click item → popover with input).
- * - Custom drag handles and remove buttons via DrupalInputMultivalueForm component.
- */
-
-/**
  * Helper function to open popover for a specific row and type a value.
  */
 const typeInRow = (alias, rowIndex, value) => {
@@ -119,9 +106,6 @@ configs.forEach((config) => {
   const fieldTypeLower = fieldType.toLowerCase();
 
   describe(`Multi-value Form Design – ${fieldType}`, () => {
-    // Destructuring inside describe but outside hooks can trigger mocha/no-setup-in-describe
-    // in some strict configs. To be safe, we access via config.* or destructure inside hooks.
-
     before(() => {
       cy.drupalCanvasInstall(['canvas_test_article_fields']);
     });
@@ -297,7 +281,7 @@ configs.forEach((config) => {
       const fieldName = config.drupalSelector
         .replace(/^edit-/, '')
         .replace(/-/g, '_');
-      cy.assertMultivalueReorder({
+      cy.assertReorderEntityFieldRequest({
         alias: 'previewUpdate',
         fieldName,
         expectedOrder: config.reorderedValues,
@@ -306,9 +290,7 @@ configs.forEach((config) => {
       cy.waitForAjax();
 
       confirmInputs(`@${config.fieldAlias}`, config.reorderedValues);
-      // Wait to ensure order is auto saved before reloading.
-      // eslint-disable-next-line cypress/no-unnecessary-waiting
-      cy.wait(10000);
+
       // Refresh the page to ensure the update persists.
       cy.reload();
       confirmInputs(`@${config.fieldAlias}`, [...config.reorderedValues, '']);

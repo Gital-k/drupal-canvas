@@ -1,12 +1,5 @@
 /**
  * Comprehensive test for multivalue datetime form.
- *
- * This test covers the popover-based multivalue datetime form UI.
- *
- * The design features:
- * - Collapsed list items showing date/time previews.
- * - Popover-based editing (click item → popover with date and time inputs).
- * - Custom drag handles and remove buttons via DrupalDatetimeMultivalueForm component.
  */
 
 describe('Multivalue DateTime Form Design', () => {
