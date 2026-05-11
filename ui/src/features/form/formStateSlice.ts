@@ -196,9 +196,9 @@ export const selectFieldError = createSelector(
 );
 
 export const selectFieldErrors = createSelector(
-  [selectFormState, selectFieldIdentifiers],
-  (formState: FormStateSliceState, identifiers: { formId: FormId }) =>
-    formState[identifiers.formId]?.errors || null,
+  [selectFormState, (_state: RootState, { formId }: { formId: FormId }) => formId],
+  (formState: FormStateSliceState, formId: FormId) =>
+    formState[formId]?.errors || {},
 );
 
 export const { selectCurrentComponent } = formStateSlice.selectors;

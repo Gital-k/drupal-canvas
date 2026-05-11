@@ -1,29 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { debounce } from 'lodash';
 
+
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { useComponentTransforms } from '@/components/ComponentInstanceForm';
-import {
-  coerceValueForSchema,
-  ComponentPreviewUpdateEvent,
-  getPropSchemas,
-  getPropsValues,
-  propInputData,
-  shouldSkipPropValidation,
-  toDateTime,
-  toPropName,
-  validateProp,
-} from '@/components/form/formUtil';
-import {
-  DEBOUNCE_TIMEOUT,
-  InputBehaviorsCommon,
-  POLLED_BACKGROUND_TIMEOUT,
-} from '@/components/form/inputBehaviors';
+import { coerceValueForSchema, ComponentPreviewUpdateEvent, getPropSchemas, getPropsValues, propInputData, shouldSkipPropValidation, toDateTime, toPropName, validateProp } from '@/components/form/formUtil';
+import { DEBOUNCE_TIMEOUT, InputBehaviorsCommon, POLLED_BACKGROUND_TIMEOUT } from '@/components/form/inputBehaviors';
 import { FORM_TYPES } from '@/features/form/constants';
-import {
-  selectFieldErrors,
-  selectFormValues,
-} from '@/features/form/formStateSlice';
+import { selectFieldErrors, selectFormValues } from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import useInputUIData from '@/hooks/useInputUIData';
@@ -31,15 +16,18 @@ import { usePatchComponent } from '@/services/preview';
 import { isPropSourceComponent } from '@/types/Component';
 import { parseValue } from '@/utils/function-utils';
 
+
+
+import type { InputMessage } from '@/types/Form';
 import type { PropsValues } from '@drupal-canvas/types';
 import type { FormId } from '@/features/form/formStateSlice';
-import type {
-  ComponentModels,
-  ResolvedValues,
-  Sources,
-} from '@/features/layout/layoutModelSlice';
+import type { ComponentModels, ResolvedValues, Sources } from '@/features/layout/layoutModelSlice';
 import type { CanvasComponent, PropSourceComponent } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
+
+
+
+
 
 export const InputBehaviorsComponentPropsForm = (
   OriginalInput: React.FC,
@@ -68,11 +56,11 @@ export const InputBehaviorsComponentPropsForm = (
     component?.propSources?.[propName]?.jsonSchema?.type as string,
   );
 
-  const fieldErrorsRef = useRef();
-  const fieldErrors = useAppSelector((state) =>
+  const fieldErrorsRef = useRef<Record<string, InputMessage> | null>(null);
+  fieldErrorsRef.current = useAppSelector((state) =>
     selectFieldErrors(state, { formId: 'component_instance_form' as FormId }),
   );
-  fieldErrorsRef.current = fieldErrors;
+
   const formStateToStore = (
     newFormState: PropsValues,
     newInputAndUiData: InputUIData,
