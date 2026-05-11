@@ -37,6 +37,11 @@ import {
   pushBuiltComponents,
   uploadGlobalAssetLibrary,
 } from '../utils/prepare-push';
+import {
+  collectRegionResults,
+  prepareRegions,
+  pushRegions,
+} from '../utils/prepare-regions-push';
 import { reportResults } from '../utils/report-results';
 import { createProgressCallback, processInPool } from '../utils/request-pool';
 import { validateContentTemplates } from '../utils/validate-content-template';
@@ -346,9 +351,7 @@ export function pushCommand(program: Command): void {
           warnings,
         } = discoveryResult;
         const discoveredPages = includesPages ? allDiscoveredPages : [];
-        const discoveredRegions = includesPages
-          ? allDiscoveredRegions
-          : [];
+        const discoveredRegions = includesPages ? allDiscoveredRegions : [];
         const hasIgnoredPages = !includesPages && allDiscoveredPages.length > 0;
         const discoveredContentTemplates = includesContentTemplates
           ? allDiscoveredContentTemplates
