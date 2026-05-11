@@ -39,6 +39,15 @@ vi.mock('node:fs', () => ({
     const dirs: Record<string, string[]> = {
       '/components/button': ['component.yml', 'index.jsx', 'index.css'],
       [componentCardDir]: ['component.yml', 'index.tsx', 'index.css'],
+      [resolve(process.cwd(), 'src/components')]: [
+        'button.component.yml',
+        'button.tsx',
+        'heading.component.yml',
+        'heading.tsx',
+        'heading-utils.ts',
+        'icon.component.yml',
+        'icon.tsx',
+      ],
       '/custom/code-components/button': [
         'component.yml',
         'index.jsx',
@@ -67,6 +76,17 @@ testRunner.run('component-imports rule', rule, {
         export default Button;
       `,
       filename: '/components/button/index.jsx',
+    },
+    {
+      name: 'should pass when a flat named component imports another flat named component entrypoint',
+      code: `
+        import Heading from '@/components/heading';
+        const Button = ({ title }) => {
+          return <button>{title} <Heading text={title} /></button>;
+        };
+        export default Button;
+      `,
+      filename: resolve(process.cwd(), 'src/components/button.tsx'),
     },
     {
       name: 'should pass when component imports a relative image asset',
@@ -404,6 +424,24 @@ testRunner.run('component-imports rule', rule, {
         {
           message:
             'Importing "@/components/card/utils" from a component directory is not supported. ' +
+            'Use "@/" alias to import other components or helpers/utilities from shared locations outside component directories.',
+          line: 2,
+        },
+      ],
+    },
+    {
+      name: 'should fail when a flat named component imports a helper from the flat component directory',
+      code: `
+        import { helper } from "@/components/heading-utils";
+        export default ({ title }) => {
+          return <button>{title}</button>;
+        };
+      `,
+      filename: resolve(process.cwd(), 'src/components/button.tsx'),
+      errors: [
+        {
+          message:
+            'Importing "@/components/heading-utils" from a component directory is not supported. ' +
             'Use "@/" alias to import other components or helpers/utilities from shared locations outside component directories.',
           line: 2,
         },

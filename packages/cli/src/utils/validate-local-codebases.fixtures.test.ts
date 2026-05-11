@@ -47,6 +47,9 @@ describe('local codebase fixture projects', () => {
       'Importing "@/components/pricing-card/helpers" from a component directory is not supported.',
     );
     expect(messages).toContain(
+      'Importing "@/components/heading-utils" from a component directory is not supported.',
+    );
+    expect(messages).toContain(
       "Relative JavaScript and TypeScript module imports are not supported. Use '@/...' alias instead of './formatDate'",
     );
     expect(messages).toContain(
