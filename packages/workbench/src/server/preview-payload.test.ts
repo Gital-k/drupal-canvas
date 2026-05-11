@@ -37,6 +37,38 @@ afterEach(async () => {
 });
 
 describe('preview-payload', () => {
+  it('reports invalid Canvas import root config before discovery', async () => {
+    const root = await makeTemporaryDirectory();
+
+    await writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify(
+        {
+          componentDir: './components',
+          pagesDir: './pages',
+          aliasBaseDir: 'src',
+        },
+        null,
+        2,
+      ),
+    );
+
+    const payload = await buildPreviewPayload({
+      mode: 'component',
+      inputPath: 'components/card/component.yml',
+      projectRoot: root,
+    });
+
+    expect(payload.ok).toBe(false);
+    expect(payload.errors).toEqual([
+      expect.objectContaining({
+        code: 'invalid_canvas_config',
+        message:
+          'Invalid Canvas config: componentDir "./components" must be inside aliasBaseDir "src".',
+      }),
+    ]);
+  });
+
   it('builds interactive component preview payload with inlined css html', async () => {
     const root = await makeTemporaryDirectory();
 
