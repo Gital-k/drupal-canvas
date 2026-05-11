@@ -78,13 +78,14 @@ describe('discoverCanvasProject', () => {
     );
     await writeFile(
       path.join(root, 'regions/sidebar_first.json'),
-      JSON.stringify({ theme: 'olivero', region: 'sidebar_first', elements: {} }),
+      JSON.stringify({
+        theme: 'olivero',
+        region: 'sidebar_first',
+        elements: {},
+      }),
     );
     // Nested file — should be ignored.
-    await writeFile(
-      path.join(root, 'regions/nested/ignored.json'),
-      '{}',
-    );
+    await writeFile(path.join(root, 'regions/nested/ignored.json'), '{}');
 
     const result = await discoverCanvasProject({ componentRoot: root });
 

@@ -121,9 +121,7 @@ async function getCandidateRegionFiles(
   });
 }
 
-function parseRegionFilename(
-  filename: string,
-): { region: string } | null {
+function parseRegionFilename(filename: string): { region: string } | null {
   const base = filename.replace(/\.json$/, '');
   if (!/^[a-z0-9_]+$/.test(base) || base.length === 0) {
     return null;

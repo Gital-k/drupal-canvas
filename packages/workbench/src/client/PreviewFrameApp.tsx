@@ -74,10 +74,7 @@ function RenderSignal({
 }: {
   renderId: string;
   type: 'component' | 'page' | 'region';
-  onRendered: (
-    type: 'component' | 'page' | 'region',
-    renderId: string,
-  ) => void;
+  onRendered: (type: 'component' | 'page' | 'region', renderId: string) => void;
 }) {
   useEffect(() => {
     onRendered(type, renderId);

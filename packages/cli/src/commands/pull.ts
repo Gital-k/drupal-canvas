@@ -23,8 +23,8 @@ import {
 } from '../utils/command-helpers';
 import { contentTemplateToAuthored } from '../utils/content-templates';
 import { ensureTailwindImportAtTop } from '../utils/ensure-global-css-tailwind-import';
-import { regionToAuthoredSpec } from '../utils/regions';
 import { pageToAuthoredSpec } from '../utils/pages';
+import { regionToAuthoredSpec } from '../utils/regions';
 import { reportResults } from '../utils/report-results';
 
 import type {
@@ -547,8 +547,7 @@ export function createRegionsPullTask(
 
           const localData = regionToAuthoredSpec(region);
           const filePath =
-            discovered?.path ??
-            path.join(regionsDir, `${region.region}.json`);
+            discovered?.path ?? path.join(regionsDir, `${region.region}.json`);
           await fs.mkdir(path.dirname(filePath), { recursive: true });
           await fs.writeFile(
             filePath,
