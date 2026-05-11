@@ -10,7 +10,7 @@ import {
   resolveCanvasConfig,
 } from '@drupal-canvas/discovery';
 import {
-  drupalCanvasCompat,
+  createCanvasViteBuildConfig,
   extractComponentPreviewMetadataFromComponentYaml,
 } from '@drupal-canvas/vite-compat';
 import tailwindcss from '@tailwindcss/vite';
@@ -416,6 +416,10 @@ export async function bundleInteractivePreview(options: {
     componentSources: options.componentSources,
     cssEntryPaths: options.cssEntryPaths,
   });
+  const canvasViteConfig = createCanvasViteBuildConfig({
+    hostRoot: options.projectRoot,
+    hostAliasBaseDir: options.aliasBaseDir,
+  });
 
   try {
     await fs.writeFile(entryPath, entrySource, 'utf-8');
@@ -423,6 +427,7 @@ export async function bundleInteractivePreview(options: {
     const buildResult = await viteBuild({
       configFile: false,
       root: options.projectRoot,
+      esbuild: canvasViteConfig.esbuild,
       logLevel: 'silent',
       define: {
         'process.env.NODE_ENV': JSON.stringify('production'),
@@ -432,10 +437,7 @@ export async function bundleInteractivePreview(options: {
       plugins: [
         react(),
         tailwindcss(),
-        ...drupalCanvasCompat({
-          hostRoot: options.projectRoot,
-          hostAliasBaseDir: options.aliasBaseDir,
-        }),
+        ...(canvasViteConfig.plugins ?? []),
       ] as any,
       resolve: {
         dedupe: [
