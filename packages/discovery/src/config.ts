@@ -15,6 +15,7 @@ export function resolveCanvasConfig(options: {
     regionsDir: './regions',
     deprecatedComponentDir: './components',
     globalCssPath: './src/components/global.css',
+    layoutPath: './src/layout.tsx',
   };
 
   const configPath = resolve(options.hostRoot, 'canvas.config.json');
@@ -37,6 +38,7 @@ export function resolveCanvasConfig(options: {
         parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.deprecatedComponentDir,
       globalCssPath:
         parsed.globalCssPath ?? DEFAULT_CANVAS_CONFIG.globalCssPath,
+      layoutPath: parsed.layoutPath ?? DEFAULT_CANVAS_CONFIG.layoutPath,
     };
   } catch {
     return { ...DEFAULT_CANVAS_CONFIG };
