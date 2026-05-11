@@ -49,6 +49,7 @@ describe('config', () => {
         includeBrandKit: false,
         outputDir: 'dist',
         pagesDir: './pages',
+        regionsDir: './regions',
         scope:
           'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
         siteUrl: '',
@@ -75,6 +76,7 @@ describe('config', () => {
         includeBrandKit: false,
         outputDir: 'dist',
         pagesDir: './pages',
+        regionsDir: './regions',
         scope:
           'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
         siteUrl: 'https://example.com',
@@ -250,7 +252,7 @@ describe('config', () => {
       vi.stubEnv('CANVAS_CLIENT_SECRET', 'test-secret');
       vi.stubEnv(
         'CANVAS_SCOPE',
-        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:page_region',
       );
       vi.stubEnv('CANVAS_INCLUDE_PAGES', 'true');
       vi.stubEnv('CANVAS_USER_AGENT', 'simpletest123456');
@@ -272,8 +274,9 @@ describe('config', () => {
         includeBrandKit: false,
         outputDir: 'dist',
         pagesDir: './pages',
+        regionsDir: './regions',
         scope:
-          'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
+          'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:page_region',
         siteUrl: 'https://test.example.com',
         userAgent: 'simpletest123456',
       });
@@ -302,6 +305,7 @@ describe('config', () => {
         globalCssPath: './src/components/global.css',
         outputDir: 'dist',
         pagesDir: './pages',
+        regionsDir: './regions',
         userAgent: '',
       });
     });
@@ -313,7 +317,7 @@ describe('config', () => {
 
       expect(getConfig().includePages).toBe(true);
       expect(getConfig().scope).toBe(
-        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:page_region',
       );
     });
   });

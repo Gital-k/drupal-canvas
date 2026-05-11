@@ -68,6 +68,7 @@ function setupHappyPath(overrides?: {
     outputDir: '',
     pagesDir: '',
     contentTemplatesDir: '',
+    regionsDir: '',
     globalCssPath: '',
     aliasBaseDir: '',
     userAgent: '',
