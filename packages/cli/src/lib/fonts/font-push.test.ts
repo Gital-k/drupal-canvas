@@ -53,6 +53,7 @@ describe('pushFonts', () => {
       regionsDir: './regions',
       deprecatedComponentDir: tmpDir,
       globalCssPath: './src/global.css',
+      layoutPath: './layout.tsx',
     };
     api = {
       getBrandKit: vi.fn().mockResolvedValue({ id: 'global', fonts: [] }),

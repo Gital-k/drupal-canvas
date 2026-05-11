@@ -70,6 +70,7 @@ function setupHappyPath(overrides?: {
     contentTemplatesDir: '',
     regionsDir: '',
     globalCssPath: '',
+    layoutPath: '',
     aliasBaseDir: '',
     userAgent: '',
     fonts: undefined,
