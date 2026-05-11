@@ -57,6 +57,13 @@ interface PreparedComponent {
   importedJsComponents: string[];
 }
 
+interface BuiltComponentForPush {
+  machineName: string;
+  componentName: string;
+  componentPayload: Component;
+  importedJsComponents: string[];
+}
+
 /**
  * Determine the operation for each component (create, update, or delete)
  * and build upload tasks with payloads attached.
@@ -316,6 +323,11 @@ async function prepareComponentsForUpload(
           component.directory,
           componentName,
           component.kind,
+          {
+            metadataPath: component.metadataPath,
+            jsEntryPath: component.jsEntryPath,
+            cssEntryPath: component.cssEntryPath,
+          },
         );
       if (!metadata) {
         throw new Error('Invalid metadata file');
@@ -482,6 +494,117 @@ export async function buildAndPushComponents(
 
     results.push({
       itemName: prepared[i]?.componentName ?? uploadResult.machineName,
+      success: uploadResult.success,
+      details: [
+        {
+          content: uploadResult.success
+            ? operationLabels[uploadResult.operation]
+            : uploadResult.error?.message?.trim() || 'Unknown upload error',
+        },
+      ],
+    });
+  }
+
+  spinner.stop(
+    chalk.green(
+      `Processed ${results.length} ${pluralizeComponent(results.length)}`,
+    ),
+  );
+  return results;
+}
+
+/**
+ * Upload already-built components to Drupal.
+ *
+ * This is the push path used by the shared build service. Backend dependency
+ * metadata is still extracted before this point so create/delete ordering is
+ * preserved.
+ */
+export async function pushBuiltComponents(
+  builtComponents: BuiltComponentForPush[],
+  apiService: ApiService,
+  actionLabel: string = 'Uploading',
+): Promise<Result[]> {
+  const results: Result[] = [];
+  const spinner = p.spinner();
+
+  if (builtComponents.length === 0) {
+    return results;
+  }
+
+  const preparedByName = new Map(
+    builtComponents.map((component) => [
+      component.machineName,
+      {
+        machineName: component.machineName,
+        componentName: component.componentName,
+        componentPayload: component.componentPayload,
+        importedJsComponents: component.importedJsComponents,
+      },
+    ]),
+  );
+
+  const existenceProgress = createProgressCallback(
+    spinner,
+    'Checking component existence',
+    preparedByName.size,
+  );
+
+  spinner.start('Checking component operations');
+  const uploadTasks = await buildComponentUploadTasks(
+    preparedByName,
+    apiService,
+    existenceProgress,
+  );
+
+  const uploadProgress = createProgressCallback(
+    spinner,
+    `${actionLabel} components`,
+    uploadTasks.length,
+  );
+
+  spinner.message(`${actionLabel} components`);
+  const uploadResults = await uploadComponents(
+    uploadTasks,
+    apiService,
+    uploadProgress,
+  );
+
+  const failedUploads = uploadResults
+    .map((uploadResult) => {
+      if (uploadResult.success) {
+        return null;
+      }
+      const componentName =
+        builtComponents.find((component) => {
+          return component.machineName === uploadResult.machineName;
+        })?.componentName ||
+        uploadResult.machineName ||
+        'unknown';
+      const message =
+        uploadResult.error?.message?.trim() || 'Unknown upload error';
+      return `${componentName} (${message})`;
+    })
+    .filter((value): value is string => Boolean(value));
+
+  if (failedUploads.length > 0) {
+    spinner.stop(chalk.red('Component upload failed'));
+    throw new Error(
+      `Component upload failed for ${failedUploads.length} ${pluralizeComponent(failedUploads.length)}: ${failedUploads.join(', ')}`,
+    );
+  }
+
+  const operationLabels: Record<ComponentOperation, string> = {
+    create: 'Created',
+    update: chalk.cyan('Updated'),
+    delete: chalk.dim('Deleted'),
+  };
+  for (const uploadResult of uploadResults) {
+    const builtComponent = builtComponents.find((component) => {
+      return component.machineName === uploadResult.machineName;
+    });
+    results.push({
+      itemName: builtComponent?.componentName ?? uploadResult.machineName,
       success: uploadResult.success,
       details: [
         {
