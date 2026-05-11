@@ -234,6 +234,7 @@ describe('buildCanvasProject fixture projects', () => {
       'svg-component-example',
       'svg-url-example',
       'third-party-package-example',
+      'third-party-shared-dependency-example',
     ]);
     expect(buildResult.componentResults).toEqual(
       componentNames.map((itemName) =>
@@ -295,11 +296,28 @@ describe('buildCanvasProject fixture projects', () => {
     await expect(componentJs('third-party-package-example')).resolves.toContain(
       'from "date-fns"',
     );
+    await expect(
+      componentJs('third-party-shared-dependency-example'),
+    ).resolves.toContain('from "@radix-ui/react-checkbox"');
+    await expect(
+      componentJs('third-party-shared-dependency-example'),
+    ).resolves.toContain('from "@radix-ui/react-switch"');
 
     expect(buildResult.manifest.vendor).toEqual({
+      '@radix-ui/react-checkbox': expect.stringMatching(
+        /^\.\/vendor\/@radix-ui--react-checkbox-[\w-]+\.js$/,
+      ),
+      '@radix-ui/react-switch': expect.stringMatching(
+        /^\.\/vendor\/@radix-ui--react-switch-[\w-]+\.js$/,
+      ),
       'date-fns': expect.stringMatching(/^\.\/vendor\/date-fns-[\w-]+\.js$/),
     });
     expect(buildResult.manifest.vendor).not.toHaveProperty('clsx');
+    expect(buildResult.manifest.shared).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^\.\/vendor\/[\w@.-]+-[\w-]+\.js$/),
+      ]),
+    );
     expect(buildResult.manifest.local).toEqual({
       '@/assets/intro.mp4': expect.stringMatching(
         /^\.\/local\/intro-[\w-]+\.mp4$/,
