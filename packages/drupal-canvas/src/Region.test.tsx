@@ -13,10 +13,10 @@ describe('Region / RegionsProvider', () => {
 
   it('RegionsProvider returns a valid React element with regions in props', () => {
     const regions = { header: createElement('span', null, 'H') };
-    const element = createElement(
-      RegionsProvider,
-      { regions },
-      createElement(Region, { name: 'header' }),
+    const element = (
+      <RegionsProvider regions={regions}>
+        <Region name="header" />
+      </RegionsProvider>
     );
     expect(isValidElement(element)).toBe(true);
     expect(element.type).toBe(RegionsProvider);
