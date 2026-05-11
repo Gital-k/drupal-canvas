@@ -115,6 +115,7 @@ describe('validatePages', () => {
           relativePath: 'pages/home.json',
         },
       ],
+      regions: [],
       warnings: [],
       stats: { scannedFiles: 1, ignoredFiles: 0 },
     };
@@ -157,6 +158,7 @@ describe('validatePages', () => {
           relativePath: 'pages/home.json',
         },
       ],
+      regions: [],
       warnings: [],
       stats: { scannedFiles: 1, ignoredFiles: 0 },
     };
@@ -215,6 +217,7 @@ describe('validatePages', () => {
           relativePath: 'pages/new-page.json',
         },
       ],
+      regions: [],
       warnings: [],
       stats: { scannedFiles: 1, ignoredFiles: 0 },
     };

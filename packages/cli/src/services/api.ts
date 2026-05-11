@@ -27,6 +27,11 @@ import type {
   ContentTemplateListItem,
 } from '../types/ContentTemplate';
 import type { Page, PageListItem } from '../types/Page';
+import type {
+  Region,
+  RegionComponentTreePayload,
+  RegionListItem,
+} from '../types/Region';
 
 export interface ApiOptions {
   siteUrl: string;
@@ -663,6 +668,75 @@ export class ApiService {
     try {
       const response = await this.client.get(
         `/canvas/api/v0/ui/content_template/suggestions/prop-sources/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(bundle)}/${encodeURIComponent(componentId)}`,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * List all regions.
+   */
+  async listRegions(): Promise<Record<string, RegionListItem>> {
+    try {
+      const response = await this.client.get(
+        '/canvas/api/v0/config/page_region',
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Get a single region by composite ID `{theme}.{region}`.
+   */
+  async getRegion(id: string): Promise<Region> {
+    try {
+      const response = await this.client.get(
+        `/canvas/api/v0/config/page_region/${id}`,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Create a new region.
+   */
+  async createRegion(payload: {
+    theme: string;
+    region: string;
+    status: boolean;
+    component_tree: RegionComponentTreePayload;
+  }): Promise<Region> {
+    try {
+      const response = await this.client.post(
+        '/canvas/api/v0/config/page_region',
+        payload,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Update an existing region.
+   */
+  async updateRegion(
+    id: string,
+    payload: {
+      status?: boolean;
+      component_tree?: RegionComponentTreePayload;
+    },
+  ): Promise<Region> {
+    try {
+      const response = await this.client.patch(
+        `/canvas/api/v0/config/page_region/${id}`,
+        payload,
       );
       return response.data;
     } catch (error) {
