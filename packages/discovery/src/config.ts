@@ -12,6 +12,7 @@ export function resolveCanvasConfig(options: {
     componentDir: 'src/components',
     pagesDir: './pages',
     contentTemplatesDir: './content-templates',
+    regionsDir: './regions',
     deprecatedComponentDir: './components',
     globalCssPath: './src/components/global.css',
   };
@@ -31,6 +32,7 @@ export function resolveCanvasConfig(options: {
       pagesDir: parsed.pagesDir ?? DEFAULT_CANVAS_CONFIG.pagesDir,
       contentTemplatesDir:
         parsed.contentTemplatesDir ?? DEFAULT_CANVAS_CONFIG.contentTemplatesDir,
+      regionsDir: parsed.regionsDir ?? DEFAULT_CANVAS_CONFIG.regionsDir,
       deprecatedComponentDir:
         parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.deprecatedComponentDir,
       globalCssPath:
