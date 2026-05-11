@@ -91,6 +91,7 @@ export interface Config {
   regionsDir: string;
   deprecatedComponentDir: string;
   globalCssPath: string;
+  layoutPath: string;
   fonts?: FontsConfig;
 }
 
@@ -139,6 +140,7 @@ const {
   regionsDir,
   deprecatedComponentDir,
   globalCssPath,
+  layoutPath,
 } = resolveCanvasConfig({ hostRoot: process.cwd() });
 
 export const DEFAULT_INCLUDE_PAGES = false;
@@ -244,6 +246,7 @@ let config: Config = {
   // We need this because the old commands use './components' as a default.
   deprecatedComponentDir: deprecatedComponentDir,
   globalCssPath: globalCssPath,
+  layoutPath: layoutPath,
   fonts: loadFontsFromBrandKitFile(process.cwd()),
 };
 
