@@ -25,7 +25,7 @@
     "lint:yaml": "yamllint '**/*.(yaml|yml)' --ignore='.gitlab/**' --ignore='.gitlab-ci.yml' --ignore='node_modules/**'",
     "fix": "npm run lint:prettier -- --write && npm run lint:eslint -- --fix && npm run lint:stylelint -- --fix",
     "test": "npx concurrently --group npm:test:*",
-    "lint": "npx concurrently --group npm:lint:*"
+    "lint": "node scripts/lint-all.js"
   },
   "repository": {
     "type": "git",
