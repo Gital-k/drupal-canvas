@@ -196,7 +196,10 @@ export const selectFieldError = createSelector(
 );
 
 export const selectFieldErrors = createSelector(
-  [selectFormState, (_state: RootState, { formId }: { formId: FormId }) => formId],
+  [
+    selectFormState,
+    (_state: RootState, { formId }: { formId: FormId }) => formId,
+  ],
   (formState: FormStateSliceState, formId: FormId) =>
     formState[formId]?.errors || {},
 );
