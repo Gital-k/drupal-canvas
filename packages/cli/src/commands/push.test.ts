@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildComponent } from '../utils/build-component';
 import { generateManifest } from '../utils/generate-manifest';
-import { buildAndPushComponents } from '../utils/prepare-push';
+import {
+  buildAndPushComponents,
+  pushBuiltComponents,
+} from '../utils/prepare-push';
 import { processComponentFiles } from '../utils/process-component-files';
 import { syncManifestArtifacts } from './push';
 
@@ -26,6 +29,10 @@ vi.mock('@clack/prompts', () => ({
 vi.mock('@drupal-canvas/ui/features/code-editor/utils/ast-utils', () => ({
   getDataDependenciesFromAst: vi.fn(() => ({})),
   getImportsFromAst: vi.fn(() => []),
+}));
+
+vi.mock('tailwindcss-in-browser', () => ({
+  compilePartialCss: vi.fn(async (source: string) => source),
 }));
 
 vi.mock('../utils/build-tailwind', () => ({
@@ -51,9 +58,11 @@ vi.mock('../utils/process-component-files', () => ({
 function mockDiscoveredComponent(name: string): DiscoveredComponent {
   return {
     name,
-    kind: 'component',
+    kind: 'named',
     directory: `/tmp/${name}`,
-    jsEntryPath: `/tmp/${name}/index.jsx`,
+    metadataPath: `/tmp/${name}/${name}.component.yml`,
+    jsEntryPath: `/tmp/${name}/${name}.tsx`,
+    cssEntryPath: `/tmp/${name}/${name}.css`,
   } as unknown as DiscoveredComponent;
 }
 
@@ -172,6 +181,65 @@ describe('Push artifacts', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('uploads duplicate manifest artifact files once and reuses the URI', async () => {
+    const outputDir = path.join(tmpDir, 'dist');
+    await fs.mkdir(path.join(outputDir, 'local'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(outputDir, 'local/hero-abc123.webp'),
+      'webp fixture',
+      'utf-8',
+    );
+
+    await generateManifest({
+      outputDir,
+      vendorImportMap: { imports: {} },
+      localImportMap: {
+        '@/components/card/hero.webp': './local/hero-abc123.webp',
+        '@/components/local-image-example/image-1.webp':
+          './local/hero-abc123.webp',
+      },
+      sharedChunks: [],
+    });
+
+    const uploadArtifact = vi.fn(async (filename: string) => ({
+      uri: `public://canvas/artifacts/${filename}`,
+      fid: 1,
+    }));
+    const syncManifest = vi.fn().mockResolvedValue({ ok: true });
+
+    const result = await syncManifestArtifacts(outputDir, {
+      apiService: { uploadArtifact, syncManifest },
+      createSpinner: () => ({
+        start: vi.fn(),
+        stop: vi.fn(),
+        message: vi.fn(),
+      }),
+      logInfo: vi.fn(),
+    });
+
+    expect(uploadArtifact).toHaveBeenCalledTimes(1);
+    expect(uploadArtifact).toHaveBeenCalledWith(
+      'hero-abc123.webp',
+      Buffer.from('webp fixture'),
+    );
+    expect(syncManifest).toHaveBeenCalledWith({
+      vendor: [],
+      local: [
+        {
+          name: '@/components/card/hero.webp',
+          uri: 'public://canvas/artifacts/hero-abc123.webp',
+        },
+        {
+          name: '@/components/local-image-example/image-1.webp',
+          uri: 'public://canvas/artifacts/hero-abc123.webp',
+        },
+      ],
+      shared: [],
+    });
+    expect(result.artifactCount).toBe(2);
+  });
+
   it('skips manifest sync when there are no artifacts to upload', async () => {
     const outputDir = path.join(tmpDir, 'dist');
     await fs.mkdir(outputDir, { recursive: true });
@@ -260,6 +328,28 @@ describe('Push components', () => {
     );
 
     expect(api.listComponents).toHaveBeenCalledTimes(1);
+    expect(processComponentFiles).toHaveBeenNthCalledWith(
+      1,
+      '/tmp/button',
+      'button',
+      'named',
+      {
+        metadataPath: '/tmp/button/button.component.yml',
+        jsEntryPath: '/tmp/button/button.tsx',
+        cssEntryPath: '/tmp/button/button.css',
+      },
+    );
+    expect(processComponentFiles).toHaveBeenNthCalledWith(
+      2,
+      '/tmp/card',
+      'card',
+      'named',
+      {
+        metadataPath: '/tmp/card/card.component.yml',
+        jsEntryPath: '/tmp/card/card.tsx',
+        cssEntryPath: '/tmp/card/card.css',
+      },
+    );
     expect(api.createComponent).toHaveBeenCalledTimes(1);
     expect(api.updateComponent).toHaveBeenCalledTimes(1);
     expect(api.deleteComponent).toHaveBeenCalledTimes(1);
@@ -290,6 +380,57 @@ describe('Push components', () => {
         success: true,
         details: [{ content: 'Deleted' }],
       },
+    ]);
+  });
+
+  it('uploads built component payloads in dependency order', async () => {
+    const api = mockApiService();
+    vi.mocked(api.listComponents).mockResolvedValue({});
+    vi.mocked(api.createComponent).mockResolvedValue({} as never);
+
+    const results = await pushBuiltComponents(
+      [
+        {
+          machineName: 'card',
+          componentName: 'card',
+          importedJsComponents: ['button'],
+          componentPayload: {
+            machineName: 'card',
+            name: 'card',
+            sourceCodeJs: "import Button from '@/components/button';",
+            compiledJs: "import Button from '@/components/button';",
+          } as never,
+        },
+        {
+          machineName: 'button',
+          componentName: 'button',
+          importedJsComponents: [],
+          componentPayload: {
+            machineName: 'button',
+            name: 'button',
+            sourceCodeJs: 'export default function Button() {}',
+            compiledJs: 'export default function Button() {}',
+          } as never,
+        },
+      ],
+      api,
+      'Pushing',
+    );
+
+    expect(api.createComponent).toHaveBeenCalledTimes(2);
+    expect(api.createComponent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ machineName: 'button' }),
+      true,
+    );
+    expect(api.createComponent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ machineName: 'card' }),
+      true,
+    );
+    expect(results.map((result) => result.itemName)).toEqual([
+      'card',
+      'button',
     ]);
   });
 
