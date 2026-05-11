@@ -41,7 +41,7 @@ export function regionToAuthoredSpec(region: Region): AuthoredRegionSpec {
   // The PageRegion config schema omits `parent_uuid`, `slot`, and `label`
   // when they have no value, so the server returns root-level components
   // with those keys absent. canvasTreeToSpec requires explicit `null` to
-  // recognise root components, so normalise back here.
+  // recognize root components, so normalize back here.
   const components = region.component_tree.map((node) => ({
     ...node,
     parent_uuid: node.parent_uuid ?? null,
