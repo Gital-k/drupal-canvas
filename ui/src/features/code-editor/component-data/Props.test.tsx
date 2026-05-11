@@ -158,13 +158,13 @@ describe('props in code editor', () => {
           screen.getByRole('textbox', { name: 'Prop name' }),
         ).toBeInTheDocument();
       });
-      const propName = selectCodeComponentProperty('props')(store.getState())[0]
-        .name;
+      const propId = selectCodeComponentProperty('props')(store.getState())[0]
+        .id;
       await userEvent.click(screen.getByRole('switch', { name: 'Required' }));
       expect(screen.getByRole('switch', { name: 'Required' })).toBeChecked();
       expect(
         selectCodeComponentProperty('required')(store.getState())[0],
-      ).toEqual(getPropMachineName(propName));
+      ).toEqual(propId);
     });
 
     it('changing type clears example data', async () => {

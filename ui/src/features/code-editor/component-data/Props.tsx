@@ -201,7 +201,7 @@ export default function Props() {
                     (item) => item.type === value,
                   );
                   if (selectedPropType) {
-                    const isRequired = required.includes(propName);
+                    const isRequired = required.includes(prop.id);
                     const isImageOrVideo =
                       value === 'image' || value === 'video';
                     // Default examples for image and video are handled in their own components
@@ -261,7 +261,7 @@ export default function Props() {
             <Label htmlFor={`prop-required-${prop.id}`}>Required</Label>
             <Switch
               id={`prop-required-${prop.id}`}
-              checked={required.includes(propName)}
+              checked={required.includes(prop.id)}
               size="1"
               mb="1"
               onCheckedChange={() =>
@@ -291,7 +291,7 @@ export default function Props() {
                       | 'number'
                   }
                   isDisabled={disabledPropIds.has(prop.id)}
-                  required={required.includes(propName)}
+                  required={required.includes(prop.id)}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
                 />
@@ -300,7 +300,7 @@ export default function Props() {
                   id={prop.id}
                   type={prop.type as 'string' | 'number' | 'integer'}
                   example={prop.example as string}
-                  required={required.includes(propName)}
+                  required={required.includes(prop.id)}
                 />
               );
             case 'formattedText':
@@ -308,7 +308,7 @@ export default function Props() {
                 <FormPropTypeFormattedText
                   id={prop.id}
                   example={prop.example}
-                  required={required.includes(propName)}
+                  required={required.includes(prop.id)}
                 />
               );
             case 'link':
@@ -318,7 +318,7 @@ export default function Props() {
                   example={prop.example as string | string[]}
                   format={prop.format as string}
                   isDisabled={disabledPropIds.has(prop.id)}
-                  required={required.includes(propName)}
+                  required={required.includes(prop.id)}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -333,7 +333,7 @@ export default function Props() {
                       | CodeComponentPropImageExample
                       | CodeComponentPropImageExample[]
                   }
-                  required={required.includes(propName)}
+                  required={required.includes(prop.id)}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -348,7 +348,7 @@ export default function Props() {
                       | CodeComponentPropVideoExample
                       | CodeComponentPropVideoExample[]
                   }
-                  required={required.includes(propName)}
+                  required={required.includes(prop.id)}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -372,7 +372,7 @@ export default function Props() {
                       | 'integer'
                   }
                   id={prop.id}
-                  required={required.includes(propName)}
+                  required={required.includes(prop.id)}
                   enum={prop.enum || []}
                   example={prop.example as string | string[]}
                   isDisabled={disabledPropIds.has(prop.id)}
@@ -388,7 +388,7 @@ export default function Props() {
                   example={prop.example as string | string[]}
                   format={prop.format as string}
                   isDisabled={disabledPropIds.has(prop.id)}
-                  required={required.includes(propName)}
+                  required={required.includes(prop.id)}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -424,7 +424,7 @@ export default function Props() {
                   if (checked) {
                     // Convert to array type - for date and link types.
                     if (['date', 'link'].includes(prop.derivedType ?? '')) {
-                      const isRequired = required.includes(propName);
+                      const isRequired = required.includes(prop.id);
                       updates.type = 'array';
                       updates.items = {
                         type: 'string',
@@ -443,7 +443,7 @@ export default function Props() {
                     } else if (
                       ['string', 'integer', 'number'].includes(prop.type)
                     ) {
-                      const isRequired = required.includes(propName);
+                      const isRequired = required.includes(prop.id);
                       // Convert to array type - for primitive types.
                       updates.type = 'array';
                       updates.items = {
@@ -501,7 +501,7 @@ export default function Props() {
                     // selection survives the single ↔ multi toggle
                     // round-trip. Fall back to type-specific defaults when
                     // the array is empty.
-                    const isRequired = required.includes(propName);
+                    const isRequired = required.includes(prop.id);
                     let defaultExample = '';
                     if (isRequired) {
                       if (
