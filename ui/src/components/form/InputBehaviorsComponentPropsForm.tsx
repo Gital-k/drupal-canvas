@@ -20,7 +20,10 @@ import {
   POLLED_BACKGROUND_TIMEOUT,
 } from '@/components/form/inputBehaviors';
 import { FORM_TYPES } from '@/features/form/constants';
-import { selectFormValues } from '@/features/form/formStateSlice';
+import {
+  selectFieldErrors,
+  selectFormValues,
+} from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import useInputUIData from '@/hooks/useInputUIData';
@@ -29,6 +32,7 @@ import { isPropSourceComponent } from '@/types/Component';
 import { parseValue } from '@/utils/function-utils';
 
 import type { PropsValues } from '@drupal-canvas/types';
+import type { FormId } from '@/features/form/formStateSlice';
 import type {
   ComponentModels,
   ResolvedValues,
@@ -64,13 +68,24 @@ export const InputBehaviorsComponentPropsForm = (
     component?.propSources?.[propName]?.jsonSchema?.type as string,
   );
 
+  const fieldErrorsRef = useRef();
+  const fieldErrors = useAppSelector((state) =>
+    selectFieldErrors(state, { formId: 'component_instance_form' as FormId }),
+  );
+  fieldErrorsRef.current = fieldErrors;
   const formStateToStore = (
     newFormState: PropsValues,
     newInputAndUiData: InputUIData,
   ) => {
+    const filteredFormState = Object.fromEntries(
+      Object.entries(newFormState).filter(
+        ([key]) => !(fieldErrorsRef.current && key in fieldErrorsRef.current),
+      ),
+    );
+
     // Apply (client-side) transforms for form state.
     const { propsValues: values, selectedModel } = getPropsValues(
-      newFormState,
+      filteredFormState,
       newInputAndUiData,
       // If transforms are not available (typically because TransformsContext is
       // not available to the input), fall back to the transforms stored in the
