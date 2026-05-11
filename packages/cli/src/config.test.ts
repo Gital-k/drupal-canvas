@@ -50,6 +50,7 @@ describe('config', () => {
         outputDir: 'dist',
         pagesDir: './pages',
         regionsDir: './regions',
+        layoutPath: './src/layout.tsx',
         scope:
           'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
         siteUrl: '',
@@ -77,6 +78,7 @@ describe('config', () => {
         outputDir: 'dist',
         pagesDir: './pages',
         regionsDir: './regions',
+        layoutPath: './src/layout.tsx',
         scope:
           'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
         siteUrl: 'https://example.com',
@@ -275,6 +277,7 @@ describe('config', () => {
         outputDir: 'dist',
         pagesDir: './pages',
         regionsDir: './regions',
+        layoutPath: './src/layout.tsx',
         scope:
           'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:page_region',
         siteUrl: 'https://test.example.com',
@@ -306,6 +309,7 @@ describe('config', () => {
         outputDir: 'dist',
         pagesDir: './pages',
         regionsDir: './regions',
+        layoutPath: './src/layout.tsx',
         userAgent: '',
       });
     });
