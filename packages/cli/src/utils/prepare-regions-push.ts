@@ -17,10 +17,7 @@ import type {
   CanvasComponentTree,
 } from 'drupal-canvas/json-render-utils';
 import type { ApiService } from '../services/api';
-import type {
-  Region,
-  RegionComponentTreeNodePayload,
-} from '../types/Region';
+import type { Region, RegionComponentTreeNodePayload } from '../types/Region';
 import type { Result } from '../types/Result';
 
 /**

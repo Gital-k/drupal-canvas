@@ -181,8 +181,7 @@ export function App() {
     location.pathname === '/content-template' ||
     location.pathname.startsWith('/content-template/');
   const isRegionRoute =
-    location.pathname === '/region' ||
-    location.pathname.startsWith('/region/');
+    location.pathname === '/region' || location.pathname.startsWith('/region/');
 
   const loadWorkbenchData = useCallback(async (): Promise<{
     discovery: EnrichedDiscoveryResult;
@@ -326,8 +325,7 @@ export function App() {
       return null;
     }
     return (
-      sortedRegions.find((region) => region.region === selectedRegionId) ??
-      null
+      sortedRegions.find((region) => region.region === selectedRegionId) ?? null
     );
   }, [isRegionRoute, selectedRegionId, sortedRegions]);
 
@@ -742,9 +740,7 @@ export function App() {
           // discovered region specs in parallel so we can render the page
           // wrapped in its global chrome.
           const layoutPath = discoveryResult.layoutPath;
-          const regionsToRender = layoutPath
-            ? discoveryResult.regions
-            : [];
+          const regionsToRender = layoutPath ? discoveryResult.regions : [];
 
           const [pageSpec, ...regionSpecs] = await Promise.all([
             fetchPreviewPageSpec(
@@ -1172,9 +1168,7 @@ export function App() {
                   {sortedRegions.map((region) => (
                     <SidebarMenuItem key={region.region}>
                       <SidebarMenuButton
-                        isActive={
-                          region.region === selectedRegion?.region
-                        }
+                        isActive={region.region === selectedRegion?.region}
                         onClick={() => {
                           navigate(`/region/${region.region}`);
                         }}

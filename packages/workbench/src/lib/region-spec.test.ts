@@ -35,9 +35,9 @@ describe('normalizeRegionSpec', () => {
       },
     });
 
-    expect(
-      normalized.spec.elements['canvas:component-tree'].children,
-    ).toEqual(['root']);
+    expect(normalized.spec.elements['canvas:component-tree'].children).toEqual([
+      'root',
+    ]);
   });
 });
 
@@ -69,9 +69,7 @@ describe('parseRegionSpec', () => {
 
     expect(result.region).toBeNull();
     expect(
-      result.issues.some((issue) =>
-        issue.message.includes('non-empty theme'),
-      ),
+      result.issues.some((issue) => issue.message.includes('non-empty theme')),
     ).toBe(true);
   });
 
@@ -83,9 +81,7 @@ describe('parseRegionSpec', () => {
 
     expect(result.region).toBeNull();
     expect(
-      result.issues.some((issue) =>
-        issue.message.includes('non-empty region'),
-      ),
+      result.issues.some((issue) => issue.message.includes('non-empty region')),
     ).toBe(true);
   });
 
