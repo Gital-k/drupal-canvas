@@ -228,6 +228,74 @@ describe('buildCanvasProject', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('builds distinct payloads for named components in the same directory', async () => {
+    const flatComponentDir = path.join(tmpDir, 'src/flat-components');
+    await fs.mkdir(flatComponentDir, { recursive: true });
+    for (const name of ['hero', 'card']) {
+      await fs.writeFile(
+        path.join(flatComponentDir, `${name}.component.yml`),
+        [
+          `name: ${name}`,
+          `machineName: ${name}`,
+          'status: true',
+          'props:',
+          '  properties: {}',
+          'slots: {}',
+        ].join('\n'),
+      );
+      await fs.writeFile(
+        path.join(flatComponentDir, `${name}.tsx`),
+        `export default function ${name}() { return '${name}'; }`,
+      );
+    }
+
+    const components = ['card', 'hero'].map(
+      (name) =>
+        ({
+          id: name,
+          name,
+          kind: 'named',
+          directory: flatComponentDir,
+          relativeDirectory: 'src/flat-components',
+          projectRelativeDirectory: 'src/flat-components',
+          metadataPath: path.join(flatComponentDir, `${name}.component.yml`),
+          jsEntryPath: path.join(flatComponentDir, `${name}.tsx`),
+          cssEntryPath: null,
+        }) as DiscoveredComponent,
+    );
+
+    const result = await buildCanvasProject({
+      projectRoot: tmpDir,
+      componentDir: flatComponentDir,
+      aliasBaseDir: 'src',
+      outputDir,
+      discoveryResult: {
+        componentRoot: flatComponentDir,
+        projectRoot: tmpDir,
+        components,
+        pages: [],
+        warnings: [],
+        stats: {
+          scannedFiles: 4,
+          ignoredFiles: 0,
+        },
+      } as DiscoveryResult,
+      cleanOutputDir: true,
+      requireJsEntries: true,
+    });
+
+    expect(result.builtComponents).toHaveLength(2);
+    expect(
+      result.builtComponents.map((component) => component.machineName),
+    ).toEqual(['card', 'hero']);
+    expect(result.builtComponents[0]?.componentPayload.sourceCodeJs).toContain(
+      "return 'card'",
+    );
+    expect(result.builtComponents[1]?.componentPayload.sourceCodeJs).toContain(
+      "return 'hero'",
+    );
+  });
+
   it('rejects componentDir outside aliasBaseDir', async () => {
     await expect(
       buildCanvasProject({
