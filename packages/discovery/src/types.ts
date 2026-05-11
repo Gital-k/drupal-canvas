@@ -92,4 +92,5 @@ export interface CanvasConfig {
   regionsDir: string;
   deprecatedComponentDir: string;
   globalCssPath: string;
+  layoutPath: string;
 }
