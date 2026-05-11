@@ -323,6 +323,11 @@ async function prepareComponentsForUpload(
           component.directory,
           componentName,
           component.kind,
+          {
+            metadataPath: component.metadataPath,
+            jsEntryPath: component.jsEntryPath,
+            cssEntryPath: component.cssEntryPath,
+          },
         );
       if (!metadata) {
         throw new Error('Invalid metadata file');

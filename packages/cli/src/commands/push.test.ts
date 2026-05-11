@@ -58,9 +58,11 @@ vi.mock('../utils/process-component-files', () => ({
 function mockDiscoveredComponent(name: string): DiscoveredComponent {
   return {
     name,
-    kind: 'component',
+    kind: 'named',
     directory: `/tmp/${name}`,
-    jsEntryPath: `/tmp/${name}/index.jsx`,
+    metadataPath: `/tmp/${name}/${name}.component.yml`,
+    jsEntryPath: `/tmp/${name}/${name}.tsx`,
+    cssEntryPath: `/tmp/${name}/${name}.css`,
   } as unknown as DiscoveredComponent;
 }
 
@@ -326,6 +328,28 @@ describe('Push components', () => {
     );
 
     expect(api.listComponents).toHaveBeenCalledTimes(1);
+    expect(processComponentFiles).toHaveBeenNthCalledWith(
+      1,
+      '/tmp/button',
+      'button',
+      'named',
+      {
+        metadataPath: '/tmp/button/button.component.yml',
+        jsEntryPath: '/tmp/button/button.tsx',
+        cssEntryPath: '/tmp/button/button.css',
+      },
+    );
+    expect(processComponentFiles).toHaveBeenNthCalledWith(
+      2,
+      '/tmp/card',
+      'card',
+      'named',
+      {
+        metadataPath: '/tmp/card/card.component.yml',
+        jsEntryPath: '/tmp/card/card.tsx',
+        cssEntryPath: '/tmp/card/card.css',
+      },
+    );
     expect(api.createComponent).toHaveBeenCalledTimes(1);
     expect(api.updateComponent).toHaveBeenCalledTimes(1);
     expect(api.deleteComponent).toHaveBeenCalledTimes(1);
