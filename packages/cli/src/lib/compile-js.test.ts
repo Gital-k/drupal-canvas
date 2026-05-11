@@ -38,6 +38,27 @@ describe('compile js', () => {
     `);
   });
 
+  it('rewrites Vite-style image imports to import map resolutions', () => {
+    expect(
+      compileJS(
+        [
+          `import wallImage from './image-1.webp';`,
+          `import cafeImage from './cafe.jpg';`,
+          `const src = wallImage || cafeImage;`,
+        ].join('\n'),
+        {
+          filePath: '/project/src/components/local-image-example/index.tsx',
+          aliasBaseDir: '/project/src',
+        },
+      ),
+    ).toMatchInlineSnapshot(`
+      "const wallImage = import.meta.resolve("@/components/local-image-example/image-1.webp");
+      const cafeImage = import.meta.resolve("@/components/local-image-example/cafe.jpg");
+      const src = wallImage || cafeImage;
+      "
+    `);
+  });
+
   it('should handle errors', () => {
     expect(() => compileJS('const x')).toThrowErrorMatchingInlineSnapshot(`
       "  x 'const' declarations must be initialized
