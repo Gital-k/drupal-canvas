@@ -59,7 +59,7 @@ describe('regionToAuthoredSpec', () => {
   it('treats components with missing parent_uuid/slot/label as root', () => {
     // The PageRegion config schema omits these keys when null, so the
     // server returns them as undefined. canvasTreeToSpec requires explicit
-    // null to recognise root components.
+    // null to recognize root components.
     const region: Region = {
       id: 'olivero.header',
       theme: 'olivero',
