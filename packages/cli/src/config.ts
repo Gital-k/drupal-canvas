@@ -88,6 +88,7 @@ export interface Config {
   componentDir: string;
   pagesDir: string;
   contentTemplatesDir: string;
+  regionsDir: string;
   deprecatedComponentDir: string;
   globalCssPath: string;
   fonts?: FontsConfig;
@@ -135,6 +136,7 @@ const {
   componentDir,
   pagesDir,
   contentTemplatesDir,
+  regionsDir,
   deprecatedComponentDir,
   globalCssPath,
 } = resolveCanvasConfig({ hostRoot: process.cwd() });
@@ -238,6 +240,7 @@ let config: Config = {
   componentDir: componentDir,
   pagesDir: pagesDir,
   contentTemplatesDir: contentTemplatesDir,
+  regionsDir: regionsDir,
   // We need this because the old commands use './components' as a default.
   deprecatedComponentDir: deprecatedComponentDir,
   globalCssPath: globalCssPath,
