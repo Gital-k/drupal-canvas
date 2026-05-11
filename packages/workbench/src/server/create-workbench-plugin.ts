@@ -12,8 +12,8 @@ import {
 
 import { isTopLevelContentTemplateSpecPath } from '../lib/content-template-spec-path';
 import {
-  isTopLevelRegionSpecPath,
   isTopLevelPageSpecPath,
+  isTopLevelRegionSpecPath,
 } from '../lib/page-spec-path';
 import { buildPreviewManifest } from '../lib/preview-contract';
 import { parseRegionSpec } from '../lib/region-spec';
