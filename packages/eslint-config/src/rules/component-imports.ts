@@ -7,6 +7,7 @@ import {
 
 import {
   isComponentDir,
+  isNamedComponentEntrypointInDirectory,
   isNonComponentImportFromComponentDir,
 } from '../utils/components.js';
 
@@ -209,7 +210,10 @@ function checkImportSource(
           )
         : resolve(aliasBase, suffix);
 
-    if (isNonComponentImportFromComponentDir(resolvedPath, importBase)) {
+    if (
+      !isNamedComponentEntrypointInDirectory(resolvedPath) &&
+      isNonComponentImportFromComponentDir(resolvedPath, importBase)
+    ) {
       context.report({
         node,
         message:
