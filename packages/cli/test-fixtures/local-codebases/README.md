@@ -19,8 +19,8 @@ Custom configuration fixture. It verifies non-default `componentDir`,
 
 Positive fixture for the documented imports and assets matrix. It demonstrates
 supported component imports, built-in packages, third-party packages, shared
-local code, relative and alias static assets, SVG URL imports, and SVG React
-component imports.
+local code, shared React component modules, relative and alias static assets,
+SVG URL imports, and SVG React component imports.
 
 ## `imports-and-assets-unsupported-caught-by-eslint`
 
