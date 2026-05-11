@@ -64,6 +64,43 @@ describe('discoverCanvasProject', () => {
     expect(result.pages[0].slug).toBe('home');
   });
 
+  it('discovers regions matching `{region}.json` and reads theme from file content', async () => {
+    const root = await makeTempDir();
+    tempDirs.push(root);
+
+    await writeFile(
+      path.join(root, 'regions/header.json'),
+      JSON.stringify({ theme: 'olivero', region: 'header', elements: {} }),
+    );
+    await writeFile(
+      path.join(root, 'regions/footer.json'),
+      JSON.stringify({ theme: 'olivero', region: 'footer', elements: {} }),
+    );
+    await writeFile(
+      path.join(root, 'regions/sidebar_first.json'),
+      JSON.stringify({ theme: 'olivero', region: 'sidebar_first', elements: {} }),
+    );
+    // Nested file — should be ignored.
+    await writeFile(
+      path.join(root, 'regions/nested/ignored.json'),
+      '{}',
+    );
+
+    const result = await discoverCanvasProject({ componentRoot: root });
+
+    expect(result.regions.map((r) => r.region)).toEqual([
+      'footer',
+      'header',
+      'sidebar_first',
+    ]);
+    const header = result.regions.find((r) => r.region === 'header');
+    expect(header).toMatchObject({
+      theme: 'olivero',
+      region: 'header',
+      relativePath: 'regions/header.json',
+    });
+  });
+
   it('supports a dedicated pagesRoot outside the component scan root', async () => {
     const root = await makeTempDir();
     tempDirs.push(root);
