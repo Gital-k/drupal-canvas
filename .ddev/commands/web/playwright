@@ -15,5 +15,10 @@ if [[ ! -f vendor/autoload.php ]]; then
   exit 1
 fi
 
-npm ci
-DRUPAL_TEST_DRUPAL_ROOT=web npx playwright "$@"
+# Auto-add --host flag for show-report so it's accessible outside the container
+args=("$@")
+if [[ "${1:-}" == "show-report" ]]; then
+  args+=("--host=0.0.0.0")
+fi
+
+DRUPAL_TEST_DRUPAL_ROOT=web npx playwright "${args[@]}"
