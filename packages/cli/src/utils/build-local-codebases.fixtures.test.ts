@@ -221,8 +221,15 @@ describe('buildCanvasProject fixture projects', () => {
       'built-in-package-example',
       'button',
       'component-imports-example',
+      'shared-asset-example',
       'shared-code-example',
+      'shared-default-export-example',
+      'shared-exported-jsx-example',
+      'shared-hook-example',
+      'shared-react-component-consumer-example',
       'shared-react-component-example',
+      'shared-react-node-example',
+      'shared-transitive-example',
       'static-assets-example',
       'svg-component-example',
       'svg-url-example',
@@ -246,9 +253,30 @@ describe('buildCanvasProject fixture projects', () => {
     await expect(componentJs('shared-code-example')).resolves.toContain(
       'from "@/lib/formatTitle"',
     );
+    await expect(componentJs('shared-asset-example')).resolves.toContain(
+      'from "@/lib/AssetLabel"',
+    );
+    await expect(
+      componentJs('shared-default-export-example'),
+    ).resolves.toContain('from "@/lib/DefaultLabel"');
+    await expect(componentJs('shared-exported-jsx-example')).resolves.toContain(
+      'from "@/lib/exportedIcon"',
+    );
+    await expect(componentJs('shared-hook-example')).resolves.toContain(
+      'from "@/lib/HookLabel"',
+    );
+    await expect(
+      componentJs('shared-react-component-consumer-example'),
+    ).resolves.toContain('from "@/lib/ExampleLabel"');
     await expect(
       componentJs('shared-react-component-example'),
     ).resolves.toContain('from "@/lib/ExampleLabel"');
+    await expect(componentJs('shared-react-node-example')).resolves.toContain(
+      'from "@/lib/ReactNodeLabel"',
+    );
+    await expect(componentJs('shared-transitive-example')).resolves.toContain(
+      'from "@/lib/FormattedLabel"',
+    );
     await expect(componentJs('static-assets-example')).resolves.toContain(
       'import.meta.resolve("@/components/static-assets-example/hero.webp")',
     );
@@ -288,10 +316,38 @@ describe('buildCanvasProject fixture projects', () => {
       '@/lib/formatTitle': expect.stringMatching(
         /^\.\/local\/formatTitle-[\w-]+\.js$/,
       ),
+      '@/lib/AssetLabel': expect.stringMatching(
+        /^\.\/local\/AssetLabel-[\w-]+\.js$/,
+      ),
+      '@/lib/DefaultLabel': expect.stringMatching(
+        /^\.\/local\/DefaultLabel-[\w-]+\.js$/,
+      ),
       '@/lib/ExampleLabel': expect.stringMatching(
         /^\.\/local\/ExampleLabel-[\w-]+\.js$/,
       ),
+      '@/lib/exportedIcon': expect.stringMatching(
+        /^\.\/local\/exportedIcon-[\w-]+\.js$/,
+      ),
+      '@/lib/FormattedLabel': expect.stringMatching(
+        /^\.\/local\/FormattedLabel-[\w-]+\.js$/,
+      ),
+      '@/lib/HookLabel': expect.stringMatching(
+        /^\.\/local\/HookLabel-[\w-]+\.js$/,
+      ),
+      '@/lib/ReactNodeLabel': expect.stringMatching(
+        /^\.\/local\/ReactNodeLabel-[\w-]+\.js$/,
+      ),
     });
+    expect(
+      Object.keys(buildResult.manifest.local).filter(
+        (specifier) => specifier === '@/lib/ExampleLabel',
+      ),
+    ).toHaveLength(1);
+    await expect(
+      fs.readdir(path.join(projectRoot, 'dist/local')),
+    ).resolves.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^poster-/)]),
+    );
     await expectManifestFilesExist(projectRoot, buildResult.manifest.vendor);
     await expectManifestFilesExist(projectRoot, buildResult.manifest.local);
   });
