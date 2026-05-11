@@ -222,6 +222,7 @@ describe('buildCanvasProject fixture projects', () => {
       'button',
       'component-imports-example',
       'shared-code-example',
+      'shared-react-component-example',
       'static-assets-example',
       'svg-component-example',
       'svg-url-example',
@@ -245,6 +246,9 @@ describe('buildCanvasProject fixture projects', () => {
     await expect(componentJs('shared-code-example')).resolves.toContain(
       'from "@/lib/formatTitle"',
     );
+    await expect(
+      componentJs('shared-react-component-example'),
+    ).resolves.toContain('from "@/lib/ExampleLabel"');
     await expect(componentJs('static-assets-example')).resolves.toContain(
       'import.meta.resolve("@/components/static-assets-example/hero.webp")',
     );
@@ -283,6 +287,9 @@ describe('buildCanvasProject fixture projects', () => {
       ),
       '@/lib/formatTitle': expect.stringMatching(
         /^\.\/local\/formatTitle-[\w-]+\.js$/,
+      ),
+      '@/lib/ExampleLabel': expect.stringMatching(
+        /^\.\/local\/ExampleLabel-[\w-]+\.js$/,
       ),
     });
     await expectManifestFilesExist(projectRoot, buildResult.manifest.vendor);
