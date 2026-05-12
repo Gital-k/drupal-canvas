@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
-import { authoredSpecToComponentTree } from './pages';
+import { authoredSpecToComponentTree } from './authored-elements';
 import {
   collectUnreconciledMediaProps,
   serializeElementMapForServer,
