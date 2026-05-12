@@ -911,6 +911,7 @@ export async function buildCanvasVendorArtifacts(options: {
       if (!(FONT_EXTENSIONS as readonly string[]).includes(ext)) {
         sharedChunks.push(`./vendor/${info.file}`);
       }
+      continue;
     }
 
     const entryName = info.name;
