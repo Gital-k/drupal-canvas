@@ -5,7 +5,7 @@ import yamlParser from 'yaml-eslint-parser';
 import rule from '../src/rules/component-no-hierarchy.js';
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => true),
+  existsSync: vi.fn((filePath) => filePath !== '/default/canvas.config.json'),
   readFileSync: vi.fn((filePath) => {
     const configs: Record<string, string> = {
       '/valid/canvas.config.json': JSON.stringify({
@@ -197,6 +197,46 @@ customComponentDirTestRunner.run(
           {
             message:
               'Component directories must be direct children of configured componentDir "code-components". Found "hero" inside "code-components/marketing".',
+            line: 1,
+          },
+        ],
+      },
+    ],
+  },
+);
+
+cwd.mockReturnValue('/default');
+const defaultConfigTestRunner = new RuleTester({
+  languageOptions: {
+    parser: yamlParser,
+  },
+});
+defaultConfigTestRunner.run(
+  'component-no-hierarchy rule - should use default config when no config file exists',
+  rule,
+  {
+    valid: [
+      {
+        name: 'component directly in default componentDir',
+        code: `
+        name: Button
+        machineName: button
+      `,
+        filename: '/default/src/components/button/component.yml',
+      },
+    ],
+    invalid: [
+      {
+        name: 'component nested inside grouping folder in default componentDir',
+        code: `
+        name: Heading
+        machineName: heading
+      `,
+        filename: '/default/src/components/marketing/heading/component.yml',
+        errors: [
+          {
+            message:
+              'Component directories must be direct children of configured componentDir "src/components". Found "heading" inside "src/components/marketing".',
             line: 1,
           },
         ],

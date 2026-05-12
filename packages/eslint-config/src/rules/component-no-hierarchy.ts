@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { resolveCanvasConfig } from '@drupal-canvas/discovery';
 
@@ -36,11 +35,6 @@ const rule: EslintRule.RuleModule = {
   },
   create(context: EslintRule.RuleContext): EslintRule.RuleListener {
     if (!isComponentYmlFile(context.filename)) {
-      return {};
-    }
-
-    const configPath = resolve(context.cwd, 'canvas.config.json');
-    if (!existsSync(configPath)) {
       return {};
     }
 
