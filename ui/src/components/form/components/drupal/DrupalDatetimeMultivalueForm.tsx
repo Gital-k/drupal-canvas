@@ -91,14 +91,6 @@ const DrupalDatetimeMultivalueForm = ({
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
   const [displayTime, setDisplayTime] = useState('');
-  const valueAtOpenRef = useRef<{ date: string; time: string }>({
-    date: '',
-    time: '',
-  });
-  // Tracks whether a time input exists — derived from the real DOM via
-  // useEffect  rather than queried at render time, so it is stable across
-  // renders and correct before the popover container is first populated.
-  const [hasTime, setHasTime] = useState(false);
 
   // This state is set when Radix mounts the popover content, which
   // may be deferred past the first render commit. Using state (rather than a
@@ -110,14 +102,6 @@ const DrupalDatetimeMultivalueForm = ({
   const hasError = () =>
     popoverContainer &&
     !!popoverContainer.querySelector('[data-has-field-error="true"]');
-
-  // Returns the date input from the popover container, or null.
-  const getDateInput = (): HTMLInputElement | null =>
-    popoverContainer?.querySelector('input[type="date"]') ?? null;
-
-  // Returns the time input from the popover container, or null.
-  const getTimeInput = (): HTMLInputElement | null =>
-    popoverContainer?.querySelector('input[type="time"]') ?? null;
 
   const setPopoverOpenAndRefocus = (open: boolean) => {
     setPopoverOpen(open);
@@ -139,7 +123,7 @@ const DrupalDatetimeMultivalueForm = ({
 
     setDisplayDate(dateInput?.value || dateInput?.defaultValue || '');
     setDisplayTime(timeInput?.value || timeInput?.defaultValue || '');
-    setHasTime(!!timeInput);
+
     // Since datetime is two inputs but one field, we can't listen for changes
     // as elegantly as we do in <DrupalInputMultivalueForm>, where we can just
     // add an `onInput` prop. Instead, we need to add dedicated input listeners
@@ -182,15 +166,11 @@ const DrupalDatetimeMultivalueForm = ({
 
   const handlePopoverOpenChange = (open: boolean) => {
     if (open) {
-      const dateInput = getDateInput();
-      const timeInput = getTimeInput();
-      valueAtOpenRef.current = {
-        date: dateInput?.value ?? displayDate,
-        time: timeInput?.value ?? displayTime,
-      };
       setTimeout(() => {
-        const firstInput = dateInput || timeInput;
-        firstInput?.focus();
+        const firstInput =
+          popoverContainer?.querySelector('input[type="date"]') ??
+          popoverContainer?.querySelector('input[type="time"]');
+        (firstInput as HTMLInputElement | null)?.focus();
       }, 0);
     }
     if (!hasError()) {
@@ -204,7 +184,9 @@ const DrupalDatetimeMultivalueForm = ({
     if (!triggerElement) return;
     setPopoverOpenAndRefocus(false);
     setTimeout(() => {
-      const dateInput = getDateInput();
+      const dateInput = popoverContainer?.querySelector(
+        'input[type="date"]',
+      ) as HTMLInputElement | null;
       const { name } = dateInput || {};
       const formId = dateInput?.getAttribute('data-form-id');
 
@@ -259,92 +241,80 @@ const DrupalDatetimeMultivalueForm = ({
     });
   };
 
-  // Build the combined display value.
-  const combinedDisplayValue = (() => {
-    if (!hasTime) {
-      return formatDateForDisplay(displayDate) || 'Empty';
-    }
-    if (displayDate || displayTime) {
-      return `${formatDateForDisplay(displayDate)}${displayDate && displayTime ? ', ' : ''}${formatTimeForDisplay(displayTime)}`;
-    }
-    return 'Empty';
-  })();
+  const combinedDisplayValue =
+    displayDate || displayTime
+      ? `${formatDateForDisplay(displayDate)}${displayDate && displayTime ? ', ' : ''}${formatTimeForDisplay(displayTime)}`
+      : 'Empty';
 
   return (
-    <div style={{ display: 'contents' }}>
-      <Popover.Root open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
-        <Flex
-          ref={triggerRowRef}
-          align="center"
-          gap="2"
-          className={styles.itemRow}
-        >
-          {/* List Item View - Trigger */}
-          <Popover.Trigger asChild>
-            <button
-              ref={triggerButtonRef}
-              className={styles.listItem}
-              type="button"
-              aria-label={`Edit ${fieldLabel}: ${combinedDisplayValue}`}
+    <Popover.Root open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
+      <Flex
+        ref={triggerRowRef}
+        align="center"
+        gap="2"
+        className={styles.itemRow}
+      >
+        {/* List Item View - Trigger */}
+        <Popover.Trigger asChild>
+          <button
+            ref={triggerButtonRef}
+            className={styles.listItem}
+            type="button"
+            aria-label={`Edit ${fieldLabel}: ${combinedDisplayValue}`}
+          >
+            <Text
+              size="2"
+              className={styles.itemText}
+              data-canvas-multivalue-label
             >
-              <Text
-                size="2"
-                className={styles.itemText}
-                data-canvas-multivalue-label
-              >
-                {combinedDisplayValue}
-              </Text>
-              <ArrowRightIcon className={styles.arrowIcon} />
-            </button>
-          </Popover.Trigger>
+              {combinedDisplayValue}
+            </Text>
+            <ArrowRightIcon className={styles.arrowIcon} />
+          </button>
+        </Popover.Trigger>
+      </Flex>
+
+      {/* Edit Popover */}
+      <Popover.Content
+        forceMount={true}
+        ref={setPopoverContainer}
+        side="left"
+        align="start"
+        sideOffset={6}
+        className={clsx(styles.popoverContent, [
+          !popoverOpen && styles.visuallyHiddenInput,
+        ])}
+        onKeyDown={handleKeyDown}
+      >
+        {/* Popover Header */}
+        <Flex justify="between" align="center" className={styles.popoverHeader}>
+          <Text size="1" weight="medium" className={styles.popoverLabel}>
+            {fieldLabel}
+          </Text>
+          <Popover.Close aria-label="Close">
+            <Cross2Icon />
+          </Popover.Close>
         </Flex>
 
-        {/* Edit Popover */}
-        <Popover.Content
-          forceMount={true}
-          ref={setPopoverContainer}
-          side="left"
-          align="start"
-          sideOffset={6}
-          className={clsx(styles.popoverContent, [
-            !popoverOpen && styles.visuallyHiddenInput,
-          ])}
-          onKeyDown={handleKeyDown}
-        >
-          {/* Popover Header */}
-          <Flex
-            justify="between"
-            align="center"
-            className={styles.popoverHeader}
+        {/* Date and time inputs rendered by Drupal */}
+        {children}
+
+        {/* Remove Button - disabled when removing is not allowed */}
+        <Flex justify="center" className={styles.removeButtonContainer}>
+          <Button
+            data-multivalue-remove-item="true"
+            variant="ghost"
+            color="red"
+            size="1"
+            onClick={handleRemove}
+            disabled={!isRemoveButtonEnabled(triggerRowRef.current)}
           >
-            <Text size="1" weight="medium" className={styles.popoverLabel}>
-              {fieldLabel}
-            </Text>
-            <Popover.Close aria-label="Close">
-              <Cross2Icon />
-            </Popover.Close>
-          </Flex>
-
-          {/* Date and time inputs rendered by Drupal */}
-          {children}
-
-          {/* Remove Button - disabled when removing is not allowed */}
-          <Flex justify="center" className={styles.removeButtonContainer}>
-            <Button
-              data-multivalue-remove-item="true"
-              variant="ghost"
-              color="red"
-              size="1"
-              onClick={handleRemove}
-              disabled={!isRemoveButtonEnabled(triggerRowRef.current)}
-            >
-              <TrashIcon />
-              Remove
-            </Button>
-          </Flex>
-        </Popover.Content>
-      </Popover.Root>
-    </div>
+            <TrashIcon />
+            Remove
+          </Button>
+        </Flex>
+      </Popover.Content>
+    </Popover.Root>
   );
 };
 
