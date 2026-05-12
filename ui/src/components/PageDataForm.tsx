@@ -112,15 +112,11 @@ const PageDataFormRenderer = () => {
           // Without this conversion, http_build_query() in PHP's
           // ClientDataToEntityConverter::setEntityFields() produces nested arrays
           // that break Select::valueCallback() with "Array to string conversion".
+          // Multi-select field names always end with `[]`, so that suffix is the
+          // reliable signal — no DOM query needed.
           // @see \Drupal\canvas\ClientDataToEntityConverter::setEntityFields()
           // @see ui/src/components/form/InputBehaviorsEntityForm.tsx formStateToStore
-          if (
-            Array.isArray(value) &&
-            // @todo replace this with a better solution in https://www.drupal.org/i/3587609.
-            document.querySelector(
-              `select[data-is-multiselect="true"][name="${key}"]`,
-            )
-          ) {
+          if (Array.isArray(value) && key.endsWith('[]')) {
             const baseKey = key.slice(0, -2);
             (value as any[]).forEach((item, index) => {
               acc[`${baseKey}[${index}]`] = item;
