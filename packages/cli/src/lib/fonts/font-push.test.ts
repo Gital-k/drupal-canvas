@@ -44,6 +44,7 @@ describe('pushFonts', () => {
       userAgent: '',
       includePages: false,
       includeContentTemplates: false,
+      includeRegions: false,
       includeBrandKit: true,
       aliasBaseDir: 'src',
       outputDir: 'dist',
