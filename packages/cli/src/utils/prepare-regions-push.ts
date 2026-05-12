@@ -55,8 +55,6 @@ export interface RegionPushResult {
 }
 
 export interface PreparedRegion {
-  id: string;
-  theme: string;
   region: string;
   status: boolean;
   components: Region['component_tree'];
@@ -70,15 +68,14 @@ export interface PreparedRegion {
 }
 
 interface AuthoredRegionFile {
-  theme?: string;
-  region?: string;
   status?: boolean;
   elements?: AuthoredSpecElementMap;
 }
 
 /**
- * Reads each region file, validates that the filename matches the spec's
- * region, and converts the authored elements to a component tree.
+ * Reads each region file and converts the authored elements to a component
+ * tree. The region's machine name is sourced from the filename; the theme is
+ * implicit and resolved by the server from the site's default theme.
  */
 export async function prepareRegions(
   discoveredRegions: DiscoveredRegion[],
@@ -94,17 +91,6 @@ export async function prepareRegions(
     const fileContent = await fs.readFile(discovered.path, 'utf-8');
     const spec = JSON.parse(fileContent) as AuthoredRegionFile;
 
-    if (!spec.theme) {
-      throw new Error(
-        `Missing "theme" in ${discovered.relativePath}: the region file must include a theme key.`,
-      );
-    }
-    if (spec.region !== undefined && spec.region !== discovered.region) {
-      throw new Error(
-        `Region mismatch in ${discovered.relativePath}: filename declares "${discovered.region}" but spec declares "${spec.region}".`,
-      );
-    }
-
     const pendingMediaReconciliations = collectUnreconciledMediaProps(
       spec.elements ?? {},
       componentMetadata,
@@ -116,8 +102,6 @@ export async function prepareRegions(
     const components = authoredSpecToComponentTree(elements, componentVersions);
 
     return {
-      id: `${spec.theme}.${discovered.region}`,
-      theme: spec.theme,
       region: discovered.region,
       status: spec.status ?? true,
       components,
@@ -145,7 +129,7 @@ export async function prepareRegions(
  */
 export async function pushRegions(
   preparedRegions: Array<{ index: number; result: PreparedRegion }>,
-  remoteIds: Set<string>,
+  remoteIdsByShortName: Map<string, string>,
   apiService: Pick<ApiService, 'createRegion' | 'updateRegion'>,
 ): Promise<
   Array<{
@@ -157,25 +141,25 @@ export async function pushRegions(
 > {
   return processInPool(preparedRegions, async (entry) => {
     const region = entry.result;
-    const isRemote = remoteIds.has(region.id);
+    const remoteId = remoteIdsByShortName.get(region.region);
 
     const component_tree = stripNullableKeysForRegion(region.components);
 
-    if (isRemote) {
-      await apiService.updateRegion(region.id, {
+    if (remoteId) {
+      await apiService.updateRegion(remoteId, {
         status: region.status,
         component_tree,
       });
-      return { id: region.id, operation: 'Updated' as const };
+      return { id: remoteId, operation: 'Updated' as const };
     }
 
-    await apiService.createRegion({
-      theme: region.theme,
+    // Omit `theme`: the server fills it in from the site's default theme.
+    const created = await apiService.createRegion({
       region: region.region,
       status: region.status,
       component_tree,
     });
-    return { id: region.id, operation: 'Created' as const };
+    return { id: created.id, operation: 'Created' as const };
   });
 }
 

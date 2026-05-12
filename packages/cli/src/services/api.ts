@@ -707,7 +707,7 @@ export class ApiService {
    * Create a new region.
    */
   async createRegion(payload: {
-    theme: string;
+    theme?: string;
     region: string;
     status: boolean;
     component_tree: RegionComponentTreePayload;
