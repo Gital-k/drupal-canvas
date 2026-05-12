@@ -130,7 +130,7 @@ export function resolveAliasPath(
     return null;
   }
 
-  const suffix = aliasSource.slice(ALIAS_PREFIX.length);
+  const suffix = stripQueryAndHash(aliasSource.slice(ALIAS_PREFIX.length));
   // aliasBaseDir is relative to project root (cwd), not scanRoot
   const unresolvedTarget = path.resolve(aliasBaseDir, suffix);
 

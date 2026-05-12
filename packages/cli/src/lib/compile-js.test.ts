@@ -59,6 +59,27 @@ describe('compile js', () => {
     `);
   });
 
+  it('rewrites image imports with query strings and hashes to import map resolutions', () => {
+    expect(
+      compileJS(
+        [
+          `import heroImage from './hero.webp?url';`,
+          `import posterImage from './poster.jpg#poster';`,
+          `const src = heroImage || posterImage;`,
+        ].join('\n'),
+        {
+          filePath: '/project/src/components/card/index.tsx',
+          aliasBaseDir: '/project/src',
+        },
+      ),
+    ).toMatchInlineSnapshot(`
+      "const heroImage = import.meta.resolve("@/components/card/hero.webp");
+      const posterImage = import.meta.resolve("@/components/card/poster.jpg");
+      const src = heroImage || posterImage;
+      "
+    `);
+  });
+
   it('should handle errors', () => {
     expect(() => compileJS('const x')).toThrowErrorMatchingInlineSnapshot(`
       "  x 'const' declarations must be initialized
