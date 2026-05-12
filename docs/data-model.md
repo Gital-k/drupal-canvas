@@ -579,15 +579,16 @@ Each `component source` is able to specify an updater class (see `\Drupal\canvas
 This updater will be responsible for:
 
 * Checking if a `component instance` is using the active version.
-* Deciding if a `component instance` not using the active version can be updated automatically without any data loss.
+* Deciding if a `component instance` not using the active version can be updated automatically according to that source's migration policy.
 * Performing that update.
 
 This update of the `component tree`'s`component instance`s will happen automatically
 as soon as we attempt to edit a component tree (see `\Drupal\canvas\Controller\ApiLayoutController::buildRegion()` and
 `\Drupal\canvas\Controller\ApiConfigControllers::normalize()`).
 
-For those `component source`s not providing an input UX (see [`Canvas Components` doc](components.md)), the scenarios
-where such an update is possible without any risk are:
+For component sources using
+`\Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater`,
+the scenarios where such an update is possible without any risk are:
 
 - Adding optional props
 - Adding slots
@@ -606,3 +607,12 @@ Unsafe changes (that prevent auto-update) include:
 
 See
 - `\Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater::canUpdate`
+
+For the `js` component source, Canvas uses
+`\Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentInstanceUpdater`.
+That updater intentionally allows prop shape changes and accepts data loss for
+incompatible existing inputs:
+
+- Inputs for incompatible prop shapes are dropped.
+- Required props missing after that drop are repopulated from default/example
+  values in the target component version.
