@@ -46,6 +46,7 @@ describe('config', () => {
         globalCssPath: './src/components/global.css',
         includePages: false,
         includeContentTemplates: false,
+        includeRegions: false,
         includeBrandKit: false,
         outputDir: 'dist',
         pagesDir: './pages',
@@ -74,6 +75,7 @@ describe('config', () => {
         globalCssPath: './src/components/global.css',
         includePages: false,
         includeContentTemplates: false,
+        includeRegions: false,
         includeBrandKit: false,
         outputDir: 'dist',
         pagesDir: './pages',
@@ -273,6 +275,7 @@ describe('config', () => {
         globalCssPath: './src/components/global.css',
         includePages: true,
         includeContentTemplates: false,
+        includeRegions: false,
         includeBrandKit: false,
         outputDir: 'dist',
         pagesDir: './pages',
@@ -299,6 +302,7 @@ describe('config', () => {
         includeBrandKit: false,
         includeContentTemplates: false,
         includePages: false,
+        includeRegions: false,
         scope:
           'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
         componentDir: 'src/components',
@@ -321,7 +325,18 @@ describe('config', () => {
 
       expect(getConfig().includePages).toBe(true);
       expect(getConfig().scope).toBe(
-        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:page_region',
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
+      );
+    });
+
+    it('should enable region scopes when CANVAS_INCLUDE_REGIONS is true', async () => {
+      vi.stubEnv('CANVAS_INCLUDE_REGIONS', 'true');
+
+      const { getConfig } = await import('./config');
+
+      expect(getConfig().includeRegions).toBe(true);
+      expect(getConfig().scope).toBe(
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page_region',
       );
     });
   });
