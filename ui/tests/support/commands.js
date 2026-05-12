@@ -1,10 +1,21 @@
+
+
+
 import '@testing-library/cypress/add-commands.js';
+
+
 
 import { realType } from 'cypress-real-events';
 import { queries } from '@testing-library/dom';
 
+
+
 import { realDnd } from './realDnd.js';
 import { onlyVisibleChars } from './utils.js';
+
+
+
+
 
 // This selector gets the preview iframe ensuring that it is initialized and that it is the currently active/swapped in element.
 const initializedReadyPreviewIframeSelector =
@@ -759,24 +770,6 @@ Cypress.Commands.add(
 /**
  * Assert that a multivalue-field reorder was committed to the server.
  *
- * Canvas DnD reorders dispatch through POST /canvas/api/v0/layout/node/{id}.
- * Multiple preview POSTs can fire around a single drag (debounced typing
- * tails, intermediate drag-state updates, the final reorder POST). This
- * helper extracts (value, _weight) pairs from each intercepted POST body,
- * sorts by weight, and asserts that the LAST completed POST's sorted order
- * matches the expected sequence — since `ApiLayoutController::post` calls
- * `autoSaveManager->saveEntity()` on every POST, the last-completed POST
- * represents the state the server has most recently persisted.
- *
- * Known limitation: this helper does not guard against a late-arriving POST
- * that fires AFTER the assertion passes but BEFORE a subsequent
- * cy.reload(). In that case, a stale-state POST could overwrite the
- * auto-save and the reload would read stale data. Empirically this happens
- * in ~1/3 of runs for the Integer Field DnD and is handled by Cypress's
- * test-retry (`retries: { runMode: 3 }`); the test retries from the top and
- * typically passes on attempt 2. A stronger guard (polling for network-idle
- * before proceeding) was deemed not worth the added complexity.
- *
  * @param {Object} options
  * @param {string} options.alias
  *   The cy.intercept alias name (without leading `@`) aliasing POSTs to
@@ -790,7 +783,7 @@ Cypress.Commands.add(
  *   The subfield under each row that holds the value. Use `'uri'` for link
  *   fields, default `'value'` for text/number/most others.
  */
-Cypress.Commands.add('assertMultivalueReorder', (options) => {
+Cypress.Commands.add('assertReorderEntityFieldRequest', (options) => {
   const { alias, fieldName, expectedOrder, valueKey = 'value' } = options;
   const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const field = escapeRe(fieldName);
@@ -805,6 +798,7 @@ Cypress.Commands.add('assertMultivalueReorder', (options) => {
   );
 
   const extractSorted = (body) => {
+    console.log('extract sorted',  body);
     const asString = typeof body === 'string' ? body : JSON.stringify(body);
     const values = {};
     const weights = {};
@@ -821,18 +815,8 @@ Cypress.Commands.add('assertMultivalueReorder', (options) => {
       .map((item) => item.value);
   };
 
+
   cy.get(`@${alias}.all`).should((intercepts) => {
-    // We require two things for determinism before cy.reload():
-    //   1. The POST's response must have landed — that guarantees the
-    //      server has finished processing (ApiLayoutController::post calls
-    //      autoSaveManager->saveEntity() before returning).
-    //   2. The *last* completed POST (not just any) must carry the reorder.
-    //      Multiple POSTs can fire around a drag; if a later one overwrites
-    //      the auto-save with stale state (e.g. a debounced tail from an
-    //      earlier interaction), checking "any POST has the reorder" is
-    //      insufficient — the reload would pull the last-writer's stale
-    //      state. Asserting the last completed body guarantees the server's
-    //      auto-save matches expectations at the moment we proceed.
     const completed = intercepts.filter(({ response }) => response);
     expect(
       completed,

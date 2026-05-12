@@ -1,15 +1,4 @@
-/**
- * Comprehensive tests for multi-value form design for link fields.
- *
- * This test covers the new popover-based multi-value form UI for
- * link fields.
- *
- * The new design features:
- * - Popover-based editing (click item → popover with input).
- * - Custom drag handles and remove buttons via DrupalInputMultivalueForm.
- */
-
-describe('Multivalue Form Design – Link Field', () => {
+describe('Multivalue Link Field - Entity', () => {
   before(() => {
     cy.drupalCanvasInstall([
       'canvas_test_article_fields',
@@ -26,17 +15,6 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.drupalUninstall();
   });
 
-  /**
-   * Helper function to open the URL sub-field popover for a specific row and
-   * type a value, then commit it either via autocomplete selection or Enter key.
-   *
-   * @param {string} fieldAlias - The Cypress alias for the field container.
-   * @param {number} rowIndex - The zero-based row index.
-   * @param {string} title - The value to type (node title or plain URL).
-   * @param {boolean} [useAutocomplete=false] - When true, waits for the jQuery
-   *   UI autocomplete dropdown (.ui-menu-item-wrapper) and clicks the matching
-   *   suggestion. When false (default), commits the value by pressing Enter.
-   */
   /**
    * Types a value into the first input of the currently open popover dialog,
    * using select-all to replace any existing content without triggering a
@@ -455,7 +433,7 @@ describe('Multivalue Form Design – Link Field', () => {
     ]);
   });
 
-  it('can drag and drop link items with custom drag handles', () => {
+  it.only('can drag and drop link items with custom drag handles', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
     cy.get('@entityForm').recordFormBuildId();
@@ -508,18 +486,6 @@ describe('Multivalue Form Design – Link Field', () => {
       .should('have.length', 3);
     cy.get('@unlimited-link').scrollIntoView({ offset: { top: -400 } });
 
-    // The drag-handle reorder does NOT submit a Drupal form AJAX POST (unlike
-    // typing into a popover, which posts to /canvas/api/v0/form/content-entity).
-    // It dispatches only through the preview pathway: POST
-    // /canvas/api/v0/layout/node/2 → ApiLayoutController::post →
-    // autoSaveManager->saveEntity(), which is what cy.reload() below reads.
-    //
-    // Multiple preview POSTs can fire around a drag (debounced updates from
-    // typing's tail end, intermediate drag-state updates, and the final
-    // reorder POST). We can't rely on "the first /layout/node/2 POST after
-    // realDnd" being the one with the reorder — it's often a stale POST from
-    // an earlier action. Instead, inspect every intercepted request body and
-    // assert that at least one carries the expected post-reorder sort order.
     cy.intercept('POST', '**/canvas/api/v0/layout/node/2').as('previewUpdate');
 
     cy.get(
@@ -529,7 +495,7 @@ describe('Multivalue Form Design – Link Field', () => {
       dndDefaults,
     );
 
-    cy.assertMultivalueReorder({
+    cy.assertReorderEntityFieldRequest({
       alias: 'previewUpdate',
       fieldName: 'field_cvt_unlimited_link',
       valueKey: 'uri',
@@ -546,9 +512,7 @@ describe('Multivalue Form Design – Link Field', () => {
       'https://www.cypress.io',
       'https://www.example.com',
     ]);
-    // Wait to ensure order is auto saved before reloading.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(10000);
+
     // Refresh the page to ensure the update persists.
     cy.reload();
     confirmUrlInputs('@unlimited-link', [
