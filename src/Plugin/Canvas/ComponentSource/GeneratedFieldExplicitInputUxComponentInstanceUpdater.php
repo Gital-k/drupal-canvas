@@ -14,7 +14,7 @@ use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 
-final class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
+class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
 
   /**
    * {@inheritdoc}
@@ -220,7 +220,7 @@ final class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Com
    * @return array
    *   An array containing the prop field definitions.
    */
-  private static function getPropDefinitions(ComponentInterface $component, string $from_version, string $to_version): array {
+  protected static function getPropDefinitions(ComponentInterface $component, string $from_version, string $to_version): array {
     $from_settings = $component->getSettings($from_version);
     $to_settings = $component->getSettings($to_version);
     return [$from_settings['prop_field_definitions'], $to_settings['prop_field_definitions']];

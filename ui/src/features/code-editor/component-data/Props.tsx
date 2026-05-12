@@ -201,6 +201,9 @@ export default function Props() {
                     (item) => item.type === value,
                   );
                   if (selectedPropType) {
+                    const isListType = ['listText', 'listInteger'].includes(
+                      value,
+                    );
                     const isRequired = required.includes(propName);
                     const isImageOrVideo =
                       value === 'image' || value === 'video';
@@ -234,7 +237,9 @@ export default function Props() {
                           // Override the enum value from ...selectedPropType.init if the prop is required
                           // to have it prefilled with a default option.
                           enum:
-                            isRequired && DEFAULT_ENUM_OPTIONS[value]
+                            isRequired &&
+                            isListType &&
+                            DEFAULT_ENUM_OPTIONS[value]
                               ? [DEFAULT_ENUM_OPTIONS[value]]
                               : selectedPropType.init.enum,
                         } as Partial<CodeComponentProp>,

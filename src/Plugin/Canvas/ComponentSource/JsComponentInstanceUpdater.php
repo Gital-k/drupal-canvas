@@ -53,17 +53,37 @@ final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComp
     $to_version = $component->getActiveVersion();
     [$from_props, $to_props] = self::getPropDefinitions($component, $from_version, $to_version);
 
+    $target_source = $component->loadVersion($to_version)->getComponentSource();
+    $default_explicit_input = $target_source->getDefaultExplicitInput();
     $inputs = $component_instance->getInputs() ?? [];
     $changed = FALSE;
-    foreach (self::getShapeChangedPropNames($from_props, $to_props) as $prop_name) {
+    $shape_changed_prop_names = self::getShapeChangedPropNames($from_props, $to_props);
+    foreach ($shape_changed_prop_names as $prop_name) {
       if (\array_key_exists($prop_name, $inputs)) {
         unset($inputs[$prop_name]);
         $changed = TRUE;
       }
     }
 
+    // For required props whose shape changed, pre-seed target defaults now.
+    // The parent updater intentionally skips this case when a prop remained
+    // required across versions.
+    foreach ($shape_changed_prop_names as $prop_name) {
+      $def = $to_props[$prop_name] ?? NULL;
+      if (($def['required'] ?? FALSE) !== TRUE || \array_key_exists($prop_name, $inputs)) {
+        continue;
+      }
+      \assert(\array_key_exists($prop_name, $default_explicit_input));
+      \assert(\array_key_exists('value', $default_explicit_input[$prop_name]));
+      $value = $default_explicit_input[$prop_name]['value'];
+      if (self::isMultiValuePropDefinition($def) && !\is_array($value)) {
+        $value = [$value];
+      }
+      $inputs[$prop_name] = $value;
+      $changed = TRUE;
+    }
+
     // @todo try to coerce values across compatible types.
-    $target_source = $component->loadVersion($to_version)->getComponentSource();
     $invalid_prop_names = self::getInvalidPropNames(
       $target_source->validateComponentInput(
         inputValues: $inputs,
@@ -82,6 +102,13 @@ final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComp
     }
 
     return parent::update($component_instance);
+  }
+
+  /**
+   * Determines if a prop definition stores multiple values.
+   */
+  private static function isMultiValuePropDefinition(array $prop_definition): bool {
+    return ($prop_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) !== 1;
   }
 
   /**
