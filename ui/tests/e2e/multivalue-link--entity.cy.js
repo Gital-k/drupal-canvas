@@ -16,9 +16,7 @@ describe('Multivalue Link Field - Entity', () => {
   });
 
   /**
-   * Types a value into the first input of the currently open popover dialog,
-   * using select-all to replace any existing content without triggering a
-   * debounced commit of the intermediate empty value.
+   * Types a value into the first input of the currently open popover dialog.
    *
    * @param {string} value - The value to type.
    */
@@ -56,9 +54,6 @@ describe('Multivalue Link Field - Entity', () => {
 
   /**
    * Types into a row and waits for the resulting preview update.
-   *
-   * Registers the intercept before typeUrlInRow so the preview POST triggered
-   * by the {enter} keypress (or the autocomplete selection) is reliably captured.
    */
   const typeUrlInRowAwaitPreview = (
     fieldAlias,
@@ -89,7 +84,7 @@ describe('Multivalue Link Field - Entity', () => {
   };
 
   /**
-   * Helper to trigger Enter key in the open popover dialog.
+   * Triggers Enter key in the open popover dialog.
    */
   const keyOutOfPopover = () => {
     cy.get('[role="dialog"][data-state="open"]')
@@ -105,8 +100,7 @@ describe('Multivalue Link Field - Entity', () => {
   };
 
   /**
-   * Helper function to confirm the URL values displayed in all rows.
-   * Uses per-row retryable assertions to avoid stale DOM issues.
+   * Confirms the URL values are displayed in all rows.
    */
   const confirmUrlInputs = (fieldAlias, expectedUrls) => {
     cy.get(fieldAlias)
@@ -126,8 +120,8 @@ describe('Multivalue Link Field - Entity', () => {
   };
 
   /**
-   * Helper function to verify preview iframe shows expected values for all four
-   * fields in the Four Multiple Links component.
+   * Verifies preview iframe shows expected values for all four fields in the
+   * Four Multiple Links component.
    *
    * @param {string} relativeValue - Expected value for Relative field item 0
    * @param {string} relativeTwoValue - Expected value for Relative Two field item 0
@@ -190,8 +184,6 @@ describe('Multivalue Link Field - Entity', () => {
     cy.openMultivaluePopover('@relative-field', 0);
 
     // Type an invalid URI-reference value containing '>'.
-    // Use select-all + type rather than .clear() to avoid triggering a
-    // debounced commit of the intermediate empty value.
     typeInPopover('invalid>value');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
@@ -203,7 +195,8 @@ describe('Multivalue Link Field - Entity', () => {
       .find('[data-prop-message="true"]')
       .should('contain.text', '❌ data/0 must match format "uri-reference"');
 
-    // The list item text should be unchanged (error should not propagate).
+    // The list item text should be unchanged (invalid values should not
+    // propagate).
     // The display (and preview) only show the most recent valid value.
     // The user typed "invalid>value", and it became invalid with the ">".
     verifyUrlRowText('@relative-field', 0, 'invalid');
@@ -239,8 +232,6 @@ describe('Multivalue Link Field - Entity', () => {
     cy.openMultivaluePopover('@relative-field', 0);
 
     // Type an invalid URI-reference value.
-    // Use select-all + type rather than .clear() to avoid triggering a
-    // debounced commit of the intermediate empty value.
     typeInPopover('apple test');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
@@ -272,8 +263,6 @@ describe('Multivalue Link Field - Entity', () => {
     cy.openMultivaluePopover('@absolute-field', 0);
 
     // Type a single-character value (not a valid absolute URI).
-    // Use select-all + type rather than .clear() to avoid triggering a
-    // debounced commit of the intermediate empty value.
     typeInPopover('x');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
@@ -299,9 +288,7 @@ describe('Multivalue Link Field - Entity', () => {
       'https://github.com',
     );
 
-    // --- Edit valid values and confirm the preview updates ---
-    // (Relative fields use entity autocomplete and require node selection;
-    // we test valid edits on the absolute URL fields which accept plain input.)
+    // Edit valid values and confirm the preview updates.
 
     // Edit the Absolute field row 0: change to a new valid absolute URL.
     typeInPopover('https://www.example.com');

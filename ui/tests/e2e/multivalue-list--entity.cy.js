@@ -167,7 +167,7 @@ configs.forEach((config) => {
   const { fieldType } = config;
   const fieldTypeLower = fieldType.toLowerCase();
 
-  describe(`Multi-value Form Design – ${fieldType}`, () => {
+  describe(`Multi-value Form Widget – ${fieldType}`, () => {
     before(() => {
       cy.drupalCanvasInstall(['canvas_test_article_fields']);
     });

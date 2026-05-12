@@ -1,5 +1,5 @@
 /**
- * Helper function to open popover for a specific row and type a value.
+ * Open popover for a specific row and type a value.
  */
 const typeInRow = (alias, rowIndex, value) => {
   cy.get(alias)
@@ -20,7 +20,7 @@ const typeInRow = (alias, rowIndex, value) => {
 };
 
 /**
- * Helper to verify the displayed text in a row's item.
+ * Verify the displayed text in a row's item.
  */
 const verifyRowText = (alias, rowIndex, expectedText) => {
   cy.get(alias)
@@ -44,7 +44,7 @@ const typeInRowAwaitPreview = (alias, rowIndex, value) => {
 };
 
 /**
- * Helper to confirm the contents of all rows.
+ * Confirms the contents of all rows.
  */
 const confirmInputs = (alias, inputContent) => {
   cy.get(alias)
@@ -255,9 +255,8 @@ configs.forEach((config) => {
         .find('.canvas-drag-handle a.tabledrag-handle')
         .should('have.length', 3);
 
-      // Register intercept before the drag so we capture every preview POST
-      // the reorder triggers (multiple can fire; the one that carries the
-      // reordered `_weight` values is what we wait for below).
+      // Register intercept before the drag to capture every preview POST
+      // the reorder triggers.
       cy.intercept('POST', '**/canvas/api/v0/layout/node/2').as(
         'previewUpdate',
       );

@@ -356,9 +356,6 @@ describe('Multivalue DateTime Form Design', () => {
       .find('tbody tr')
       .then(($initialRows) => {
         const initialCount = $initialRows.length;
-
-        // Register intercept BEFORE the action that triggers the preview
-        // update.
         cy.intercept({
           url: '**/canvas/api/v0/layout/node/2',
           times: 1,
@@ -392,7 +389,6 @@ describe('Multivalue DateTime Form Design', () => {
           .find('tbody tr')
           .should('have.length', initialCount + 1);
 
-        // Register intercept before the second action.
         cy.intercept({
           url: '**/canvas/api/v0/layout/node/2',
           times: 1,
@@ -429,8 +425,6 @@ describe('Multivalue DateTime Form Design', () => {
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
-    // Set up two datetime items. Register intercept BEFORE each action that
-    // triggers the preview update.
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
       times: 1,
@@ -702,9 +696,6 @@ describe('Multivalue DateTime Form Design', () => {
       .as('unlimited-datetime');
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
-
-    // Set up two items. Register intercept BEFORE each action that triggers
-    // the preview update.
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
       times: 1,
@@ -766,7 +757,6 @@ describe('Multivalue DateTime Form Design', () => {
       .as('required-datetime');
 
     // Set one datetime value (required field must have at least one value).
-    // Register intercept BEFORE the action that triggers the preview update.
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
       times: 1,
@@ -819,14 +809,12 @@ describe('Multivalue DateTime Form Design', () => {
       .as('required-datetime');
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
-
-    // Set first datetime value. Register intercept BEFORE the action that
-    // triggers the preview update.
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
       times: 1,
       method: 'POST',
     }).as('updatePreview');
+    // Set first datetime value.
     setDateTimeInFirstEmptyRow('@required-datetime', '2024-01-01', '10:00');
     cy.wait('@updatePreview');
     cy.waitForAjax();
