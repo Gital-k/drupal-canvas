@@ -2036,7 +2036,11 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     if (empty($examples)) {
       throw new \Exception('We require to define at least one example for POST "/canvas/api/v0/config/' . $entity_type_id . '" request in openapi.yml.');
     }
-    return (array) reset($examples);
+    $example = reset($examples);
+    if (\is_object($example) && \property_exists($example, 'value')) {
+      $example = $example->value;
+    }
+    return (array) $example;
   }
 
   private function assertExposedCodeComponents(array $expected, string $expected_dynamic_page_cache, array $request_options, array $additional_expected_cache_tags = []): void {
