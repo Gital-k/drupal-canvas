@@ -32,9 +32,6 @@ const verifyRowText = (alias, rowIndex, expectedText) => {
 
 /**
  * Types into a row and waits for the resulting preview update.
- *
- * The intercept MUST be registered before the {enter} keypress inside typeInRow,
- * otherwise the preview POST can fire before the alias exists and cy.wait hangs.
  */
 const typeInRowAwaitPreview = (alias, rowIndex, value) => {
   cy.intercept({
@@ -48,9 +45,6 @@ const typeInRowAwaitPreview = (alias, rowIndex, value) => {
 
 /**
  * Helper to confirm the contents of all rows.
- *
- * Uses retryable `should` assertions on each row's text so it waits for the DOM
- * to settle after an async update (e.g. preview POST, drag reorder).
  */
 const confirmInputs = (alias, inputContent) => {
   cy.get(alias)
