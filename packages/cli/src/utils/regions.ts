@@ -1,6 +1,6 @@
 import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 
-import { specToAuthoredElementMap } from './pages';
+import { specToAuthoredElementMap } from './authored-elements';
 import { isRecord } from './utils';
 
 import type {
