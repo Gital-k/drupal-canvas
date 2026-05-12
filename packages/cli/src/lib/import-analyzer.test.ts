@@ -94,6 +94,30 @@ describe('parseFileImports', () => {
     );
   });
 
+  it('marks asset imports with query strings and hashes with appropriate flags', async () => {
+    const filePath = await writeFixture(
+      'assets-query.tsx',
+      `
+        import heroImg from './hero.jpg?url';
+        import posterImg from './poster.webp#poster';
+      `,
+    );
+    const imports = await parseFileImports(filePath);
+
+    expect(imports).toContainEqual(
+      expect.objectContaining({
+        source: './hero.jpg?url',
+        isImage: true,
+      }),
+    );
+    expect(imports).toContainEqual(
+      expect.objectContaining({
+        source: './poster.webp#poster',
+        isImage: true,
+      }),
+    );
+  });
+
   it('categorizes relative imports as relative', async () => {
     const filePath = await writeFixture(
       'relative.tsx',
@@ -243,6 +267,37 @@ describe('collectImports', () => {
 
     expect(result.assetImports).toEqual(
       new Map([['@/components/card/hero.webp', imagePath]]),
+    );
+  });
+
+  it('collects image imports with query strings and hashes as asset imports', async () => {
+    const entryFile = await writeFixture(
+      'components/card/index.tsx',
+      `
+        import heroImage from './hero.webp?url';
+        import posterImage from '@/components/card/poster.jpg#poster';
+        export default function Card() {
+          return <img src={heroImage || posterImage} />;
+        }
+      `,
+    );
+    const heroPath = await writeFixture('components/card/hero.webp', 'image');
+    const posterPath = await writeFixture(
+      'components/card/poster.jpg',
+      'image',
+    );
+
+    const result = await collectImports(
+      [entryFile],
+      path.join(tmpDir, 'components'),
+      tmpDir,
+    );
+
+    expect(result.assetImports).toEqual(
+      new Map([
+        ['@/components/card/hero.webp', heroPath],
+        ['@/components/card/poster.jpg', posterPath],
+      ]),
     );
   });
 });

@@ -146,6 +146,21 @@ invalidTestRunner.run(
           },
         ],
       },
+      {
+        name: 'nested component path with Windows separators',
+        code: `
+        name: Field
+        machineName: field
+      `,
+        filename: '/invalid/src/components/form/input\\field/component.yml',
+        errors: [
+          {
+            message:
+              'Component directories must be direct children of configured componentDir "src/components". Found "input\\field" inside "src/components/form".',
+            line: 1,
+          },
+        ],
+      },
     ],
   },
 );

@@ -269,6 +269,9 @@ describe('vite-compat', () => {
         '/tmp/host/src/components/card.tsx',
       ),
     ).toBe('/tmp/host/src/icons/logo.svg?react');
+    expect(
+      resolveId?.('@/icons/logo.svg#icon', '/tmp/host/src/components/card.tsx'),
+    ).toBe('/tmp/host/src/icons/logo.svg#icon');
   });
 
   it('rewrites deployable asset imports to Canvas import map lookups', async () => {
