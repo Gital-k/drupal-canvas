@@ -183,6 +183,41 @@ describe('Code editor utilities', () => {
         'videoGalleryWithExampleValue',
       ]);
     });
+
+    it('drops array examples for single-value props', () => {
+      const result = serializeProps([
+        {
+          id: 'prop-id',
+          name: 'Field',
+          type: 'integer',
+          example: ['1234'],
+          derivedType: 'integer',
+          allowMultiple: false,
+        },
+      ]);
+
+      expect(result.field.type).toBe('integer');
+      expect(result.field.examples).toBeUndefined();
+    });
+
+    it('drops empty examples after multi-value normalization', () => {
+      const result = serializeProps([
+        {
+          id: 'prop-id',
+          name: 'Field',
+          type: 'array',
+          items: { type: 'integer' },
+          example: ['', ''],
+          derivedType: 'listInteger',
+          allowMultiple: true,
+          valueMode: 'unlimited',
+          limitedCount: 1,
+        },
+      ]);
+
+      expect(result.field.type).toBe('array');
+      expect(result.field.examples).toBeUndefined();
+    });
   });
 
   describe('deserialize props', () => {
