@@ -66,6 +66,7 @@ interface PushOptions {
   scope?: string;
   includePages?: boolean;
   includeContentTemplates?: boolean;
+  includeRegions?: boolean;
   includeBrandKit?: boolean;
   dir?: string;
   yes?: boolean;
@@ -311,6 +312,15 @@ export function pushCommand(program: Command): void {
     )
     .addOption(
       new Option(
+        '--include-regions [enabled]',
+        'Include global regions in the push operation',
+      )
+        .preset('true')
+        .argParser(parseBooleanOption)
+        .default(undefined),
+    )
+    .addOption(
+      new Option(
         '--include-brand-kit [enabled]',
         'Include brand kit (fonts) in the push operation',
       )
@@ -333,6 +343,7 @@ export function pushCommand(program: Command): void {
         const { componentDir, aliasBaseDir, outputDir } = config;
         const includesPages = config.includePages;
         const includesContentTemplates = config.includeContentTemplates;
+        const includesRegions = config.includeRegions;
         const includesBrandKit = config.includeBrandKit;
         const hasBrandKitFontsConfig = config.fonts !== undefined;
         // Step 1. Discover all components, pages, content templates and regions.
@@ -351,13 +362,15 @@ export function pushCommand(program: Command): void {
           warnings,
         } = discoveryResult;
         const discoveredPages = includesPages ? allDiscoveredPages : [];
-        const discoveredRegions = includesPages ? allDiscoveredRegions : [];
         const hasIgnoredPages = !includesPages && allDiscoveredPages.length > 0;
         const discoveredContentTemplates = includesContentTemplates
           ? allDiscoveredContentTemplates
           : [];
         const hasIgnoredContentTemplates =
           !includesContentTemplates && allDiscoveredContentTemplates.length > 0;
+        const discoveredRegions = includesRegions ? allDiscoveredRegions : [];
+        const hasIgnoredRegions =
+          !includesRegions && allDiscoveredRegions.length > 0;
 
         if (
           components.length === 0 &&
@@ -377,6 +390,12 @@ export function pushCommand(program: Command): void {
             );
           }
           p.log.warn('No components, pages, content templates or global regions found.');
+          if (hasIgnoredRegions) {
+            p.log.info(
+              'Ignoring local global regions. Use --include-regions or set CANVAS_INCLUDE_REGIONS=true to push them.',
+            );
+          }
+          p.log.warn('No components, pages, or global regions found.');
           p.outro('Push aborted (nothing to push)');
           return;
         }
@@ -407,6 +426,12 @@ export function pushCommand(program: Command): void {
         if (hasIgnoredContentTemplates && components.length > 0) {
           p.log.info(
             'Ignoring local content templates. Use --include-content-templates or set CANVAS_INCLUDE_CONTENT_TEMPLATES=true to push them.',
+          );
+        }
+
+        if (hasIgnoredRegions && components.length > 0) {
+          p.log.info(
+            'Ignoring local global regions. Use --include-regions or set CANVAS_INCLUDE_REGIONS=true to push them.',
           );
         }
 
@@ -450,7 +475,7 @@ export function pushCommand(program: Command): void {
         }
 
         // Fetch remote page regions early for the planned operations summary.
-        const remoteRegions = includesPages
+        const remoteRegions = includesRegions
           ? await apiService.listRegions()
           : {};
         const remoteRegionIds = new Set(

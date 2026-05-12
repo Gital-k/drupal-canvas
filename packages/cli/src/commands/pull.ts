@@ -49,6 +49,7 @@ interface PullOptions {
   scope?: string;
   includePages?: boolean;
   includeContentTemplates?: boolean;
+  includeRegions?: boolean;
   includeBrandKit?: boolean;
   dir?: string;
   yes?: boolean;
@@ -748,6 +749,15 @@ export function pullCommand(program: Command): void {
     )
     .addOption(
       new Option(
+        '--include-regions [enabled]',
+        'Include global regions in the pull operation',
+      )
+        .preset('true')
+        .argParser(parseBooleanOption)
+        .default(undefined),
+    )
+    .addOption(
+      new Option(
         '--include-brand-kit [enabled]',
         'Include brand kit (fonts) in the pull operation',
       )
@@ -771,6 +781,7 @@ export function pullCommand(program: Command): void {
         const apiService = await createApiService();
         const includesPages = config.includePages;
         const includesContentTemplates = config.includeContentTemplates;
+        const includesRegions = config.includeRegions;
         const includesBrandKit = config.includeBrandKit;
 
         const s = p.spinner();
@@ -778,6 +789,7 @@ export function pullCommand(program: Command): void {
         if (includesBrandKit) contentParts.push('fonts');
         if (includesPages) contentParts.push('pages');
         if (includesContentTemplates) contentParts.push('content templates');
+        if (includesRegions) contentParts.push('global regions');
         const contentLabel = contentParts.join(', ');
 
         // Build pull tasks.
@@ -806,6 +818,11 @@ export function pullCommand(program: Command): void {
               config.pagesDir,
               options.skipOverwrite ?? false,
             ),
+          );
+        }
+
+        if (includesRegions) {
+          tasks.push(
             createRegionsPullTask(
               apiService,
               config.regionsDir,
