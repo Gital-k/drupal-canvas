@@ -52,9 +52,6 @@ export interface DiscoveredContentTemplate {
 }
 
 export interface DiscoveredRegion {
-  /** Theme machine name, read from the file content. `null` if missing. */
-  theme: string | null;
-  /** Region machine name, derived from the filename. */
   region: string;
   path: string;
   relativePath: string;

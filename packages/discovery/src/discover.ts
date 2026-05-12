@@ -322,19 +322,7 @@ export async function discoverCanvasProject(
     if (!parsed) {
       continue;
     }
-    let theme: string | null = null;
-    try {
-      const content = JSON.parse(
-        await fs.readFile(absoluteRegionPath, 'utf-8'),
-      );
-      if (typeof content.theme === 'string' && content.theme) {
-        theme = content.theme;
-      }
-    } catch {
-      // Skip files that can't be read/parsed.
-    }
     regions.push({
-      theme,
       region: parsed.region,
       path: absoluteRegionPath,
       relativePath: projectRelativePath.startsWith('..')

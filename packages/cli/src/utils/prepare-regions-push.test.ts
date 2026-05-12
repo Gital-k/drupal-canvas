@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { stripNullableKeysForRegion } from './prepare-regions-push';
+import {
+  pushRegions,
+  stripNullableKeysForRegion,
+} from './prepare-regions-push';
+
+import type { Region } from '../types/Region';
+import type { PreparedRegion } from './prepare-regions-push';
 
 describe('stripNullableKeysForRegion', () => {
   it('omits null parent_uuid, slot, and label for root-level components', () => {
@@ -65,5 +71,79 @@ describe('stripNullableKeysForRegion', () => {
     ]);
 
     expect(stripped[0].label).toBe('Main heading');
+  });
+});
+
+function makePrepared(region: string): PreparedRegion {
+  return {
+    region,
+    status: true,
+    components: [],
+    filePath: `/tmp/regions/${region}.json`,
+    pendingMediaReconciliations: [],
+  };
+}
+
+describe('pushRegions', () => {
+  it('POSTs a new region without theme; server fills it server-side', async () => {
+    const createRegion = vi.fn(
+      async (): Promise<Region> => ({
+        id: 'stark.header',
+        theme: 'stark',
+        region: 'header',
+        status: true,
+        component_tree: [],
+      }),
+    );
+    const updateRegion = vi.fn();
+
+    const results = await pushRegions(
+      [{ index: 0, result: makePrepared('header') }],
+      new Map(),
+      { createRegion, updateRegion },
+    );
+
+    expect(createRegion).toHaveBeenCalledOnce();
+    const payload = createRegion.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('theme');
+    expect(payload).toMatchObject({
+      region: 'header',
+      status: true,
+      component_tree: [],
+    });
+    expect(updateRegion).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({
+      success: true,
+      result: { id: 'stark.header', operation: 'Created' },
+    });
+  });
+
+  it('PATCHes an existing region using the full id from the short-name map', async () => {
+    const createRegion = vi.fn();
+    const updateRegion = vi.fn(
+      async (): Promise<Region> => ({
+        id: 'olivero.header',
+        theme: 'olivero',
+        region: 'header',
+        status: false,
+        component_tree: [],
+      }),
+    );
+
+    const results = await pushRegions(
+      [{ index: 0, result: makePrepared('header') }],
+      new Map([['header', 'olivero.header']]),
+      { createRegion, updateRegion },
+    );
+
+    expect(updateRegion).toHaveBeenCalledWith('olivero.header', {
+      status: true,
+      component_tree: [],
+    });
+    expect(createRegion).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({
+      success: true,
+      result: { id: 'olivero.header', operation: 'Updated' },
+    });
   });
 });

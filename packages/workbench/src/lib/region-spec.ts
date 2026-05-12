@@ -1,5 +1,4 @@
 import {
-  isNonEmptyString,
   isRecord,
   normalizeElementMapProps,
   parseElementMap,
@@ -12,18 +11,11 @@ import type { AuthoredSpecElementMap } from './authored-spec-utils';
 import type { PageSpecIssue } from './page-spec';
 
 export interface AuthoredRegionSpec {
-  uuid?: string;
-  theme: string;
-  region: string;
   status?: boolean;
   elements: AuthoredSpecElementMap;
 }
 
 export interface NormalizedRegionSpec {
-  /** Composite ID `{theme}.{region}` derived from the spec. */
-  id: string;
-  theme: string;
-  region: string;
   spec: Spec;
 }
 
@@ -44,9 +36,6 @@ export function normalizeRegionSpec(
   const elements = normalizeElementMapProps(region.elements);
 
   return {
-    id: `${region.theme}.${region.region}`,
-    theme: region.theme,
-    region: region.region,
     spec: {
       root: 'canvas:component-tree',
       elements: {
@@ -83,14 +72,7 @@ export function parseRegionSpec(
   }
 
   const issues: PageSpecIssue[] = [];
-  const allowedTopLevelKeys = new Set([
-    '$schema',
-    'uuid',
-    'theme',
-    'region',
-    'status',
-    'elements',
-  ]);
+  const allowedTopLevelKeys = new Set(['$schema', 'status', 'elements']);
   const unexpectedTopLevelKeys = Object.keys(value).filter(
     (key) => !allowedTopLevelKeys.has(key),
   );
@@ -99,21 +81,6 @@ export function parseRegionSpec(
       code: 'invalid_page_spec',
       message: `Region file contains unexpected top-level keys in ${sourcePath}: ${unexpectedTopLevelKeys.join(', ')}.`,
       path: sourcePath,
-    });
-  }
-
-  if (!isNonEmptyString(value.theme)) {
-    issues.push({
-      code: 'invalid_page_spec',
-      message: `Region file must include a non-empty theme: ${sourcePath}`,
-      path: `${sourcePath}#theme`,
-    });
-  }
-  if (!isNonEmptyString(value.region)) {
-    issues.push({
-      code: 'invalid_page_spec',
-      message: `Region file must include a non-empty region: ${sourcePath}`,
-      path: `${sourcePath}#region`,
     });
   }
 
@@ -153,18 +120,11 @@ export function parseRegionSpec(
     });
   }
 
-  if (
-    issues.length > 0 ||
-    !parsedElements.elements ||
-    !isNonEmptyString(value.theme) ||
-    !isNonEmptyString(value.region)
-  ) {
+  if (issues.length > 0 || !parsedElements.elements) {
     return { region: null, issues };
   }
 
   const region = normalizeRegionSpec({
-    theme: value.theme,
-    region: value.region,
     elements: parsedElements.elements,
   });
 

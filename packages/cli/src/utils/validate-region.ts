@@ -27,7 +27,7 @@ export async function validateRegions(
 
   for (const region of discoveryResult.regions) {
     const fileName = path.basename(region.path);
-    const itemName = `${region.theme ?? 'unknown'}.${region.region}`;
+    const itemName = region.region;
 
     try {
       const fileContent = await fs.readFile(region.path, 'utf-8');
