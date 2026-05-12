@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildElementsValidationContext,
   validateElements,
-  validatePages,
-} from './validate-page';
+} from './validate-elements';
+import { validatePages } from './validate-page';
 
 import type {
   ComponentMetadata,
