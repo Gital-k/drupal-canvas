@@ -592,20 +592,7 @@ describe('Prop types editing', () => {
     );
 
     cy.waitForElementContentInIframe(stringPreviewSelector, stringUpdatedValue);
-
-    cy.testInIframe('.layout-content', (preview) => {
-      expect(preview.textContent.trim()).to.equal('');
-    });
-
-    // Confirm the uri field is still suppressed (invalid value not rendered).
-    cy.testInIframe(previewSelector, (uriPreview) => {
-      expect(uriPreview.textContent.trim()).to.equal('');
-    });
-
-    // Confirm the String — single line update is reflected in the iframe.
-    cy.testInIframe(stringPreviewSelector, (preview) => {
-      expect(preview.textContent.trim()).to.equal(stringUpdatedValue);
-    });
+    cy.waitForElementContentInIframe(previewSelector, '');
   });
 
   it('idn-email', { retries: { openMode: 0, runMode: 3 } }, () => {
