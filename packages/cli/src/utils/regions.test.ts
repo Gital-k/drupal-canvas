@@ -17,14 +17,12 @@ describe('regionToAuthoredSpec', () => {
     const spec = regionToAuthoredSpec(region);
 
     expect(spec).toEqual({
-      theme: 'olivero',
-      region: 'header',
       status: true,
       elements: {},
     });
   });
 
-  it('preserves theme/region/status metadata and produces an authored element map for non-empty trees', () => {
+  it('preserves status and produces an authored element map for non-empty trees', () => {
     const region: Region = {
       id: 'olivero.footer',
       theme: 'olivero',
@@ -45,8 +43,6 @@ describe('regionToAuthoredSpec', () => {
 
     const spec = regionToAuthoredSpec(region);
 
-    expect(spec.theme).toBe('olivero');
-    expect(spec.region).toBe('footer');
     expect(spec.status).toBe(false);
     expect(Object.keys(spec.elements)).toContain(
       '11111111-1111-4111-8111-111111111111',
@@ -82,7 +78,7 @@ describe('regionToAuthoredSpec', () => {
 });
 
 describe('authoredRegionToPayload', () => {
-  it('builds a payload from authored spec metadata + a precomputed component tree', () => {
+  it('builds a payload with region from the caller and omits theme', () => {
     const componentTree = [
       {
         uuid: 'aa',
@@ -96,30 +92,23 @@ describe('authoredRegionToPayload', () => {
     ];
 
     const payload = authoredRegionToPayload(
-      {
-        theme: 'olivero',
-        region: 'header',
-        status: true,
-        elements: {},
-      },
+      { status: true, elements: {} },
+      'header',
       componentTree,
     );
 
     expect(payload).toEqual({
-      theme: 'olivero',
       region: 'header',
       status: true,
       component_tree: componentTree,
     });
+    expect(payload).not.toHaveProperty('theme');
   });
 
   it('defaults `status` to true when omitted from the authored spec', () => {
     const payload = authoredRegionToPayload(
-      {
-        theme: 'olivero',
-        region: 'sidebar_first',
-        elements: {},
-      },
+      { elements: {} },
+      'sidebar_first',
       [],
     );
 

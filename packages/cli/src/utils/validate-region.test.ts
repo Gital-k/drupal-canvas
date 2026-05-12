@@ -36,13 +36,10 @@ describe('validateRegions', () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'canvas-region-'));
     try {
       const regionPath = await writeRegion(tmpDir, 'header.json', {
-        theme: 'olivero',
-        region: 'header',
         elements: {},
       });
       const discoveryResult = makeDiscoveryResult(tmpDir, [
         {
-          theme: 'olivero',
           region: 'header',
           path: regionPath,
           relativePath: 'regions/header.json',
@@ -50,7 +47,7 @@ describe('validateRegions', () => {
       ]);
 
       await expect(validateRegions(discoveryResult)).resolves.toEqual({
-        results: [{ itemName: 'olivero.header', success: true }],
+        results: [{ itemName: 'header', success: true }],
       });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
@@ -60,13 +57,9 @@ describe('validateRegions', () => {
   it('reports missing required fields', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'canvas-region-'));
     try {
-      const regionPath = await writeRegion(tmpDir, 'header.json', {
-        theme: 'olivero',
-        elements: {},
-      });
+      const regionPath = await writeRegion(tmpDir, 'header.json', {});
       const discoveryResult = makeDiscoveryResult(tmpDir, [
         {
-          theme: 'olivero',
           region: 'header',
           path: regionPath,
           relativePath: 'regions/header.json',
@@ -77,7 +70,7 @@ describe('validateRegions', () => {
       expect(results).toHaveLength(1);
       expect(results[0].success).toBe(false);
       expect(
-        results[0].details?.some((d) => d.content.includes('region')),
+        results[0].details?.some((d) => d.content.includes('elements')),
       ).toBe(true);
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
@@ -88,14 +81,11 @@ describe('validateRegions', () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'canvas-region-'));
     try {
       const regionPath = await writeRegion(tmpDir, 'header.json', {
-        theme: 'olivero',
-        region: 'header',
         elements: {},
         title: 'Not allowed on regions',
       });
       const discoveryResult = makeDiscoveryResult(tmpDir, [
         {
-          theme: 'olivero',
           region: 'header',
           path: regionPath,
           relativePath: 'regions/header.json',
@@ -116,15 +106,12 @@ describe('validateRegions', () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'canvas-region-'));
     try {
       const regionPath = await writeRegion(tmpDir, 'header.json', {
-        theme: 'olivero',
-        region: 'header',
         elements: {
           'canvas:component-tree': { type: 'canvas:component-tree' },
         },
       });
       const discoveryResult = makeDiscoveryResult(tmpDir, [
         {
-          theme: 'olivero',
           region: 'header',
           path: regionPath,
           relativePath: 'regions/header.json',
@@ -145,7 +132,6 @@ describe('validateRegions', () => {
       await fs.writeFile(regionPath, '{ not valid json', 'utf-8');
       const discoveryResult = makeDiscoveryResult(tmpDir, [
         {
-          theme: 'olivero',
           region: 'header',
           path: regionPath,
           relativePath: 'regions/header.json',
