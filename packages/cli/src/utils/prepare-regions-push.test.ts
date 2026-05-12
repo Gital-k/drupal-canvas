@@ -103,10 +103,7 @@ describe('pushRegions', () => {
       { createRegion, updateRegion },
     );
 
-    expect(createRegion).toHaveBeenCalledOnce();
-    const payload = createRegion.mock.calls[0][0];
-    expect(payload).not.toHaveProperty('theme');
-    expect(payload).toMatchObject({
+    expect(createRegion).toHaveBeenCalledExactlyOnceWith({
       region: 'header',
       status: true,
       component_tree: [],
