@@ -3,24 +3,14 @@ import path from 'path';
 import chalk from 'chalk';
 import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
-import {
-  getDataDependenciesFromAst,
-  getImportsFromAst,
-} from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
+import { getImportsFromAst } from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
 
-import { buildComponent } from './build-component';
 import { getGlobalCss } from './build-tailwind.js';
 import { pluralizeComponent } from './command-helpers';
 import { sortByDependencies } from './dependency-sort';
-import {
-  createComponentPayload,
-  processComponentFiles,
-} from './process-component-files';
 import { createProgressCallback, processInPool } from './request-pool';
 import { fileExists } from './utils';
 
-import type { DiscoveredComponent } from '@drupal-canvas/discovery';
-import type { DataDependencies } from '@drupal-canvas/ui/types/CodeComponent';
 import type { ApiService } from '../services/api.js';
 import type { Component } from '../types/Component.js';
 import type { Result } from '../types/Result.js';
@@ -50,13 +40,6 @@ interface ComponentUploadResult {
   error?: Error;
 }
 
-interface PreparedComponent {
-  machineName: string;
-  componentName: string;
-  componentPayload: ReturnType<typeof createComponentPayload>;
-  importedJsComponents: string[];
-}
-
 interface BuiltComponentForPush {
   machineName: string;
   componentName: string;
@@ -68,8 +51,8 @@ interface BuiltComponentForPush {
  * Determine the operation for each component (create, update, or delete)
  * and build upload tasks with payloads attached.
  */
-export async function buildComponentUploadTasks(
-  preparedByName: Map<string, PreparedComponent>,
+async function buildComponentUploadTasks(
+  preparedByName: Map<string, BuiltComponentForPush>,
   apiService: { listComponents: () => Promise<Record<string, unknown>> },
   onProgress: () => void,
 ): Promise<ComponentUploadTask[]> {
@@ -300,212 +283,6 @@ async function processTaskBatch(
       error: result.error || new Error('Unknown error during upload'),
     };
   });
-}
-
-async function prepareComponentsForUpload(
-  successfulBuilds: Result[],
-  componentsToUpload: DiscoveredComponent[],
-): Promise<{ prepared: PreparedComponent[]; failed: Result[] }> {
-  const prepared: PreparedComponent[] = [];
-  const failed: Result[] = [];
-
-  for (const buildResult of successfulBuilds) {
-    const component = buildResult.itemName
-      ? componentsToUpload.find((c) => c.name === buildResult.itemName)
-      : undefined;
-
-    if (!component) continue;
-
-    try {
-      const componentName = component.name;
-      const { sourceCodeJs, compiledJs, sourceCodeCss, compiledCss, metadata } =
-        await processComponentFiles(
-          component.directory,
-          componentName,
-          component.kind,
-        );
-      if (!metadata) {
-        throw new Error('Invalid metadata file');
-      }
-
-      const machineName =
-        buildResult.itemName ||
-        metadata.machineName ||
-        componentName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-
-      let importedJsComponents = [] as string[];
-      let dataDependencies: DataDependencies = {};
-      try {
-        const ast = parse(sourceCodeJs, {
-          sourceType: 'module',
-          plugins: ['jsx', 'typescript'],
-        });
-        importedJsComponents = getImportsFromAst(ast, '@/components/');
-        dataDependencies = getDataDependenciesFromAst(ast);
-      } catch (error) {
-        p.note(chalk.red(`Error: ${error}`));
-      }
-
-      const componentPayload = createComponentPayload({
-        metadata,
-        machineName,
-        componentName,
-        sourceCodeJs,
-        compiledJs,
-        sourceCodeCss,
-        compiledCss,
-        importedJsComponents,
-        dataDependencies,
-      });
-
-      prepared.push({
-        machineName,
-        componentName,
-        componentPayload,
-        importedJsComponents,
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      failed.push({
-        itemName: buildResult.itemName,
-        success: false,
-        details: [{ content: errorMessage }],
-      });
-    }
-  }
-
-  return { prepared, failed };
-}
-
-/**
- * Build, prepare, and upload components to Drupal.
- *
- * Shared by both the push and upload commands.
- */
-export async function buildAndPushComponents(
-  componentsToUpload: DiscoveredComponent[],
-  apiService: ApiService,
-  includeGlobalCss: boolean,
-  actionLabel: string = 'Uploading',
-): Promise<Result[]> {
-  const results: Result[] = [];
-  const spinner = p.spinner();
-
-  const buildResults: Result[] = [];
-  spinner.start('Building components');
-  for (const component of componentsToUpload) {
-    buildResults.push(await buildComponent(component, includeGlobalCss));
-  }
-
-  const successfulBuilds = buildResults.filter((build) => build.success);
-  const failedBuilds = buildResults.filter((build) => !build.success);
-
-  if (failedBuilds.length > 0) {
-    spinner.stop(
-      chalk.red(
-        `Build failed for ${failedBuilds.length} ${pluralizeComponent(failedBuilds.length)}.`,
-      ),
-    );
-    return buildResults;
-  }
-
-  if (successfulBuilds.length === 0) {
-    spinner.stop(chalk.red('All component builds failed.'));
-    return failedBuilds;
-  }
-
-  spinner.message(`Preparing components for ${actionLabel.toLowerCase()}`);
-  const { prepared, failed: preparationFailures } =
-    await prepareComponentsForUpload(successfulBuilds, componentsToUpload);
-
-  if (preparationFailures.length > 0) {
-    spinner.stop(
-      chalk.red(
-        `Preparation failed for ${preparationFailures.length} ${pluralizeComponent(preparationFailures.length)}.`,
-      ),
-    );
-    return [...successfulBuilds, ...preparationFailures];
-  }
-
-  if (prepared.length === 0) {
-    spinner.stop(chalk.red('No components were prepared for upload.'));
-    return [...successfulBuilds, ...preparationFailures];
-  }
-
-  const preparedByName = new Map(prepared.map((c) => [c.machineName, c]));
-  const existenceProgress = createProgressCallback(
-    spinner,
-    'Checking component existence',
-    preparedByName.size,
-  );
-
-  spinner.message('Checking component operations');
-  const uploadTasks = await buildComponentUploadTasks(
-    preparedByName,
-    apiService,
-    existenceProgress,
-  );
-
-  const uploadProgress = createProgressCallback(
-    spinner,
-    `${actionLabel} components`,
-    uploadTasks.length,
-  );
-
-  spinner.message(`${actionLabel} components`);
-  const uploadResults = await uploadComponents(
-    uploadTasks,
-    apiService,
-    uploadProgress,
-  );
-
-  const failedUploads = uploadResults
-    .map((uploadResult, index) => {
-      if (uploadResult.success) {
-        return null;
-      }
-      const componentName =
-        prepared[index]?.componentName || uploadResult.machineName || 'unknown';
-      const message =
-        uploadResult.error?.message?.trim() || 'Unknown upload error';
-      return `${componentName} (${message})`;
-    })
-    .filter((value): value is string => Boolean(value));
-
-  if (failedUploads.length > 0) {
-    throw new Error(
-      `Component upload failed for ${failedUploads.length} ${pluralizeComponent(failedUploads.length)}: ${failedUploads.join(', ')}`,
-    );
-  }
-
-  const operationLabels: Record<ComponentOperation, string> = {
-    create: 'Created',
-    update: chalk.cyan('Updated'),
-    delete: chalk.dim('Deleted'),
-  };
-  for (let i = 0; i < uploadResults.length; i++) {
-    const uploadResult = uploadResults[i];
-
-    results.push({
-      itemName: prepared[i]?.componentName ?? uploadResult.machineName,
-      success: uploadResult.success,
-      details: [
-        {
-          content: uploadResult.success
-            ? operationLabels[uploadResult.operation]
-            : uploadResult.error?.message?.trim() || 'Unknown upload error',
-        },
-      ],
-    });
-  }
-
-  spinner.stop(
-    chalk.green(
-      `Processed ${results.length} ${pluralizeComponent(results.length)}`,
-    ),
-  );
-  return results;
 }
 
 /**
