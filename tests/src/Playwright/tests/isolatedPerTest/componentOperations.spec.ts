@@ -5,6 +5,53 @@ import { isolatedPerTest as test } from '../../fixtures/test.js';
 test.use({ modules: ['canvas_test_sdc'], enableTestExtensions: true });
 
 test.describe('Perform CRUD operations on components', () => {
+  test('Can edit a select prop on a component', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.login({ username: 'editor', password: 'editor' });
+    await canvas.openCanvas(await canvas.createCanvas());
+    await canvas.openLibraryPanel();
+    await canvas.addComponent({ id: 'sdc.canvas_test_sdc.select-fields' });
+
+    // Iteration 1: select Small
+    await canvas.editComponentProp('size', 'Small', 'select');
+    await canvas.testInPreviewFrame('.select-fields__size', async (sizeEl) => {
+      await expect(sizeEl).toContainText('Size: small');
+    });
+
+    // Iteration 1: select Medium
+    await canvas.editComponentProp('size', 'Medium', 'select');
+    await canvas.testInPreviewFrame('.select-fields__size', async (sizeEl) => {
+      await expect(sizeEl).toContainText('Size: medium');
+    });
+
+    // Iteration 1: select Large
+    await canvas.editComponentProp('size', 'Large', 'select');
+    await canvas.testInPreviewFrame('.select-fields__size', async (sizeEl) => {
+      await expect(sizeEl).toContainText('Size: large');
+    });
+
+    // Iteration 2: select Small
+    await canvas.editComponentProp('size', 'Small', 'select');
+    await canvas.testInPreviewFrame('.select-fields__size', async (sizeEl) => {
+      await expect(sizeEl).toContainText('Size: small');
+    });
+
+    // Iteration 2: select Medium
+    await canvas.editComponentProp('size', 'Medium', 'select');
+    await canvas.testInPreviewFrame('.select-fields__size', async (sizeEl) => {
+      await expect(sizeEl).toContainText('Size: medium');
+    });
+
+    // Iteration 2: select Large
+    await canvas.editComponentProp('size', 'Large', 'select');
+    await canvas.testInPreviewFrame('.select-fields__size', async (sizeEl) => {
+      await expect(sizeEl).toContainText('Size: large');
+    });
+  });
+
   test('Layer and Components Panel', async ({ page, drupal, canvas }) => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.openCanvas(await canvas.createCanvas());

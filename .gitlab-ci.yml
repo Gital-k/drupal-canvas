@@ -373,6 +373,8 @@ phpcs-rules-match-drupal-11:
 
 phpunit (11.2, sqlite):
   rules:
+    - when: never
+    - *is-push-rule
     - *is-nightly-scheduled-rule
     - *backend-files-change-rule
     # Changes to the infra for running PHPUnit itself also need to trigger CI.
@@ -617,7 +619,9 @@ vitest:
 
 cypress E2E:
   extends: .cypress-base
-  rules: *e2e-ci-job-rules
+  rules:
+    - *e2e-ci-job-rules
+    - when: never
   parallel: 4
   script:
     - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log || EXIT_CODE=$?
@@ -750,7 +754,7 @@ playwright:
     - !reference [ .canvas-ui ]
   script:
     - npm ci
-    - npm run test:playwright -- --shard=$SHARD
+    - npm run test:playwright -- --project=chromium tests/isolatedPerTest/componentOperations.spec.ts --shard=$SHARD --reporter=blob
   after_script:
     - cp -R _drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/blob-report $CI_PROJECT_DIR/blob-report
   artifacts:

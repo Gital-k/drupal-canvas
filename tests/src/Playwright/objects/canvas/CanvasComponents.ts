@@ -258,8 +258,9 @@ export function CanvasComponentsMixin<
       propValue: string,
       propType = 'text',
     ) {
-      const inputLocator = `[data-testid="canvas-contextual-panel"] [data-drupal-selector="component-instance-form"] .field--name-${propName.toLowerCase()} input`;
-      const labelLocator = `[data-testid="canvas-contextual-panel"] [data-drupal-selector="component-instance-form"] .field--name-${propName.toLowerCase()} label`;
+      const fieldLocator = `[data-testid="canvas-contextual-panel"] [data-drupal-selector="component-instance-form"] .field--name-${propName.toLowerCase()}`;
+      const inputLocator = `${fieldLocator} input`;
+      const labelLocator = `${fieldLocator} label`;
 
       switch (propType) {
         case 'file':
@@ -282,6 +283,18 @@ export function CanvasComponentsMixin<
             this.page.getByRole('button', { name: 'remove' }),
           ).toBeVisible();
           break;
+        case 'select': {
+          const selectControl = this.page.locator(
+            `${fieldLocator} [class*="canvas-select__control"]`,
+          );
+          await selectControl.click();
+          await this.page
+            .locator('[class*="canvas-select__option"]', { hasText: propValue })
+            .click();
+          // eslint-disable-next-line playwright/no-networkidle
+          await this.page.waitForLoadState('networkidle');
+          break;
+        }
         default:
           await this.page.locator(inputLocator).fill(propValue);
           // Click the label as autocomplete/link fields will not update until the
@@ -492,7 +505,7 @@ export function CanvasComponentsMixin<
         field
           .locator('tr.draggable')
           .last()
-          .locator('[data-canvas-multivalue-label="true"]'),
+          .locator('[``data-canvas-multivalue-label``="true"]'),
       ).toHaveText('Empty');
 
       if (propValue) {
