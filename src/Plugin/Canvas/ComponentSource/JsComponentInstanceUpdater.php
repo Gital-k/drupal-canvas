@@ -7,9 +7,6 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 use Drupal\canvas\ComponentSource\ComponentInstanceUpdateAttemptResult;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
-use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 
 /**
@@ -30,9 +27,6 @@ final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComp
    * Data loss is accepted.
    */
   public function canUpdate(ComponentTreeItem $component_instance): bool {
-    if ($component_instance->getComponent() === NULL) {
-      return FALSE;
-    }
     return $this->isUpdateNeeded($component_instance);
   }
 
@@ -158,33 +152,6 @@ final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComp
       $common,
       fn (string $prop_name): bool => !$from_storable[$prop_name]->fieldDataFitsIn($to_storable[$prop_name]),
     ));
-  }
-
-  /**
-   * Converts prop field definitions to StorablePropShape objects.
-   *
-   * @param array $prop_field_definitions
-   *   The prop field definitions array from Component::getSettings().
-   *
-   * @return array<string, \Drupal\canvas\PropShape\StorablePropShape>
-   */
-  private static function toStorablePropShapes(array $prop_field_definitions): array {
-    return \array_map(static function (array $def): StorablePropShape {
-      $field_type_prop = StructuredDataPropExpression::fromString($def['expression']);
-      \assert($field_type_prop instanceof FieldTypeBasedPropExpressionInterface);
-      $is_single_value = ($def['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) === 1;
-      $irrelevant_shape = $is_single_value
-        ? new PropShape(['type' => 'object'])
-        : new PropShape(['type' => 'array', 'items' => ['type' => 'object']]);
-      return new StorablePropShape(
-        shape: $irrelevant_shape,
-        fieldTypeProp: $field_type_prop,
-        fieldWidget: 'irrelevant',
-        cardinality: $def['cardinality'] ?? NULL,
-        fieldStorageSettings: $def['field_storage_settings'] ?? NULL,
-        fieldInstanceSettings: $def['field_instance_settings'] ?? NULL,
-      );
-    }, $prop_field_definitions);
   }
 
 }

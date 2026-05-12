@@ -66,32 +66,12 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
     $from_version = $component->getLoadedVersion();
     $to_version = $component->getActiveVersion();
 
+    [$from_props, $to_props] = self::getPropDefinitions($component, $from_version, $to_version);
     // Props that are still present, need to allow the same field data to be
     // stored in the active version of the Component. If not
     // (If only the field widget or expression changes, it's SAFE to update.)
-    $prop_field_definition_to_storable_prop_shape = static function (array $prop_field_definition): StorablePropShape {
-      $field_type_prop = StructuredDataPropExpression::fromString($prop_field_definition['expression']);
-      \assert($field_type_prop instanceof FieldTypeBasedPropExpressionInterface);
-
-      // Shape details are irrelevant for update safety checks, but the
-      // constructor validates that cardinality aligns with array/non-array.
-      $is_single_value = ($prop_field_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) === 1;
-      $irrelevant_prop_shape = $is_single_value
-        ? new PropShape(['type' => 'object'])
-        : new PropShape(['type' => 'array', 'items' => ['type' => 'object']]);
-
-      return new StorablePropShape(
-        shape: $irrelevant_prop_shape,
-        fieldTypeProp: $field_type_prop,
-        fieldWidget: 'irrelevant',
-        cardinality: $prop_field_definition['cardinality'] ?? NULL,
-        fieldStorageSettings: $prop_field_definition['field_storage_settings'] ?? NULL,
-        fieldInstanceSettings: $prop_field_definition['field_instance_settings'] ?? NULL,
-      );
-    };
-    [$from_props, $to_props] = self::getPropDefinitions($component, $from_version, $to_version);
-    $from_props = \array_map($prop_field_definition_to_storable_prop_shape, $from_props);
-    $to_props = \array_map($prop_field_definition_to_storable_prop_shape, $to_props);
+    $from_props = self::toStorablePropShapes($from_props);
+    $to_props = self::toStorablePropShapes($to_props);
     $common_props_names = \array_keys(\array_intersect_key($to_props, $from_props));
     $common_props_names_with_changed_definition = \array_any(
       $common_props_names,
@@ -224,6 +204,37 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
     $from_settings = $component->getSettings($from_version);
     $to_settings = $component->getSettings($to_version);
     return [$from_settings['prop_field_definitions'], $to_settings['prop_field_definitions']];
+  }
+
+  /**
+   * Converts prop field definitions to StorablePropShape objects.
+   *
+   * @param array $prop_field_definitions
+   *   The prop field definitions array from Component::getSettings().
+   *
+   * @return array<string, \Drupal\canvas\PropShape\StorablePropShape>
+   */
+  protected static function toStorablePropShapes(array $prop_field_definitions): array {
+    return \array_map(static function (array $prop_field_definition): StorablePropShape {
+      $field_type_prop = StructuredDataPropExpression::fromString($prop_field_definition['expression']);
+      \assert($field_type_prop instanceof FieldTypeBasedPropExpressionInterface);
+
+      // Shape details are irrelevant for update safety checks, but the
+      // constructor validates that cardinality aligns with array/non-array.
+      $is_single_value = ($prop_field_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) === 1;
+      $irrelevant_prop_shape = $is_single_value
+        ? new PropShape(['type' => 'object'])
+        : new PropShape(['type' => 'array', 'items' => ['type' => 'object']]);
+
+      return new StorablePropShape(
+        shape: $irrelevant_prop_shape,
+        fieldTypeProp: $field_type_prop,
+        fieldWidget: 'irrelevant',
+        cardinality: $prop_field_definition['cardinality'] ?? NULL,
+        fieldStorageSettings: $prop_field_definition['field_storage_settings'] ?? NULL,
+        fieldInstanceSettings: $prop_field_definition['field_instance_settings'] ?? NULL,
+      );
+    }, $prop_field_definitions);
   }
 
 }
