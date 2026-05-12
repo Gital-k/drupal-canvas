@@ -112,7 +112,16 @@ describe('command-helpers', () => {
 
       const config = getConfig();
       expect(config.scope).toBe(
-        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:page_region',
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
+      );
+    });
+
+    it('should update the default scope when includeRegions changes', () => {
+      updateConfigFromOptions({ includeRegions: true });
+
+      const config = getConfig();
+      expect(config.scope).toBe(
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page_region',
       );
     });
 
