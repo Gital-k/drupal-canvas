@@ -1,12 +1,12 @@
 import fs from 'fs/promises';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
+import { authoredSpecToComponentTree } from './authored-elements';
 import {
   formatPagePathAliasChangeError,
   getPathAliasChange,
   normalizePathAlias,
 } from './page-path-alias-validation';
-import { authoredSpecToComponentTree } from './pages';
 import {
   collectUnreconciledMediaProps,
   serializeElementMapForServer,

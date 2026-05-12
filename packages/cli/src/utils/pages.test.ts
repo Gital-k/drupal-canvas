@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   authoredSpecToComponentTree,
-  pageToAuthoredSpec,
   specToAuthoredElementMap,
-} from './pages';
+} from './authored-elements';
+import { pageToAuthoredSpec } from './pages';
 
 import type {
   AuthoredSpecElementMap,
