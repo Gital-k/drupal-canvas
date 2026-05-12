@@ -433,7 +433,7 @@ describe('Multivalue Link Field - Entity', () => {
     ]);
   });
 
-  it.only('can drag and drop link items with custom drag handles', () => {
+  it('can drag and drop link items with custom drag handles', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
     cy.get('@entityForm').recordFormBuildId();

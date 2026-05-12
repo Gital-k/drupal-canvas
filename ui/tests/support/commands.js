@@ -1,21 +1,10 @@
-
-
-
 import '@testing-library/cypress/add-commands.js';
-
-
 
 import { realType } from 'cypress-real-events';
 import { queries } from '@testing-library/dom';
 
-
-
 import { realDnd } from './realDnd.js';
 import { onlyVisibleChars } from './utils.js';
-
-
-
-
 
 // This selector gets the preview iframe ensuring that it is initialized and that it is the currently active/swapped in element.
 const initializedReadyPreviewIframeSelector =
@@ -798,7 +787,7 @@ Cypress.Commands.add('assertReorderEntityFieldRequest', (options) => {
   );
 
   const extractSorted = (body) => {
-    console.log('extract sorted',  body);
+    console.log('extract sorted', body);
     const asString = typeof body === 'string' ? body : JSON.stringify(body);
     const values = {};
     const weights = {};
@@ -814,7 +803,6 @@ Cypress.Commands.add('assertReorderEntityFieldRequest', (options) => {
       .sort((a, b) => a.weight - b.weight)
       .map((item) => item.value);
   };
-
 
   cy.get(`@${alias}.all`).should((intercepts) => {
     const completed = intercepts.filter(({ response }) => response);
