@@ -479,11 +479,13 @@ export function pushCommand(program: Command): void {
         const remoteRegions = includesRegions
           ? await apiService.listRegions()
           : {};
-        const remoteRegionIds = new Set(
-          Object.values(remoteRegions).map((r) => `${r.theme}.${r.region}`),
-        );
-        const remoteRegionShortNames = new Set(
-          Object.values(remoteRegions).map((r) => r.region),
+        // Map each remote region's short name to its full `{theme}.{region}`
+        // id so the push step can resolve the PATCH target without needing
+        // the theme in the local file.
+        const remoteRegionIdsByShortName = new Map(
+          Object.values(remoteRegions).map(
+            (r) => [r.region, `${r.theme}.${r.region}`] as const,
+          ),
         );
 
         // Build a preview of planned operations.
@@ -552,7 +554,7 @@ export function pushCommand(program: Command): void {
             success: true,
             details: [
               {
-                content: remoteRegionShortNames.has(region.region)
+                content: remoteRegionIdsByShortName.has(region.region)
                   ? operationLabels.update
                   : operationLabels.create,
               },
@@ -991,7 +993,7 @@ export function pushCommand(program: Command): void {
           regionPushSpinner.start('Pushing global regions');
           const regionPushResults = await pushRegions(
             validRegions,
-            remoteRegionIds,
+            remoteRegionIdsByShortName,
             apiService,
           );
           regionPushSpinner.stop(

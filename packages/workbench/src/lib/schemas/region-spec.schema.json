@@ -3,27 +3,12 @@
   "title": "Canvas global region spec",
   "description": "Authored Canvas global region format. Workbench normalizes this into an @json-render/react-compatible spec by synthesizing the canvas:component-tree root wrapper.",
   "type": "object",
-  "required": ["theme", "region", "elements"],
+  "required": ["elements"],
   "properties": {
     "$schema": {
       "type": "string",
       "minLength": 1,
       "description": "Optional JSON Schema reference for editor tooling."
-    },
-    "uuid": {
-      "type": "string",
-      "format": "uuid",
-      "description": "Region UUID. Used to match local regions with their remote counterparts."
-    },
-    "theme": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Theme machine name the region belongs to."
-    },
-    "region": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Region machine name within the theme."
     },
     "status": {
       "type": "boolean",
