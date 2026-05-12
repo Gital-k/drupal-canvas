@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\ComponentSource\ComponentInstanceUpdateAttemptResult;
-use Drupal\canvas\ComponentSource\ComponentInstanceUpdaterInterface;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
@@ -23,18 +21,7 @@ use Drupal\canvas\PropShape\StorablePropShape;
  *
  * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater
  */
-final class JsComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
-
-  /**
-   * {@inheritdoc}
-   */
-  public function isUpdateNeeded(ComponentTreeItem $component_instance): bool {
-    $component = $component_instance->getComponent();
-    if ($component === NULL) {
-      return FALSE;
-    }
-    return $component_instance->getComponentVersion() !== $component->getActiveVersion();
-  }
+final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComponentInstanceUpdater {
 
   /**
    * {@inheritdoc}
@@ -56,103 +43,74 @@ final class JsComponentInstanceUpdater implements ComponentInstanceUpdaterInterf
     if (!$this->isUpdateNeeded($component_instance)) {
       return ComponentInstanceUpdateAttemptResult::NotNeeded;
     }
+
+    // Pre-drop inputs that cannot be preserved as-is in the target version, then
+    // delegate to the parent flow for required default injection, slot cleanup,
+    // and version bump.
     $component = $component_instance->getComponent();
     \assert($component instanceof ComponentInterface);
     $from_version = $component_instance->getComponentVersion();
     $to_version = $component->getActiveVersion();
-    \assert($from_version !== $to_version);
-
     [$from_props, $to_props] = self::getPropDefinitions($component, $from_version, $to_version);
 
     $inputs = $component_instance->getInputs() ?? [];
-    $needs_input_update = FALSE;
-
-    // Remove inputs for props that don't exist in the active version. Removed?
-    $unknown_inputs = \array_diff_key($inputs, $to_props);
-    if (count($unknown_inputs) > 0) {
-      $inputs = \array_intersect_key($inputs, $to_props);
-      $needs_input_update = TRUE;
-    }
-
-    // Drop inputs for props whose shape changed. Data loss is accepted for JS
-    // components. Track which props were explicitly dropped so the default
-    // injection logic below can bypass the "was previously required" guard.
-    $explicitly_dropped = [];
+    $changed = FALSE;
     foreach (self::getShapeChangedPropNames($from_props, $to_props) as $prop_name) {
       if (\array_key_exists($prop_name, $inputs)) {
         unset($inputs[$prop_name]);
-        $explicitly_dropped[$prop_name] = TRUE;
-        $needs_input_update = TRUE;
+        $changed = TRUE;
       }
     }
 
-    // Validate the projected inputs against the target version's source to
-    // detect existing inputs that are invalid for the new version.
+    // @todo try to coerce values across compatible types.
     $target_source = $component->loadVersion($to_version)->getComponentSource();
-    $component_uuid = $component_instance->getUuid();
-    $violations = $target_source->validateComponentInput(
-      inputValues: $inputs,
-      component_instance_uuid: $component_uuid,
-      entity: NULL,
+    $invalid_prop_names = self::getInvalidPropNames(
+      $target_source->validateComponentInput(
+        inputValues: $inputs,
+        component_instance_uuid: $component_instance->getUuid(),
+        entity: NULL,
+      ),
+      $component_instance->getUuid(),
     );
-    $invalid_prop_names = [];
-    foreach ($violations as $violation) {
-      $path = $violation->getPropertyPath();
-      $prefix = "inputs.$component_uuid.";
-      if (str_starts_with($path, $prefix)) {
-        $invalid_prop_names[substr($path, \strlen($prefix))] = TRUE;
-      }
+    if (!empty($invalid_prop_names)) {
+      $inputs = \array_diff_key($inputs, \array_flip($invalid_prop_names));
+      $changed = TRUE;
     }
 
-    // Add default prop values for required props that are new, now required,
-    // invalid in the active version, or whose input was dropped due to a shape
-    // change.
-    foreach ($to_props as $prop_name => $def) {
-      if ($def['required'] !== TRUE ||
-          (\array_key_exists($prop_name, $inputs) && !isset($invalid_prop_names[$prop_name]))) {
-        continue;
-      }
-
-      if (isset($from_props[$prop_name]) && !isset($explicitly_dropped[$prop_name])) {
-        if (($from_props[$prop_name]['required'] === TRUE || isset($inputs[$prop_name])) && !isset($invalid_prop_names[$prop_name])) {
-          continue;
-        }
-      }
-
-      $default_explicit_input = $target_source->getDefaultExplicitInput();
-      \assert(\array_key_exists('value', $default_explicit_input[$prop_name]) && $default_explicit_input[$prop_name]['value'] !== NULL);
-      $inputs[$prop_name] = $default_explicit_input[$prop_name]['value'];
-      $needs_input_update = TRUE;
-    }
-
-    if ($needs_input_update) {
+    if ($changed) {
       $component_instance->setInput($inputs);
     }
 
-    $from_slots = $component->getSlotDefinitions($from_version);
-    $to_slots = $component->getSlotDefinitions($to_version);
-    $removed_slot_names = \array_keys(\array_diff_key($from_slots, $to_slots));
-    if (count($removed_slot_names) > 0) {
-      $component_tree_list = $component_instance->getParent();
-      \assert($component_tree_list instanceof ComponentTreeItemList);
-      $component_tree_list->filter(
-        static function (ComponentTreeItem $item) use (
-          $component_uuid,
-          $removed_slot_names
-        ): bool {
-          $slot = $item->getSlot();
-          return !($slot !== NULL && $item->getParentUuid(
-            ) === $component_uuid && \in_array(
-              $slot,
-              $removed_slot_names,
-              TRUE
-            ));
-        }
-      );
-    }
+    return parent::update($component_instance);
+  }
 
-    $component_instance->set('component_version', $to_version);
-    return ComponentInstanceUpdateAttemptResult::Latest;
+  /**
+   * Extracts top-level prop names with validation errors.
+   *
+   * @param iterable $violations
+   *   Constraint violations returned by validateComponentInput().
+   * @param string $component_instance_uuid
+   *   Component instance UUID.
+   *
+   * @return list<string>
+   *   Invalid top-level prop names.
+   */
+  private static function getInvalidPropNames(iterable $violations, string $component_instance_uuid): array {
+    $invalid_prop_names = [];
+    $prefix = "inputs.$component_instance_uuid.";
+    foreach ($violations as $violation) {
+      $path = $violation->getPropertyPath();
+      if (!str_starts_with($path, $prefix)) {
+        continue;
+      }
+      $relative_path = substr($path, \strlen($prefix));
+      if ($relative_path === '') {
+        continue;
+      }
+      $segments = explode('.', $relative_path);
+      $invalid_prop_names[$segments[0]] = TRUE;
+    }
+    return \array_keys($invalid_prop_names);
   }
 
   /**
@@ -200,19 +158,6 @@ final class JsComponentInstanceUpdater implements ComponentInstanceUpdaterInterf
         fieldInstanceSettings: $def['field_instance_settings'] ?? NULL,
       );
     }, $prop_field_definitions);
-  }
-
-  /**
-   * Gets prop field definitions for two versions of a Component config entity.
-   *
-   * @return array{array, array}
-   *   From-version definitions, then to-version definitions.
-   */
-  private static function getPropDefinitions(ComponentInterface $component, string $from_version, string $to_version): array {
-    return [
-      $component->getSettings($from_version)['prop_field_definitions'],
-      $component->getSettings($to_version)['prop_field_definitions'],
-    ];
   }
 
 }
