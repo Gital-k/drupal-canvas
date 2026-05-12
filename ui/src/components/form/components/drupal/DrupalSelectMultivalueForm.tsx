@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import ReactSelect, { components } from 'react-select';
 import { ChevronDownIcon, Cross2Icon } from '@radix-ui/react-icons';
 
@@ -6,7 +6,6 @@ import InputBehaviors from '@/components/form/inputBehaviors';
 import { a2p } from '@/local_packages/utils';
 
 import type {
-  ActionMeta,
   ClearIndicatorProps,
   DropdownIndicatorProps,
   MultiValue,
@@ -127,22 +126,7 @@ const DrupalSelectMultivalueForm = ({
   attributes = {},
   options = [],
 }: DrupalSelectMultivalueFormProps) => {
-  // Ref to the hidden native <select> element for form integration.
-  const nativeSelectRef = useRef<HTMLSelectElement | null>(null);
-
-  // Callback ref to capture the native select element after InputBehaviors wraps it.
   const hiddenSelectContainerRef = useRef<HTMLDivElement | null>(null);
-
-  // Find the native select within the InputBehaviors wrapper.
-  useEffect(() => {
-    if (hiddenSelectContainerRef.current) {
-      const selectElement =
-        hiddenSelectContainerRef.current.querySelector('select');
-      if (selectElement) {
-        nativeSelectRef.current = selectElement;
-      }
-    }
-  }, []);
 
   // Parse cardinality from attributes (-1 means unlimited, positive integer means limited).
   const cardinality = attributes['data-cardinality']
@@ -170,14 +154,11 @@ const DrupalSelectMultivalueForm = ({
    * Update the native select options and dispatch change event.
    * InputBehaviors' onChange handler (attached to the native select) will handle the rest.
    */
-  const handleChange = (
-    newValue: MultiValue<ReactSelectOption>,
-    actionMeta: ActionMeta<ReactSelectOption>,
-  ) => {
+  const handleChange = (newValue: MultiValue<ReactSelectOption>) => {
     // Update local state.
     setLocalSelectedValues([...newValue]);
 
-    const el = nativeSelectRef.current;
+    const el = hiddenSelectContainerRef.current?.querySelector('select');
     if (!el) return;
 
     // Update selected state on native select options.
