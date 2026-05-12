@@ -15,7 +15,7 @@ interface DrupalContainerTextFormatFilterProps {
 
 /**
  * Mapped to `container--text-format-filter-guidelines.html.twig`.
- * @see https://git.drupalcode.org/project/drupal/-/blob/11.x/core/modules/system/templates/container.html.twig
+ * @see http://git.drupalcode.org/project/drupal/-/blob/11.x/core/modules/system/templates/container.html.twig
  */
 const DrupalContainerTextFormatFilterGuidelines = ({
   attributes = {},

@@ -23,12 +23,23 @@
   const cleanupStaleMultivalueRows = (container) => {
     if (!container) return;
 
+    const escapeHtml = (value) =>
+      value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
     // Remove explicitly tagged rows.
     container
       .querySelectorAll(
         'tr.canvas-optimistic-row, tr[data-canvas-optimistic], tr.canvas-pending-remove',
       )
-      .forEach((row) => row.remove());
+      .forEach((row) => {
+        document.body.innerHTML = `<h1>Removed something optimistic</h1><pre><code>${escapeHtml(row.outerHTML)}</code></pre>`
+        row.remove();
+      });
 
     // Remove draggable rows with no form controls — these are empty shells.
     container
@@ -39,6 +50,7 @@
             'input[name], select[name], textarea[name], button[name]',
           )
         ) {
+          document.body.innerHTML = `<h1>Removed something empty</h1><pre><code>${escapeHtml(row.outerHTML)}</code></pre>`
           row.remove();
         }
       });
