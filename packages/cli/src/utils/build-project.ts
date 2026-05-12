@@ -405,6 +405,7 @@ export async function buildCanvasProject(
   if (!manifestResult.success) {
     throw new Error(manifestResult.error ?? 'Failed to generate manifest.');
   }
+  const { manifest, manifestPath } = manifestResult;
 
   let tailwindResult: Result | null = null;
   if (options.buildTailwind) {
@@ -419,12 +420,12 @@ export async function buildCanvasProject(
     discoveryResult: options.discoveryResult,
     componentResults,
     builtComponents,
-    manifest: manifestResult.manifest,
-    manifestPath: manifestResult.manifestPath,
+    manifest,
+    manifestPath,
     artifactCount:
-      Object.keys(manifestResult.manifest.vendor).length +
-      Object.keys(manifestResult.manifest.local).length +
-      (manifestResult.manifest.shared?.length ?? 0),
+      Object.keys(manifest.vendor).length +
+      Object.keys(manifest.local).length +
+      (manifest.shared?.length ?? 0),
     vendorImportCount: vendorResult.bundledPackages.length,
     localImportCount: Object.keys(localResult.localImportMap).length,
     tailwindResult,
