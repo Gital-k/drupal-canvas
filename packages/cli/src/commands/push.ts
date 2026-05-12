@@ -46,6 +46,7 @@ import { reportResults } from '../utils/report-results';
 import { createProgressCallback, processInPool } from '../utils/request-pool';
 import { validateContentTemplates } from '../utils/validate-content-template';
 import { validatePages } from '../utils/validate-page';
+import { validateRegions } from '../utils/validate-region';
 
 import type { Command } from 'commander';
 import type { ApiService } from '../services/api.js';
@@ -927,6 +928,31 @@ export function pushCommand(program: Command): void {
 
         // Validate and push global regions.
         if (discoveredRegions.length > 0) {
+          const regionValidationSpinner = p.spinner();
+          regionValidationSpinner.start(
+            `Validating ${discoveredRegions.length} global ${pluralize(discoveredRegions.length, 'region')}`,
+          );
+
+          const { results: regionValidationResults } =
+            await validateRegions(discoveryResult);
+
+          regionValidationSpinner.stop(
+            chalk.green(
+              `Validated ${discoveredRegions.length} global ${pluralize(discoveredRegions.length, 'region')}`,
+            ),
+          );
+
+          if (regionValidationResults.some((r) => !r.success)) {
+            reportResults(
+              regionValidationResults,
+              'Global region validation results',
+              'Global region',
+            );
+            throw new Error(
+              'Global region validation failed. Fix the errors above before pushing.',
+            );
+          }
+
           const componentVersions = await apiService.listComponentVersions();
 
           const regionPrepSpinner = p.spinner();
