@@ -196,11 +196,20 @@ test.describe('Multivalue Prop Types', () => {
 
     await expect(textField.locator('tr.draggable')).toHaveCount(1);
 
-    // Add a new rows and populate their values.
-    // @todo we should actually be using canvas.addMultiValueProp, but it will
-    // fail due to a legitimate bug: https://drupal.org/i/3587472
-    await textField.getByRole('button', { name: '+ Add new' }).click();
+    // Add a new row.
+    await canvas.addMultiValueProp('Text (Unlimited)');
     await expect(textField.locator('tr.draggable')).toHaveCount(2);
+
+    await expect(
+      textField
+        .locator('tr.draggable [data-canvas-multivalue-label="true"]')
+        .nth(1),
+    ).not.toContainText('Sample Text');
+    await expect(
+      textField
+        .locator('tr.draggable [data-canvas-multivalue-label="true"]')
+        .nth(1),
+    ).toHaveText('Empty');
     await canvas.editMultiValueProp(
       'Text (Unlimited)',
       'Hello, world!',
