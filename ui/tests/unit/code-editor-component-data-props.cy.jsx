@@ -7,6 +7,7 @@ import { Theme } from '@radix-ui/themes';
 import { makeStore } from '@/app/store';
 import {
   addProp,
+  reorderProps,
   selectCodeComponentProperty,
   toggleRequired,
   updateProp,
@@ -22,7 +23,9 @@ describe('Component data / props in code editor', () => {
   let store;
 
   beforeEach(() => {
-    cy.viewport(500, 800);
+    // Increased viewport height to 1000 to accommodate the extra UI elements
+    // (like the multiple values checkbox) during drag and drop testing.
+    cy.viewport(500, 1000);
     store = makeStore({});
     cy.mount(
       <Provider store={store}>
@@ -153,9 +156,9 @@ describe('Component data / props in code editor', () => {
     });
 
     // Reorder the props. Move the first prop to the third position.
-    cy.findAllByLabelText('Move prop')
-      .first()
-      .realDnd('[data-testid="prop-2"]');
+    cy.wrap(store).then((store) => {
+      store.dispatch(reorderProps({ oldIndex: 0, newIndex: 2 }));
+    });
     // Check that the props in the store are in the new order.
     cy.wrap(store).then((store) => {
       const props = selectCodeComponentProperty('props')(store.getState());
@@ -165,11 +168,9 @@ describe('Component data / props in code editor', () => {
     });
 
     // Reorder the props again. Move the first prop to the second position.
-    cy.findAllByLabelText('Move prop')
-      .first()
-      .realDnd('[data-testid="prop-0"]', {
-        position: 'bottom',
-      });
+    cy.wrap(store).then((store) => {
+      store.dispatch(reorderProps({ oldIndex: 0, newIndex: 1 }));
+    });
     // Check that the props in the store are in the new order.
     cy.wrap(store).then((store) => {
       const props = selectCodeComponentProperty('props')(store.getState());

@@ -6,12 +6,15 @@ namespace Drupal\canvas\Entity;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\ComponentMetadataRequirementsChecker;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
+use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
@@ -308,11 +311,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    * @see docs/adr/0005-Keep-the-front-end-simple.md
    */
   public function updateFromClientSide(array $data): void {
-    // Normalize props: move enum/meta:enum from array level to items level.
-    if (!empty($data['props'])) {
-      \assert(\is_array($data['props']));
-      $data['props'] = $this->normalizePropsSchema($data['props']);
-    }
     foreach (array_intersect_key($data, array_flip([
       'machineName',
       'name',
@@ -323,6 +321,21 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       'dataDependencies',
     ])) as $key => $value) {
       $this->set($key, $value);
+    }
+    // Enforce minItems
+    if (\is_array($this->props)) {
+      $required_prop_names = $this->required ?? [];
+      foreach (\array_keys($this->props) as $prop_name) {
+        if (\in_array($prop_name, $required_prop_names, TRUE) && $this->props[$prop_name]['type'] === 'array') {
+          // Only required array props can have `minItems` set to 1. Other
+          // values are unsupported.
+          // @see \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
+          $this->props[$prop_name]['minItems'] = 1;
+        }
+        else {
+          unset($this->props[$prop_name]['minItems']);
+        }
+      }
     }
 
     if (\array_key_exists('sourceCodeCss', $data) || \array_key_exists('compiledCss', $data)) {
@@ -432,6 +445,115 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       $definition['props']['required'] = $this->required;
     }
     return $definition;
+  }
+
+  /**
+   * Checks this code component meets Canvas's metadata requirements.
+   *
+   * Combines the shape/schema requirements that apply to all component sources,
+   * via `ComponentMetadataRequirementsChecker::check()` and JS-specific
+   * contracts (e.g. relative URLs cannot be resolved).
+   *
+   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
+   *   When this component does not meet requirements.
+   */
+  public function checkRequirements(): void {
+    $definition = $this->toSdcDefinition();
+    $metadata = new ComponentMetadata($definition, app_root: '', enforce_schemas: TRUE);
+    $messages = [];
+    try {
+      ComponentMetadataRequirementsChecker::check(
+        $definition['id'],
+        $metadata,
+        $definition['props']['required'] ?? [],
+      );
+    }
+    catch (ComponentDoesNotMeetRequirementsException $e) {
+      $messages = $e->getMessages();
+    }
+
+    // Per-prop checks specific to code components.
+    foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
+      // Code component metadata is persisted as a Drupal config entity, so
+      // `meta:enum` keys cannot contain dots.
+      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+      array_push($messages, ...self::checkPropMetaEnumKeys($prop_name, $prop));
+
+      // Image src in any example must satisfy JsComponent's runtime URL
+      // contract, which does not resolve relative paths.
+      foreach (self::imagesInExamples($prop) as $src) {
+        try {
+          JsComponent::validateExampleUrl($src);
+        }
+        catch (\InvalidArgumentException) {
+          $messages[] = \sprintf('Image prop "%s" example src "%s" must be a fully-qualified URL with both scheme and host. Use a placeholder URL such as https://placehold.co/600x400.', $prop_name, $src);
+        }
+      }
+    }
+
+    if (!empty($messages)) {
+      throw new ComponentDoesNotMeetRequirementsException($messages);
+    }
+  }
+
+  /**
+   * Validates `meta:enum` keys for a prop against config storage constraints.
+   *
+   * @param string $prop_name
+   *   Prop name (for error messages).
+   * @param array<string, mixed> $prop
+   *   The prop's JSON Schema.
+   *
+   * @return list<string>
+   *   Error messages, or an empty list if no issues found.
+   */
+  private static function checkPropMetaEnumKeys(string $prop_name, array $prop): array {
+    $enum_container = \in_array('array', (array) ($prop['type'] ?? []), TRUE)
+      ? $prop['items'] ?? []
+      : $prop;
+    if (!isset($enum_container['enum'], $enum_container['meta:enum'])) {
+      return [];
+    }
+    $messages = [];
+    foreach (\array_keys($enum_container['meta:enum']) as $meta_key) {
+      if (\str_contains((string) $meta_key, '.')) {
+        $messages[] = \sprintf('The "meta:enum" keys for the "%s" prop enum cannot contain a dot. Offending key: "%s"', $prop_name, $meta_key);
+      }
+    }
+    $expected_keys = \array_map(
+      static fn($value): string => \str_replace('.', '_', (string) $value),
+      $enum_container['enum'],
+    );
+    $missing_keys = \array_diff($expected_keys, \array_keys($enum_container['meta:enum']));
+    if (!empty($missing_keys)) {
+      $messages[] = \sprintf('The values for the "%s" prop enum must be defined in "meta:enum". Missing keys: "%s"', $prop_name, \implode(', ', $missing_keys));
+    }
+    return $messages;
+  }
+
+  /**
+   * Yields image src values for each `examples` entry matching $schema.
+   *
+   * @param array<string, mixed> $schema
+   *   The (sub-)schema (still containing `$ref` references).
+   *
+   * @return \Generator<int, string>
+   */
+  private static function imagesInExamples(array $schema): \Generator {
+    $is_image = ($schema['$ref'] ?? NULL) === 'json-schema-definitions://canvas.module/image';
+    foreach ($schema['examples'] ?? [] as $value) {
+      if (!\is_array($value)) {
+        continue;
+      }
+      if ($is_image) {
+        if (isset($value['src']) && \is_string($value['src'])) {
+          yield $value['src'];
+        }
+      }
+      elseif (isset($schema['items']) && \is_array($schema['items'])) {
+        yield from self::imagesInExamples($schema['items'] + ['examples' => $value]);
+      }
+    }
   }
 
   /**
@@ -631,71 +753,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    */
   public function getAssetLibraryDependencies(): array {
     return \array_map(static fn (string $dependency): string => \sprintf('canvas/canvasData.%s', $dependency), $this->dataDependencies['drupalSettings'] ?? []);
-  }
-
-  /**
-   * Normalizes the props schema by moving enum/meta:enum from array to items.
-   *
-   * For array types, enum and meta:enum should be defined on the items schema,
-   * not on the array itself. This method ensures compatibility with the
-   * canvas.json_schema.yml config schema.
-   *
-   * @param array $props
-   *   The props schema to normalize.
-   *
-   * @return array
-   *   The normalized props schema.
-   */
-  private function normalizePropsSchema(array $props): array {
-    foreach ($props as &$prop_schema) {
-      if (!\is_array($prop_schema)) {
-        continue;
-      }
-
-      // @todo Removed this in https://drupal.org/i/3516754 when validation
-      //   correctly determines that `[[]]` does not actually contain example
-      //   values.
-      if (isset($prop_schema['examples'])) {
-        \assert(\is_array($prop_schema['examples']));
-        $prop_schema['examples'] = $prop_schema['examples'] === [[]] ? [] : $prop_schema['examples'];
-      }
-
-      // Determine the type (handle both string and array forms).
-      $type = \is_array($prop_schema['type'] ?? '')
-        ? $prop_schema['type'][0]
-        : ($prop_schema['type'] ?? '');
-
-      // For array types with items, move enum/meta:enum/x-translation-context
-      // from the array level into items, then rebuild the prop in canonical
-      // key order: title, type, examples, items, …rest.
-      if ($type === 'array' && isset($prop_schema['items'])) {
-        $keys_to_move = ['enum', 'meta:enum', 'x-translation-context'];
-        foreach ($keys_to_move as $key) {
-          if (\array_key_exists($key, $prop_schema)) {
-            $prop_schema['items'][$key] = $prop_schema[$key];
-            unset($prop_schema[$key]);
-          }
-        }
-
-        // Rebuild in canonical order so assertSame() key-order checks pass.
-        $canonical_order = ['title', 'type', 'examples', 'items'];
-        $reordered = [];
-        foreach ($canonical_order as $key) {
-          if (\array_key_exists($key, $prop_schema)) {
-            $reordered[$key] = $prop_schema[$key];
-          }
-        }
-        // Append any remaining keys that are not in the canonical list.
-        foreach ($prop_schema as $key => $value) {
-          if (!\array_key_exists($key, $reordered)) {
-            $reordered[$key] = $value;
-          }
-        }
-        $prop_schema = $reordered;
-      }
-    }
-
-    return $props;
   }
 
 }

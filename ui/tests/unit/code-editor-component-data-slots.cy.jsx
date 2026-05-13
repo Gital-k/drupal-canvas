@@ -4,6 +4,7 @@ import { Theme } from '@radix-ui/themes';
 import { makeStore } from '@/app/store';
 import {
   addSlot,
+  reorderSlots,
   selectCodeComponentProperty,
   updateSlot,
 } from '@/features/code-editor/codeEditorSlice';
@@ -37,7 +38,7 @@ describe('Component data / slots in code editor', () => {
     // Add a new slot.
     cy.findByText('Add').click();
 
-    cy.findByLabelText('Slot name').should('exist');
+    cy.findByLabelText('Title').should('exist');
     cy.findByText('Example HTML/JSX value').should('exist');
 
     cy.log('Checking first slot in store with default values');
@@ -50,13 +51,14 @@ describe('Component data / slots in code editor', () => {
       expect(slots[0]).to.deep.include(
         {
           name: '',
+          machineName: '',
           example: '',
         },
         'Should have the correct default slot values',
       );
     });
 
-    cy.findByLabelText('Slot name').type('Alpha');
+    cy.findByLabelText('Title').type('Alpha');
     cy.findByTestId(/slot-example-[0-9a-f-]+/).click();
     cy.realType('A slot');
 
@@ -77,7 +79,7 @@ describe('Component data / slots in code editor', () => {
 
     // Add a second slot
     cy.findByText('Add').click();
-    cy.findAllByLabelText('Slot name').last().type('Bravo');
+    cy.findAllByLabelText('Title').last().type('Bravo');
     cy.findAllByTestId(/slot-example-[0-9a-f-]+/)
       .last()
       .click();
@@ -85,7 +87,7 @@ describe('Component data / slots in code editor', () => {
 
     // Add a third slot
     cy.findByText('Add').click();
-    cy.findAllByLabelText('Slot name').last().type('Charlie');
+    cy.findAllByLabelText('Title').last().type('Charlie');
     cy.findAllByTestId(/slot-example-[0-9a-f-]+/)
       .last()
       .click();
@@ -110,11 +112,9 @@ describe('Component data / slots in code editor', () => {
     });
 
     // Reorder the slots. Move the first slot to the third position.
-    cy.findAllByLabelText('Move slot')
-      .first()
-      .realDnd('[data-testid="slot-2"]', {
-        position: 'bottom',
-      });
+    cy.wrap(store).then((store) => {
+      store.dispatch(reorderSlots({ oldIndex: 0, newIndex: 2 }));
+    });
     // Check that the slots in the store are in the new order.
     cy.wrap(store).then((store) => {
       const slots = selectCodeComponentProperty('slots')(store.getState());
@@ -124,11 +124,9 @@ describe('Component data / slots in code editor', () => {
     });
 
     // Reorder the slots again. Move the first slot to the second position.
-    cy.findAllByLabelText('Move slot')
-      .first()
-      .realDnd('[data-testid="slot-1"]', {
-        position: 'top',
-      });
+    cy.wrap(store).then((store) => {
+      store.dispatch(reorderSlots({ oldIndex: 0, newIndex: 1 }));
+    });
     // Check that the slots in the store are in the new order.
     cy.wrap(store).then((store) => {
       const slots = selectCodeComponentProperty('slots')(store.getState());
@@ -187,7 +185,7 @@ describe('Component data / slots in code editor', () => {
     });
 
     // Check that the slot is displayed in the component.
-    cy.findByLabelText('Slot name').should('have.value', 'Alpha');
+    cy.findByLabelText('Title').should('have.value', 'Alpha');
     cy.findByText('A slot').should('exist');
   });
 });

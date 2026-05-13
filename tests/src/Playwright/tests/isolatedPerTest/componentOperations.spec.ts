@@ -122,16 +122,12 @@ test.describe('Perform CRUD operations on components', () => {
         '[data-component-id="canvas_test_sdc:my-hero"] h1',
       ),
     ).toContainText('There goes my hero');
+    await expect(page.getByText('The main heading of the hero')).toHaveCount(1);
     await expect(
-      await page.getByText('The main heading of the hero').count(),
-    ).toEqual(1);
-    await expect(
-      await page
-        .getByText('Start typing the title of a piece of content', {
-          exact: false,
-        })
-        .count(),
-    ).toEqual(0);
+      page.getByText('Start typing the title of a piece of content', {
+        exact: false,
+      }),
+    ).toHaveCount(0);
   });
 
   test('Renders markup in prop descriptions including links with quoted href', async ({
@@ -182,9 +178,9 @@ test.describe('Perform CRUD operations on components', () => {
 
     // Refresh the page.
     await page.reload();
-    await expect(
-      await page.getByLabel('Heading', { exact: true }),
-    ).not.toHaveValue('There goes my hero');
+    await expect(page.getByLabel('Heading', { exact: true })).not.toHaveValue(
+      'There goes my hero',
+    );
     await expect(
       (await canvas.getActivePreviewFrame()).locator(
         '[data-component-id="canvas_test_sdc:my-hero"] h1',
@@ -210,7 +206,58 @@ test.describe('Perform CRUD operations on components', () => {
     ).toHaveAttribute('href', /drupal\.org/);
   });
 
-  test('Can delete component with delete key', async ({ drupal, canvas }) => {
+  test('Can handle empty required formatted body prop', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.login({ username: 'editor', password: 'editor' });
+    await canvas.openCanvas(await canvas.createCanvas());
+    await canvas.openLibraryPanel();
+    await canvas.addComponent({
+      id: 'sdc.canvas_test_sdc.required-formatted-body',
+    });
+
+    const contextualForm =
+      '[data-testid="canvas-contextual-panel"] [data-drupal-selector="component-instance-form"]';
+
+    const previewFrame = await canvas.getActivePreviewFrame();
+    await expect(
+      previewFrame.getByText('Example', { exact: true }),
+    ).toBeVisible();
+
+    const bodyEditable = page.locator(
+      `${contextualForm} .field--name-body .ck-editor__editable`,
+    );
+    await expect(bodyEditable).toBeVisible();
+    await bodyEditable.click();
+    await bodyEditable.fill('');
+    await page
+      .locator(`${contextualForm} .field--name-body`)
+      .locator('label.js-form-required')
+      .click();
+
+    await expect(
+      (await canvas.getActivePreviewFrame()).getByText('Example'),
+    ).toHaveCount(0);
+
+    await page.reload();
+
+    await expect(
+      page.locator(`${contextualForm} .field--name-body textarea`),
+    ).toHaveValue('');
+    await expect(
+      (await canvas.getActivePreviewFrame()).getByText('Example'),
+    ).toHaveCount(0);
+  });
+
+  // Assertions are made in the helper functions.
+  // eslint-disable-next-line playwright/expect-expect
+  test('Can delete component with delete key', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.openCanvas(await canvas.createCanvas());
     await canvas.openLibraryPanel();
@@ -333,11 +380,14 @@ test.describe('Perform CRUD operations on components', () => {
     // would revert the preview to earlier values.
     await page.getByLabel('CTA 2 text', { exact: true }).click();
 
-    // To make this a test that will fail without the fix present, but pass with
-    // the fix in place, we need a fixed value wait here so that there's enough time
-    // for the problem to appear in the preview. The correct contents will be asserted after this.
-    // Wait 1000ms
-    await page.waitForTimeout(1000);
+    // Wait for network idle before asserting. Typing in a Drupal entity-reference
+    // autocomplete triggers an AJAX request; blurring the field cancels or completes
+    // it. The bug (#3519734) caused the AJAX response (or its cancellation handler)
+    // to revert the component state. By waiting until there are no in-flight requests
+    // we give any such side-effects time to run, so the assertions below will catch
+    // a revert if the fix were absent, without relying on an arbitrary timeout.
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
 
     // Assert the preview still has the correct values
     await expect(

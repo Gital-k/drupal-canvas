@@ -449,6 +449,12 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
    *   b. WITHOUT backwards compatibility layer (or: hard BC break)
    * 3. post-update (after update path has been applied)
    *
+   * TRICKY: post-update, config-defined component trees that contain block
+   * component instances may be ordered differently than content-defined ones.
+   * This is due to the order in config schema: `label` and `label_display` are
+   * listed first, because `type: block.settings.<plugin ID>` inherits them from
+   * `type: block_settings`.
+   *
    * At all times should the component tree MUST continue to render, in the
    * worst case it should fall back to a fallback message informing the user of
    * render failure.
@@ -464,7 +470,8 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     array $expected_mid_update_markup_bc_break,
     array $expected_post_update_markup,
     array $expected_post_update_violations,
-    array $expected_post_update_component_tree,
+    array $expected_post_update_content_defined_component_tree,
+    array|false $expected_post_update_config_defined_component_tree,
   ): void {
     // A content-defined component tree.
     $page = Page::create([
@@ -489,13 +496,13 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     // updated settings config schema.
     // @see ::testBlockPluginUpdateConsequences()
     self::assertCount(1, Component::load('block.canvas_test_block_input_schema_change_poc')?->getVersions() ?? []);
-    $old_version = Component::load('block.canvas_test_block_input_schema_change_poc')?->getActiveVersion();
+    $old_version = Component::load('block.canvas_test_block_input_schema_change_poc')->getActiveVersion();
     \Drupal::state()->set('canvas_test_block.allow_hook_block_alter', TRUE);
     $original_service_cache_config = $this->container->get('cache.config');
     $original_service_config_factory = $this->container->get(ConfigFactoryInterface::class);
     $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_block_simulate_input_schema_change']);
-    self::assertCount(2, Component::load('block.canvas_test_block_input_schema_change_poc')?->getVersions());
-    $new_version = Component::load('block.canvas_test_block_input_schema_change_poc')?->getActiveVersion();
+    self::assertCount(2, Component::load('block.canvas_test_block_input_schema_change_poc')->getVersions());
+    $new_version = Component::load('block.canvas_test_block_input_schema_change_poc')->getActiveVersion();
 
     // MID-update: AFTER the module update, BEFORE applying an update path: the
     // component tree contains instances with explicit inputs that are now
@@ -567,7 +574,7 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     // 2. contains exactly the expected values
     // 3. renders the expected markup.
     self::assertEntityIsValid($page);
-    self::assertSame($expected_post_update_component_tree, \array_map(
+    self::assertSame($expected_post_update_content_defined_component_tree, \array_map(
       function (ComponentTreeItem $item): array {
         $array = array_filter($item->toArray());
         \assert(\array_key_exists('inputs', $array));
@@ -620,7 +627,7 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     // 2. contains exactly the expected values
     // 3. renders the expected markup.
     self::assertEntityIsValid($pattern);
-    self::assertSame($expected_post_update_component_tree, \array_map(
+    self::assertSame($expected_post_update_config_defined_component_tree ?: $expected_post_update_content_defined_component_tree, \array_map(
       function (ComponentTreeItem $item): array {
         $array = array_filter($item->toArray());
         $array['inputs'] = json_decode($array['inputs'], TRUE);

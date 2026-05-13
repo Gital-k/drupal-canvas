@@ -28,15 +28,11 @@ final class ComponentMetadataRequirementsChecker {
    *   Component metadata.
    * @param string[] $required_props
    *   Array of required prop names.
-   * @param array<string, string> $forbidden_key_characters
-   *   Array of forbidden key characters as keys and replacements as values.
-   *   For example, component metadata stored as Configuration entities does not
-   *   allow dots.
    *
    * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
    *   When the component does not meet requirements.
    */
-  public static function check(string $component_id, ComponentMetadata $metadata, array $required_props, array $forbidden_key_characters): void {
+  public static function check(string $component_id, ComponentMetadata $metadata, array $required_props): void {
     $messages = [];
 
     if ($metadata->group == 'Elements') {
@@ -64,13 +60,31 @@ final class ComponentMetadataRequirementsChecker {
       }
 
       // For array types, also check enum in items.
-      if (\in_array('array', $prop['type'], TRUE) && isset($prop['items']['enum']) && \in_array('', $prop['items']['enum'], TRUE)) {
+      $is_array_prop_type = \in_array('array', $prop['type'], TRUE);
+      if ($is_array_prop_type && isset($prop['items']['enum']) && \in_array('', $prop['items']['enum'], TRUE)) {
         $messages[] = \sprintf('Prop "%s" has an empty enum value in items.', $prop_name);
       }
 
       // Required props must have examples.
-      if (\in_array($prop_name, $required_props, TRUE) && !isset($prop['examples'][0])) {
+      $is_required_prop = \in_array($prop_name, $required_props, TRUE);
+      if ($is_required_prop && !isset($prop['examples'][0])) {
         $messages[] = \sprintf('Prop "%s" is required, but does not have example value', $prop_name);
+      }
+
+      // Required array ("multiple cardinality") props must have `minItems: 1`.
+      // JSON Schema's `required` keyword only means that the key must be
+      // present, but it does not enforce that an array cannot be empty (`[]`).
+      // That would make a required multiple-cardinality prop meaningless for a
+      // content author: no values would be required.
+      // To align with Content Author expectations, every required `type: array`
+      // prop must hence also have `minItems: 1`. This also happens to align
+      // exactly with Drupal's Field API semantics for a "required" field.
+      if ($is_array_prop_type && $is_required_prop && (!\array_key_exists('minItems', $prop) || $prop['minItems'] < 1)) {
+        $messages[] = \sprintf('Multiple-cardinality prop "%s" is required, but does not specify `minItems: 1`.', $prop_name);
+      }
+      // `minItems` only ever makes sense for required props.
+      if ($is_array_prop_type && !$is_required_prop && \array_key_exists('minItems', $prop)) {
+        $messages[] = \sprintf('Multiple-cardinality prop "%s" specifies `minItems`, but is not required. Only required multiple-cardinality props can specify `minItems`.', $prop_name);
       }
 
       // JSON Schema does not require that examples must be valid, but we do
@@ -105,7 +119,7 @@ final class ComponentMetadataRequirementsChecker {
       // that IF `maxItems` is specified, it is >1. Because a single-value array
       // would be a pointless (array) wrapper for a component prop. (And `0` for
       // an empty array would make even less sense, let alone negative numbers.)
-      if (\in_array('array', $prop['type'], TRUE) && \array_key_exists('maxItems', $prop) && $prop['maxItems'] < 2) {
+      if ($is_array_prop_type && \array_key_exists('maxItems', $prop) && $prop['maxItems'] < 2) {
         $messages[] = \sprintf('The "maxItems" restriction on arrays (if set) must be at least 2, but got %d on prop "%s". Use a non-array type for single-value props.', $prop['maxItems'], $prop_name);
       }
 
@@ -122,33 +136,6 @@ final class ComponentMetadataRequirementsChecker {
       // Every prop must have a title.
       if (!isset($prop['title'])) {
         $messages[] = \sprintf('Prop "%s" must have title', $prop_name);
-      }
-
-      $enum_container = \in_array('array', $prop['type'], TRUE) ?
-        $prop['items'] ?? [] :
-        $prop;
-      if (isset($enum_container['enum'], $enum_container['meta:enum']) && !empty($forbidden_key_characters)) {
-        foreach ($enum_container['meta:enum'] as $meta_key => $meta_value) {
-          $meta_key_with_replacements = str_replace(
-            \array_keys($forbidden_key_characters),
-            array_values($forbidden_key_characters),
-            (string) $meta_key,
-          );
-          if ((string) $meta_key !== $meta_key_with_replacements) {
-            $messages[] = \sprintf('The "meta:enum" keys for the "%s" prop enum cannot contain a dot. Offending key: "%s"', $prop_name, $meta_key);
-          }
-        }
-
-        // Ensure we replace dots with underscores when checking meta:enums.
-        $meta_enum_valid_keys = \array_map(fn($key) => str_replace(
-          \array_keys($forbidden_key_characters),
-          array_values($forbidden_key_characters),
-          (string) $key,
-        ), $enum_container['enum']);
-        $enum_keys_diff = \array_diff($meta_enum_valid_keys, \array_keys($enum_container['meta:enum']));
-        if (!empty($enum_keys_diff)) {
-          $messages[] = \sprintf('The values for the "%s" prop enum must be defined in "meta:enum". Missing keys: "%s"', $prop_name, \implode(', ', $enum_keys_diff));
-        }
       }
     }
 
