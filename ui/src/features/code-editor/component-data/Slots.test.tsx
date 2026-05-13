@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -108,6 +109,57 @@ describe('Slots', () => {
       expect(
         selectCodeComponentProperty('slots')(store.getState())[0].machineName,
       ).toBe('main_body');
+    });
+
+    describe('machine name format validation', () => {
+      const INVALID_MESSAGE =
+        'Use letters, numbers and underscores only. Must start with a letter or underscore.';
+
+      it('does not show the format error while typing (only on blur)', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+      });
+
+      it('shows the format error after blurring an invalid value', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        fireEvent.blur(machineNameInput);
+        expect(await screen.findByText(INVALID_MESSAGE)).toBeInTheDocument();
+      });
+
+      it('clears the format error once the value becomes valid', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        fireEvent.blur(machineNameInput);
+        expect(await screen.findByText(INVALID_MESSAGE)).toBeInTheDocument();
+
+        await userEvent.clear(machineNameInput);
+        await userEvent.type(machineNameInput, 'good_one');
+        await waitFor(() => {
+          expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+        });
+      });
+
+      it('shows the top-level callout when any slot has an invalid machine name', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, 'bad-name');
+        expect(
+          screen.getByText(/one or more slots have an invalid machine name/i),
+        ).toBeInTheDocument();
+      });
     });
 
     it('reorders slots', async () => {

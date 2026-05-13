@@ -12,12 +12,16 @@ import {
 import {
   deserializeProps,
   deserializeSlots,
+  filterRequiredAgainstSerializedProps,
   formatToValidImportName,
   getDuplicatePropSchemaKeys,
   getDuplicateSlotSchemaKeys,
+  getInvalidMachineNamePropIds,
+  getInvalidMachineNameSlotIds,
   getPropSchemaKey,
   getPropValuesForPreview,
   getSlotSchemaKey,
+  isValidMachineName,
   serializeProps,
   serializeSlots,
 } from '@/features/code-editor/utils/utils';
@@ -608,6 +612,106 @@ describe('Prop/slot schema keys and round-trip (machine name)', () => {
     expect(deser.name).toBe('Body copy');
     expect(deser.machineName).toBe('body_copy');
     expect(deser.example).toBe('<p>x</p>');
+  });
+});
+
+describe('Machine name validation', () => {
+  const baseProp = {
+    type: 'string',
+    derivedType: 'text',
+    example: '',
+    name: '',
+  };
+  const baseSlot = { name: '' };
+
+  describe('isValidMachineName', () => {
+    it('treats empty and whitespace-only as valid (means "derive from title")', () => {
+      expect(isValidMachineName('')).toBe(true);
+      expect(isValidMachineName('   ')).toBe(true);
+      expect(isValidMachineName(undefined)).toBe(true);
+      expect(isValidMachineName(null)).toBe(true);
+    });
+
+    it('accepts identifiers starting with a letter', () => {
+      expect(isValidMachineName('foo')).toBe(true);
+      expect(isValidMachineName('fooBar')).toBe(true);
+      expect(isValidMachineName('FOO_BAR_99')).toBe(true);
+    });
+
+    it('accepts identifiers starting with an underscore', () => {
+      expect(isValidMachineName('_foo')).toBe(true);
+      expect(isValidMachineName('__private')).toBe(true);
+    });
+
+    it('rejects identifiers starting with a digit', () => {
+      expect(isValidMachineName('1foo')).toBe(false);
+      expect(isValidMachineName('123')).toBe(false);
+    });
+
+    it('rejects identifiers containing disallowed characters', () => {
+      expect(isValidMachineName('foo-bar')).toBe(false);
+      expect(isValidMachineName('foo bar')).toBe(false);
+      expect(isValidMachineName('foo.bar')).toBe(false);
+      expect(isValidMachineName('foo@bar')).toBe(false);
+    });
+  });
+
+  describe('getInvalidMachineNamePropIds', () => {
+    it('returns the ids of only invalid props', () => {
+      const props = [
+        { id: 'a', machineName: 'goodOne', ...baseProp },
+        { id: 'b', machineName: '1bad', ...baseProp },
+        { id: 'c', machineName: '', ...baseProp },
+        { id: 'd', machineName: 'has space', ...baseProp },
+      ];
+      expect(getInvalidMachineNamePropIds(props)).toEqual(['b', 'd']);
+    });
+
+    it('returns an empty array when all are valid', () => {
+      const props = [
+        { id: 'a', machineName: 'foo', ...baseProp },
+        { id: 'b', machineName: '', ...baseProp },
+      ];
+      expect(getInvalidMachineNamePropIds(props)).toEqual([]);
+    });
+  });
+
+  describe('getInvalidMachineNameSlotIds', () => {
+    it('returns the ids of only invalid slots', () => {
+      const slots = [
+        { id: 'a', machineName: 'good', ...baseSlot },
+        { id: 'b', machineName: '9bad', ...baseSlot },
+      ];
+      expect(getInvalidMachineNameSlotIds(slots)).toEqual(['b']);
+    });
+  });
+});
+
+describe('filterRequiredAgainstSerializedProps', () => {
+  it('drops keys that are not in serialized props', () => {
+    const serialized = { foo: {}, bar: {} };
+    expect(
+      filterRequiredAgainstSerializedProps(['foo', 'missing'], serialized),
+    ).toEqual(['foo']);
+  });
+
+  it('returns input unchanged when all keys are present', () => {
+    const serialized = { foo: {}, bar: {} };
+    expect(
+      filterRequiredAgainstSerializedProps(['foo', 'bar'], serialized),
+    ).toEqual(['foo', 'bar']);
+  });
+
+  it('returns an empty array when none of the keys are present', () => {
+    expect(
+      filterRequiredAgainstSerializedProps(['foo'], {}),
+    ).toEqual([]);
+  });
+
+  it('returns an empty array when required is empty', () => {
+    expect(
+      filterRequiredAgainstSerializedProps([], { foo: {} }),
+    ).toEqual([]);
   });
 });
 

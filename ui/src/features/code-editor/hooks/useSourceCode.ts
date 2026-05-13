@@ -36,6 +36,8 @@ import {
   detectValidPropOrSlotChange,
   getDuplicatePropSchemaKeys,
   getDuplicateSlotSchemaKeys,
+  getInvalidMachineNamePropIds,
+  getInvalidMachineNameSlotIds,
   getJsForSlotsPreview,
 } from '@/features/code-editor/utils/utils';
 
@@ -162,7 +164,10 @@ const useSourceCode = (requestedComponentId: string): void => {
       const hasCollidingSchemaKeys =
         getDuplicatePropSchemaKeys(props).length > 0 ||
         getDuplicateSlotSchemaKeys(slots).length > 0;
-      if (hasCollidingSchemaKeys) {
+      const hasInvalidMachineNames =
+        getInvalidMachineNamePropIds(props).length > 0 ||
+        getInvalidMachineNameSlotIds(slots).length > 0;
+      if (hasCollidingSchemaKeys || hasInvalidMachineNames) {
         dispatch(
           setStatus({
             compilationError: true,

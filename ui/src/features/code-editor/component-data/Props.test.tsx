@@ -1540,6 +1540,68 @@ describe('props in code editor', () => {
       );
       expect(dupMessages).toHaveLength(2);
     });
+
+    describe('machine name format validation', () => {
+      const INVALID_MESSAGE =
+        'Use letters, numbers and underscores only. Must start with a letter or underscore.';
+
+      it('does not show the format error while typing (only on blur)', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+      });
+
+      it('shows the format error after blurring an invalid value', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        fireEvent.blur(machineNameInput);
+        expect(await screen.findByText(INVALID_MESSAGE)).toBeInTheDocument();
+      });
+
+      it('clears the format error once the value becomes valid', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        fireEvent.blur(machineNameInput);
+        expect(await screen.findByText(INVALID_MESSAGE)).toBeInTheDocument();
+
+        await userEvent.clear(machineNameInput);
+        await userEvent.type(machineNameInput, 'good_one');
+        await waitFor(() => {
+          expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+        });
+      });
+
+      it('does not show the format error when the field is empty (means derived from title)', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        fireEvent.blur(machineNameInput);
+        expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+      });
+
+      it('shows the top-level callout when any prop has an invalid machine name', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, 'bad-name');
+        // Callout uses the store state, not the touched UI state, so it
+        // surfaces as soon as the value becomes invalid.
+        expect(
+          screen.getByText(/one or more props have an invalid machine name/i),
+        ).toBeInTheDocument();
+      });
+    });
   });
 
   describe('image data', () => {

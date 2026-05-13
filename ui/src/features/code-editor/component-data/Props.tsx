@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   InfoCircledIcon,
   QuestionMarkCircledIcon,
@@ -45,7 +45,10 @@ import FormPropTypeVideo from '@/features/code-editor/component-data/forms/FormP
 import SortableList from '@/features/code-editor/component-data/SortableList';
 import {
   getDuplicatePropSchemaKeys,
+  getInvalidMachineNamePropIds,
   getPropSchemaKey,
+  isValidMachineName,
+  MACHINE_NAME_ERROR_MESSAGE,
 } from '@/features/code-editor/utils/utils';
 import {
   VALUE_MODE_LIMITED,
@@ -109,6 +112,26 @@ export default function Props() {
 
   const duplicatePropSchemaKeys = useMemo(
     () => getDuplicatePropSchemaKeys(props),
+    [props],
+  );
+
+  // Tracks prop IDs whose machine name input has been blurred at least
+  // once. We only surface the format error after a blur to avoid flashing
+  // an error while the user is still typing.
+  const [touchedMachineNameIds, setTouchedMachineNameIds] = useState<
+    Set<string>
+  >(new Set());
+  const markMachineNameTouched = (propId: string) => {
+    setTouchedMachineNameIds((prev) => {
+      if (prev.has(propId)) return prev;
+      const next = new Set(prev);
+      next.add(propId);
+      return next;
+    });
+  };
+
+  const invalidMachineNamePropIds = useMemo(
+    () => new Set(getInvalidMachineNamePropIds(props)),
     [props],
   );
 
@@ -182,6 +205,9 @@ export default function Props() {
       props.some(
         (p) => p.id !== prop.id && p.name && getPropSchemaKey(p) === propName,
       );
+    const machineNameInvalid =
+      touchedMachineNameIds.has(prop.id) &&
+      !isValidMachineName(prop.machineName);
     return (
       <Flex direction="column" flexGrow="1" gap="4">
         {/*
@@ -219,7 +245,7 @@ export default function Props() {
                 <Label htmlFor={`prop-machine-name-${prop.id}`}>
                   Machine name
                 </Label>
-                <Tooltip content="The key in component config, required fields, and your source (props passed to the component). If empty, it is derived from the title.">
+                <Tooltip content="The name used to access this prop in your component code, for example as a function argument. If left empty, it is auto-generated from the title.">
                   <QuestionMarkCircledIcon aria-label="About machine name" />
                 </Tooltip>
               </Flex>
@@ -242,10 +268,18 @@ export default function Props() {
                     }),
                   )
                 }
+                onBlur={() => markMachineNameTouched(prop.id)}
                 disabled={disabledPropIds.has(prop.id)}
-                color={duplicateSchemaKey ? 'red' : undefined}
+                color={
+                  duplicateSchemaKey || machineNameInvalid ? 'red' : undefined
+                }
               />
-              {duplicateSchemaKey && (
+              {machineNameInvalid && (
+                <Text size="1" color="red" mt="1">
+                  {MACHINE_NAME_ERROR_MESSAGE}
+                </Text>
+              )}
+              {duplicateSchemaKey && !machineNameInvalid && (
                 <Text size="1" color="red" mt="1">
                   Another prop uses this machine name.
                 </Text>
@@ -883,6 +917,20 @@ export default function Props() {
               {duplicatePropSchemaKeys.join(', ')}). The first prop with each
               key is what gets saved; give each prop a unique machine name (or
               title) before the component can compile or auto-save.
+            </Callout.Text>
+          </Callout.Root>
+        </Box>
+      )}
+      {invalidMachineNamePropIds.size > 0 && (
+        <Box flexGrow="1" pt="4" maxWidth="500px" mx="auto">
+          <Callout.Root size="1" variant="surface" color="red">
+            <Callout.Icon>
+              <InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              One or more props have an invalid machine name.{' '}
+              {MACHINE_NAME_ERROR_MESSAGE} The component cannot compile or
+              auto-save until each machine name is valid.
             </Callout.Text>
           </Callout.Root>
         </Box>

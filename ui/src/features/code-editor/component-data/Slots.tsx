@@ -1,9 +1,17 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   InfoCircledIcon,
   QuestionMarkCircledIcon,
 } from '@radix-ui/react-icons';
-import { Box, Callout, Flex, Grid, TextField, Tooltip } from '@radix-ui/themes';
+import {
+  Box,
+  Callout,
+  Flex,
+  Grid,
+  Text,
+  TextField,
+  Tooltip,
+} from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
@@ -25,7 +33,10 @@ import './Slots.css';
 
 import {
   getDuplicateSlotSchemaKeys,
+  getInvalidMachineNameSlotIds,
   getSlotSchemaKey,
+  isValidMachineName,
+  MACHINE_NAME_ERROR_MESSAGE,
 } from '@/features/code-editor/utils/utils';
 
 import type { CodeComponentSlot } from '@/types/CodeComponent';
@@ -47,6 +58,25 @@ export default function Slots() {
     [slots],
   );
 
+  // Tracks slot IDs whose machine name input has been blurred at least once.
+  // See Props.tsx for the matching pattern and rationale.
+  const [touchedMachineNameIds, setTouchedMachineNameIds] = useState<
+    Set<string>
+  >(new Set());
+  const markMachineNameTouched = (slotId: string) => {
+    setTouchedMachineNameIds((prev) => {
+      if (prev.has(slotId)) return prev;
+      const next = new Set(prev);
+      next.add(slotId);
+      return next;
+    });
+  };
+
+  const invalidMachineNameSlotIds = useMemo(
+    () => new Set(getInvalidMachineNameSlotIds(slots)),
+    [slots],
+  );
+
   const handleAddSlot = () => {
     dispatch(addSlot());
   };
@@ -63,6 +93,9 @@ export default function Slots() {
     const defaultKeyHint = slot.name
       ? getSlotSchemaKey({ ...slot, machineName: '' })
       : '';
+    const machineNameInvalid =
+      touchedMachineNameIds.has(slot.id) &&
+      !isValidMachineName(slot.machineName);
     return (
       <Flex direction="column" flexGrow="1" gap="4">
         <Grid columns={{ initial: '1', sm: '2' }} gap="4" width="100%">
@@ -96,7 +129,7 @@ export default function Slots() {
                 <Label htmlFor={`slot-machine-name-${slot.id}`}>
                   Machine name
                 </Label>
-                <Tooltip content="The key used for this slot in config. If empty, it is derived from the title.">
+                <Tooltip content="The name used to render this slot in your component code. If left empty, it is auto-generated from the title.">
                   <QuestionMarkCircledIcon aria-label="About slot machine name" />
                 </Tooltip>
               </Flex>
@@ -117,8 +150,15 @@ export default function Slots() {
                     }),
                   )
                 }
+                onBlur={() => markMachineNameTouched(slot.id)}
                 disabled={disabledSlotIds.has(slot.id)}
+                color={machineNameInvalid ? 'red' : undefined}
               />
+              {machineNameInvalid && (
+                <Text size="1" color="red" mt="1">
+                  {MACHINE_NAME_ERROR_MESSAGE}
+                </Text>
+              )}
             </FormElement>
           </Box>
         </Grid>
@@ -166,6 +206,20 @@ export default function Slots() {
               {duplicateSlotSchemaKeys.join(', ')}). The first slot with each
               key is what gets saved; give each slot a unique machine name (or
               title) before the component can compile or auto-save.
+            </Callout.Text>
+          </Callout.Root>
+        </Box>
+      )}
+      {invalidMachineNameSlotIds.size > 0 && (
+        <Box flexGrow="1" pt="4" maxWidth="500px" mx="auto">
+          <Callout.Root size="1" variant="surface" color="red">
+            <Callout.Icon>
+              <InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              One or more slots have an invalid machine name.{' '}
+              {MACHINE_NAME_ERROR_MESSAGE} The component cannot compile or
+              auto-save until each machine name is valid.
             </Callout.Text>
           </Callout.Root>
         </Box>
