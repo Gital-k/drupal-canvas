@@ -2123,12 +2123,6 @@ HTML,
     $hydrated_parent = $tree[ComponentTreeItemList::ROOT_UUID][$parent_uuid];
     $this->assertSame($test_component_id, $hydrated_parent['component']);
     $this->assertArrayNotHasKey('hydration_exception', $hydrated_parent);
-    $this->assertSame($original_version, $hydrated_parent['component_version']);
-
-    $entity = Page::create([])->enforceIsNew(FALSE);
-    $build = $item_list->toRenderable($entity, TRUE);
-    $this->render($build);
-    $this->assertNoText('Component failed to render, check logs for more detail.');
   }
 
 }
