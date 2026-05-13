@@ -257,6 +257,7 @@ const DrupalDatetimeMultivalueForm = ({
         {/* List Item View - Trigger */}
         <Popover.Trigger asChild>
           <button
+            data-multivalue-popover-trigger
             ref={triggerButtonRef}
             className={styles.listItem}
             type="button"
