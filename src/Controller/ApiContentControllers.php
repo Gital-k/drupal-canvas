@@ -6,7 +6,6 @@ namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Utility\HomePageHelper;
-use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\CacheableJsonResponse;
@@ -93,12 +92,13 @@ final class ApiContentControllers extends ApiControllerBase {
     // If there's any auto-saved data, we throw a conflict error.
     $autoSaved = $this->autoSaveManager->getAutoSaveEntity($canvas_page);
     if (!$autoSaved->isEmpty()) {
-      throw new ConflictHttpException(Json::encode([
-        'error' => \sprintf('%s with ID %s has existing auto-saved data. Please use the UI to publish it or discard it.',
+      throw new ConflictHttpException(
+        \sprintf(
+          '%s with ID %s has existing auto-saved data. Please use the Canvas UI to publish or discard it before pushing.',
           (string) $canvas_page->getEntityType()->getLabel(),
           $canvas_page->id(),
-        ),
-      ]));
+        )
+      );
     }
 
     // Get the request body content
@@ -225,7 +225,7 @@ final class ApiContentControllers extends ApiControllerBase {
    *
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
-  public function delete(ContentEntityInterface $canvas_page): JsonResponse {
+  public static function delete(ContentEntityInterface $canvas_page): JsonResponse {
     $canvas_page->delete();
     return new JsonResponse(status: Response::HTTP_NO_CONTENT);
   }
@@ -343,7 +343,7 @@ final class ApiContentControllers extends ApiControllerBase {
    *
    * @see https://jsonapi.org/format/#fetching-pagination
    */
-  private function buildPaginationLinks(Request $request, int $offset, int $limit, int $total): array {
+  private static function buildPaginationLinks(Request $request, int $offset, int $limit, int $total): array {
     $uri = $request->getSchemeAndHttpHost() . $request->getBaseUrl() . $request->getPathInfo();
     $existing_query = $request->query->all();
     unset($existing_query['page']);

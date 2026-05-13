@@ -243,7 +243,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
     return $dependencies;
   }
 
-  private function calculateDependenciesForFieldDefinition(FieldDefinitionInterface $field_definition, ?string $bundle): array {
+  private static function calculateDependenciesForFieldDefinition(FieldDefinitionInterface $field_definition, ?string $bundle): array {
     $dependencies = [];
 
     // If this is a base field definition, there are no other dependencies.
@@ -279,15 +279,6 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
       sort($values);
       return $values;
     }, $dependencies);
-  }
-
-  public function withDelta(int $delta): static {
-    return new static(
-      $this->entityType,
-      $this->fieldName,
-      $delta,
-      $this->propName,
-    );
   }
 
   public static function fromString(string $representation): static {
