@@ -1,0 +1,10 @@
+@keyframes canvas-test-grow-over-time {
+  from { min-height: 0; }
+  to { min-height: 1500px; }
+}
+
+.canvas-test-grow-over-time {
+  min-height: 0;
+  animation: canvas-test-grow-over-time 500ms 300ms forwards;
+  background: #e0e0e0;
+}
