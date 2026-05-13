@@ -518,8 +518,20 @@ final class StaticPropSource extends PropSourceBase {
     $field_definition->setRequired($is_required);
 
     $triggering_element = $form_state->getTriggeringElement();
-    if (!empty($triggering_element['#value']) &&
-      (string) $triggering_element['#value'] === 'Remove' &&
+    $ajax = $triggering_element['#ajax'] ?? NULL;
+    $is_remove = \is_array($ajax) && isset($ajax['callback']) && \is_array($ajax['callback']) && \in_array('deleteAjax', $ajax['callback'], TRUE);
+
+    // Special handling for remove operations. The form references
+    // $this->fieldItemList to generate its items, which - unless updated here -
+    // will retain the value as passed to the constructor.
+    // The form contents are primary based on input - so it's largely fine that
+    // this list retains the values as initially passed to the constructor.
+    // However, this is an issue when adding a new item with a delta already
+    // occupied in fieldItemList -- because there is not yet input for that
+    // item, it will assume the default value of the delta-matching item in
+    // $this->fieldItemList. To prevent this, we explicitly remove the item
+    // from $this->fieldItemList on remove requests.
+    if ($is_remove &&
       isset($triggering_element['#delta'])) {
       $delta = $triggering_element['#delta'];
       $values = $this->fieldItemList->getValue();
