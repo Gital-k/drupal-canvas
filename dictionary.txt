@@ -2,6 +2,7 @@
 !Autosave # Use "auto-save", "AutoSave", or "auto_save" instead.
 acquia
 adrs
+agentic
 aiwizard
 alternatewidths
 apikey
@@ -70,6 +71,7 @@ ianvs
 importmap
 inlines
 interactable
+invariantly
 inwidget
 jangregor
 Jsona
@@ -133,6 +135,7 @@ sdcs
 serp
 SERP
 shadcn
+shipmonk
 slnt
 sonner
 sparkline
@@ -160,10 +163,14 @@ uncollapsed
 uncollapses
 unhydrated
 unlayered
+unmodeled
+unparseable
+unrooted
 unstorable
 unstub
 untampered
 unvalidatable
+unvalidated
 upserting
 upserts
 useswr
