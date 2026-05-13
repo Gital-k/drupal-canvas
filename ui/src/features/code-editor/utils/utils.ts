@@ -157,7 +157,7 @@ function hasCompatibleCardinalityExample(
 function hasSerializableExampleValue(
   example: CodeComponentProp['example'],
   serializedExample:
-    | CodeComponentPropSerialized['examples'][number]
+    | NonNullable<CodeComponentPropSerialized['examples']>[number]
     | undefined,
 ): boolean {
   if (serializedExample === undefined) {
@@ -221,7 +221,7 @@ export function serializeProps(props: CodeComponentProp[]) {
         // Drop schema-incompatible cardinality examples (array <-> scalar
         // mismatch) instead of sending invalid payloads to the backend.
         const matchesCardinality = hasCompatibleCardinalityExample(
-          isMultiValueProp,
+          !!isMultiValueProp,
           example,
         );
         const serializedExample = matchesCardinality
@@ -245,7 +245,7 @@ export function serializeProps(props: CodeComponentProp[]) {
           title: name,
           type: serializedType,
           ...(hasExample && {
-            examples: [serializedExample],
+            examples: [serializedExample!],
           }),
           // Only add enum/meta:enum at root level if NOT an array
           ...(!allowMultiple &&
