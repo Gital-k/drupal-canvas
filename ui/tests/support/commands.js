@@ -787,7 +787,6 @@ Cypress.Commands.add('assertReorderEntityFieldRequest', (options) => {
   );
 
   const extractSorted = (body) => {
-    console.log('extract sorted', body);
     const asString = typeof body === 'string' ? body : JSON.stringify(body);
     const values = {};
     const weights = {};
