@@ -2098,7 +2098,7 @@ HTML,
       'value' => [
         'title' => 'Value',
         'type' => 'integer',
-        'examples' => [27],
+        'examples' => ['27'],
       ],
     ]);
     $js_component->save();

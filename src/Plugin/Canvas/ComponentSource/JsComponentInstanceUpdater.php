@@ -38,9 +38,9 @@ final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComp
       return ComponentInstanceUpdateAttemptResult::NotNeeded;
     }
 
-    // Pre-drop inputs that cannot be preserved as-is in the target version, then
-    // delegate to the parent flow for required default injection, slot cleanup,
-    // and version bump.
+    // Pre-drop inputs that cannot be preserved as-is in the target version,
+    // then delegate to the parent flow for required default injection, slot
+    // cleanup, and version bump.
     $component = $component_instance->getComponent();
     \assert($component instanceof ComponentInterface);
     $from_version = $component_instance->getComponentVersion();

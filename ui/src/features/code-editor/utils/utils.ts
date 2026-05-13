@@ -245,9 +245,7 @@ export function serializeProps(props: CodeComponentProp[]) {
           title: name,
           type: serializedType,
           ...(hasExample && {
-            examples: [
-              serializedExample,
-            ],
+            examples: [serializedExample],
           }),
           // Only add enum/meta:enum at root level if NOT an array
           ...(!allowMultiple &&
