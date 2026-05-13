@@ -99,7 +99,7 @@ final class JsonSchemaObject extends Mapping {
    * @return string|null
    *   The $ref URI, or NULL if not found.
    */
-  private function findContainingSingleCardinalityProperty(?TypedDataInterface $parent): ?string {
+  private static function findContainingSingleCardinalityProperty(?TypedDataInterface $parent): ?string {
     // Case 1: Regular object prop example - $ref is sibling of examples.
     // Structure: props.some_prop.$ref, props.some_prop.examples.0
     // Parent chain: example item -> examples sequence -> prop definition
@@ -112,7 +112,7 @@ final class JsonSchemaObject extends Mapping {
     // Structure: props.array_prop.items.$ref, props.array_prop.examples.0.0
     // Parent chain: item -> inner sequence (examples.0) -> outer sequence
     // (examples) -> prop definition.
-    $propDefinition = $parent->getParent()?->getParent()?->getValue();
+    $propDefinition = $parent->getParent()->getParent()?->getValue();
     if (\is_array($propDefinition) && ($propDefinition['type'] ?? NULL) === 'array') {
       return $propDefinition['items']['$ref'] ?? NULL;
     }

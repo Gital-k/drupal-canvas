@@ -674,7 +674,7 @@
       const hydrated = snapshots.every((el) => !el.outerHTML.includes('</drupal-canvas'));
       if (hydrated) {
         clearInterval(pollInterval);
-        setTimeout(reveal)
+        setTimeout(reveal);
       } else if (elapsed >= hydrationDelayMs) {
         clearInterval(pollInterval);
         reveal();

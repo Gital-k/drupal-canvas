@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
-use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Render\Element;
@@ -20,11 +19,6 @@ use Drupal\Core\Render\Element;
  * @see https://git.drupalcode.org/project/canvas/-/commit/c5b5d93d79cb7260ec5160fa22014a1f755b40cf
  */
 class SemiCoupledThemeEngineForceTwigHooks {
-
-  public function __construct(
-    private readonly ModuleHandlerInterface $moduleHandler,
-  ) {
-  }
 
   /**
    * Implements hook_form_alter().
@@ -61,7 +55,7 @@ class SemiCoupledThemeEngineForceTwigHooks {
    * Implements hook_theme_suggestions_form_element_label().
    */
   #[Hook('theme_suggestions_form_element_label')]
-  public function themeSuggestionsFormElementLabel(array $variables): array {
+  public static function themeSuggestionsFormElementLabel(array $variables): array {
     $suggestions = [];
     if (isset($variables['element']['#form_id']) && \str_contains($variables['element']['#form_id'], 'media_library')) {
       $suggestions[] = 'form_element_label__media_library';
@@ -73,7 +67,7 @@ class SemiCoupledThemeEngineForceTwigHooks {
    * Implements hook_theme_suggestions_HOOK().
    */
   #[Hook('theme_suggestions_form_element')]
-  public function themeSuggestionsFormElement(array $variables): array {
+  public static function themeSuggestionsFormElement(array $variables): array {
     $suggestions = [];
     if (isset($variables['element']['#form_id']) && str_contains($variables['element']['#form_id'], 'media_library')) {
       $suggestions[] = 'form_element__media_library';
@@ -85,7 +79,7 @@ class SemiCoupledThemeEngineForceTwigHooks {
    * Implements hook_theme_suggestions_HOOK().
    */
   #[Hook('theme_suggestions_form')]
-  public function themeSuggestionsForm(array $variables): array {
+  public static function themeSuggestionsForm(array $variables): array {
     $suggestions = [];
     $ml_view = isset($variables['element']['#id']) && str_contains($variables['element']['#id'], 'views-exposed-form-media-library-widget');
     $ml_form = !empty($variables['element']['#form_id']) && str_contains($variables['element']['#form_id'], 'media_library');
@@ -99,7 +93,7 @@ class SemiCoupledThemeEngineForceTwigHooks {
    * Implements hook_theme_suggestions_HOOK().
    */
   #[Hook('theme_suggestions_select')]
-  public function themeSuggestionsSelect(array $variables): array {
+  public static function themeSuggestionsSelect(array $variables): array {
     $suggestions = [];
     $ml_view = isset($variables['element']['#id']) && str_contains($variables['element']['#id'], 'views-exposed-form-media-library-widget');
     $ml_form = !empty($variables['element']['#form_id']) && str_contains($variables['element']['#form_id'], 'media_library');
@@ -113,17 +107,14 @@ class SemiCoupledThemeEngineForceTwigHooks {
    * Implements hook_theme_suggestions_HOOK().
    */
   #[Hook('theme_suggestions_input')]
-  public function themeSuggestionsInput(array $variables): array {
+  public static function themeSuggestionsInput(array $variables): array {
     $suggestions = [];
     $ml_ajax = isset($variables['element']['#ajax']['wrapper']) && $variables['element']['#ajax']['wrapper'] === 'media-library-wrapper';
     $ml_form = isset($variables['element']['#form_id']) && str_contains($variables['element']['#form_id'], 'media_library');
     if ($ml_ajax || $ml_form) {
       $suggestions[] = 'input__media_library';
     }
-    // Only apply multivalue form input suggestion if canvas_dev_mode is
-    // enabled.
-    if ($this->moduleHandler->moduleExists('canvas_dev_mode') &&
-        isset($variables['element']['#is_multivalue_form']) &&
+    if (isset($variables['element']['#is_multivalue_form']) &&
         $variables['element']['#is_multivalue_form']) {
       $suggestions[] = 'input__multivalue_form';
     }
