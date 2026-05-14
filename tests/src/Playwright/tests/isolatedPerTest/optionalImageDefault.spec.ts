@@ -27,8 +27,9 @@ test.describe('Optional Image Default Management', () => {
       id: 'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop',
     });
 
-    let frame = await canvas.getActivePreviewFrame();
-    await expect(frame.locator('img[alt="A good dog"]')).toBeVisible();
+    await canvas.testInPreviewFrame('img[alt="A good dog"]', async (img) => {
+      await expect(img).toBeVisible();
+    });
 
     const imageFieldset = page.locator(
       '[class*="contextualPanel"] fieldset[data-form-id="component_instance_form"][data-canvas-media-library-fieldset="true"]',
@@ -43,8 +44,9 @@ test.describe('Optional Image Default Management', () => {
       .locator('button[aria-label="Remove default"]')
       .click();
 
-    frame = await canvas.getActivePreviewFrame();
-    await expect(frame.locator('img[alt="A good dog"]')).toBeHidden();
+    await canvas.testInPreviewFrame('img[alt="A good dog"]', async (img) => {
+      await expect(img).toBeHidden();
+    });
 
     await expect(defaultImagePreview).toBeHidden();
     await expect(
@@ -56,12 +58,14 @@ test.describe('Optional Image Default Management', () => {
       id: 'sdc.canvas_test_sdc.card',
     });
 
-    frame = await canvas.getActivePreviewFrame();
-    const optionalImageComponent = frame.locator(
-      '[data-canvas-component-id="sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop"]',
+    await canvas.testInPreviewFrame(
+      '[data-canvas-component-id="sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop"] img',
+      async (img) => {
+        await expect(img).toHaveCount(0);
+      },
     );
-    await expect(optionalImageComponent.locator('img')).toHaveCount(0);
 
+    // await canvas.waitForComponentAutoSave();
     await canvas.publishAllChanges();
 
     await page.goto(`/page/${canvasPage.entity_id}`);
@@ -86,13 +90,15 @@ test.describe('Optional Image Default Management', () => {
       'A cat on top of a cat tree trying to reach a Christmas tree',
     );
 
-    frame = await canvas.getActivePreviewFrame();
-    await expect(
-      frame.locator(
-        'img[alt="A cat on top of a cat tree trying to reach a Christmas tree"]',
-      ),
-    ).toBeVisible();
-    await expect(frame.locator('img[alt="A good dog"]')).toBeHidden();
+    await canvas.testInPreviewFrame(
+      'img[alt="A cat on top of a cat tree trying to reach a Christmas tree"]',
+      async (catImg) => {
+        await expect(catImg).toBeVisible();
+      },
+    );
+    await canvas.testInPreviewFrame('img[alt="A good dog"]', async (img) => {
+      await expect(img).toBeHidden();
+    });
   });
 
   test('SDC and Code Component: Required vs optional image behavior', async ({
@@ -108,8 +114,9 @@ test.describe('Optional Image Default Management', () => {
       id: 'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop',
     });
 
-    let frame = await canvas.getActivePreviewFrame();
-    await expect(frame.locator('img[alt="A good dog"]')).toBeVisible();
+    await canvas.testInPreviewFrame('img[alt="A good dog"]', async (img) => {
+      await expect(img).toBeVisible();
+    });
 
     let imageFieldset = page.locator(
       '[class*="contextualPanel"] fieldset[data-form-id="component_instance_form"][data-canvas-media-library-fieldset="true"]',
@@ -126,8 +133,12 @@ test.describe('Optional Image Default Management', () => {
       id: 'sdc.canvas_test_sdc.image-required-with-example',
     });
 
-    frame = await canvas.getActivePreviewFrame();
-    await expect(frame.locator('img[alt="Boring placeholder"]')).toBeVisible();
+    await canvas.testInPreviewFrame(
+      'img[alt="Boring placeholder"]',
+      async (img) => {
+        await expect(img).toBeVisible();
+      },
+    );
 
     imageFieldset = page.locator(
       '[class*="contextualPanel"] fieldset[data-form-id="component_instance_form"][data-canvas-media-library-fieldset="true"]',
@@ -147,10 +158,12 @@ test.describe('Optional Image Default Management', () => {
       id: 'js.canvas_test_e2e_code_components_optional_image',
     });
 
-    frame = await canvas.getActivePreviewFrame();
-    await expect(
-      frame.locator('.layout-content img[alt="Example image placeholder"]'),
-    ).toBeVisible();
+    await canvas.testInPreviewFrame(
+      '.layout-content img[alt="Example image placeholder"]',
+      async (img) => {
+        await expect(img).toBeVisible();
+      },
+    );
 
     imageFieldset = page.locator(
       '[class*="contextualPanel"] fieldset[data-form-id="component_instance_form"][data-canvas-media-library-fieldset="true"]',
@@ -177,10 +190,12 @@ test.describe('Optional Image Default Management', () => {
       id: 'js.canvas_test_e2e_code_components_optional_image',
     });
 
-    let frame = await canvas.getActivePreviewFrame();
-    await expect(
-      frame.locator('.layout-content img[alt="Example image placeholder"]'),
-    ).toBeVisible();
+    await canvas.testInPreviewFrame(
+      '.layout-content img[alt="Example image placeholder"]',
+      async (img) => {
+        await expect(img).toBeVisible();
+      },
+    );
 
     const imageFieldset = page.locator(
       '[class*="contextualPanel"] fieldset[data-form-id="component_instance_form"][data-canvas-media-library-fieldset="true"]',
@@ -197,12 +212,14 @@ test.describe('Optional Image Default Management', () => {
       .locator('button[aria-label="Remove default"]')
       .click();
 
-    frame = await canvas.getActivePreviewFrame();
-    const componentLocator = frame.locator(
-      '[data-canvas-component-id="js.canvas_test_e2e_code_components_optional_image"]',
+    await canvas.testInPreviewFrame(
+      '[data-canvas-component-id="js.canvas_test_e2e_code_components_optional_image"] img',
+      async (img) => {
+        await expect(img).toHaveCount(0);
+      },
     );
-    await expect(componentLocator.locator('img')).toHaveCount(0);
 
+    await canvas.waitForComponentAutoSave();
     await canvas.publishAllChanges();
 
     await page.goto(`/page/${canvasPage.entity_id}`);
@@ -225,30 +242,36 @@ test.describe('Optional Image Default Management', () => {
       'A cat on top of a cat tree trying to reach a Christmas tree',
     );
 
-    frame = await canvas.getActivePreviewFrame();
-    await expect(
-      frame.locator(
-        'img[alt="A cat on top of a cat tree trying to reach a Christmas tree"]',
-      ),
-    ).toBeVisible();
+    await canvas.testInPreviewFrame(
+      'img[alt="A cat on top of a cat tree trying to reach a Christmas tree"]',
+      async (img) => {
+        await expect(img).toBeVisible();
+      },
+    );
 
     await page
       .locator('[class*="contextualPanel"]')
       .getByLabel('Remove cats-1.jpg')
       .click();
-
-    await expect(componentLocator.locator('img')).toHaveCount(0);
+    await canvas.waitForComponentAutoSave();
+    await canvas.testInPreviewFrame(
+      '[data-canvas-component-id="js.canvas_test_e2e_code_components_optional_image"] img',
+      async (img) => {
+        await expect(img).toHaveCount(0);
+      },
+    );
 
     await canvas.openLibraryPanel();
     await canvas.addComponent({
       id: 'sdc.canvas_test_sdc.card',
     });
 
-    frame = await canvas.getActivePreviewFrame();
-    const optionalImageComponent = frame.locator(
-      '[data-canvas-component-id="js.canvas_test_e2e_code_components_optional_image"]',
+    await canvas.testInPreviewFrame(
+      '[data-canvas-component-id="js.canvas_test_e2e_code_components_optional_image"] img',
+      async (img) => {
+        await expect(img).toHaveCount(0);
+      },
     );
-    await expect(optionalImageComponent.locator('img')).toHaveCount(0);
   });
 
   test('SDC: Multiple media widgets — each DefaultImagePreview is scoped to its own prop, and required images cannot be deleted', async ({
@@ -264,16 +287,24 @@ test.describe('Optional Image Default Management', () => {
     });
 
     // All three default images should be visible in the preview.
-    let frame = await canvas.getActivePreviewFrame();
-    await expect(
-      frame.locator('img[alt="Primary default image"]'),
-    ).toBeVisible();
-    await expect(
-      frame.locator('img[alt="Secondary default image"]'),
-    ).toBeVisible();
-    await expect(
-      frame.locator('img[alt="Required default image"]'),
-    ).toBeVisible();
+    await canvas.testInPreviewFrame(
+      'img[alt="Primary default image"]',
+      async (img) => {
+        await expect(img).toBeVisible();
+      },
+    );
+    await canvas.testInPreviewFrame(
+      'img[alt="Secondary default image"]',
+      async (img) => {
+        await expect(img).toBeVisible();
+      },
+    );
+    await canvas.testInPreviewFrame(
+      'img[alt="Required default image"]',
+      async (img) => {
+        await expect(img).toBeVisible();
+      },
+    );
 
     // All three fieldsets should each have their own independent
     // DefaultImagePreview — one per prop.
@@ -316,16 +347,24 @@ test.describe('Optional Image Default Management', () => {
     // SECONDARY or the REQUIRED field.
     await primaryPreview.locator('button[aria-label="Remove default"]').click();
 
-    frame = await canvas.getActivePreviewFrame();
-    await expect(
-      frame.locator('img[alt="Primary default image"]'),
-    ).toBeHidden();
-    await expect(
-      frame.locator('img[alt="Secondary default image"]'),
-    ).toBeVisible();
-    await expect(
-      frame.locator('img[alt="Required default image"]'),
-    ).toBeVisible();
+    await canvas.testInPreviewFrame(
+      'img[alt="Primary default image"]',
+      async (img) => {
+        await expect(img).toBeHidden();
+      },
+    );
+    await canvas.testInPreviewFrame(
+      'img[alt="Secondary default image"]',
+      async (img) => {
+        await expect(img).toBeVisible();
+      },
+    );
+    await canvas.testInPreviewFrame(
+      'img[alt="Required default image"]',
+      async (img) => {
+        await expect(img).toBeVisible();
+      },
+    );
 
     await expect(primaryPreview).toBeHidden();
     await expect(secondaryPreview).toBeVisible();

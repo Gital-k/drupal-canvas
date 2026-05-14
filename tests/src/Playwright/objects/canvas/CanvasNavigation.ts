@@ -239,6 +239,17 @@ export function CanvasNavigationMixin<TBase extends Constructor<CanvasBase>>(
       await this.waitForEditorUi();
     }
 
+    async waitForComponentAutoSave(
+      path = '/canvas/api/v0/layout/canvas_page/',
+    ): Promise<void> {
+      const autoSavePromise = this.page.waitForResponse(
+        (response) =>
+          response.url().includes(path) &&
+          response.request().method() === 'PATCH',
+      );
+      await autoSavePromise;
+    }
+
     async publishAllChanges(expectedTitles: string[] = []) {
       await this.page
         .getByRole('button', { name: /Review \d+ changes?/ })

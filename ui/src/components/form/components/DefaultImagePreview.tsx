@@ -44,6 +44,7 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
   const patchProp = usePatchProp();
 
   const [hasMediaInWidget, setHasMediaInWidget] = useState(false);
+  const [removed, setRemoved] = useState(false);
   const fieldsetRef = useRef<Element | null>(null);
 
   const componentRefCallback = useCallback((node: HTMLDivElement | null) => {
@@ -109,6 +110,7 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
    * preventing it from reappearing after save/publish operations.
    */
   const handleRemoveDefault = () => {
+    setRemoved(true);
     if (
       !propData ||
       !editorFrameContext ||
@@ -116,11 +118,10 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
     ) {
       return;
     }
-
     patchProp(inputUIData, propName, { ...propData, value: [] }, []);
   };
 
-  if (!isShowingDefaultImage || !defaultImageValue) {
+  if (!isShowingDefaultImage || !defaultImageValue || removed) {
     return null;
   }
 
@@ -143,6 +144,11 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
             className={styles.removeDefaultButton}
             aria-label="Remove default"
             title="Remove default"
+            disabled={
+              !propData ||
+              !editorFrameContext ||
+              editorFrameContext === EditorFrameContext.NONE
+            }
           />
         )}
         <span className={styles.defaultImageLabel}>{imageAlt}</span>
