@@ -34,7 +34,7 @@ async function tryRefresh(
  * Manages a Bearer token for the workbench dev-server proxy.
  *
  * Tokens come from one of three sources (resolution order in `start()`):
- *   1. `CANVAS_API_TOKEN` — used as a static Bearer (no refresh).
+ *   1. `CANVAS_ACCESS_TOKEN` — used as a static Bearer (no refresh).
  *   2. `CANVAS_CLIENT_ID` + `CANVAS_CLIENT_SECRET` — fetched via the OAuth
  *      `client_credentials` grant; refreshed by re-fetching.
  *   3. CLI token store (`~/.config/drupal-canvas/oauth.json`) — populated by
@@ -62,8 +62,8 @@ class TokenManager {
 
   async start(siteUrl: string, env: Record<string, string>): Promise<void> {
     this.siteUrl = siteUrl;
-    if (env.CANVAS_API_TOKEN) {
-      this.currentHeader = `Bearer ${env.CANVAS_API_TOKEN}`;
+    if (env.CANVAS_ACCESS_TOKEN) {
+      this.currentHeader = `Bearer ${env.CANVAS_ACCESS_TOKEN}`;
       return;
     }
     if (env.CANVAS_CLIENT_ID && env.CANVAS_CLIENT_SECRET) {
@@ -120,7 +120,7 @@ class TokenManager {
       return;
     }
     console.warn(
-      '[workbench] No auth credentials configured. Set CANVAS_API_TOKEN, ' +
+      '[workbench] No auth credentials configured. Set CANVAS_ACCESS_TOKEN, ' +
         'CANVAS_CLIENT_ID + CANVAS_CLIENT_SECRET, or run `canvas login` to ' +
         'enable authenticated requests to the Drupal site.',
     );
