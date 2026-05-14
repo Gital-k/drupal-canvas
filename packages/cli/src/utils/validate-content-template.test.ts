@@ -67,7 +67,6 @@ async function makeDiscovery(
       {
         name: slug,
         slug,
-        uuid: null,
         label: null,
         entityTypeId: 'node',
         bundle: 'article',

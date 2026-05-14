@@ -10,7 +10,6 @@ import type { Spec } from '@json-render/core';
 import type { AuthoredSpecElementMap } from './authored-spec-utils';
 
 export interface AuthoredContentTemplateSpec {
-  uuid?: string;
   label: string;
   entityType: string;
   bundle: string;
@@ -156,7 +155,6 @@ export function parseContentTemplateSpec(
   const issues: ContentTemplateSpecIssue[] = [];
   const allowedTopLevelKeys = new Set([
     '$schema',
-    'uuid',
     'label',
     'entityType',
     'bundle',

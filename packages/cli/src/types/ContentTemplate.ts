@@ -2,7 +2,6 @@ import type { CanvasComponentTree } from 'drupal-canvas/json-render-utils';
 
 export interface ContentTemplate {
   id: string;
-  uuid?: string;
   label: string;
   status: boolean;
   entityType: string;

@@ -42,7 +42,6 @@ export interface DiscoveredPage {
 export interface DiscoveredContentTemplate {
   name: string;
   slug: string;
-  uuid: string | null;
   label: string | null;
   entityTypeId: string | null;
   bundle: string | null;

@@ -31,7 +31,6 @@ export interface ContentTemplatePushResult {
 
 export interface PreparedContentTemplate {
   id: string;
-  uuid: string | null;
   label: string;
   entityTypeId: string;
   bundle: string;
@@ -89,7 +88,6 @@ export async function prepareContentTemplates(
   const results = await processInPool(discovered, async (localTemplate) => {
     const fileContent = await fs.readFile(localTemplate.path, 'utf-8');
     const spec = JSON.parse(fileContent) as {
-      uuid?: string;
       label: string;
       entityType: string;
       bundle: string;
@@ -126,7 +124,6 @@ export async function prepareContentTemplates(
 
     return {
       id: deriveId(spec),
-      uuid: spec.uuid ?? null,
       label: spec.label,
       entityTypeId: spec.entityType,
       bundle: spec.bundle,
@@ -187,7 +184,7 @@ export async function pushContentTemplates(
       viewMode: template.viewMode,
       status: true,
       component_tree: template.components,
-    } as Omit<ContentTemplate, 'uuid'>);
+    } as ContentTemplate);
     return {
       label: template.label,
       id: template.id,

@@ -532,7 +532,7 @@ export class ApiService {
    * Create a new content template.
    */
   async createContentTemplate(
-    template: Omit<ContentTemplate, 'uuid'>,
+    template: ContentTemplate,
   ): Promise<ContentTemplate> {
     try {
       const response = await this.client.post(

@@ -171,7 +171,6 @@ export function authoredElementsToComponentTree(
 }
 
 export interface AuthoredContentTemplateFile {
-  uuid?: string;
   label: string;
   entityType: string;
   bundle: string;
@@ -188,15 +187,11 @@ export function contentTemplateToAuthored(
   const elements = componentTreeToAuthoredElements(
     template.component_tree ?? [],
   );
-  const authored: AuthoredContentTemplateFile = {
+  return {
     label: template.label,
     entityType: template.entityType,
     bundle: template.bundle,
     viewMode: template.viewMode,
     elements,
   };
-  if (template.uuid) {
-    authored.uuid = template.uuid;
-  }
-  return authored;
 }

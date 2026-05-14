@@ -235,7 +235,6 @@ export async function discoverCanvasProject(
 
     const templateFilename = path.posix.basename(normalizedRelativePath);
     const slug = templateFilename.replace(/\.json$/, '');
-    let uuid: string | null = null;
     let label: string | null = null;
     let entityTypeId: string | null = null;
     let bundle: string | null = null;
@@ -244,9 +243,6 @@ export async function discoverCanvasProject(
       const content = JSON.parse(
         await fs.readFile(absoluteTemplatePath, 'utf-8'),
       );
-      if (typeof content.uuid === 'string' && content.uuid) {
-        uuid = content.uuid;
-      }
       if (typeof content.label === 'string' && content.label) {
         label = content.label;
       }
@@ -265,7 +261,6 @@ export async function discoverCanvasProject(
     contentTemplates.push({
       name: label ?? slug,
       slug,
-      uuid,
       label,
       entityTypeId,
       bundle,
