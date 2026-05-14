@@ -41,6 +41,7 @@
     "vite-plugin-svgr": "^4.5.0"
   },
   "devDependencies": {
+    "@drupal-canvas/auth": "*",
     "@drupal-canvas/discovery": "*",
     "@drupal-canvas/vite-compat": "*",
     "@types/node": "^24.10.1",
