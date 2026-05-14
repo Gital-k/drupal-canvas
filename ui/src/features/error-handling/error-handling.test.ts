@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-
-
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
-
-
-
-
 
 describe('extractErrorMessageFromApiResponse', () => {
   it('returns a fallback message when errors are absent or empty', () => {
