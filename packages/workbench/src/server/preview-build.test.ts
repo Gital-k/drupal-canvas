@@ -116,7 +116,7 @@ function makeCanvasConfig(): CanvasConfig {
     regionsDir: './regions',
     deprecatedComponentDir: './components',
     globalCssPath: './src/global.css',
-    layoutPath: './layout.tsx',
+    layoutPath: './src/layout.jsx',
   };
 }
 
