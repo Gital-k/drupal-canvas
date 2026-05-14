@@ -49,6 +49,125 @@ describe('extractErrorMessageFromApiResponse', () => {
     expect(result).toContain('<li>The source code is invalid.</li>');
   });
 
+  it('deduplicates exact duplicate errors (same pointer AND same message)', () => {
+    const error = {
+      data: {
+        errors: [
+          {
+            detail: 'The name field is required.',
+            source: { pointer: 'name' },
+          },
+          {
+            detail: 'The name field is required.',
+            source: { pointer: 'name' },
+          },
+          {
+            detail: 'Source code is invalid.',
+            source: { pointer: 'sourceCodeJs' },
+          },
+        ],
+      },
+    };
+    const result = extractErrorMessageFromApiResponse(error);
+    const count = (result.match(/The name field is required\./g) ?? []).length;
+    expect(count).toBe(1);
+    expect(result).toContain('Source code is invalid.');
+  });
+
+  it('suppresses follow-on prop errors when a primary "Prop X has invalid example value" is already shown', () => {
+    // Mirrors the real Canvas API response where all these errors share pointer ''.
+    const error = {
+      data: {
+        errors: [
+          {
+            detail:
+              'Prop "first" has invalid example value: [] Double value found.',
+            source: { pointer: '' },
+          },
+          {
+            detail:
+              'Prop "second" has invalid example value: [] Double value found.',
+            source: { pointer: '' },
+          },
+          {
+            detail:
+              'Prop "third" has invalid example value: [] Double value found.',
+            source: { pointer: '' },
+          },
+          {
+            detail:
+              'The "meta:enum" keys for the "second" prop enum cannot contain a dot.',
+            source: { pointer: '' },
+          },
+          {
+            detail:
+              'The values for the "second" prop enum must be defined in "meta:enum".',
+            source: { pointer: '' },
+          },
+          {
+            detail: 'This value should be of the correct primitive type.',
+            source: { pointer: 'props.first.examples.0' },
+          },
+          {
+            detail: 'This value should be of the correct primitive type.',
+            source: { pointer: 'props.second.examples.0' },
+          },
+          {
+            detail: 'This value should be of the correct primitive type.',
+            source: { pointer: 'props.third.examples.0' },
+          },
+        ],
+      },
+    };
+    const result = extractErrorMessageFromApiResponse(error);
+    // Primary "Prop X" errors are shown (one per prop).
+    expect(result).toContain('Prop "first" has invalid example value');
+    expect(result).toContain('Prop "second" has invalid example value');
+    expect(result).toContain('Prop "third" has invalid example value');
+    // Follow-on errors for sdff are suppressed.
+    expect(result).not.toContain('meta:enum');
+    expect(result).not.toContain('must be defined in');
+    // Low-quality primitive type fallbacks are suppressed.
+    expect(result).not.toContain(
+      'This value should be of the correct primitive type.',
+    );
+  });
+
+
+  it('shows "This value should be of the correct primitive type." once per affected field when it is the only message type', () => {
+    const error = {
+      data: {
+        errors: [
+          {
+            detail: 'This value should be of the correct primitive type.',
+            source: { pointer: 'props/0/exampleValue' },
+          },
+          {
+            detail: 'This value should be of the correct primitive type.',
+            source: { pointer: 'props/1/exampleValue' },
+          },
+        ],
+      },
+    };
+    const result = extractErrorMessageFromApiResponse(error);
+    // Both fields are affected — message appears twice in the list.
+    const count = (
+      result.match(/This value should be of the correct primitive type\./g) ??
+      []
+    ).length;
+    expect(count).toBe(2);
+    expect(result).toContain('<ul>');
+  });
+
+  it('deduplicates multiple general errors with the same message into one', () => {
+    const error = {
+      data: {
+        errors: [{ detail: 'General error.' }, { detail: 'General error.' }],
+      },
+    };
+    expect(extractErrorMessageFromApiResponse(error)).toBe('General error.');
+  });
+
   it('sorts errors with a pointer before errors without a pointer', () => {
     const error = {
       data: {
