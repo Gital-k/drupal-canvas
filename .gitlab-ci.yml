@@ -1,74 +1,20 @@
-################
-# DrupalCI GitLabCI template
-#
-# Gitlab-ci.yml to replicate DrupalCI testing for Contrib
-#
-# With thanks to:
-#   * The GitLab Acceleration Initiative participants
-#   * DrupalSpoons
-################
-
-################
-# Guidelines
-#
-# This template is designed to give any Contrib maintainer everything they need to test, without requiring modification. It is also designed to keep up to date with Core Development automatically through the use of include files that can be centrally maintained.
-#
-# However, you can modify this template if you have additional needs for your project.
-################
-
-################
-# Includes
-#
-# Additional configuration can be provided through includes.
-# One advantage of include files is that if they are updated upstream, the changes affect all pipelines using that include.
-#
-# Includes can be overridden by re-declaring anything provided in an include, here in gitlab-ci.yml
-# https://docs.gitlab.com/ee/ci/yaml/includes.html#override-included-configuration-values
-################
-
 include:
-  ################
-  # DrupalCI includes:
-  # As long as you include this, any future includes added by the Drupal Association will be accessible to your pipelines automatically.
-  # View these include files at https://git.drupalcode.org/project/gitlab_templates/
-  ################
-  - project: $_GITLAB_TEMPLATES_REPO
-    # "ref" value can be:
-    # - Recommended (default) - `ref: $_GITLAB_TEMPLATES_REF` - The Drupal Association will update this value to the recommended tag for contrib.
-    # - Latest - `ref: main` - Get the latest additions and bug fixes as they are merged into the templates.
-    # - Minor or Major latests - `ref: 1.x-latest` or `ref: 1.0.x-latest` - Get the latest additions within a minor (mostly bugfixes) or major (bugs and new features).
-    # - Fixed tag - `ref: 1.0.1` - Set the value to a known tag. This will not get any updates.
-    # If you change the default value of ref, you should set the _CURL_TEMPLATES_REF variable in the variables section to be the same as set here.
-    ref: 1.12.x-latest
-    file:
-      - "/includes/include.drupalci.main.yml"
-      # For Drupal 7, remove the above line and uncomment the below.
-      # - "/includes/include.drupalci.main-d7.yml"
-      - "/includes/include.drupalci.variables.yml"
-      - "/includes/include.drupalci.workflows.yml"
-  # Local includes
   - local: .gitlab/ci/canvas.yml
   - local: .gitlab/ci/drupal.yml
   - local: .gitlab/ci/test.yml
 
 stages:
-  - development
-  - build
+  - cache
   - validate
   - test
   - report
-  - cache
   - publish
 
-#
-################
-# Pipeline configuration variables
-#
-# These are the variables provided to the Run Pipeline form that a user may want to override.
-#
-# Docs at https://git.drupalcode.org/project/gitlab_templates/-/blob/main/includes/include.drupalci.variables.yml
-################
 variables:
+  # Enable Canvas contributors to change this from `true` to `false` to disable E2E (end-to-end) tests.
+  # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
+  E2E_TESTS_ENABLED: "true"
+
   PLAYWRIGHT_BROWSERS_PATH: $CI_PROJECT_DIR/.cache/ms-playwright
   COMPOSER_CACHE_DIR: $CI_PROJECT_DIR/.cache/composer
   npm_config_cache: $CI_PROJECT_DIR/.cache/npm
@@ -76,126 +22,124 @@ variables:
   # Disable npm lifecycle scripts.
   npm_config_ignore_scripts: "true"
 
-  # This needs to match $_GITLAB_TEMPLATES_REPO `ref`. Omit if `ref` value is `_GITLAB_TEMPLATES_REF`.
-  _CURL_TEMPLATES_REF: 1.12.x-latest
-  # Show env variables always to help with debugging.
-  _SHOW_ENVIRONMENT_VARIABLES: 1
-
-  # Ignore that `ext-sodium` is not available in the CI environment.
-  # It's required by a dependency of `drupal/simple_oauth`, but it doesn't cause any issues with what
-  # `drupal/simple_oauth` does.
-  # See https://git.drupalcode.org/project/simple_oauth/-/blob/6.0.x/.gitlab-ci.yml
-  COMPOSER_IGNORE_PLATFORM_REQS: ext-sodium
   COMPOSER_PROCESS_TIMEOUT: 0
-  COMPOSER_ROOT_VERSION: 0.0.0
   GIT_DEPTH: 1
 
-  PHP_VERSION: "8.3"
-  _TARGET_PHP_IMAGE_TAG: "production"
-
-  # Needed to allow this to run locally.
-  # https://project.pages.drupalcode.org/gitlab_templates/info/test-locally/
-  DRUPALORG_CI_SERVER_URL: https://git.drupalcode.org
   # Set this as CI_PROJECT_NAME changes on forks.
   CI_PARENT_PROJECT_NAME: canvas
-  DRUPAL_PROJECT_FOLDER: "$CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas"
-  PHPUNIT_FAIL_ON_PHPUNIT_DEPRECATION: 0
-  _CONCURRENCY_THREADS: '12'
 
-  # Enable testing against next minor version of Drupal core
-  OPT_IN_TEST_NEXT_MINOR: '1'
-  # Target a specific 11.3 release, not 11.3.x-dev, to avoid breaking on evolving test expectations unnecessarily.
-  # It should match the latest security release on the branch.
-  CORE_NEXT_MINOR: 11.3.8
-  # Target a specific 11.2 release, not 11.2.x-dev, to avoid breaking on evolving test expectations unnecessarily.
-  # It should match the latest security release on the branch.
+  # Target a specific release, not 11.x.x-dev, to avoid breaking on evolving
+  # test expectations unnecessarily.
   DRUPAL_CORE: 11.2.11
+  DRUPAL_CORE_NEXT_MINOR: 11.3.8
 
-  # Enable Canvas contributors to change this from `true` to `false` to disable E2E (end-to-end) tests.
-  # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
-  _CANVAS_E2E_TESTS: true
+  DRUPAL_TEST_WEBSERVER_USER: www-data
 
-.is-nightly-scheduled-rule: &is-nightly-scheduled-rule
-  if: $CI_PIPELINE_SOURCE == "schedule"
+########################################
+# File groups                          #
+# Used to control when jobs should run #
+########################################
+.backend-files: &backend-files
+  # The files and directories most Drupal modules contain.
+  - canvas.*.yml
+  - canvas.module
+  - canvas.install
+  - canvas.post_update.php
+  - composer.*
+  - config/**/*
+  - src/**/*
+  - templates/**/*
+  - themes/**/*
+  # JSON Schema definitions used by SDCs to define props.
+  - schema.json
+  # SDCs provided by Canvas for other SDCs to reuse.
+  - components/**/*
+  # Submodules.
+  - modules/**/*
+  # Any test using Canvas' Internal HTTP API has its requests and responses validated against the OpenAPI spec.
+  - openapi.yml
+  # Tests
+  - "tests/**/*"
+  - "!tests/src/Playwright/**/*"
 
-.is-push-rule: &is-push-rule
+.cli-files: &cli-files
+  - "packages/cli/**/*"
+  - package.json
+  - package-lock.json
+  - openapi.yml
+  # Everything below is a subset of .backend-files
+  - src/Entity/**/*
+  - src/Controller/**/*
+  # CLI Test checks these components so changes may affect test results.
+  - tests/modules/canvas_test_code_components/**/*
+
+.data-integrity-files: &data-integrity-files
+  # Configuration schema, which references many validation constraints.
+  - config/schema/**/*
+  # Validation logic for either content or config.
+  - "**/*Constraint.php"
+  - "**/*Validator.php"
+  # ⚠️Imperfect, because validation constraints can be added to entity type classes, altered in, etc. However, it
+  # is very unlikely that an MR would add or change validation constraints without also changing one of these files.
+
+.ui-files: &ui-files
+  # Customizations to Drupal's JS.
+  - js/**/*
+  # The Canvas UI.
+  - package.json
+  - package-lock.json
+  # Workspace packages can affect dependency hoisting to the root node_modules.
+  - packages/*/package.json
+  - ui/**/*
+  # Dependencies of the Canvas UI.
+  - packages/astro-hydration
+  - packages/types
+
+.user-docs-files: &user-docs-files
+  - "docs/user/**/*"
+
+##############################################
+# Rules                                      #
+# https://docs.gitlab.com/ci/jobs/job_rules/ #
+##############################################
+.nightly-rule: &nightly-rule
+  if: $CI_PIPELINE_SOURCE == "schedule" && $CI_SCHEDULE_TYPE == "nightly"
+
+.push-rule: &push-rule
   if: $CI_PIPELINE_SOURCE == "push" && $CI_PROJECT_ROOT_NAMESPACE == "project"
+
+.mr-rule: &mr-rule
+  if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train"
+
+.mr-e2e-rule: &mr-e2e-rule
+  if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "merge_train") && $E2E_TESTS_ENABLED == "true"
+
+.cli-release-rule: &cli-release-rule
+  if: '$CI_COMMIT_TAG =~ /^cli-\d+\.\d+\.\d+(-\w+\d*)?$/'
 
 .manual-rule: &manual-rule
   - when: manual
     allow_failure: true
 
-.backend-files-change-rule: &backend-files-change-rule
-  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
-    changes:
-      # The files and directories most Drupal modules contain.
-      - canvas.*.yml
-      - canvas.module
-      - canvas.install
-      - canvas.post_update.php
-      - composer.*
-      - config/**/*
-      - src/**/*
-      - templates/**/*
-      - themes/**/*
-      # JSON Schema definitions used by SDCs to define props.
-      - schema.json
-      # SDCs provided by Canvas for other SDCs to reuse.
-      - components/**/*
-      # Submodules.
-      - modules/**/*
-      # Any test using Canvas' Internal HTTP API has its requests and responses validated against the OpenAPI spec.
-      - openapi.yml
-      # Tests
-      - "tests/**/*"
-      - "!tests/src/Playwright/**/*"
-    when: on_success
-
-# This is a subset of .backend-files-change-rule.
-.data-integrity-files-change-rule: &data-integrity-files-change-rule
-  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
-    changes:
-      # Configuration schema, which references many validation constraints.
-      - config/schema/**/*
-      # Validation logic for either content or config.
-      - "**/*Constraint.php"
-      - "**/*Validator.php"
-      # ⚠️Imperfect, because validation constraints can be added to entity type classes, altered in, etc. However, it
-      # is very unlikely that an MR would add or change validation constraints without also changing one of these files.
-
-.UI-files-change-rule: &UI-files-change-rule
-  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
-    changes:
-      # Customizations to Drupal's JS.
-      - js/**/*
-      # The Canvas UI.
-      - package.json
-      - package-lock.json
-      - ui/**/*
-      # Dependencies of the Canvas UI.
-      - packages/astro-hydration
-      - packages/types
-    when: on_success
-
-.ui-fixture-files-change-rule: &UI-fixtures-files-change-rule
-  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
-    changes:
-      - ui/tests/fixtures/**/*
-    when: on_success
-
-.e2e-tests-must-not-be-disabled-rule: &e2e-tests-must-not-be-disabled-rule
-  - if: $_CANVAS_E2E_TESTS == "false"
-    when: never
-
-# The rules to be used by all E2E CI jobs, to ensure they are triggered consistently.
-.e2e-ci-job-rules: &e2e-ci-job-rules
-  - *e2e-tests-must-not-be-disabled-rule
-  - *is-push-rule
-  - *backend-files-change-rule
-  - *UI-files-change-rule
-  - *manual-rule
-
+########
+# Jobs #
+########
 .image-node: &image-node node:24-alpine
+
+workflow:
+  auto_cancel:
+    # cancels running interruptible jobs when a new commit is pushed.
+    on_new_commit: conservative
+  # Only run pipelines for merge requests, merge trains, tags,
+  # protected branches, scheduled, and manually triggered through the UI.
+  # i.e. no CI on feature branches until an MR is opened.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_train"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
 
 default:
   image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
@@ -213,7 +157,16 @@ default:
 
 cache dependencies:
   stage: cache
+  allow_failure: true
   needs: []
+  rules:
+    - *push-rule
+    - <<: *mr-rule
+      changes:
+        paths:
+          - composer.lock
+          - package-lock.json
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       paths:
@@ -226,9 +179,13 @@ cache dependencies:
         - .cache/phpcs
         - .cache/phpstan
     - key: ${CI_PARENT_PROJECT_NAME}-playwright-${CI_COMMIT_REF_NAME}
+      fallback_keys:
+        - ${CI_PARENT_PROJECT_NAME}-playwright-${CI_DEFAULT_BRANCH}
       paths:
         - .cache/ms-playwright
     - key: ${CI_PARENT_PROJECT_NAME}-cypress-${CI_COMMIT_REF_NAME}
+      fallback_keys:
+        - ${CI_PARENT_PROJECT_NAME}-cypress-${CI_DEFAULT_BRANCH}
       paths:
         - .cache/cypress
   before_script:
@@ -238,59 +195,10 @@ cache dependencies:
     - npx playwright install
     - npx cypress install
 
-# Disable jobs from the upstream template.
-composer:
-  rules:
-    - when: never
-
-composer (next minor):
-  rules:
-    - when: never
-
-eslint:
-  rules:
-    - when: never
-
-phpcs:
-  rules:
-    - when: never
-
-phpstan:
-  rules:
-    - when: never
-
-phpunit:
-  rules:
-    - when: never
-
-phpunit (next minor):
-  rules:
-    - when: never
-
-cspell:
-  rules:
-    - when: never
-
-composer-lint:
-  rules:
-    - when: never
-
-phpstan (next minor):
-  rules:
-    - when: never
-
-stylelint:
-  rules:
-    - when: never
-
-test-only changes:
-  rules:
-    - when: never
-
 phpstan-is-up-to-date:
-  stage: development
+  stage: validate
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - *nightly-rule
     - *manual-rule
   script:
     - |
@@ -335,40 +243,33 @@ phpstan-is-up-to-date:
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
 
-phpcs-rules-match-drupal-11:
-  stage: development
+phpcs-rules-match-drupal:
+  stage: validate
   image: *image-node
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - *nightly-rule
     - *manual-rule
   cache: []
   script:
     - |
+      DRUPAL_MAJOR=$(echo "$DRUPAL_CORE" | cut -d. -f1)
+      DRUPAL_URL="https://git.drupalcode.org/project/drupal/-/raw/${DRUPAL_MAJOR}.x/core/phpcs.xml.dist?ref_type=heads"
       # Download the file from the Drupal repository
-      wget -O drupal_core_phpcs.xml.dist "https://git.drupalcode.org/project/drupal/-/raw/11.x/core/phpcs.xml.dist?ref_type=heads"
+      wget -O drupal_core_phpcs.xml.dist "$DRUPAL_URL"
 
-      # Check if the download was successful
-      if [ $? -ne 0 ]; then
-        echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
-        echo "Error: Failed to download $DRUPAL_URL"
-        exit 1
-      fi
-
-      # Compare the downloaded file with the local file using a subshell to prevent premature exit
+      # diff returns exit code 1 when files differ; `set -e` would abort the script
+      # before we can capture it, so capture it explicitly.
       echo "Comparing downloaded file with local file..."
-      # With uses the braces the job just ends here for some reason.
-       {
-        diff drupal_core_phpcs.xml.dist core.phpcs.xml.dist
-        DIFF_EXIT_CODE=$?
-      } || true
+      DIFF_EXIT_CODE=0
+      diff drupal_core_phpcs.xml.dist core.phpcs.xml.dist || DIFF_EXIT_CODE=$?
 
       if [ $DIFF_EXIT_CODE -ne 0 ]; then
         echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
-        echo "Error: core.phpcs.xml.dist not up to date with Drupal 11.x core/phpcs.xml.dist. Please create an issue to update this file."
-        echo "Issue template: https://www.drupal.org/node/add/project-issue/canvas?title=Update%20PHPCS%20config%20to%20match%20Drupal%2011&field_issue_parent=3512890&clone_body=1&categories=2&priorities=100&status=1&version=1.x-dev&component=Code&assigned=0&tags="
+        echo "Error: core.phpcs.xml.dist not up to date with Drupal ${DRUPAL_MAJOR}.x core/phpcs.xml.dist. Please create an issue to update this file."
+        echo "Issue template: https://www.drupal.org/node/add/project-issue/canvas?title=Update%20PHPCS%20config%20to%20match%20Drupal%20${DRUPAL_MAJOR}&field_issue_parent=3512890&clone_body=1&categories=2&priorities=100&status=1&version=1.x-dev&component=Code&assigned=0&tags="
       else
         echo "👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍"
-        echo "core.phpcs.xml.dist is up to date with Drupal 11.x core/phpcs.xml.dist"
+        echo "core.phpcs.xml.dist is up to date with Drupal ${DRUPAL_MAJOR}.x core/phpcs.xml.dist"
       fi
 
       # Exit with the exit code of the diff command
@@ -376,285 +277,13 @@ phpcs-rules-match-drupal-11:
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
 
-phpunit (11.2, sqlite):
-  rules:
-    - *is-nightly-scheduled-rule
-    - *backend-files-change-rule
-    # Changes to the infra for running PHPUnit itself also need to trigger CI.
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null)
-      changes:
-        - .env.defaults
-        - phpunit.xml.dist
-    - *manual-rule
-  needs: []
-  parallel:
-    matrix:
-      # The KUBERNETES_CPU_REQUEST and DRUPAL_TEST_CONCURRENCY values match core.
-      - PHPUNIT_TESTSUITE: 'PHPUnit-Unit'
-        KUBERNETES_CPU_REQUEST: "4"
-        DRUPAL_TEST_CONCURRENCY: '24'
-      - PHPUNIT_TESTSUITE: 'PHPUnit-Kernel'
-        CI_PARALLEL_NODE_INDEX: ['1', '2', '3']
-        CI_PARALLEL_NODE_TOTAL: '3'
-        KUBERNETES_CPU_REQUEST: "10"
-        DRUPAL_TEST_CONCURRENCY: '20'
-      - PHPUNIT_TESTSUITE: 'PHPUnit-Functional'
-        KUBERNETES_CPU_REQUEST: "20"
-        DRUPAL_TEST_CONCURRENCY: '14'
-  variables:
-    DRUPAL_TEST_WEBSERVER_USER: www-data
-  before_script:
-    - !reference [ .drupal-with-dev-dependencies ]
-    - !reference [ .canvas-ui ]
-    # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
-    # (PHPUnit SourceMapper races with concurrent test cleanup under sites/simpletest,
-    # causing "RecursiveDirectoryIterator: Failed to open directory" random failures).
-    # Fixed on Drupal 11.x (commit 3753f904, 2026-03-30); not yet in 11.2.x. Idempotent —
-    # becomes a no-op once the minimum supported core version ships the fix.
-    - sed -i '\|<directory>\.\./sites</directory>|d' $CI_PROJECT_DIR/_drupal/web/core/phpunit.xml.dist
-
-  script:
-    - !reference [ .test_runner ]
-    - run_test "phpunit" "composer run phpunit -- --types $PHPUNIT_TESTSUITE --ci-parallel-node-index $CI_PARALLEL_NODE_INDEX --ci-parallel-node-total $CI_PARALLEL_NODE_TOTAL"
-    - !reference [ .test_summary ]
-  after_script:
-    - cp -R _drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/test-results $CI_PROJECT_DIR/test-results
-    - cp -R _drupal/web/sites/simpletest/browser_output $CI_PROJECT_DIR/test-results || true
-    - |
-      cat > $CI_PROJECT_DIR/test-results/links.json << EOF
-      {
-        "PHPUnit test report": [
-          {
-            "external_link": {
-              "label": "PHPUnit browser output ($PHPUNIT_TESTSUITE)",
-              "url": "${CI_SERVER_URL}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/-/jobs/${CI_JOB_ID}/artifacts/browse/test-results/browser_output"
-            }
-          }
-        ]
-      }
-      EOF
-  artifacts:
-    expose_as: 'PHPUnit tests'
-    when: always
-    expire_in: 6 mos
-    paths:
-      - test-results/
-    reports:
-      junit:
-        - test-results/*.xml
-      annotations: test-results/links.json
-
-phpunit (11.2, mariadb 10.6):
-  extends: phpunit (11.2, sqlite)
-  # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
-  rules:
-    - *is-nightly-scheduled-rule
-    - *manual-rule
-  services:
-    - mariadb:10.6
-  variables:
-    SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
-    MYSQL_DATABASE: drupal
-    MYSQL_USER: drupal
-    MYSQL_PASSWORD: drupal
-    MYSQL_ROOT_PASSWORD: root
-
-phpunit (11.2, pgsql 16):
-  extends: phpunit (11.2, sqlite)
-  # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
-  rules:
-    - *is-nightly-scheduled-rule
-    - *manual-rule
-  services:
-    - postgres:16
-  variables:
-    SIMPLETEST_DB: pgsql://drupal:drupal@127.0.0.1/drupal
-    POSTGRES_DB: drupal
-    POSTGRES_USER: drupal
-    POSTGRES_PASSWORD: drupal
-
-phpunit (11.2, mysql 8):
-  extends: phpunit (11.2, sqlite)
-  # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
-  rules:
-    - *is-nightly-scheduled-rule
-    - *manual-rule
-  services:
-    - mysql:8.0
-  variables:
-    SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
-    MYSQL_DATABASE: drupal
-    MYSQL_USER: drupal
-    MYSQL_PASSWORD: drupal
-    MYSQL_ROOT_PASSWORD: root
-
-phpunit (11.3, sqlite):
-  extends: phpunit (11.2, sqlite)
-  variables:
-    DRUPAL_CORE: $CORE_NEXT_MINOR
-
-phpunit (11.3, mariadb 10.6):
-  extends: phpunit (11.2, sqlite)
-  services:
-    - mariadb:10.6
-  variables:
-    _FOR_EVERY_MR_COMMIT: false
-    DRUPAL_CORE: $CORE_NEXT_MINOR
-    SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
-    MYSQL_DATABASE: drupal
-    MYSQL_USER: drupal
-    MYSQL_PASSWORD: drupal
-    MYSQL_ROOT_PASSWORD: root
-
-phpunit (11.3, pgsql 16):
-  extends: phpunit (11.2, sqlite)
-  services:
-    - postgres:16
-  variables:
-    _FOR_EVERY_MR_COMMIT: false
-    DRUPAL_CORE: $CORE_NEXT_MINOR
-    SIMPLETEST_DB: pgsql://drupal:drupal@127.0.0.1/drupal
-    POSTGRES_DB: drupal
-    POSTGRES_USER: drupal
-    POSTGRES_PASSWORD: drupal
-
-phpunit (11.3, mysql 8):
-  extends: phpunit (11.2, sqlite)
-  services:
-    - mysql:8.0
-  variables:
-    _FOR_EVERY_MR_COMMIT: false
-    DRUPAL_CORE: $CORE_NEXT_MINOR
-    SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
-    MYSQL_DATABASE: drupal
-    MYSQL_USER: drupal
-    MYSQL_PASSWORD: drupal
-    MYSQL_ROOT_PASSWORD: root
-
-vitest:
-  stage: test
-  image: *image-node
-  allow_failure: false
-  needs: []
-  rules:
-    - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - ui/src/**/*
-        - ui/tsconfig.json
-        - ui/tsconfig.node.json
-        - ui/tests/vitest/**/*
-        - ui/vitest.config.js
-        - ui/vite.config.ts
-        - ui/package.json
-        - package.json
-        - package-lock.json
-        # Workspace packages can affect dependency hoisting to the root node_modules.
-        - packages/*/package.json
-    - *UI-fixtures-files-change-rule
-    - *manual-rule
-  script:
-    - npm ci
-    - npm run test --workspace=@drupal-canvas/ui -- --reporter=junit --outputFile=$CI_PROJECT_DIR/ui-vitest-junit.xml
-  artifacts:
-    expose_as: junit
-    expire_in: 6 mos
-    when: always
-    name: artifacts-$CI_PIPELINE_ID-$CI_JOB_NAME_SLUG
-    paths:
-      - ui-vitest-junit.xml
-    reports:
-      junit: ui-vitest-junit.xml
-
-.cypress-base:
-  stage: test
-  cache:
-    - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
-      fallback_keys:
-        - ${CI_PARENT_PROJECT_NAME}-default-${CI_DEFAULT_BRANCH}
-      paths:
-        - .cache/composer
-        - .cache/npm
-        - .cache/astro
-        - .cache/tsc
-      policy: pull
-    - key: ${CI_PARENT_PROJECT_NAME}-cypress-${CI_COMMIT_REF_NAME}
-      fallback_keys:
-        - ${CI_PARENT_PROJECT_NAME}-cypress-${CI_DEFAULT_BRANCH}
-      paths:
-        - .cache/cypress
-      policy: pull
-  before_script:
-    - !reference [ .drupal-with-dev-dependencies ]
-    - !reference [ .drupal-enable-test-modules ]
-    - !reference [ .canvas-ui ]
-    - cd ui
-    - npx cypress install
-    - cp .env.example .env
-    - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> .env
-    - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> .env
-    - echo "DRUPAL_TEST_WEBSERVER_USER=www-data" >> .env
-    - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/_drupal/web/core'" >> .env
-
-  variables:
-    DRUPAL_PROJECT_FOLDER: "$CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas"
-    _TARGET_DB_TYPE: sqlite
-    CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas/.cache/cypress
-    DRUPAL_TEST_WEBSERVER_USER: www-data
-    DRUPAL_TEST_WEBDRIVER_AUTOSTART: true
-    DRUPAL_TEST_WEBDRIVER_BINARY: "chromedriver"
-    DRUPAL_TEST_WEBDRIVER_BINARY_FLAGS: "--port=9515"
-    DRUPAL_TEST_BASE_URL: http://localhost
-    DRUPAL_TEST_DB_URL: sqlite://localhost/sites/default/files/.ht.sqlite
-    MINK_DRIVER_ARGS_WEBDRIVER: '["chrome", {"browserName":"chrome", "goog:chromeOptions":{"w3c": true, "args":["--no-sandbox","--ignore-certificate-errors", "--allow-insecure-localhost", "--headless", "--disable-dev-shm-usage", "--disable-gpu"]}}, "http://localhost:9515"]'
-    SIMPLETEST_BASE_URL: http://localhost
-    SIMPLETEST_DB: sqlite://localhost/sites/default/files/.ht.sqlite
-  artifacts:
-    when: always
-    expire_in: 6 mos
-    paths:
-      - _drupal/web/modules/contrib/canvas/ui/tests/screenshots/**/*.png
-    reports:
-      junit:
-        - _drupal/web/modules/contrib/canvas/ui/junit-*.xml
-
-cypress E2E:
-  extends: .cypress-base
-  rules: *e2e-ci-job-rules
-  parallel: 4
-  script:
-    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log || EXIT_CODE=$?
-    # Auto-retry when known frequent random failures occur.
-    - grep "✖.*autocomplete-props" $CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas/ui/cypress.log && exit 112 || true
-    - grep "✖.*copy-and-paste" $CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas/ui/cypress.log && exit 112 || true
-    - grep "✖.*global-regions-interact" $CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas/ui/cypress.log && exit 112 || true
-    - grep "✖.*media-library-component-instance" $CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas/ui/cypress.log && exit 112 || true
-    # If no auto-retry was attempted, use the original exit code.
-    - exit $EXIT_CODE
-  retry:
-    max: 2
-    exit_codes: 112
-
-cypress unit:
-  extends: .cypress-base
-  script:
-    - npx cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
-  rules:
-    - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - ui/src/**/*
-        - ui/tsconfig.json
-        - ui/tsconfig.node.json
-        - ui/tests/unit/**/*
-    - *UI-fixtures-files-change-rule
-    - *manual-rule
-
 lint (php):
   stage: validate
   needs: []
+  rules:
+    - *push-rule
+    - *mr-rule
   variables:
-    GIT_DEPTH: 1
     COMPOSER_ROOT_VERSION: 0.0.0
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
@@ -707,22 +336,292 @@ lint (node):
   stage: validate
   image: *image-node
   needs: []
+  rules:
+    - *push-rule
+    - *mr-rule
+    - *cli-release-rule
   script:
     - npm ci
     - npm run build --workspace=drupal-canvas
     - npm run lint
+    - |
+      if [ "$E2E_TESTS_ENABLED" != "true" ]; then
+        echo "❌ 'E2E_TESTS_ENABLED' is $E2E_TESTS_ENABLED — E2E tests must not be disabled when merging. Reset it to 'true'."
+        exit 1
+      fi
+
+phpunit (11.2 sqlite):
+  rules:
+    - *push-rule
+    - <<: *mr-rule
+      changes:
+        paths: *backend-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-rule
+      changes:
+        paths:
+          - .env.defaults
+          - phpunit.xml.dist
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - *nightly-rule
+    - *manual-rule
+  parallel:
+    matrix:
+      # The KUBERNETES_CPU_REQUEST and DRUPAL_TEST_CONCURRENCY values match core.
+      - PHPUNIT_TESTSUITE: 'PHPUnit-Unit'
+        KUBERNETES_CPU_REQUEST: "4"
+        DRUPAL_TEST_CONCURRENCY: '24'
+      - PHPUNIT_TESTSUITE: 'PHPUnit-Kernel'
+        CI_PARALLEL_NODE_INDEX: ['1', '2', '3']
+        CI_PARALLEL_NODE_TOTAL: '3'
+        KUBERNETES_CPU_REQUEST: "10"
+        DRUPAL_TEST_CONCURRENCY: '20'
+      - PHPUNIT_TESTSUITE: 'PHPUnit-Functional'
+        KUBERNETES_CPU_REQUEST: "20"
+        DRUPAL_TEST_CONCURRENCY: '14'
+  before_script:
+    - !reference [ .drupal-with-dev-dependencies ]
+    - !reference [ .canvas-ui ]
+    # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
+    # (PHPUnit SourceMapper races with concurrent test cleanup under sites/simpletest,
+    # causing "RecursiveDirectoryIterator: Failed to open directory" random failures).
+    # Fixed on Drupal 11.x (commit 3753f904, 2026-03-30); not yet in 11.2.x. Idempotent —
+    # becomes a no-op once the minimum supported core version ships the fix.
+    - sed -i '\|<directory>\.\./sites</directory>|d' $CI_PROJECT_DIR/_drupal/web/core/phpunit.xml.dist
+  script:
+    - !reference [ .test_runner ]
+    - run_test "phpunit" "composer run phpunit -- --types $PHPUNIT_TESTSUITE --ci-parallel-node-index $CI_PARALLEL_NODE_INDEX --ci-parallel-node-total $CI_PARALLEL_NODE_TOTAL"
+    - !reference [ .test_summary ]
+  after_script:
+    - cp -R _drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/test-results $CI_PROJECT_DIR/test-results
+    - cp -R _drupal/web/sites/simpletest/browser_output $CI_PROJECT_DIR/test-results || true
+    - |
+      cat > $CI_PROJECT_DIR/test-results/links.json << EOF
+      {
+        "PHPUnit test report": [
+          {
+            "external_link": {
+              "label": "PHPUnit browser output ($PHPUNIT_TESTSUITE)",
+              "url": "${CI_SERVER_URL}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/-/jobs/${CI_JOB_ID}/artifacts/browse/test-results/browser_output"
+            }
+          }
+        ]
+      }
+      EOF
+  artifacts:
+    expose_as: 'PHPUnit tests'
+    when: always
+    expire_in: 6 mos
+    paths:
+      - test-results/
+    reports:
+      junit:
+        - test-results/*.xml
+      annotations: test-results/links.json
+
+phpunit (11.2 mariadb):
+  extends: phpunit (11.2 sqlite)
+  # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
+  rules:
+    - *nightly-rule
+    - *manual-rule
+  services:
+    - mariadb:10.6
+  variables:
+    SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
+    MYSQL_DATABASE: drupal
+    MYSQL_USER: drupal
+    MYSQL_PASSWORD: drupal
+    MYSQL_ROOT_PASSWORD: root
+
+phpunit (11.2 pgsql):
+  extends: phpunit (11.2 sqlite)
+  # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
+  rules:
+    - *nightly-rule
+    - *manual-rule
+  services:
+    - postgres:16
+  variables:
+    SIMPLETEST_DB: pgsql://drupal:drupal@127.0.0.1/drupal
+    POSTGRES_DB: drupal
+    POSTGRES_USER: drupal
+    POSTGRES_PASSWORD: drupal
+
+phpunit (11.2 mysql):
+  extends: phpunit (11.2 sqlite)
+  # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
+  rules:
+    - *nightly-rule
+    - *manual-rule
+  services:
+    - mysql:8.0
+  variables:
+    SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
+    MYSQL_DATABASE: drupal
+    MYSQL_USER: drupal
+    MYSQL_PASSWORD: drupal
+    MYSQL_ROOT_PASSWORD: root
+
+phpunit (11.3 sqlite):
+  extends: phpunit (11.2 sqlite)
+  rules:
+    - *nightly-rule
+    - *manual-rule
+  variables:
+    DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
+
+phpunit (11.3 mariadb):
+  extends: phpunit (11.2 mariadb)
+  variables:
+    DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
+
+phpunit (11.3 pgsql):
+  extends: phpunit (11.2 pgsql)
+  variables:
+    DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
+
+phpunit (11.3 mysql):
+  extends: phpunit (11.2 mysql)
+  variables:
+    DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
+
+vitest:
+  stage: test
+  image: *image-node
+  rules:
+    - *push-rule
+    - <<: *mr-rule
+      changes:
+        paths: *ui-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - *manual-rule
+  script:
+    - npm ci
+    - npm run test --workspace=@drupal-canvas/ui -- --reporter=junit --outputFile=$CI_PROJECT_DIR/ui-vitest-junit.xml
+  artifacts:
+    expose_as: junit
+    expire_in: 6 mos
+    when: always
+    name: artifacts-$CI_PIPELINE_ID-$CI_JOB_NAME_SLUG
+    paths:
+      - ui-vitest-junit.xml
+    reports:
+      junit: ui-vitest-junit.xml
+
+.cypress-base:
+  stage: test
+  cache:
+    - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
+      fallback_keys:
+        - ${CI_PARENT_PROJECT_NAME}-default-${CI_DEFAULT_BRANCH}
+      paths:
+        - .cache/composer
+        - .cache/npm
+        - .cache/astro
+        - .cache/tsc
+      policy: pull
+    - key: ${CI_PARENT_PROJECT_NAME}-cypress-${CI_COMMIT_REF_NAME}
+      fallback_keys:
+        - ${CI_PARENT_PROJECT_NAME}-cypress-${CI_DEFAULT_BRANCH}
+      paths:
+        - .cache/cypress
+      policy: pull
+  before_script:
+    - !reference [ .drupal-with-dev-dependencies ]
+    - !reference [ .drupal-enable-test-modules ]
+    - !reference [ .canvas-ui ]
+    - cd ui
+    - npx cypress install
+    - cp .env.example .env
+    - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> .env
+    - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> .env
+    - echo "DRUPAL_TEST_WEBSERVER_USER=www-data" >> .env
+    - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/_drupal/web/core'" >> .env
+  variables:
+    DRUPAL_PROJECT_FOLDER: "$CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas"
+    _TARGET_DB_TYPE: sqlite
+    CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/_drupal/web/modules/contrib/canvas/.cache/cypress
+    DRUPAL_TEST_WEBSERVER_USER: www-data
+    DRUPAL_TEST_WEBDRIVER_AUTOSTART: true
+    DRUPAL_TEST_WEBDRIVER_BINARY: "chromedriver"
+    DRUPAL_TEST_WEBDRIVER_BINARY_FLAGS: "--port=9515"
+    DRUPAL_TEST_BASE_URL: http://localhost
+    DRUPAL_TEST_DB_URL: sqlite://localhost/sites/default/files/.ht.sqlite
+    MINK_DRIVER_ARGS_WEBDRIVER: '["chrome", {"browserName":"chrome", "goog:chromeOptions":{"w3c": true, "args":["--no-sandbox","--ignore-certificate-errors", "--allow-insecure-localhost", "--headless", "--disable-dev-shm-usage", "--disable-gpu"]}}, "http://localhost:9515"]'
+    SIMPLETEST_BASE_URL: http://localhost
+    SIMPLETEST_DB: sqlite://localhost/sites/default/files/.ht.sqlite
+  artifacts:
+    when: always
+    expire_in: 6 mos
+    paths:
+      - _drupal/web/modules/contrib/canvas/ui/tests/screenshots/**/*.png
+    reports:
+      junit:
+        - _drupal/web/modules/contrib/canvas/ui/junit-*.xml
+
+cypress E2E:
+  extends: .cypress-base
+  rules:
+    - *push-rule
+    - <<: *mr-e2e-rule
+      changes:
+        paths: *backend-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-e2e-rule
+      changes:
+        paths: *ui-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - *manual-rule
+  parallel: 4
+  script:
+    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log; EXIT_CODE=${PIPESTATUS[0]}
+    # Auto-retry when known frequent random failures occur.
+    - grep "✖.*autocomplete-props" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
+    - grep "✖.*copy-and-paste" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
+    - grep "✖.*global-regions-interact" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
+    - grep "✖.*media-library-component-instance" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
+    # If no auto-retry was attempted, use the original exit code.
+    - exit $EXIT_CODE
+  retry:
+    max: 2
+    exit_codes: 112
+
+cypress unit:
+  extends: .cypress-base
+  script:
+    - npx cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
+  rules:
+    - *push-rule
+    - <<: *mr-rule
+      changes:
+        paths: *ui-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - *manual-rule
 
 playwright:
   stage: test
-  needs: []
   parallel:
     matrix:
       - SHARD: [ "1/6", "2/6", "3/6", "4/6", "5/6", "6/6" ]
         #PROJECT: [ "chromium", "firefox", "webkit" ]
-  rules: *e2e-ci-job-rules
-  interruptible: true
-  extends:
-    - .test-variables
+  rules:
+    - *push-rule
+    - <<: *mr-e2e-rule
+      changes:
+        paths: *backend-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-e2e-rule
+      changes:
+        paths: *ui-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-e2e-rule
+      changes:
+        paths:
+          - tests/fixtures/**/*
+          - tests/src/Playwright/**/*
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - *manual-rule
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       fallback_keys:
@@ -740,12 +639,9 @@ playwright:
         - .cache/ms-playwright
       policy: pull
   variables:
-    GIT_DEPTH: 1
     _TARGET_DB_TYPE: sqlite
     DRUPAL_TEST_BASE_URL: http://localhost
-    DRUPAL_TEST_WEBSERVER_USER: www-data
     DRUPAL_TEST_PLAYWRIGHT_SKIP_TEARDOWN: true
-    COMPOSER_IGNORE_PLATFORM_REQS:
   before_script:
     - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
@@ -763,12 +659,12 @@ playwright:
 playwright-reports:
   stage: report
   image: *image-node
-  rules: *e2e-ci-job-rules
+  rules: !reference [playwright, rules]
   needs:
     - playwright
+  variables:
+    GIT_STRATEGY: none
   cache: []
-  when:
-    always
   script:
     - mkdir -p test-results
     - npx playwright merge-reports --reporter=html ./blob-report
@@ -800,28 +696,22 @@ playwright-reports:
 
 CLI Test:
   stage: test
-  needs: []
   rules:
-    - *e2e-tests-must-not-be-disabled-rule
-    - changes:
-        - "packages/cli/**/*"
-        - package.json
-        - package-lock.json
-        - openapi.yml
-        # Everything below is a subset of .backend-files-change-rule.
-        - src/Entity/**/*
-        - src/Controller/**/*
-        # CLI Test checks these components so changes may affect test results.
-        - tests/modules/canvas_test_code_components/**/*
-    - if: '$CI_COMMIT_TAG =~ /^cli-\d+\.\d+\.\d+(-\w+\d*)?$/'
-    - *data-integrity-files-change-rule
+    - *push-rule
+    - <<: *mr-rule
+      changes:
+        paths: *cli-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-rule
+      changes:
+        paths: *data-integrity-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - *cli-release-rule
     - *manual-rule
   variables:
-    GIT_DEPTH: 1
     _TARGET_DB_TYPE: sqlite
     TEST_CANVAS_CLIENT_ID: cli
     TEST_CANVAS_CLIENT_SECRET: secret
-    DRUPAL_TEST_WEBSERVER_USER: www-data
     DRUPAL_TEST_BASE_URL: http://localhost
   before_script:
     - !reference [ .drupal-with-dev-dependencies ]
@@ -854,7 +744,7 @@ CLI Publish:
     - lint (node)
     - CLI Test
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^cli-\d+\.\d+\.\d+(-\w+\d*)?$/'
+    - *cli-release-rule
   before_script:
     - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
   script:
@@ -870,8 +760,7 @@ pages-mr:
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - "docs/user/**/*"
+      changes: *user-docs-files
   variables:
     ASTRO_SITE: https://project.pages.drupalcode.org
     ASTRO_BASE: /$CI_PARENT_PROJECT_NAME/mr-$CI_MERGE_REQUEST_IID/
@@ -893,15 +782,12 @@ stop-pages-mr:
   interruptible: false
   needs: []
   cache: []
+  variables:
+    GIT_STRATEGY: none
   rules:
-    # Branch merge.
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_MERGE_REQUEST_IID
-      changes:
-        - "docs/user/**/*"
-    # Branch deletion.
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BEFORE_SHA != "0000000000000000000000000000000000000000" && $CI_COMMIT_SHA == "0000000000000000000000000000000000000000"
-      changes:
-        - "docs/user/**/*"
+    - when: manual
+      allow_failure: true
+      changes: *user-docs-files
   script:
     - echo "Stopping pages deployment for MR $CI_MERGE_REQUEST_IID"
   environment:
@@ -910,12 +796,12 @@ stop-pages-mr:
 
 pages-publish:
   stage: publish
+  interruptible: false
   image: *image-node
   needs: []
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        - "docs/user/**/*"
+      changes: *user-docs-files
   variables:
     ASTRO_SITE: https://$CI_PAGES_HOSTNAME
     ASTRO_BASE: /$CI_PROJECT_NAME/
@@ -935,8 +821,8 @@ release:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   before_script:
     - export VERSION=$(echo ${CI_COMMIT_TAG} | cut -c2-)
-    - git config --global user.email "no-reply@drupal.org"
-    - git config --global user.name "drupal.org GitLab CI"
+    - git config --local user.email "no-reply@drupal.org"
+    - git config --local user.name "drupal.org GitLab CI"
     - git remote set-url origin https://gitlab-ci-token:${GITLAB_CI_RELEASE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
   script:
     - |
@@ -956,7 +842,6 @@ release:
     - git push origin $VERSION
     - git archive --format=zip --prefix="${CI_PROJECT_NAME}-${VERSION}/" HEAD > ${CI_PROJECT_NAME}-${VERSION}.zip
   artifacts:
-    expose_as: 'Release archive'
     paths:
-      - '${CI_PROJECT_NAME}-${VERSION}.zip'
+      - '${CI_PROJECT_NAME}-*.zip'
     expire_in: never

@@ -53,18 +53,18 @@ const DrupalInputMultivalueForm = ({
   const isAutocomplete =
     attributes?.class instanceof Array &&
     attributes?.class?.includes('form-autocomplete');
-  const initialValue = attributes.value || attributes.defaultValue || '';
-
+  const initialValue = attributes.value ?? attributes.defaultValue ?? '';
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [popoverContainer, setPopoverContainer] =
     useState<HTMLDivElement | null>(null);
   const [displayValue, setDisplayValue] = useState<string>(
-    initialValue as string,
+    String(initialValue ?? ''),
   );
 
   const fieldLabel = attributes['data-field-label'] || '';
+  const displayText = displayValue === '' ? 'Empty' : String(displayValue);
 
   const hasError = () =>
     popoverContainer &&
@@ -196,14 +196,14 @@ const DrupalInputMultivalueForm = ({
             ref={triggerButtonRef}
             className={styles.listItem}
             type="button"
-            aria-label={`Edit ${fieldLabel}: ${displayValue || 'Empty'}`}
+            aria-label={`Edit ${fieldLabel}: ${displayText}`}
           >
             <Text
               size="2"
               className={styles.itemText}
               data-canvas-multivalue-label
             >
-              {displayValue || 'Empty'}
+              {displayText}
             </Text>
             <ArrowRightIcon className={styles.arrowIcon} />
           </button>
