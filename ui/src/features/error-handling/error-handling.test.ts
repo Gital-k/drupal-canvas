@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+
+
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
+
+
+
+
 
 describe('extractErrorMessageFromApiResponse', () => {
   it('returns a fallback message when errors are absent or empty', () => {
@@ -124,7 +130,7 @@ describe('extractErrorMessageFromApiResponse', () => {
     expect(result).toContain('Prop "first" has invalid example value');
     expect(result).toContain('Prop "second" has invalid example value');
     expect(result).toContain('Prop "third" has invalid example value');
-    // Follow-on errors for sdff are suppressed.
+    // Follow-on errors for second are suppressed.
     expect(result).not.toContain('meta:enum');
     expect(result).not.toContain('must be defined in');
     // Low-quality primitive type fallbacks are suppressed.
@@ -132,7 +138,6 @@ describe('extractErrorMessageFromApiResponse', () => {
       'This value should be of the correct primitive type.',
     );
   });
-
 
   it('shows "This value should be of the correct primitive type." once per affected field when it is the only message type', () => {
     const error = {
