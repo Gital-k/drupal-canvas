@@ -376,7 +376,8 @@ downloaded by default and can be controlled with `--skip-css` to exclude them or
 ### `pull`
 
 Pull code components and global CSS from Drupal to your local filesystem. Pages,
-content templates, and Brand Kit fonts are only included when explicitly enabled.
+content templates, and Brand Kit fonts are only included when explicitly
+enabled.
 
 **Usage:**
 
