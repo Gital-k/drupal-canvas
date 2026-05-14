@@ -15,7 +15,7 @@ export function resolveCanvasConfig(options: {
     regionsDir: './regions',
     deprecatedComponentDir: './components',
     globalCssPath: './src/components/global.css',
-    layoutPath: './src/layout.tsx',
+    layoutPath: './src/layout.jsx',
   };
 
   const configPath = resolve(options.hostRoot, 'canvas.config.json');
