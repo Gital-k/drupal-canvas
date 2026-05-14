@@ -1,4 +1,12 @@
 import { useEffect, useState } from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@wb/client/components/ui/select';
 import { fetchPreviewEntitySuggestions } from '@wb/lib/preview-entity-suggestions';
 
 import type { PreviewEntitySuggestion } from '@wb/lib/preview-entity-suggestions';
@@ -132,6 +140,14 @@ export function ContentTemplateEntityPicker({
     );
   }
 
+  const selectedEntity =
+    loadState.entities.find((entity) => entity.id === selectedEntityId) ??
+    loadState.entities[0];
+  const selectItems = loadState.entities.map((entity) => ({
+    label: entity.label,
+    value: entity.id,
+  }));
+
   return (
     <div className="flex items-center gap-2 border p-2 text-xs">
       <label
@@ -140,20 +156,26 @@ export function ContentTemplateEntityPicker({
       >
         Preview content:
       </label>
-      <select
-        id="canvas-content-template-entity-picker"
-        className="border bg-transparent px-2 py-1 font-mono text-xs"
-        value={selectedEntityId ?? loadState.entities[0].id}
-        onChange={(event) => {
-          onSelect(event.target.value);
+      <Select
+        items={selectItems}
+        value={selectedEntity.id}
+        onValueChange={(id) => {
+          onSelect(id);
         }}
       >
-        {loadState.entities.map((entity) => (
-          <option key={entity.id} value={entity.id}>
-            {entity.label}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id="canvas-content-template-entity-picker">
+          <SelectValue placeholder="Select preview content" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {loadState.entities.map((entity: PreviewEntitySuggestion) => (
+              <SelectItem key={entity.id} value={entity.id}>
+                {entity.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
     </div>
   );
 }
