@@ -19,8 +19,15 @@ function useSyncIframeHeightToContent(
       window.requestAnimationFrame(() => {
         if (previewContainer?.style) {
           // set the iFrame container height to the height of the content inside the iFrame.
-          if (iframeHTML?.offsetHeight) {
-            previewContainer.style.height = `${iframeHTML.offsetHeight}px`;
+          const contentHeight = Math.max(
+            iframeBody?.scrollHeight || 0,
+            iframeBody?.offsetHeight || 0,
+            iframeHTML?.clientHeight || 0,
+            iframeHTML?.scrollHeight || 0,
+            iframeHTML?.offsetHeight || 0
+          );
+          if (contentHeight) {
+            previewContainer.style.height = `${contentHeight}px`;
           }
         }
         if (iframeHTML?.style) {
@@ -40,6 +47,7 @@ function useSyncIframeHeightToContent(
 
         if (iframeContentDoc) {
           const iframeHTML = iframeContentDoc.documentElement;
+          const iframeBody = iframeContentDoc.body;
 
           // initially set the iFrame height to the height passed in to the hook
           iframe.style.height = height + 'px';
@@ -53,7 +61,8 @@ function useSyncIframeHeightToContent(
           });
           resizeObserverRef.current = new ResizeObserver(resizeIframe);
           resizeObserverRef.current.observe(iframeHTML);
-
+          resizeObserverRef.current.observe(iframeBody);
+          
           // Apply a max-height to elements with vh units in their height - otherwise an infinite loop can occur where a component's
           // height is based on the height of the iFrame and the iFrame's height is based on that component leading
           // to an ever-increasing iFrame height!
