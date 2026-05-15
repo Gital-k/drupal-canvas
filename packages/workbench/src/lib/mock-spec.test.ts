@@ -45,7 +45,38 @@ describe('mock-spec', () => {
     });
   });
 
-  it('merges shorthand mock props with component example props', () => {
+  it('normalizes shorthand mock entries with no props to empty props', () => {
+    const result = parseMockSpecArray(
+      {
+        mocks: [
+          {
+            name: 'Default',
+          },
+        ],
+      },
+      '/tmp/components/spacer/mocks.json',
+      {
+        componentName: 'spacer',
+        componentNames: ['spacer'],
+      },
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.mocks[0]).toEqual({
+      name: 'Default',
+      spec: {
+        root: 'canvas:mock-root',
+        elements: {
+          'canvas:mock-root': {
+            type: 'spacer',
+            props: {},
+          },
+        },
+      },
+    });
+  });
+
+  it('merges only required example props into shorthand mock props', () => {
     const result = parseMockSpecArray(
       {
         mocks: [
@@ -66,6 +97,7 @@ describe('mock-spec', () => {
           backgroundColor: 'crust',
           darkVariant: true,
         },
+        componentRequiredPropNames: ['title', 'darkVariant'],
       },
     );
 
@@ -74,7 +106,6 @@ describe('mock-spec', () => {
       type: 'hero',
       props: {
         title: 'Example title',
-        backgroundColor: 'crust',
         darkVariant: false,
       },
     });
@@ -133,6 +164,54 @@ describe('mock-spec', () => {
     });
   });
 
+  it('normalizes slots mock entries with no props to empty root props', () => {
+    const result = parseMockSpecArray(
+      {
+        mocks: [
+          {
+            name: 'With content',
+            slots: {
+              content: ['text'],
+            },
+            elements: {
+              text: {
+                type: 'text',
+                props: {
+                  body: 'Hello',
+                },
+              },
+            },
+          },
+        ],
+      },
+      '/tmp/components/container/container.mocks.json',
+      {
+        componentName: 'container',
+        componentNames: ['container', 'text'],
+      },
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.mocks[0].spec).toEqual({
+      root: 'canvas:mock-root',
+      elements: {
+        'canvas:mock-root': {
+          type: 'container',
+          props: {},
+          slots: {
+            content: ['text'],
+          },
+        },
+        text: {
+          type: 'text',
+          props: {
+            body: 'Hello',
+          },
+        },
+      },
+    });
+  });
+
   it('preserves advanced-format mock entries', () => {
     const normalized = normalizeMockSpecEntry({
       name: 'In grid',
@@ -160,6 +239,7 @@ describe('mock-spec', () => {
         elements: {
           'card-grid': {
             type: 'grid',
+            props: {},
             slots: {
               items: ['card-1'],
             },
@@ -202,6 +282,7 @@ describe('mock-spec', () => {
           entryTierName: 'Starter',
           buttonLabel: 'Choose {tier}',
         },
+        componentRequiredPropNames: ['entryTierName'],
       },
     );
 
@@ -209,7 +290,6 @@ describe('mock-spec', () => {
       type: 'pricing-table',
       props: {
         entryTierName: 'Starter',
-        buttonLabel: 'Choose {tier}',
       },
     });
     expect(normalized.spec.elements['pricing-table-in-section']).toEqual({
@@ -336,6 +416,10 @@ describe('mock-spec', () => {
 
     expect(result.issues).toEqual([]);
     expect(result.mocks).toHaveLength(1);
+    expect(result.mocks[0].spec.elements['card-footer']).toEqual({
+      type: 'button',
+      props: {},
+    });
   });
 
   it('keeps unknown advanced-format component types for later render-time handling', () => {
@@ -395,6 +479,7 @@ describe('mock-spec', () => {
           entryTierName: 'Starter',
           buttonLabel: 'Choose {tier}',
         },
+        componentRequiredPropNames: ['entryTierName'],
       },
     );
 
@@ -403,7 +488,6 @@ describe('mock-spec', () => {
       type: 'pricing-table',
       props: {
         entryTierName: 'Starter',
-        buttonLabel: 'Choose {tier}',
       },
     });
   });

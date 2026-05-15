@@ -31,7 +31,11 @@ export default defineConfig({
   deps: {
     // Bundle these workspace packages into the published config so consumers do
     // not need the Canvas monorepo source layout at runtime.
-    alwaysBundle: ['@drupal-canvas/discovery', '@drupal-canvas/vite-compat'],
+    alwaysBundle: [
+      '@drupal-canvas/auth',
+      '@drupal-canvas/discovery',
+      '@drupal-canvas/vite-compat',
+    ],
     // These are pulled in transitively when the published Vite config bundles
     // the discovery and Vite compatibility helpers used by the Workbench server.
     onlyBundle: ['glob', 'ignore', 'js-yaml'],
@@ -47,7 +51,7 @@ export default defineConfig({
     ],
   },
   dts: false,
-  entry: ['vite.published.config.ts'],
+  entry: ['vite.published.config.ts', 'src/server/preview-build.ts'],
   format: ['es'],
   hooks: {
     async 'build:done'(ctx) {

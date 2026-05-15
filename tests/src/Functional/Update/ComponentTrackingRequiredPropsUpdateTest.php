@@ -28,6 +28,7 @@ final class ComponentTrackingRequiredPropsUpdateTest extends CanvasUpdatePathTes
    * The 5 test cases to test the update path, each needs a generated Component.
    *
    * @see tests/fixtures/update/tracking-required/generate-components-with-multiple-versions.php
+   * @phpstan-ignore-next-line shipmonk.deadConstant
    */
   public const TEST_CASES = [
     'case_a__active_hasnot_required__past_hasnot_required' => '>1 version, active NOT required, past NOT required',
@@ -46,7 +47,7 @@ final class ComponentTrackingRequiredPropsUpdateTest extends CanvasUpdatePathTes
     $this->databaseDumpFiles[] = \dirname(__DIR__, 3) . '/fixtures/update/tracking-required/tracking-required-fixture.php';
   }
 
-  private function assertExpectedVersionsAndRequiredness(string $component_id, array $expected_info): void {
+  private static function assertExpectedVersionsAndRequiredness(string $component_id, array $expected_info): void {
     $before = Component::load($component_id);
     self::assertInstanceOf(Component::class, $before);
     self::assertSame(\array_keys($expected_info), $before->getVersions(), $component_id);

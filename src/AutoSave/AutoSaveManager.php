@@ -334,7 +334,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     [
       // Remove the unique session key for anonymous users.
       'owner' => \is_numeric($entry['owner']) ? (int) $entry['owner'] : 0,
-      'entity' => $with_entities ? $this->entityTypeManager->getStorage($entry['entity_type'])->create($entry['data']) : NULL,
+      'entity' => $with_entities ? $this->entityTypeManager->getStorage($entry['entity_type'])->create($entry['data'])->enforceIsNew(FALSE) : NULL,
     ], $entries);
     return $result;
   }
@@ -429,7 +429,10 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert($entity->getEntityType() instanceof ConfigEntityTypeInterface);
     $properties_to_assess = $entity->getEntityType()->getPropertiesToExport();
     \assert(\is_array($properties_to_assess));
-    $auto_save_updatable_properties = \array_intersect_key($entity->getEntityType()->getKeys(), \array_flip(['status', 'label']));
+    $auto_save_updatable_properties = \array_intersect_key(
+      $entity->getEntityType()->getKeys(),
+      \array_flip(['status', 'label']),
+    );
 
     // Ensure that no properties other than `status` and `label` were modified;
     // otherwise the auto-save entry must be deleted.

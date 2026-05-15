@@ -2,7 +2,8 @@
 
 Canvas Workbench is a local preview and development app for Drupal Canvas Code
 Components, inspired by Storybook. It scans your project, lists discovered
-components and pages, and renders previews in an isolated frame.
+components, pages, and content templates, and renders previews in an isolated
+frame.
 
 Workbench has no required configuration. If your project uses the default Canvas
 layout, you can run it from your project root:
@@ -39,8 +40,9 @@ need:
 
 ```json
 {
-  "componentDir": "./components",
+  "componentDir": "./src/components",
   "pagesDir": "./pages",
+  "contentTemplatesDir": "./content-templates",
   "aliasBaseDir": "src",
   "globalCssPath": "./src/components/global.css"
 }
@@ -48,16 +50,65 @@ need:
 
 Workbench reads these options:
 
-| Property        | Default                         | Used for                                                                                                                 |
-| --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `componentDir`  | `process.cwd()`                 | Root directory Workbench scans for `component.yml`, `*.component.yml`, source files, and mocks.                          |
-| `pagesDir`      | `"./pages"`                     | Directory Workbench scans for page specs such as `pages/home.json`.                                                      |
-| `aliasBaseDir`  | `"src"`                         | Base directory for resolving `@/` imports inside component source files.                                                 |
-| `globalCssPath` | `"./src/components/global.css"` | Global CSS entrypoint loaded into the preview iframe. This is where Workbench picks up shared styles and Tailwind setup. |
+| Property              | Default                         | Used for                                                                                                                          |
+| --------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `componentDir`        | `"src/components"`              | Root directory Workbench scans for `component.yml`, `*.component.yml`, source files, and mocks. It must be inside `aliasBaseDir`. |
+| `pagesDir`            | `"./pages"`                     | Directory Workbench scans for page specs such as `pages/home.json`.                                                               |
+| `contentTemplatesDir` | `"./content-templates"`         | Directory Workbench scans for content template specs such as `content-templates/node.article.full.json`.                          |
+| `aliasBaseDir`        | `"src"`                         | Base directory for resolving `@/` imports inside component source files.                                                          |
+| `globalCssPath`       | `"./src/components/global.css"` | Global CSS entrypoint loaded into the preview iframe. This is where Workbench picks up shared styles and Tailwind setup.          |
 
 If `canvas.config.json` is not present, Workbench uses those defaults.
 `outputDir` is part of the wider Canvas config surface, but Workbench does not
 use it.
+
+## Preview build command
+
+Workbench can export target-based standalone preview artifacts into the output
+directory you pass with `--out-dir`.
+
+```bash
+npx canvas-workbench preview-build --component-path components/card/component.yml --out-dir .canvas-preview/card
+```
+
+```bash
+npx canvas-workbench preview-build --page-path pages/home.json --out-dir .canvas-preview/home
+```
+
+`--component-path` must point to a component metadata file discovered inside the
+configured `componentDir`. `--page-path` must point to a page JSON file inside
+the configured `pagesDir`. Paths elsewhere in the project are not supported,
+because preview discovery, mocks, and `@/` module resolution are scoped to those
+configured roots. If your files live under a different tree, update
+`canvas.config.json` first.
+
+For component targets, output writes:
+
+- `component-default.html`
+- `component-mock-01.html`, `component-mock-02.html`, and so on for each mock
+- `manifest.json`
+
+For page targets, output writes:
+
+- `page-default.html`
+- `manifest.json`
+
+`manifest.json` is target-specific:
+
+- Component manifests include `entries.default` and `entries.mocks`.
+- Page manifests include only `entries.default`.
+- Each entry includes `path` and `label`.
+- Entry `path` values are relative to the export directory, so the bundle stays
+  portable when you move or copy it.
+- The default entry uses `Default`, and mock entries use each mock name.
+
+The command also prints one JSON payload to stdout with `request`, `target`,
+`renderMode` (`interactive`), `outDir`, `manifestPath`, summary counts, plus
+warnings and errors.
+
+Each exported HTML file is self-contained. Local asset imports, such as fonts
+and images, are bundled inline as data URLs. Binary assets, such as WOFF2 and
+PNG files, use base64 encoding in those URLs.
 
 ## User docs
 

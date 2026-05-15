@@ -153,6 +153,41 @@ describe('authoredSpecToComponentTree', () => {
     ]);
   });
 
+  it('generates valid UUIDs for non-UUID element keys', () => {
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    const elements: AuthoredSpecElementMap = {
+      hero: {
+        type: 'js.hero',
+        props: { heading: 'Welcome' },
+        slots: {
+          actions: ['cta-button'],
+        },
+      },
+      'cta-button': {
+        type: 'js.button',
+        props: { label: 'Click' },
+      },
+    };
+
+    const tree = authoredSpecToComponentTree(elements);
+    expect(tree).toHaveLength(2);
+
+    const hero = tree.find((c) => c.component_id === 'js.hero')!;
+    const button = tree.find((c) => c.component_id === 'js.button')!;
+
+    // Both should have valid UUIDs, not the original keys.
+    expect(hero.uuid).toMatch(uuidRegex);
+    expect(hero.uuid).not.toBe('hero');
+    expect(button.uuid).toMatch(uuidRegex);
+    expect(button.uuid).not.toBe('cta-button');
+
+    // Parent relationship should use the generated UUID.
+    expect(button.parent_uuid).toBe(hero.uuid);
+    expect(button.slot).toBe('actions');
+  });
+
   it('defaults missing props to an empty object', () => {
     const spacerId = '44444444-4444-4444-8444-444444444444';
 
@@ -182,6 +217,7 @@ describe('pageToAuthoredSpec', () => {
       id: 1,
       uuid: '27a539f5-2dd0-471a-a364-8fee7a024a73',
       title: 'Empty Page',
+      description: '',
       status: true,
       path: '/empty',
       internalPath: '/page/1',
@@ -194,7 +230,47 @@ describe('pageToAuthoredSpec', () => {
     expect(pageToAuthoredSpec(page)).toEqual({
       uuid: '27a539f5-2dd0-471a-a364-8fee7a024a73',
       title: 'Empty Page',
+      path: '/empty',
+      description: '',
       elements: {},
+    });
+  });
+
+  it('saves empty component props returned from the api as an array as an empty object', () => {
+    const page: Page = {
+      id: 1,
+      uuid: '27a539f5-2dd0-471a-a364-8fee7a024a73',
+      title: 'Test',
+      description: '',
+      status: true,
+      path: '/test',
+      internalPath: '/page/1',
+      autoSaveLabel: null,
+      autoSavePath: null,
+      links: {},
+      components: [
+        {
+          uuid: '48030ccd-8ed3-4d90-8866-bb0fe55dda0d',
+          component_id: 'js.spacer',
+          component_version: 'v1',
+          parent_uuid: null,
+          slot: null,
+          inputs: [] as unknown as Record<string, unknown>,
+          inputs_resolved: [] as unknown as Record<string, unknown>,
+          label: null,
+        },
+      ],
+    };
+
+    const result = pageToAuthoredSpec(page) as {
+      elements: AuthoredSpecElementMap;
+    };
+
+    expect(result.elements).toEqual({
+      '48030ccd-8ed3-4d90-8866-bb0fe55dda0d': {
+        type: 'js.spacer',
+        props: {},
+      },
     });
   });
 
@@ -203,6 +279,7 @@ describe('pageToAuthoredSpec', () => {
       id: 1,
       uuid: '27a539f5-2dd0-471a-a364-8fee7a024a73',
       title: 'Test',
+      description: '',
       status: true,
       path: '/test',
       internalPath: '/page/1',
@@ -235,10 +312,15 @@ describe('pageToAuthoredSpec', () => {
   });
 
   it('round-trips nested components through authored spec helpers', () => {
+    const heroUuid = '489ba42c-abde-47ed-ae72-c8d577154841';
+    const textUuid = '01561529-b81a-43ae-afd6-7566c1bac4df';
+    const buttonUuid = 'f7f47df3-b4a1-483e-bf78-01641eddec06';
+
     const page: Page = {
       id: 1,
       uuid: '27a539f5-2dd0-471a-a364-8fee7a024a73',
       title: 'Home',
+      description: 'Welcome to the homepage',
       status: true,
       path: '/home',
       internalPath: '/page/1',
@@ -247,7 +329,7 @@ describe('pageToAuthoredSpec', () => {
       links: {},
       components: [
         {
-          uuid: 'hero-uuid',
+          uuid: heroUuid,
           component_id: 'js.hero',
           component_version: 'v1',
           parent_uuid: null,
@@ -257,20 +339,20 @@ describe('pageToAuthoredSpec', () => {
           label: null,
         },
         {
-          uuid: 'text-uuid',
+          uuid: textUuid,
           component_id: 'js.text',
           component_version: 'v2',
-          parent_uuid: 'hero-uuid',
+          parent_uuid: heroUuid,
           slot: 'content',
           inputs: { body: 'Hello' },
           inputs_resolved: { body: 'Hello' },
           label: null,
         },
         {
-          uuid: 'button-uuid',
+          uuid: buttonUuid,
           component_id: 'js.button',
           component_version: 'v3',
-          parent_uuid: 'hero-uuid',
+          parent_uuid: heroUuid,
           slot: 'actions',
           inputs: { label: 'Read more' },
           inputs_resolved: { label: 'Read more' },
@@ -288,11 +370,13 @@ describe('pageToAuthoredSpec', () => {
     expect(result).toMatchObject({
       uuid: '27a539f5-2dd0-471a-a364-8fee7a024a73',
       title: 'Home',
+      path: '/home',
+      description: 'Welcome to the homepage',
       elements: {
-        'hero-uuid': {
+        [heroUuid]: {
           slots: {
-            content: ['text-uuid'],
-            actions: ['button-uuid'],
+            content: [textUuid],
+            actions: [buttonUuid],
           },
         },
       },
@@ -308,5 +392,64 @@ describe('pageToAuthoredSpec', () => {
         ]),
       ),
     ).toEqual(page.components.map(({ inputs_resolved: _, ...rest }) => rest));
+  });
+
+  it('stores media provenance in _provenance when inputs_resolved contains resolved media data', () => {
+    const page: Page = {
+      id: 1,
+      uuid: '27a539f5-2dd0-471a-a364-8fee7a024a73',
+      title: 'Gallery',
+      description: '',
+      status: true,
+      path: '/gallery',
+      internalPath: '/page/1',
+      autoSaveLabel: null,
+      autoSavePath: null,
+      links: {},
+      components: [
+        {
+          uuid: 'image-uuid',
+          component_id: 'js.hero',
+          component_version: 'v1',
+          parent_uuid: null,
+          slot: null,
+          inputs: { image: { target_id: 42 } },
+          inputs_resolved: {
+            image: {
+              src: '/sites/default/files/example.jpg',
+              alt: 'Example image',
+              width: 1200,
+              height: 800,
+            },
+          },
+          label: null,
+        },
+      ],
+    };
+
+    expect(pageToAuthoredSpec(page)).toEqual({
+      uuid: '27a539f5-2dd0-471a-a364-8fee7a024a73',
+      title: 'Gallery',
+      path: '/gallery',
+      description: '',
+      elements: {
+        'image-uuid': {
+          type: 'js.hero',
+          props: {
+            image: {
+              src: '/sites/default/files/example.jpg',
+              alt: 'Example image',
+              width: 1200,
+              height: 800,
+            },
+          },
+          _provenance: {
+            image: {
+              target_id: 42,
+            },
+          },
+        },
+      },
+    });
   });
 });

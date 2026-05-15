@@ -3,6 +3,7 @@ import clsx from 'clsx';
 
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
+import { resolveEntityUri } from '@/utils/transforms';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -44,7 +45,12 @@ const TextFieldAutocomplete = ({
               'data-canvas-autocomplete-selected',
             );
             if (selection) {
-              record.target.value = selection;
+              // @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetSingleElementLinkDefaultWidgetFormAlter()
+              const shouldResolveEntityUri =
+                record.target.dataset.canvasResolveEntityUri === 'true';
+              record.target.value = shouldResolveEntityUri
+                ? resolveEntityUri(selection)
+                : selection;
             }
 
             // Remove the attribute to prevent multiple attempts to update the

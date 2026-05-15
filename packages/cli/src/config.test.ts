@@ -40,14 +40,17 @@ describe('config', () => {
         clientId: '',
         clientSecret: '',
         componentDir: './components',
+        contentTemplatesDir: './content-templates',
         deprecatedComponentDir: './components',
         fonts: undefined,
         globalCssPath: './src/components/global.css',
         includePages: false,
+        includeContentTemplates: false,
         includeBrandKit: false,
         outputDir: 'dist',
         pagesDir: './pages',
-        scope: 'canvas:js_component canvas:asset_library',
+        scope:
+          'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
         siteUrl: '',
         userAgent: '',
       });
@@ -63,14 +66,17 @@ describe('config', () => {
         clientId: 'test-client',
         clientSecret: '',
         componentDir: './components',
+        contentTemplatesDir: './content-templates',
         deprecatedComponentDir: './components',
         fonts: undefined,
         globalCssPath: './src/components/global.css',
         includePages: false,
+        includeContentTemplates: false,
         includeBrandKit: false,
         outputDir: 'dist',
         pagesDir: './pages',
-        scope: 'canvas:js_component canvas:asset_library',
+        scope:
+          'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
         siteUrl: 'https://example.com',
         userAgent: '',
       });
@@ -244,7 +250,7 @@ describe('config', () => {
       vi.stubEnv('CANVAS_CLIENT_SECRET', 'test-secret');
       vi.stubEnv(
         'CANVAS_SCOPE',
-        'canvas:js_component canvas:asset_library canvas:page:create canvas:page:read canvas:page:edit',
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
       );
       vi.stubEnv('CANVAS_INCLUDE_PAGES', 'true');
       vi.stubEnv('CANVAS_USER_AGENT', 'simpletest123456');
@@ -256,16 +262,18 @@ describe('config', () => {
         aliasBaseDir: 'src',
         clientId: 'test-client',
         clientSecret: 'test-secret',
-        componentDir: process.cwd(),
+        componentDir: 'src/components',
+        contentTemplatesDir: './content-templates',
         deprecatedComponentDir: './components',
         fonts: undefined,
         globalCssPath: './src/components/global.css',
         includePages: true,
+        includeContentTemplates: false,
         includeBrandKit: false,
         outputDir: 'dist',
         pagesDir: './pages',
         scope:
-          'canvas:js_component canvas:asset_library canvas:page:create canvas:page:read canvas:page:edit',
+          'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
         siteUrl: 'https://test.example.com',
         userAgent: 'simpletest123456',
       });
@@ -282,10 +290,13 @@ describe('config', () => {
         siteUrl: '',
         clientId: '',
         clientSecret: '',
-        includePages: false,
         includeBrandKit: false,
-        scope: 'canvas:js_component canvas:asset_library',
-        componentDir: process.cwd(),
+        includeContentTemplates: false,
+        includePages: false,
+        scope:
+          'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
+        componentDir: 'src/components',
+        contentTemplatesDir: './content-templates',
         deprecatedComponentDir: './components',
         fonts: undefined,
         globalCssPath: './src/components/global.css',
@@ -302,7 +313,7 @@ describe('config', () => {
 
       expect(getConfig().includePages).toBe(true);
       expect(getConfig().scope).toBe(
-        'canvas:js_component canvas:asset_library canvas:page:create canvas:page:read canvas:page:edit',
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
       );
     });
   });

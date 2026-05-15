@@ -7,11 +7,11 @@ import { isolatedPerTest as test } from '../../fixtures/test.js';
  * This test suite will verify Canvas AI related features.
  */
 
+test.use({ modules: ['canvas_ai_test'], enableTestExtensions: true });
+
 test.describe('AI Features', () => {
   test.beforeEach(async ({ drupal }) => {
-    await drupal.enableTestExtensions();
     await drupal.loginAsAdmin();
-    await drupal.installModules(['canvas_ai_test']);
     await drupal.createRole({ name: 'ai_editor' });
     await drupal.createUser({
       email: `ai_editor@example.com`,
@@ -115,7 +115,7 @@ test.describe('AI Features', () => {
       page
         .getByTestId('canvas-ai-panel')
         .locator('div.submit-button[role="button"]'),
-    ).not.toBeVisible();
+    ).toBeHidden();
 
     await page
       .getByRole('textbox', { name: 'Build me a' })
@@ -132,10 +132,10 @@ test.describe('AI Features', () => {
       .click();
     await expect(
       page.locator('#file-attachment-container img.image-attachment'),
-    ).not.toBeVisible();
+    ).toBeHidden();
     await expect(
       page.locator('#file-attachment-container .remove-file-attachment-button'),
-    ).not.toBeVisible();
+    ).toBeHidden();
   });
 
   test('Generate title', async ({ page, drupal, canvas, ai }) => {

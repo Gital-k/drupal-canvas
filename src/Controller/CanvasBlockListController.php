@@ -78,7 +78,11 @@ final class CanvasBlockListController extends BlockListController implements Eve
 
     // Load the editable page regions for the current default theme.
     $theme = $theme ?? $this->configFactory->get('system.theme')->get('default');
-    $regions = $this->entityTypeManager->getStorage(PageRegion::ENTITY_TYPE_ID)->loadByProperties(['theme' => $theme, 'status' => TRUE]);
+    $regions = $this->entityTypeManager->getStorage(PageRegion::ENTITY_TYPE_ID)
+      ->loadByProperties([
+        'theme' => $theme,
+        'status' => TRUE,
+      ]);
     if (!empty($regions)) {
       $theme_settings_url = Url::fromRoute('system.theme_settings_theme', ['theme' => $theme]);
       $link = Link::fromTextAndUrl($this->t('theme'), $theme_settings_url)->toString();
@@ -96,7 +100,7 @@ final class CanvasBlockListController extends BlockListController implements Eve
     return $events;
   }
 
-  public function onAlterRoutes(RouteBuildEvent $event): void {
+  public static function onAlterRoutes(RouteBuildEvent $event): void {
     $collection = $event->getRouteCollection();
     if ($route = $collection->get('block.admin_display')) {
       $route->setDefault('_controller', static::class . '::listing');

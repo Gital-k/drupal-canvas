@@ -5,14 +5,20 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 // cspell:ignore Bwidth Fitok Synx Tilly anzut nhsy sxnz Umso Dzyawdvr Mafgg Royu Cmsy Pmsg Lgfkq ergmkgy Ptgi Ltxk
+
+use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\Attributes\TestWith;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery;
+use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\NestedArray;
@@ -23,6 +29,7 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\StorageInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
@@ -35,7 +42,6 @@ use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\link\LinkItemInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
 use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\CodeComponentDataProvider;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Component;
@@ -44,7 +50,13 @@ use Drupal\file\FileInterface;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\PropSource\StaticPropSource;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\node\Entity\Node;
+use Drupal\node\Entity\NodeType;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\media\Entity\MediaType;
 use Drupal\canvas_test_code_components\Hook\IslandCastaway;
@@ -63,10 +75,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use CacheBustingTrait;
+  use CreateTestJsComponentTrait;
 
   protected readonly AssetResolverInterface $assetResolver;
-  protected readonly CodeComponentDataProvider $codeComponentDataProvider;
-
   /**
    * @see ::testRenderSdcWithOptionalObjectShape())
    */
@@ -82,6 +93,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // For testing a code component using the "video" prop shape.
     'field',
     'canvas_test_video_fixture',
+    'node',
   ];
 
   /**
@@ -90,7 +102,6 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
   public function setUp(): void {
     parent::setUp();
     $this->assetResolver = $this->container->get(AssetResolverInterface::class);
-    $this->codeComponentDataProvider = $this->container->get(CodeComponentDataProvider::class);
 
     // For testing a code component using the "video" prop shape.
     $this->installEntitySchema('field_storage_config');
@@ -117,7 +128,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $this->container->get('config.installer')->installDefaultConfig('module', 'canvas_test_code_components');
   }
 
-  private function createFontFile(string $filename = 'test-font.woff2'): string {
+  private static function createFontFile(string $filename = 'test-font.woff2'): string {
     return BrandKit::ARTIFACTS_DIRECTORY . $filename;
   }
 
@@ -261,6 +272,9 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         ],
       ],
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
+        'prop_field_definitions' => [],
+      ],
+      'js.canvas_test_code_components_using_drupalsettings_get_theme_assets' => [
         'prop_field_definitions' => [],
       ],
       'js.canvas_test_code_components_using_get_page_data' => [
@@ -865,6 +879,29 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'import_maps' => $default_imports,
         ],
       ],
+      'js.canvas_test_code_components_using_drupalsettings_get_theme_assets' => [
+        'cacheability' => (clone $default_cacheability)
+          ->setCacheTags([
+            'config:canvas.js_component.canvas_test_code_components_using_drupalsettings_get_theme_assets',
+          ]),
+        'attachments' => [
+          'library' => [
+            'canvas/astro_island.canvas_test_code_components_using_drupalsettings_get_theme_assets',
+            ...$default_libraries,
+          ],
+          'html_head_link' => [
+            ...$default_html_head_links,
+            [
+              [
+                'rel' => 'modulepreload',
+                'fetchpriority' => 'high',
+                'href' => \sprintf('/%s/files/astro-island/YA8XnDFY2bejxOaOhkOI0tf8p26EOJcqAjvZvT1TSiA.js', $site_path),
+              ],
+            ],
+          ],
+          'import_maps' => $default_imports,
+        ],
+      ],
     ], $rendered_without_html);
   }
 
@@ -1151,6 +1188,11 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
         'config' => [
           'canvas.js_component.canvas_test_code_components_using_drupalsettings_get_site_data',
+        ],
+      ],
+      'js.canvas_test_code_components_using_drupalsettings_get_theme_assets' => [
+        'config' => [
+          'canvas.js_component.canvas_test_code_components_using_drupalsettings_get_theme_assets',
         ],
       ],
       'js.canvas_test_code_components_using_get_page_data' => [
@@ -1597,7 +1639,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                   'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/video',
+              'id' => JsonSchemaObjectRef::Video->value,
             ],
             'sourceType' => 'static:field_item:entity_reference',
             // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
@@ -1702,6 +1744,16 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         'propSources' => [],
         'transforms' => [],
       ],
+      'js.canvas_test_code_components_using_drupalsettings_get_theme_assets' => [
+        'expected_output_selectors' => [
+          'canvas-island[opts*="Using drupalSettings getThemeAssets"][props="{}"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
+        ],
+        'source' => 'Code component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
+        'transforms' => [],
+      ],
       'js.canvas_test_code_components_using_get_page_data' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Using drupalSettings getPageData"][props="{}"]',
@@ -1760,7 +1812,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                   'type' => 'integer',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -1834,6 +1886,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
               'items' => [
                 'type' => 'string',
               ],
+              'minItems' => 1,
             ],
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
@@ -1932,7 +1985,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                     'type' => 'integer',
                   ],
                 ],
-                'id' => 'json-schema-definitions://canvas.module/image',
+                'id' => JsonSchemaObjectRef::Image->value,
               ],
             ],
             'sourceType' => 'static:field_item:image',
@@ -2653,6 +2706,31 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     return \sprintf('The JavaScript Component with ID `%s` does not exist.', self::PSEUDO_RANDOM_CODE_COMPONENT_ID);
   }
 
+  #[DataProvider('providerGetTranslatableInputKeys')]
+  public function testGetTranslatableInputKeys(string $host_entity_type_id, array $host_entity_values, string $component_id, array $inputs, array $expected_translatable_inputs): void {
+    $this->createMyCtaComponentFromSdc();
+    parent::testGetTranslatableInputKeys($host_entity_type_id, $host_entity_values, $component_id, $inputs, $expected_translatable_inputs);
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceInputsConfigSchemaGenerator
+   */
+  public static function providerSymmetricallyTranslatableComponentInstanceScenarios(string $host_entity_type_id): \Generator {
+    foreach (SingleDirectoryComponentTest::providerSymmetricallyTranslatableComponentInstanceScenarios($host_entity_type_id) as $label => $test_case) {
+      // Reuse all the "my-cta" test cases from the SDC source's test coverage
+      // (because an equivalent code component can easily be made). Do not
+      // repeat other test cases; they're powered by the same logic anyway.
+      // @see \Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait::createMyCtaComponentFromSdc()
+      if ($test_case[0] !== 'sdc.canvas_test_sdc.my-cta') {
+        continue;
+      }
+      $test_case[0] = 'js.my-cta';
+      yield $label => $test_case;
+    }
+  }
+
   public static function providerResolvedComponentInputs(): \Generator {
     yield 'JsComponent that does not exist' => [
       'js.missing_component',
@@ -2680,6 +2758,459 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         ],
       ],
     ];
+  }
+
+  /**
+   * Resolves content-entity-reference prop inputs to a developer-key-keyed map.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::getExplicitInput
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::generateKeyForExpression
+   */
+  #[DataProvider('providerContentEntityReferencePropResolves')]
+  public function testContentEntityReferencePropResolves(
+    array $inputs,
+    array $value_fixtures,
+    bool $pass_host,
+    array $expected_resolved,
+    array $expected_cache_tag_fixtures,
+    array $expected_cache_contexts,
+    int $expected_cache_max_age,
+  ): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    foreach ($value_fixtures as $prop_name => $fixture_key) {
+      $value_entity = match ($fixture_key) {
+        'referenced_news' => $fixtures['referenced_news'],
+        'referenced_user' => $fixtures['referenced_user'],
+        default => throw new \UnexpectedValueException("Unknown value_fixture: $fixture_key"),
+      };
+      $inputs[$prop_name]['value'] = $value_entity->id();
+    }
+
+    $item = $this->buildComponentTreeItem($fixtures['component_id'], $inputs);
+    $uuid = $this->container->get('uuid')->generate();
+    $result = $fixtures['source']->getExplicitInput($uuid, $item, $pass_host ? $fixtures['host_news'] : NULL);
+
+    self::assertSame(['source', 'resolved'], \array_keys($result), 'result must contain only source and resolved, no extras');
+
+    // The parent-tracked source records each input's `sourceType` and
+    // `expression`. (Other fields like `value` are normalized by
+    // `PropSource::parse(...)->toArray()` — e.g. wrapped to `['target_id'
+    // => ...]` for entity references — so we don't compare the full array.)
+    $populated_props = \array_keys($inputs);
+    self::assertSame($populated_props, \array_keys($result['source']), 'source must contain only the populated props, no extras');
+    foreach ($populated_props as $prop) {
+      self::assertSame($inputs[$prop]['sourceType'], $result['source'][$prop]['sourceType']);
+      self::assertSame($inputs[$prop]['expression'], $result['source'][$prop]['expression']);
+    }
+
+    // The resolved entry: for content-entity-reference props, a label-keyed map
+    // carrying the referenced content entity's cacheability; for any other
+    // prop, the parent's resolved value passed through untouched.
+    self::assertSame($populated_props, \array_keys($result['resolved']), 'resolved must contain only the populated props, no extras');
+    $cacheability = new CacheableMetadata();
+    foreach ($populated_props as $prop) {
+      self::assertInstanceOf(EvaluationResult::class, $result['resolved'][$prop]);
+      self::assertSame($expected_resolved[$prop], $result['resolved'][$prop]->value);
+      $cacheability->addCacheableDependency($result['resolved'][$prop]);
+    }
+
+    $expected_tags = [];
+    foreach ($expected_cache_tag_fixtures as $key) {
+      $expected_tags[] = match ($key) {
+        'referenced_news' => 'node:' . $fixtures['referenced_news']->id(),
+        'host_news' => 'node:' . $fixtures['host_news']->id(),
+        'referenced_user' => 'user:' . $fixtures['referenced_user']->id(),
+        'host_news_owner' => 'user:' . $fixtures['host_news']->getOwnerId(),
+        default => throw new \UnexpectedValueException("Unknown cache tag fixture: $key"),
+      };
+    }
+    \sort($expected_tags);
+    $actual_tags = $cacheability->getCacheTags();
+    \sort($actual_tags);
+    self::assertSame($expected_tags, $actual_tags);
+    self::assertSame($expected_cache_contexts, $cacheability->getCacheContexts());
+    self::assertSame($expected_cache_max_age, $cacheability->getCacheMaxAge());
+  }
+
+  public static function providerContentEntityReferencePropResolves(): array {
+    // @todo Add a case for a multi-valued content-entity-reference prop: https://www.drupal.org/project/canvas/issues/3589536
+    return [
+      'StaticPropSource bundled (node:news_item) → label' => [
+        'inputs' => [
+          'news_item_reference' => [
+            'sourceType' => 'static:field_item:entity_reference',
+            'expression' => 'ℹ︎entity_reference␟entity',
+            'sourceTypeSettings' => [
+              'storage' => ['target_type' => 'node'],
+              'instance' => [
+                'handler' => 'default:node',
+                'handler_settings' => [
+                  'target_bundles' => ['news_item' => 'news_item'],
+                ],
+              ],
+            ],
+          ],
+        ],
+        'value_fixtures' => ['news_item_reference' => 'referenced_news'],
+        'pass_host' => FALSE,
+        'expected_resolved' => [
+          'news_item_reference' => ['label' => 'The referenced news item'],
+        ],
+        'expected_cache_tag_fixtures' => ['referenced_news'],
+        'expected_cache_contexts' => ['user.permissions'],
+        'expected_cache_max_age' => Cache::PERMANENT,
+      ],
+      'EntityFieldPropSource bundled (node:news_item) → label' => [
+        'inputs' => [
+          'news_item_reference' => [
+            'sourceType' => PropSource::EntityField->value,
+            'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+          ],
+        ],
+        'value_fixtures' => [],
+        'pass_host' => TRUE,
+        'expected_resolved' => [
+          'news_item_reference' => ['label' => 'The referenced news item'],
+        ],
+        'expected_cache_tag_fixtures' => ['referenced_news', 'host_news'],
+        'expected_cache_contexts' => ['user.permissions'],
+        'expected_cache_max_age' => Cache::PERMANENT,
+      ],
+      'EntityFieldPropSource bundleless (user) → name' => [
+        'inputs' => [
+          'user_reference' => [
+            'sourceType' => PropSource::EntityField->value,
+            'expression' => 'ℹ︎␜entity:node:news_item␝uid␞␟entity',
+          ],
+        ],
+        'value_fixtures' => [],
+        'pass_host' => TRUE,
+        'expected_resolved' => [
+          'user_reference' => ['name' => 'Owner Of Host Node'],
+        ],
+        'expected_cache_tag_fixtures' => ['host_news_owner', 'host_news'],
+        'expected_cache_contexts' => ['user.permissions'],
+        'expected_cache_max_age' => Cache::PERMANENT,
+      ],
+      'StaticPropSource bundleless (user) → name' => [
+        'inputs' => [
+          'user_reference' => [
+            'sourceType' => 'static:field_item:entity_reference',
+            'expression' => 'ℹ︎entity_reference␟entity',
+            'sourceTypeSettings' => [
+              'storage' => ['target_type' => 'user'],
+            ],
+          ],
+        ],
+        'value_fixtures' => ['user_reference' => 'referenced_user'],
+        'pass_host' => FALSE,
+        'expected_resolved' => [
+          'user_reference' => ['name' => 'Some Fan'],
+        ],
+        'expected_cache_tag_fixtures' => ['referenced_user'],
+        'expected_cache_contexts' => ['user.permissions'],
+        'expected_cache_max_age' => Cache::PERMANENT,
+      ],
+      'two EntityFieldPropSource content-entity-reference props populated together' => [
+        'inputs' => [
+          'news_item_reference' => [
+            'sourceType' => PropSource::EntityField->value,
+            'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+          ],
+          'user_reference' => [
+            'sourceType' => PropSource::EntityField->value,
+            'expression' => 'ℹ︎␜entity:node:news_item␝uid␞␟entity',
+          ],
+        ],
+        'value_fixtures' => [],
+        'pass_host' => TRUE,
+        'expected_resolved' => [
+          'news_item_reference' => ['label' => 'The referenced news item'],
+          'user_reference' => ['name' => 'Owner Of Host Node'],
+        ],
+        'expected_cache_tag_fixtures' => ['referenced_news', 'host_news', 'host_news_owner'],
+        'expected_cache_contexts' => ['user.permissions'],
+        'expected_cache_max_age' => Cache::PERMANENT,
+      ],
+      'non-content-entity-reference (string) prop is passed through unmodified' => [
+        'inputs' => [
+          'headline' => [
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'value' => 'Big news today',
+          ],
+        ],
+        'value_fixtures' => [],
+        'pass_host' => FALSE,
+        'expected_resolved' => [
+          'headline' => 'Big news today',
+        ],
+        'expected_cache_tag_fixtures' => [],
+        'expected_cache_contexts' => [],
+        'expected_cache_max_age' => Cache::PERMANENT,
+      ],
+    ];
+  }
+
+  /**
+   * An empty content-entity-reference does not produce a developer-facing payload.
+   */
+  public function testContentEntityReferencePropSilentSkipPaths(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+    $entity_field_inputs = [
+      'news_item_reference' => [
+        'sourceType' => PropSource::EntityField->value,
+        'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+      ],
+    ];
+
+    // Empty host reference field: a fresh news_item with no
+    // field_related_news evaluates to NULL on the EntityFieldPropSource.
+    $empty_host = Node::create([
+      'type' => 'news_item',
+      'title' => 'Host with no related news',
+    ]);
+    self::assertEntityIsValid($empty_host);
+    $empty_host->save();
+    $unrooted_item = $this->buildComponentTreeItem($fixtures['component_id'], $entity_field_inputs);
+    $empty_host_result = $fixtures['source']->getExplicitInput(
+      $this->container->get('uuid')->generate(),
+      $unrooted_item,
+      $empty_host,
+    );
+    self::assertArrayHasKey('news_item_reference', $empty_host_result['resolved']);
+    $empty_host_value = $empty_host_result['resolved']['news_item_reference']->value;
+    self::assertFalse(
+      \is_array($empty_host_value) && \array_key_exists('label', $empty_host_value),
+      'No developer-facing entry should be written when the resolved value is NULL.'
+    );
+  }
+
+  /**
+   * Content-entity-reference props resolve when rendering without an explicit host.
+   */
+  public function testContentEntityReferencePropResolvesViaTreeRootHostFallback(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    $entity_field_inputs = [
+      'news_item_reference' => [
+        'sourceType' => PropSource::EntityField->value,
+        'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+      ],
+    ];
+
+    // Tree rooted in a fieldable host (host_news), $host_entity argument
+    // omitted — exactly what ComponentTreeItemList::getHydratedValue() and
+    // ComponentTreeInputExtractor::extract() do in production.
+    $rooted_item = $this->buildComponentTreeItem(
+      $fixtures['component_id'],
+      $entity_field_inputs,
+      $fixtures['host_news'],
+    );
+    $result = $fixtures['source']->getExplicitInput(
+      $this->container->get('uuid')->generate(),
+      $rooted_item,
+    // No explicit $host_entity — must fall back to the tree root.
+    );
+
+    self::assertArrayHasKey('news_item_reference', $result['resolved']);
+    $resolved = $result['resolved']['news_item_reference'];
+    self::assertInstanceOf(EvaluationResult::class, $resolved);
+
+    // The override MUST run: the value must be the developer-facing payload
+    // (entity-key-keyed array of expression results, per
+    // `JsComponent::generateKeyForExpression`), NOT the bare referenced node.
+    $value = $resolved->value;
+    self::assertIsArray(
+      $value,
+      'Resolved value must be the developer-facing payload, not the bare referenced entity.'
+    );
+    // The entityFields expression is `…news_item␝title␞␟value`; node maps the
+    // `title` field to the `label` entity key, so
+    // `JsComponent::generateKeyForExpression()` emits `label` as the
+    // developer-facing key.
+    self::assertArrayHasKey('label', $value);
+    self::assertSame('The referenced news item', $value['label']);
+
+    self::assertContains(
+      'node:' . $fixtures['referenced_news']->id(),
+      $resolved->getCacheTags(),
+      'Resolved EvaluationResult must depend on the referenced entity.',
+    );
+  }
+
+  /**
+   * Forces a collision on developer key between two content-entity-reference props.
+   *
+   * If a host declares both a string field named `prop__body` and an
+   * entity-reference field named `prop` whose target has a `body` field,
+   * two expressions on that host could produce the same developer-facing key if
+   * `__` is used as the separator. Avoid this by using a character that is not
+   * considered valid in a field's machine name, but is a valid JS/TS identifier
+   * character (so consumers can use dot access): the dollar sign:
+   *   1. flat field `prop__body` → `prop__body` 🆚 `prop__body`
+   *   2. reference `prop` → `body` → `prop__body` 🆚 `prop$body`
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::generateKeyForExpression
+   */
+  public function testGenerateKeyForExpressionCollision(): void {
+    $flat_field = StructuredDataPropExpression::fromString('ℹ︎␜entity:node:article␝prop__body␞␟value');
+    $reference = StructuredDataPropExpression::fromString('ℹ︎␜entity:node:article␝prop␞␟entity␜␜entity:node:article␝body␞␟value');
+    \assert($flat_field instanceof EntityFieldBasedPropExpressionInterface);
+    \assert($reference instanceof EntityFieldBasedPropExpressionInterface);
+
+    // No collision.
+    self::assertNotSame(
+      JsComponent::generateKeyForExpression($flat_field),
+      JsComponent::generateKeyForExpression($reference),
+    );
+    // But if it weren't for the separator, they'd indeed be identical.
+    self::assertSame(
+      str_replace(JsComponent::CONTENT_ENTITY_REFERENCE_KEY_SEPARATOR, '__', JsComponent::generateKeyForExpression($flat_field)),
+      str_replace(JsComponent::CONTENT_ENTITY_REFERENCE_KEY_SEPARATOR, '__', JsComponent::generateKeyForExpression($reference)),
+    );
+  }
+
+  /**
+   * Sets up shared fixtures for the testContentEntityReferenceProp* tests.
+   *
+   * Installs the node entity schema, creates a `news_item` node type with a
+   * self-referencing `field_related_news`, two news_item nodes (one host, one
+   * referenced), an owner user assigned to the host, a separate referenced
+   * user, and a JavaScriptComponent with one bundled (node:news_item) and one
+   * bundleless (user) content-entity-reference prop.
+   *
+   * @return array{
+   *   referenced_news: \Drupal\node\NodeInterface,
+   *   host_news: \Drupal\node\NodeInterface,
+   *   referenced_user: \Drupal\user\UserInterface,
+   *   component_id: string,
+   *   source: \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent,
+   *   }
+   */
+  private function setUpContentEntityReferenceFixtures(): array {
+    $this->installEntitySchema('node');
+    $this->installSchema('node', 'node_access');
+    $this->installConfig(['node']);
+
+    // Field-level access checks during expression evaluation require an
+    // authenticated user with `access content` (and view-permission for the
+    // user entity, since the bundleless `user_reference` prop targets users).
+    $this->setUpCurrentUser([], ['access content', 'access user profiles']);
+
+    NodeType::create(['type' => 'news_item', 'name' => 'News item'])->save();
+
+    // Self-referencing field on news_item — keeps the fixture small while
+    // exercising the host→target lookup path end-to-end.
+    FieldStorageConfig::create([
+      'field_name' => 'field_related_news',
+      'type' => 'entity_reference',
+      'entity_type' => 'node',
+      'settings' => ['target_type' => 'node'],
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_related_news',
+      'entity_type' => 'node',
+      'bundle' => 'news_item',
+      'label' => 'Related news',
+      'settings' => [
+        'handler' => 'default:node',
+        'handler_settings' => ['target_bundles' => ['news_item' => 'news_item']],
+      ],
+    ])->save();
+
+    $referenced_news = Node::create([
+      'type' => 'news_item',
+      'title' => 'The referenced news item',
+    ]);
+    self::assertEntityIsValid($referenced_news);
+    $referenced_news->save();
+
+    // The host's owner backs the bundleless `user_reference` EntityFieldPropSource
+    // case (which evaluates against `host_news.uid`). Setting it
+    // unconditionally is harmless to other cases.
+    $owner_user = $this->createUser([], 'Owner Of Host Node');
+    self::assertNotFalse($owner_user);
+
+    $host_news = Node::create([
+      'type' => 'news_item',
+      'title' => 'The host news item',
+      'field_related_news' => $referenced_news->id(),
+      'uid' => $owner_user->id(),
+    ]);
+    self::assertEntityIsValid($host_news);
+    $host_news->save();
+
+    $referenced_user = $this->createUser([], 'Some Fan');
+    self::assertNotFalse($referenced_user);
+
+    // Same fixture pattern as
+    // JavascriptComponentStorageTest::testComponentEntityCreation().
+    $machine_name = 'content_entity_reference_test_component';
+    $component_id = JsComponent::componentIdFromJavascriptComponentId($machine_name);
+    $js_component = JavaScriptComponent::create([
+      'machineName' => $machine_name,
+      'name' => 'Entity reference test component',
+      'status' => TRUE,
+      'props' => [
+        'news_item_reference' => [
+          'title' => 'Featured news item',
+          ...JsonSchemaObjectRef::ContentEntityReference->asPropShapeArray(),
+        ],
+        'user_reference' => [
+          'title' => 'Featured fan',
+          ...JsonSchemaObjectRef::ContentEntityReference->asPropShapeArray(),
+        ],
+        // A non content-entity-reference prop.
+        'headline' => [
+          'title' => 'Headline',
+          'type' => 'string',
+        ],
+      ],
+      'required' => [],
+      'js' => ['original' => '', 'compiled' => ''],
+      'css' => ['original' => '', 'compiled' => ''],
+      'dataDependencies' => [
+        'entityFields' => [
+          'news_item_reference' => ['ℹ︎␜entity:node:news_item␝title␞␟value'],
+          'user_reference' => ['ℹ︎␜entity:user␝name␞␟value'],
+        ],
+      ],
+    ]);
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    $component = Component::load($component_id);
+    self::assertInstanceOf(Component::class, $component);
+    $source = $component->getComponentSource();
+    self::assertInstanceOf(JsComponent::class, $source);
+
+    return [
+      'referenced_news' => $referenced_news,
+      'host_news' => $host_news,
+      'referenced_user' => $referenced_user,
+      'component_id' => $component_id,
+      'source' => $source,
+    ];
+  }
+
+  /**
+   * Instantiates a (dangling) Canvas component tree item.
+   */
+  private function buildComponentTreeItem(string $component_id, array $inputs, ?FieldableEntityInterface $root_entity = NULL): ComponentTreeItem {
+    $item_list = $this->createDanglingComponentTreeItemList($root_entity);
+    $uuid = $this->container->get('uuid')->generate();
+    $item_list->setValue([
+      [
+        'uuid' => $uuid,
+        'component_id' => $component_id,
+        'inputs' => $inputs,
+      ],
+    ]);
+    $item = $item_list->get(0);
+    \assert($item instanceof ComponentTreeItem);
+    return $item;
   }
 
 }

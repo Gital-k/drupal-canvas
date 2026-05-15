@@ -67,9 +67,10 @@ final class JsonSchemaObject extends Mapping {
       }
       if ($detail['type'] === 'string' && \array_key_exists('format', $detail)) {
         // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat::toDataTypeShapeRequirements()
-        if (\in_array($detail['format'], [JsonSchemaStringFormat::Iri->value, JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::Uri->value, JsonSchemaStringFormat::UriReference->value], TRUE)) {
+        $format = JsonSchemaStringFormat::tryFrom($detail['format']);
+        if ($format?->isUriEsque()) {
           $definition['mapping'][$property_name]['constraints'][UriConstraint::PLUGIN_ID] = [
-            'allowReferences' => \in_array($detail['format'], [JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::UriReference->value], TRUE),
+            'allowReferences' => $format->allowsBothAbsoluteOrRelativeUri(),
           ];
           if (\array_key_exists('x-allowed-schemes', $detail)) {
             $definition['mapping'][$property_name]['constraints'][UriSchemeConstraint::PLUGIN_ID] = [
@@ -98,7 +99,7 @@ final class JsonSchemaObject extends Mapping {
    * @return string|null
    *   The $ref URI, or NULL if not found.
    */
-  private function findContainingSingleCardinalityProperty(?TypedDataInterface $parent): ?string {
+  private static function findContainingSingleCardinalityProperty(?TypedDataInterface $parent): ?string {
     // Case 1: Regular object prop example - $ref is sibling of examples.
     // Structure: props.some_prop.$ref, props.some_prop.examples.0
     // Parent chain: example item -> examples sequence -> prop definition
@@ -111,7 +112,7 @@ final class JsonSchemaObject extends Mapping {
     // Structure: props.array_prop.items.$ref, props.array_prop.examples.0.0
     // Parent chain: item -> inner sequence (examples.0) -> outer sequence
     // (examples) -> prop definition.
-    $propDefinition = $parent->getParent()?->getParent()?->getValue();
+    $propDefinition = $parent->getParent()->getParent()?->getValue();
     if (\is_array($propDefinition) && ($propDefinition['type'] ?? NULL) === 'array') {
       return $propDefinition['items']['$ref'] ?? NULL;
     }

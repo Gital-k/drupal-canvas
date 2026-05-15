@@ -61,26 +61,6 @@ type BaseTransformOptions = {
   multiple?: boolean;
 };
 
-/**
- * Maps empty strings to null and removes trailing null entries.
- *
- * Empty strings become null to preserve positional placeholders so the backend
- * can render filled rows at the correct positions. Trailing nulls are removed
- * because rows empty at the end have no positional significance.
- */
-const trimTrailingNulls = <T>(
-  values: Array<T | null | string>,
-): Array<T | null> => {
-  const normalized = values.map((v) =>
-    v === '' ? null : v,
-  ) as Array<T | null>;
-  let end = normalized.length;
-  while (end > 0 && normalized[end - 1] === null) {
-    end--;
-  }
-  return normalized.slice(0, end);
-};
-
 const normalizeMultipleRecords = (
   value: PropsValuesOrArrayOfPropsValues,
 ): Array<PropsValues | null> => {
@@ -236,7 +216,7 @@ const link: Transformer<
       : (record as PropsValues);
   });
   if (options.multiple) {
-    return trimTrailingNulls(returnValue);
+    return returnValue.filter(Boolean);
   }
   return returnValue[0] ?? null;
 };
@@ -331,14 +311,24 @@ const dateTime: Transformer<
     if (type === 'date') {
       return dateString;
     }
-    if ('time' in record) {
+    if ('time' in record && record.time) {
       timeString = record.time;
     }
+    if (!dateString && !timeString) {
+      return null;
+    }
+
+    try {
+      return new Date(`${dateString} ${timeString}+0000`).toISOString();
+    } catch (e) {
+      return null;
+    }
+
     // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
     return new Date(`${dateString} ${timeString}+0000`).toISOString();
   });
   if (options.multiple) {
-    return trimTrailingNulls(returnValue);
+    return returnValue.filter(Boolean);
   }
   const singleValue = returnValue.shift();
   if (singleValue === undefined) {

@@ -68,12 +68,12 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     'canvas_test_code_components',
   ];
 
-  protected function reloadJavascriptComponent(): JavaScriptComponent {
+  protected static function reloadJavascriptComponent(): JavaScriptComponent {
     /** @var \Drupal\canvas\Entity\JavaScriptComponent */
     return \Drupal::entityTypeManager()->getStorage(JavaScriptComponent::ENTITY_TYPE_ID)->loadUnchanged(self::JAVASCRIPT_COMPONENT_ID);
   }
 
-  protected function reloadComponent(): ComponentInterface {
+  protected static function reloadComponent(): ComponentInterface {
     /** @var \Drupal\canvas\Entity\ComponentInterface */
     return \Drupal::entityTypeManager()->getStorage(Component::ENTITY_TYPE_ID)->loadUnchanged(self::COMPONENT_ID);
   }
@@ -396,19 +396,19 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanAddOptionalProp(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanAddOptionalProp(bool $usingHttpApi): void {
     $this->addOrUpdateAgeProp($usingHttpApi);
     $this->assertOptionalPropNewVersion();
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanAddRequiredProp(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanAddRequiredProp(bool $usingHttpApi): void {
     $this->addOrUpdateAgeProp($usingHttpApi, TRUE);
     $this->assertRequiredPropNewVersion();
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanRemoveRequiredPropThenAddAnotherRequiredProp(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanRemoveRequiredPropThenAddAnotherRequiredProp(bool $usingHttpApi): void {
     $this->removeNamePropAndAddAgeProp($usingHttpApi, TRUE);
 
     unset($this->expectedClientModel['model'][self::COMPONENT_INSTANCE_UUID]['source']['name']);
@@ -594,7 +594,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanAddNewSlot(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanAddNewSlot(bool $usingHttpApi): void {
     $this->addSlot($usingHttpApi);
     $inputs = [
       'name' => 'mike_watt',
@@ -732,7 +732,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanMakeAnOptionalPropRequired(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanMakeAnOptionalPropRequired(bool $usingHttpApi): void {
     $this->addOrUpdateAgeProp($usingHttpApi);
     $this->makeAgePropRequired($usingHttpApi);
     $this->assertRequiredPropNewVersion();
@@ -748,7 +748,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanMakeARequiredPropOptional(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanMakeARequiredPropOptional(bool $usingHttpApi): void {
     $this->addOrUpdateAgeProp($usingHttpApi, TRUE);
     $this->makeAgePropOptional($usingHttpApi);
     $this->assertOptionalPropNewVersion();
@@ -775,7 +775,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanRemoveProp(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanRemoveProp(bool $usingHttpApi): void {
     $this->removeNameProp($usingHttpApi);
     // When a prop is removed and an update happens, the old instances get
     // upgraded and their removed prop values are cleaned up. If all props are
@@ -834,7 +834,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanModifyDefaultValuesAndExamples(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanModifyDefaultValuesAndExamples(bool $usingHttpApi): void {
     $this->modifyExamples($usingHttpApi);
     $inputs = [
       'name' => 'Mike Watt',
@@ -898,7 +898,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanRemoveASlot(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanRemoveASlot(bool $usingHttpApi): void {
     $this->removeDescriptionSlot($usingHttpApi);
     $inputs = ['name' => 'D. Boon'];
     $expectedClientModelFunction = fn(string $version) => [
@@ -956,24 +956,10 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     self::assertSame(self::COMPONENT_INSTANCE_UUID, $values[1]['parent_uuid'], 'Child should still reference parent');
   }
 
-  protected function reAddDescriptionSlot(bool $usingHttpRequest = FALSE): void {
-    $js_component = $this->reloadJavascriptComponent();
-    $slots = $js_component->get('slots');
-    $slots['description'] = [
-      'title' => 'Description',
-      'examples' => ['<p>Example description</p>'],
-    ];
-    if (!$usingHttpRequest) {
-      $js_component->set('slots', $slots);
-      self::assertEntityIsValid($js_component);
-      $js_component->save();
-      return;
-    }
-    $data = $js_component->normalizeForClientSide()->values;
-    $data['slots'] = $slots;
-    $this->patchComponent($data);
-  }
-
+  /**
+   * @todo Remove this ignore in https://www.drupal.org/project/canvas/issues/3557271
+   * @phpstan-ignore-next-line shipmonk.deadMethod
+   */
   protected function modifyPropType(bool $usingHttpRequest = FALSE): void {
     $js_component = $this->reloadJavascriptComponent();
     $options = [
@@ -998,7 +984,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   }
 
   #[DataProvider('providerTrueFalse')]
-  public function testCodeComponentCanChangeThePropType(bool $usingHttpApi = FALSE): void {
+  public function testCodeComponentCanChangeThePropType(bool $usingHttpApi): void {
     $this->markTestSkipped('To be fixed in https://www.drupal.org/project/canvas/issues/3557271');
     // @phpstan-ignore deadCode.unreachable
     $this->modifyPropType($usingHttpApi);

@@ -1,8 +1,16 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import axios from 'axios';
+import {
+  defaultTokenEndpoint,
+  fetchClientCredentialsToken,
+  getTokenEntry,
+  OauthError,
+  refreshAccessToken,
+  setTokenEntry,
+} from '@drupal-canvas/auth';
 
-import { BRAND_KIT_GLOBAL_ID, getConfig } from '../config.js';
+import { BRAND_KIT_GLOBAL_ID, ensureConfig, getConfig } from '../config.js';
 
 import type { AxiosError, AxiosInstance } from 'axios';
 import type { CanvasComponentTree } from 'drupal-canvas/json-render-utils';
@@ -14,6 +22,10 @@ import type {
   UploadedArtifact,
   UploadedArtifactResult,
 } from '../types/Component';
+import type {
+  ContentTemplate,
+  ContentTemplateListItem,
+} from '../types/ContentTemplate';
 import type { Page, PageListItem } from '../types/Page';
 
 export interface ApiOptions {
@@ -23,6 +35,14 @@ export interface ApiOptions {
   scope: string;
   userAgent?: string;
   accessToken?: string;
+  refreshToken?: string;
+  tokenEndpoint?: string;
+}
+
+export interface UploadedMedia<TInputsResolved = unknown> {
+  id: number;
+  uuid: string;
+  inputs_resolved: TInputsResolved;
 }
 
 export class ApiService {
@@ -33,6 +53,8 @@ export class ApiService {
   private readonly scope: string;
   private readonly userAgent: string;
   private accessToken: string | null = null;
+  private refreshToken: string | null = null;
+  private readonly tokenEndpoint: string | null;
   private refreshPromise: Promise<string> | null = null;
 
   private constructor(options: ApiOptions) {
@@ -41,10 +63,15 @@ export class ApiService {
     this.siteUrl = options.siteUrl;
     this.scope = options.scope;
     this.userAgent = options.userAgent || '';
+    this.refreshToken = options.refreshToken ?? null;
+    this.tokenEndpoint = options.tokenEndpoint ?? null;
 
     // Create the client without authorization headers by default
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      // CLI pushes make many short-lived requests; avoid reusing sockets that
+      // may still have request-scoped listeners attached.
+      Connection: 'close',
       // Add the CLI marker header to identify CLI requests
       'X-Canvas-CLI': '1',
     };
@@ -139,16 +166,12 @@ export class ApiService {
   }
 
   /**
-   * Refresh the access token using client credentials.
+   * Refresh the access token.
+   * Supports both the refresh_token grant (user tokens from auth:login) and
+   * the client_credentials grant (service accounts).
    * Handles concurrent refresh attempts by reusing the same promise.
    */
   private async refreshAccessToken(): Promise<string> {
-    if (!this.clientId || !this.clientSecret) {
-      throw new Error(
-        'No client credentials configured; cannot refresh access token.',
-      );
-    }
-
     // If a refresh is already in progress, wait for it
     if (this.refreshPromise) {
       return this.refreshPromise;
@@ -157,33 +180,76 @@ export class ApiService {
     // Start a new refresh - create the promise immediately so concurrent calls share it
     this.refreshPromise = (async (): Promise<string> => {
       try {
-        const response = await this.client.post(
-          '/oauth/token',
-          new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
-            scope: this.scope,
-          }).toString(),
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-          },
-        );
+        // User token: use refresh_token grant.
+        if (this.refreshToken && this.tokenEndpoint) {
+          let result;
+          try {
+            result = await refreshAccessToken({
+              tokenEndpoint: this.tokenEndpoint,
+              refreshToken: this.refreshToken,
+              clientId: this.clientId,
+            });
+          } catch (refreshError) {
+            // Refresh-token grant failures are almost always recoverable only
+            // by re-authenticating, so prefer a CLI-specific hint over the
+            // generic auth-error path. Surface the OAuth server's
+            // `error_description` (if any) for diagnostics.
+            if (refreshError instanceof OauthError) {
+              throw new Error(
+                refreshError.errorDescription ??
+                  refreshError.errorCode ??
+                  'Session expired. Run `canvas login` to re-authenticate.',
+              );
+            }
+            throw refreshError;
+          }
 
-        this.accessToken = response.data.access_token;
+          this.accessToken = result.accessToken;
+          // simple_oauth rotates refresh tokens by default; persist whichever
+          // refresh token we should use next so future refreshes don't trip
+          // on a stale value.
+          this.refreshToken = result.refreshToken ?? this.refreshToken;
+          this.client.defaults.headers.common['Authorization'] =
+            `Bearer ${this.accessToken}`;
+
+          // Persist updated tokens back to the store so subsequent CLI runs
+          // (and the workbench dev server) see the latest credentials.
+          const entry = getTokenEntry(this.siteUrl);
+          if (entry) {
+            setTokenEntry(this.siteUrl, {
+              ...entry,
+              accessToken: this.accessToken,
+              refreshToken: this.refreshToken ?? entry.refreshToken,
+              expiresAt: result.expiresAt,
+            });
+          }
+
+          return this.accessToken;
+        }
+
+        // Service account: use client_credentials grant.
+        if (!this.clientId || !this.clientSecret) {
+          throw new Error(
+            'No client credentials configured; cannot refresh access token.',
+          );
+        }
+
+        const result = await fetchClientCredentialsToken({
+          tokenEndpoint: defaultTokenEndpoint(this.siteUrl),
+          clientId: this.clientId,
+          clientSecret: this.clientSecret,
+          scope: this.scope,
+        });
+
+        this.accessToken = result.accessToken;
 
         // Update the default authorization header
         this.client.defaults.headers.common['Authorization'] =
           `Bearer ${this.accessToken}`;
 
-        return this.accessToken!;
+        return this.accessToken;
       } catch (error) {
-        // Use the existing error handling to maintain consistency with original behavior
         this.handleApiError(error);
-        // This line should never be reached because handleApiError always throws
-        throw new Error('Failed to refresh access token');
       }
     })();
 
@@ -213,7 +279,6 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error('Failed to list components');
     }
   }
 
@@ -234,7 +299,6 @@ export class ApiService {
       return versions;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error('Failed to list component versions');
     }
   }
 
@@ -257,7 +321,6 @@ export class ApiService {
         throw error;
       }
       this.handleApiError(error);
-      throw new Error(`Failed to create component: '${component.machineName}'`);
     }
   }
 
@@ -272,7 +335,6 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Component '${machineName}' not found`);
     }
   }
 
@@ -291,7 +353,6 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Failed to update component '${machineName}'`);
     }
   }
 
@@ -305,7 +366,6 @@ export class ApiService {
       );
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Failed to delete component '${machineName}'`);
     }
   }
 
@@ -320,7 +380,6 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error('Failed to get global asset library');
     }
   }
 
@@ -349,7 +408,6 @@ export class ApiService {
       return pages;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error('Failed to list pages');
     }
   }
 
@@ -364,7 +422,6 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Failed to get page '${id}'`);
     }
   }
 
@@ -373,8 +430,9 @@ export class ApiService {
    */
   async createPage(page: {
     title: string;
+    description: string;
     status: boolean;
-    path: string | null;
+    path: string;
     components: CanvasComponentTree;
   }): Promise<Page> {
     try {
@@ -385,7 +443,6 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Failed to create page '${page.title}'`);
     }
   }
 
@@ -396,8 +453,9 @@ export class ApiService {
     id: string | number,
     page: {
       title: string;
+      description: string;
       status: boolean;
-      path: string | null;
+      path: string;
       components: CanvasComponentTree;
     },
   ): Promise<Page> {
@@ -409,7 +467,206 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Failed to update page '${page.title}'`);
+    }
+  }
+
+  /**
+   * List all content templates.
+   *
+   * The `/canvas/api/v0/config/content_template` endpoint returns a hierarchical
+   * representation. We also try the flat listing at
+   * `/canvas/api/v0/config/{entity_type_id}` (which is the generic config list
+   * endpoint) to keep the CLI flow symmetrical with components.
+   */
+  async listContentTemplates(): Promise<
+    Record<string, ContentTemplateListItem>
+  > {
+    try {
+      const response = await this.client.get(
+        '/canvas/api/v0/config/content_template',
+      );
+      const data = response.data as unknown;
+
+      if (!data || typeof data !== 'object') {
+        return {};
+      }
+
+      const result: Record<string, ContentTemplateListItem> = {};
+      // The endpoint returns either a flat map keyed by id, or a hierarchical
+      // representation grouped by entity type / bundle. Flatten both shapes.
+      const visit = (value: unknown): void => {
+        if (!value || typeof value !== 'object') {
+          return;
+        }
+        const record = value as Record<string, unknown>;
+        if (typeof record.id === 'string' && record.id.length > 0) {
+          result[record.id] = record as unknown as ContentTemplateListItem;
+          return;
+        }
+        for (const nested of Object.values(record)) {
+          visit(nested);
+        }
+      };
+      visit(data);
+      return result;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Get a single content template with its component tree.
+   */
+  async getContentTemplate(id: string): Promise<ContentTemplate> {
+    try {
+      const response = await this.client.get(
+        `/canvas/api/v0/config/content_template/${encodeURIComponent(id)}`,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Create a new content template.
+   */
+  async createContentTemplate(
+    template: ContentTemplate,
+  ): Promise<ContentTemplate> {
+    try {
+      const response = await this.client.post(
+        '/canvas/api/v0/config/content_template',
+        template,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Update an existing content template.
+   */
+  async updateContentTemplate(
+    id: string,
+    template: Partial<ContentTemplate>,
+  ): Promise<ContentTemplate> {
+    try {
+      const response = await this.client.patch(
+        `/canvas/api/v0/config/content_template/${encodeURIComponent(id)}`,
+        template,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Delete a content template.
+   */
+  async deleteContentTemplate(id: string): Promise<void> {
+    try {
+      await this.client.delete(
+        `/canvas/api/v0/config/content_template/${encodeURIComponent(id)}`,
+      );
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Fetch preview entity suggestions for a content template's entity
+   * type and bundle. Returns up to 10 candidate entities.
+   */
+  async fetchPreviewEntitySuggestions(
+    entityTypeId: string,
+    bundle: string,
+  ): Promise<Array<{ id: string; label: string }>> {
+    try {
+      const response = await this.client.get(
+        `/canvas/api/v0/ui/content_template/suggestions/preview/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(bundle)}`,
+      );
+      const data = response.data as unknown;
+      const items: unknown[] = Array.isArray(data)
+        ? data
+        : data && typeof data === 'object'
+          ? Object.values(data as Record<string, unknown>)
+          : [];
+      return items
+        .map((item) => {
+          if (!item || typeof item !== 'object') return null;
+          const record = item as Record<string, unknown>;
+          const id =
+            typeof record.id === 'string' || typeof record.id === 'number'
+              ? String(record.id)
+              : null;
+          if (!id) return null;
+          const label =
+            typeof record.label === 'string' ? record.label : '(untitled)';
+          return { id, label };
+        })
+        .filter((item): item is { id: string; label: string } => item !== null);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * POST a draft content template to the server for validation/resolution.
+   * Returns the resolved model, or throws on 4xx/5xx errors.
+   */
+  async validateContentTemplateDraft(
+    entityTypeId: string,
+    previewEntityId: string,
+    bundle: string,
+    viewMode: string,
+    componentTree: CanvasComponentTree,
+  ): Promise<{ model: Record<string, unknown> }> {
+    try {
+      const response = await this.client.post(
+        `/canvas/api/v0/layout-content-template-draft/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(previewEntityId)}?_format=json`,
+        {
+          bundle,
+          viewMode,
+          component_tree: componentTree,
+        },
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  async listViewModes(): Promise<
+    Record<
+      string,
+      Record<string, Record<string, { label: string; hasTemplate: boolean }>>
+    >
+  > {
+    try {
+      const response = await this.client.get(
+        '/canvas/api/v0/ui/content_template/view_modes/node',
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  async fetchPropSourceSuggestions(
+    entityTypeId: string,
+    bundle: string,
+    componentId: string,
+  ): Promise<Record<string, unknown[]>> {
+    try {
+      const response = await this.client.get(
+        `/canvas/api/v0/ui/content_template/suggestions/prop-sources/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(bundle)}/${encodeURIComponent(componentId)}`,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
     }
   }
 
@@ -427,7 +684,6 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error('Failed to update global asset library');
     }
   }
 
@@ -454,7 +710,44 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Failed to upload artifact: ${filename}`);
+    }
+  }
+
+  /**
+   * Upload a file and create a Drupal media entity.
+   */
+  async uploadMedia<TInputsResolved = unknown>(options: {
+    mediaType: string;
+    filename: string;
+    fileBuffer: Buffer;
+    data?: Record<string, string | Blob>;
+  }): Promise<UploadedMedia<TInputsResolved>> {
+    try {
+      const formData = new FormData();
+      formData.append(
+        'file',
+        new Blob([options.fileBuffer as unknown as BlobPart]),
+        options.filename,
+      );
+
+      for (const [key, value] of Object.entries(options.data ?? {})) {
+        formData.append(key, value);
+      }
+
+      const response = await this.client.post(
+        `/canvas/api/v0/media/${encodeURIComponent(options.mediaType)}/upload`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+        },
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
     }
   }
 
@@ -499,7 +792,6 @@ export class ApiService {
       };
     } catch (error) {
       this.handleApiError(error);
-      throw new Error('Failed to sync manifest');
     }
   }
 
@@ -566,7 +858,6 @@ export class ApiService {
       return Buffer.from(response.data as ArrayBuffer);
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Failed to download file: ${url}`);
     }
   }
 
@@ -581,7 +872,6 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Failed to get Brand Kit '${id}'`);
     }
   }
 
@@ -599,7 +889,6 @@ export class ApiService {
       return response.data;
     } catch (error) {
       this.handleApiError(error);
-      throw new Error(`Failed to update Brand Kit '${BRAND_KIT_GLOBAL_ID}'`);
     }
   }
 
@@ -787,7 +1076,23 @@ export class ApiService {
   /**
    * Main error handler for API requests.
    */
-  private handleApiError(error: unknown): void {
+  private handleApiError(error: unknown): never {
+    if (error instanceof OauthError) {
+      if (error.status === undefined) {
+        this.handleNetworkError();
+      }
+      const canvasErrors = this.parseCanvasErrors(error.body);
+      this.throwApiError(
+        error.status,
+        error.body,
+        {
+          config: { url: '/oauth/token', method: 'post' },
+          message: error.message,
+        } as AxiosError,
+        canvasErrors,
+      );
+    }
+
     if (!axios.isAxiosError(error)) {
       if (error instanceof Error) {
         throw error;
@@ -813,7 +1118,7 @@ export class ApiService {
   }
 }
 
-export function createApiService(): Promise<ApiService> {
+export async function createApiService(): Promise<ApiService> {
   const config = getConfig();
 
   if (!config.siteUrl) {
@@ -825,13 +1130,28 @@ export function createApiService(): Promise<ApiService> {
   const accessToken = process.env.CANVAS_ACCESS_TOKEN;
 
   if (accessToken) {
-    return ApiService.create({
+    return await ApiService.create({
       siteUrl: config.siteUrl,
       clientId: '',
       clientSecret: '',
       scope: '',
       userAgent: config.userAgent,
       accessToken,
+    });
+  }
+
+  // Check for a stored user token from `canvas login`.
+  const tokenEntry = getTokenEntry(config.siteUrl);
+  if (tokenEntry) {
+    return await ApiService.create({
+      siteUrl: config.siteUrl,
+      clientId: tokenEntry.clientId,
+      clientSecret: '',
+      scope: '',
+      userAgent: config.userAgent,
+      accessToken: tokenEntry.accessToken,
+      refreshToken: tokenEntry.refreshToken,
+      tokenEndpoint: tokenEntry.tokenEndpoint,
     });
   }
 
@@ -853,11 +1173,32 @@ export function createApiService(): Promise<ApiService> {
     );
   }
 
-  return ApiService.create({
+  return await ApiService.create({
     siteUrl: config.siteUrl,
     clientId: config.clientId,
     clientSecret: config.clientSecret,
     scope: config.scope,
     userAgent: config.userAgent,
   });
+}
+
+/**
+ * Returns true when the user has a stored OAuth token for the given site URL
+ * or a pre-issued access token in the environment.
+ * Used by commands to skip prompting for client credentials when not needed.
+ */
+export function isUserAuthenticated(siteUrl: string): boolean {
+  if (process.env.CANVAS_ACCESS_TOKEN) return true;
+  return getTokenEntry(siteUrl) !== null;
+}
+
+/**
+ * Ensures siteUrl is configured, then prompts for client credentials only
+ * when the user has no stored OAuth token and no CANVAS_ACCESS_TOKEN set.
+ */
+export async function ensureAuthConfig(): Promise<void> {
+  await ensureConfig(['siteUrl']);
+  if (!isUserAuthenticated(getConfig().siteUrl!)) {
+    await ensureConfig(['clientId', 'clientSecret', 'scope']);
+  }
 }

@@ -10,6 +10,7 @@ import {
   getPropsValues,
   propInputData,
   shouldSkipPropValidation,
+  toDateTime,
   toPropName,
   validateProp,
 } from '@/components/form/formUtil';
@@ -22,10 +23,8 @@ import { FORM_TYPES } from '@/features/form/constants';
 import { selectFormValues } from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
-import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
-import { useGetComponentsQuery } from '@/services/componentAndLayout';
-import { useUpdateComponentMutation } from '@/services/preview';
+import { usePatchComponent } from '@/services/preview';
 import { isPropSourceComponent } from '@/types/Component';
 import { parseValue } from '@/utils/function-utils';
 
@@ -48,18 +47,15 @@ export const InputBehaviorsComponentPropsForm = (
    * rendering in the correct React Router context so we can't get the selected component ID from the url in inputBehaviors.tsx.
    * We already have a workaround for this for the Redux provider, could we do the same for the React Router context?
    */
-  const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const dispatch = useAppDispatch();
   const polledBackgroundUpdate = useRef<number | null>(null);
   const { attributes } = props;
-  const { data: components } = useGetComponentsQuery();
   const transforms = useComponentTransforms();
   const inputAndUiData = useInputUIData();
-  const { selectedComponentType, version, selectedComponent } = inputAndUiData;
+  const { selectedComponentType, selectedComponent, components } =
+    inputAndUiData;
   const component = components?.[selectedComponentType] as PropSourceComponent;
-  const [patchComponent] = useUpdateComponentMutation({
-    fixedCacheKey: selectedComponent,
-  });
+  const patchComponent = usePatchComponent();
 
   const fieldName = attributes.name || attributes['data-canvas-name'];
   const propName = toPropName(fieldName, selectedComponent);
@@ -111,18 +107,13 @@ export const InputBehaviorsComponentPropsForm = (
 
     if (isEvaluatedComponentModel(selectedModel) && component) {
       const updateBackend = () => {
-        patchComponent({
-          type: editorFrameContext,
-          componentInstanceUuid: selectedComponent,
-          componentType: `${selectedComponentType}@${version}`,
-          model: {
-            source: syncPropSourcesToResolvedValues(
-              selectedModel.source,
-              component,
-              resolved,
-            ),
+        patchComponent(newInputAndUiData, {
+          source: syncPropSourcesToResolvedValues(
+            selectedModel.source,
+            component,
             resolved,
-          },
+          ),
+          resolved,
         });
       };
       if (backgroundPreviewUpdate) {
@@ -143,14 +134,9 @@ export const InputBehaviorsComponentPropsForm = (
       updateBackend();
       return;
     }
-    patchComponent({
-      type: editorFrameContext,
-      componentInstanceUuid: selectedComponent,
-      componentType: `${selectedComponentType}@${version}`,
-      model: {
-        ...selectedModel,
-        resolved,
-      },
+    patchComponent(newInputAndUiData, {
+      ...selectedModel,
+      resolved,
     });
   };
 
@@ -178,6 +164,14 @@ export const InputBehaviorsComponentPropsForm = (
   const parseNewValue = (e: React.ChangeEvent) => {
     const schemas = getPropSchemas(inputAndUiData);
     const target = e.target as HTMLInputElement | HTMLSelectElement;
+    const eventFieldName = target.name;
+    const fieldName = eventFieldName;
+    const isNestedArraySubfield =
+      fieldName &&
+      schemas?.[propName]?.type === 'array' &&
+      fieldName.startsWith(
+        `canvas_component_props[${selectedComponent}][${propName}][`,
+      );
 
     // A <select multiple> element's .value is only the last-clicked option.
     // For array props rendered as multi-selects, collect every selected option.
@@ -190,7 +184,6 @@ export const InputBehaviorsComponentPropsForm = (
       e.target as HTMLInputElement,
       schemas?.[propName],
     );
-    const fieldName = (e.target as HTMLInputElement | HTMLSelectElement).name;
     if (
       // If there are no transforms, we cannot use them, just return the raw
       // value. Note that the 'undefined' check here is technically not required
@@ -202,7 +195,11 @@ export const InputBehaviorsComponentPropsForm = (
       // overhead of transforms.
       !(propName in transforms) ||
       // Or if the prop relies on multiple input fields.
-      multipleInputsSingleValue.includes(propName)
+      multipleInputsSingleValue.includes(propName) ||
+      // Nested updates for array props (for example multivalue `_weight` and
+      // `value` subfields) should bypass per-field transforms. Transforms will
+      // be applied at the entire-prop level.
+      isNestedArraySubfield
     ) {
       return rawValue;
     }
@@ -221,7 +218,19 @@ export const InputBehaviorsComponentPropsForm = (
     ) {
       const schemas = getPropSchemas(inputAndUiData);
       const schema = schemas?.[toPropName(fieldName, selectedComponent)];
-      const valueToValidate = coerceValueForSchema(newValue, schema);
+
+      let valueToValidate = coerceValueForSchema(
+        newValue,
+        schema?.type === 'array' ? schema.items : schema,
+      );
+
+      if ([schema?.format, schema?.items?.format].includes('date-time')) {
+        valueToValidate = toDateTime(valueToValidate);
+      }
+
+      if (schema?.type === 'array' && !Array.isArray(valueToValidate)) {
+        valueToValidate = [valueToValidate];
+      }
       const [valid, validate] = validateProp(
         toPropName(fieldName, selectedComponent),
         valueToValidate,

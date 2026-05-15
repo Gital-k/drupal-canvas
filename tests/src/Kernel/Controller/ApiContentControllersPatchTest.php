@@ -20,7 +20,6 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
@@ -123,6 +122,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
         'autoSaveLabel' => NULL,
         'autoSavePath' => NULL,
         'components' => [],
+        'description' => '',
         'links' => [
           CanvasUriDefinitions::LINK_REL_UNPUBLISH => '/canvas/api/v0/content/auto-save/canvas_page/1',
           CanvasUriDefinitions::LINK_REL_EDIT => '/canvas/editor/canvas_page/1',
@@ -189,6 +189,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
             'inputs_resolved' => ['heading' => 'Nested'],
           ],
         ],
+        'description' => '',
         'links' => [
           CanvasUriDefinitions::LINK_REL_UNPUBLISH => '/canvas/api/v0/content/auto-save/canvas_page/1',
           CanvasUriDefinitions::LINK_REL_EDIT => '/canvas/editor/canvas_page/1',
@@ -252,6 +253,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
 
   public function testConflictErrorIfPatchingEntityWithAutoSaveDataPresent(): void {
     $this->expectException(ConflictHttpException::class);
+    $this->expectExceptionMessage('Page with ID 1 has existing auto-saved data. Please use the Canvas UI to publish or discard it before pushing.');
     $page = Page::create([
       'title' => 'Initial title',
       'status' => FALSE,
@@ -269,7 +271,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
     $page->set('path', '/autosaved/path');
     $autoSaveManager->saveEntity($page);
 
-    $request = Request::create(\sprintf(self::URL, $page->id()),
+    $this->request(Request::create(\sprintf(self::URL, $page->id()),
       'PATCH',
       server: ['CONTENT_TYPE' => 'application/json'],
       content: \json_encode([
@@ -278,15 +280,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
         'path' => '/patched',
         'components' => [],
       ], JSON_THROW_ON_ERROR),
-    );
-    $response = $this->request($request);
-    // The response of a patch shouldn't be cacheable.
-    \assert($response instanceof JsonResponse && !$response instanceof CacheableJsonResponse);
-
-    $this->assertSame(Response::HTTP_CONFLICT, $response->getStatusCode());
-    $this->assertSame([
-      'error' => 'Page with ID 1 has existing auto-saved data. Please use the UI to publish it or discard it.',
-    ], $this->decodeResponse($response));
+    ));
   }
 
 }

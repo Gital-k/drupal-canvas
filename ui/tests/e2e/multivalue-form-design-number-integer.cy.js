@@ -20,10 +20,16 @@ const typeInRow = (alias, rowIndex, value) => {
     .eq(rowIndex)
     .find('[class*="_listItem_"]')
     .click();
-  cy.get('[role="dialog"]').find('input[type="number"]').clear();
-  cy.get('[role="dialog"]').find('input[type="number"]').type(value);
-  cy.get('[role="dialog"]').find('input[type="number"]').type('{enter}');
-  cy.get('[role="dialog"]').should('not.exist');
+  cy.get('[role="dialog"][data-state="open"]')
+    .find('input[type="number"]')
+    .clear();
+  cy.get('[role="dialog"][data-state="open"]')
+    .find('input[type="number"]')
+    .type(value);
+  cy.get('[role="dialog"][data-state="open"]')
+    .find('input[type="number"]')
+    .type('{enter}');
+  cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 };
 
 /**
@@ -38,47 +44,40 @@ const verifyRowText = (alias, rowIndex, expectedText) => {
 };
 
 /**
- * Helper to wait for the preview layout update.
+ * Types into a row and waits for the resulting preview update.
+ *
+ * The intercept MUST be registered before the {enter} keypress inside typeInRow,
+ * otherwise the preview POST can fire before the alias exists and cy.wait hangs.
  */
-const waitForPreview = () => {
+const typeInRowAwaitPreview = (alias, rowIndex, value) => {
   cy.intercept({
     url: '**/canvas/api/v0/layout/node/2',
     times: 1,
     method: 'POST',
   }).as('updatePreview');
-  cy.get(document.activeElement).blur();
+  typeInRow(alias, rowIndex, value);
   cy.wait('@updatePreview');
 };
 
 /**
  * Helper to confirm the contents of all rows.
+ *
+ * Uses retryable `should` assertions on each row's text so it waits for the DOM
+ * to settle after an async update (e.g. preview POST, drag reorder).
  */
 const confirmInputs = (alias, inputContent) => {
   cy.get(alias)
     .find('[class*="_listItem_"]')
     .should('have.length', inputContent.length);
-
-  cy.get(alias)
-    .find('tbody tr')
-    .should('have.length', inputContent.length)
-    .then(($rows) => {
-      const items = [];
-      $rows.each((ix, row) => {
-        const listItem = Cypress.$(row).find('[class*="_listItem_"]');
-        if (listItem.length > 0) {
-          const textElement = listItem.find('[class*="_itemText_"]');
-          if (textElement.length > 0) {
-            const text = textElement.text().trim();
-            items.push(text === 'Empty' ? '' : text);
-          } else {
-            items.push('');
-          }
-        } else {
-          items.push('');
-        }
-      });
-      expect(items).to.deep.equal(inputContent);
-    });
+  cy.get(alias).find('tbody tr').should('have.length', inputContent.length);
+  inputContent.forEach((expected, ix) => {
+    const expectedText = expected === '' ? 'Empty' : expected;
+    cy.get(alias)
+      .find('tbody tr')
+      .eq(ix)
+      .find('[class*="_itemText_"]')
+      .should('have.text', expectedText);
+  });
 };
 
 /**
@@ -124,12 +123,7 @@ configs.forEach((config) => {
     // in some strict configs. To be safe, we access via config.* or destructure inside hooks.
 
     before(() => {
-      cy.drupalCanvasInstall([
-        'canvas_test_article_fields',
-        // @todo remove once https://drupal.org/i/3577946 is fixed.
-        // Required for multi-value form UI.
-        'canvas_dev_mode',
-      ]);
+      cy.drupalCanvasInstall(['canvas_test_article_fields']);
     });
 
     beforeEach(() => {
@@ -189,19 +183,11 @@ configs.forEach((config) => {
       cy.findByRole('heading', { name: config.fieldLabel })
         .closest('.js-form-wrapper')
         .as(config.fieldAlias);
-
+      cy.get('@' + config.fieldAlias).scrollIntoView({ offset: { top: -500 } });
       cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
 
-      cy.intercept({
-        url: '**/canvas/api/v0/layout/node/2',
-        times: 1,
-        method: 'POST',
-      }).as('updatePreview');
-
       // Populate the empty second item using the popover interface.
-      typeInRow(`@${config.fieldAlias}`, 1, config.testValues[0]);
-
-      cy.wait('@updatePreview');
+      typeInRowAwaitPreview(`@${config.fieldAlias}`, 1, config.testValues[0]);
       cy.findByLabelText('Loading Preview').should('not.exist');
 
       verifyRowText(`@${config.fieldAlias}`, 1, config.testValues[0]);
@@ -223,8 +209,7 @@ configs.forEach((config) => {
       const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
       // Populate the empty second item first.
-      typeInRow(`@${config.fieldAlias}`, 1, config.testValues[0]);
-      waitForPreview();
+      typeInRowAwaitPreview(`@${config.fieldAlias}`, 1, config.testValues[0]);
 
       cy.get(`@${config.fieldAlias}`)
         .findByRole('button', { name: '+ Add new' })
@@ -239,8 +224,7 @@ configs.forEach((config) => {
       cy.get(`@${config.fieldAlias}`).find('tbody tr').should('have.length', 3);
 
       // Populate the new item.
-      typeInRow(`@${config.fieldAlias}`, 2, config.testValues[1]);
-      waitForPreview();
+      typeInRowAwaitPreview(`@${config.fieldAlias}`, 2, config.testValues[1]);
       cy.waitForAjax();
 
       confirmInputs(`@${config.fieldAlias}`, [
@@ -262,8 +246,7 @@ configs.forEach((config) => {
       const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
       // Set up three items.
-      typeInRow(`@${config.fieldAlias}`, 1, config.testValues[0]);
-      waitForPreview();
+      typeInRowAwaitPreview(`@${config.fieldAlias}`, 1, config.testValues[0]);
 
       cy.get(`@${config.fieldAlias}`)
         .findByRole('button', { name: '+ Add new' })
@@ -271,8 +254,7 @@ configs.forEach((config) => {
       cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
       cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
-      typeInRow(`@${config.fieldAlias}`, 2, config.testValues[1]);
-      waitForPreview();
+      typeInRowAwaitPreview(`@${config.fieldAlias}`, 2, config.testValues[1]);
       cy.waitForAjax();
 
       confirmInputs(`@${config.fieldAlias}`, [
@@ -283,7 +265,7 @@ configs.forEach((config) => {
 
       cy.log('Move item 3 to position 2 using custom drag handle');
 
-      cy.get(`@${config.fieldAlias}`).find('tbody tr').eq(0).scrollIntoView();
+      cy.get(`@${config.fieldAlias}`).scrollIntoView({ offset: { top: -500 } });
 
       const dndDefaults = {
         position: 'topLeft',
@@ -295,19 +277,38 @@ configs.forEach((config) => {
         .find('.canvas-drag-handle a.tabledrag-handle')
         .should('have.length', 3);
 
+      // Register intercept before the drag so we capture every preview POST
+      // the reorder triggers (multiple can fire; the one that carries the
+      // reordered `_weight` values is what we wait for below).
+      cy.intercept('POST', '**/canvas/api/v0/layout/node/2').as(
+        'previewUpdate',
+      );
+
       cy.get(
         `[data-drupal-selector="${config.drupalSelector}"] tr.draggable:nth-child(3) [title="Change order"]`,
       ).realDnd(
-        `[data-drupal-selector="${config.drupalSelector}"] tr.draggable:nth-child(2)`,
+        `[data-drupal-selector="${config.drupalSelector}"] tr.draggable:nth-child(2) [title="Change order"]`,
         dndDefaults,
       );
 
+      // `drupalSelector` is `edit-<field_name-with-dashes>`; convert to the
+      // form-field name shape (`field_cvt_unlimited_number`) used in the POST
+      // body.
+      const fieldName = config.drupalSelector
+        .replace(/^edit-/, '')
+        .replace(/-/g, '_');
+      cy.assertMultivalueReorder({
+        alias: 'previewUpdate',
+        fieldName,
+        expectedOrder: config.reorderedValues,
+      });
       cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
       cy.waitForAjax();
 
-      // eslint-disable-next-line cypress/no-unnecessary-waiting
-      cy.wait(1000);
       confirmInputs(`@${config.fieldAlias}`, config.reorderedValues);
+      // Wait to ensure order is auto saved before reloading.
+      // eslint-disable-next-line cypress/no-unnecessary-waiting
+      cy.wait(10000);
       // Refresh the page to ensure the update persists.
       cy.reload();
       confirmInputs(`@${config.fieldAlias}`, [...config.reorderedValues, '']);
@@ -322,8 +323,7 @@ configs.forEach((config) => {
         .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
-      typeInRow(`@${config.fieldAlias}`, 1, config.testValues[0]);
-      waitForPreview();
+      typeInRowAwaitPreview(`@${config.fieldAlias}`, 1, config.testValues[0]);
 
       cy.get(`@${config.fieldAlias}`)
         .findByRole('button', { name: '+ Add new' })
@@ -333,8 +333,7 @@ configs.forEach((config) => {
       );
       cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
-      typeInRow(`@${config.fieldAlias}`, 2, config.testValues[1]);
-      waitForPreview();
+      typeInRowAwaitPreview(`@${config.fieldAlias}`, 2, config.testValues[1]);
       cy.waitForAjax();
 
       confirmInputs(`@${config.fieldAlias}`, [
@@ -344,23 +343,19 @@ configs.forEach((config) => {
       ]);
 
       // Open the popover for the second item and click Remove.
-      cy.get(`@${config.fieldAlias}`)
-        .find('tbody tr')
-        .eq(1)
-        .find('[class*="_listItem_"]')
-        .click();
+      cy.openMultivaluePopover(`@${config.fieldAlias}`, 1);
 
-      cy.get('[role="dialog"]').should('be.visible');
+      cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
-      cy.get('[role="dialog"]')
+      cy.get('[role="dialog"][data-state="open"]')
         .findByRole('button', { name: /Remove/i })
         .should('be.visible');
 
-      cy.get('[role="dialog"]')
+      cy.get('[role="dialog"][data-state="open"]')
         .findByRole('button', { name: /Remove/i })
         .click();
 
-      cy.get('[role="dialog"]').should('not.exist');
+      cy.get('[role="dialog"][data-state="open"]').should('not.exist');
       cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
       cy.waitForAjax();
 
@@ -376,27 +371,24 @@ configs.forEach((config) => {
         .as(config.fieldAlias);
 
       // Click the first item to open popover.
-      cy.get(`@${config.fieldAlias}`)
-        .find('tbody tr')
-        .eq(0)
-        .find('[class*="_listItem_"]')
-        .click();
+      cy.openMultivaluePopover(`@${config.fieldAlias}`, 0);
 
-      cy.get('[role="dialog"]')
+      cy.get('[role="dialog"][data-state="open"]')
         .should('be.visible')
         .and('contain', config.fieldLabel);
-      cy.get('[role="dialog"]')
+      cy.get('[role="dialog"][data-state="open"]')
         .find('input[type="number"]')
         .should('be.visible')
         .should('have.value', config.defaultValue);
 
-      cy.get('[role="dialog"]').find('[aria-label="Close"]').should('exist');
+      cy.get('[role="dialog"][data-state="open"]')
+        .find('[aria-label="Close"]')
+        .should('exist');
 
-      cy.get('[aria-label="Close"]').click();
-      cy.get('[role="dialog"]').should('not.exist');
+      cy.closeMultivaluePopover();
     });
 
-    it('popover discards uncommitted changes when closed without Enter', () => {
+    it('popover propagates changes live as user types', () => {
       cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
       cy.findByTestId('canvas-page-data-form').as('entityForm');
 
@@ -404,18 +396,23 @@ configs.forEach((config) => {
         .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
-      cy.get(`@${config.fieldAlias}`)
-        .find('tbody tr')
-        .eq(0)
-        .find('[class*="_listItem_"]')
-        .click();
+      // Open the first row's popover.
+      cy.openMultivaluePopover(`@${config.fieldAlias}`, 0);
 
-      cy.get('[role="dialog"]').find('input[type="number"]').clear();
-      cy.get('[role="dialog"]').find('input[type="number"]').type('99');
-      cy.get('[aria-label="Close"]').click();
-      cy.get('[role="dialog"]').should('not.exist');
+      // Type a new value — row label should update immediately without Enter.
+      cy.get('[role="dialog"][data-state="open"]')
+        .find('input[type="number"]')
+        .clear();
+      cy.get('[role="dialog"][data-state="open"]')
+        .find('input[type="number"]')
+        .type('99');
 
-      verifyRowText(`@${config.fieldAlias}`, 0, config.defaultValue);
+      verifyRowText(`@${config.fieldAlias}`, 0, '99');
+
+      // Close via the × button — value should not be reverted.
+      cy.closeMultivaluePopover();
+
+      verifyRowText(`@${config.fieldAlias}`, 0, '99');
     });
 
     it(`maintains form state across popover interactions for ${fieldTypeLower}`, () => {
@@ -427,12 +424,8 @@ configs.forEach((config) => {
         .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
-      typeInRow(`@${config.fieldAlias}`, 0, config.testValues[2]);
-      waitForPreview();
-
-      typeInRow(`@${config.fieldAlias}`, 1, config.testValues[3]);
-
-      waitForPreview();
+      typeInRowAwaitPreview(`@${config.fieldAlias}`, 0, config.testValues[2]);
+      typeInRowAwaitPreview(`@${config.fieldAlias}`, 1, config.testValues[3]);
       cy.findByLabelText('Loading Preview').should('not.exist');
 
       verifyRowText(`@${config.fieldAlias}`, 0, config.testValues[2]);
@@ -472,8 +465,7 @@ configs.forEach((config) => {
           .should('have.length', 2);
 
         // Fill the empty second item
-        typeInRow(`@${config.fieldAlias}`, 1, config.testValues[0]);
-        waitForPreview();
+        typeInRowAwaitPreview(`@${config.fieldAlias}`, 1, config.testValues[0]);
 
         confirmInputs(`@${config.fieldAlias}`, [
           config.defaultValue,
@@ -481,39 +473,28 @@ configs.forEach((config) => {
         ]);
 
         // Open popover for first item (we have 2 items now, remove should be enabled)
-        cy.get(`@${config.fieldAlias}`)
-          .find('tbody tr')
-          .eq(0)
-          .find('[class*="_listItem_"]')
-          .click();
+        cy.openMultivaluePopover(`@${config.fieldAlias}`, 0);
 
-        cy.get('[role="dialog"]').should('be.visible');
+        cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
         // Remove button should be enabled when there are multiple items
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .should('be.visible')
           .should('not.be.disabled');
 
         // Close popover
-        cy.get('[aria-label="Close"]').click();
-        cy.get('[role="dialog"]').should('not.exist');
+        cy.closeMultivaluePopover();
+        cy.openMultivaluePopover(`@${config.fieldAlias}`, 1);
 
-        // Now remove the second item to leave only one
-        cy.get(`@${config.fieldAlias}`)
-          .find('tbody tr')
-          .eq(1)
-          .find('[class*="_listItem_"]')
-          .click();
+        cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
-        cy.get('[role="dialog"]').should('be.visible');
-
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .should('be.visible')
           .click();
 
-        cy.get('[role="dialog"]').should('not.exist');
+        cy.get('[role="dialog"][data-state="open"]').should('not.exist');
         cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
         cy.waitForAjax();
 
@@ -524,23 +505,18 @@ configs.forEach((config) => {
         confirmInputs(`@${config.fieldAlias}`, [config.defaultValue]);
 
         // Open popover for the only remaining item
-        cy.get(`@${config.fieldAlias}`)
-          .find('tbody tr')
-          .eq(0)
-          .find('[class*="_listItem_"]')
-          .click();
+        cy.openMultivaluePopover(`@${config.fieldAlias}`, 0);
 
-        cy.get('[role="dialog"]').should('be.visible');
+        cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
         // Remove button should be DISABLED because field is required and only one item exists
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .should('be.visible')
           .should('be.disabled');
 
         // Close popover
-        cy.get('[aria-label="Close"]').click();
-        cy.get('[role="dialog"]').should('not.exist');
+        cy.closeMultivaluePopover();
       });
 
       it('enables remove button when required field has multiple items', function () {
@@ -559,8 +535,7 @@ configs.forEach((config) => {
         const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
         // Fill the empty second item
-        typeInRow(`@${config.fieldAlias}`, 1, config.testValues[0]);
-        waitForPreview();
+        typeInRowAwaitPreview(`@${config.fieldAlias}`, 1, config.testValues[0]);
 
         // Add a third item
         cy.get(`@${config.fieldAlias}`)
@@ -570,8 +545,7 @@ configs.forEach((config) => {
         cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
         cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
-        typeInRow(`@${config.fieldAlias}`, 2, config.testValues[1]);
-        waitForPreview();
+        typeInRowAwaitPreview(`@${config.fieldAlias}`, 2, config.testValues[1]);
         cy.waitForAjax();
 
         // Now we have 3 items
@@ -582,36 +556,27 @@ configs.forEach((config) => {
         ]);
 
         // Open popover for any item - remove should be enabled
-        cy.get(`@${config.fieldAlias}`)
-          .find('tbody tr')
-          .eq(1)
-          .find('[class*="_listItem_"]')
-          .click();
+        cy.openMultivaluePopover(`@${config.fieldAlias}`, 1);
 
-        cy.get('[role="dialog"]').should('be.visible');
+        cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
         // Remove button should be enabled when there are multiple items
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .should('be.visible')
           .should('not.be.disabled');
 
         // Close popover without removing
-        cy.get('[aria-label="Close"]').click();
-        cy.get('[role="dialog"]').should('not.exist');
+        cy.closeMultivaluePopover();
 
         // Remove one item to get down to 2 items
-        cy.get(`@${config.fieldAlias}`)
-          .find('tbody tr')
-          .eq(2)
-          .find('[class*="_listItem_"]')
-          .click();
+        cy.openMultivaluePopover(`@${config.fieldAlias}`, 2);
 
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .click();
 
-        cy.get('[role="dialog"]').should('not.exist');
+        cy.get('[role="dialog"][data-state="open"]').should('not.exist');
         cy.waitForAjax();
 
         // Still 2 items, remove should still be enabled
@@ -619,18 +584,14 @@ configs.forEach((config) => {
           .find('tbody tr')
           .should('have.length', 2);
 
-        cy.get(`@${config.fieldAlias}`)
-          .find('tbody tr')
-          .eq(0)
-          .find('[class*="_listItem_"]')
-          .click();
+        cy.openMultivaluePopover(`@${config.fieldAlias}`, 0);
 
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .should('be.visible')
           .should('not.be.disabled');
 
-        cy.get('[aria-label="Close"]').click();
+        cy.closeMultivaluePopover();
       });
     });
   });

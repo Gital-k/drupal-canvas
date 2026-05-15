@@ -16,9 +16,15 @@ npm install @drupal-canvas/cli
 
 1. Install the Drupal Canvas OAuth module (`canvas_oauth`), which is shipped as
    a submodule of Drupal Canvas.
-2. Follow the
-   [configuration steps of the module](https://git.drupalcode.org/project/canvas/-/tree/1.x/modules/canvas_oauth#22-configuration)
-   to set up a client with an ID and secret.
+2. Choose an authentication flow:
+   - **Interactive login (recommended for individual developers):** Follow the
+     [authorization code setup](https://git.drupalcode.org/project/canvas/-/tree/1.x/modules/canvas_oauth#23-interactive-login-with-canvas-login)
+     and run `npx canvas login`. Tokens are stored in
+     `~/.config/drupal-canvas/oauth.json` and used automatically — no
+     environment variables needed.
+   - **Client credentials (for CI/CD or service accounts):** Follow the
+     [client credentials setup](https://git.drupalcode.org/project/canvas/-/tree/1.x/modules/canvas_oauth#22-configuration)
+     and configure `CANVAS_CLIENT_ID` and `CANVAS_CLIENT_SECRET`.
 
 ### Configuration
 
@@ -27,8 +33,9 @@ The Canvas CLI uses three types of configuration:
 - **canvas.config.json** - Repository-committed configuration for values tied to
   your codebase structure (where files are stored, build output locations)
 - **canvas.brand-kit.json** - Optional Brand Kit (font) configuration. When
-  present, `canvas push` and `canvas pull` use it to sync fonts with the global
-  Brand Kit. See [Font push (Brand Kit)](#font-push-brand-kit).
+  Brand Kit sync is enabled, `canvas push` and `canvas pull` use it to sync
+  fonts with the global Brand Kit. See
+  [Font push (Brand Kit)](#font-push-brand-kit).
 - **.env** - Environmental configuration and secrets that should not be tracked
   in version control (site URLs, OAuth credentials)
 
@@ -43,8 +50,9 @@ properties:
 
 ```json
 {
-  "componentDir": "./components",
+  "componentDir": "./src/components",
   "pagesDir": "./pages",
+  "contentTemplatesDir": "./content-templates",
   "aliasBaseDir": "src",
   "outputDir": "dist",
   "globalCssPath": "./src/components/global.css"
@@ -53,12 +61,14 @@ properties:
 
 **Properties:**
 
-| Property        | Default                         | Description                                                                                                               |
-| --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `componentDir`  | `process.cwd()`                 | Directory where Code Components are stored in the filesystem.                                                             |
-| `aliasBaseDir`  | `"src"`                         | Base directory for module resolution when using path aliases in your components. Tied to your project's import structure. |
-| `outputDir`     | `"dist"`                        | Build output directory (similar to Vite's `build.outDir`). Defines where compiled assets are generated.                   |
-| `globalCssPath` | `"./src/components/global.css"` | Path to the global CSS file.                                                                                              |
+| Property              | Default                         | Description                                                                                                               |
+| --------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `componentDir`        | `"src/components"`              | Directory where Code Components are stored in the filesystem. It must be inside `aliasBaseDir` for local builds.          |
+| `pagesDir`            | `"./pages"`                     | Directory where pages are stored in the filesystem.                                                                       |
+| `contentTemplatesDir` | `"./content-templates"`         | Directory where content templates are stored in the filesystem.                                                           |
+| `aliasBaseDir`        | `"src"`                         | Base directory for module resolution when using path aliases in your components. Tied to your project's import structure. |
+| `outputDir`           | `"dist"`                        | Build output directory (similar to Vite's `build.outDir`). Defines where compiled assets are generated.                   |
+| `globalCssPath`       | `"./src/components/global.css"` | Path to the global CSS file.                                                                                              |
 
 If `canvas.config.json` is not present, the CLI will use the default values
 shown above.
@@ -66,8 +76,8 @@ shown above.
 #### canvas.brand-kit.json (Optional)
 
 Brand Kit (font) configuration lives in `canvas.brand-kit.json` in the project
-root. When this file is present, `canvas push` and `canvas pull` use it to sync
-fonts with the global Brand Kit. Example:
+root. When Brand Kit sync is enabled, `canvas push` and `canvas pull` use it to
+sync fonts with the global Brand Kit. Example:
 
 ```json
 {
@@ -95,31 +105,21 @@ fonts with the global Brand Kit. Example:
 }
 ```
 
-**Properties:**
-
-| Property        | Default                         | Description                                                                                                               |
-| --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `componentDir`  | `process.cwd()`                 | Directory where Code Components are stored in the filesystem.                                                             |
-| `pagesDir`      | `"./pages"`                     | Directory where page specs are stored in the filesystem.                                                                  |
-| `aliasBaseDir`  | `"src"`                         | Base directory for module resolution when using path aliases in your components. Tied to your project's import structure. |
-| `outputDir`     | `"dist"`                        | Build output directory (similar to Vite's `build.outDir`). Defines where compiled assets are generated.                   |
-| `globalCssPath` | `"./src/components/global.css"` | Path to the global CSS file.                                                                                              |
-
 Font configuration lives in `canvas.brand-kit.json`. See
 [Font push (Brand Kit)](#font-push-brand-kit) for the full schema.
 
-If `canvas.config.json` is not present, the CLI will use the default values
-shown above.
-
 #### Font push (Brand Kit)
 
-When `canvas.brand-kit.json` is present, the `push` command will resolve each
-family (via a provider or a local file), upload the font files to the site, and
-sync the font list to the global Brand Kit. Push replaces the remote font set
-with the set from config; an empty `families` list clears all fonts on the
-global Brand Kit. Fonts are stored on the Brand Kit entity and generate
-`@font-face` CSS for the Canvas editor and front end. This uses
-[unifont](https://github.com/unjs/unifont) for provider-based families.
+When `canvas.brand-kit.json` is present and Brand Kit sync is enabled, the
+`push` command will resolve each family (via a provider or a local file), upload
+the font files to the site, and sync the font list to the global Brand Kit. Push
+replaces the remote font set with the set from config; an empty `families` list
+clears all fonts on the global Brand Kit. Fonts are stored on the Brand Kit
+entity and generate `@font-face` CSS for the Canvas editor and front end. This
+uses [unifont](https://github.com/unjs/unifont) for provider-based families.
+
+For user-facing Brand Kit docs, see
+[Code Components - Brand Kit](../../docs/user/src/content/docs/code-components/brand-kit.mdx).
 
 **canvas.brand-kit.json shape:** The file has a top-level **`fonts`** key (other
 brand kit keys may be added later). Under `fonts`:
@@ -172,27 +172,30 @@ You can copy the
 [`.env.example` file](https://git.drupalcode.org/project/canvas/-/blob/1.x/cli/.env.example)
 to get started.
 
-| CLI argument          | Environment variable       | Description                                                                                                                                                                                           |
-| --------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--site-url`          | `CANVAS_SITE_URL`          | Base URL of your Drupal site. Can point to different environments (local dev, staging, production).                                                                                                   |
-| `--client-id`         | `CANVAS_CLIENT_ID`         | OAuth client ID. Different environments may have different OAuth clients with different permissions.                                                                                                  |
-| `--client-secret`     | `CANVAS_CLIENT_SECRET`     | OAuth client secret. This is a secret credential that must never be committed to version control.                                                                                                     |
-| `--scope`             | `CANVAS_SCOPE`             | (Optional) Space-separated list of OAuth scopes to request. Tied to your specific Drupal site's OAuth configuration. Defaults to standard scopes.                                                     |
-| _(none)_              | `CANVAS_ACCESS_TOKEN`      | (Optional) Pre-issued Bearer token. When set, skips the OAuth client credentials flow entirely. `CANVAS_CLIENT_ID`, `CANVAS_CLIENT_SECRET`, and `CANVAS_SCOPE` are ignored. Must not be empty if set. |
-| `--include-pages`     | `CANVAS_INCLUDE_PAGES`     | (Optional) Include pages in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                                   |
-| `--include-brand-kit` | `CANVAS_INCLUDE_BRAND_KIT` | (Optional) Include brand kit (fonts) in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                       |
+| CLI argument                  | Environment variable               | Description                                                                                                                                                                                           |
+| ----------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--site-url`                  | `CANVAS_SITE_URL`                  | Base URL of your Drupal site. Can point to different environments (local dev, staging, production).                                                                                                   |
+| `--client-id`                 | `CANVAS_CLIENT_ID`                 | OAuth client ID. Different environments may have different OAuth clients with different permissions.                                                                                                  |
+| `--client-secret`             | `CANVAS_CLIENT_SECRET`             | OAuth client secret. This is a secret credential that must never be committed to version control.                                                                                                     |
+| `--scope`                     | `CANVAS_SCOPE`                     | (Optional) Space-separated list of OAuth scopes to request. Tied to your specific Drupal site's OAuth configuration. Defaults to standard scopes.                                                     |
+| _(none)_                      | `CANVAS_ACCESS_TOKEN`              | (Optional) Pre-issued Bearer token. When set, skips the OAuth client credentials flow entirely. `CANVAS_CLIENT_ID`, `CANVAS_CLIENT_SECRET`, and `CANVAS_SCOPE` are ignored. Must not be empty if set. |
+| _(none)_                      | _(none)_                           | User tokens from `canvas auth login` are stored in `~/.config/drupal-canvas/oauth.json` (keyed by site URL) and used automatically. No environment variable is needed.                                |
+| `--include-pages`             | `CANVAS_INCLUDE_PAGES`             | (Optional) Include pages in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                                   |
+| `--include-content-templates` | `CANVAS_INCLUDE_CONTENT_TEMPLATES` | (Optional) Include content templates in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                       |
+| `--include-brand-kit`         | `CANVAS_INCLUDE_BRAND_KIT`         | (Optional) Include brand kit (fonts) in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                       |
 
 **Note:** When `CANVAS_SCOPE` is unset, the CLI uses the `canvas_oauth`
 defaults. With `--include-brand-kit` or `CANVAS_INCLUDE_BRAND_KIT`, it adds the
 `canvas:brand_kit` scope. With `--include-pages` or `CANVAS_INCLUDE_PAGES`, it
-also adds the `canvas:page:*` scopes.
+adds the `canvas:page:*` scopes. With `--include-content-templates` or
+`CANVAS_INCLUDE_CONTENT_TEMPLATES`, it adds the `canvas:content_template` scope.
 
 #### Configuration Precedence
 
 The CLI uses different precedence rules depending on the type of configuration:
 
 **For canvas.config.json properties** (`componentDir`, `pagesDir`,
-`aliasBaseDir`, `outputDir`, `globalCssPath`):
+`contentTemplatesDir`, `aliasBaseDir`, `outputDir`, `globalCssPath`):
 
 Configuration sources are applied in order of precedence from highest to lowest:
 
@@ -225,8 +228,9 @@ will use `https://prod.example.com`.
 
 Canvas Code Components support the following import patterns. Unsupported
 patterns are caught by the `drupal-canvas/component-imports` ESLint rule during
-[`npx canvas validate`](#validate). See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for
-the full list of unsupported patterns.
+[`npx canvas validate`](#validate). See the
+[imports and assets documentation](../../docs/user/src/content/docs/code-components/imports-and-assets.mdx)
+for the full list of supported and unsupported patterns.
 
 ### Third-Party npm Packages
 
@@ -371,8 +375,9 @@ downloaded by default and can be controlled with `--skip-css` to exclude them or
 
 ### `pull`
 
-Pull code components, global CSS, and fonts from Drupal to your local
-filesystem. Pages are only included when explicitly enabled.
+Pull code components and global CSS from Drupal to your local filesystem. Pages,
+content templates, and Brand Kit fonts are only included when explicitly
+enabled.
 
 **Usage:**
 
@@ -385,6 +390,9 @@ npx canvas pull [options]
 - `-d, --dir <directory>`: Component directory (defaults to `componentDir` from
   `canvas.config.json` or current working directory)
 - `--include-pages [enabled]`: Include pages in the pull operation
+- `--include-content-templates [enabled]`: Include content templates in the pull
+  operation
+- `--include-brand-kit [enabled]`: Include Brand Kit fonts in the pull operation
 - `-y, --yes`: Skip all confirmation prompts (non-interactive mode)
 - `--skip-overwrite`: Skip items that already exist locally
 
@@ -398,16 +406,22 @@ npx canvas pull [options]
 
 **Examples:**
 
-Pull everything:
+Pull Code Components and global CSS:
 
 ```bash
 npx canvas pull
 ```
 
-Pull everything, including pages:
+Pull Code Components, global CSS, pages, and content templates:
 
 ```bash
-npx canvas pull --include-pages
+npx canvas pull --include-pages --include-content-templates
+```
+
+Pull Brand Kit fonts:
+
+```bash
+npx canvas pull --include-brand-kit
 ```
 
 Pull only new items (skip existing):
@@ -422,9 +436,11 @@ Fully non-interactive, only pull new items:
 npx canvas pull --yes --skip-overwrite
 ```
 
-Pulls all components, global CSS, and fonts from your site. Use
-`--include-pages` or `CANVAS_INCLUDE_PAGES=true` to include pages, and
-`--skip-overwrite` to skip items that already exist locally.
+Pulls Code Components and global CSS from your site. Use `--include-pages` or
+`CANVAS_INCLUDE_PAGES=true` to include pages, `--include-content-templates` or
+`CANVAS_INCLUDE_CONTENT_TEMPLATES=true` to include content templates, and
+`--include-brand-kit` or `CANVAS_INCLUDE_BRAND_KIT=true` to include Brand Kit
+fonts. Use `--skip-overwrite` to skip items that already exist locally.
 
 **Fonts:** The pull command fetches fonts from the global Brand Kit, downloads
 font files into a `fonts/` directory, and adds local `src` entries to
@@ -703,7 +719,8 @@ the site will be updated if they already exist.
 ### `push`
 
 Build and push local components, global CSS, and build artifacts to Drupal.
-Pages are only included when explicitly enabled.
+Pages, content templates, and Brand Kit fonts are only included when explicitly
+enabled.
 
 **Usage:**
 
@@ -716,6 +733,9 @@ npx canvas push [options]
 - `-d, --dir <directory>`: Directory to scan for components (defaults to
   `componentDir` from `canvas.config.json` or current working directory)
 - `--include-pages [enabled]`: Include pages in the push operation
+- `--include-content-templates [enabled]`: Include content templates in the push
+  operation
+- `--include-brand-kit [enabled]`: Include Brand Kit fonts in the push operation
 - `-y, --yes`: Skip confirmation prompts (non-interactive mode)
 
 **Examples:**
@@ -730,6 +750,18 @@ Push components and pages:
 
 ```bash
 npx canvas push --include-pages
+```
+
+Push components and content templates:
+
+```bash
+npx canvas push --include-content-templates
+```
+
+Push Brand Kit fonts:
+
+```bash
+npx canvas push --include-brand-kit
 ```
 
 Push components in a specific directory:
@@ -759,6 +791,140 @@ Tailwind CSS, and uploads the selected content to your Drupal site including:
 6. **Shared chunks** - Common code shared between vendor bundles
 7. **Pages** - Canvas pages built from components, when enabled with
    `--include-pages` or `CANVAS_INCLUDE_PAGES=true`.
+8. **Content Templates** - Content templates that define component layouts for
+   entity view modes, when enabled with `--include-content-templates` or
+   `CANVAS_INCLUDE_CONTENT_TEMPLATES=true`.
+
+---
+
+### `reconcile-media`
+
+Upload external media referenced in local page specs and content templates to
+Drupal and store provenance metadata so that pages and content templates can be
+pushed.
+
+When page specs or content templates contain image props with external URLs
+(e.g. `https://example.com/photo.jpg`), they cannot be pushed directly because
+Drupal expects a media entity reference. This command downloads each external
+image, uploads it to Drupal as a media entity, and updates the local spec with
+the resolved image data and provenance (`target_id`).
+
+**Usage:**
+
+```bash
+npx canvas reconcile-media [options]
+```
+
+**Options:**
+
+- `-y, --yes`: Skip confirmation prompts (non-interactive mode)
+
+**Examples:**
+
+Reconcile all external media in local pages:
+
+```bash
+npx canvas reconcile-media
+```
+
+Non-interactive mode for CI/CD:
+
+```bash
+npx canvas reconcile-media --yes
+```
+
+---
+
+### `agents-context`
+
+> **Experimental:** This command is experimental and may change in future
+> releases.
+
+Pull context for AI agents working on content templates and write it to
+`.agents/drupal-canvas/`. The directory contains:
+
+- `prop-sources.json` — for each entity bundle and component, the available
+  field bindings agents can use as prop sources.
+- `view-modes.json` — view modes available per entity type and bundle.
+- `.gitignore` — ignores the generated files; the directory should not be
+  committed.
+
+**Usage:**
+
+```bash
+npx canvas agents-context [options]
+```
+
+**Options:**
+
+- `--site-url <url>`: Site URL
+- `--client-id <id>`: Client ID
+- `--client-secret <secret>`: Client Secret
+- `--scope <scope>`: Scope
+
+**Example:**
+
+```bash
+npx canvas agents-context
+```
+
+---
+
+### `login`
+
+Log in to a Canvas site via browser using the OAuth 2.0 authorization code flow
+with PKCE. Stores the resulting access and refresh tokens in
+`~/.config/drupal-canvas/oauth.json` (keyed by site URL). After logging in,
+`canvas push` and `canvas pull` use the stored token automatically.
+
+**Usage:**
+
+```bash
+npx canvas login [options]
+```
+
+**Options:**
+
+- `--site-url <url>`: Canvas site URL (prompted if not provided)
+- `--client-id <id>`: OAuth client ID for the consumer configured in Drupal
+  admin
+- `--port <number>`: Local callback port (default: `4444`). The consumer's
+  redirect URI must match: `http://localhost:<port>/callback`.
+
+**Example:**
+
+```bash
+npx canvas login --site-url https://example.com --client-id my-cli-client
+```
+
+The CLI opens your browser to the Drupal login page, waits for authorization,
+then saves your tokens locally. Requires the consumer to be configured for the
+Authorization Code grant with `http://localhost:4444/callback` (or the port you
+specify) as a redirect URI — see the
+[canvas_oauth setup guide](https://git.drupalcode.org/project/canvas/-/tree/1.x/modules/canvas_oauth#23-interactive-login-with-canvas-login).
+
+---
+
+### `logout`
+
+Remove stored credentials for a Canvas site from
+`~/.config/drupal-canvas/oauth.json`.
+
+**Usage:**
+
+```bash
+npx canvas logout [options]
+```
+
+**Options:**
+
+- `--site-url <url>`: Canvas site URL to log out of (prompted if not provided)
+
+**Example:**
+
+```bash
+npx canvas logout --site-url https://example.com
+```
 
 ---
 

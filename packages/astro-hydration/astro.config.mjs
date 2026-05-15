@@ -11,6 +11,8 @@ const pkg = require('./package.json');
 
 // https://astro.build/config
 export default defineConfig({
+  cacheDir: '../../.cache/astro',
+
   // Enable Preact to support Preact JSX components.
   integrations: [preact()],
   vite: {
@@ -29,6 +31,7 @@ export default defineConfig({
             // names so we can easily distinguish between them.
             const matches = {
               'astro-hydration/src/lib/jsx-runtime-default.js': 'jsx-runtime-default.js',
+              'preact-render-to-string': 'preact-render-to-string.js',
               clsx: 'clsx.js',
               'class-variance-authority': 'class-variance-authority.js',
               'tailwind-merge': 'tailwind-merge.js',

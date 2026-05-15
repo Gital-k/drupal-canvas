@@ -191,8 +191,11 @@ export function coerceValueForSchema(
     typeof value !== 'string' ||
     value === ''
   ) {
-    return value;
+    return propType === 'string' && typeof value === 'number'
+      ? `${value}`
+      : value;
   }
+
   const coerced = transforms.cast(
     value,
     { to: propType as 'integer' | 'number' | 'boolean' },
@@ -277,6 +280,9 @@ export function propInputData(
 ) {
   const { selectedComponent, components, selectedComponentType } =
     inputAndUiData;
+
+  const component = components?.[selectedComponentType];
+
   // Keep track of fields that are part of a group of fields that result
   // in a single prop value being stored, such as individual date and time
   // fields being stored as a single datetime prop.
@@ -288,7 +294,14 @@ export function propInputData(
   Object.keys(formState).forEach((itemKey) => {
     if (itemKey.includes(`canvas_component_props[${selectedComponent}][`)) {
       const propName = toPropName(itemKey, selectedComponent);
-      if (propsInThisForm.includes(propName)) {
+      // @ts-ignore
+      const cardinality =
+        isPropSourceComponent(component) &&
+        component?.propSources?.[propName]?.sourceTypeSettings?.cardinality;
+      if (
+        propsInThisForm.includes(propName) &&
+        (!cardinality || cardinality === 1)
+      ) {
         // If we hit a prop that is already in `propsInThisForm`, add it
         // to the array keeping track of props that have multiple single
         // value form elements associated with it.
@@ -302,9 +315,7 @@ export function propInputData(
 
   const propsWithObjectValues: PropsValues = {};
   const propsWithSourceStorageSettings: PropsValues = {};
-  // OpenAPI already ensures this exists, but the condition check is here
-  // to soothe Typescript.
-  const component = components?.[selectedComponentType];
+
   if (isPropSourceComponent(component)) {
     Object.entries(component.propSources).forEach(
       // @ts-ignore
@@ -398,7 +409,13 @@ export const formStateToObject = (
       normalizedKey.indexOf(']', prefix.length) === normalizedKey.length - 1;
     if (isDirectArrayProp) {
       arrayPropNames.push(toPropName(normalizedKey, componentId));
-      (value as any[]).forEach((item) => params.append(key, item));
+      if ((value as any[]).length) {
+        (value as any[]).forEach((item) => params.append(key, item));
+      } else {
+        // Represent an empty array with an empty string to convey an
+        // empty value in the query string.
+        params.append(key, '');
+      }
     } else {
       params.append(key, value as any);
     }
@@ -413,6 +430,16 @@ export const formStateToObject = (
   const result = parsed.canvas_component_props[componentId] as PropsValues;
   arrayPropNames.forEach((propName) => {
     if (!(propName in result)) {
+      result[propName] = [];
+    } else if (
+      result[propName] === '' ||
+      // When the key has a `[]` suffix, qs.parse wraps the sentinel empty
+      // string into a single-element array [''] — treat that as empty too.
+      (Array.isArray(result[propName]) &&
+        (result[propName] as any[]).length === 1 &&
+        (result[propName] as any[])[0] === '')
+    ) {
+      // An empty string (or ['']) is our sentinel for an empty array.
       result[propName] = [];
     } else if (!Array.isArray(result[propName])) {
       result[propName] = [result[propName]];
@@ -586,3 +613,14 @@ export class ComponentPreviewUpdateEvent extends Event {
     return this.previewBackgroundUpdate;
   }
 }
+
+export const isDateOnly = (val: string): boolean =>
+  /^\d{4}-\d{2}-\d{2}$/.test(val);
+export const isTimeOnly = (val: string): boolean =>
+  /^\d{2}:\d{2}(:\d{2})?$/.test(val);
+
+export const toDateTime = (val: string): string => {
+  if (isDateOnly(val)) return `${val}T00:00:00Z`;
+  if (isTimeOnly(val)) return `1970-01-01T${val}Z`;
+  return val;
+};

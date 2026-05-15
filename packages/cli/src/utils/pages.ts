@@ -1,10 +1,47 @@
 import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 
+import {
+  buildChildToParentMap,
+  buildElementKeyToUuidMap,
+} from './authored-element-utils';
+import { isRecord } from './utils';
+
 import type {
   AuthoredSpecElementMap,
   CanvasComponentTree,
 } from 'drupal-canvas/json-render-utils';
 import type { Page } from '../types/Page';
+
+function isResolvedMediaValue(
+  value: unknown,
+): value is Record<string, unknown> {
+  return isRecord(value) && typeof value.src === 'string';
+}
+
+function isMediaProvenanceValue(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (typeof value.target_id === 'number' ||
+      typeof value.target_id === 'string' ||
+      typeof value.target_uuid === 'string')
+  );
+}
+
+function extractMediaProvenance(
+  inputs: Record<string, unknown>,
+  resolvedInputs: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const provenance = Object.fromEntries(
+    Object.entries(inputs).filter(([key, value]) => {
+      return (
+        isResolvedMediaValue(resolvedInputs[key]) &&
+        isMediaProvenanceValue(value)
+      );
+    }),
+  );
+
+  return Object.keys(provenance).length > 0 ? provenance : undefined;
+}
 
 /**
  * Converts a json-render spec to an authored element map suitable for page
@@ -38,7 +75,7 @@ export function specToAuthoredElementMap(
 
     elements[key] = {
       type: element.type,
-      props: element.props ?? {},
+      props: isRecord(element.props) ? element.props : {},
       ...(Object.keys(slots).length > 0 ? { slots } : {}),
     };
   }
@@ -57,27 +94,20 @@ export function authoredSpecToComponentTree(
   elements: AuthoredSpecElementMap,
   componentVersions?: Map<string, string>,
 ): CanvasComponentTree {
-  // Build a reverse lookup: child UUID → { parentUuid, slotName }
-  const childToParent = new Map<string, { parentUuid: string; slot: string }>();
-
-  for (const [uuid, element] of Object.entries(elements)) {
-    if (!element.slots) continue;
-    for (const [slotName, childUuids] of Object.entries(element.slots)) {
-      for (const childUuid of childUuids) {
-        childToParent.set(childUuid, { parentUuid: uuid, slot: slotName });
-      }
-    }
-  }
+  const keyToUuid = buildElementKeyToUuidMap(Object.keys(elements));
+  const childToParent = buildChildToParentMap(elements);
 
   const components: CanvasComponentTree = [];
-  for (const [uuid, element] of Object.entries(elements)) {
-    const parent = childToParent.get(uuid);
+  for (const [key, element] of Object.entries(elements)) {
+    const parent = childToParent.get(key);
     components.push({
-      uuid,
+      uuid: keyToUuid.get(key)!,
       component_id: element.type,
       component_version: componentVersions?.get(element.type) ?? '',
-      inputs: (element.props as Record<string, unknown>) ?? {},
-      parent_uuid: parent?.parentUuid ?? null,
+      inputs: isRecord(element.props)
+        ? (element.props as Record<string, unknown>)
+        : {},
+      parent_uuid: parent ? (keyToUuid.get(parent.parentKey) ?? null) : null,
       slot: parent?.slot ?? null,
       label: null,
     });
@@ -87,17 +117,41 @@ export function authoredSpecToComponentTree(
 }
 
 export function pageToAuthoredSpec(page: Page): Record<string, unknown> {
+  const meta: Record<string, unknown> = {
+    uuid: page.uuid,
+    title: page.title,
+    path: page.path,
+    description: page.description,
+  };
+
   if (page.components.length === 0) {
-    return { uuid: page.uuid, title: page.title, elements: {} };
+    return { ...meta, elements: {} };
   }
 
   const components = page.components.map((node) => ({
     ...node,
-    inputs: node.inputs_resolved ?? ({} as Record<string, unknown>),
+    inputs: isRecord(node.inputs_resolved)
+      ? node.inputs_resolved
+      : ({} as Record<string, unknown>),
   }));
 
   const spec = canvasTreeToSpec(components);
   const elements = specToAuthoredElementMap(spec);
 
-  return { uuid: page.uuid, title: page.title, elements };
+  for (const node of page.components) {
+    const element = elements[node.uuid];
+    if (!element) {
+      continue;
+    }
+
+    const provenance = extractMediaProvenance(
+      isRecord(node.inputs) ? node.inputs : {},
+      isRecord(node.inputs_resolved) ? node.inputs_resolved : {},
+    );
+    if (provenance) {
+      element._provenance = provenance;
+    }
+  }
+
+  return { ...meta, elements };
 }

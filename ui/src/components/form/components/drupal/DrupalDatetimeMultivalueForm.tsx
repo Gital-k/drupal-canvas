@@ -1,14 +1,22 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import clsx from 'clsx';
 import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
-import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
+import * as Popover from '@radix-ui/react-popover';
+import { Button, Flex, Text } from '@radix-ui/themes';
 
-import TextField from '@/components/form/components/TextField';
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { toPropName } from '@/components/form/formUtil';
+import { removeFieldValue } from '@/features/form/formStateSlice';
+import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
+import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import useInputUIData from '@/hooks/useInputUIData';
+import { useUpdateComponentMutation } from '@/services/preview';
 
 import {
-  copyInputAttributes,
+  buildModelWithItemRemoved,
+  extractPositionFromFieldName,
   isRemoveButtonEnabled,
   triggerDrupalRemoveButton,
-  updateInputValue,
 } from './multivalueFormUtils';
 
 import styles from './DrupalInputMultivalueForm.module.css';
@@ -71,186 +79,199 @@ const DrupalDatetimeMultivalueForm = ({
   children?: React.ReactNode;
   fieldLabel?: string;
 }) => {
-  const contentWrapperRef = useRef<HTMLDivElement | null>(null);
+  const dispatch = useAppDispatch();
+  const inputUIData = useInputUIData();
+  const [patchComponent] = useUpdateComponentMutation({
+    fixedCacheKey: inputUIData?.selectedComponent || '-',
+  });
+  const editorFrameContext = useAppSelector(selectEditorFrameContext);
+
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const [values, setValues] = useState({
+  const [displayDate, setDisplayDate] = useState('');
+  const [displayTime, setDisplayTime] = useState('');
+  const valueAtOpenRef = useRef<{ date: string; time: string }>({
     date: '',
     time: '',
-    tempDate: '',
-    tempTime: '',
   });
-  const popoverDateFieldWrapperRef = useRef<HTMLDivElement | null>(null);
-  const popoverTimeFieldWrapperRef = useRef<HTMLDivElement | null>(null);
-  // Store refs to the hidden date and time inputs.
-  const hiddenDateInputRef = useRef<HTMLInputElement | null>(null);
-  const hiddenTimeInputRef = useRef<HTMLInputElement | null>(null);
+  // Tracks whether a time input exists — derived from the real DOM via
+  // useEffect  rather than queried at render time, so it is stable across
+  // renders and correct before the popover container is first populated.
+  const [hasTime, setHasTime] = useState(false);
 
-  // Read initial values from the rendered inputs.
-  useLayoutEffect(() => {
-    if (!contentWrapperRef.current) return;
+  // This state is set when Radix mounts the popover content, which
+  // may be deferred past the first render commit. Using state (rather than a
+  // ref) means the useEffect below re-runs reliably as soon as the node is
+  // available.
+  const [popoverContainer, setPopoverContainer] =
+    useState<HTMLDivElement | null>(null);
 
-    const dateInput = contentWrapperRef.current.querySelector(
-      'input[type="date"]',
-    ) as HTMLInputElement;
-    const timeInput = contentWrapperRef.current.querySelector(
-      'input[type="time"]',
-    ) as HTMLInputElement;
+  const hasError = () =>
+    popoverContainer &&
+    !!popoverContainer.querySelector('[data-has-field-error="true"]');
 
-    // Store refs to hidden inputs so we can access their attributes.
-    hiddenDateInputRef.current = dateInput;
-    hiddenTimeInputRef.current = timeInput;
+  // Returns the date input from the popover container, or null.
+  const getDateInput = (): HTMLInputElement | null =>
+    popoverContainer?.querySelector('input[type="date"]') ?? null;
 
-    const dateVal = dateInput?.value || dateInput?.defaultValue || '';
-    const timeVal = timeInput?.value || timeInput?.defaultValue || '';
+  // Returns the time input from the popover container, or null.
+  const getTimeInput = (): HTMLInputElement | null =>
+    popoverContainer?.querySelector('input[type="time"]') ?? null;
 
-    setValues({
-      date: dateVal,
-      time: timeVal,
-      tempDate: dateVal,
-      tempTime: timeVal,
-    });
-  }, [children]);
-
-  /**
-   * Helper function to validate an input ref.
-   * Returns true if valid, false if invalid (and shows validation message).
-   */
-  const checkValid = (ref: React.RefObject<HTMLDivElement>): boolean => {
-    const input = ref.current?.querySelector('input');
-    if (input && !input.checkValidity()) {
-      input.reportValidity();
-      return false;
-    }
-    return true;
-  };
-
-  /**
-   * Helper function to update the hidden date and time inputs.
-   */
-  const updateHiddenInputs = (date: string, time: string) => {
-    updateInputValue(hiddenDateInputRef.current, date);
-    if (hiddenTimeInputRef.current) {
-      updateInputValue(hiddenTimeInputRef.current, time);
-    }
-  };
-
-  // Commit the temporary values to the actual inputs and display.
-  const handleCommitValues = () => {
-    // Validate the date input.
-    if (!checkValid(popoverDateFieldWrapperRef)) return;
-
-    // Validate the time input (only if not date-only).
-    if (hiddenTimeInputRef.current && !checkValid(popoverTimeFieldWrapperRef))
-      return;
-
-    setValues((prev) => {
-      // Update the hidden inputs with the temp values before updating state.
-      updateHiddenInputs(prev.tempDate, prev.tempTime);
-
-      return {
-        ...prev,
-        date: prev.tempDate,
-        time: prev.tempTime,
-      };
-    });
-  };
-
-  // Handle Enter key press in popover inputs.
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-
-      // Determine which input triggered the event.
-      const inputElement = e.target as HTMLInputElement;
-
-      // Validate the input before committing.
-      if (inputElement && !inputElement.checkValidity()) {
-        // Show validation error and keep popover open.
-        inputElement.reportValidity();
-        return;
-      }
-
-      // If date input is valid, also check time input if not date-only.
-      if (
-        inputElement.type === 'date' &&
-        hiddenTimeInputRef.current &&
-        !checkValid(popoverTimeFieldWrapperRef)
-      ) {
-        return;
-      }
-
-      // If time input is valid, also check date input.
-      if (
-        inputElement.type === 'time' &&
-        !checkValid(popoverDateFieldWrapperRef)
-      ) {
-        return;
-      }
-
-      handleCommitValues();
-      setPopoverOpen(false);
-    }
-  };
-
-  // Handle popover open/close
-  const handlePopoverOpenChange = (open: boolean) => {
-    // Reset temp values to current values.
-    setValues((prev) => ({
-      ...prev,
-      tempDate: prev.date,
-      tempTime: prev.time,
-    }));
+  const setPopoverOpenAndRefocus = (open: boolean) => {
     setPopoverOpen(open);
+    if (!open) {
+      setTimeout(() => triggerButtonRef.current?.focus(), 30);
+    }
   };
 
-  const handleRemove = () => {
-    // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
-    setPopoverOpen(false);
+  // Read initial values from the inputs once the popover container is in the DOM.
+  useEffect(() => {
+    if (!popoverContainer) return;
 
-    if (!triggerRowRef.current) return;
+    const dateInput = popoverContainer.querySelector(
+      'input[type="date"]',
+    ) as HTMLInputElement | null;
+    const timeInput = popoverContainer.querySelector(
+      'input[type="time"]',
+    ) as HTMLInputElement | null;
 
-    // Try to trigger the Drupal remove button.
-    if (triggerDrupalRemoveButton(triggerRowRef.current)) {
+    setDisplayDate(dateInput?.value || dateInput?.defaultValue || '');
+    setDisplayTime(timeInput?.value || timeInput?.defaultValue || '');
+    setHasTime(!!timeInput);
+    // Since datetime is two inputs but one field, we can't listen for changes
+    // as elegantly as we do in <DrupalInputMultivalueForm>, where we can just
+    // add an `onInput` prop. Instead, we need to add dedicated input listeners
+    // on both inputs.
+    [dateInput, timeInput].forEach((input) => {
+      // Using the __listenersAdded approach to preventing duplicate listeners,
+      // instead of the more common useEffect cleanup, as popoverContainer is
+      // the most reliable useEffect dependency. However, it can retrigger more
+      // often than the need addEventListener, and can lead to gaps in
+      // callback availability.
+      if (input && !(input as any).__listenersAdded) {
+        (input as any).__listenersAdded = true;
+        input.addEventListener('input', (e) => {
+          const target = e.target as HTMLInputElement;
+          const { value, type } = target;
+          if (type === 'date') {
+            // A date input value is either '' or a valid ISO date (YYYY-MM-DD).
+            // An empty string means the field was cleared; a non-empty value
+            // from a date input is always structurally valid.
+            setDisplayDate(value);
+          } else if (type === 'time') {
+            // A time input value is either '' or a valid time string (HH:MM or
+            // HH:MM:SS). Validate by parsing; an invalid time produces NaN.
+            if (!value || !isNaN(new Date(`2000-01-01T${value}`).getTime())) {
+              setDisplayTime(value);
+            }
+          }
+        });
+      }
+    });
+  }, [popoverContainer]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape' || e.key === 'Enter') {
+      handlePopoverOpenChange(false);
+      e.preventDefault();
       return;
     }
-
-    setValues({
-      date: '',
-      time: '',
-      tempDate: '',
-      tempTime: '',
-    });
-
-    // Clear both hidden inputs.
-    updateHiddenInputs('', '');
   };
 
-  // Create the combined display value.
-  const combinedDisplayValue = (() => {
-    if (!hiddenTimeInputRef.current) {
-      // Date-only field: show just the formatted date.
-      return formatDateForDisplay(values.date) || 'Empty';
-    } else {
-      // DateTime field: show date and time combined.
-      if (values.date || values.time) {
-        return `${formatDateForDisplay(values.date)}${values.date && values.time ? ', ' : ''}${formatTimeForDisplay(values.time)}`;
-      }
-      return 'Empty';
+  const handlePopoverOpenChange = (open: boolean) => {
+    if (open) {
+      const dateInput = getDateInput();
+      const timeInput = getTimeInput();
+      valueAtOpenRef.current = {
+        date: dateInput?.value ?? displayDate,
+        time: timeInput?.value ?? displayTime,
+      };
+      setTimeout(() => {
+        const firstInput = dateInput || timeInput;
+        firstInput?.focus();
+      }, 0);
     }
+    if (!hasError()) {
+      setPopoverOpenAndRefocus(open);
+    }
+  };
+
+  const handleRemove = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const triggerElement = triggerRowRef.current;
+    if (!triggerElement) return;
+    setPopoverOpenAndRefocus(false);
+    setTimeout(() => {
+      const dateInput = getDateInput();
+      const { name } = dateInput || {};
+      const formId = dateInput?.getAttribute('data-form-id');
+
+      const removeButtonName: string | null = triggerDrupalRemoveButton(
+        triggerRowRef.current,
+        formId as string,
+      );
+      if (removeButtonName && name && formId) {
+        const fieldNames: string[] = [name];
+
+        // Add the time field name if it exists (replace [date] with [time])
+        if (name.includes('[date]')) {
+          const timeName = name.replace('[date]', '[time]');
+          fieldNames.push(timeName);
+        }
+
+        // Add the weight field (replace [value][date] with [_weight])
+        if (name.includes('[value][date]')) {
+          const weightName = name.replace('[value][date]', '[_weight]');
+          fieldNames.push(weightName);
+        }
+
+        // Add the remove button name
+        fieldNames.push(removeButtonName);
+        // If this is a component, update the model to reflect the removal
+        // immediately, then fire the actual Drupal AJAX click.
+        if (formId === 'component_instance_form') {
+          const propName = toPropName(name, inputUIData.selectedComponent);
+          const position = extractPositionFromFieldName(name, propName);
+          const model = inputUIData.model?.[inputUIData.selectedComponent];
+          if (!model || !isEvaluatedComponentModel(model)) {
+            return;
+          }
+          patchComponent({
+            type: editorFrameContext,
+            componentInstanceUuid: inputUIData.selectedComponent,
+            componentType: `${inputUIData.selectedComponentType}@${inputUIData.version}`,
+            model: buildModelWithItemRemoved(model, propName, position ?? 0),
+          });
+          // Second call: now that the model is patched, invoke the real
+          // Drupal AJAX click (no formId passed so the click is not suppressed).
+          setTimeout(() => triggerDrupalRemoveButton(triggerRowRef.current));
+        }
+
+        dispatch(
+          removeFieldValue({
+            formId: formId as any,
+            fieldName: fieldNames,
+          }),
+        );
+      }
+    });
+  };
+
+  // Build the combined display value.
+  const combinedDisplayValue = (() => {
+    if (!hasTime) {
+      return formatDateForDisplay(displayDate) || 'Empty';
+    }
+    if (displayDate || displayTime) {
+      return `${formatDateForDisplay(displayDate)}${displayDate && displayTime ? ', ' : ''}${formatTimeForDisplay(displayTime)}`;
+    }
+    return 'Empty';
   })();
 
   return (
-    <>
-      {/* Hidden datetime inputs - render the actual content off-screen */}
-      <Box
-        ref={contentWrapperRef}
-        className={styles.visuallyHiddenInput}
-        aria-hidden="true"
-      >
-        {children}
-      </Box>
-
+    <div style={{ display: 'contents' }}>
       <Popover.Root open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
         <Flex
           ref={triggerRowRef}
@@ -259,13 +280,19 @@ const DrupalDatetimeMultivalueForm = ({
           className={styles.itemRow}
         >
           {/* List Item View - Trigger */}
-          <Popover.Trigger>
+          <Popover.Trigger asChild>
             <button
+              data-multivalue-popover-trigger
+              ref={triggerButtonRef}
               className={styles.listItem}
               type="button"
               aria-label={`Edit ${fieldLabel}: ${combinedDisplayValue}`}
             >
-              <Text size="2" className={styles.itemText}>
+              <Text
+                size="2"
+                className={styles.itemText}
+                data-canvas-multivalue-label
+              >
                 {combinedDisplayValue}
               </Text>
               <ArrowRightIcon className={styles.arrowIcon} />
@@ -275,10 +302,15 @@ const DrupalDatetimeMultivalueForm = ({
 
         {/* Edit Popover */}
         <Popover.Content
+          forceMount={true}
+          ref={setPopoverContainer}
           side="left"
           align="start"
           sideOffset={6}
-          className={styles.popoverContent}
+          className={clsx(styles.popoverContent, [
+            !popoverOpen && styles.visuallyHiddenInput,
+          ])}
+          onKeyDown={handleKeyDown}
         >
           {/* Popover Header */}
           <Flex
@@ -294,62 +326,13 @@ const DrupalDatetimeMultivalueForm = ({
             </Popover.Close>
           </Flex>
 
-          {/* Date Input Field */}
-          <Box ref={popoverDateFieldWrapperRef}>
-            <TextField
-              {...{
-                attributes: {
-                  value: values.tempDate,
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                    setValues((prev) => ({
-                      ...prev,
-                      tempDate: e.target.value,
-                    }));
-                    // Focus the input after value selection.
-                    setTimeout(() => {
-                      e.target.focus();
-                    }, 0);
-                  },
-                  onKeyDown: handleKeyDown,
-                  type: 'date',
-                  ...copyInputAttributes(hiddenDateInputRef.current),
-                },
-              }}
-            />
-          </Box>
-
-          {/* Time Input Field - only show for datetime fields, not date-only */}
-          {hiddenTimeInputRef.current && (
-            <Box
-              className={styles.timeInputWrapper}
-              ref={popoverTimeFieldWrapperRef}
-            >
-              <TextField
-                {...{
-                  attributes: {
-                    value: values.tempTime,
-                    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                      setValues((prev) => ({
-                        ...prev,
-                        tempTime: e.target.value,
-                      }));
-                      // Focus the input after value selection
-                      setTimeout(() => {
-                        e.target.focus();
-                      }, 0);
-                    },
-                    onKeyDown: handleKeyDown,
-                    type: 'time',
-                    ...copyInputAttributes(hiddenTimeInputRef.current),
-                  },
-                }}
-              />
-            </Box>
-          )}
+          {/* Date and time inputs rendered by Drupal */}
+          {children}
 
           {/* Remove Button - disabled when removing is not allowed */}
           <Flex justify="center" className={styles.removeButtonContainer}>
             <Button
+              data-multivalue-remove-item="true"
               variant="ghost"
               color="red"
               size="1"
@@ -362,7 +345,7 @@ const DrupalDatetimeMultivalueForm = ({
           </Flex>
         </Popover.Content>
       </Popover.Root>
-    </>
+    </div>
   );
 };
 

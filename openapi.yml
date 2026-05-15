@@ -152,7 +152,7 @@ paths:
             text/javascript:
               example: 'console.log("hey");'
   /canvas/api/v0/auto-saves/pending:
-    description: TODO
+    description: Current auto-save entries
     get:
       summary: All current auto-save entries
       responses:
@@ -163,57 +163,60 @@ paths:
               examples:
                 multipleEntries:
                   value:
-                    node:1:en:
-                      owner:
-                        name: Garrett Bobby Ferguson, Jr
-                        avatar: /sites/default/files/user-pictures/garrett.jpg
-                        uri: /user/12
-                        id: 12
-                      updated: 1732763679
-                      entity_type: node
-                      langcode: en
-                      data_hash: 4711efecf75d2d1a
-                      entity_id: 1
-                      label: Home page
-                    asset_library:global:
-                      owner:
-                        name: Gracie Dog
-                        avatar: /sites/default/files/user-pictures/good-dog.jpg
-                        uri: /user/13
-                        id: 13
-                      updated: 1732763680
-                      entity_type: asset_library
-                      langcode: NULL
-                      data_hash: 4711efecf75d2d1b
-                      entity_id: global
-                      label: Global asset library
-                    js_component:hero:
-                      owner:
-                        name: Mark Scout
-                        avatar: /sites/default/files/user-pictures/severed.jpg
-                        uri: /user/16
-                        id: 16
-                      updated: 1732763680
-                      entity_type: js_component
-                      langcode: NULL
-                      data_hash: 4711efecf75d2d1b
-                      entity_id: hero
-                      label: Hero component
-                    segment:test_segment:
-                      owner:
-                        name: Mark Scout
-                        avatar: /sites/default/files/user-pictures/severed.jpg
-                        uri: /user/16
-                        id: 16
-                      updated: 1732763680
-                      entity_type: test_segment
-                      langcode: NULL
-                      data_hash: a95cf01fd2e9c59e
-                      entity_id: test_segment
-                      label: Test segment
-
+                    data:
+                      node:1:en:
+                        owner:
+                          name: Garrett Bobby Ferguson, Jr
+                          avatar: /sites/default/files/user-pictures/garrett.jpg
+                          uri: /user/12
+                          id: 12
+                        updated: 1732763679
+                        entity_type: node
+                        langcode: en
+                        data_hash: 4711efecf75d2d1a
+                        entity_id: 1
+                        label: Home page
+                      asset_library:global:
+                        owner:
+                          name: Gracie Dog
+                          avatar: /sites/default/files/user-pictures/good-dog.jpg
+                          uri: /user/13
+                          id: 13
+                        updated: 1732763680
+                        entity_type: asset_library
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: global
+                        label: Global asset library
+                      js_component:hero:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: js_component
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: hero
+                        label: Hero component
+                      segment:test_segment:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: test_segment
+                        langcode: NULL
+                        data_hash: a95cf01fd2e9c59e
+                        entity_id: test_segment
+                        label: Test segment
               schema:
-                $ref: '#/components/schemas/AutoSaveCollection'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AutoSaveCollection'
   /canvas/api/v0/auto-saves/publish:
     description: TODO
     post:
@@ -728,6 +731,24 @@ paths:
       responses:
         '200':
           description: Individual ContentTemplate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentTemplate'
+    patch:
+      summary: Updates a specific Content Template.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      requestBody:
+        description: Properties to update on the Content Template.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateContentTemplate'
+      responses:
+        '200':
+          description: Updated Content Template.
           content:
             application/json:
               schema:
@@ -1544,6 +1565,7 @@ paths:
                   title: Home
                   status: true
                   path: /home
+                  description: The home page of the site.
                   components: [ ]
               "A page with components":
                 summary: A page with nested components
@@ -1551,6 +1573,7 @@ paths:
                   title: About
                   status: true
                   path: /about
+                  description: Learn more about us.
                   components:
                     - uuid: 09365c2d-1ee1-47fd-b5a3-7e4f34866186
                       component_id: sdc.my_theme.hero
@@ -1687,6 +1710,63 @@ paths:
               schema:
                 type: object
                 description: A Drupal AJAX response.
+  '/canvas/api/v0/layout-content-template-draft/{entityTypeId}/{entityId}':
+    description: >
+      Resolves a content template draft (provided in the request body) against
+      a preview entity, returning evaluated input values, for use in consumers
+      that provide their own renderer.
+    parameters:
+      - $ref: '#/components/parameters/entityTypeId'
+      - $ref: '#/components/parameters/entityId'
+    post:
+      summary: Resolves a content template draft against a preview entity.
+      requestBody:
+        description: The content template draft to resolve.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - bundle
+                - viewMode
+              properties:
+                bundle:
+                  type: string
+                  description: The content entity bundle the template targets.
+                viewMode:
+                  type: string
+                  description: The view mode the template targets.
+                component_tree:
+                  $ref: '#/components/schemas/ComponentTree'
+                  description: The component tree to resolve. Defaults to empty.
+      responses:
+        '200':
+          description: The resolved draft model keyed by component instance UUID.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - model
+                properties:
+                  model:
+                    $ref: '#/components/schemas/Model'
+        '400':
+          description: Malformed request body or mismatched bundle.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
+        '403':
+          description: Access denied response.
+          $ref: '#/components/responses/AuthenticationErrorResponse'
   '/canvas/api/v0/layout-content-template/{configEntityId}/{entityId}':
     description: Layout content template endpoints for managing layout components with preview entity context
     parameters:
@@ -2892,6 +2972,12 @@ components:
               type: array
               items:
                 type: string
+            entityFields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
     ExistingCodeComponent:
       type: object
       allOf:
@@ -3688,6 +3774,23 @@ components:
         viewMode:
           type: string
           description: Drupal View Mode
+        status:
+          type: boolean
+          description: ContentTemplate entity status. Defaults to false (disabled) when omitted.
+        component_tree:
+          $ref: '#/components/schemas/ComponentTree'
+          description: Initial component tree. Defaults to an empty tree when omitted.
+    UpdateContentTemplate:
+      title: ContentTemplate fields the client may PATCH on the server side.
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: boolean
+          description: ContentTemplate entity status.
+        component_tree:
+          $ref: '#/components/schemas/ComponentTree'
+          description: Replacement component tree.
     Extension:
       title: Canvas Extension metadata
       description: Canvas Extension metadata
@@ -3773,6 +3876,9 @@ components:
           type: string
           format: uri-reference
           title: The processed path
+        description:
+          type: string
+          description: The meta description.
         components:
           type: array
           description: >
@@ -3827,6 +3933,7 @@ components:
           autoSavePath: /updated-path
           internalPath: /page/1
           components: [ ]
+          description: The home page of the site.
           links:
             edit-form: /canvas/editor/canvas_page/1
         -
@@ -3855,6 +3962,7 @@ components:
               inputs:
                 body: Hello world
               label: null
+          description: Learn more about us.
           links:
             edit-form: "/canvas/editor/canvas_page/1"
     DuplicateContentRequestBody:
@@ -3892,6 +4000,9 @@ components:
           type: string
           format: uri-reference
           title: The processed path
+        description:
+          type: string
+          description: The meta description.
         components:
           type: array
           description: >
@@ -3961,6 +4072,7 @@ components:
         - suggestedPreviewEntityId
         - label
         - viewModeLabel
+        - component_tree
       properties:
         entityType:
           type: string
@@ -3986,6 +4098,44 @@ components:
         viewModeLabel:
           type: string
           description: Entity View Mode label.
+        component_tree:
+          $ref: '#/components/schemas/ComponentTree'
+          description: The persisted component tree.
+    ComponentTree:
+      title: A flat array of component tree items.
+      description: >
+        The stored component tree as a flat array of items.
+      type: array
+      items:
+        type: object
+        required:
+          - uuid
+          - component_id
+          - component_version
+        properties:
+          uuid:
+            type: string
+            format: uuid
+            description: Unique identifier of this component instance.
+          component_id:
+            type: string
+            description: The component config entity ID.
+          component_version:
+            type: string
+            description: The component version hash.
+          parent_uuid:
+            type: [ 'null', string ]
+            format: uuid
+            description: UUID of the parent component (null for root items).
+          slot:
+            type: [ 'null', string ]
+            description: The slot name in the parent component (null for root items).
+          inputs:
+            type: [ 'null', object ]
+            description: The component input values (prop sources).
+          label:
+            type: [ 'null', string ]
+            description: Optional label for the component instance.
   # @see https://spec.openapis.org/oas/v3.1.0.html#response-object
   responses:
     ContentEntityResponse:

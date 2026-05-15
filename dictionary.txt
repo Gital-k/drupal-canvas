@@ -2,6 +2,7 @@
 !Autosave # Use "auto-save", "AutoSave", or "auto_save" instead.
 acquia
 adrs
+agentic
 aiwizard
 alternatewidths
 apikey
@@ -47,6 +48,7 @@ drupalsettings
 druplicon
 endapply
 entityviewdisplay
+esque
 extralight
 extensionless
 fieldtext
@@ -67,7 +69,9 @@ hyperscriptify
 hyperscriptifying
 ianvs
 importmap
+inlines
 interactable
+invariantly
 inwidget
 jangregor
 Jsona
@@ -75,6 +79,7 @@ JSONified
 jsxs
 langcode
 leftbar
+liftup
 lightningcss
 Linkit
 Mautic
@@ -112,6 +117,7 @@ Pryce's
 pubout
 Qqtnj
 rdndmb
+rearchitected
 recomputations
 redoable
 redocly
@@ -129,6 +135,7 @@ sdcs
 serp
 SERP
 shadcn
+shipmonk
 slnt
 sonner
 sparkline
@@ -140,7 +147,9 @@ subtyping
 supersets
 superstrongpassword
 SVAY
+targetable
 testid
+tmgmt
 toolset
 topbar
 trackpad
@@ -152,10 +161,16 @@ ultrawide
 uncollapse
 uncollapsed
 uncollapses
+unhydrated
 unlayered
+unmodeled
+unparseable
+unrooted
 unstorable
 unstub
+untampered
 unvalidatable
+unvalidated
 upserting
 upserts
 useswr
@@ -163,6 +178,7 @@ uuidv
 Validatable
 vaul
 wdth
+webform
 wght
 xmdi
 ymls
@@ -201,3 +217,6 @@ trae
 videomedia
 Zencoder
 zencoder
+PKCE
+Catbro
+Minibro

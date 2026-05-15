@@ -9,8 +9,9 @@ export function resolveCanvasConfig(options: {
   const DEFAULT_CANVAS_CONFIG: CanvasConfig = {
     aliasBaseDir: 'src',
     outputDir: 'dist',
-    componentDir: options.hostRoot,
+    componentDir: 'src/components',
     pagesDir: './pages',
+    contentTemplatesDir: './content-templates',
     deprecatedComponentDir: './components',
     globalCssPath: './src/components/global.css',
   };
@@ -28,6 +29,8 @@ export function resolveCanvasConfig(options: {
       outputDir: parsed.outputDir ?? DEFAULT_CANVAS_CONFIG.outputDir,
       componentDir: parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.componentDir,
       pagesDir: parsed.pagesDir ?? DEFAULT_CANVAS_CONFIG.pagesDir,
+      contentTemplatesDir:
+        parsed.contentTemplatesDir ?? DEFAULT_CANVAS_CONFIG.contentTemplatesDir,
       deprecatedComponentDir:
         parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.deprecatedComponentDir,
       globalCssPath:

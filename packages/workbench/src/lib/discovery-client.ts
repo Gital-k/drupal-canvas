@@ -1,19 +1,28 @@
-import type { DiscoveryResult } from '@drupal-canvas/discovery';
+import type { DiscoveredPage, DiscoveryResult } from '@drupal-canvas/discovery';
 
 export type {
   DiscoveredComponent,
+  DiscoveredContentTemplate,
   DiscoveredPage,
   DiscoveryResult,
   DiscoveryWarning,
 } from '@drupal-canvas/discovery';
 
-export async function fetchDiscoveryResult(): Promise<DiscoveryResult> {
+export type EnrichedDiscoveredPage = DiscoveredPage & {
+  pagePath: string | null;
+};
+
+export type EnrichedDiscoveryResult = Omit<DiscoveryResult, 'pages'> & {
+  pages: EnrichedDiscoveredPage[];
+};
+
+export async function fetchDiscoveryResult(): Promise<EnrichedDiscoveryResult> {
   const response = await fetch('/__canvas/discovery');
 
   if (!response.ok) {
     throw new Error(`Discovery request failed with status ${response.status}.`);
   }
 
-  const data = (await response.json()) as DiscoveryResult;
+  const data = (await response.json()) as EnrichedDiscoveryResult;
   return data;
 }

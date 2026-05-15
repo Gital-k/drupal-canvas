@@ -1,8 +1,12 @@
 /* Multivalue Form Styles */
+.multivalue-label {
+  margin-bottom: 8px;
+}
+
 .multivalue-container {
-  overflow: visible;
+  overflow: hidden;
   margin-bottom: 16px;
-  border: none;
+  border: 1px solid #CDCED6;
   border-radius: 4px;
   background-color: white;
 }
@@ -14,60 +18,55 @@
   border-collapse: collapse;
 }
 
-/* Hide table header */
+/* Hide table header — label is rendered outside via multivalue-label */
 .multivalue-container table thead,
 .multivalue-container table caption {
-  margin: 0;
-  padding: 0;
-}
-
-.multivalue-container table thead tr {
-  margin: 0;
-  padding: 0;
-}
-
-.multivalue-container table thead tr th.field-label {
-  width: 100%;
-  margin: 0;
-  padding: 8px 0;
-  text-align: left;
-  border: none;
-  background: white;
-}
-
-.multivalue-container table thead tr th.field-label h4.label {
-  width: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-/* Apply border only to tbody */
-.multivalue-container table tbody {
-  border-top: 1px solid #CDCED6;
-  border-right: 1px solid #CDCED6;
-  border-left: 1px solid #CDCED6;
-}
-
-.multivalue-container table tbody tr {
-  border-top-left-radius: 4px;
-  border-top-right-radius: 4px;
+  display: none;
 }
 
 .multivalue-container table tr {
   border-bottom: 1px solid #CDCED6;
 }
 
+.multivalue-container table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.multivalue-container table tbody tr:hover,
+.multivalue-container table tbody tr:focus-within {
+  background: transparent;
+}
+
 .multivalue-container table td {
   height: 40px;
-  gap: 4px;
+  padding: 0;
+}
+
+.multivalue-container .canvas-multivalue-field-content {
+  width: 100%;
 }
 
 /* Hide weight column and tabledrag elements */
 .multivalue-container .tabledrag-toggle-weight-wrapper,
 .multivalue-container .tabledrag-toggle-weight,
 .multivalue-container td.tabledrag-hide,
-.multivalue-container .field-weight {
+.multivalue-container th.tabledrag-hide,
+.multivalue-container .field-weight,
+.multivalue-container [name*="_weight"],
+.multivalue-container td.delta-order,
+.multivalue-container table.field-multiple-table > thead > tr > th:last-child {
   display: none;
+}
+
+.multivalue-container .ajax-progress,
+.multivalue-container .ajax-progress-throbber,
+[data-canvas-multiple-values] ~ .ajax-progress {
+  display: none;
+}
+
+.multivalue-container .tabledrag-changed,
+.multivalue-container .tabledrag-changed-warning {
+  display: none !important;
 }
 
 /* Position form-item container for absolute positioning of toggle */
@@ -77,12 +76,7 @@
 
 /* Add new button wrapper */
 .add-new-wrapper {
-  overflow: hidden;
-  border-right: 1px solid #CDCED6;
-  border-bottom: 1px solid #CDCED6;
-  border-left: 1px solid #CDCED6;
-  border-bottom-right-radius: 4px;
-  border-bottom-left-radius: 4px;
+  border-top: 1px solid #CDCED6;
 }
 
 .add-new-wrapper button,
@@ -90,11 +84,9 @@
   width: 100%;
   padding: 8px 12px;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, opacity .3s ease;
   color: #0090FF;
   border: none;
-  border-bottom-right-radius: 4px;
-  border-bottom-left-radius: 4px;
   background-color: #F3F4F6;
   font-size: 14px;
 }
@@ -107,7 +99,6 @@
 
 .add-new-wrapper button::before,
 .add-new-wrapper input[type="submit"]::before {
-  content: "+";
   font-size: 16px;
   font-weight: 600;
 }
@@ -127,16 +118,6 @@
   padding: 0 0 0 8px;
 }
 
-.multivalue-container .tabledrag-changed {
-  display: none;
-}
-
-/* Hide the "You have unsaved changes" warning message for multivalue forms. */
-.multivalue-container .tabledrag-changed-warning {
-  display: none !important;
-}
-
-/* Style the tabledrag anchor to display the custom SVG icon */
 .multivalue-container .canvas-drag-handle a.tabledrag-handle {
   display: flex;
   align-items: center;
@@ -199,6 +180,25 @@
   display: none;
 }
 
+/* A shimmer effect for new rows being added via AJAX. */
+@keyframes canvas-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.canvas-skeleton-shimmer {
+  height: 20px;
+  animation: canvas-shimmer 1.2s infinite linear;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+}
+
 /* Hide legends and fieldset borders in multivalue form field content */
 .canvas-multivalue-field-content fieldset {
   margin: 0;
@@ -214,4 +214,3 @@
   margin: 0;
   padding: 0;
 }
-
