@@ -434,20 +434,25 @@ Value`,
     expect(propsValues.entityReferenceAutocomplete).to.deep.equal(['3', '42']);
   });
 
-  it('Should omit invalid entity autocomplete values', () => {
-    const invalidAutocompleteFormState = {
+  it('Should pass through an already-extracted entity autocomplete id', () => {
+    // The transform runs on every commit, so values that were extracted on a
+    // prior pass (a bare id like '3') must round-trip unchanged rather than
+    // being dropped. Without idempotency, picking a value once would never
+    // patch the backend because the second pass turns the id into null and
+    // drops the prop. @see entityAutocompleteTargetId in transforms.ts
+    const alreadyExtractedFormState = {
       ...formState,
       'canvas_component_props[all-props][entityReferenceAutocomplete][0][target_id]':
-        'A node title',
+        '3',
     };
 
     const { propsValues } = getPropsValues(
-      invalidAutocompleteFormState,
+      alreadyExtractedFormState,
       inputAndUiData,
       transformConfig,
     );
 
-    expect(propsValues).to.not.have.property('entityReferenceAutocomplete');
+    expect(propsValues.entityReferenceAutocomplete).to.equal('3');
   });
 
   it('Should truncate array props that exceed maxItems', () => {

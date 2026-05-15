@@ -493,14 +493,54 @@ describe('Transforms - entityAutocompleteTargetId', () => {
     ).to.deep.equal(['3', '42']);
   });
 
-  it('Should return null when no autocomplete ID is present', () => {
+  it('Should pass through an already-extracted target ID unchanged', () => {
+    // The transform is re-applied on every commit; the second pass receives
+    // the previously-extracted id (e.g. '3'), and must return it unchanged so
+    // the value is not destroyed. Mirrors the pass-through behavior of
+    // \Drupal\Core\Entity\Element\EntityAutocomplete::extractEntityIdFromAutocompleteInput.
+    expect(transforms.entityAutocompleteTargetId('3')).to.equal('3');
     expect(transforms.entityAutocompleteTargetId('A node title')).to.equal(
-      null,
+      'A node title',
     );
+  });
+
+  it('Should be idempotent for single values', () => {
+    const first = transforms.entityAutocompleteTargetId('A node title (3)');
+    expect(first).to.equal('3');
+    expect(transforms.entityAutocompleteTargetId(first)).to.equal('3');
+  });
+
+  it('Should be idempotent for array values', () => {
+    const first = transforms.entityAutocompleteTargetId([
+      'A node title (3)',
+      'Another node title (42)',
+    ]);
+    expect(first).to.deep.equal(['3', '42']);
+    expect(transforms.entityAutocompleteTargetId(first)).to.deep.equal([
+      '3',
+      '42',
+    ]);
+  });
+
+  it('Should pass through bare ids in an array', () => {
+    expect(transforms.entityAutocompleteTargetId(['3', '42'])).to.deep.equal([
+      '3',
+      '42',
+    ]);
+  });
+
+  it('Should accept arrays mixing bare ids and "Label (id)" values', () => {
+    expect(
+      transforms.entityAutocompleteTargetId(['A node title (3)', '42']),
+    ).to.deep.equal(['3', '42']);
   });
 
   it('Should return null for null input', () => {
     expect(transforms.entityAutocompleteTargetId(null)).to.equal(null);
+  });
+
+  it('Should return null for an empty string', () => {
+    expect(transforms.entityAutocompleteTargetId('')).to.equal(null);
   });
 });
 

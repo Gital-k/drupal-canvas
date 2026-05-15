@@ -221,6 +221,24 @@ const link: Transformer<
   return returnValue[0] ?? null;
 };
 
+// Pass through values that don't match the "Label (id)" autocomplete shape so
+// the transform is idempotent. Without this, picking from the autocomplete
+// once would never patch the backend: the first transform pass turns
+// "Label (id)" into the bare id (storing it in form state and the input's
+// displayed value), and the second pass — running on commit against that
+// stored bare id — would return null, dropping the prop. PHP core takes the
+// same approach in
+// \Drupal\Core\Entity\Element\EntityAutocomplete::extractEntityIdFromAutocompleteInput,
+// leaving unparseable input intact for server-side validation to surface.
+const passThroughIfAlreadyExtracted = (value: string): string | null => {
+  const extracted = parseSingleEntityAutocompleteSelection(value);
+  if (extracted !== null) {
+    return extracted;
+  }
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+};
+
 const entityAutocompleteTargetId: Transformer<
   BaseTransformOptions,
   null | string | string[],
@@ -230,10 +248,21 @@ const entityAutocompleteTargetId: Transformer<
     return null;
   }
   if (Array.isArray(value)) {
-    const ids = value.map(parseSingleEntityAutocompleteSelection);
+    const ids = value.map((v) =>
+      typeof v === 'string' ? passThroughIfAlreadyExtracted(v) : null,
+    );
     return ids.some((id) => id === null) ? null : (ids as string[]);
   }
-  return parseEntityAutocompleteValue(value);
+  if (typeof value !== 'string') {
+    return null;
+  }
+  // Comma-separated input means the autocomplete widget is in tags mode and
+  // collected multiple selections; defer to the multi-value parser, which
+  // returns an array.
+  if (value.includes(',')) {
+    return parseEntityAutocompleteValue(value);
+  }
+  return passThroughIfAlreadyExtracted(value);
 };
 
 const cast: Transformer<
