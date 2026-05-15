@@ -9,6 +9,9 @@ props:
     - test_REQUIRED_string_html_block
     - test_REQUIRED_string_html
     - test_REQUIRED_string_format_uri_reference_web_links
+    - test_REQUIRED_string_format_iri_reference
+    - test_REQUIRED_string_format_date_time
+    - test_REQUIRED_string_format_date
   properties:
     test_bool_default_false:
       title: 'Bool (default false)'
@@ -80,9 +83,23 @@ props:
       format: date-time
       examples:
         - '2016-09-16T20:20:39+00:00'
+    test_REQUIRED_string_format_date_time:
+      title: 'String, format=date-time (required)'
+      description: 'This is the description of String, format=date-time (required)'
+      type: string
+      format: date-time
+      examples:
+        - '2016-09-16T20:20:39+00:00'
     test_string_format_date:
       title: 'String, format=date'
       description: 'This is the description of String, format=date'
+      type: string
+      format: date
+      examples:
+        - '2018-11-13'
+    test_REQUIRED_string_format_date:
+      title: 'String, format=date (required)'
+      description: 'This is the description of String, format=date (required)'
       type: string
       format: date
       examples:
@@ -222,6 +239,13 @@ props:
     test_string_format_iri_reference:
       title: 'String, format=iri-reference'
       description: 'This is the description of String, format=iri-reference'
+      type: string
+      format: iri-reference
+      examples:
+        - /example-iri
+    test_REQUIRED_string_format_iri_reference:
+      title: 'String, format=iri-reference (required)'
+      description: 'This is the description of String, format=iri-reference (required)'
       type: string
       format: iri-reference
       examples:

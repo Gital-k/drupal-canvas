@@ -6,6 +6,7 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\InvalidComponentInputsPropSourceException;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
@@ -1408,7 +1409,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // string input, as they're thinking about what string they do want.
         // ⚠️ This won't work for components whose logic specifically checks for
         // an empty string and refuses to render then.
-        if ($is_required_prop && $evaluated === '' && PropShape::isPlainOrRichProse($this->getExplicitInputDefinitions()['shapes'][$prop])) {
+        if ($is_required_prop && $evaluated === '' && self::skipValidationIfEmptyString($this->getExplicitInputDefinitions()['shapes'][$prop])) {
           // Confirm that *if* this weren't special-cased, that this would
           // indeed enter the next branch, which would cause it to be skipped.
           // @todo Consider adding a new `GracefulDegradationPropSource` to
@@ -1465,6 +1466,16 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     }
 
     return $props;
+  }
+
+  private static function skipValidationIfEmptyString(array $prop_schema): bool {
+    return PropShape::isPlainOrRichProse($prop_schema)
+    || (
+      $prop_schema['type'] === 'string'
+      && \array_key_exists('format', $prop_schema)
+      && JsonSchemaStringFormat::tryFrom($prop_schema['format'])?->isUriEsque()
+    );
+
   }
 
   public function optimizeExplicitInput(array $values): array {

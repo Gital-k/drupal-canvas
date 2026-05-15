@@ -7520,7 +7520,7 @@ HTML
             'href' => '',
           ],
         ],
-        'assert_absent' => ['href'],
+        'assert_absent' => [],
         'assert_present' => [
           'text' => 'Press',
         ],
@@ -7555,7 +7555,7 @@ HTML
             'cta1href' => '',
           ],
         ],
-        'assert_absent' => ['cta1href'],
+        'assert_absent' => [],
         'assert_present' => [
           'heading' => 'There goes my hero',
         ],
