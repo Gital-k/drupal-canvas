@@ -367,7 +367,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    *
    * @return \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList
    */
-  protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs, bool $assertCount = TRUE): ComponentTreeItemList {
+  protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs, bool $assertCount = TRUE, ?string $component_version = NULL): ComponentTreeItemList {
     if ($assertCount) {
       $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
       $this->generateComponentConfig();
@@ -395,6 +395,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
         // @see https://en.wikipedia.org/wiki/Crash_test_dummy
         'uuid' => self::UUID_CRASH_TEST_DUMMY,
         'component_id' => $component_id,
+        ...($component_version !== NULL ? ['component_version' => $component_version] : []),
         'inputs' => $inputs,
         'parent_uuid' => '38b79bf8-53d0-4307-b9ef-221c6a63023a',
         'slot' => 'column_one',
@@ -428,9 +429,9 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    * @see ::alterEnvironmentForCrashTestDummyComponentTree()
    */
   #[DataProvider('providerRenderComponentFailure')]
-  public function testRenderComponentFailure(string $component_id, array $inputs, array $expected_validation_errors, ?array $expected_exception, ?string $expected_output_selector): void {
+  public function testRenderComponentFailure(string $component_id, array $inputs, array $expected_validation_errors, ?array $expected_exception, ?string $expected_output_selector, ?string $component_version = NULL): void {
     $this->setUpCurrentUser(permissions: ['view media']);
-    $component_tree = $this->generateCrashTestDummyComponentTree($component_id, $inputs);
+    $component_tree = $this->generateCrashTestDummyComponentTree($component_id, $inputs, component_version: $component_version);
     // Child implementations of ::generateCrashTestDummyComponentTree may
     // install additional modules, which will rebuild the container. So we add
     // the logger afterward.

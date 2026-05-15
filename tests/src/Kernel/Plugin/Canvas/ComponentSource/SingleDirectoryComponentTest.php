@@ -1449,7 +1449,7 @@ HTML
     return $test_cases;
   }
 
-  protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs, bool $assertCount = TRUE): ComponentTreeItemList {
+  protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs, bool $assertCount = TRUE, ?string $component_version = NULL): ComponentTreeItemList {
     if (str_starts_with($component_id, 'sdc.canvas_broken_sdcs.')) {
       // This component needs an extra module.
       $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
@@ -1457,9 +1457,9 @@ HTML
 
       // Now call the parent, but don't assert the count of components, as we've
       // done it here, and installing a module will generate component config.
-      return parent::generateCrashTestDummyComponentTree($component_id, $inputs, assertCount: FALSE);
+      return parent::generateCrashTestDummyComponentTree($component_id, $inputs, assertCount: FALSE, component_version: $component_version);
     }
-    return parent::generateCrashTestDummyComponentTree($component_id, $inputs);
+    return parent::generateCrashTestDummyComponentTree($component_id, $inputs, component_version: $component_version);
   }
 
   protected function alterEnvironmentForCrashTestDummyComponentTree(string $component_id, array $inputs): void {
