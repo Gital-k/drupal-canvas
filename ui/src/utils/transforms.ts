@@ -243,9 +243,7 @@ const entityAutocompleteTargetId: Transformer<
     return null;
   }
   if (Array.isArray(value)) {
-    const ids = value.map((v) =>
-      typeof v === 'string' ? passThroughIfAlreadyExtracted(v) : null,
-    );
+    const ids = value.map(passThroughIfAlreadyExtracted);
     return ids.some((id) => id === null) ? null : (ids as string[]);
   }
   if (typeof value !== 'string') {
