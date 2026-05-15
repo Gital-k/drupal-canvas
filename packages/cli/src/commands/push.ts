@@ -24,11 +24,6 @@ import {
   pushContentTemplates,
 } from '../utils/prepare-content-templates-push';
 import {
-  collectRegionResults,
-  prepareRegions,
-  pushRegions,
-} from '../utils/prepare-regions-push';
-import {
   collectPageResults,
   preparePages,
   pushPages,
@@ -390,7 +385,9 @@ export function pushCommand(program: Command): void {
               'Ignoring local content templates. Use --include-content-templates or set CANVAS_INCLUDE_CONTENT_TEMPLATES=true to push them.',
             );
           }
-          p.log.warn('No components, pages, content templates or global regions found.');
+          p.log.warn(
+            'No components, pages, content templates or global regions found.',
+          );
           if (hasIgnoredRegions) {
             p.log.info(
               'Ignoring local global regions. Use --include-regions or set CANVAS_INCLUDE_REGIONS=true to push them.',
