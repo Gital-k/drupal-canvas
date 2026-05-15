@@ -22,21 +22,15 @@ export interface TransformConfig {
 export const ENTITY_AUTOCOMPLETE_MATCH = /.+\s\(([^)]+)\)\s*$/;
 
 const parseSingleEntityAutocompleteSelection = (
-  value: unknown,
+  value: string,
 ): string | null => {
-  if (typeof value !== 'string') {
-    return null;
-  }
   const match = value.trim().match(ENTITY_AUTOCOMPLETE_MATCH);
   return match !== null ? match[1] : null;
 };
 
 const parseEntityAutocompleteValue = (
-  value: unknown,
+  value: string,
 ): string | string[] | null => {
-  if (typeof value !== 'string') {
-    return null;
-  }
   const selections = value
     .split(',')
     .map((selection) => selection.trim())
