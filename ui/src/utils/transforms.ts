@@ -246,9 +246,6 @@ const entityAutocompleteTargetId: Transformer<
     const ids = value.map(passThroughIfAlreadyExtracted);
     return ids.some((id) => id === null) ? null : (ids as string[]);
   }
-  if (typeof value !== 'string') {
-    return null;
-  }
   // Comma-separated input means the autocomplete widget is in tags mode and
   // collected multiple selections; defer to the multi-value parser, which
   // returns an array.
