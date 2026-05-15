@@ -542,6 +542,19 @@ describe('Transforms - entityAutocompleteTargetId', () => {
   it('Should return null for an empty string', () => {
     expect(transforms.entityAutocompleteTargetId('')).to.equal(null);
   });
+
+  it('Should keep an internal comma inside a quoted label', () => {
+    // Mirrors Drupal.autocomplete.splitValues quote handling.
+    expect(
+      transforms.entityAutocompleteTargetId('"Hello, world" (3)'),
+    ).to.equal('3');
+  });
+
+  it('Should split tags around quoted labels containing commas', () => {
+    expect(
+      transforms.entityAutocompleteTargetId('"Hello, world" (3), Another (5)'),
+    ).to.deep.equal(['3', '5']);
+  });
 });
 
 describe('Transforms - dateTime', () => {

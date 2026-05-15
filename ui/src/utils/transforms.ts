@@ -28,13 +28,35 @@ const parseSingleEntityAutocompleteSelection = (
   return match !== null ? match[1] : null;
 };
 
+// Quote-aware comma splitter mirroring core/misc/autocomplete.js so labels
+// like `"Hello, world" (3)` survive tags-mode input.
+// @see Drupal.autocomplete.splitValues
+const splitAutocompleteValues = (value: string): string[] => {
+  const result: string[] = [];
+  let quote = false;
+  let current = '';
+  for (let i = 0; i < value.length; i++) {
+    const character = value.charAt(i);
+    if (character === '"') {
+      current += character;
+      quote = !quote;
+    } else if (character === ',' && !quote) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += character;
+    }
+  }
+  if (value.length > 0) {
+    result.push(current.trim());
+  }
+  return result;
+};
+
 const parseEntityAutocompleteValue = (
   value: string,
 ): string | string[] | null => {
-  const selections = value
-    .split(',')
-    .map((selection) => selection.trim())
-    .filter(Boolean);
+  const selections = splitAutocompleteValues(value).filter(Boolean);
   if (selections.length <= 1) {
     return parseSingleEntityAutocompleteSelection(selections[0] ?? value);
   }
