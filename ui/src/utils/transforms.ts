@@ -60,11 +60,10 @@ const parseEntityAutocompleteValue = (
   if (selections.length <= 1) {
     return parseSingleEntityAutocompleteSelection(selections[0] ?? value);
   }
-  const ids = selections.map(parseSingleEntityAutocompleteSelection);
-  if (ids.some((id) => id === null)) {
-    return null;
-  }
-  return ids as string[];
+  // Treat entries that don't match `Label (id)` as bare ids so a single bad
+  // entry doesn't discard the rest of the selection; server-side validation
+  // surfaces the actual error.
+  return selections.map((s) => parseSingleEntityAutocompleteSelection(s) ?? s);
 };
 
 type PropsValuesOrArrayOfPropsValues =
@@ -259,8 +258,9 @@ const entityAutocompleteTargetId: Transformer<
     return null;
   }
   if (Array.isArray(value)) {
-    const ids = value.map(passThroughIfAlreadyExtracted);
-    return ids.some((id) => id === null) ? null : (ids as string[]);
+    return value
+      .map(passThroughIfAlreadyExtracted)
+      .filter((id): id is string => id !== null);
   }
   // Comma-separated input means the autocomplete widget is in tags mode and
   // collected multiple selections; defer to the multi-value parser, which

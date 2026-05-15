@@ -555,6 +555,14 @@ describe('Transforms - entityAutocompleteTargetId', () => {
       transforms.entityAutocompleteTargetId('"Hello, world" (3), Another (5)'),
     ).to.deep.equal(['3', '5']);
   });
+
+  it('Should keep legitimate ids when a tags-mode entry is unparseable', () => {
+    // Unparseable entries are treated as bare ids (idempotent pass-through);
+    // server-side validation surfaces the actual error.
+    expect(
+      transforms.entityAutocompleteTargetId('A node title (3), invalid'),
+    ).to.deep.equal(['3', 'invalid']);
+  });
 });
 
 describe('Transforms - dateTime', () => {
