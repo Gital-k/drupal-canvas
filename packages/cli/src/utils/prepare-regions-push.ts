@@ -99,7 +99,10 @@ export async function prepareRegions(
       spec.elements ?? {},
       componentMetadata,
     );
-    const components = authoredElementMapToComponentTree(elements, componentVersions);
+    const components = authoredElementMapToComponentTree(
+      elements,
+      componentVersions,
+    );
 
     return {
       region: discovered.region,

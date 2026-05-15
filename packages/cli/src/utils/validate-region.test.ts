@@ -19,6 +19,7 @@ function makeDiscoveryResult(
     projectRoot: tmpDir,
     components: [],
     pages: [],
+    contentTemplates: [],
     regions,
     warnings: [],
     stats: { scannedFiles: regions.length, ignoredFiles: 0 },
