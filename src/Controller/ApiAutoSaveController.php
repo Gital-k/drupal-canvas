@@ -365,7 +365,6 @@ final class ApiAutoSaveController extends ApiControllerBase {
         self::ensureEntityIsValid($entity);
         $entity->save();
       }
-
       foreach ($entities as $entity) {
         $this->autoSaveManager->delete($entity);
       }
@@ -501,6 +500,5 @@ final class ApiAutoSaveController extends ApiControllerBase {
       ($violations instanceof EntityConstraintViolationListInterface) ? EntityConstraintViolationList::fromCoreConstraintViolationList($violations) : $violations,
     );
   }
-
 
 }
