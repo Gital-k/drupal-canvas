@@ -676,7 +676,9 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
   public function testPageRegion(): void {
 
     $this->drupalLogin($this->limitedPermissionsUser);
-    $this->assertAuthenticationAndAuthorization('page_region', FALSE, initial_cache_tags: ['http_response', 'config:system.theme']);
+    // PageRegion::refineListQuery adds the `theme` cache context to the list
+    // response (it filters to the active theme).
+    $this->assertAuthenticationAndAuthorization('page_region', FALSE, initial_cache_tags: ['http_response'], initial_cache_contexts: ['theme', 'user.permissions']);
 
     $base = rtrim(base_path(), '/');
     $list_url = Url::fromUri("base:/canvas/api/v0/config/page_region");
@@ -765,9 +767,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertSame($expected_normalization, $body);
 
     // GET list returns the stark region.
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], [
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
       'config:page_region_list',
-      'config:system.theme',
       'http_response',
     ], 'UNCACHEABLE (request policy)', 'MISS');
     $this->assertSame([$region_id => $expected_normalization], $body);
@@ -847,9 +848,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       ],
     ]);
 
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], [
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
       'config:page_region_list',
-      'config:system.theme',
       'http_response',
     ], 'UNCACHEABLE (request policy)', 'MISS');
     self::assertIsArray($body);
@@ -858,9 +858,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // Switch default theme to olivero; list should now only return olivero.
     \Drupal::service('config.factory')->getEditable('system.theme')->set('default', 'olivero')->save();
 
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], [
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
       'config:page_region_list',
-      'config:system.theme',
       'http_response',
     ], 'UNCACHEABLE (request policy)', 'MISS');
     self::assertIsArray($body);
@@ -872,9 +871,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $olivero_region = PageRegion::load($olivero_region_id);
     self::assertInstanceOf(PageRegion::class, $olivero_region);
     $olivero_region->delete();
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], [
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
       'config:page_region_list',
-      'config:system.theme',
       'http_response',
     ], 'UNCACHEABLE (request policy)', 'MISS');
     self::assertSame([], $body);
@@ -1945,7 +1943,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertExpectedResponse('DELETE', $canonical_url, [], 403, NULL, NULL, NULL, NULL);
   }
 
-  private function assertAuthenticationAndAuthorization(string $entity_type_id, bool $delete_allowed = TRUE, array $initial_items = [], array $initial_cache_tags = ['http_response']): void {
+  private function assertAuthenticationAndAuthorization(string $entity_type_id, bool $delete_allowed = TRUE, array $initial_items = [], array $initial_cache_tags = ['http_response'], array $initial_cache_contexts = ['user.permissions']): void {
     if (!\in_array("config:{$entity_type_id}_list", $initial_cache_tags, TRUE)) {
       $initial_cache_tags[] = "config:{$entity_type_id}_list";
     }
@@ -1961,7 +1959,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // Authenticated & authorized: 200, but empty list.
     $this->drupalLogin($this->httpApiUser);
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], $initial_cache_tags, 'UNCACHEABLE (request policy)', 'MISS');
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, $initial_cache_contexts, $initial_cache_tags, 'UNCACHEABLE (request policy)', 'MISS');
     if (empty($initial_items)) {
       $this->assertSame([], $body);
     }

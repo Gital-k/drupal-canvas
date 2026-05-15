@@ -7,8 +7,8 @@ namespace Drupal\canvas\Entity;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
-use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Exception\ConstraintViolationException;
@@ -164,11 +164,11 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
    * {@inheritdoc}
    */
   public static function createFromClientSide(array $data): static {
-    // Default `theme` to the site's default theme when the client omits it,
+    // Default `theme` to the active theme when the client omits it,
     // so single-theme consumers (Canvas CLI) don't have to
     // discover and send the theme name themselves.
     if (!\array_key_exists('theme', $data)) {
-      $data['theme'] = (string) \Drupal::config('system.theme')->get('default');
+      $data['theme'] = \Drupal::service(ThemeManagerInterface::class)->getActiveTheme()->getName();
     }
     $values = [];
     foreach (['theme', 'region'] as $key) {
@@ -197,12 +197,10 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
    * {@inheritdoc}
    */
   public static function refineListQuery(QueryInterface &$query, RefinableCacheableDependencyInterface $cacheability): void {
-    // Only the default theme's regions render on the site.
-    $default_theme = \Drupal::service(ThemeHandlerInterface::class)->getDefault();
-    $query->condition('theme', $default_theme);
-    $cacheability->addCacheTags([
-      'config:system.theme',
-    ]);
+    // Only the active theme regions render on the site.
+    $active_theme = \Drupal::service(ThemeManagerInterface::class)->getActiveTheme()->getName();
+    $query->condition('theme', $active_theme);
+    $cacheability->addCacheContexts(['theme']);
   }
 
   /**
