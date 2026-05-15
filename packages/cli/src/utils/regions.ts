@@ -1,6 +1,6 @@
 import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 
-import { specToAuthoredElementMap } from './authored-elements';
+import { jsonRenderSpecToAuthoredElementMap } from './authored-elements';
 import { isRecord } from './utils';
 
 import type {
@@ -44,7 +44,7 @@ export function regionToAuthoredSpec(region: Region): AuthoredRegionSpec {
   }));
 
   const spec = canvasTreeToSpec(components);
-  const elements = specToAuthoredElementMap(spec);
+  const elements = jsonRenderSpecToAuthoredElementMap(spec);
 
   return { ...meta, elements };
 }

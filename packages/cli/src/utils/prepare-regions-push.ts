@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
-import { authoredSpecToComponentTree } from './authored-elements';
+import { authoredElementMapToComponentTree } from './authored-elements';
 import {
   collectUnreconciledMediaProps,
   serializeElementMapForServer,
@@ -99,7 +99,7 @@ export async function prepareRegions(
       spec.elements ?? {},
       componentMetadata,
     );
-    const components = authoredSpecToComponentTree(elements, componentVersions);
+    const components = authoredElementMapToComponentTree(elements, componentVersions);
 
     return {
       region: discovered.region,
