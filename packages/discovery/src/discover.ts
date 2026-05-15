@@ -109,9 +109,7 @@ async function getCandidateContentTemplateFiles(
   });
 }
 
-async function getCandidateRegionFiles(
-  regionsRoot: string,
-): Promise<string[]> {
+async function getCandidateRegionFiles(regionsRoot: string): Promise<string[]> {
   return glob('*.json', {
     cwd: regionsRoot,
     nodir: true,
@@ -169,8 +167,7 @@ export async function discoverCanvasProject(
   const pageCandidates = await getCandidatePageFiles(pagesRoot);
   const contentTemplateCandidates =
     await getCandidateContentTemplateFiles(contentTemplatesRoot);
-  const regionCandidates =
-    await getCandidateRegionFiles(regionsRoot);
+  const regionCandidates = await getCandidateRegionFiles(regionsRoot);
   const warnings: DiscoveryWarning[] = [];
   const components: DiscoveredComponent[] = [];
   const pages: DiscoveredPage[] = [];
