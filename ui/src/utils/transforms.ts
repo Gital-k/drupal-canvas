@@ -221,15 +221,10 @@ const link: Transformer<
   return returnValue[0] ?? null;
 };
 
-// Pass through values that don't match the "Label (id)" autocomplete shape so
-// the transform is idempotent. Without this, picking from the autocomplete
-// once would never patch the backend: the first transform pass turns
-// "Label (id)" into the bare id (storing it in form state and the input's
-// displayed value), and the second pass — running on commit against that
-// stored bare id — would return null, dropping the prop. PHP core takes the
-// same approach in
-// \Drupal\Core\Entity\Element\EntityAutocomplete::extractEntityIdFromAutocompleteInput,
-// leaving unparseable input intact for server-side validation to surface.
+// Treat unparseable text as a bare ID so the transform stays idempotent when
+// commit re-runs it against its own output (otherwise the second pass would
+// drop the prop).
+// @see \Drupal\Core\Entity\Element\EntityAutocomplete::extractEntityIdFromAutocompleteInput
 const passThroughIfAlreadyExtracted = (value: string): string | null => {
   const extracted = parseSingleEntityAutocompleteSelection(value);
   if (extracted !== null) {
