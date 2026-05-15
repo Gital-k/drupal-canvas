@@ -77,7 +77,10 @@ export async function preparePages(
       spec.elements ?? {},
       componentMetadata,
     );
-    const components = authoredElementMapToComponentTree(elements, componentVersions);
+    const components = authoredElementMapToComponentTree(
+      elements,
+      componentVersions,
+    );
     return {
       uuid: localPage.uuid,
       title: spec.title,
