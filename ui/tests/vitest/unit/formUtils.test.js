@@ -3,6 +3,7 @@ import {
   formStateToObject,
   getPropsValues,
   propInputData,
+  shouldSkipPropValidation,
   validateProp,
 } from '@/components/form/formUtil';
 
@@ -639,6 +640,121 @@ describe('validateProp', () => {
     };
     const [valid] = validateProp('colors', ['red'], inputAndUiData);
     expect(valid).to.equal(true);
+  });
+});
+
+describe('shouldSkipPropValidation', () => {
+  const buildTargetInForm = (name, otherInputNames = []) => {
+    const form = document.createElement('form');
+    const input = document.createElement('input');
+    input.name = name;
+    form.appendChild(input);
+    otherInputNames.forEach((extraName) => {
+      const extra = document.createElement('input');
+      extra.name = extraName;
+      form.appendChild(extra);
+    });
+    return input;
+  };
+
+  it('skips validation for content-entity-reference props', () => {
+    // The schema's `id` keyword (draft-04 artifact added by
+    // justinrainbow/json-schema when resolving the `$ref`) makes Ajv strict
+    // mode throw on compile, so client-side validation is short-circuited
+    // here. Server-side validation remains the source of truth.
+    const target = buildTargetInForm(
+      'canvas_component_props[comp1][author][0][target_id]',
+    );
+    const inputAndUiData = {
+      selectedComponent: 'comp1',
+      selectedComponentType: 'js.article',
+      components: {
+        'js.article': {
+          propSources: {
+            author: {
+              jsonSchema: {
+                type: 'object',
+                id: 'json-schema-definitions://canvas.module/content-entity-reference',
+              },
+            },
+          },
+        },
+      },
+    };
+    expect(
+      shouldSkipPropValidation(target.name, target, inputAndUiData, '3'),
+    ).to.equal(true);
+  });
+
+  it('does not skip validation for an unrelated single-input prop', () => {
+    // Sanity check: the CER skip should not leak to other object props that
+    // happen to live in the same code path.
+    const target = buildTargetInForm(
+      'canvas_component_props[comp1][title][0][value]',
+    );
+    const inputAndUiData = {
+      selectedComponent: 'comp1',
+      selectedComponentType: 'js.article',
+      components: {
+        'js.article': {
+          propSources: {
+            title: { jsonSchema: { type: 'string' } },
+          },
+        },
+      },
+    };
+    expect(
+      shouldSkipPropValidation(target.name, target, inputAndUiData, 'hello'),
+    ).to.equal(false);
+  });
+
+  it('skips validation for image props (multiple inputs per single value)', () => {
+    // Image props have several inputs (fids, alt, width, height) backing one
+    // prop value. propInputData lifts them into multipleInputsSingleValue, so
+    // shouldSkipPropValidation returns true regardless of the schema.
+    const target = buildTargetInForm(
+      'canvas_component_props[comp1][image][0][fids]',
+      [
+        'canvas_component_props[comp1][image][0][alt]',
+        'canvas_component_props[comp1][image][0][width]',
+        'canvas_component_props[comp1][image][0][height]',
+      ],
+    );
+    const inputAndUiData = {
+      selectedComponent: 'comp1',
+      selectedComponentType: 'js.banner',
+      components: {
+        'js.banner': {
+          propSources: {
+            image: { jsonSchema: { type: 'object' } },
+          },
+        },
+      },
+    };
+    expect(
+      shouldSkipPropValidation(target.name, target, inputAndUiData, '5'),
+    ).to.equal(true);
+  });
+
+  it('skips validation for video props (multiple inputs per single value)', () => {
+    const target = buildTargetInForm(
+      'canvas_component_props[comp1][video][0][fids]',
+      ['canvas_component_props[comp1][video][0][poster]'],
+    );
+    const inputAndUiData = {
+      selectedComponent: 'comp1',
+      selectedComponentType: 'js.banner',
+      components: {
+        'js.banner': {
+          propSources: {
+            video: { jsonSchema: { type: 'object' } },
+          },
+        },
+      },
+    };
+    expect(
+      shouldSkipPropValidation(target.name, target, inputAndUiData, '7'),
+    ).to.equal(true);
   });
 });
 

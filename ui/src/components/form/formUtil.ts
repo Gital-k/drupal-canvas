@@ -149,6 +149,23 @@ export const shouldSkipPropValidation = (
   }
 
   const { selectedComponent } = inputAndUiData;
+  const propName = toPropName(name, selectedComponent);
+
+  // PHP (justinrainbow/json-schema, draft-04) emits an `id` keyword on
+  // resolved $refs; Ajv (draft-07+) rejects it. Skip client-side validation
+  // here; server-side still runs.
+  // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef::ContentEntityReference
+  const propSchemas = getPropSchemas(inputAndUiData);
+  if (
+    propSchemas[propName]?.id ===
+    'json-schema-definitions://canvas.module/content-entity-reference'
+  ) {
+    console.warn(
+      `Input ${propName} is a content-entity-reference prop. Client-side JSON Schema validation is skipped because the resolved schema carries a draft-04 \`id\` keyword that Ajv strict mode rejects. Server-side validation still runs.`,
+    );
+    return true;
+  }
+
   const formData = new FormData(target.form);
   const formState = Object.fromEntries(formData);
   const { multipleInputsSingleValue } = propInputData(
@@ -156,9 +173,9 @@ export const shouldSkipPropValidation = (
     inputAndUiData,
   );
 
-  if (multipleInputsSingleValue.includes(toPropName(name, selectedComponent))) {
+  if (multipleInputsSingleValue.includes(propName)) {
     console.warn(
-      `Input ${toPropName(name, selectedComponent)} is part of a single value prop that corresponds to multiple form fields. This is not yet supported and JSON Schema validation is skipped.`,
+      `Input ${propName} is part of a single value prop that corresponds to multiple form fields. This is not yet supported and JSON Schema validation is skipped.`,
     );
     return true;
   }
