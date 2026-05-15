@@ -53,17 +53,13 @@ const splitAutocompleteValues = (value: string): string[] => {
   return result;
 };
 
-const parseEntityAutocompleteValue = (
-  value: string,
-): string | string[] | null => {
-  const selections = splitAutocompleteValues(value).filter(Boolean);
-  if (selections.length <= 1) {
-    return parseSingleEntityAutocompleteSelection(selections[0] ?? value);
-  }
+const parseEntityAutocompleteValue = (value: string): string[] => {
   // Treat entries that don't match `Label (id)` as bare ids so a single bad
   // entry doesn't discard the rest of the selection; server-side validation
   // surfaces the actual error.
-  return selections.map((s) => parseSingleEntityAutocompleteSelection(s) ?? s);
+  return splitAutocompleteValues(value)
+    .filter(Boolean)
+    .map((s) => parseSingleEntityAutocompleteSelection(s) ?? s);
 };
 
 type PropsValuesOrArrayOfPropsValues =
@@ -262,11 +258,15 @@ const entityAutocompleteTargetId: Transformer<
       .map(passThroughIfAlreadyExtracted)
       .filter((id): id is string => id !== null);
   }
-  // Comma-separated input means the autocomplete widget is in tags mode and
-  // collected multiple selections; defer to the multi-value parser, which
-  // returns an array.
+  // Tags-mode (comma-separated) input; the parser always returns an array.
+  // Collapse to a single id when only one selection survives (e.g. trailing
+  // comma), matching PHP core's single-vs-multi handling.
   if (value.includes(',')) {
-    return parseEntityAutocompleteValue(value);
+    const ids = parseEntityAutocompleteValue(value);
+    if (ids.length === 0) {
+      return null;
+    }
+    return ids.length === 1 ? ids[0] : ids;
   }
   return passThroughIfAlreadyExtracted(value);
 };
