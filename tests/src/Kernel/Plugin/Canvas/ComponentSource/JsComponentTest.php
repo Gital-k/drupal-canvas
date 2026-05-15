@@ -1302,6 +1302,81 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     }
   }
 
+  public function testRenderComponentFailureWhenPropsValidForPriorVersionButInvalidForActiveVersion(): void {
+    $component_id = JsComponent::componentIdFromJavascriptComponentId('canvas_test_code_components_with_props');
+    $prior_string_version = $this->createPriorStringVersionAndNewActiveIntegerVersion($component_id);
+
+    parent::testRenderComponentFailure(
+      component_id: $component_id,
+      inputs: [
+        'age' => "It's rude to ask",
+        'name' => 'Tilly',
+      ],
+      expected_validation_errors: [],
+      expected_exception: [
+        'class' => InvalidComponentException::class,
+        'message' => 'String value found, but an integer or an object is required.',
+      ],
+      expected_output_selector: NULL,
+      component_version: $prior_string_version,
+    );
+  }
+
+  /**
+   * Creates a prior string-typed version and a new active integer-typed version.
+   *
+   * This creates the exact render-time scenario where stored inputs are valid
+   * for a previous version but invalid for the active implementation.
+   */
+  private function createPriorStringVersionAndNewActiveIntegerVersion(string $component_id): string {
+    $component = Component::load($component_id);
+    self::assertInstanceOf(Component::class, $component);
+    self::assertCount(1, $component->getVersions());
+
+    $active_settings = $component->getSettings();
+    self::assertSame('integer', $active_settings['prop_field_definitions']['age']['field_type']);
+
+    $string_settings = $active_settings;
+    $string_settings['prop_field_definitions']['age']['field_type'] = 'string';
+    $string_settings['prop_field_definitions']['age']['default_value'][0] = ['value' => 'Oh hi'];
+    $string_settings['prop_field_definitions']['age']['expression'] = 'ℹ︎string␟value';
+    $string_settings['prop_field_definitions']['age']['field_widget'] = 'string_textfield';
+
+    $source_manager = $this->container->get(ComponentSourceManager::class);
+    \assert($source_manager instanceof ComponentSourceManager);
+    $string_source = $source_manager->createInstance(JsComponent::SOURCE_PLUGIN_ID, [
+      'local_source_id' => JsComponentDiscovery::getSourceSpecificComponentId($component_id),
+      ...$string_settings,
+    ]);
+    \assert($string_source instanceof ComponentSourceBase);
+    $string_version = $string_source->generateVersionHash();
+    $component->createVersion($string_version)
+      ->setSettings($string_settings)
+      ->save();
+    self::assertCount(2, $component->getVersions());
+    self::assertSame($string_version, $component->getActiveVersion());
+
+    $new_integer_settings = $string_settings;
+    $new_integer_settings['prop_field_definitions']['age']['field_type'] = 'integer';
+    // Ensure this integer-typed version hash differs from the original one.
+    $new_integer_settings['prop_field_definitions']['age']['default_value'][0] = ['value' => 42];
+    $new_integer_settings['prop_field_definitions']['age']['expression'] = 'ℹ︎integer␟value';
+    $new_integer_settings['prop_field_definitions']['age']['field_widget'] = 'number';
+    $new_integer_source = $source_manager->createInstance(JsComponent::SOURCE_PLUGIN_ID, [
+      'local_source_id' => JsComponentDiscovery::getSourceSpecificComponentId($component_id),
+      ...$new_integer_settings,
+    ]);
+    \assert($new_integer_source instanceof ComponentSourceBase);
+    $new_integer_version = $new_integer_source->generateVersionHash();
+    $component->createVersion($new_integer_version)
+      ->setSettings($new_integer_settings)
+      ->save();
+    self::assertCount(3, $component->getVersions());
+    self::assertSame($new_integer_version, $component->getActiveVersion());
+
+    return $string_version;
+  }
+
   /**
    * {@inheritdoc}
    */
