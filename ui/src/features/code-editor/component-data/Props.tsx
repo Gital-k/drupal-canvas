@@ -20,6 +20,7 @@ import {
   reorderProps,
   selectCodeComponentProperty,
   selectSavedPropIds,
+  setCodeComponentProperty,
   toggleRequired,
   updateProp,
 } from '@/features/code-editor/codeEditorSlice';
@@ -55,6 +56,50 @@ import type {
 } from '@/types/CodeComponent';
 
 import './Props.css';
+
+const FORMATTED_TEXT_IMPORT_STATEMENT = "import { FormattedText } from 'drupal-canvas';";
+const FORMATTED_TEXT_IMPORT = [
+  '// Formatted text props must be wrapped <FormattedText>{text}</FormattedText>',
+  FORMATTED_TEXT_IMPORT_STATEMENT,
+].join('\n');
+
+/**
+ * Inserts the FormattedText import into source code if not already present.
+ *
+ * Follows the same insertion logic as CodeComponentImports.tsx: after the last
+ * existing import statement, or at the top of the file if there are none.
+ */
+export function insertFormattedTextImport(sourceCodeJs: string): string {
+  // Check for the import statement itself, regardless of whether the comment
+  // is already there, to avoid inserting a duplicate.
+  if (sourceCodeJs.includes(FORMATTED_TEXT_IMPORT_STATEMENT)) {
+    return sourceCodeJs;
+  }
+
+  const isEmpty = sourceCodeJs.trim() === '';
+  if (isEmpty) {
+    return FORMATTED_TEXT_IMPORT + '\n';
+  }
+
+  const lines = sourceCodeJs.split('\n');
+  const lastImportIndex = lines.findIndex((line, index) => {
+    const trimmed = line.trim();
+    return (
+      !trimmed.startsWith('//') &&
+      !trimmed.startsWith('/*') &&
+      trimmed.startsWith('import') &&
+      (index === lines.length - 1 ||
+        !lines[index + 1].trim().startsWith('import'))
+    );
+  });
+
+  if (lastImportIndex >= 0) {
+    lines.splice(lastImportIndex + 1, 0, FORMATTED_TEXT_IMPORT);
+    return lines.join('\n');
+  }
+
+  return `${FORMATTED_TEXT_IMPORT}\n\n${sourceCodeJs}`;
+}
 
 // Default example values when prop is required.
 export const DEFAULT_EXAMPLES: Record<string, string> = {
@@ -94,6 +139,7 @@ export default function Props() {
   const required = useAppSelector(selectCodeComponentProperty('required'));
   const componentStatus = useAppSelector(selectCodeComponentProperty('status'));
   const initialPropIds = useAppSelector(selectSavedPropIds);
+  const sourceCodeJs = useAppSelector(selectCodeComponentProperty('sourceCodeJs'));
 
   // Memoized Set of prop IDs that need to be disabled from editing name and type.
   const disabledPropIds = useMemo(() => {
@@ -240,6 +286,14 @@ export default function Props() {
                         } as Partial<CodeComponentProp>,
                       }),
                     );
+                    // When switching to Formatted text, insert the required
+                    // import into the JS editor if it isn't already there.
+                    if (value === 'formattedText') {
+                      const newSourceCode = insertFormattedTextImport(sourceCodeJs);
+                      if (newSourceCode !== sourceCodeJs) {
+                        dispatch(setCodeComponentProperty(['sourceCodeJs', newSourceCode]));
+                      }
+                    }
                   }
                 }}
                 // Disable changing type if component is exposed and prop existed when loaded.
