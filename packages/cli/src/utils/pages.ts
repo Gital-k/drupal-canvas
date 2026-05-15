@@ -1,6 +1,6 @@
 import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 
-import { specToAuthoredElementMap } from './authored-elements';
+import { jsonRenderSpecToAuthoredElementMap } from './authored-elements';
 import { isRecord } from './utils';
 
 import type { Page } from '../types/Page';
@@ -55,7 +55,7 @@ export function pageToAuthoredSpec(page: Page): Record<string, unknown> {
   }));
 
   const spec = canvasTreeToSpec(components);
-  const elements = specToAuthoredElementMap(spec);
+  const elements = jsonRenderSpecToAuthoredElementMap(spec);
 
   for (const node of page.components) {
     const element = elements[node.uuid];
