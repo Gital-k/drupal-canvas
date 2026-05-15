@@ -174,9 +174,12 @@ export function usesManagedDefaultScope(scope: string): boolean {
   const tokens = new Set(scope.split(/\s+/).filter(Boolean));
   const baseTokens = DEFAULT_SCOPES.split(/\s+/);
   const optionalTokens = new Set(
-    [PAGE_SCOPES, REGION_SCOPES, BRAND_KIT_SCOPES, CONTENT_TEMPLATE_SCOPES].flatMap((s) =>
-      s.split(/\s+/),
-    ),
+    [
+      PAGE_SCOPES,
+      REGION_SCOPES,
+      BRAND_KIT_SCOPES,
+      CONTENT_TEMPLATE_SCOPES,
+    ].flatMap((s) => s.split(/\s+/)),
   );
   for (const token of baseTokens) {
     if (!tokens.has(token)) return false;
@@ -235,7 +238,12 @@ let config: Config = {
   clientSecret: process.env.CANVAS_CLIENT_SECRET || '',
   scope:
     process.env.CANVAS_SCOPE ||
-    getDefaultScope(includePages, includeBrandKit, includeContentTemplates, includeRegions),
+    getDefaultScope(
+      includePages,
+      includeBrandKit,
+      includeContentTemplates,
+      includeRegions,
+    ),
   userAgent: process.env.CANVAS_USER_AGENT || '',
   includePages,
   includeContentTemplates,

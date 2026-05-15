@@ -1,9 +1,5 @@
 import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 
-import {
-  buildChildToParentMap,
-  buildElementKeyToUuidMap,
-} from './authored-element-utils';
 import { specToAuthoredElementMap } from './authored-elements';
 import { isRecord } from './utils';
 
