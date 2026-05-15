@@ -159,6 +159,7 @@ const BRAND_KIT_SCOPES = 'canvas:brand_kit';
 export function getDefaultScope(
   includePages: boolean,
   includeBrandKit: boolean = false,
+  includeContentTemplates: boolean = false,
   includeRegions: boolean = false,
 ): string {
   const parts = [DEFAULT_SCOPES];
