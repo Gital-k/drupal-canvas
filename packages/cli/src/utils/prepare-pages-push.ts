@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
-import { authoredSpecToComponentTree } from './authored-elements';
+import { authoredElementMapToComponentTree } from './authored-elements';
 import {
   formatPagePathAliasChangeError,
   getPathAliasChange,
@@ -77,7 +77,7 @@ export async function preparePages(
       spec.elements ?? {},
       componentMetadata,
     );
-    const components = authoredSpecToComponentTree(elements, componentVersions);
+    const components = authoredElementMapToComponentTree(elements, componentVersions);
     return {
       uuid: localPage.uuid,
       title: spec.title,

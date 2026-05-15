@@ -3,7 +3,7 @@ import {
   defineComponentCatalog,
 } from 'drupal-canvas/json-render-utils';
 
-import { authoredSpecToComponentTree } from './authored-elements';
+import { authoredElementMapToComponentTree } from './authored-elements';
 
 import type { ComponentMetadata } from '@drupal-canvas/discovery';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
@@ -58,7 +58,7 @@ export function validateElements(
     return { success: false, details: disabledErrors };
   }
 
-  const componentTree = authoredSpecToComponentTree(elements);
+  const componentTree = authoredElementMapToComponentTree(elements);
   const jsonRenderSpec = canvasTreeToSpec(componentTree);
 
   for (const element of Object.values(jsonRenderSpec.elements)) {

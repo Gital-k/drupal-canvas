@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import chalk from 'chalk';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
-import { authoredElementsToComponentTree } from './content-templates';
+import { authoredElementMapToComponentTree } from './authored-elements';
 import { serializeElementMapForServer } from './prop-transforms';
 import { processInPool } from './request-pool';
 import { isRecord } from './utils';
@@ -117,7 +117,7 @@ export async function prepareContentTemplates(
       spec.elements ?? {},
       componentMetadata,
     );
-    const tree = authoredElementsToComponentTree(
+    const tree = authoredElementMapToComponentTree(
       serializedElements,
       componentVersions,
     );
