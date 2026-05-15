@@ -1,0 +1,4 @@
+services:
+  logger.channel.canvas_dev_translation:
+    parent: logger.channel_base
+    arguments: ['canvas_dev_translation']

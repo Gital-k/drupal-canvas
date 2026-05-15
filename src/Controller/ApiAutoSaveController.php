@@ -19,7 +19,6 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
-use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\PluralTranslatableMarkup;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -62,7 +61,6 @@ final class ApiAutoSaveController extends ApiControllerBase {
     #[Autowire(service: 'logger.channel.canvas')]
     private readonly LoggerInterface $logger,
     private readonly AccountInterface $currentUser,
-    private readonly LanguageManagerInterface $languageManager,
   ) {}
 
   private static function validateExpectedAutoSaves(array $expected_auto_saves, array $all_auto_saves): ?JsonResponse {
@@ -367,11 +365,6 @@ final class ApiAutoSaveController extends ApiControllerBase {
         self::ensureEntityIsValid($entity);
         $entity->save();
       }
-      // NOTE: This is a spike/experiment only. If this behavior is adopted,
-      // it should be extracted into a CanvasPublishEvent + a canvas_tmgmt
-      // sub-module that responds to that event, keeping canvas core free of
-      // the tmgmt dependency.
-      $tmgmt_job_urls = $this->createTmgmtJobsForPublishedEntities($entities);
 
       foreach ($entities as $entity) {
         $this->autoSaveManager->delete($entity);
@@ -411,13 +404,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
       ], status: 500);
     }
 
-    $response_data = [
-      'message' => new PluralTranslatableMarkup(\count($publish_auto_saves), 'Successfully published 1 item.', 'Successfully published @count items.'),
-    ];
-    if (!empty($tmgmt_job_urls)) {
-      $response_data['tmgmt_jobs'] = $tmgmt_job_urls;
-    }
-    return new JsonResponse(data: $response_data, status: 200);
+    return new JsonResponse(data: ['message' => new PluralTranslatableMarkup(\count($publish_auto_saves), 'Successfully published 1 item.', 'Successfully published @count items.')], status: 200);
   }
 
   public function delete(EntityInterface $entity): JsonResponse {
@@ -515,84 +502,5 @@ final class ApiAutoSaveController extends ApiControllerBase {
     );
   }
 
-  /**
-   * Creates TMGMT translation jobs for all published content entities.
-   *
-   * Groups content entities by source language and creates one job per
-   * (source language, target language) pair containing all entities that
-   * share that source language.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface[] $entities
-   *   The entities that were just published.
-   *
-   * @return string[]
-   *   Absolute URLs to the created TMGMT jobs.
-   */
-  private function createTmgmtJobsForPublishedEntities(array $entities): array {
-    if (!\Drupal::moduleHandler()->moduleExists('tmgmt')) {
-      return [];
-    }
-
-    // The TMGMT 'content' source plugin only handles ContentEntityInterface.
-    $content_entities = \array_filter(
-      $entities,
-      fn(EntityInterface $e) => $e instanceof ContentEntityInterface,
-    );
-
-    if (empty($content_entities)) {
-      return [];
-    }
-
-    // Group content entities by their source language so we can create one
-    // job per (source_lang, target_lang) pair.
-    $entities_by_source_lang = [];
-    foreach ($content_entities as $entity) {
-      \assert($entity instanceof ContentEntityInterface);
-      $entities_by_source_lang[$entity->language()->getId()][] = $entity;
-    }
-
-    $all_langcodes = \array_keys($this->languageManager->getLanguages());
-    $job_urls = [];
-
-    foreach ($entities_by_source_lang as $source_langcode => $source_entities) {
-      foreach ($all_langcodes as $target_langcode) {
-        if ($target_langcode === $source_langcode) {
-          continue;
-        }
-
-        $job = tmgmt_job_create($source_langcode, $target_langcode, $this->currentUser->id());
-        // We could also pass the translator to use for the job.
-        // $job->translator = 'ai';
-        $job_has_items = FALSE;
-
-        foreach ($source_entities as $entity) {
-          \assert($entity instanceof ContentEntityInterface);
-          try {
-            $job->addItem('content', $entity->getEntityTypeId(), $entity->id());
-            $job_has_items = TRUE;
-          }
-          catch (\Exception $e) {
-            $this->logger->warning(
-              'Spike: Could not add entity @type:@id to TMGMT job (@source → @target): @message',
-              [
-                '@type' => $entity->getEntityTypeId(),
-                '@id' => $entity->id(),
-                '@source' => $source_langcode,
-                '@target' => $target_langcode,
-                '@message' => $e->getMessage(),
-              ],
-            );
-          }
-        }
-
-        if ($job_has_items) {
-          $job->save();
-          $job_urls[] = $job->toUrl()->setAbsolute()->toString();
-        }
-      }
-    }
-
-    return $job_urls;
-  }
 
 }
