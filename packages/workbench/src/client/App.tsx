@@ -828,13 +828,39 @@ export function App() {
     if (isContentTemplateRoute && selectedContentTemplate && discoveryResult) {
       void (async () => {
         try {
-          const templateResponse = await fetchPreviewContentTemplateSpec(
-            selectedContentTemplate.slug,
-            pageSpecAbortController.signal,
-          );
+          const layoutPath = discoveryResult.layoutPath;
+          const regionsToRender = layoutPath ? discoveryResult.regions : [];
+
+          const [templateResponse, ...regionSpecs] = await Promise.all([
+            fetchPreviewContentTemplateSpec(
+              selectedContentTemplate.slug,
+              pageSpecAbortController.signal,
+            ),
+            ...regionsToRender.map((region) =>
+              fetchPreviewRegionSpec(
+                region.region,
+                pageSpecAbortController.signal,
+              ),
+            ),
+          ]);
           if (pageSpecAbortController.signal.aborted) {
             return;
           }
+
+          const layoutPayload =
+            layoutPath && regionsToRender.length > 0
+              ? {
+                  jsEntryUrl: toViteFsUrl(layoutPath),
+                  regions: Object.fromEntries(
+                    regionsToRender.map((region, index) => [
+                      region.region,
+                      regionSpecs[index],
+                    ]),
+                  ),
+                }
+              : layoutPath
+                ? { jsEntryUrl: toViteFsUrl(layoutPath), regions: {} }
+                : undefined;
 
           // Resolve all prop sources (entity-field expressions,
           // host-entity-url, adapters, static, etc.) server-side. Drupal
@@ -959,6 +985,7 @@ export function App() {
               renderType: 'page',
               spec: specWithState,
               shellPath,
+              ...(layoutPayload ? { layout: layoutPayload } : {}),
               registrySources: discoveryResult.components
                 .filter(
                   (
