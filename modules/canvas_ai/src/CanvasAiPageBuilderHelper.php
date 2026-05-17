@@ -2,17 +2,20 @@
 
 namespace Drupal\canvas_ai;
 
+use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Component\Serialization\Json;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Template\Attribute as TemplateAttribute;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\Url;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Yaml\Yaml;
 use Drupal\Component\Utility\DiffArray;
+use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Uuid\UuidInterface;
+use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\canvas\Component\Schema\PropMetadataNormalizer;
@@ -29,6 +32,11 @@ class CanvasAiPageBuilderHelper {
   use StringTranslationTrait;
 
   /**
+   * Cache key for storing all components keyed by source.
+   */
+  public const CACHE_KEY_ALL_COMPONENTS_BY_SOURCE = 'canvas_ai:all_components_by_source';
+
+  /**
    * Constructor.
    *
    * @param \Drupal\Core\Theme\ComponentPluginManager $componentPluginManager
@@ -37,16 +45,20 @@ class CanvasAiPageBuilderHelper {
    *   The entity type manager.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory.
-   * @param \Symfony\Component\HttpKernel\HttpKernelInterface $httpKernel
-   *   The HTTP kernel.
-   * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
-   *   The stack of requests.
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
    *   The UUID service.
    * @param \Drupal\canvas_ai\CanvasAiTempStore $canvasAiTempstore
    *   The Canvas AI tempstore.
    * @param \Drupal\Core\Extension\ThemeHandlerInterface $themeHandler
    *   The theme handler.
+   * @param \Drupal\Core\Cache\Context\CacheContextsManager $cacheContextsManager
+   *   The cache contexts manager.
+   * @param \Drupal\Core\Cache\CacheBackendInterface $cacheBackend
+   *   The cache backend.
+   * @param \Drupal\Component\Datetime\TimeInterface $time
+   *   The time service.
+   * @param \Drupal\canvas\Controller\ApiConfigControllers $apiConfigControllers
+   *   The API config controllers service.
    * @param \Drupal\canvas\Component\Schema\PropMetadataNormalizer $propMetadataNormalizer
    *   The prop metadata normalizer.
    */
@@ -54,11 +66,13 @@ class CanvasAiPageBuilderHelper {
     private readonly ComponentPluginManager $componentPluginManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly ConfigFactoryInterface $configFactory,
-    private readonly HttpKernelInterface $httpKernel,
-    private readonly RequestStack $requestStack,
     private readonly UuidInterface $uuidService,
     private readonly CanvasAiTempStore $canvasAiTempstore,
     private readonly ThemeHandlerInterface $themeHandler,
+    private readonly CacheContextsManager $cacheContextsManager,
+    private readonly CacheBackendInterface $cacheBackend,
+    private readonly TimeInterface $time,
+    private readonly ApiConfigControllers $apiConfigControllers,
     private readonly PropMetadataNormalizer $propMetadataNormalizer,
   ) {
   }
@@ -247,21 +261,19 @@ class CanvasAiPageBuilderHelper {
    *   The components keyed by source.
    */
   public function getAllComponentsKeyedBySource(): array {
+    $base_cacheability = $this->getComponentListCacheability();
+    $cache_id = $this->buildCacheId($base_cacheability);
+    $cache = $this->cacheBackend->get($cache_id);
+    if ($cache) {
+      return $cache->data ?? [];
+    }
     $output = [];
-    $current_request = $this->requestStack->getCurrentRequest();
-    $sub_request = Request::create(
-      Url::fromRoute('canvas.api.config.list', ['canvas_config_entity_type_id' => Component::ENTITY_TYPE_ID])->toString(),
-      'GET',
-      [],
-      $current_request?->cookies->all() ?? [],
-      [],
-      $current_request?->server->all() ?? []
-    );
-    $sub_request->attributes->set('_format', 'json');
+
+    // Call the controller directly to avoid mutating request-stack route context.
+    // Subrequests were causing the settings form submit redirect/title regressions.
     try {
-      $available_components_response = $this->httpKernel->handle($sub_request, HttpKernelInterface::SUB_REQUEST);
-      $available_components = (string) $available_components_response->getContent();
-      $available_components = Json::decode($available_components);
+      $available_components_response = $this->apiConfigControllers->list(Component::ENTITY_TYPE_ID);
+      $available_components = Json::decode((string) $available_components_response->getContent());
     }
     catch (\Exception) {
       return [];
@@ -298,7 +310,48 @@ class CanvasAiPageBuilderHelper {
         ];
       }
     }
+    $available_components_response->addCacheableDependency($base_cacheability);
+    $response_cacheability = $available_components_response->getCacheableMetadata();
+
+    $max_age = $response_cacheability->getCacheMaxAge();
+    if ($max_age !== 0) {
+      $expire = $max_age === CacheBackendInterface::CACHE_PERMANENT
+        ? CacheBackendInterface::CACHE_PERMANENT
+        : $this->time->getRequestTime() + $max_age;
+      $this->cacheBackend->set(
+        $cache_id,
+        $output,
+        $expire,
+        $response_cacheability->getCacheTags()
+      );
+    }
+
     return $output;
+  }
+
+  /**
+   * Builds cacheable metadata for the component listing.
+   */
+  private function getComponentListCacheability(): CacheableMetadata {
+    $component_entity_type = $this->entityTypeManager->getDefinition(Component::ENTITY_TYPE_ID);
+    $cacheability = new CacheableMetadata();
+    $cacheability->setCacheContexts($component_entity_type->getListCacheContexts());
+    $cacheability->setCacheTags($component_entity_type->getListCacheTags());
+    $cacheability->addCacheContexts(['user.permissions']);
+    return $cacheability;
+  }
+
+  /**
+   * Builds a cache ID that varies by cache contexts.
+   */
+  private function buildCacheId(CacheableMetadata $cacheability): string {
+    $keys = [self::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE];
+    if ($contexts = $cacheability->getCacheContexts()) {
+      $context_cache_keys = $this->cacheContextsManager->convertTokensToKeys($contexts);
+      $keys = array_merge($keys, $context_cache_keys->getKeys());
+      $cacheability->addCacheableDependency($context_cache_keys);
+    }
+    return implode(':', $keys);
   }
 
   /**
@@ -500,14 +553,22 @@ class CanvasAiPageBuilderHelper {
       $client_normalized = $component->normalizeForClientSide()->values;
       $output[$source_id]['components'][$component_id]['props'] = [];
       foreach ($props as $prop_name => $prop_details) {
-        if ($prop_name === 'attributes') {
+        // Skip Drupal attributes prop.
+        if (($prop_details['type'] ?? NULL) === TemplateAttribute::class) {
           continue;
+        }
+        $default_value = $client_normalized["propSources"][$prop_name]["default_values"]["resolved"] ?? $prop_details['default'] ?? $prop_details['examples'][0] ?? NULL;
+        // Default values of some props may have HTML markup as default value.
+        // Convert it to string so that it can be safely YAML encoded when saving
+        // the CanvasAiComponentDescriptionSettingsForm config.
+        if ($default_value instanceof MarkupInterface) {
+          $default_value = (string) $default_value;
         }
         $prop_metadata = [
           'name' => $prop_details['title'] ?? $prop_name,
           'description' => $prop_details['description'] ?? 'No description available',
           'type' => $prop_details['type'],
-          'default' => $client_normalized["propSources"][$prop_name]["default_values"]["resolved"] ?? $prop_details['default'] ?? $prop_details['examples'][0] ?? NULL,
+          'default' => $default_value,
         ];
 
         // Mark required props.

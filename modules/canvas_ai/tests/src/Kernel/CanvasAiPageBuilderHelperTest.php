@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel;
 
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\Page;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\user\Entity\User;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -15,6 +20,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 #[Group('canvas_ai')]
 final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
+  use UserCreationTrait;
 
   /**
    * The CanvasAiPageBuilderHelper service.
@@ -28,6 +34,7 @@ final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
    */
   protected static $modules = [
     'canvas_ai',
+    'media',
   ];
 
   /**
@@ -35,6 +42,19 @@ final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installEntitySchema('user');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_sdc']);
+    $this->container->get('theme_installer')->install(['stark']);
+    $this->container->get('config.factory')
+      ->getEditable('system.theme')
+      ->set('default', 'stark')
+      ->save();
+    $privileged_user = $this->createUser(['create canvas_page']);
+    if (!$privileged_user instanceof User) {
+      throw new \Exception('Failed to create test user');
+    }
+    $this->container->get('current_user')->setAccount($privileged_user);
 
     // Get the service from the container.
     $this->canvasAiPageBuilderHelper = $this->container->get('canvas_ai.page_builder_helper');
@@ -306,6 +326,51 @@ YAML;
   public function testGenerateVerboseContextForOrchestrator(array $prompt, string $expected): void {
     $result = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
     $this->assertEquals($expected, $result);
+  }
+
+  /**
+   * Tests that getAllComponentsKeyedBySource uses cache correctly.
+   */
+  public function testGetAllComponentsKeyedBySourceCaching(): void {
+    $cache = $this->container->get('cache.default');
+    // The helper varies the cache ID by cache contexts, so compute the cache ID
+    // the same way.
+    $component_entity_type = $this->container->get('entity_type.manager')->getDefinition(Component::ENTITY_TYPE_ID);
+    $cache_contexts = $component_entity_type->getListCacheContexts();
+    $cache_contexts[] = 'user.permissions';
+    $context_cache_keys = $this->container->get('cache_contexts_manager')->convertTokensToKeys($cache_contexts);
+    $cache_id = implode(':', [
+      CanvasAiPageBuilderHelper::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE,
+      ...$context_cache_keys->getKeys(),
+    ]);
+
+    // Ensure cache is empty initially.
+    $cache->delete($cache_id);
+    $this->assertFalse($cache->get($cache_id), 'Cache is empty before first call');
+
+    // First call - should fetch fresh data and cache it.
+    $this->canvasAiPageBuilderHelper->getAllComponentsKeyedBySource();
+
+    // Verify cache now contains data.
+    $cached1 = $cache->get($cache_id);
+    $this->assertIsObject($cached1, 'Data is now cached after first call');
+    $this->assertNotEmpty($cached1->data, 'Cached data is not empty');
+
+    // Update a component to force cache invalidation.
+    $breadcrumb_component = Component::load('block.system_breadcrumb_block');
+    $this->assertNotNull($breadcrumb_component, 'Breadcrumb component exists');
+    $breadcrumb_component->set('label', $breadcrumb_component->label() . ' (updated)')->save();
+    // Check if cache is invalidated.
+    $cached2 = $cache->get($cache_id);
+    // @phpstan-ignore-next-line method.alreadyNarrowedType
+    $this->assertFalse($cached2, 'Cache is invalidated after component update');
+
+    // Second call - should rebuild and repopulate the persistent cache entry.
+    $this->canvasAiPageBuilderHelper->getAllComponentsKeyedBySource();
+
+    $cached3 = $cache->get($cache_id);
+    $this->assertIsObject($cached3, 'Data is cached again after second call');
+    $this->assertNotEmpty($cached3->data, 'Cached data is not empty after second call');
   }
 
 }
