@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 
+import { useAppSelector } from '@/app/hooks';
+import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { getDisplayNameForNode } from '@/features/layout/layoutUtils';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 
@@ -16,6 +18,9 @@ const useGetComponentName = (
   parentNode?: LayoutNode | null,
 ) => {
   const { data: components } = useGetComponentsQuery();
+  // Layout is read so the unnamed-component fallback can append a per-page
+  // positional index (e.g. "Section Wrapper 1"). See #3527952.
+  const layout = useAppSelector(selectLayout);
 
   // Helper to cast parentNode to ComponentNode if needed
   const getParentComponentNode = (
@@ -52,16 +57,18 @@ const useGetComponentName = (
         getComponentNode(node),
         null,
         components as ComponentsList,
+        layout,
       );
     } else if (node.nodeType === 'slot') {
       return getDisplayNameForNode(
         getSlotNode(node),
         getParentComponentNode(parentNode),
         components as ComponentsList,
+        layout,
       );
     }
     return '';
-  }, [node, parentNode, components]);
+  }, [node, parentNode, components, layout]);
 
   return getName();
 };

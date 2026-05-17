@@ -6,6 +6,7 @@ import {
   layoutModelSlice,
   moveNode,
   selectLayoutHistory,
+  setComponentName,
   setLayoutModel,
   shiftNode,
   sortNode,
@@ -374,5 +375,88 @@ describe('Duplicate node', () => {
     expect(stateAfterDuplication.model[newNode.uuid]).to.deep.equal(
       stateAfterDuplication.model[nodeToDuplicateUUID],
     );
+  });
+});
+
+// Issue #3527952: Allow Content Creator to name component instances.
+describe('Set component name', () => {
+  const targetUuid = 'static-static-card2df';
+
+  it('Sets .name on the targeted component', () => {
+    const state = layoutModelSlice.reducer(
+      layout,
+      setComponentName({ uuid: targetUuid, name: 'Mission section' }),
+    );
+    const node = state.layout[0].components.find((c) => c.uuid === targetUuid);
+    expect(node.name).to.equal('Mission section');
+  });
+
+  it('Trims surrounding whitespace before storing', () => {
+    const state = layoutModelSlice.reducer(
+      layout,
+      setComponentName({ uuid: targetUuid, name: '   Stats section   ' }),
+    );
+    const node = state.layout[0].components.find((c) => c.uuid === targetUuid);
+    expect(node.name).to.equal('Stats section');
+  });
+
+  it('Stores null when name is an empty string', () => {
+    const state = layoutModelSlice.reducer(
+      layout,
+      setComponentName({ uuid: targetUuid, name: '' }),
+    );
+    const node = state.layout[0].components.find((c) => c.uuid === targetUuid);
+    expect(node.name).to.equal(null);
+  });
+
+  it('Stores null when name is whitespace-only', () => {
+    const state = layoutModelSlice.reducer(
+      layout,
+      setComponentName({ uuid: targetUuid, name: '   ' }),
+    );
+    const node = state.layout[0].components.find((c) => c.uuid === targetUuid);
+    expect(node.name).to.equal(null);
+  });
+
+  it('Stores null when name is explicitly null', () => {
+    const state = layoutModelSlice.reducer(
+      layout,
+      setComponentName({ uuid: targetUuid, name: null }),
+    );
+    const node = state.layout[0].components.find((c) => c.uuid === targetUuid);
+    expect(node.name).to.equal(null);
+  });
+
+  it('Flags updatePreview so the autosave POST is scheduled', () => {
+    // Start from a clean updatePreview=false state.
+    const stateAfterReset = { ...layout, updatePreview: false };
+    const state = layoutModelSlice.reducer(
+      stateAfterReset,
+      setComponentName({ uuid: targetUuid, name: 'Section A' }),
+    );
+    expect(state.updatePreview).to.equal(true);
+  });
+
+  it('Leaves other components untouched', () => {
+    const state = layoutModelSlice.reducer(
+      layout,
+      setComponentName({ uuid: targetUuid, name: 'Section A' }),
+    );
+    const others = state.layout[0].components.filter(
+      (c) => c.uuid !== targetUuid,
+    );
+    others.forEach((c) => {
+      expect(c.name).to.equal(undefined);
+    });
+  });
+
+  it('Does not throw or mutate state when uuid does not exist', () => {
+    const beforeLayout = JSON.parse(JSON.stringify(layout.layout));
+    const state = layoutModelSlice.reducer(
+      layout,
+      setComponentName({ uuid: 'no-such-uuid', name: 'Whatever' }),
+    );
+    // Layout structure unchanged.
+    expect(state.layout).to.deep.equal(beforeLayout);
   });
 });

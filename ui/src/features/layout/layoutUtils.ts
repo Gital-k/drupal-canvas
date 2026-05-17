@@ -271,6 +271,60 @@ export function findSlotById(
 }
 
 /**
+ * For a component identified by uuid, return its 1-based position among all
+ * components of the same type (after stripping `@version`) anywhere on the page.
+ *
+ * Used to compute the default "Section Wrapper 1" / "Section Wrapper 2" labels
+ * that the Layers panel shows for component instances whose `name` is null or
+ * empty. Counts every same-type ComponentNode in tree order, regardless of
+ * whether the others have custom names — so naming one instance does not
+ * renumber its unnamed siblings.
+ *
+ * Returns 0 if the uuid is not found in the layout.
+ *
+ * See Drupal.org issue #3527952.
+ *
+ * @param roots - The root region nodes to search in.
+ * @param uuid - The uuid of the component whose position is wanted.
+ * @param type - The component type to match against (may include `@version`).
+ * @returns The 1-based position, or 0 if not found.
+ */
+export function getComponentTypeIndex(
+  roots: Array<RegionNode>,
+  uuid: string,
+  type: string,
+): number {
+  const baseType = type.split('@')[0];
+  let counter = 0;
+  let result = 0;
+
+  const visitComponents = (components: ComponentNode[]): void => {
+    for (const component of components) {
+      const componentBaseType = component.type.split('@')[0];
+      if (componentBaseType === baseType) {
+        counter += 1;
+        if (component.uuid === uuid) {
+          result = counter;
+        }
+      }
+      visitSlots(component.slots);
+    }
+  };
+
+  const visitSlots = (slots: SlotNode[]): void => {
+    for (const slot of slots) {
+      visitComponents(slot.components);
+    }
+  };
+
+  for (const region of roots) {
+    visitComponents(region.components);
+  }
+
+  return result;
+}
+
+/**
  * Find the path to a node by its UUID.
  * @param nodes - The nodes to search through.
  * @param id - The UUID of the node to find.
@@ -737,21 +791,44 @@ export function findNodeParents(
 
 /**
  * Shared utility to get the display name for a component or slot node.
+ *
+ * For a ComponentNode the resolution order is:
+ *   1. `node.name` (the Content-Creator-provided instance label), if non-empty.
+ *   2. The component-type name from the registry, with a per-page positional
+ *      index appended (e.g. "Section Wrapper 1") — but only when the full
+ *      layout is provided so the index can be computed.
+ *   3. The bare component-type name (no index) when `layout` is omitted.
+ *
+ * See Drupal.org issue #3527952.
+ *
  * @param node - The node (component or slot)
  * @param parentComponentNode - The parent component node (for slots)
  * @param componentsData - The components data from useGetComponentsQuery
+ * @param layout - Optional root layout, required to compute the per-page index
+ *                 in the unnamed-component fallback. When omitted, the fallback
+ *                 is the bare type name (backward-compatible behavior).
  * @returns The display name for the node
  */
 export function getDisplayNameForNode(
   node: ComponentNode | SlotNode | null,
   parentComponentNode: ComponentNode | null | undefined,
   componentsData: ComponentsList | undefined,
+  layout?: Array<RegionNode>,
 ): string {
   if (!node) return '';
   if ('type' in node) {
     // ComponentNode
+    // Prefer the Content-Creator-provided instance name when set.
+    if (node.name) return node.name;
     const [nodeType] = node.type.split('@');
-    return componentsData?.[nodeType]?.name || 'Component';
+    const typeName = componentsData?.[nodeType]?.name || 'Component';
+    // Append the per-page index when the full layout is available, so unnamed
+    // siblings of the same type are distinguishable on the Layers panel.
+    if (layout) {
+      const index = getComponentTypeIndex(layout, node.uuid, node.type);
+      if (index > 0) return `${typeName} ${index}`;
+    }
+    return typeName;
   } else {
     // SlotNode
     if (parentComponentNode && parentComponentNode.type && node.name) {
