@@ -4,18 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin;
 
-use Drupal\Component\Plugin\CategorizingPluginManagerInterface;
 use Drupal\Core\Cache\CacheBackendInterface;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Extension\ThemeHandlerInterface;
-use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Plugin\Component;
-use Drupal\Core\Theme\Component\ComponentValidator;
-use Drupal\Core\Theme\Component\SchemaCompatibilityChecker;
-use Drupal\Core\Theme\ComponentNegotiator;
 use Drupal\Core\Theme\ComponentPluginManager as CoreComponentPluginManager;
-use Drupal\Core\Theme\ThemeManagerInterface;
 use JsonSchema\Constraints\BaseConstraint;
 use JsonSchema\SchemaStorage;
 
@@ -24,8 +15,8 @@ use JsonSchema\SchemaStorage;
  * @internal
  *
  * TRICKY: because Drupal\Core\Theme\ComponentPluginManager does not have an
- * interface and all of core typehints to the concrete implementation,
- * decorating this service is extraordinarily brittle.
+ * interface and all of core expects the concrete implementation, decorating
+ * this service is extraordinarily brittle.
  */
 class ComponentPluginManager extends CoreComponentPluginManager {
 
@@ -56,7 +47,7 @@ class ComponentPluginManager extends CoreComponentPluginManager {
     return $this->decorated->getDefinition($plugin_id, $exception_on_invalid);
   }
 
-    /**
+  /**
    * {@inheritdoc}
    */
   public function getDefinitions() {
@@ -148,6 +139,8 @@ class ComponentPluginManager extends CoreComponentPluginManager {
 
   /**
    * {@inheritdoc}
+   *
+   * @phpstan-ignore-next-line missingType.parameter
    */
   public function getSortedDefinitions(?array $definitions = NULL, $label_key = 'label') {
     return $this->decorated->getSortedDefinitions($definitions, $label_key);
@@ -155,6 +148,8 @@ class ComponentPluginManager extends CoreComponentPluginManager {
 
   /**
    * {@inheritdoc}
+   *
+   * @phpstan-ignore-next-line missingType.parameter
    */
   public function getGroupedDefinitions(?array $definitions = NULL, $label_key = 'label') {
     return $this->decorated->getGroupedDefinitions($definitions, $label_key);
