@@ -103,9 +103,7 @@ final class PropShape {
    * @return JsonSchema
    */
   private static function resolveSchemaReferences(array $schema): array {
-    $componentManager = self::componentPluginManager();
-    \assert($componentManager instanceof CanvasComponentPluginManager);
-    return $componentManager->resolveJsonSchemaReferences($schema);
+    return self::componentPluginManager()->resolveJsonSchemaReferences($schema);
   }
 
   /**
@@ -236,8 +234,10 @@ final class PropShape {
     return \Drupal::service(ThemeHandlerInterface::class);
   }
 
-  private static function componentPluginManager(): ComponentPluginManager {
-    return \Drupal::service(ComponentPluginManager::class);
+  private static function componentPluginManager(): CanvasComponentPluginManager {
+    $manager = \Drupal::service(ComponentPluginManager::class);
+    \assert($manager instanceof CanvasComponentPluginManager);
+    return $manager;
   }
 
   /**

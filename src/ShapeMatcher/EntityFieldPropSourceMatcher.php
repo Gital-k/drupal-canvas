@@ -201,9 +201,7 @@ final class EntityFieldPropSourceMatcher {
    * @return JsonSchema
    */
   private static function resolveSchemaReferences(array $schema): array {
-    $componentManager = self::componentPluginManager();
-    \assert($componentManager instanceof CanvasComponentPluginManager);
-    return $componentManager->resolveJsonSchemaReferences($schema);
+    return self::componentPluginManager()->resolveJsonSchemaReferences($schema);
   }
 
   /**
@@ -1164,8 +1162,10 @@ final class EntityFieldPropSourceMatcher {
     return FieldItemAnalyzer::getReferenceDependency($data_definition) !== NULL;
   }
 
-  private static function componentPluginManager(): ComponentPluginManager {
-    return \Drupal::service(ComponentPluginManager::class);
+  private static function componentPluginManager(): CanvasComponentPluginManager {
+    $manager = \Drupal::service(ComponentPluginManager::class);
+    \assert($manager instanceof CanvasComponentPluginManager);
+    return $manager;
   }
 
 }
