@@ -71,6 +71,8 @@ export default function FormPropTypeEnum({
   const hasNonEmptyMultiValue = hasNonEmptyArrayValue(
     allowMultiple ? defaultValue : [],
   );
+  // Normalize for useRequiredProp: ![] is false in JS, so an empty selection
+  // must be mapped to an empty string so the hook's empty-check works.
   const normalizedExampleForHook: string | string[] = allowMultiple
     ? hasNonEmptyMultiValue
       ? 'non-empty'
@@ -82,6 +84,7 @@ export default function FormPropTypeEnum({
     normalizedExampleForHook,
     () => {
       if (allowMultiple) {
+        // Multi-value mode: select the first available option or add a default one.
         if (validEnumValues.length === 0) {
           const defaultOption = DEFAULT_ENUM_OPTIONS[type];
           dispatchUpdateProp(dispatch, id, {
@@ -94,6 +97,7 @@ export default function FormPropTypeEnum({
           });
         }
       } else {
+        // Single-value mode (existing logic).
         if (validEnumValues.length === 0) {
           const defaultOption = DEFAULT_ENUM_OPTIONS[type];
           dispatchUpdateProp(dispatch, id, {
@@ -101,6 +105,7 @@ export default function FormPropTypeEnum({
             example: String(defaultOption.value),
           });
         } else if (!defaultValue) {
+          // If we have valid values but no default, set the first one
           dispatchUpdateProp(dispatch, id, {
             example: String(validEnumValues[0].value),
           });
@@ -110,6 +115,7 @@ export default function FormPropTypeEnum({
     [dispatch, id, type, validEnumValues, allowMultiple],
   );
 
+  // Normalize defaultValue to always work with arrays internally when allowMultiple is true
   const selectedValues = useMemo(() => {
     if (!allowMultiple) {
       return [];
@@ -120,11 +126,15 @@ export default function FormPropTypeEnum({
     return defaultValue ? [String(defaultValue)] : [];
   }, [allowMultiple, defaultValue]);
 
+  // Filter selectedValues to only include values that exist in validEnumValues
   const validSelectedValues = useMemo(() => {
     const validValueStrings = validEnumValues.map((item) => String(item.value));
     return selectedValues.filter((v) => validValueStrings.includes(v));
   }, [selectedValues, validEnumValues]);
 
+  // Show error when required but no valid example or no options.
+  // Also handles the multi-value case where defaultValue is an empty array
+  // (![] is false in JS, so we use hasNonEmptyMultiValue instead).
   useEffect(() => {
     const hasNoValue = allowMultiple ? !hasNonEmptyMultiValue : !defaultValue;
     if (required && (validEnumValues.length === 0 || hasNoValue)) {
@@ -165,6 +175,9 @@ export default function FormPropTypeEnum({
 
             const updates: Partial<CodeComponentProp> = { enum: values };
 
+            // If in limited mode and valid options count decreased, update limitedCount.
+            // Only reduce when valid options actually decreased (not when an empty row is
+            // being added), to avoid resetting a user-configured cardinality back to 1.
             if (
               allowMultiple &&
               valueMode === VALUE_MODE_LIMITED &&
@@ -174,6 +187,7 @@ export default function FormPropTypeEnum({
               updates.limitedCount = Math.max(1, validNewValues.length);
             }
 
+            // For allowMultiple, filter out selected values that no longer exist
             if (allowMultiple && Array.isArray(defaultValue)) {
               const validValueStrings = validNewValues.map((item) =>
                 String(item.value),
@@ -185,6 +199,9 @@ export default function FormPropTypeEnum({
                 updates.example = filteredSelected;
               }
             } else {
+              // For single value: Update default value if:
+              // 1. Current default value doesn't exist in new values, OR
+              // 2. Current default value is empty, prop is required, and there are valid values.
               if (
                 !validNewValues.some((item) => item.value === defaultValue) ||
                 (!defaultValue && validNewValues.length > 0)
@@ -267,6 +284,7 @@ export default function FormPropTypeEnum({
                                   );
                                 }
 
+                                // Convert back to proper type for backend
                                 const typedExample =
                                   type === 'integer' || type === 'number'
                                     ? newSelected.map((v) => Number(v))
@@ -301,6 +319,7 @@ export default function FormPropTypeEnum({
                 }
                 onValueChange={(value) => {
                   handleDefaultValueChange(value);
+                  // Show/hide error based on whether value is empty while required
                   setShowRequiredError(required && value === NONE_VALUE);
                 }}
                 size="1"

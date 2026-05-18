@@ -38,6 +38,7 @@ const DEFAULT_PIXEL_DENSITY = EXAMPLE_PIXEL_DENSITY_OPTIONS[1].value;
 export const parseExampleSrc = (
   src: string,
 ): { aspectRatio: string; pixelDensity: string } => {
+  // Default values if parsing fails
   const defaults = {
     aspectRatio: DEFAULT_ASPECT_RATIO,
     pixelDensity: DEFAULT_PIXEL_DENSITY,
@@ -48,17 +49,21 @@ export const parseExampleSrc = (
   }
 
   try {
+    // Extract dimensions and density from URL
+    // Example: https://placehold.co/800x600@2x.png
     const match = src.match(/(\d+)x(\d+)(?:@(\d+)x)?/);
     if (!match) return defaults;
 
     const [, width, height, density = '1'] = match;
 
+    // Find exact matching aspect ratio
     const aspectRatio =
       EXAMPLE_ASPECT_RATIO_VALUES.find(
         (ratio) =>
           ratio.width === Number(width) && ratio.height === Number(height),
       )?.value || DEFAULT_ASPECT_RATIO;
 
+    // Find matching pixel density
     const pixelDensity = `${density}x`;
     if (
       !EXAMPLE_PIXEL_DENSITY_OPTIONS.some(

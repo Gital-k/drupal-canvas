@@ -58,10 +58,14 @@ export default function FormPropTypeDate({
   const [dateType, setDateType] = useState<'date' | 'date-time'>(format);
   const [isExampleValueValid, setIsExampleValueValid] = useState(true);
 
+  // The datetime format the server requires is in UTC ISO string, but the input element of type "datetime-local"
+  // requires a local datetime format. We need to convert between these two formats.
   const [datetimeLocalForInput, setDatetimeLocalForInput] = useState(
     utcToLocalTimeConversion(typeof example === 'string' ? example : ''),
   );
 
+  // For multiple values mode
+  // Memoize to prevent unnecessary recomputations
   const displayArray = useMemo(
     () =>
       createDisplayArray(
@@ -91,6 +95,7 @@ export default function FormPropTypeDate({
   };
 
   const handleMultiValueChange = (index: number, value: string) => {
+    // Convert the value to the format we want to store (UTC for date-time, raw for date)
     const convertedValue =
       dateType === 'date-time' ? localTimeToUtcConversion(value) : value;
 
@@ -128,6 +133,8 @@ export default function FormPropTypeDate({
   );
   const defaultValue = DEFAULT_EXAMPLES[dateType] as string;
 
+  // For multi-value mode, normalize the example so `useRequiredProp` can
+  // detect empty arrays (since `![]` is false in JS).
   const hasNonEmptyValue = hasNonEmptyArrayValue(allowMultiple ? example : []);
 
   const { showRequiredError, setShowRequiredError } = useRequiredProp(
@@ -152,6 +159,7 @@ export default function FormPropTypeDate({
     [dispatch, id, dateType, allowMultiple],
   );
 
+  // Keep error state in sync with whether the array has non-empty values.
   useSyncRequiredArrayError(
     required,
     hasNonEmptyValue,
@@ -173,6 +181,7 @@ export default function FormPropTypeDate({
               ? (DEFAULT_EXAMPLES[value] as string)
               : '';
 
+            // In multi-value mode, reset the array to a single default value
             if (allowMultiple) {
               resetValidityStates([true]);
 
@@ -183,6 +192,7 @@ export default function FormPropTypeDate({
                 limitedCount: undefined,
               });
             } else {
+              // Single value mode - just update format and example
               dispatchUpdateProp(dispatch, id, {
                 example: newDefaultValue,
                 format: value,
@@ -217,7 +227,9 @@ export default function FormPropTypeDate({
             type={dateType === 'date' ? 'date' : 'datetime-local'}
             onChange={(e) => {
               const value = e.target.value;
+              // Show/hide error based on whether field is empty while required
               setShowRequiredError(required && !value);
+              // Convert the datetime-local value to UTC ISO string for the server.
               const convertedValue =
                 dateType === 'date-time'
                   ? localTimeToUtcConversion(value)

@@ -79,6 +79,8 @@ export default function FormPropTypeLink({
 
   const [isExampleValueValid, setIsExampleValueValid] = useState(true);
 
+  // For multi-value mode, normalize the example so `useRequiredProp` can
+  // detect empty arrays (since `![]` is false in JS).
   const hasNonEmptyValue = hasNonEmptyArrayValue(allowMultiple ? example : []);
 
   const { showRequiredError, setShowRequiredError } = useRequiredProp(
@@ -100,6 +102,7 @@ export default function FormPropTypeLink({
     [dispatch, id, linkType, allowMultiple],
   );
 
+  // Keep error state in sync with whether the array has non-empty values.
   useSyncRequiredArrayError(
     required,
     hasNonEmptyValue,
@@ -118,6 +121,7 @@ export default function FormPropTypeLink({
     [example, valueMode, limitedCount, allowMultiple],
   );
 
+  // Add validity state for multiple values
   const { validityStates, setValidity, resetValidityStates } =
     useMultiValueValidation(
       displayArray,
@@ -130,7 +134,7 @@ export default function FormPropTypeLink({
 
   const handleAdd = () => {
     handleArrayAdd(displayArray, dispatch, id, '');
-    resetValidityStates([...validityStates, true]);
+    resetValidityStates([...validityStates, true]); // Add validity for new input
   };
 
   const handleRemove = (index: number) => {
@@ -142,6 +146,7 @@ export default function FormPropTypeLink({
     handleArrayValueChange(displayArray, dispatch, id, index, value, {
       format: linkType === 'full' ? 'uri' : 'uri-reference',
     });
+    // Reset validity on change
     setValidity(index, true);
   };
 
@@ -190,9 +195,11 @@ export default function FormPropTypeLink({
             setIsExampleValueValid(true);
             setLinkType(value);
 
+            // Get the default value for the new link type
             const newDefaultValue = DEFAULT_LINK_EXAMPLES[value];
             const newFormat = value === 'full' ? 'uri' : 'uri-reference';
 
+            // In multi-value mode, reset the array to a single default value
             if (allowMultiple) {
               dispatchUpdateProp(dispatch, id, {
                 example: [newDefaultValue],
@@ -200,8 +207,10 @@ export default function FormPropTypeLink({
                 valueMode: VALUE_MODE_UNLIMITED,
                 limitedCount: undefined,
               });
+              // Reset validity states to a single valid entry
               resetValidityStates([true]);
             } else {
+              // Single value mode - just update format and example
               dispatchUpdateProp(dispatch, id, {
                 example: newDefaultValue,
                 format: newFormat,
@@ -242,7 +251,8 @@ export default function FormPropTypeLink({
                 size="1"
                 onChange={(e) => {
                   const input = e.target;
-                  setIsExampleValueValid(true);
+                  setIsExampleValueValid(true); // Reset validation state on change
+                  // Show/hide error based on whether field is empty while required
                   setShowRequiredError(required && !input.value);
                   dispatchUpdateProp(dispatch, id, {
                     example: input.value,

@@ -12,6 +12,7 @@ import type { CodeComponentPropEnumItem } from '@/types/CodeComponent';
 const getDuplicateValueIndices = (
   arr: Array<Pick<CodeComponentPropEnumItem, 'value'>>,
 ) => {
+  // Helper: find indices of duplicate values in the array of props.
   const valueCount: Record<string | number, number> = {};
   arr.forEach(({ value }) => {
     valueCount[value] = (valueCount[value] || 0) + 1;
@@ -32,10 +33,13 @@ export function EnumValuesForm({
   type: 'string' | 'integer' | 'number';
   isDisabled: boolean;
 }) {
+  // Keep track of which labels have been touched (manually edited) by the user.
+  // If a label has not been touched, it will be auto-updated to match the value.
   const [touched, setTouched] = useState(values.map(({ label }) => !!label));
   const typeRef = useRef(type);
 
   useEffect(() => {
+    // If the type changes, the values are reset, so we need to reset the touched state.
     if (typeRef.current !== type && type !== undefined) {
       setTouched([false]);
     }
@@ -51,12 +55,14 @@ export function EnumValuesForm({
   const handleRemove = (index: number) => {
     const newValues = [...values];
     newValues.splice(index, 1);
+    // Also remove the touched state for this index.
     setTouched((prev) => prev.filter((_, i) => i !== index));
     onChange(newValues);
   };
 
   const handleValueChange = (index: number, value: string | number) => {
     const newValues = [...values];
+    // If label is untouched, update label to match the value entered.
     if (!touched[index]) {
       newValues[index] = { ...newValues[index], value, label: String(value) };
     } else {
@@ -101,6 +107,7 @@ export function EnumValuesForm({
                     }[type]
                   }
                   disabled={isDisabled}
+                  // Show as invalid if duplicate
                   color={invalidValueIndices[index] ? 'red' : undefined}
                 />
               </FormElement>
