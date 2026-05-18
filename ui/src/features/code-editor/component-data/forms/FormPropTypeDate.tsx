@@ -131,9 +131,7 @@ export default function FormPropTypeDate({
   );
   const defaultValue = DEFAULT_EXAMPLES[dateType] as string;
 
-  // For multi-value mode, normalize the example so `useRequiredProp` can
-  // detect empty arrays (since `![]` is false in JS).
-  const hasNonEmptyValue = hasNonEmptyArrayValue(allowMultiple ? example : []);
+  const hasNonEmptyValue = allowMultiple && hasNonEmptyArrayValue(example);
 
   const { showRequiredError, setShowRequiredError } = useRequiredProp(
     required,
