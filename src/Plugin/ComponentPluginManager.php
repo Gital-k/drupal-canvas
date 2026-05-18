@@ -29,7 +29,9 @@ class ComponentPluginManager extends CoreComponentPluginManager {
 
   // @phpstan-ignore pluginManagerSetsCacheBackend.missingCacheBackend
   public function __construct(
-    private readonly CoreComponentPluginManager $decorated,
+    // TRICKY: must be protected, not private, for testing purposes.
+    // @see \Drupal\Tests\canvas\Kernel\BrokenComponentManager
+    protected readonly CoreComponentPluginManager $decorated,
   ) {}
 
   /**
