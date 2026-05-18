@@ -40,7 +40,12 @@ const SiblingSlotsSubMenu: React.FC<{
             slot,
             parentComponent: sib,
             parentComponentName: name,
-            slotDisplayName: getDisplayNameForNode(slot, sib, components, layout),
+            slotDisplayName: getDisplayNameForNode(
+              slot,
+              sib,
+              components,
+              layout,
+            ),
           });
         });
       });

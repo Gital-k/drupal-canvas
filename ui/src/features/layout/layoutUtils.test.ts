@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { NodeType } from '@/features/layout/layoutModelSlice';
 import {
   getComponentTypeIndex,
   getDisplayNameForNode,
 } from '@/features/layout/layoutUtils';
-import { NodeType } from '@/features/layout/layoutModelSlice';
 
 import type {
   ComponentNode,
@@ -159,25 +159,13 @@ describe('getComponentTypeIndex', () => {
       ]),
     ];
     expect(
-      getComponentTypeIndex(
-        layout,
-        'a',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex(layout, 'a', 'bcsao_mercury:bcsao-section-wrapper'),
     ).toBe(1);
     expect(
-      getComponentTypeIndex(
-        layout,
-        'b',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex(layout, 'b', 'bcsao_mercury:bcsao-section-wrapper'),
     ).toBe(2);
     expect(
-      getComponentTypeIndex(
-        layout,
-        'c',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex(layout, 'c', 'bcsao_mercury:bcsao-section-wrapper'),
     ).toBe(3);
   });
 
@@ -192,11 +180,7 @@ describe('getComponentTypeIndex', () => {
       ]),
     ];
     expect(
-      getComponentTypeIndex(
-        layout,
-        'b',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex(layout, 'b', 'bcsao_mercury:bcsao-section-wrapper'),
     ).toBe(2);
     expect(
       getComponentTypeIndex(layout, 'h2', 'bcsao_mercury:bcsao-hero'),
@@ -209,11 +193,7 @@ describe('getComponentTypeIndex', () => {
       makeRegion([makeSectionWrapper('c')]),
     ];
     expect(
-      getComponentTypeIndex(
-        layout,
-        'c',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex(layout, 'c', 'bcsao_mercury:bcsao-section-wrapper'),
     ).toBe(3);
   });
 
@@ -271,18 +251,10 @@ describe('getComponentTypeIndex', () => {
       ]),
     ];
     expect(
-      getComponentTypeIndex(
-        layout,
-        'a',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex(layout, 'a', 'bcsao_mercury:bcsao-section-wrapper'),
     ).toBe(1);
     expect(
-      getComponentTypeIndex(
-        layout,
-        'c',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex(layout, 'c', 'bcsao_mercury:bcsao-section-wrapper'),
     ).toBe(3);
   });
 
@@ -299,11 +271,7 @@ describe('getComponentTypeIndex', () => {
 
   it('returns 0 against an empty layout', () => {
     expect(
-      getComponentTypeIndex(
-        [],
-        'a',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex([], 'a', 'bcsao_mercury:bcsao-section-wrapper'),
     ).toBe(0);
   });
 });
@@ -315,15 +283,15 @@ describe('getDisplayNameForNode with layout (auto-numbered fallback)', () => {
     const c = makeSectionWrapper('c');
     const layout = [makeRegion([a, b, c])];
 
-    expect(
-      getDisplayNameForNode(a, null, componentsRegistry, layout),
-    ).toBe('BCSAO Section Wrapper 1');
-    expect(
-      getDisplayNameForNode(b, null, componentsRegistry, layout),
-    ).toBe('BCSAO Section Wrapper 2');
-    expect(
-      getDisplayNameForNode(c, null, componentsRegistry, layout),
-    ).toBe('BCSAO Section Wrapper 3');
+    expect(getDisplayNameForNode(a, null, componentsRegistry, layout)).toBe(
+      'BCSAO Section Wrapper 1',
+    );
+    expect(getDisplayNameForNode(b, null, componentsRegistry, layout)).toBe(
+      'BCSAO Section Wrapper 2',
+    );
+    expect(getDisplayNameForNode(c, null, componentsRegistry, layout)).toBe(
+      'BCSAO Section Wrapper 3',
+    );
   });
 
   it('returns the instance name (no index) when a custom name is set', () => {
@@ -332,9 +300,9 @@ describe('getDisplayNameForNode with layout (auto-numbered fallback)', () => {
     const c = makeSectionWrapper('c');
     const layout = [makeRegion([a, b, c])];
 
-    expect(
-      getDisplayNameForNode(b, null, componentsRegistry, layout),
-    ).toBe('Mission');
+    expect(getDisplayNameForNode(b, null, componentsRegistry, layout)).toBe(
+      'Mission',
+    );
   });
 
   it('still appends the position-based index to unnamed siblings of a named one', () => {
@@ -345,12 +313,12 @@ describe('getDisplayNameForNode with layout (auto-numbered fallback)', () => {
 
     // Unnamed siblings keep their position-based numbers — they do not renumber
     // around the named one.
-    expect(
-      getDisplayNameForNode(a, null, componentsRegistry, layout),
-    ).toBe('BCSAO Section Wrapper 1');
-    expect(
-      getDisplayNameForNode(c, null, componentsRegistry, layout),
-    ).toBe('BCSAO Section Wrapper 3');
+    expect(getDisplayNameForNode(a, null, componentsRegistry, layout)).toBe(
+      'BCSAO Section Wrapper 1',
+    );
+    expect(getDisplayNameForNode(c, null, componentsRegistry, layout)).toBe(
+      'BCSAO Section Wrapper 3',
+    );
   });
 
   it('omits the index when no layout is provided (backward-compat fallback)', () => {

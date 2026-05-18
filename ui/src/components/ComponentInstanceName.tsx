@@ -14,7 +14,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-
 import { Flex, Text, TextField } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -81,8 +80,7 @@ const ComponentInstanceName: React.FC = () => {
   // left the field blank — i.e. the per-page positional index appended to
   // the component-type name. See #3527952.
   const typeIndex = getComponentTypeIndex(layout, selectedUuid, node.type);
-  const placeholderName =
-    typeIndex > 0 ? `${typeName} ${typeIndex}` : typeName;
+  const placeholderName = typeIndex > 0 ? `${typeName} ${typeIndex}` : typeName;
 
   return (
     <Flex

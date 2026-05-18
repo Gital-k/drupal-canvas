@@ -247,10 +247,7 @@ export const layoutModelSlice = createSlice({
      * Refs: Drupal.org issue #3527952.
      */
     setComponentName: create.reducer(
-      (
-        state,
-        action: PayloadAction<{ uuid: string; name: string | null }>,
-      ) => {
+      (state, action: PayloadAction<{ uuid: string; name: string | null }>) => {
         const { uuid, name } = action.payload;
         const node = findComponentByUuid(state.layout, uuid);
         if (!node) {
