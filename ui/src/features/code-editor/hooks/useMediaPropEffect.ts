@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { updateProp } from '@/features/code-editor/codeEditorSlice';
+import { dispatchUpdateProp } from '@/features/code-editor/utils/arrayPropUtils';
 
 import type { AppDispatch } from '@/app/store';
 import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
@@ -188,12 +188,7 @@ export function useMediaPropEffect<
     };
 
     if (aspectRatio === noneValueRef.current) {
-      dispatch(
-        updateProp({
-          id,
-          updates: { example: allowMultiple ? [] : '' },
-        }),
-      );
+      dispatchUpdateProp(dispatch, id, { example: allowMultiple ? [] : '' });
       return;
     }
 
@@ -214,17 +209,12 @@ export function useMediaPropEffect<
       // For limited mode, ensure we have exactly limitedCount items
       if (valueMode === 'limited') {
         // Update all items to use the new mediaObject (aspect ratio/pixel density changes should apply to all)
-        dispatch(
-          updateProp({
-            id,
-            updates: {
-              example: Array.from(
-                { length: limitedCount },
-                () => mediaObject,
-              ) as any,
-            },
-          }),
-        );
+        dispatchUpdateProp(dispatch, id, {
+          example: Array.from(
+            { length: limitedCount },
+            () => mediaObject,
+          ) as any,
+        });
       } else {
         // For unlimited mode:
         // - If aspect ratio or pixel density changed, update all existing items
@@ -237,11 +227,11 @@ export function useMediaPropEffect<
           // Keep existing items or create initial item
           newArray = currentArray.length > 0 ? currentArray : [mediaObject];
         }
-        dispatch(updateProp({ id, updates: { example: newArray as any } }));
+        dispatchUpdateProp(dispatch, id, { example: newArray as any });
       }
     } else {
       // Single value mode
-      dispatch(updateProp({ id, updates: { example: mediaObject as any } }));
+      dispatchUpdateProp(dispatch, id, { example: mediaObject as any });
     }
   }, [
     aspectRatio,

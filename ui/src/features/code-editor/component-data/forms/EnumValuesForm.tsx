@@ -12,7 +12,7 @@ import type { CodeComponentPropEnumItem } from '@/types/CodeComponent';
 const getDuplicateValueIndices = (
   arr: Array<Pick<CodeComponentPropEnumItem, 'value'>>,
 ) => {
-  // Helper: find indices of duplicate values in the array of props.
+  // Find indices of duplicate values in the array of props.
   const valueCount: Record<string | number, number> = {};
   arr.forEach(({ value }) => {
     valueCount[value] = (valueCount[value] || 0) + 1;

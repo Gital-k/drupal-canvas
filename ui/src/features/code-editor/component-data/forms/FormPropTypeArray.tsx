@@ -61,10 +61,8 @@ function NumericArrayItem({
   const displayValueRef = useRef(displayValue);
   displayValueRef.current = displayValue;
 
-  // Sync the display string when the store value changes externally (e.g. on
-  // reorder or add/remove), but NOT when the difference is only a trailing
-  // zero (e.g. display "10.0" while store holds 10). Comparing numerically
-  // lets the user keep typing "10.0" without the zero being stripped.
+  // Sync display string from the store, but preserve trailing zeros while typing
+  // (e.g. keep "10.0" when the store holds 10).
   useEffect(() => {
     const storedStr = String(value ?? '');
     const displayNum =

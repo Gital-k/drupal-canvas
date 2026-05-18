@@ -21,7 +21,6 @@ import {
   selectCodeComponentProperty,
   selectSavedPropIds,
   toggleRequired,
-  updateProp,
 } from '@/features/code-editor/codeEditorSlice';
 import derivedPropTypes from '@/features/code-editor/component-data/derivedPropTypes';
 import {
@@ -41,6 +40,7 @@ import FormPropTypeLink, {
 import FormPropTypeTextField from '@/features/code-editor/component-data/forms/FormPropTypeTextField';
 import FormPropTypeVideo from '@/features/code-editor/component-data/forms/FormPropTypeVideo';
 import SortableList from '@/features/code-editor/component-data/SortableList';
+import { dispatchUpdateProp } from '@/features/code-editor/utils/arrayPropUtils';
 import { getPropMachineName } from '@/features/code-editor/utils/utils';
 import {
   VALUE_MODE_LIMITED,
@@ -88,6 +88,130 @@ export const DEFAULT_ENUM_OPTIONS: Record<
 export const REQUIRED_EXAMPLE_ERROR_MESSAGE =
   'A required prop must have an example value.';
 
+function getMaxLimitForListType(prop: CodeComponentProp): number {
+  return ['listText', 'listInteger'].includes(prop.derivedType ?? '')
+    ? (prop.enum?.filter((item) => item.value !== '' && item.label !== '')
+        .length ?? Infinity)
+    : Infinity;
+}
+
+function getMultiValueToggleUpdates(
+  prop: CodeComponentProp,
+  checked: boolean,
+  isRequired: boolean,
+  propName: string,
+): Partial<CodeComponentProp> {
+  const updates: Partial<CodeComponentProp> = { allowMultiple: checked };
+
+  if (checked) {
+    // Convert to array type - for date and link types.
+    if (['date', 'link'].includes(prop.derivedType ?? '')) {
+      updates.type = 'array';
+      updates.items = {
+        type: 'string',
+        format: prop.format,
+      };
+      // Preserve the current example value for required props
+      // so the required error doesn't flash during the transition.
+      updates.example =
+        isRequired && prop.example && typeof prop.example === 'string'
+          ? [prop.example]
+          : [];
+      updates.valueMode = VALUE_MODE_UNLIMITED;
+      updates.limitedCount = 1;
+    } else if (['string', 'integer', 'number'].includes(prop.type)) {
+      // Convert to array type - for primitive types.
+      updates.type = 'array';
+      updates.items = {
+        type: prop.type as 'string' | 'integer' | 'number',
+      };
+      // Preserve the current example value for required props
+      // so the required error doesn't flash during the transition.
+      updates.example =
+        isRequired && prop.example !== '' && prop.example !== undefined
+          ? ([prop.example] as string[] | number[])
+          : [];
+      updates.valueMode = VALUE_MODE_UNLIMITED;
+      updates.limitedCount = 1;
+    } else if (prop.type === 'object') {
+      // Convert to array type - for object types (image/video).
+      updates.type = 'array';
+      updates.items = {
+        type: 'object',
+        $ref: prop.$ref,
+      };
+      // Convert single object to array with that object
+      // Handle both valid objects and empty strings (which is the initial state)
+      if (
+        prop.example &&
+        typeof prop.example === 'object' &&
+        !Array.isArray(prop.example) &&
+        (prop.example as CodeComponentPropImageExample).src
+      ) {
+        updates.example = [prop.example] as
+          | CodeComponentPropImageExample[]
+          | CodeComponentPropVideoExample[];
+      } else {
+        // Start with empty array - FormPropTypeImageArray will handle initialization
+        updates.example = [];
+      }
+      updates.valueMode = 'unlimited';
+      updates.limitedCount = 1;
+    }
+  } else {
+    // Convert back to single value.
+    // Restore the original type from items before clearing.
+    if (prop.items?.type) {
+      updates.type = prop.items.type as
+        | 'string'
+        | 'integer'
+        | 'number'
+        | 'boolean'
+        | 'object';
+    }
+    updates.items = undefined;
+    // If prop is required, try to preserve the first value
+    // from the current array example so that the user's
+    // selection survives the single ↔ multi toggle
+    // round-trip. Fall back to type-specific defaults when
+    // the array is empty.
+    let defaultExample = '';
+    if (isRequired) {
+      if (
+        Array.isArray(prop.example) &&
+        prop.example.length > 0 &&
+        String(prop.example[0]) !== ''
+      ) {
+        defaultExample = String(prop.example[0]);
+      } else if (['listText', 'listInteger'].includes(prop.derivedType ?? '')) {
+        // For list types, use the first valid (non-empty) enum
+        // option as the fallback.
+        const firstValid = prop.enum?.find(
+          (item) => item.value !== '' && item.label !== '',
+        );
+        if (firstValid) {
+          defaultExample = String(firstValid.value);
+        }
+      } else if (prop.derivedType === 'link') {
+        const linkType =
+          prop.format && prop.format in linkFormatMap
+            ? linkFormatMap[prop.format as keyof typeof linkFormatMap]
+            : 'relative';
+        defaultExample = DEFAULT_LINK_EXAMPLES[linkType];
+      } else if (prop.derivedType === 'date') {
+        defaultExample = DEFAULT_EXAMPLES[prop.format ?? 'date'] ?? '';
+      } else {
+        defaultExample = DEFAULT_EXAMPLES[prop.derivedType ?? ''] ?? '';
+      }
+    }
+    updates.example = defaultExample;
+    updates.valueMode = undefined;
+    updates.limitedCount = undefined;
+  }
+
+  return updates;
+}
+
 export default function Props() {
   const dispatch = useAppDispatch();
   const props = useAppSelector(selectCodeComponentProperty('props'));
@@ -102,8 +226,8 @@ export default function Props() {
   }, [componentStatus, initialPropIds]);
 
   /**
-   * Helper function to create a new array with the specified count,
-   * preserving existing values and filling new slots with default value.
+   * Create a new array with the specified count, preserving existing values and
+   * filling new slots with default value.
    */
   const createArrayWithCount = (
     currentExample: unknown,
@@ -118,7 +242,7 @@ export default function Props() {
   };
 
   /**
-   * Helper function to update both limitedCount and example array for a prop.
+   * Update both limitedCount and example array for a prop.
    */
   const updateLimitedCount = (
     propId: string,
@@ -141,15 +265,10 @@ export default function Props() {
       ) as string[] | number[];
     }
 
-    dispatch(
-      updateProp({
-        id: propId,
-        updates: {
-          limitedCount: newCount,
-          example: newExample,
-        },
-      }),
-    );
+    dispatchUpdateProp(dispatch, propId, {
+      limitedCount: newCount,
+      example: newExample,
+    });
   };
 
   const handleAddProp = () => {
@@ -166,6 +285,13 @@ export default function Props() {
 
   const renderPropContent = (prop: CodeComponentProp) => {
     const propName = getPropMachineName(prop.name);
+    const isRequired = required.includes(propName);
+    const isListType = ['listText', 'listInteger'].includes(
+      prop.derivedType ?? '',
+    );
+    const isMediaType =
+      prop.derivedType === 'image' || prop.derivedType === 'video';
+
     return (
       <Flex direction="column" flexGrow="1">
         <Flex mb="4" gap="4" align="end" width="100%" wrap="wrap">
@@ -179,12 +305,9 @@ export default function Props() {
                 value={prop.name}
                 size="1"
                 onChange={(e) =>
-                  dispatch(
-                    updateProp({
-                      id: prop.id,
-                      updates: { name: e.target.value },
-                    }),
-                  )
+                  dispatchUpdateProp(dispatch, prop.id, {
+                    name: e.target.value,
+                  })
                 }
                 disabled={disabledPropIds.has(prop.id)}
               />
@@ -201,7 +324,6 @@ export default function Props() {
                     (item) => item.type === value,
                   );
                   if (selectedPropType) {
-                    const isRequired = required.includes(propName);
                     const isImageOrVideo =
                       value === 'image' || value === 'video';
                     // Default examples for image and video are handled in their own components
@@ -211,35 +333,30 @@ export default function Props() {
                       isRequired && !isImageOrVideo
                         ? DEFAULT_EXAMPLES[value]
                         : '';
-                    dispatch(
-                      updateProp({
-                        id: prop.id,
-                        updates: {
-                          derivedType: value,
-                          $ref: undefined,
-                          format: undefined,
-                          // Explicitly clear type-specific fields so they are not
-                          // carried over from a previously selected prop type.
-                          // When adding a new prop type with type-specific fields,
-                          // add those fields here explicitly so they are cleared
-                          // when switching away from that type.
-                          contentMediaType: undefined,
-                          'x-formatting-context': undefined,
-                          example: defaultExample,
-                          allowMultiple: false,
-                          items: undefined,
-                          valueMode: undefined,
-                          limitedCount: undefined,
-                          ...selectedPropType.init,
-                          // Override the enum value from ...selectedPropType.init if the prop is required
-                          // to have it prefilled with a default option.
-                          enum:
-                            isRequired && DEFAULT_ENUM_OPTIONS[value]
-                              ? [DEFAULT_ENUM_OPTIONS[value]]
-                              : selectedPropType.init.enum,
-                        } as Partial<CodeComponentProp>,
-                      }),
-                    );
+                    dispatchUpdateProp(dispatch, prop.id, {
+                      derivedType: value,
+                      $ref: undefined,
+                      format: undefined,
+                      // Explicitly clear type-specific fields so they are not
+                      // carried over from a previously selected prop type.
+                      // When adding a new prop type with type-specific fields,
+                      // add those fields here explicitly so they are cleared
+                      // when switching away from that type.
+                      contentMediaType: undefined,
+                      'x-formatting-context': undefined,
+                      example: defaultExample,
+                      allowMultiple: false,
+                      items: undefined,
+                      valueMode: undefined,
+                      limitedCount: undefined,
+                      ...selectedPropType.init,
+                      // Override the enum value from ...selectedPropType.init if the prop is required
+                      // to have it prefilled with a default option.
+                      enum:
+                        isRequired && DEFAULT_ENUM_OPTIONS[value]
+                          ? [DEFAULT_ENUM_OPTIONS[value]]
+                          : selectedPropType.init.enum,
+                    } as Partial<CodeComponentProp>);
                   }
                 }}
                 // Disable changing type if component is exposed and prop existed when loaded.
@@ -261,7 +378,7 @@ export default function Props() {
             <Label htmlFor={`prop-required-${prop.id}`}>Required</Label>
             <Switch
               id={`prop-required-${prop.id}`}
-              checked={required.includes(propName)}
+              checked={isRequired}
               size="1"
               mb="1"
               onCheckedChange={() =>
@@ -291,7 +408,7 @@ export default function Props() {
                       | 'number'
                   }
                   isDisabled={disabledPropIds.has(prop.id)}
-                  required={required.includes(propName)}
+                  required={isRequired}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
                 />
@@ -300,7 +417,7 @@ export default function Props() {
                   id={prop.id}
                   type={prop.type as 'string' | 'number' | 'integer'}
                   example={prop.example as string}
-                  required={required.includes(propName)}
+                  required={isRequired}
                 />
               );
             case 'formattedText':
@@ -308,7 +425,7 @@ export default function Props() {
                 <FormPropTypeFormattedText
                   id={prop.id}
                   example={prop.example}
-                  required={required.includes(propName)}
+                  required={isRequired}
                 />
               );
             case 'link':
@@ -318,7 +435,7 @@ export default function Props() {
                   example={prop.example as string | string[]}
                   format={prop.format as string}
                   isDisabled={disabledPropIds.has(prop.id)}
-                  required={required.includes(propName)}
+                  required={isRequired}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -333,7 +450,7 @@ export default function Props() {
                       | CodeComponentPropImageExample
                       | CodeComponentPropImageExample[]
                   }
-                  required={required.includes(propName)}
+                  required={isRequired}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -348,7 +465,7 @@ export default function Props() {
                       | CodeComponentPropVideoExample
                       | CodeComponentPropVideoExample[]
                   }
-                  required={required.includes(propName)}
+                  required={isRequired}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -372,7 +489,7 @@ export default function Props() {
                       | 'integer'
                   }
                   id={prop.id}
-                  required={required.includes(propName)}
+                  required={isRequired}
                   enum={prop.enum || []}
                   example={prop.example as string | string[]}
                   isDisabled={disabledPropIds.has(prop.id)}
@@ -388,7 +505,7 @@ export default function Props() {
                   example={prop.example as string | string[]}
                   format={prop.format as 'date' | 'date-time'}
                   isDisabled={disabledPropIds.has(prop.id)}
-                  required={required.includes(propName)}
+                  required={isRequired}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -416,135 +533,13 @@ export default function Props() {
                 id={`prop-allow-multiple-${prop.id}`}
                 checked={prop.allowMultiple ?? false}
                 onChange={(e) => {
-                  const checked = e.target.checked;
-                  const updates: Partial<CodeComponentProp> = {
-                    allowMultiple: checked,
-                  };
-
-                  if (checked) {
-                    // Convert to array type - for date and link types.
-                    if (['date', 'link'].includes(prop.derivedType ?? '')) {
-                      const isRequired = required.includes(propName);
-                      updates.type = 'array';
-                      updates.items = {
-                        type: 'string',
-                        format: prop.format,
-                      };
-                      // Preserve the current example value for required props
-                      // so the required error doesn't flash during the transition.
-                      updates.example =
-                        isRequired &&
-                        prop.example &&
-                        typeof prop.example === 'string'
-                          ? [prop.example]
-                          : [];
-                      updates.valueMode = VALUE_MODE_UNLIMITED;
-                      updates.limitedCount = 1;
-                    } else if (
-                      ['string', 'integer', 'number'].includes(prop.type)
-                    ) {
-                      const isRequired = required.includes(propName);
-                      // Convert to array type - for primitive types.
-                      updates.type = 'array';
-                      updates.items = {
-                        type: prop.type as 'string' | 'integer' | 'number',
-                      };
-                      // Preserve the current example value for required props
-                      // so the required error doesn't flash during the transition.
-                      updates.example =
-                        isRequired &&
-                        prop.example !== '' &&
-                        prop.example !== undefined
-                          ? ([prop.example] as string[] | number[])
-                          : [];
-                      updates.valueMode = VALUE_MODE_UNLIMITED;
-                      updates.limitedCount = 1;
-                    } else if (prop.type === 'object') {
-                      // Convert to array type - for object types (image/video).
-                      updates.type = 'array';
-                      updates.items = {
-                        type: 'object',
-                        $ref: prop.$ref,
-                      };
-                      // Convert single object to array with that object
-                      // Handle both valid objects and empty strings (which is the initial state)
-                      if (
-                        prop.example &&
-                        typeof prop.example === 'object' &&
-                        !Array.isArray(prop.example) &&
-                        (prop.example as CodeComponentPropImageExample).src
-                      ) {
-                        updates.example = [prop.example] as
-                          | CodeComponentPropImageExample[]
-                          | CodeComponentPropVideoExample[];
-                      } else {
-                        // Start with empty array - FormPropTypeImageArray will handle initialization
-                        updates.example = [];
-                      }
-                      updates.valueMode = 'unlimited';
-                      updates.limitedCount = 1;
-                    }
-                  } else {
-                    // Convert back to single value.
-                    // Restore the original type from items before clearing.
-                    if (prop.items?.type) {
-                      updates.type = prop.items.type as
-                        | 'string'
-                        | 'integer'
-                        | 'number'
-                        | 'boolean'
-                        | 'object';
-                    }
-                    updates.items = undefined;
-                    // If prop is required, try to preserve the first value
-                    // from the current array example so that the user's
-                    // selection survives the single ↔ multi toggle
-                    // round-trip. Fall back to type-specific defaults when
-                    // the array is empty.
-                    const isRequired = required.includes(propName);
-                    let defaultExample = '';
-                    if (isRequired) {
-                      if (
-                        Array.isArray(prop.example) &&
-                        prop.example.length > 0 &&
-                        String(prop.example[0]) !== ''
-                      ) {
-                        defaultExample = String(prop.example[0]);
-                      } else if (
-                        ['listText', 'listInteger'].includes(
-                          prop.derivedType ?? '',
-                        )
-                      ) {
-                        // For list types, use the first valid (non-empty) enum
-                        // option as the fallback.
-                        const firstValid = prop.enum?.find(
-                          (item) => item.value !== '' && item.label !== '',
-                        );
-                        if (firstValid) {
-                          defaultExample = String(firstValid.value);
-                        }
-                      } else if (prop.derivedType === 'link') {
-                        const linkType =
-                          prop.format && prop.format in linkFormatMap
-                            ? linkFormatMap[
-                                prop.format as keyof typeof linkFormatMap
-                              ]
-                            : 'relative';
-                        defaultExample = DEFAULT_LINK_EXAMPLES[linkType];
-                      } else if (prop.derivedType === 'date') {
-                        defaultExample =
-                          DEFAULT_EXAMPLES[prop.format ?? 'date'] ?? '';
-                      } else {
-                        defaultExample =
-                          DEFAULT_EXAMPLES[prop.derivedType ?? ''] ?? '';
-                      }
-                    }
-                    updates.example = defaultExample;
-                    updates.valueMode = undefined;
-                    updates.limitedCount = undefined;
-                  }
-
-                  dispatch(updateProp({ id: prop.id, updates }));
+                  const updates = getMultiValueToggleUpdates(
+                    prop,
+                    e.target.checked,
+                    isRequired,
+                    propName,
+                  );
+                  dispatchUpdateProp(dispatch, prop.id, updates);
                 }}
                 disabled={disabledPropIds.has(prop.id)}
               />
@@ -574,10 +569,7 @@ export default function Props() {
 
                       // For complex object types (video, image), we need to preserve
                       // existing objects or use an empty array.
-                      if (
-                        prop.derivedType === 'video' ||
-                        prop.derivedType === 'image'
-                      ) {
+                      if (isMediaType) {
                         const exampleArray = Array.isArray(prop.example)
                           ? prop.example
                           : [];
@@ -591,7 +583,7 @@ export default function Props() {
                       }
                     }
 
-                    dispatch(updateProp({ id: prop.id, updates }));
+                    dispatchUpdateProp(dispatch, prop.id, updates);
                   }}
                   disabled={disabledPropIds.has(prop.id)}
                 >
@@ -610,169 +602,110 @@ export default function Props() {
                 </Select.Root>
 
                 {/* Counter for limited mode */}
-                {prop.valueMode === VALUE_MODE_LIMITED && (
-                  <Box className="props-limited-box">
-                    <TextField.Root
-                      autoComplete="off"
-                      id={`prop-limited-count-${prop.id}`}
-                      type="number"
-                      value={prop.limitedCount ?? 2}
-                      size="1"
-                      min={2}
-                      max={
-                        ['listText', 'listInteger'].includes(
-                          prop.derivedType ?? '',
-                        )
-                          ? (prop.enum?.filter(
-                              (item) => item.value !== '' && item.label !== '',
-                            ).length ?? undefined)
-                          : undefined
-                      }
-                      className="props-textfield-root"
-                      onChange={(e) => {
-                        // For list types, max limit is the number of enum options
-                        const maxLimit = ['listText', 'listInteger'].includes(
-                          prop.derivedType ?? '',
-                        )
-                          ? (prop.enum?.filter(
-                              (item) => item.value !== '' && item.label !== '',
-                            ).length ?? Infinity)
-                          : Infinity;
-                        const newCount = Math.min(
-                          maxLimit,
-                          Math.max(2, Number(e.target.value)),
-                        );
-                        // Use empty string as default to match single-value component behavior
-                        // (no default value unless explicitly set or required)
-                        updateLimitedCount(
-                          prop.id,
-                          prop.example,
-                          newCount,
-                          '',
-                          prop.derivedType,
-                        );
-                      }}
-                      disabled={disabledPropIds.has(prop.id)}
-                    >
-                      <TextField.Slot side="right">
-                        <Flex gap="0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentCount = prop.limitedCount ?? 2;
-                              if (currentCount <= 2) return;
-                              const newCount = currentCount - 1;
-                              // Use empty string as default to match single-value component behavior
-                              // (no default value unless explicitly set or required)
-                              updateLimitedCount(
-                                prop.id,
-                                prop.example,
-                                newCount,
-                                '',
-                              );
-                            }}
-                            disabled={
-                              disabledPropIds.has(prop.id) ||
-                              (prop.limitedCount ?? 2) <= 2
-                            }
-                            aria-label="Decrease count"
-                            style={{
-                              border: 'none',
-                              background: 'transparent',
-                              cursor:
-                                (prop.limitedCount ?? 2) <= 2
-                                  ? 'not-allowed'
-                                  : 'pointer',
-                              padding: '2px 6px',
-                              opacity: (prop.limitedCount ?? 2) <= 2 ? 0.5 : 1,
-                            }}
-                          >
-                            −
-                          </button>
-                          <span className="props-divider" />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentCount = prop.limitedCount ?? 2;
-                              // For list types, max limit is the number of enum options
-                              const maxLimit = [
-                                'listText',
-                                'listInteger',
-                              ].includes(prop.derivedType ?? '')
-                                ? (prop.enum?.filter(
-                                    (item) =>
-                                      item.value !== '' && item.label !== '',
-                                  ).length ?? Infinity)
-                                : Infinity;
-                              if (currentCount >= maxLimit) return;
-                              const newCount = currentCount + 1;
-                              // Use empty string as default to match single-value component behavior
-                              // (no default value unless explicitly set or required)
-                              updateLimitedCount(
-                                prop.id,
-                                prop.example,
-                                newCount,
-                                '',
-                              );
-                            }}
-                            disabled={(() => {
-                              const maxLimit = [
-                                'listText',
-                                'listInteger',
-                              ].includes(prop.derivedType ?? '')
-                                ? (prop.enum?.filter(
-                                    (item) =>
-                                      item.value !== '' && item.label !== '',
-                                  ).length ?? Infinity)
-                                : Infinity;
-                              return (
-                                disabledPropIds.has(prop.id) ||
-                                (prop.limitedCount ?? 2) >= maxLimit
-                              );
-                            })()}
-                            aria-label="Increase count"
-                            style={{
-                              border: 'none',
-                              background: 'transparent',
-                              cursor: (() => {
-                                const maxLimit = [
-                                  'listText',
-                                  'listInteger',
-                                ].includes(prop.derivedType ?? '')
-                                  ? (prop.enum?.filter(
-                                      (item) =>
-                                        item.value !== '' && item.label !== '',
-                                    ).length ?? Infinity)
-                                  : Infinity;
-                                return disabledPropIds.has(prop.id) ||
-                                  (prop.limitedCount ?? 2) >= maxLimit
-                                  ? 'not-allowed'
-                                  : 'pointer';
-                              })(),
-                              padding: '2px 6px',
-                              opacity: (() => {
-                                const maxLimit = [
-                                  'listText',
-                                  'listInteger',
-                                ].includes(prop.derivedType ?? '')
-                                  ? (prop.enum?.filter(
-                                      (item) =>
-                                        item.value !== '' && item.label !== '',
-                                    ).length ?? Infinity)
-                                  : Infinity;
-                                return (prop.limitedCount ?? 2) >= maxLimit
-                                  ? 0.5
-                                  : 1;
-                              })(),
-                            }}
-                          >
-                            +
-                          </button>
-                        </Flex>
-                      </TextField.Slot>
-                    </TextField.Root>
-                  </Box>
-                )}
+                {prop.valueMode === VALUE_MODE_LIMITED &&
+                  (() => {
+                    const maxLimit = getMaxLimitForListType(prop);
+                    const currentCount = prop.limitedCount ?? 2;
+                    const isAtMin = currentCount <= 2;
+                    const isAtMax = currentCount >= maxLimit;
+
+                    return (
+                      <Box className="props-limited-box">
+                        <TextField.Root
+                          autoComplete="off"
+                          id={`prop-limited-count-${prop.id}`}
+                          type="number"
+                          value={currentCount}
+                          size="1"
+                          min={2}
+                          max={
+                            isListType
+                              ? (prop.enum?.filter(
+                                  (item) =>
+                                    item.value !== '' && item.label !== '',
+                                ).length ?? undefined)
+                              : undefined
+                          }
+                          className="props-textfield-root"
+                          onChange={(e) => {
+                            // For list types, max limit is the number of enum options
+                            const newCount = Math.min(
+                              maxLimit,
+                              Math.max(2, Number(e.target.value)),
+                            );
+                            // Use empty string as default to match single-value component behavior
+                            // (no default value unless explicitly set or required)
+                            updateLimitedCount(
+                              prop.id,
+                              prop.example,
+                              newCount,
+                              '',
+                              prop.derivedType,
+                            );
+                          }}
+                          disabled={disabledPropIds.has(prop.id)}
+                        >
+                          <TextField.Slot side="right">
+                            <Flex gap="0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isAtMin) return;
+                                  // Use empty string as default to match single-value component behavior
+                                  // (no default value unless explicitly set or required)
+                                  updateLimitedCount(
+                                    prop.id,
+                                    prop.example,
+                                    currentCount - 1,
+                                  );
+                                }}
+                                disabled={
+                                  disabledPropIds.has(prop.id) || isAtMin
+                                }
+                                aria-label="Decrease count"
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: isAtMin ? 'not-allowed' : 'pointer',
+                                  padding: '2px 6px',
+                                  opacity: isAtMin ? 0.5 : 1,
+                                }}
+                              >
+                                −
+                              </button>
+                              <span className="props-divider" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isAtMax) return;
+                                  // Use empty string as default to match single-value component behavior
+                                  // (no default value unless explicitly set or required)
+                                  updateLimitedCount(
+                                    prop.id,
+                                    prop.example,
+                                    currentCount + 1,
+                                  );
+                                }}
+                                disabled={
+                                  disabledPropIds.has(prop.id) || isAtMax
+                                }
+                                aria-label="Increase count"
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: isAtMax ? 'not-allowed' : 'pointer',
+                                  padding: '2px 6px',
+                                  opacity: isAtMax ? 0.5 : 1,
+                                }}
+                              >
+                                +
+                              </button>
+                            </Flex>
+                          </TextField.Slot>
+                        </TextField.Root>
+                      </Box>
+                    );
+                  })()}
               </Flex>
             )}
           </Flex>
