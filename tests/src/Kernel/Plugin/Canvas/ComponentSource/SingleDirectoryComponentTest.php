@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
@@ -24,6 +23,7 @@ use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\GeneratedUrl;
 use Drupal\Core\StreamWrapper\PublicStream;
+use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\Core\Plugin\Component as SdcPlugin;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
