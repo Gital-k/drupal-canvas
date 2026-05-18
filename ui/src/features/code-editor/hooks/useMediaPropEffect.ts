@@ -77,19 +77,8 @@ export function useMediaPropEffect<
   );
   const [localRequired, setLocalRequired] = useState(required);
 
-  // Use a ref to track the previous values of the UI-controlled inputs (aspectRatio,
-  // pixelDensity) and the multi-value settings (allowMultiple, valueMode, limitedCount).
-  //
-  // Why this is needed to prevent an infinite loop:
-  //   1. The main useEffect below reads these values and dispatches `updateProp`, which
-  //      writes a new `example` object/array back into the Redux store.
-  //   2. `example` is a dependency of that same effect (needed to build the correct
-  //      multi-value array in unlimited mode).
-  //   3. Without a guard, each dispatch → new `example` reference → effect re-runs →
-  //      another dispatch → … repeating forever.
-  //
-  // By comparing the current UI-input values against the ref before dispatching, the
-  // effect exits early when nothing the user actually changed, breaking the cycle.
+  // Track previous UI-controlled values to avoid re-triggering the effect
+  // when only the derived `example` reference changes after a dispatch.
   const prevValuesRef = useRef({
     aspectRatio: parsed.aspectRatio,
     pixelDensity: parsed.pixelDensity ?? defaultPixelDensity,
