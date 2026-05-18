@@ -1,39 +1,28 @@
 import { useMemo, useState } from 'react';
+
 import clsx from 'clsx';
 import { Box, Flex, Select, TextField } from '@radix-ui/themes';
 
+
+
 import { useAppDispatch } from '@/app/hooks';
-import {
-  Divider,
-  FormElement,
-  Label,
-  RequiredFieldError,
-} from '@/features/code-editor/component-data/FormElement';
+import { Divider, FormElement, Label, RequiredFieldError } from '@/features/code-editor/component-data/FormElement';
 import { PropValuesSortableList } from '@/features/code-editor/component-data/forms/PropValuesSortableList';
 import { DEFAULT_EXAMPLES } from '@/features/code-editor/component-data/Props';
 import { useMultiValueValidation } from '@/features/code-editor/hooks/useMultiValueValidation';
-import {
-  useRequiredProp,
-  useSyncRequiredArrayError,
-} from '@/features/code-editor/hooks/useRequiredProp';
-import {
-  createArrayDragEndHandler,
-  createDisplayArray,
-  dispatchUpdateProp,
-  handleArrayAdd,
-  handleArrayRemove,
-  handleArrayValueChange,
-  hasNonEmptyArrayValue,
-} from '@/features/code-editor/utils/arrayPropUtils';
+import { useRequiredProp, useSyncRequiredArrayError } from '@/features/code-editor/hooks/useRequiredProp';
+import { createArrayDragEndHandler, createDisplayArray, dispatchUpdateProp, handleArrayAdd, handleArrayRemove, handleArrayValueChange, hasNonEmptyArrayValue } from '@/features/code-editor/utils/arrayPropUtils';
 import { VALUE_MODE_UNLIMITED } from '@/types/CodeComponent';
-import {
-  localTimeToUtcConversion,
-  utcToLocalTimeConversion,
-} from '@/utils/date-utils';
+import { localTimeToUtcConversion, utcToLocalTimeConversion } from '@/utils/date-utils';
+
+
 
 import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
 
+
+
 import styles from '@/features/code-editor/component-data/FormElement.module.css';
+
 
 export default function FormPropTypeDate({
   id,
@@ -46,7 +35,7 @@ export default function FormPropTypeDate({
   limitedCount = 1,
 }: Pick<CodeComponentProp, 'id'> & {
   example: string | string[];
-  format: string;
+  format: 'date' | 'date-time';
   isDisabled?: boolean;
   required: boolean;
   allowMultiple?: boolean;
@@ -54,14 +43,13 @@ export default function FormPropTypeDate({
   limitedCount?: number;
 }) {
   const dispatch = useAppDispatch();
-  // @ts-ignore
   const [dateType, setDateType] = useState<'date' | 'date-time'>(format);
   const [isExampleValueValid, setIsExampleValueValid] = useState(true);
 
   // The datetime format the server requires is in UTC ISO string, but the input element of type "datetime-local"
   // requires a local datetime format. We need to convert between these two formats.
-  const [datetimeLocalForInput, setDatetimeLocalForInput] = useState(
-    utcToLocalTimeConversion(typeof example === 'string' ? example : ''),
+  const datetimeLocalForInput = utcToLocalTimeConversion(
+    typeof example === 'string' ? example : '',
   );
 
   // For multiple values mode
@@ -151,9 +139,6 @@ export default function FormPropTypeDate({
           example: defaultValue,
           format: dateType,
         });
-        if (dateType === 'date-time') {
-          setDatetimeLocalForInput(utcToLocalTimeConversion(defaultValue));
-        }
       }
     },
     [dispatch, id, dateType, allowMultiple],
@@ -197,11 +182,6 @@ export default function FormPropTypeDate({
                 example: newDefaultValue,
                 format: value,
               });
-              if (value === 'date-time') {
-                setDatetimeLocalForInput(
-                  utcToLocalTimeConversion(newDefaultValue),
-                );
-              }
             }
           }}
           size="1"
@@ -238,9 +218,6 @@ export default function FormPropTypeDate({
                 example: convertedValue,
                 format: dateType,
               });
-              if (dateType === 'date-time') {
-                setDatetimeLocalForInput(value);
-              }
             }}
             onBlur={(e) => {
               setIsExampleValueValid(e.target.validity.valid);
