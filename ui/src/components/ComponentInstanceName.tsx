@@ -4,7 +4,7 @@
  * A small text input that lets a Content Creator give a per-instance label
  * ("Layer name") to a single component on a Canvas page. The label shows up
  * in the Layers panel in place of the generic component-type name, so
- * sitebuilders can tell e.g. five Section Wrappers apart.
+ * site builders can tell e.g. five Section Wrappers apart.
  *
  * Renders only when exactly one component is selected. Reads from and writes
  * directly to Redux — `node.name` on the ComponentNode in the layout slice.

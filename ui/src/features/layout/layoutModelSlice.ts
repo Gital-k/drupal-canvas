@@ -242,7 +242,7 @@ export const layoutModelSlice = createSlice({
      * Trims whitespace; an empty/whitespace-only string is stored as null so
      * the display falls back to the component-type name. Flags
      * `updatePreview` so the next render of <Preview/> triggers the POST that
-     * persists the rename via the autosave hash.
+     * persists the rename via the auto-save hash.
      *
      * Refs: Drupal.org issue #3527952.
      */
@@ -260,8 +260,8 @@ export const layoutModelSlice = createSlice({
         // Canonical "no name" is null (matches the OpenAPI contract:
         // LayoutComponent.name has type [string, "null"]).
         node.name = trimmed ? trimmed : null;
-        // Flag a preview update so the change is persisted via autosave.
-        // The rendered HTML is unaffected by `name`, but the autosave POST
+        // Flag a preview update so the change is persisted via auto-save.
+        // The rendered HTML is unaffected by `name`, but the auto-save POST
         // is what carries the rename to the server.
         state.updatePreview = true;
       },

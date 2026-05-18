@@ -427,7 +427,7 @@ describe('Set component name', () => {
     expect(node.name).to.equal(null);
   });
 
-  it('Flags updatePreview so the autosave POST is scheduled', () => {
+  it('Flags updatePreview so the auto-save POST is scheduled', () => {
     // Start from a clean updatePreview=false state.
     const stateAfterReset = { ...layout, updatePreview: false };
     const state = layoutModelSlice.reducer(

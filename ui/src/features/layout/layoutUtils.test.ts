@@ -17,8 +17,8 @@ import type { ComponentsList } from '@/types/Component';
 // `metadata.slots[...]` off the registered component, so we don't need to
 // satisfy the full BaseComponent shape.
 const componentsRegistry = {
-  'bcsao_mercury:bcsao-section-wrapper': {
-    name: 'BCSAO Section Wrapper',
+  'test_module:section_wrapper': {
+    name: 'Section Wrapper',
     metadata: {
       slots: {
         content: { title: 'Section content' },
@@ -33,7 +33,7 @@ function makeComponentNode(
   return {
     nodeType: NodeType.Component,
     uuid: 'uuid-1',
-    type: 'bcsao_mercury:bcsao-section-wrapper',
+    type: 'test_module:section_wrapper',
     slots: [],
     ...overrides,
   };
@@ -51,21 +51,21 @@ describe('getDisplayNameForNode', () => {
     it('falls back to component-type name when name is undefined', () => {
       const node = makeComponentNode(); // no name
       expect(getDisplayNameForNode(node, null, componentsRegistry)).toBe(
-        'BCSAO Section Wrapper',
+        'Section Wrapper',
       );
     });
 
     it('falls back to component-type name when name is null', () => {
       const node = makeComponentNode({ name: null });
       expect(getDisplayNameForNode(node, null, componentsRegistry)).toBe(
-        'BCSAO Section Wrapper',
+        'Section Wrapper',
       );
     });
 
     it('falls back to component-type name when name is an empty string', () => {
       const node = makeComponentNode({ name: '' });
       expect(getDisplayNameForNode(node, null, componentsRegistry)).toBe(
-        'BCSAO Section Wrapper',
+        'Section Wrapper',
       );
     });
 
@@ -78,10 +78,10 @@ describe('getDisplayNameForNode', () => {
 
     it('strips the @version suffix from the component type when resolving', () => {
       const node = makeComponentNode({
-        type: 'bcsao_mercury:bcsao-section-wrapper@abc123',
+        type: 'test_module:section_wrapper@abc123',
       });
       expect(getDisplayNameForNode(node, null, componentsRegistry)).toBe(
-        'BCSAO Section Wrapper',
+        'Section Wrapper',
       );
     });
   });
@@ -126,7 +126,7 @@ function makeSectionWrapper(uuid: string): ComponentNode {
   return {
     nodeType: NodeType.Component,
     uuid,
-    type: 'bcsao_mercury:bcsao-section-wrapper',
+    type: 'test_module:section_wrapper',
     slots: [],
   };
 }
@@ -135,7 +135,7 @@ function makeHero(uuid: string): ComponentNode {
   return {
     nodeType: NodeType.Component,
     uuid,
-    type: 'bcsao_mercury:bcsao-hero',
+    type: 'test_module:hero',
     slots: [],
   };
 }
@@ -159,13 +159,13 @@ describe('getComponentTypeIndex', () => {
       ]),
     ];
     expect(
-      getComponentTypeIndex(layout, 'a', 'bcsao_mercury:bcsao-section-wrapper'),
+      getComponentTypeIndex(layout, 'a', 'test_module:section_wrapper'),
     ).toBe(1);
     expect(
-      getComponentTypeIndex(layout, 'b', 'bcsao_mercury:bcsao-section-wrapper'),
+      getComponentTypeIndex(layout, 'b', 'test_module:section_wrapper'),
     ).toBe(2);
     expect(
-      getComponentTypeIndex(layout, 'c', 'bcsao_mercury:bcsao-section-wrapper'),
+      getComponentTypeIndex(layout, 'c', 'test_module:section_wrapper'),
     ).toBe(3);
   });
 
@@ -180,11 +180,9 @@ describe('getComponentTypeIndex', () => {
       ]),
     ];
     expect(
-      getComponentTypeIndex(layout, 'b', 'bcsao_mercury:bcsao-section-wrapper'),
+      getComponentTypeIndex(layout, 'b', 'test_module:section_wrapper'),
     ).toBe(2);
-    expect(
-      getComponentTypeIndex(layout, 'h2', 'bcsao_mercury:bcsao-hero'),
-    ).toBe(2);
+    expect(getComponentTypeIndex(layout, 'h2', 'test_module:hero')).toBe(2);
   });
 
   it('counts across regions (per-page scope, not per-region)', () => {
@@ -193,7 +191,7 @@ describe('getComponentTypeIndex', () => {
       makeRegion([makeSectionWrapper('c')]),
     ];
     expect(
-      getComponentTypeIndex(layout, 'c', 'bcsao_mercury:bcsao-section-wrapper'),
+      getComponentTypeIndex(layout, 'c', 'test_module:section_wrapper'),
     ).toBe(3);
   });
 
@@ -202,7 +200,7 @@ describe('getComponentTypeIndex', () => {
     const outer: ComponentNode = {
       nodeType: NodeType.Component,
       uuid: 'outer',
-      type: 'bcsao_mercury:bcsao-section-wrapper',
+      type: 'test_module:section_wrapper',
       slots: [
         {
           nodeType: NodeType.Slot,
@@ -214,18 +212,10 @@ describe('getComponentTypeIndex', () => {
     };
     const layout = [makeRegion([outer])];
     expect(
-      getComponentTypeIndex(
-        layout,
-        'outer',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex(layout, 'outer', 'test_module:section_wrapper'),
     ).toBe(1);
     expect(
-      getComponentTypeIndex(
-        layout,
-        'inner',
-        'bcsao_mercury:bcsao-section-wrapper',
-      ),
+      getComponentTypeIndex(layout, 'inner', 'test_module:section_wrapper'),
     ).toBe(2);
   });
 
@@ -234,11 +224,7 @@ describe('getComponentTypeIndex', () => {
       makeRegion([makeSectionWrapper('a'), makeSectionWrapper('b')]),
     ];
     expect(
-      getComponentTypeIndex(
-        layout,
-        'b',
-        'bcsao_mercury:bcsao-section-wrapper@abc123',
-      ),
+      getComponentTypeIndex(layout, 'b', 'test_module:section_wrapper@abc123'),
     ).toBe(2);
   });
 
@@ -251,10 +237,10 @@ describe('getComponentTypeIndex', () => {
       ]),
     ];
     expect(
-      getComponentTypeIndex(layout, 'a', 'bcsao_mercury:bcsao-section-wrapper'),
+      getComponentTypeIndex(layout, 'a', 'test_module:section_wrapper'),
     ).toBe(1);
     expect(
-      getComponentTypeIndex(layout, 'c', 'bcsao_mercury:bcsao-section-wrapper'),
+      getComponentTypeIndex(layout, 'c', 'test_module:section_wrapper'),
     ).toBe(3);
   });
 
@@ -264,15 +250,15 @@ describe('getComponentTypeIndex', () => {
       getComponentTypeIndex(
         layout,
         'no-such-uuid',
-        'bcsao_mercury:bcsao-section-wrapper',
+        'test_module:section_wrapper',
       ),
     ).toBe(0);
   });
 
   it('returns 0 against an empty layout', () => {
-    expect(
-      getComponentTypeIndex([], 'a', 'bcsao_mercury:bcsao-section-wrapper'),
-    ).toBe(0);
+    expect(getComponentTypeIndex([], 'a', 'test_module:section_wrapper')).toBe(
+      0,
+    );
   });
 });
 
@@ -284,13 +270,13 @@ describe('getDisplayNameForNode with layout (auto-numbered fallback)', () => {
     const layout = [makeRegion([a, b, c])];
 
     expect(getDisplayNameForNode(a, null, componentsRegistry, layout)).toBe(
-      'BCSAO Section Wrapper 1',
+      'Section Wrapper 1',
     );
     expect(getDisplayNameForNode(b, null, componentsRegistry, layout)).toBe(
-      'BCSAO Section Wrapper 2',
+      'Section Wrapper 2',
     );
     expect(getDisplayNameForNode(c, null, componentsRegistry, layout)).toBe(
-      'BCSAO Section Wrapper 3',
+      'Section Wrapper 3',
     );
   });
 
@@ -314,17 +300,17 @@ describe('getDisplayNameForNode with layout (auto-numbered fallback)', () => {
     // Unnamed siblings keep their position-based numbers — they do not renumber
     // around the named one.
     expect(getDisplayNameForNode(a, null, componentsRegistry, layout)).toBe(
-      'BCSAO Section Wrapper 1',
+      'Section Wrapper 1',
     );
     expect(getDisplayNameForNode(c, null, componentsRegistry, layout)).toBe(
-      'BCSAO Section Wrapper 3',
+      'Section Wrapper 3',
     );
   });
 
   it('omits the index when no layout is provided (backward-compat fallback)', () => {
     const a = makeSectionWrapper('a');
     expect(getDisplayNameForNode(a, null, componentsRegistry)).toBe(
-      'BCSAO Section Wrapper',
+      'Section Wrapper',
     );
   });
 
@@ -333,6 +319,6 @@ describe('getDisplayNameForNode with layout (auto-numbered fallback)', () => {
     const layout = [makeRegion([makeSectionWrapper('a')])];
     expect(
       getDisplayNameForNode(orphan, null, componentsRegistry, layout),
-    ).toBe('BCSAO Section Wrapper');
+    ).toBe('Section Wrapper');
   });
 });
