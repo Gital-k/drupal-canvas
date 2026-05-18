@@ -36,7 +36,6 @@ use Drupal\Core\Field\Plugin\Field\FieldType\PasswordItem;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinitionInterface;
 use Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser;
 use Drupal\Core\ProxyClass\File\MimeType\ExtensionMimeTypeGuesser as LazyExtensionMimeTypeGuesser;
-use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
 use Drupal\Core\TypedData\DataReferenceTargetDefinition;
@@ -1255,7 +1254,7 @@ final class EntityFieldPropSourceMatcher {
   }
 
   private static function componentPluginManager(): CanvasComponentPluginManager {
-    $manager = \Drupal::service(ComponentPluginManager::class);
+    $manager = \Drupal::service(CanvasComponentPluginManager::class);
     \assert($manager instanceof CanvasComponentPluginManager);
     return $manager;
   }
