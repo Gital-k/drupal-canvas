@@ -23,7 +23,6 @@ use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\GeneratedUrl;
 use Drupal\Core\StreamWrapper\PublicStream;
-use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\Core\Plugin\Component as SdcPlugin;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
@@ -7228,7 +7227,7 @@ HTML
 
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
     /** @var \Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface */
-    return \Drupal::service(ComponentPluginManager::class);
+    return \Drupal::service('plugin.manager.sdc');
   }
 
   /**
@@ -7687,7 +7686,7 @@ HTML
     // Swap in the broken version of this class.
     // @see ::triggerBrokenComponent()
     // @see ::testIsBroken()
-    $container->getDefinition(ComponentPluginManager::class)->setClass(BrokenComponentManager::class);
+    $container->getDefinition('plugin.manager.sdc')->setClass(BrokenComponentManager::class);
   }
 
   protected function getExpectedVerboseErrorMessage(): string {
