@@ -1,28 +1,39 @@
 import { useMemo, useState } from 'react';
-
 import clsx from 'clsx';
 import { Box, Flex, Select, TextField } from '@radix-ui/themes';
 
-
-
 import { useAppDispatch } from '@/app/hooks';
-import { Divider, FormElement, Label, RequiredFieldError } from '@/features/code-editor/component-data/FormElement';
+import {
+  Divider,
+  FormElement,
+  Label,
+  RequiredFieldError,
+} from '@/features/code-editor/component-data/FormElement';
 import { PropValuesSortableList } from '@/features/code-editor/component-data/forms/PropValuesSortableList';
 import { DEFAULT_EXAMPLES } from '@/features/code-editor/component-data/Props';
 import { useMultiValueValidation } from '@/features/code-editor/hooks/useMultiValueValidation';
-import { useRequiredProp, useSyncRequiredArrayError } from '@/features/code-editor/hooks/useRequiredProp';
-import { createArrayDragEndHandler, createDisplayArray, dispatchUpdateProp, handleArrayAdd, handleArrayRemove, handleArrayValueChange, hasNonEmptyArrayValue } from '@/features/code-editor/utils/arrayPropUtils';
+import {
+  useRequiredProp,
+  useSyncRequiredArrayError,
+} from '@/features/code-editor/hooks/useRequiredProp';
+import {
+  createArrayDragEndHandler,
+  createDisplayArray,
+  dispatchUpdateProp,
+  handleArrayAdd,
+  handleArrayRemove,
+  handleArrayValueChange,
+  hasNonEmptyArrayValue,
+} from '@/features/code-editor/utils/arrayPropUtils';
 import { VALUE_MODE_UNLIMITED } from '@/types/CodeComponent';
-import { localTimeToUtcConversion, utcToLocalTimeConversion } from '@/utils/date-utils';
-
-
+import {
+  localTimeToUtcConversion,
+  utcToLocalTimeConversion,
+} from '@/utils/date-utils';
 
 import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
 
-
-
 import styles from '@/features/code-editor/component-data/FormElement.module.css';
-
 
 export default function FormPropTypeDate({
   id,
@@ -53,7 +64,6 @@ export default function FormPropTypeDate({
   );
 
   // For multiple values mode
-  // Memoize to prevent unnecessary recomputations
   const displayArray = useMemo(
     () =>
       createDisplayArray(
@@ -72,12 +82,12 @@ export default function FormPropTypeDate({
   const { validityStates, setValidity, resetValidityStates } =
     useMultiValueValidation(displayArray, () => true, valueMode, limitedCount);
 
-  const handleAdd = () => {
+  const handleMultiValueAdd = () => {
     handleArrayAdd(displayArray, dispatch, id, '', { format: dateType });
     resetValidityStates([...validityStates, true]);
   };
 
-  const handleRemove = (index: number) => {
+  const handleMultiValueRemove = (index: number) => {
     handleArrayRemove(displayArray, dispatch, id, index, { format: dateType });
     resetValidityStates(validityStates.filter((_, i) => i !== index));
   };
@@ -101,7 +111,7 @@ export default function FormPropTypeDate({
     setValidity(index, e.target.validity.valid);
   };
 
-  const renderInputField = (index: number) => (
+  const renderInputFieldInMulti = (index: number) => (
     <Box flexGrow="1">
       <TextField.Root
         data-testid={`array-prop-value-${id}-${index}`}
@@ -129,17 +139,10 @@ export default function FormPropTypeDate({
     required,
     allowMultiple ? (hasNonEmptyValue ? 'non-empty' : '') : example,
     () => {
-      if (allowMultiple) {
-        dispatchUpdateProp(dispatch, id, {
-          example: [defaultValue],
-          format: dateType,
-        });
-      } else {
-        dispatchUpdateProp(dispatch, id, {
-          example: defaultValue,
-          format: dateType,
-        });
-      }
+      dispatchUpdateProp(dispatch, id, {
+        example: allowMultiple ? [defaultValue] : defaultValue,
+        format: dateType,
+      });
     },
     [dispatch, id, dateType, allowMultiple],
   );
@@ -198,54 +201,64 @@ export default function FormPropTypeDate({
       <FormElement>
         <Label htmlFor={`prop-example-${id}`}>Example value</Label>
         {!allowMultiple && (
-          <TextField.Root
-            id={`prop-example-${id}`}
-            size="1"
-            value={
-              dateType === 'date' ? (example as string) : datetimeLocalForInput
-            }
-            type={dateType === 'date' ? 'date' : 'datetime-local'}
-            onChange={(e) => {
-              const value = e.target.value;
-              // Show/hide error based on whether field is empty while required
-              setShowRequiredError(required && !value);
-              // Convert the datetime-local value to UTC ISO string for the server.
-              const convertedValue =
-                dateType === 'date-time'
-                  ? localTimeToUtcConversion(value)
-                  : value;
-              dispatchUpdateProp(dispatch, id, {
-                example: convertedValue,
-                format: dateType,
-              });
-            }}
-            onBlur={(e) => {
-              setIsExampleValueValid(e.target.validity.valid);
-            }}
-            className={clsx({
-              [styles.error]: !isExampleValueValid || showRequiredError,
-            })}
-            {...(!isExampleValueValid || showRequiredError
-              ? { 'data-invalid-prop-value': true }
-              : {})}
-          />
+          <>
+            <TextField.Root
+              id={`prop-example-${id}`}
+              size="1"
+              value={
+                dateType === 'date'
+                  ? (example as string)
+                  : datetimeLocalForInput
+              }
+              type={dateType === 'date' ? 'date' : 'datetime-local'}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Show/hide error based on whether field is empty while required
+                setShowRequiredError(required && !value);
+                // Convert the datetime-local value to UTC ISO string for the server.
+                const convertedValue =
+                  dateType === 'date-time'
+                    ? localTimeToUtcConversion(value)
+                    : value;
+                dispatchUpdateProp(dispatch, id, {
+                  example: convertedValue,
+                  format: dateType,
+                });
+              }}
+              onBlur={(e) => {
+                setIsExampleValueValid(e.target.validity.valid);
+              }}
+              className={clsx({
+                [styles.error]: !isExampleValueValid || showRequiredError,
+              })}
+              {...(!isExampleValueValid || showRequiredError
+                ? { 'data-invalid-prop-value': true }
+                : {})}
+            />
+            <RequiredFieldError show={showRequiredError} />
+          </>
         )}
 
         {allowMultiple && (
           <PropValuesSortableList
             items={displayArray.map((_, index) => index)}
-            renderItem={renderInputField}
+            renderItem={renderInputFieldInMulti}
             onDragEnd={handleDragEnd}
             onRemove={
-              valueMode === VALUE_MODE_UNLIMITED ? handleRemove : undefined
+              valueMode === VALUE_MODE_UNLIMITED
+                ? handleMultiValueRemove
+                : undefined
             }
-            onAdd={valueMode === VALUE_MODE_UNLIMITED ? handleAdd : undefined}
+            onAdd={
+              valueMode === VALUE_MODE_UNLIMITED
+                ? handleMultiValueAdd
+                : undefined
+            }
             isDisabled={isDisabled}
             mode={valueMode}
             errorMessage={<RequiredFieldError show={showRequiredError} />}
           />
         )}
-        {!allowMultiple && <RequiredFieldError show={showRequiredError} />}
       </FormElement>
     </Flex>
   );
