@@ -27,18 +27,10 @@ class ComponentPluginManager extends CoreComponentPluginManager {
    */
   protected SchemaStorage $schemaStorage;
 
-  /**
-   * The decorated component plugin manager.
-   */
-  protected CoreComponentPluginManager $decorated;
-
   // @phpstan-ignore pluginManagerSetsCacheBackend.missingCacheBackend
   public function __construct(
-    CoreComponentPluginManager $decorated,
-  ) {
-    // Store the decorated service to delegate calls.
-    $this->decorated = $decorated;
-  }
+    private readonly CoreComponentPluginManager $decorated,
+  ) {}
 
   /**
    * {@inheritdoc}
