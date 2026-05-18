@@ -79,25 +79,18 @@ export default function FormPropTypeLink({
 
   const [isExampleValueValid, setIsExampleValueValid] = useState(true);
 
-  // For multi-value mode, normalize the example so `useRequiredProp` can
-  // detect empty arrays (since `![]` is false in JS).
-  const hasNonEmptyValue = hasNonEmptyArrayValue(allowMultiple ? example : []);
+  const hasNonEmptyValue = allowMultiple && hasNonEmptyArrayValue(example);
 
   const { showRequiredError, setShowRequiredError } = useRequiredProp(
     required,
     allowMultiple ? (hasNonEmptyValue ? 'non-empty' : '') : example,
     () => {
-      if (allowMultiple) {
-        dispatchUpdateProp(dispatch, id, {
-          example: [DEFAULT_LINK_EXAMPLES[linkType]],
-          format: linkType === 'full' ? 'uri' : 'uri-reference',
-        });
-      } else {
-        dispatchUpdateProp(dispatch, id, {
-          example: DEFAULT_LINK_EXAMPLES[linkType],
-          format: linkType === 'full' ? 'uri' : 'uri-reference',
-        });
-      }
+      dispatchUpdateProp(dispatch, id, {
+        example: allowMultiple
+          ? [DEFAULT_LINK_EXAMPLES[linkType]]
+          : DEFAULT_LINK_EXAMPLES[linkType],
+        format: linkType === 'full' ? 'uri' : 'uri-reference',
+      });
     },
     [dispatch, id, linkType, allowMultiple],
   );
@@ -130,14 +123,18 @@ export default function FormPropTypeLink({
       limitedCount,
     );
 
-  const handleDragEnd = createArrayDragEndHandler(displayArray, dispatch, id);
+  const handleMultiValueDragEnd = createArrayDragEndHandler(
+    displayArray,
+    dispatch,
+    id,
+  );
 
-  const handleAdd = () => {
+  const handleMultiValueAdd = () => {
     handleArrayAdd(displayArray, dispatch, id, '');
     resetValidityStates([...validityStates, true]); // Add validity for new input
   };
 
-  const handleRemove = (index: number) => {
+  const handleMultiValueRemove = (index: number) => {
     handleArrayRemove(displayArray, dispatch, id, index);
     resetValidityStates(validityStates.filter((_, i) => i !== index));
   };
@@ -154,7 +151,7 @@ export default function FormPropTypeLink({
     setValidity(index, validateLinkValue(value, linkType));
   };
 
-  const renderInputField = (index: number) => (
+  const renderMultiValueInputField = (index: number) => (
     <Flex align="center" gap="1" flexGrow="1">
       {linkType === 'relative' && (
         <Flex flexShrink="0" align="center">
@@ -278,12 +275,18 @@ export default function FormPropTypeLink({
         {allowMultiple && (
           <PropValuesSortableList
             items={displayArray.map((_, index) => index)}
-            renderItem={renderInputField}
-            onDragEnd={handleDragEnd}
+            renderItem={renderMultiValueInputField}
+            onDragEnd={handleMultiValueDragEnd}
             onRemove={
-              valueMode === VALUE_MODE_UNLIMITED ? handleRemove : undefined
+              valueMode === VALUE_MODE_UNLIMITED
+                ? handleMultiValueRemove
+                : undefined
             }
-            onAdd={valueMode === VALUE_MODE_UNLIMITED ? handleAdd : undefined}
+            onAdd={
+              valueMode === VALUE_MODE_UNLIMITED
+                ? handleMultiValueAdd
+                : undefined
+            }
             isDisabled={isDisabled}
             mode={valueMode}
             errorMessage={<RequiredFieldError show={showRequiredError} />}

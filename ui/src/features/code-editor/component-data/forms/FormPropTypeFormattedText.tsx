@@ -2,7 +2,6 @@ import clsx from 'clsx';
 import { Flex, TextArea } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
-import { updateProp } from '@/features/code-editor/codeEditorSlice';
 import {
   Divider,
   FormElement,
@@ -11,6 +10,7 @@ import {
 } from '@/features/code-editor/component-data/FormElement';
 import { DEFAULT_EXAMPLES } from '@/features/code-editor/component-data/Props';
 import { useRequiredProp } from '@/features/code-editor/hooks/useRequiredProp';
+import { dispatchUpdateProp } from '@/features/code-editor/utils/arrayPropUtils';
 
 import type { CodeComponentProp } from '@/types/CodeComponent';
 
@@ -30,12 +30,9 @@ export default function FormPropTypeFormattedText({
     required,
     example as string,
     () => {
-      dispatch(
-        updateProp({
-          id,
-          updates: { example: DEFAULT_EXAMPLES.formattedText },
-        }),
-      );
+      dispatchUpdateProp(dispatch, id, {
+        example: DEFAULT_EXAMPLES.formattedText,
+      });
     },
     [dispatch, id],
   );
@@ -51,14 +48,7 @@ export default function FormPropTypeFormattedText({
           value={example as string}
           size="1"
           onChange={(e) => {
-            dispatch(
-              updateProp({
-                id,
-                updates: {
-                  example: e.target.value,
-                },
-              }),
-            );
+            dispatchUpdateProp(dispatch, id, { example: e.target.value });
             // Show/hide error based on whether field is empty while required
             setShowRequiredError(required && !e.target.value);
           }}
