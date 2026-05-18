@@ -171,6 +171,7 @@ final class Layers {
         // @see https://www.drupal.org/project/drupal/issues/2169813
         Selector::classname(BetterEntityDataDefinition::class),
         Selector::classname(ComponentPluginManager::class),
+        // @todo Remove this once Canvas relies on a Drupal core version that includes https://www.drupal.org/i/3352063.
         Selector::classname(CanvasComponentPluginManager::class)
       )
       ->because("The entire ShapeMatcher infrastructure should depend only on core + Canvas' PropExpressions + PropShape + PropSource + JSON schema interpreter + adapters + select classes.");
