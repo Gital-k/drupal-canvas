@@ -13,6 +13,8 @@
  * Refs: Drupal.org issue #3527952.
  */
 
+import { useCallback, useEffect, useRef, useState } from 'react';
+
 import { Flex, Text, TextField } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -29,19 +31,50 @@ import { useGetComponentsQuery } from '@/services/componentAndLayout';
 
 import type React from 'react';
 
+const DEBOUNCE_MS = 300;
+
 const ComponentInstanceName: React.FC = () => {
   const dispatch = useAppDispatch();
   const selectedUuid = useAppSelector(selectSelectedComponentUuid);
   const layout = useAppSelector(selectLayout);
   const { data: components } = useGetComponentsQuery();
 
-  if (!selectedUuid) {
-    return null;
-  }
-  const node = findComponentByUuid(layout, selectedUuid);
-  if (!node) {
-    return null;
-  }
+  // Compute node before hooks so useState can use it as initial value.
+  const node = selectedUuid ? findComponentByUuid(layout, selectedUuid) : null;
+
+  // Local state keeps the input responsive; dispatch is debounced to avoid
+  // a POST per keystroke (see #3527952 review feedback).
+  const [localValue, setLocalValue] = useState(node?.name ?? '');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync local value when the selected component changes.
+  useEffect(() => {
+    setLocalValue(node?.name ?? '');
+  }, [selectedUuid, node?.name]);
+
+  // Clean up any pending debounce on unmount.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      setLocalValue(val);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (!selectedUuid) return;
+      debounceRef.current = setTimeout(() => {
+        dispatch(setComponentName({ uuid: selectedUuid, name: val }));
+      }, DEBOUNCE_MS);
+    },
+    [dispatch, selectedUuid],
+  );
+
+  if (!selectedUuid) return null;
+  if (!node) return null;
+
   const [nodeType] = node.type.split('@');
   const typeName = components?.[nodeType]?.name || 'Component';
   // The placeholder matches what the Layers panel would display if the user
@@ -50,8 +83,6 @@ const ComponentInstanceName: React.FC = () => {
   const typeIndex = getComponentTypeIndex(layout, selectedUuid, node.type);
   const placeholderName =
     typeIndex > 0 ? `${typeName} ${typeIndex}` : typeName;
-
-  const value = node.name ?? '';
 
   return (
     <Flex
@@ -67,16 +98,9 @@ const ComponentInstanceName: React.FC = () => {
         id="canvas-component-instance-name-input"
         autoComplete="off"
         size="1"
-        value={value}
+        value={localValue}
         placeholder={placeholderName}
-        onChange={(e) => {
-          dispatch(
-            setComponentName({
-              uuid: selectedUuid,
-              name: e.target.value,
-            }),
-          );
-        }}
+        onChange={handleChange}
       />
       <Text size="1" color="gray">
         Shown only in the editor — not visible on the published page.
