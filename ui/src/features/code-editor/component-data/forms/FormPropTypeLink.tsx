@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { Box, Flex, Select, Text, TextField } from '@radix-ui/themes';
 
@@ -8,9 +8,10 @@ import {
   Divider,
   FormElement,
   Label,
+  RequiredFieldError,
 } from '@/features/code-editor/component-data/FormElement';
 import { PropValuesSortableList } from '@/features/code-editor/component-data/forms/PropValuesSortableList';
-import { REQUIRED_EXAMPLE_ERROR_MESSAGE } from '@/features/code-editor/component-data/Props';
+import { useMultiValueValidation } from '@/features/code-editor/hooks/useMultiValueValidation';
 import {
   useRequiredProp,
   useSyncRequiredArrayError,
@@ -24,10 +25,7 @@ import {
   handleArrayValueChange,
   hasNonEmptyArrayValue,
 } from '@/features/code-editor/utils/arrayPropUtils';
-import {
-  VALUE_MODE_LIMITED,
-  VALUE_MODE_UNLIMITED,
-} from '@/types/CodeComponent';
+import { VALUE_MODE_UNLIMITED } from '@/types/CodeComponent';
 
 import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
 
@@ -69,19 +67,18 @@ export default function FormPropTypeLink({
       ? linkFormatMap[format as keyof typeof linkFormatMap]
       : 'relative',
   );
-  function validateLinkValue(value: string, linkType: 'relative' | 'full') {
+
+  function validateLinkValue(value: string, type: 'relative' | 'full') {
     if (value === '') return true;
     const [isValidValue] = jsonSchemaValidate(value, {
       type: 'string',
-      format: linkType === 'full' ? 'uri' : 'uri-reference',
+      format: type === 'full' ? 'uri' : 'uri-reference',
     });
     return isValidValue;
   }
 
   const [isExampleValueValid, setIsExampleValueValid] = useState(true);
 
-  // For multi-value mode, normalize the example so `useRequiredProp` can
-  // detect empty arrays (since `![]` is false in JS).
   const hasNonEmptyValue = hasNonEmptyArrayValue(allowMultiple ? example : []);
 
   const { showRequiredError, setShowRequiredError } = useRequiredProp(
@@ -103,7 +100,6 @@ export default function FormPropTypeLink({
     [dispatch, id, linkType, allowMultiple],
   );
 
-  // Keep error state in sync with whether the array has non-empty values.
   useSyncRequiredArrayError(
     required,
     hasNonEmptyValue,
@@ -122,60 +118,35 @@ export default function FormPropTypeLink({
     [example, valueMode, limitedCount, allowMultiple],
   );
 
-  // Add validity state for multiple values
-  const [multiValueValidityStates, setMultiValueValidityStates] = useState<
-    boolean[]
-  >(() => displayArray.map((v) => validateLinkValue(v, linkType)));
-
-  useEffect(() => {
-    if (
-      valueMode === VALUE_MODE_LIMITED &&
-      limitedCount > multiValueValidityStates.length
-    ) {
-      setMultiValueValidityStates((prev) => {
-        const next = [...prev];
-        while (next.length < limitedCount) {
-          next.push(true);
-        }
-        return next;
-      });
-    }
-  }, [limitedCount, valueMode, multiValueValidityStates.length]);
+  const { validityStates, setValidity, resetValidityStates } =
+    useMultiValueValidation(
+      displayArray,
+      (v) => validateLinkValue(v, linkType),
+      valueMode,
+      limitedCount,
+    );
 
   const handleDragEnd = createArrayDragEndHandler(displayArray, dispatch, id);
 
   const handleAdd = () => {
     handleArrayAdd(displayArray, dispatch, id, '');
-    setMultiValueValidityStates((prev) => [...prev, true]); // Add validity for new input
+    resetValidityStates([...validityStates, true]);
   };
 
   const handleRemove = (index: number) => {
     handleArrayRemove(displayArray, dispatch, id, index);
-    setMultiValueValidityStates((prev) => {
-      const next = [...prev];
-      next.splice(index, 1);
-      return next;
-    });
+    resetValidityStates(validityStates.filter((_, i) => i !== index));
   };
 
   const handleMultiValueChange = (index: number, value: string) => {
     handleArrayValueChange(displayArray, dispatch, id, index, value, {
       format: linkType === 'full' ? 'uri' : 'uri-reference',
     });
-    // Reset validity on change
-    setMultiValueValidityStates((prev) => {
-      const next = [...prev];
-      next[index] = true;
-      return next;
-    });
+    setValidity(index, true);
   };
 
   const handleMultiValueBlur = (index: number, value: string) => {
-    setMultiValueValidityStates((prev) => {
-      const next = [...prev];
-      next[index] = validateLinkValue(value, linkType);
-      return next;
-    });
+    setValidity(index, validateLinkValue(value, linkType));
   };
 
   const renderInputField = (index: number) => (
@@ -199,9 +170,9 @@ export default function FormPropTypeLink({
           onChange={(e) => handleMultiValueChange(index, e.target.value)}
           onBlur={(e) => handleMultiValueBlur(index, e.target.value)}
           className={clsx({
-            [styles.error]: !multiValueValidityStates[index],
+            [styles.error]: !validityStates[index],
           })}
-          {...(!multiValueValidityStates[index]
+          {...(!validityStates[index]
             ? { 'data-invalid-prop-value': true }
             : {})}
         />
@@ -219,11 +190,9 @@ export default function FormPropTypeLink({
             setIsExampleValueValid(true);
             setLinkType(value);
 
-            // Get the default value for the new link type
             const newDefaultValue = DEFAULT_LINK_EXAMPLES[value];
             const newFormat = value === 'full' ? 'uri' : 'uri-reference';
 
-            // In multi-value mode, reset the array to a single default value
             if (allowMultiple) {
               dispatchUpdateProp(dispatch, id, {
                 example: [newDefaultValue],
@@ -231,10 +200,8 @@ export default function FormPropTypeLink({
                 valueMode: VALUE_MODE_UNLIMITED,
                 limitedCount: undefined,
               });
-              // Reset validity states to a single valid entry
-              setMultiValueValidityStates([true]);
+              resetValidityStates([true]);
             } else {
-              // Single value mode - just update format and example
               dispatchUpdateProp(dispatch, id, {
                 example: newDefaultValue,
                 format: newFormat,
@@ -254,7 +221,6 @@ export default function FormPropTypeLink({
       <Divider />
       <FormElement>
         <Label htmlFor={`prop-example-${id}`}>Example value</Label>
-        {/* Single value mode */}
         {!allowMultiple && (
           <Flex align="center" gap="1" width="100%">
             {linkType === 'relative' && (
@@ -276,8 +242,7 @@ export default function FormPropTypeLink({
                 size="1"
                 onChange={(e) => {
                   const input = e.target;
-                  setIsExampleValueValid(true); // Reset validation state on change
-                  // Show/hide error based on whether field is empty while required
+                  setIsExampleValueValid(true);
                   setShowRequiredError(required && !input.value);
                   dispatchUpdateProp(dispatch, id, {
                     example: input.value,
@@ -300,7 +265,6 @@ export default function FormPropTypeLink({
           </Flex>
         )}
 
-        {/* Multiple values mode */}
         {allowMultiple && (
           <PropValuesSortableList
             items={displayArray.map((_, index) => index)}
@@ -312,20 +276,10 @@ export default function FormPropTypeLink({
             onAdd={valueMode === VALUE_MODE_UNLIMITED ? handleAdd : undefined}
             isDisabled={isDisabled}
             mode={valueMode}
-            errorMessage={
-              showRequiredError && (
-                <Text color="red" size="1">
-                  {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-                </Text>
-              )
-            }
+            errorMessage={<RequiredFieldError show={showRequiredError} />}
           />
         )}
-        {!allowMultiple && showRequiredError && (
-          <Text color="red" size="1">
-            {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-          </Text>
-        )}
+        {!allowMultiple && <RequiredFieldError show={showRequiredError} />}
       </FormElement>
     </Flex>
   );

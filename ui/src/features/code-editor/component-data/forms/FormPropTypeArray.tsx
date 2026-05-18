@@ -7,12 +7,10 @@ import { useAppDispatch } from '@/app/hooks';
 import {
   Divider,
   FormElement,
+  RequiredFieldError,
 } from '@/features/code-editor/component-data/FormElement';
 import { PropValuesSortableList } from '@/features/code-editor/component-data/forms/PropValuesSortableList';
-import {
-  DEFAULT_EXAMPLES,
-  REQUIRED_EXAMPLE_ERROR_MESSAGE,
-} from '@/features/code-editor/component-data/Props';
+import { DEFAULT_EXAMPLES } from '@/features/code-editor/component-data/Props';
 import {
   useRequiredProp,
   useSyncRequiredArrayError,
@@ -248,13 +246,7 @@ export default function FormPropTypeArray({
           onAdd={valueMode === VALUE_MODE_UNLIMITED ? handleAdd : undefined}
           isDisabled={isDisabled}
           mode={valueMode}
-          errorMessage={
-            showRequiredError && (
-              <Text color="red" size="1">
-                {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-              </Text>
-            )
-          }
+          errorMessage={<RequiredFieldError show={showRequiredError} />}
         />
       </FormElement>
     </Flex>

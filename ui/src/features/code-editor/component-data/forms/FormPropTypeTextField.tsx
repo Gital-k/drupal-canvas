@@ -3,17 +3,15 @@ import clsx from 'clsx';
 import { Flex, Text, TextField } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
-import { updateProp } from '@/features/code-editor/codeEditorSlice';
 import {
   Divider,
   FormElement,
   Label,
+  RequiredFieldError,
 } from '@/features/code-editor/component-data/FormElement';
-import {
-  DEFAULT_EXAMPLES,
-  REQUIRED_EXAMPLE_ERROR_MESSAGE,
-} from '@/features/code-editor/component-data/Props';
+import { DEFAULT_EXAMPLES } from '@/features/code-editor/component-data/Props';
 import { useRequiredProp } from '@/features/code-editor/hooks/useRequiredProp';
+import { dispatchUpdateProp } from '@/features/code-editor/utils/arrayPropUtils';
 import { getNumericInputError } from '@/features/code-editor/utils/numericInputUtils';
 
 import type { CodeComponentProp } from '@/types/CodeComponent';
@@ -84,14 +82,10 @@ export default function FormPropTypeTextField({
     required,
     example,
     () => {
-      // Map 'string' type to 'text' key in DEFAULT_EXAMPLES
       const exampleKey = type === 'string' ? 'text' : type;
-      dispatch(
-        updateProp({
-          id,
-          updates: { example: DEFAULT_EXAMPLES[exampleKey] },
-        }),
-      );
+      dispatchUpdateProp(dispatch, id, {
+        example: DEFAULT_EXAMPLES[exampleKey],
+      });
     },
     [dispatch, id, type],
   );
@@ -126,12 +120,7 @@ export default function FormPropTypeTextField({
               }
               setInvalidError('');
             }
-            dispatch(
-              updateProp({
-                id,
-                updates: { example: raw },
-              }),
-            );
+            dispatchUpdateProp(dispatch, id, { example: raw });
             setShowRequiredError(required && !raw);
           }}
           disabled={isDisabled}
@@ -142,11 +131,7 @@ export default function FormPropTypeTextField({
             ? { 'data-invalid-prop-value': true }
             : {})}
         />
-        {showRequiredError && (
-          <Text color="red" size="1">
-            {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-          </Text>
-        )}
+        <RequiredFieldError show={showRequiredError} />
         {!!invalidError && !showRequiredError && (
           <Text color="red" size="1">
             {invalidError}
