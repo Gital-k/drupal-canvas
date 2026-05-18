@@ -22,8 +22,12 @@ use JsonSchema\SchemaStorage;
 /**
  * @todo Remove this once Canvas relies on a Drupal core version that includes https://www.drupal.org/i/3352063.
  * @internal
+ *
+ * TRICKY: because Drupal\Core\Theme\ComponentPluginManager does not have an
+ * interface and all of core typehints to the concrete implementation,
+ * decorating this service is extraordinarily brittle.
  */
-class ComponentPluginManager extends CoreComponentPluginManager implements CategorizingPluginManagerInterface {
+class ComponentPluginManager extends CoreComponentPluginManager {
 
   const MAXIMUM_RECURSION_LEVEL = 10;
 
@@ -39,57 +43,48 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
 
   // @phpstan-ignore pluginManagerSetsCacheBackend.missingCacheBackend
   public function __construct(
-    ModuleHandlerInterface $module_handler,
-    ThemeHandlerInterface $themeHandler,
-    CacheBackendInterface $cacheBackend,
-    ConfigFactoryInterface $configFactory,
-    ThemeManagerInterface $themeManager,
-    ComponentNegotiator $componentNegotiator,
-    FileSystemInterface $fileSystem,
-    SchemaCompatibilityChecker $compatibilityChecker,
-    ComponentValidator $componentValidator,
-    string $appRoot,
     CoreComponentPluginManager $decorated,
   ) {
     // Store the decorated service to delegate calls.
     $this->decorated = $decorated;
-    parent::__construct(
-      $module_handler,
-      $themeHandler,
-      $cacheBackend,
-      $configFactory,
-      $themeManager,
-      $componentNegotiator,
-      $fileSystem,
-      $compatibilityChecker,
-      $componentValidator,
-      $appRoot);
   }
 
   /**
    * {@inheritdoc}
    */
+  public function getDefinition($plugin_id, $exception_on_invalid = TRUE) {
+    return $this->decorated->getDefinition($plugin_id, $exception_on_invalid);
+  }
+
+    /**
+   * {@inheritdoc}
+   */
   public function getDefinitions() {
-    $definitions = $this->getCachedDefinitions();
-    if ($definitions) {
-      return $definitions;
-    }
-
-    $definitions = $this->decorated->getCachedDefinitions();
-    if ($definitions) {
-      $this->setCachedDefinitions($definitions);
-      return $definitions;
-    }
-
-    $definitions = parent::getDefinitions();
-    $this->decorated->setCachedDefinitions($definitions);
-    $this->setCachedDefinitions($definitions);
-
-    return $definitions;
+    return $this->decorated->getDefinitions();
   }
 
   /**
    * {@inheritdoc}
+   *
+   * TRICKY: this should be on an interface, but isn't.
+   */
+  public function find(string $component_id): Component {
+    return $this->decorated->find($component_id);
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * TRICKY: this should be on an interface, but isn't.
+   */
+  public function getAllComponents(): array {
+    return $this->decorated->getAllComponents();
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * TRICKY: this should be on an interface, but isn't.
    */
   public function createInstance($plugin_id, array $configuration = []): Component {
     return $this->decorated->createInstance($plugin_id, $configuration);
@@ -106,7 +101,6 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
    * {@inheritdoc}
    */
   public function clearCachedDefinitions(): void {
-    parent::clearCachedDefinitions();
     $this->decorated->clearCachedDefinitions();
   }
 
@@ -142,8 +136,28 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
    * {@inheritdoc}
    */
   public function setCacheBackend(CacheBackendInterface $cache_backend, $cache_key, array $cache_tags = []): void {
-    parent::setCacheBackend($cache_backend, $cache_key, $cache_tags);
     $this->decorated->setCacheBackend($cache_backend, $cache_key, $cache_tags);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCategories() {
+    return $this->decorated->getCategories();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSortedDefinitions(?array $definitions = NULL, $label_key = 'label') {
+    return $this->decorated->getSortedDefinitions($definitions, $label_key);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getGroupedDefinitions(?array $definitions = NULL, $label_key = 'label') {
+    return $this->decorated->getGroupedDefinitions($definitions, $label_key);
   }
 
   /**

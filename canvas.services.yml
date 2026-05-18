@@ -222,10 +222,9 @@ services:
     public: false
     decorates: plugin.manager.block
     arguments: ['@.inner']
+  # @todo Remove after https://www.drupal.org/project/drupal/issues/3352063 lands.
   Drupal\canvas\Plugin\ComponentPluginManager:
     decorates: plugin.manager.sdc
-    decoration_inner_name: canvas.component_plugin_manager.inner
-    decoration_priority: 0
-    parent: plugin.manager.sdc
     arguments:
-      $decorated: '@canvas.component_plugin_manager.inner'
+      # TRICKY: decoration is complex and brittle because the decorated service does not have an interface.
+      $decorated: '@.inner'
