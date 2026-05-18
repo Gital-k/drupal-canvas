@@ -27,8 +27,6 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
 
   const MAXIMUM_RECURSION_LEVEL = 10;
 
-  protected static bool $isRecursing = FALSE;
-
   /**
    * JSON schema storage utility used for resolving references.
    */

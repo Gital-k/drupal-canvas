@@ -85,14 +85,6 @@ enum JsonSchemaType: string {
     };
   }
 
-  public function isIterable(): bool {
-    return !$this->isScalar();
-  }
-
-  public function isTraversable(): bool {
-    return !$this->isScalar();
-  }
-
   /**
    * Constructs a JsonSchemaType from a typical SDC prop JSON schema.
    *
@@ -395,13 +387,35 @@ enum JsonSchemaType: string {
       },
 
       JsonSchemaType::Object => match (TRUE) {
+        // Content entity reference: at minimum, `x-allowed-entity-type-id` is
+        // required (validated upstream). Optionally `x-allowed-bundle` narrows
+        // selection to a single bundle via the `default` selection handler.
+        // @see docs/shape-matching.md#3.2.3
+        // @see \Drupal\canvas\ComponentMetadataRequirementsChecker
+        JsonSchemaObjectRef::isContentEntityReference($schema)
+          && \array_key_exists('x-allowed-entity-type-id', $shape->schema) => new StorablePropShape(
+            shape: $shape,
+            fieldTypeProp: new FieldTypePropExpression('entity_reference', 'entity'),
+            fieldWidget: 'entity_reference_autocomplete',
+            fieldStorageSettings: [
+              'target_type' => $schema['x-allowed-entity-type-id'],
+            ],
+            fieldInstanceSettings: !\array_key_exists('x-allowed-bundle', $schema)
+              ? NULL
+              : [
+                'handler' => 'default',
+                'handler_settings' => [
+                  'target_bundles' => [$schema['x-allowed-bundle']],
+                ],
+              ],
+        ),
         // For object shapes, it's far simpler to match on the `$ref` than on
         // minutiae.
-        \array_key_exists('$ref', $schema) => match ($schema['$ref']) {
+        \array_key_exists('$ref', $schema) => match (JsonSchemaObjectRef::tryFrom($schema['$ref'])) {
           // @see \Drupal\image\Plugin\Field\FieldType\ImageItem
           // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
           // @todo Try decorating with adapter in https://www.drupal.org/project/canvas/issues/3536115.
-          'json-schema-definitions://canvas.module/image' => new StorablePropShape(shape: $shape, fieldWidget: 'image_image', fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
+          JsonSchemaObjectRef::Image => new StorablePropShape(shape: $shape, fieldWidget: 'image_image', fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
             // TRICKY: Additional computed property on image fields added by
             // Drupal Canvas.
             // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride
@@ -421,7 +435,7 @@ enum JsonSchemaType: string {
           ])),
           // @see \Drupal\file\Plugin\Field\FieldType\FileItem
           // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
-          'json-schema-definitions://canvas.module/video' => new StorablePropShape(
+          JsonSchemaObjectRef::Video => new StorablePropShape(
             shape: $shape,
             fieldWidget: 'file_generic',
             fieldTypeProp: new FieldTypeObjectPropsExpression('file', [

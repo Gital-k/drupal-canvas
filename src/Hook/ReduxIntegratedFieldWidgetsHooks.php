@@ -155,6 +155,12 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
   #[Hook('field_widget_single_element_link_default_form_alter')]
   public function fieldWidgetSingleElementLinkDefaultWidgetFormAlter(array &$form, FormStateInterface $form_state, array $context): void {
+    // Mark the URI input so Canvas UI can resolve selected entity references
+    // into the `entity:<type>/<id>` URI scheme on selection.
+    // @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter()
+    // @see ui/src/components/form/components/TextFieldAutocomplete.tsx
+    $form['uri']['#attributes']['data-canvas-resolve-entity-uri'] = 'true';
+
     if ($this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
       // We want the link widget to have less information, so we need to revert
       // the description mangling happening at
@@ -293,7 +299,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    * Implements hook_field_widget_info_alter().
    */
   #[Hook('field_widget_info_alter')]
-  public function fieldWidgetInfoAlter(array &$info): void {
+  public static function fieldWidgetInfoAlter(array &$info): void {
     $map = [
       'boolean_checkbox' => ['mainProperty' => []],
       'datetime_default' => ['mainProperty' => [], 'dateTime' => []],
@@ -327,7 +333,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    * Implements hook_field_widget_info_alter().
    */
   #[Hook('field_widget_info_alter', module: 'media_library')]
-  public function mediaLibraryFieldWidgetInfoAlter(array &$info): void {
+  public static function mediaLibraryFieldWidgetInfoAlter(array &$info): void {
     $info['media_library_widget']['canvas'] = [
       'transforms' => [
         'mediaSelection' => [],
@@ -337,7 +343,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   }
 
   #[Hook('element_info_alter', order: new OrderAfter(['editor']))]
-  public function elementInfoAlter(array &$info): void {
+  public static function elementInfoAlter(array &$info): void {
     if (isset($info['text_format'])) {
       $info['text_format']['#process'][] = [ReduxIntegratedFieldWidgetsHooks::class, 'processTextFormat'];
       $info['text_format']['#pre_render'][] = [ReduxIntegratedFieldWidgetsHooks::class, 'preRenderTextFormat'];

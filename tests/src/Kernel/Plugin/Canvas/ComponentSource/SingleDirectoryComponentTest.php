@@ -6,6 +6,7 @@ namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Plugin\ComponentPluginManager;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Depends;
@@ -1170,6 +1171,7 @@ HTML
       <ul id="number-list">
                   <li>42</li>
                   <li>100</li>
+                  <li>0</li>
               </ul>
     </div>
     <h2>Number Limited</h2>
@@ -2558,6 +2560,9 @@ HTML
               1 => [
                 'value' => 100.0,
               ],
+              2 => [
+                'value' => 0.0,
+              ],
             ],
             'expression' => 'ℹ︎float␟value',
           ],
@@ -3774,7 +3779,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3891,7 +3896,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -4817,7 +4822,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -4883,7 +4888,7 @@ HTML
                     'type' => 'integer',
                   ],
                 ],
-                'id' => 'json-schema-definitions://canvas.module/image',
+                'id' => JsonSchemaObjectRef::Image->value,
               ],
               'minItems' => 1,
             ],
@@ -4956,7 +4961,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -5018,7 +5023,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -5070,7 +5075,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -5115,7 +5120,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -5169,7 +5174,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -5214,7 +5219,7 @@ HTML
                 'width' => ['title' => 'Image width', 'type' => 'integer'],
                 'height' => ['title' => 'Image height', 'type' => 'integer'],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -5247,7 +5252,7 @@ HTML
                 'width' => ['title' => 'Image width', 'type' => 'integer'],
                 'height' => ['title' => 'Image height', 'type' => 'integer'],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -5280,7 +5285,7 @@ HTML
                 'width' => ['title' => 'Image width', 'type' => 'integer'],
                 'height' => ['title' => 'Image height', 'type' => 'integer'],
               ],
-              'id' => 'json-schema-definitions://canvas.module/image',
+              'id' => JsonSchemaObjectRef::Image->value,
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -5553,10 +5558,14 @@ HTML
                 1 => [
                   'value' => 100.0,
                 ],
+                2 => [
+                  'value' => 0.0,
+                ],
               ],
               'resolved' => [
                 0 => 42.0,
                 1 => 100.0,
+                2 => 0.0,
               ],
             ],
           ],
@@ -6763,7 +6772,7 @@ HTML
                   'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
               ],
-              'id' => 'json-schema-definitions://canvas.module/video',
+              'id' => JsonSchemaObjectRef::Video->value,
             ],
             'sourceType' => 'static:field_item:file',
             'expression' => 'ℹ︎file␟{src↝entity␜␜entity:file␝uri␞␟url}',
