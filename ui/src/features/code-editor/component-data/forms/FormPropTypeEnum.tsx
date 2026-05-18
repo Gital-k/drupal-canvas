@@ -63,6 +63,7 @@ export default function FormPropTypeEnum({
   limitedCount?: number;
 }) {
   const dispatch = useAppDispatch();
+  const isLimitedMode = valueMode === VALUE_MODE_LIMITED;
 
   const validEnumValues = useMemo(() => {
     return enumValues.filter((item) => validateValue(item));
@@ -71,8 +72,6 @@ export default function FormPropTypeEnum({
   const hasNonEmptyMultiValue = hasNonEmptyArrayValue(
     allowMultiple ? defaultValue : [],
   );
-  // Normalize for useRequiredProp: ![] is false in JS, so an empty selection
-  // must be mapped to an empty string so the hook's empty-check works.
   const normalizedExampleForHook: string | string[] = allowMultiple
     ? hasNonEmptyMultiValue
       ? 'non-empty'
@@ -83,54 +82,38 @@ export default function FormPropTypeEnum({
     required,
     normalizedExampleForHook,
     () => {
-      if (allowMultiple) {
-        // Multi-value mode: select the first available option or add a default one.
-        if (validEnumValues.length === 0) {
-          const defaultOption = DEFAULT_ENUM_OPTIONS[type];
-          dispatchUpdateProp(dispatch, id, {
-            enum: [defaultOption],
-            example: [String(defaultOption.value)],
-          });
-        } else {
-          dispatchUpdateProp(dispatch, id, {
-            example: [String(validEnumValues[0].value)],
-          });
-        }
-      } else {
-        // Single-value mode (existing logic).
-        if (validEnumValues.length === 0) {
-          const defaultOption = DEFAULT_ENUM_OPTIONS[type];
-          dispatchUpdateProp(dispatch, id, {
-            enum: [defaultOption],
-            example: String(defaultOption.value),
-          });
-        } else if (!defaultValue) {
-          // If we have valid values but no default, set the first one
-          dispatchUpdateProp(dispatch, id, {
-            example: String(validEnumValues[0].value),
-          });
-        }
+      if (validEnumValues.length === 0) {
+        // No options yet — create a default option and select it.
+        const defaultOption = DEFAULT_ENUM_OPTIONS[type];
+        dispatchUpdateProp(dispatch, id, {
+          enum: [defaultOption],
+          example: allowMultiple
+            ? [String(defaultOption.value)]
+            : String(defaultOption.value),
+        });
+      } else if (allowMultiple || !defaultValue) {
+        // Options exist — select the first one.
+        dispatchUpdateProp(dispatch, id, {
+          example: allowMultiple
+            ? [String(validEnumValues[0].value)]
+            : String(validEnumValues[0].value),
+        });
       }
     },
     [dispatch, id, type, validEnumValues, allowMultiple],
   );
 
-  // Normalize defaultValue to always work with arrays internally when allowMultiple is true
-  const selectedValues = useMemo(() => {
-    if (!allowMultiple) {
-      return [];
-    }
-    if (Array.isArray(defaultValue)) {
-      return defaultValue.map((v) => String(v));
-    }
-    return defaultValue ? [String(defaultValue)] : [];
-  }, [allowMultiple, defaultValue]);
-
-  // Filter selectedValues to only include values that exist in validEnumValues
+  // Normalize defaultValue to a string array and filter to only valid enum values.
   const validSelectedValues = useMemo(() => {
+    if (!allowMultiple) return [];
+    const selected = Array.isArray(defaultValue)
+      ? defaultValue.map((v) => String(v))
+      : defaultValue
+        ? [String(defaultValue)]
+        : [];
     const validValueStrings = validEnumValues.map((item) => String(item.value));
-    return selectedValues.filter((v) => validValueStrings.includes(v));
-  }, [selectedValues, validEnumValues]);
+    return selected.filter((v) => validValueStrings.includes(v));
+  }, [allowMultiple, defaultValue, validEnumValues]);
 
   // Show error when required but no valid example or no options.
   // Also handles the multi-value case where defaultValue is an empty array
@@ -180,7 +163,7 @@ export default function FormPropTypeEnum({
             // being added), to avoid resetting a user-configured cardinality back to 1.
             if (
               allowMultiple &&
-              valueMode === VALUE_MODE_LIMITED &&
+              isLimitedMode &&
               validNewValues.length < validEnumValues.length &&
               validNewValues.length < limitedCount
             ) {
@@ -224,9 +207,7 @@ export default function FormPropTypeEnum({
           <FormElement>
             <Label htmlFor={`prop-enum-default-${id}`}>
               Default value
-              {allowMultiple &&
-                valueMode === VALUE_MODE_LIMITED &&
-                ` (max ${limitedCount})`}
+              {allowMultiple && isLimitedMode && ` (max ${limitedCount})`}
             </Label>
             {allowMultiple ? (
               <Popover.Root>
@@ -257,7 +238,7 @@ export default function FormPropTypeEnum({
                         String(item.value),
                       );
                       const isAtLimit =
-                        valueMode === VALUE_MODE_LIMITED &&
+                        isLimitedMode &&
                         validSelectedValues.length >= limitedCount &&
                         !isSelected;
                       return (
@@ -300,7 +281,7 @@ export default function FormPropTypeEnum({
                         </Text>
                       );
                     })}
-                    {valueMode === VALUE_MODE_LIMITED && (
+                    {isLimitedMode && (
                       <>
                         <Box className="fpe-divider" />
                         <Text size="1" color="gray">
