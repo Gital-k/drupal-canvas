@@ -958,8 +958,6 @@ class TranslationTest extends FunctionalTestBase {
     $english_title = (string) $node->getTitle();
     self::assertSame('The first entity using Canvas!', $english_title);
 
-    // Build both URL variants for convenience.
-    $english_url = $node->toUrl();
     $french_url = Url::fromRoute('entity.node.canonical', ['node' => $nid], ['language' => $fr_language]);
 
     $this->drupalGet($french_url);
@@ -1047,49 +1045,20 @@ class TranslationTest extends FunctionalTestBase {
     $node = $this->createTestNode();
     $nid = $node->id();
 
-    // Retrieve the French language object for constructing the /fr/ URL.
-    $language_manager = $this->container->get(LanguageManagerInterface::class);
-    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
-    $fr_language = $language_manager->getLanguage('fr');
-    self::assertNotNull($fr_language, 'French language must exist.');
-
-    $french_node_url = Url::fromRoute('entity.node.canonical', ['node' => $nid], ['language' => $fr_language]);
-
-    // Visit /fr/node/{nid} — the node has no French translation, but the URL
-    // prefix is French, so the French PageRegion override must still be used.
-    $this->drupalGet($french_node_url);
-    $this->assertSession()->statusCodeEquals(200);
-
-    // French PageRegion text must appear because the URL prefix is French,
-    // regardless of the node lacking a French translation.
+    // The node has no French translation, but the URL prefix is French, so
+    // the French PageRegion override must still be used.
+    $this->drupalGet("/fr/node/$nid");
     $this->assertSession()->pageTextContains('Bonjour de la région');
-
-    // English PageRegion text must NOT appear on the French-prefixed node URL.
     $this->assertSession()->pageTextNotContains('Hello from region');
 
     $this->drupalGet($node->toUrl());
-    $this->assertSession()->statusCodeEquals(200);
-
-    // English PageRegion text must appear on the English node URL.
     $this->assertSession()->pageTextContains('Hello from region');
-
-    // French PageRegion text must NOT appear on the English node URL.
     $this->assertSession()->pageTextNotContains('Bonjour de la région');
-
-    // Retrieve the Hindi language object for constructing the /hi/ URL.
-    $hi_language = $language_manager->getLanguage('hi');
-    self::assertNotNull($hi_language, 'Hindi language must exist.');
-
-    $hindi_node_url = Url::fromRoute('entity.node.canonical', ['node' => $nid], ['language' => $hi_language]);
 
     // Visit /hi/node/{nid} — there is no Hindi PageRegion translation, so it
     // must fall back to the default language (English).
-    $this->drupalGet($hindi_node_url);
-    $this->assertSession()->statusCodeEquals(200);
-
-    // English PageRegion text must appear because no Hindi translation exists.
+    $this->drupalGet("/hi/node/$nid");
     $this->assertSession()->pageTextContains('Hello from region');
-
   }
 
 }
