@@ -579,7 +579,7 @@ Each `component source` is able to specify an updater class (see `\Drupal\canvas
 This updater will be responsible for:
 
 * Checking if a `component instance` is using the active version.
-* Deciding if a `component instance` not using the active version can be updated automatically according to that source's migration policy.
+* Deciding if a `component instance` not using the active version can be updated automatically according to the rules defined by that source's updater.
 * Performing that update.
 
 This update of the `component tree`'s`component instance`s will happen automatically
