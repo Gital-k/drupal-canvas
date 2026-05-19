@@ -207,6 +207,13 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
   }
 
   /**
+   * Determines if a prop definition stores multiple values.
+   */
+  protected static function isMultiValuePropDefinition(array $prop_definition): bool {
+    return ($prop_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) !== 1;
+  }
+
+  /**
    * Converts prop field definitions to StorablePropShape objects.
    *
    * @param array $prop_field_definitions

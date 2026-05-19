@@ -7,7 +7,6 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 use Drupal\canvas\ComponentSource\ComponentInstanceUpdateAttemptResult;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\PropShape\StorablePropShape;
 
 /**
  * Updates JS component instances, accepting data loss on prop shape changes.
@@ -38,9 +37,7 @@ final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComp
       return ComponentInstanceUpdateAttemptResult::NotNeeded;
     }
 
-    // Pre-drop inputs that cannot be preserved as-is in the target version,
-    // then delegate to the parent flow for required default injection, slot
-    // cleanup, and version bump.
+    // Pre-drop inputs that cannot be preserved as-is in the target version.
     $component = $component_instance->getComponent();
     \assert($component instanceof ComponentInterface);
     $from_version = $component_instance->getComponentVersion();
@@ -96,13 +93,6 @@ final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComp
     }
 
     return parent::update($component_instance);
-  }
-
-  /**
-   * Determines if a prop definition stores multiple values.
-   */
-  private static function isMultiValuePropDefinition(array $prop_definition): bool {
-    return ($prop_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) !== 1;
   }
 
   /**
