@@ -6,6 +6,7 @@ namespace Drupal\canvas\Entity;
 
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
+use Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
@@ -25,7 +26,7 @@ use Drupal\Core\Theme\ThemeManagerInterface;
   label_collection: new TranslatableMarkup("Page region"),
   admin_permission: self::ADMIN_PERMISSION,
   handlers: [
-    "access" => PageRegionAccessControlHandler::class,
+    "access" => CanvasConfigEntityAccessControlHandler::class,
   ],
   entity_keys: [
     "id" => "id",

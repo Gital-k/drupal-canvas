@@ -1073,10 +1073,12 @@ paths:
           description: Validation errors exist
           $ref: '#/components/responses/ClientErrorResponse'
     delete:
-      summary: Deletion is not supported for Page Regions.
+      summary: Deletes a Page Region.
       parameters:
         - $ref: '#/components/parameters/configEntityId'
       responses:
+        '204':
+          description: Deleted individual Page Region
         '401':
           description: Unauthorized (unauthenticated) response.
           $ref: '#/components/responses/UnauthorizedErrorResponse'
