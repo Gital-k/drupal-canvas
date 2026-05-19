@@ -484,6 +484,15 @@ export function pushCommand(program: Command): void {
             (r) => [r.region, `${r.theme}.${r.region}`] as const,
           ),
         );
+        const localRegionShortNames = new Set(
+          discoveredRegions.map((r) => r.region),
+        );
+        // Remote regions absent locally are deleted on push.
+        const remoteRegionIdsToDelete = Array.from(
+          remoteRegionIdsByShortName.entries(),
+        )
+          .filter(([shortName]) => !localRegionShortNames.has(shortName))
+          .map(([, id]) => id);
 
         // Build a preview of planned operations.
         const operationLabels: Record<string, string> = {
@@ -556,6 +565,12 @@ export function pushCommand(program: Command): void {
                   : operationLabels.create,
               },
             ],
+          })),
+          ...remoteRegionIdsToDelete.map((id) => ({
+            itemName: id,
+            itemType: 'Global region',
+            success: true,
+            details: [{ content: operationLabels.delete }],
           })),
           ...(includesBrandKit && config.fonts !== undefined
             ? buildFontPushPlannedResults(config.fonts, remoteBrandKitFonts, {
@@ -926,64 +941,73 @@ export function pushCommand(program: Command): void {
         }
 
         // Validate and push global regions.
-        if (discoveredRegions.length > 0) {
-          const regionValidationSpinner = p.spinner();
-          regionValidationSpinner.start(
-            `Validating ${discoveredRegions.length} global ${pluralize(discoveredRegions.length, 'region')}`,
-          );
+        if (
+          discoveredRegions.length > 0 ||
+          remoteRegionIdsToDelete.length > 0
+        ) {
+          let validRegions: Awaited<
+            ReturnType<typeof prepareRegions>
+          >['valid'] = [];
 
-          const { results: regionValidationResults } =
-            await validateRegions(discoveryResult);
-
-          regionValidationSpinner.stop(
-            chalk.green(
-              `Validated ${discoveredRegions.length} global ${pluralize(discoveredRegions.length, 'region')}`,
-            ),
-          );
-
-          if (regionValidationResults.some((r) => !r.success)) {
-            reportResults(
-              regionValidationResults,
-              'Global region validation results',
-              'Global region',
+          if (discoveredRegions.length > 0) {
+            const regionValidationSpinner = p.spinner();
+            regionValidationSpinner.start(
+              `Validating ${discoveredRegions.length} global ${pluralize(discoveredRegions.length, 'region')}`,
             );
-            throw new Error(
-              'Global region validation failed. Fix the errors above before pushing.',
+
+            const { results: regionValidationResults } =
+              await validateRegions(discoveryResult);
+
+            regionValidationSpinner.stop(
+              chalk.green(
+                `Validated ${discoveredRegions.length} global ${pluralize(discoveredRegions.length, 'region')}`,
+              ),
             );
-          }
 
-          const componentVersions = await apiService.listComponentVersions();
+            if (regionValidationResults.some((r) => !r.success)) {
+              reportResults(
+                regionValidationResults,
+                'Global region validation results',
+                'Global region',
+              );
+              throw new Error(
+                'Global region validation failed. Fix the errors above before pushing.',
+              );
+            }
 
-          const regionPrepSpinner = p.spinner();
-          regionPrepSpinner.start(
-            `Preparing ${discoveredRegions.length} global ${pluralize(discoveredRegions.length, 'region')}`,
-          );
-          const { valid: validRegions, failed: failedRegionPreps } =
-            await prepareRegions(
+            const componentVersions = await apiService.listComponentVersions();
+
+            const regionPrepSpinner = p.spinner();
+            regionPrepSpinner.start(
+              `Preparing ${discoveredRegions.length} global ${pluralize(discoveredRegions.length, 'region')}`,
+            );
+            const { valid, failed: failedRegionPreps } = await prepareRegions(
               discoveredRegions,
               componentVersions,
               discoveryResult,
             );
-          regionPrepSpinner.stop(
-            chalk.green(
-              `Prepared ${validRegions.length} global ${pluralize(validRegions.length, 'region')}`,
-            ),
-          );
+            validRegions = valid;
+            regionPrepSpinner.stop(
+              chalk.green(
+                `Prepared ${validRegions.length} global ${pluralize(validRegions.length, 'region')}`,
+              ),
+            );
 
-          if (failedRegionPreps.length > 0) {
-            const failedResults = collectRegionResults(
-              [],
-              failedRegionPreps,
-              discoveredRegions,
-            );
-            reportResults(
-              failedResults,
-              'Global region validation results',
-              'Global region',
-            );
-            throw new Error(
-              'Global region validation failed. Fix the errors above before pushing.',
-            );
+            if (failedRegionPreps.length > 0) {
+              const failedResults = collectRegionResults(
+                [],
+                failedRegionPreps,
+                discoveredRegions,
+              );
+              reportResults(
+                failedResults,
+                'Global region validation results',
+                'Global region',
+              );
+              throw new Error(
+                'Global region validation failed. Fix the errors above before pushing.',
+              );
+            }
           }
 
           const regionPushSpinner = p.spinner();
@@ -992,6 +1016,7 @@ export function pushCommand(program: Command): void {
             validRegions,
             remoteRegionIdsByShortName,
             apiService,
+            remoteRegionIdsToDelete,
           );
           regionPushSpinner.stop(
             chalk.green(
