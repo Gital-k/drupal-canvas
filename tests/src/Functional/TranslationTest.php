@@ -649,12 +649,12 @@ class TranslationTest extends FunctionalTestBase {
    *   The saved Page entity (default/English translation).
    */
   private function createCanvasTranslationTestPage(): Page {
-    $content_language_settings = ContentLanguageSettings::loadByEntityTypeBundle('canvas_page', 'canvas_page');
+    $content_language_settings = ContentLanguageSettings::loadByEntityTypeBundle(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID);
     $content_language_settings
       ->setDefaultLangcode(LanguageInterface::LANGCODE_SITE_DEFAULT)
       ->setLanguageAlterable(TRUE)
       ->save();
-    $this->container->get('content_translation.manager')->setEnabled('canvas_page', 'canvas_page', TRUE);
+    $this->container->get('content_translation.manager')->setEnabled(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID, TRUE);
     $this->container->get('router.builder')->setRebuildNeeded();
 
     $version = $this->getHeadingComponentVersion();
@@ -676,6 +676,7 @@ class TranslationTest extends FunctionalTestBase {
         ],
       ],
     ]);
+    self::assertCount(0, $page->validate());
     $page->save();
 
     $fr_page = $page->addTranslation('fr');
@@ -687,6 +688,7 @@ class TranslationTest extends FunctionalTestBase {
     \assert($fr_item !== NULL);
     $fr_item->setInput(['text' => 'Bonjour, Canvas!', 'element' => 'h1'])
       ->setLabel('French heading');
+    self::assertCount(0, $fr_page->validate());
     $fr_page->save();
 
     return $page;
@@ -794,6 +796,8 @@ class TranslationTest extends FunctionalTestBase {
         ],
       ],
     ]);
+    $violations = $template->getTypedData()->validate();
+    self::assertSame([], self::violationsToArray($violations), $template->getConfigTarget());
     $template->save();
     $language_manager = $this->container->get(LanguageManagerInterface::class);
     \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
