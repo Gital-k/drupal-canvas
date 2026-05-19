@@ -51,7 +51,7 @@ export function stripNullableKeysForRegion(
 
 export interface RegionPushResult {
   id: string;
-  operation: 'Created' | 'Updated';
+  operation: 'Created' | 'Updated' | 'Deleted';
 }
 
 export interface PreparedRegion {
@@ -124,16 +124,17 @@ export async function prepareRegions(
 }
 
 /**
- * Sync prepared regions with the server: create new ones, update existing ones.
- *
- * Regions are not deleted: the set of regions is determined by the theme,
- * not by which files happen to live locally. To stop Canvas from managing a
- * region, set its `status` to false in the local file.
+ * Sync prepared regions with the server: create new ones, update existing
+ * ones, and delete remote regions that are absent locally.
  */
 export async function pushRegions(
   preparedRegions: Array<{ index: number; result: PreparedRegion }>,
   remoteIdsByShortName: Map<string, string>,
-  apiService: Pick<ApiService, 'createRegion' | 'updateRegion'>,
+  apiService: Pick<
+    ApiService,
+    'createRegion' | 'updateRegion' | 'deleteRegion'
+  >,
+  remoteIdsToDelete: string[] = [],
 ): Promise<
   Array<{
     success: boolean;
@@ -142,7 +143,7 @@ export async function pushRegions(
     index: number;
   }>
 > {
-  return processInPool(preparedRegions, async (entry) => {
+  const upsertResults = await processInPool(preparedRegions, async (entry) => {
     const region = entry.result;
     const remoteId = remoteIdsByShortName.get(region.region);
 
@@ -164,6 +165,28 @@ export async function pushRegions(
     });
     return { id: created.id, operation: 'Created' as const };
   });
+
+  if (remoteIdsToDelete.length === 0) {
+    return upsertResults;
+  }
+
+  const deleteResults = await processInPool(remoteIdsToDelete, async (id) => {
+    await apiService.deleteRegion(id);
+    return { id, operation: 'Deleted' as const };
+  });
+
+  return [
+    ...upsertResults,
+    ...deleteResults.map((r) => ({
+      ...r,
+      result:
+        r.result ??
+        ({
+          id: remoteIdsToDelete[r.index],
+          operation: 'Deleted' as const,
+        } satisfies RegionPushResult),
+    })),
+  ];
 }
 
 export function collectRegionResults(
@@ -186,7 +209,10 @@ export function collectRegionResults(
         details: [{ content: result.result.operation }],
       });
     } else {
-      const id = discoveredRegions[result.index]?.region || 'unknown';
+      const id =
+        result.result?.id ??
+        discoveredRegions[result.index]?.region ??
+        'unknown';
       results.push({
         itemName: id,
         success: false,
