@@ -1,18 +1,16 @@
 import clsx from 'clsx';
-import { Flex, Text, TextArea } from '@radix-ui/themes';
+import { Flex, TextArea } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
-import { updateProp } from '@/features/code-editor/codeEditorSlice';
 import {
   Divider,
   FormElement,
   Label,
+  RequiredFieldError,
 } from '@/features/code-editor/component-data/FormElement';
-import {
-  DEFAULT_EXAMPLES,
-  REQUIRED_EXAMPLE_ERROR_MESSAGE,
-} from '@/features/code-editor/component-data/Props';
+import { DEFAULT_EXAMPLES } from '@/features/code-editor/component-data/Props';
 import { useRequiredProp } from '@/features/code-editor/hooks/useRequiredProp';
+import { dispatchUpdateProp } from '@/features/code-editor/utils/arrayPropUtils';
 
 import type { CodeComponentProp } from '@/types/CodeComponent';
 
@@ -32,12 +30,9 @@ export default function FormPropTypeFormattedText({
     required,
     example as string,
     () => {
-      dispatch(
-        updateProp({
-          id,
-          updates: { example: DEFAULT_EXAMPLES.formattedText },
-        }),
-      );
+      dispatchUpdateProp(dispatch, id, {
+        example: DEFAULT_EXAMPLES.formattedText,
+      });
     },
     [dispatch, id],
   );
@@ -53,14 +48,7 @@ export default function FormPropTypeFormattedText({
           value={example as string}
           size="1"
           onChange={(e) => {
-            dispatch(
-              updateProp({
-                id,
-                updates: {
-                  example: e.target.value,
-                },
-              }),
-            );
+            dispatchUpdateProp(dispatch, id, { example: e.target.value });
             // Show/hide error based on whether field is empty while required
             setShowRequiredError(required && !e.target.value);
           }}
@@ -70,11 +58,7 @@ export default function FormPropTypeFormattedText({
           })}
           {...(showRequiredError ? { 'data-invalid-prop-value': true } : {})}
         />
-        {showRequiredError && (
-          <Text color="red" size="1">
-            {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-          </Text>
-        )}
+        <RequiredFieldError show={showRequiredError} />
       </FormElement>
     </Flex>
   );

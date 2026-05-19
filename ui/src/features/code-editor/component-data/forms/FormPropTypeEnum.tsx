@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDownIcon, PlusIcon, TrashIcon } from '@radix-ui/react-icons';
+import { useEffect, useMemo } from 'react';
+import { ChevronDownIcon } from '@radix-ui/react-icons';
 import {
   Box,
   Button,
@@ -8,7 +8,6 @@ import {
   Popover,
   Select,
   Text,
-  TextField,
 } from '@radix-ui/themes';
 
 import './FormPropTypeEnum.css';
@@ -18,11 +17,10 @@ import {
   Divider,
   FormElement,
   Label,
+  RequiredFieldError,
 } from '@/features/code-editor/component-data/FormElement';
-import {
-  DEFAULT_ENUM_OPTIONS,
-  REQUIRED_EXAMPLE_ERROR_MESSAGE,
-} from '@/features/code-editor/component-data/Props';
+import { EnumValuesForm } from '@/features/code-editor/component-data/forms/EnumValuesForm';
+import { DEFAULT_ENUM_OPTIONS } from '@/features/code-editor/component-data/Props';
 import { useRequiredProp } from '@/features/code-editor/hooks/useRequiredProp';
 import {
   dispatchUpdateProp,
@@ -45,17 +43,6 @@ const validateValue = (item: CodeComponentPropEnumItem): boolean => {
   return item.value !== '' && item.label !== '';
 };
 
-// Helper: find indices of duplicate values in the array of props.
-const getDuplicateValueIndices = (
-  arr: Array<Pick<CodeComponentPropEnumItem, 'value'>>,
-) => {
-  const valueCount: Record<string | number, number> = {};
-  arr.forEach(({ value }) => {
-    valueCount[value] = (valueCount[value] || 0) + 1;
-  });
-  return arr.map(({ value }) => valueCount[value] > 1 && value !== '');
-};
-
 export default function FormPropTypeEnum({
   id,
   enum: enumValues = [],
@@ -76,13 +63,12 @@ export default function FormPropTypeEnum({
   limitedCount?: number;
 }) {
   const dispatch = useAppDispatch();
+  const isLimitedMode = valueMode === VALUE_MODE_LIMITED;
 
   const validEnumValues = useMemo(() => {
     return enumValues.filter((item) => validateValue(item));
   }, [enumValues]);
 
-  // Normalize for useRequiredProp: ![] is false in JS, so an empty selection
-  // must be mapped to an empty string so the hook's empty-check works.
   const hasNonEmptyMultiValue = hasNonEmptyArrayValue(
     allowMultiple ? defaultValue : [],
   );
@@ -96,54 +82,38 @@ export default function FormPropTypeEnum({
     required,
     normalizedExampleForHook,
     () => {
-      if (allowMultiple) {
-        // Multi-value mode: select the first available option or add a default one.
-        if (validEnumValues.length === 0) {
-          const defaultOption = DEFAULT_ENUM_OPTIONS[type];
-          dispatchUpdateProp(dispatch, id, {
-            enum: [defaultOption],
-            example: [String(defaultOption.value)],
-          });
-        } else {
-          dispatchUpdateProp(dispatch, id, {
-            example: [String(validEnumValues[0].value)],
-          });
-        }
-      } else {
-        // Single-value mode (existing logic).
-        if (validEnumValues.length === 0) {
-          const defaultOption = DEFAULT_ENUM_OPTIONS[type];
-          dispatchUpdateProp(dispatch, id, {
-            enum: [defaultOption],
-            example: String(defaultOption.value),
-          });
-        } else if (!defaultValue) {
-          // If we have valid values but no default, set the first one
-          dispatchUpdateProp(dispatch, id, {
-            example: String(validEnumValues[0].value),
-          });
-        }
+      if (validEnumValues.length === 0) {
+        // No options yet — create a default option and select it.
+        const defaultOption = DEFAULT_ENUM_OPTIONS[type];
+        dispatchUpdateProp(dispatch, id, {
+          enum: [defaultOption],
+          example: allowMultiple
+            ? [String(defaultOption.value)]
+            : String(defaultOption.value),
+        });
+      } else if (allowMultiple || !defaultValue) {
+        // Options exist — select the first one.
+        dispatchUpdateProp(dispatch, id, {
+          example: allowMultiple
+            ? [String(validEnumValues[0].value)]
+            : String(validEnumValues[0].value),
+        });
       }
     },
     [dispatch, id, type, validEnumValues, allowMultiple],
   );
 
-  // Normalize defaultValue to always work with arrays internally when allowMultiple is true
-  const selectedValues = useMemo(() => {
-    if (!allowMultiple) {
-      return [];
-    }
-    if (Array.isArray(defaultValue)) {
-      return defaultValue.map((v) => String(v));
-    }
-    return defaultValue ? [String(defaultValue)] : [];
-  }, [allowMultiple, defaultValue]);
-
-  // Filter selectedValues to only include values that exist in validEnumValues
+  // Normalize defaultValue to a string array and filter to only valid enum values.
   const validSelectedValues = useMemo(() => {
+    if (!allowMultiple) return [];
+    const selected = Array.isArray(defaultValue)
+      ? defaultValue.map((v) => String(v))
+      : defaultValue
+        ? [String(defaultValue)]
+        : [];
     const validValueStrings = validEnumValues.map((item) => String(item.value));
-    return selectedValues.filter((v) => validValueStrings.includes(v));
-  }, [selectedValues, validEnumValues]);
+    return selected.filter((v) => validValueStrings.includes(v));
+  }, [allowMultiple, defaultValue, validEnumValues]);
 
   // Show error when required but no valid example or no options.
   // Also handles the multi-value case where defaultValue is an empty array
@@ -193,7 +163,7 @@ export default function FormPropTypeEnum({
             // being added), to avoid resetting a user-configured cardinality back to 1.
             if (
               allowMultiple &&
-              valueMode === VALUE_MODE_LIMITED &&
+              isLimitedMode &&
               validNewValues.length < validEnumValues.length &&
               validNewValues.length < limitedCount
             ) {
@@ -208,7 +178,6 @@ export default function FormPropTypeEnum({
               const filteredSelected = defaultValue.filter((v) =>
                 validValueStrings.includes(String(v)),
               );
-              // Only update if the filtered list is different
               if (filteredSelected.length !== defaultValue.length) {
                 updates.example = filteredSelected;
               }
@@ -238,9 +207,7 @@ export default function FormPropTypeEnum({
           <FormElement>
             <Label htmlFor={`prop-enum-default-${id}`}>
               Default value
-              {allowMultiple &&
-                valueMode === VALUE_MODE_LIMITED &&
-                ` (max ${limitedCount})`}
+              {allowMultiple && isLimitedMode && ` (max ${limitedCount})`}
             </Label>
             {allowMultiple ? (
               <Popover.Root>
@@ -271,7 +238,7 @@ export default function FormPropTypeEnum({
                         String(item.value),
                       );
                       const isAtLimit =
-                        valueMode === VALUE_MODE_LIMITED &&
+                        isLimitedMode &&
                         validSelectedValues.length >= limitedCount &&
                         !isSelected;
                       return (
@@ -314,7 +281,7 @@ export default function FormPropTypeEnum({
                         </Text>
                       );
                     })}
-                    {valueMode === VALUE_MODE_LIMITED && (
+                    {isLimitedMode && (
                       <>
                         <Box className="fpe-divider" />
                         <Text size="1" color="gray">
@@ -357,150 +324,7 @@ export default function FormPropTypeEnum({
           </FormElement>
         </>
       )}
-      {showRequiredError && (
-        <Text color="red" size="1">
-          {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-        </Text>
-      )}
-    </Flex>
-  );
-}
-
-function EnumValuesForm({
-  propId,
-  values = [],
-  onChange,
-  type,
-  isDisabled,
-}: {
-  propId: string;
-  values: Array<CodeComponentPropEnumItem>;
-  onChange: (values: Array<CodeComponentPropEnumItem>) => void;
-  type: 'string' | 'integer' | 'number';
-  isDisabled: boolean;
-}) {
-  // Keep track of which labels have been touched (manually edited) by the user.
-  // If a label has not been touched, it will be auto-updated to match the value.
-  const [touched, setTouched] = useState(values.map(({ label }) => !!label));
-  const typeRef = React.useRef(type);
-
-  useEffect(() => {
-    // If the type changes, the values are reset, so we need to reset the touched state.
-    if (typeRef.current !== type && type !== undefined) {
-      setTouched([false]);
-    }
-    typeRef.current = type;
-  }, [type]);
-
-  const invalidValueIndices = getDuplicateValueIndices(values);
-
-  const handleAdd = () => {
-    onChange([...values, { label: '', value: '' }]);
-  };
-
-  const handleRemove = (index: number) => {
-    const newValues = [...values];
-    newValues.splice(index, 1);
-    // Also remove the touched state for this index.
-    setTouched((prev) => prev.filter((_, i) => i !== index));
-    onChange(newValues);
-  };
-
-  const handleValueChange = (index: number, value: string | number) => {
-    const newValues = [...values];
-    // If label is untouched, update label to match the value entered.
-    if (!touched[index]) {
-      newValues[index] = { ...newValues[index], value, label: String(value) };
-    } else {
-      newValues[index] = { ...newValues[index], value };
-    }
-    onChange(newValues);
-  };
-
-  const handleLabelChange = (index: number, label: string) => {
-    const newValues = [...values];
-    newValues[index] = { ...newValues[index], label };
-    setTouched((prev) => Object.assign([...prev], { [index]: true }));
-    onChange(newValues);
-  };
-
-  return (
-    <Flex mt="1" direction="column" gap="2" flexGrow="1" width="100%">
-      {values.map((item, index) => (
-        <React.Fragment key={index}>
-          <Flex gap="2" align="end" flexGrow="1" width="100%">
-            <Box flexGrow="1" flexShrink="1">
-              <FormElement>
-                <Label htmlFor={`canvas-prop-enum-value-${propId}-${index}`}>
-                  Value
-                </Label>
-                <TextField.Root
-                  autoComplete="off"
-                  data-testid={`canvas-prop-enum-value-${propId}-${index}`}
-                  id={`canvas-prop-enum-value-${propId}-${index}`}
-                  type={
-                    ['integer', 'number'].includes(type) ? 'number' : 'text'
-                  }
-                  step={type === 'integer' ? 1 : undefined}
-                  value={item.value}
-                  size="1"
-                  onChange={(e) => handleValueChange(index, e.target.value)}
-                  placeholder={
-                    {
-                      string: 'Enter a text value',
-                      integer: 'Enter an integer',
-                      number: 'Enter a number',
-                    }[type]
-                  }
-                  disabled={isDisabled}
-                  // Show as invalid if duplicate
-                  color={invalidValueIndices[index] ? 'red' : undefined}
-                />
-              </FormElement>
-            </Box>
-            <Box flexGrow="1" flexShrink="1">
-              <FormElement>
-                <Label htmlFor={`canvas-prop-enum-label-${propId}-${index}`}>
-                  Label
-                </Label>
-                <TextField.Root
-                  autoComplete="off"
-                  data-testid={`canvas-prop-enum-label-${propId}-${index}`}
-                  id={`canvas-prop-enum-label-${propId}-${index}`}
-                  type="text"
-                  value={item.label}
-                  size="1"
-                  onChange={(e) => handleLabelChange(index, e.target.value)}
-                  placeholder="Enter a label"
-                  disabled={isDisabled}
-                />
-              </FormElement>
-            </Box>
-            <Button
-              aria-label="Remove value"
-              data-testid={`canvas-prop-enum-value-delete-${propId}-${index}`}
-              size="1"
-              color="red"
-              variant="soft"
-              onClick={() => handleRemove(index)}
-              disabled={isDisabled}
-            >
-              <TrashIcon />
-            </Button>
-          </Flex>
-          {invalidValueIndices[index] && (
-            <Text color="red" size="1">
-              Value must be unique.
-            </Text>
-          )}
-        </React.Fragment>
-      ))}
-      <Button size="1" variant="soft" onClick={handleAdd} disabled={isDisabled}>
-        <Flex gap="1" align="center">
-          <PlusIcon />
-          <Text size="1">Add value</Text>
-        </Flex>
-      </Button>
+      <RequiredFieldError show={showRequiredError} />
     </Flex>
   );
 }

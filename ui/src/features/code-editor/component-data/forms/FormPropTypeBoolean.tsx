@@ -1,12 +1,12 @@
 import { Flex, Switch } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
-import { updateProp } from '@/features/code-editor/codeEditorSlice';
 import {
   Divider,
   FormElement,
   Label,
 } from '@/features/code-editor/component-data/FormElement';
+import { dispatchUpdateProp } from '@/features/code-editor/utils/arrayPropUtils';
 
 import type { CodeComponentProp } from '@/types/CodeComponent';
 
@@ -28,7 +28,7 @@ export default function FormPropTypeBoolean({
           id={`prop-example-${id}`}
           checked={example === true}
           onCheckedChange={(checked) =>
-            dispatch(updateProp({ id, updates: { example: checked } }))
+            dispatchUpdateProp(dispatch, id, { example: checked })
           }
           size="1"
           disabled={isDisabled}

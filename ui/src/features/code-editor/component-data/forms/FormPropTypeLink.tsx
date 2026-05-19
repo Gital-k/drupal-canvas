@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { Box, Flex, Select, Text, TextField } from '@radix-ui/themes';
 
@@ -8,9 +8,10 @@ import {
   Divider,
   FormElement,
   Label,
+  RequiredFieldError,
 } from '@/features/code-editor/component-data/FormElement';
 import { PropValuesSortableList } from '@/features/code-editor/component-data/forms/PropValuesSortableList';
-import { REQUIRED_EXAMPLE_ERROR_MESSAGE } from '@/features/code-editor/component-data/Props';
+import { useMultiValueValidation } from '@/features/code-editor/hooks/useMultiValueValidation';
 import {
   useRequiredProp,
   useSyncRequiredArrayError,
@@ -24,10 +25,7 @@ import {
   handleArrayValueChange,
   hasNonEmptyArrayValue,
 } from '@/features/code-editor/utils/arrayPropUtils';
-import {
-  VALUE_MODE_LIMITED,
-  VALUE_MODE_UNLIMITED,
-} from '@/types/CodeComponent';
+import { VALUE_MODE_UNLIMITED } from '@/types/CodeComponent';
 
 import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
 
@@ -69,36 +67,30 @@ export default function FormPropTypeLink({
       ? linkFormatMap[format as keyof typeof linkFormatMap]
       : 'relative',
   );
-  function validateLinkValue(value: string, linkType: 'relative' | 'full') {
+
+  function validateLinkValue(value: string, type: 'relative' | 'full') {
     if (value === '') return true;
     const [isValidValue] = jsonSchemaValidate(value, {
       type: 'string',
-      format: linkType === 'full' ? 'uri' : 'uri-reference',
+      format: type === 'full' ? 'uri' : 'uri-reference',
     });
     return isValidValue;
   }
 
   const [isExampleValueValid, setIsExampleValueValid] = useState(true);
 
-  // For multi-value mode, normalize the example so `useRequiredProp` can
-  // detect empty arrays (since `![]` is false in JS).
-  const hasNonEmptyValue = hasNonEmptyArrayValue(allowMultiple ? example : []);
+  const hasNonEmptyValue = allowMultiple && hasNonEmptyArrayValue(example);
 
   const { showRequiredError, setShowRequiredError } = useRequiredProp(
     required,
     allowMultiple ? (hasNonEmptyValue ? 'non-empty' : '') : example,
     () => {
-      if (allowMultiple) {
-        dispatchUpdateProp(dispatch, id, {
-          example: [DEFAULT_LINK_EXAMPLES[linkType]],
-          format: linkType === 'full' ? 'uri' : 'uri-reference',
-        });
-      } else {
-        dispatchUpdateProp(dispatch, id, {
-          example: DEFAULT_LINK_EXAMPLES[linkType],
-          format: linkType === 'full' ? 'uri' : 'uri-reference',
-        });
-      }
+      dispatchUpdateProp(dispatch, id, {
+        example: allowMultiple
+          ? [DEFAULT_LINK_EXAMPLES[linkType]]
+          : DEFAULT_LINK_EXAMPLES[linkType],
+        format: linkType === 'full' ? 'uri' : 'uri-reference',
+      });
     },
     [dispatch, id, linkType, allowMultiple],
   );
@@ -123,39 +115,28 @@ export default function FormPropTypeLink({
   );
 
   // Add validity state for multiple values
-  const [multiValueValidityStates, setMultiValueValidityStates] = useState<
-    boolean[]
-  >(() => displayArray.map((v) => validateLinkValue(v, linkType)));
+  const { validityStates, setValidity, resetValidityStates } =
+    useMultiValueValidation(
+      displayArray,
+      (v) => validateLinkValue(v, linkType),
+      valueMode,
+      limitedCount,
+    );
 
-  useEffect(() => {
-    if (
-      valueMode === VALUE_MODE_LIMITED &&
-      limitedCount > multiValueValidityStates.length
-    ) {
-      setMultiValueValidityStates((prev) => {
-        const next = [...prev];
-        while (next.length < limitedCount) {
-          next.push(true);
-        }
-        return next;
-      });
-    }
-  }, [limitedCount, valueMode, multiValueValidityStates.length]);
+  const handleMultiValueDragEnd = createArrayDragEndHandler(
+    displayArray,
+    dispatch,
+    id,
+  );
 
-  const handleDragEnd = createArrayDragEndHandler(displayArray, dispatch, id);
-
-  const handleAdd = () => {
+  const handleMultiValueAdd = () => {
     handleArrayAdd(displayArray, dispatch, id, '');
-    setMultiValueValidityStates((prev) => [...prev, true]); // Add validity for new input
+    resetValidityStates([...validityStates, true]); // Add validity for new input
   };
 
-  const handleRemove = (index: number) => {
+  const handleMultiValueRemove = (index: number) => {
     handleArrayRemove(displayArray, dispatch, id, index);
-    setMultiValueValidityStates((prev) => {
-      const next = [...prev];
-      next.splice(index, 1);
-      return next;
-    });
+    resetValidityStates(validityStates.filter((_, i) => i !== index));
   };
 
   const handleMultiValueChange = (index: number, value: string) => {
@@ -163,22 +144,14 @@ export default function FormPropTypeLink({
       format: linkType === 'full' ? 'uri' : 'uri-reference',
     });
     // Reset validity on change
-    setMultiValueValidityStates((prev) => {
-      const next = [...prev];
-      next[index] = true;
-      return next;
-    });
+    setValidity(index, true);
   };
 
   const handleMultiValueBlur = (index: number, value: string) => {
-    setMultiValueValidityStates((prev) => {
-      const next = [...prev];
-      next[index] = validateLinkValue(value, linkType);
-      return next;
-    });
+    setValidity(index, validateLinkValue(value, linkType));
   };
 
-  const renderInputField = (index: number) => (
+  const renderMultiValueInputField = (index: number) => (
     <Flex align="center" gap="1" flexGrow="1">
       {linkType === 'relative' && (
         <Flex flexShrink="0" align="center">
@@ -199,9 +172,9 @@ export default function FormPropTypeLink({
           onChange={(e) => handleMultiValueChange(index, e.target.value)}
           onBlur={(e) => handleMultiValueBlur(index, e.target.value)}
           className={clsx({
-            [styles.error]: !multiValueValidityStates[index],
+            [styles.error]: !validityStates[index],
           })}
-          {...(!multiValueValidityStates[index]
+          {...(!validityStates[index]
             ? { 'data-invalid-prop-value': true }
             : {})}
         />
@@ -232,7 +205,7 @@ export default function FormPropTypeLink({
                 limitedCount: undefined,
               });
               // Reset validity states to a single valid entry
-              setMultiValueValidityStates([true]);
+              resetValidityStates([true]);
             } else {
               // Single value mode - just update format and example
               dispatchUpdateProp(dispatch, id, {
@@ -254,7 +227,6 @@ export default function FormPropTypeLink({
       <Divider />
       <FormElement>
         <Label htmlFor={`prop-example-${id}`}>Example value</Label>
-        {/* Single value mode */}
         {!allowMultiple && (
           <Flex align="center" gap="1" width="100%">
             {linkType === 'relative' && (
@@ -300,32 +272,27 @@ export default function FormPropTypeLink({
           </Flex>
         )}
 
-        {/* Multiple values mode */}
         {allowMultiple && (
           <PropValuesSortableList
             items={displayArray.map((_, index) => index)}
-            renderItem={renderInputField}
-            onDragEnd={handleDragEnd}
+            renderItem={renderMultiValueInputField}
+            onDragEnd={handleMultiValueDragEnd}
             onRemove={
-              valueMode === VALUE_MODE_UNLIMITED ? handleRemove : undefined
+              valueMode === VALUE_MODE_UNLIMITED
+                ? handleMultiValueRemove
+                : undefined
             }
-            onAdd={valueMode === VALUE_MODE_UNLIMITED ? handleAdd : undefined}
+            onAdd={
+              valueMode === VALUE_MODE_UNLIMITED
+                ? handleMultiValueAdd
+                : undefined
+            }
             isDisabled={isDisabled}
             mode={valueMode}
-            errorMessage={
-              showRequiredError && (
-                <Text color="red" size="1">
-                  {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-                </Text>
-              )
-            }
+            errorMessage={<RequiredFieldError show={showRequiredError} />}
           />
         )}
-        {!allowMultiple && showRequiredError && (
-          <Text color="red" size="1">
-            {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-          </Text>
-        )}
+        {!allowMultiple && <RequiredFieldError show={showRequiredError} />}
       </FormElement>
     </Flex>
   );

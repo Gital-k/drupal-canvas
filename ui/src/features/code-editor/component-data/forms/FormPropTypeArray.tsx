@@ -7,12 +7,10 @@ import { useAppDispatch } from '@/app/hooks';
 import {
   Divider,
   FormElement,
+  RequiredFieldError,
 } from '@/features/code-editor/component-data/FormElement';
 import { PropValuesSortableList } from '@/features/code-editor/component-data/forms/PropValuesSortableList';
-import {
-  DEFAULT_EXAMPLES,
-  REQUIRED_EXAMPLE_ERROR_MESSAGE,
-} from '@/features/code-editor/component-data/Props';
+import { DEFAULT_EXAMPLES } from '@/features/code-editor/component-data/Props';
 import {
   useRequiredProp,
   useSyncRequiredArrayError,
@@ -63,10 +61,8 @@ function NumericArrayItem({
   const displayValueRef = useRef(displayValue);
   displayValueRef.current = displayValue;
 
-  // Sync the display string when the store value changes externally (e.g. on
-  // reorder or add/remove), but NOT when the difference is only a trailing
-  // zero (e.g. display "10.0" while store holds 10). Comparing numerically
-  // lets the user keep typing "10.0" without the zero being stripped.
+  // Sync display string from the store, but preserve trailing zeros while typing
+  // (e.g. keep "10.0" when the store holds 10).
   useEffect(() => {
     const storedStr = String(value ?? '');
     const displayNum =
@@ -248,13 +244,7 @@ export default function FormPropTypeArray({
           onAdd={valueMode === VALUE_MODE_UNLIMITED ? handleAdd : undefined}
           isDisabled={isDisabled}
           mode={valueMode}
-          errorMessage={
-            showRequiredError && (
-              <Text color="red" size="1">
-                {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-              </Text>
-            )
-          }
+          errorMessage={<RequiredFieldError show={showRequiredError} />}
         />
       </FormElement>
     </Flex>
