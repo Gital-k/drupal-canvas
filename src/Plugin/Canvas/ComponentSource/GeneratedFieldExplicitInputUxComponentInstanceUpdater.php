@@ -13,6 +13,7 @@ use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
 
@@ -48,6 +49,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
    * - Changing a prop matched prop shape field widget (but only the widget!)
    * - Changing default values in prop_field_definitions
    * - Changing slot examples
+   * - Changing cardinality of array props (UI constraint only, not storage)
    *
    * Unsafe changes (that prevent auto-update) include:
    * - Changing prop shapes
@@ -225,7 +227,6 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
     return \array_map(static function (array $prop_field_definition): StorablePropShape {
       $field_type_prop = StructuredDataPropExpression::fromString($prop_field_definition['expression']);
       \assert($field_type_prop instanceof FieldTypeBasedPropExpressionInterface);
-
       // Shape details are irrelevant for update safety checks, but the
       // constructor validates that cardinality aligns with array/non-array.
       $is_single_value = ($prop_field_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) === 1;
@@ -233,11 +234,13 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
         ? new PropShape(['type' => 'object'])
         : new PropShape(['type' => 'array', 'items' => ['type' => 'object']]);
 
+      $comparison_cardinality = $is_single_value ? NULL : FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED;
+
       return new StorablePropShape(
         shape: $irrelevant_prop_shape,
         fieldTypeProp: $field_type_prop,
         fieldWidget: 'irrelevant',
-        cardinality: $prop_field_definition['cardinality'] ?? NULL,
+        cardinality: $comparison_cardinality,
         fieldStorageSettings: $prop_field_definition['field_storage_settings'] ?? NULL,
         fieldInstanceSettings: $prop_field_definition['field_instance_settings'] ?? NULL,
       );
