@@ -629,17 +629,6 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
-   * Returns the active version string for the heading SDC component.
-   */
-  private function getHeadingComponentVersion(): string {
-    $component = $this->container->get('entity_type.manager')
-      ->getStorage('component')
-      ->load('sdc.canvas_test_sdc.heading');
-    \assert($component instanceof Component);
-    return $component->getActiveVersion();
-  }
-
-  /**
    * Creates a canvas_page entity with English and French translations.
    *
    * Also enables content translation for canvas_page entities, which is
@@ -657,24 +646,22 @@ class TranslationTest extends FunctionalTestBase {
     $this->container->get('content_translation.manager')->setEnabled(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID, TRUE);
     $this->container->get('router.builder')->setRebuildNeeded();
 
-    $version = $this->getHeadingComponentVersion();
-
     $page = Page::create([
       'title' => 'Canvas Translation Test Page',
       'path' => '/canvas-translation-test',
       'status' => TRUE,
-      'components' => [
+      'components' => static::populateActiveComponentVersionPlaceholders([
         [
           'uuid' => '11111111-1111-4111-8111-111111111111',
           'component_id' => 'sdc.canvas_test_sdc.heading',
-          'component_version' => $version,
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'text' => 'Hello, Canvas!',
             'element' => 'h1',
           ],
           'label' => 'English heading',
         ],
-      ],
+      ]),
     ]);
     self::assertCount(0, $page->validate());
     $page->save();
@@ -701,8 +688,6 @@ class TranslationTest extends FunctionalTestBase {
    *   The saved PageRegion entity.
    */
   private function createPageRegionWithFrenchOverride(): PageRegion {
-    $version = $this->getHeadingComponentVersion();
-
     $default_theme = $this->container->get('theme_handler')->getDefault();
     $regions = PageRegion::createFromBlockLayout($default_theme);
     $new_region = reset($regions);
@@ -711,18 +696,18 @@ class TranslationTest extends FunctionalTestBase {
       ->getStorage(PageRegion::ENTITY_TYPE_ID)
       ->load($new_region->id());
     $region = $existing instanceof PageRegion ? $existing : $new_region;
-    $region->set('component_tree', [
+    $region->set('component_tree', static::populateActiveComponentVersionPlaceholders([
       [
         'uuid' => '33333333-3333-4333-8333-333333333333',
         'component_id' => 'sdc.canvas_test_sdc.heading',
-        'component_version' => $version,
+        'component_version' => '::ACTIVE_VERSION_IN_SUT::',
         'inputs' => [
           'text' => 'Hello from region',
           'element' => 'h3',
         ],
         'label' => 'English region heading',
       ],
-    ]);
+    ]));
     $region->enable()->save();
 
     $language_manager = $this->container->get(LanguageManagerInterface::class);
@@ -764,17 +749,16 @@ class TranslationTest extends FunctionalTestBase {
 
     // Create a ContentTemplate for node/article/full with French language
     // override, so that ContentTemplate translation can be tested.
-    $version = $this->getHeadingComponentVersion();
     $template = ContentTemplate::create([
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'article',
       'content_entity_type_view_mode' => 'full',
       'status' => TRUE,
-      'component_tree' => [
+      'component_tree' => static::populateActiveComponentVersionPlaceholders([
         [
           'uuid' => '22222222-2222-4222-8222-222222222222',
           'component_id' => 'sdc.canvas_test_sdc.heading',
-          'component_version' => $version,
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'text' => 'Hello from template',
             'element' => 'h2',
@@ -784,7 +768,7 @@ class TranslationTest extends FunctionalTestBase {
         [
           'uuid' => '22222222-2222-4222-8221-222222222222',
           'component_id' => 'sdc.canvas_test_sdc.heading',
-          'component_version' => $version,
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'text' => [
               'sourceType' => PropSource::EntityField->value,
@@ -794,7 +778,7 @@ class TranslationTest extends FunctionalTestBase {
           ],
           'label' => 'English dynamic heading',
         ],
-      ],
+      ]),
     ]);
     $violations = $template->getTypedData()->validate();
     self::assertSame([], self::violationsToArray($violations), $template->getConfigTarget());
