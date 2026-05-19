@@ -15,7 +15,7 @@ use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
-use Drupal\canvas\EntityHandlers\PageRegionAccessControlHandler;
+use Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 
 #[ConfigEntityType(
@@ -26,7 +26,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
   label_collection: new TranslatableMarkup("Page region"),
   admin_permission: self::ADMIN_PERMISSION,
   handlers: [
-    "access" => PageRegionAccessControlHandler::class,
+    "access" => CanvasConfigEntityAccessControlHandler::class,
   ],
   entity_keys: [
     "id" => "id",

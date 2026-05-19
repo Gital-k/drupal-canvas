@@ -678,7 +678,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->drupalLogin($this->limitedPermissionsUser);
     // PageRegion::refineListQuery adds the `theme` cache context to the list
     // response (it filters to the active theme).
-    $this->assertAuthenticationAndAuthorization('page_region', FALSE, initial_cache_tags: ['http_response'], initial_cache_contexts: ['theme', 'user.permissions']);
+    $this->assertAuthenticationAndAuthorization('page_region', initial_cache_tags: ['http_response'], initial_cache_contexts: ['theme', 'user.permissions']);
 
     $base = rtrim(base_path(), '/');
     $list_url = Url::fromUri("base:/canvas/api/v0/config/page_region");
@@ -689,14 +689,19 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       ],
     ];
 
-    // The helper POSTed the openapi example, which omits `theme` — confirming
-    // that the server filled it from the active default theme and composed
-    // the id accordingly. Remove it so later assertions start from a clean
-    // slate.
-    $created = PageRegion::load('stark.highlighted');
-    self::assertInstanceOf(PageRegion::class, $created);
-    self::assertSame('stark', $created->get('theme'));
-    $created->delete();
+    // POST omitting `theme`: the server must fill it from the active default
+    // theme and compose the id accordingly. Then DELETE via HTTP to restore a
+    // clean slate for later assertions.
+    $request_options[RequestOptions::JSON] = [
+      'region' => 'highlighted',
+      'status' => TRUE,
+      'component_tree' => [],
+    ];
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    self::assertSame('stark.highlighted', $body['id']);
+    self::assertSame('stark', $body['theme']);
+    $this->assertExpectedResponse('DELETE', Url::fromUri('base:/canvas/api/v0/config/page_region/stark.highlighted'), [], 204, NULL, NULL, NULL, NULL);
 
     // The `content` region is reserved for the main page content and may
     // never have a PageRegion. Even with `theme` defaulted server-side, this
@@ -865,12 +870,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     self::assertIsArray($body);
     self::assertSame([$olivero_region_id], \array_keys($body));
 
-    // Clean up: deletion via HTTP is forbidden for page_region (see
-    // PageRegionAccessControlHandler, asserted in step 1). Delete via the
-    // entity API and verify the list reflects the change.
-    $olivero_region = PageRegion::load($olivero_region_id);
-    self::assertInstanceOf(PageRegion::class, $olivero_region);
-    $olivero_region->delete();
+    // Clean up via HTTP DELETE and verify the list reflects the change.
+    $this->assertExpectedResponse('DELETE', Url::fromUri("base:/canvas/api/v0/config/page_region/$olivero_region_id"), [], 204, NULL, NULL, NULL, NULL);
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
       'config:page_region_list',
       'http_response',
