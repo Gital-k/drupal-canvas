@@ -4,7 +4,7 @@
  * A small text input that lets a Content Creator give a per-instance label
  * ("Layer name") to a single component on a Canvas page. The label shows up
  * in the Layers panel in place of the generic component-type name, so
- * site builders can tell e.g. five Section Wrappers apart.
+ * site builders can distinguish e.g. five Section Wrappers.
  *
  * Renders only when exactly one component is selected. Reads from and writes
  * directly to Redux — `node.name` on the ComponentNode in the layout slice.
@@ -21,11 +21,7 @@ import {
   selectLayout,
   setComponentName,
 } from '@/features/layout/layoutModelSlice';
-import {
-  findComponentByUuid,
-  getComponentTypeCount,
-  getComponentTypeIndex,
-} from '@/features/layout/layoutUtils';
+import { findComponentByUuid } from '@/features/layout/layoutUtils';
 import { selectSelectedComponentUuid } from '@/features/ui/uiSlice';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 
@@ -43,7 +39,7 @@ const ComponentInstanceName: React.FC = () => {
   const node = selectedUuid ? findComponentByUuid(layout, selectedUuid) : null;
 
   // Local state keeps the input responsive; dispatch is debounced to avoid
-  // a POST per keystroke (see #3527952 review feedback).
+  // a POST per keystroke.
   const [localValue, setLocalValue] = useState(node?.name ?? '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -77,14 +73,6 @@ const ComponentInstanceName: React.FC = () => {
 
   const [nodeType] = node.type.split('@');
   const typeName = components?.[nodeType]?.name || 'Component';
-  // The placeholder matches what the Layers panel would display if the user
-  // left the field blank — bare type name when this is the only instance of
-  // its type on the page, type name + index when there are 2+ instances.
-  // See #3527952.
-  const typeCount = getComponentTypeCount(layout, node.type);
-  const typeIndex =
-    typeCount > 1 ? getComponentTypeIndex(layout, selectedUuid, node.type) : 0;
-  const placeholderName = typeIndex > 0 ? `${typeName} ${typeIndex}` : typeName;
 
   return (
     <Flex
@@ -101,7 +89,7 @@ const ComponentInstanceName: React.FC = () => {
         autoComplete="off"
         size="1"
         value={localValue}
-        placeholder={placeholderName}
+        placeholder={typeName}
         onChange={handleChange}
       />
       <Text size="1" color="gray">

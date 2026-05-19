@@ -34,18 +34,13 @@ const SiblingSlotsSubMenu: React.FC<{
     siblings
       .filter((sib) => sib.slots && sib.slots.length > 0) // Only display siblings with slots
       .forEach((sib) => {
-        const name = getDisplayNameForNode(sib, null, components, layout);
+        const name = getDisplayNameForNode(sib, null, components);
         sib.slots.forEach((slot) => {
           slots.push({
             slot,
             parentComponent: sib,
             parentComponentName: name,
-            slotDisplayName: getDisplayNameForNode(
-              slot,
-              sib,
-              components,
-              layout,
-            ),
+            slotDisplayName: getDisplayNameForNode(slot, sib, components),
           });
         });
       });
