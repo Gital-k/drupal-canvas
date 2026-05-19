@@ -710,6 +710,10 @@ class TranslationTest extends FunctionalTestBase {
     ]));
     $region->enable()->save();
 
+    // Create the LanguageConfigOverride programmatically rather than via the
+    // config translation UI (cf. ::testContentTemplateConfigTranslationUi())
+    // because this is a test helper setting up fixtures, not testing the UI
+    // translation workflow itself.
     $language_manager = $this->container->get(LanguageManagerInterface::class);
     \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
     $region_override = $language_manager->getLanguageConfigOverride('fr', $region->getConfigDependencyName());
@@ -728,8 +732,8 @@ class TranslationTest extends FunctionalTestBase {
   /**
    * Tests that the layout API returns translated content from language-prefixed routes when canvas_dev_translation is enabled.
    *
-   * @todo This might just be temporary test until we have a Playwright test
-   *    that test this functionality with the translation preview.
+   * @todo Replace with a Playwright test once translation preview UI exists.
+   *   https://www.drupal.org/project/canvas/issues/3585452
    */
   public function testCanvasDevTranslationLayoutApi(): void {
     // Delete the content template created in setUp() — this test needs a
@@ -908,7 +912,8 @@ class TranslationTest extends FunctionalTestBase {
     $this->drupalGet($french_page_url);
     $this->assertSession()->statusCodeEquals(200);
 
-    // The French translation of the canvas_page should be displayed.
+    // Both the Page content entity's French translation AND the PageRegion's
+    // French LanguageConfigOverride must be displayed.
     $this->assertSession()->pageTextContains('Bonjour, Canvas!');
     $this->assertSession()->pageTextContains('Bonjour de la région');
     $this->assertSession()->pageTextNotContains('Hello, Canvas!');
@@ -923,14 +928,19 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
-   * Tests that /fr/node/{nid} uses the French ContentTemplate translation.
+   * Tests that /fr/node/{nid} uses the French ContentTemplate even without a French node translation.
    *
-   * Visiting a non-default translation URL (e.g., French-language URL) applies
-   * the French ContentTemplate LanguageConfigOverride regardless of whether the
-   * node itself has a French translation. EntityFieldPropSource values follow
-   * the node's own translation availability: if no French node translation
-   * exists, the English node field value is used; once a French translation is
-   * added, the French field value is used.
+   * The French ContentTemplate LanguageConfigOverride is applied based on URL
+   * language prefix alone — the node does not need a French translation for the
+   * ContentTemplate override to take effect. This is the key distinction from
+   * ::testContentTemplateTranslationRendered(), which only tests the case where
+   * both the ContentTemplate and the node have French translations.
+   *
+   * This test also verifies EntityFieldPropSource falls back to the English node
+   * field when no French node translation exists, and resolves the French value
+   * once a French node translation is added.
+   *
+   * @see ::testContentTemplateTranslationRendered()
    */
   public function testNonDefaultLanguageNodePathContentTemplateTranslation(): void {
     $template = ContentTemplate::load('node.article.full');
@@ -998,75 +1008,20 @@ class TranslationTest extends FunctionalTestBase {
       'Dynamic CTA href must be the default-language node URL when no French node translation exists.',
     );
 
-    // Add a French translation to the existing node.
+    // After adding a French node translation, EntityFieldPropSource must now
+    // resolve to the French title on the French URL. The static ContentTemplate
+    // CTA and English-URL behaviour is already covered by
+    // ::testContentTemplateTranslationRendered() and is not repeated here.
     $node_fresh = Node::load($nid);
     self::assertNotNull($node_fresh);
     $fr_translation = $node_fresh->addTranslation('fr');
     $fr_translation->set('title', 'The French title');
     $fr_translation->save();
 
-    // Re-visit the French URL — the French node title must now be used by the
-    // EntityFieldPropSource.
     $this->drupalGet($french_url);
-    $this->assertSession()->statusCodeEquals(200);
-    $fr_page = $this->getSession()->getPage();
-
-    // French ContentTemplate static text still applies.
     self::assertNotNull(
-      $fr_page->findLink('Propulsé par Drupal Canvas'),
-      'French ContentTemplate translation must still be applied after adding a French node translation.',
-    );
-    self::assertNull(
-      $fr_page->findLink('Powered by Drupal Canvas'),
-      'English static CTA text must still not appear on the French URL after adding a French node translation.',
-    );
-
-    // The dynamic CTA must now show the French node title, not the English one.
-    $fr_node_link = $fr_page->findLink('The French title');
-    self::assertNotNull(
-      $fr_node_link,
+      $this->getSession()->getPage()->findLink('The French title'),
       'Dynamic CTA must show the French node title once a French node translation exists.',
-    );
-    self::assertNull(
-      $fr_page->findLink($english_title),
-      'Dynamic CTA must not show the English title when visiting the French URL with a French node translation present.',
-    );
-
-    // The dynamic CTA href must still resolve to the French node URL.
-    self::assertSame(
-      $GLOBALS['base_url'] . '/fr/node/' . $nid,
-      $fr_node_link->getAttribute('href'),
-      'Dynamic CTA href must remain the French-language node URL after adding a French node translation.',
-    );
-
-    $this->drupalGet($english_url);
-    $this->assertSession()->statusCodeEquals(200);
-    $en_page = $this->getSession()->getPage();
-
-    // English static CTA must appear on the English URL.
-    $en_canvas_link = $en_page->findLink('Powered by Drupal Canvas');
-    self::assertNotNull(
-      $en_canvas_link,
-      'English ContentTemplate text must be applied when visiting the English URL.',
-    );
-    self::assertSame('https://drupal.org/project/canvas', $en_canvas_link->getAttribute('href'));
-
-    // French text must not appear on the English URL.
-    self::assertNull(
-      $en_page->findLink('Propulsé par Drupal Canvas'),
-      'French ContentTemplate translation must not appear when visiting the English URL.',
-    );
-
-    // The dynamic CTA must show the English node title on the English URL.
-    $en_node_link = $en_page->findLink($english_title);
-    self::assertNotNull(
-      $en_node_link,
-      'Dynamic CTA must show the English node title when visiting the English URL.',
-    );
-    self::assertSame(
-      $GLOBALS['base_url'] . '/node/' . $nid,
-      $en_node_link->getAttribute('href'),
-      'Dynamic CTA href must be the English-language node URL when visiting the English URL.',
     );
   }
 
