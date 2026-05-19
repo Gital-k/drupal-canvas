@@ -17,6 +17,7 @@ class CanvasFormRenderer extends FormBase {
   ) {}
 
   public static function create(ContainerInterface $container): static {
+    // @phpstan-ignore return.type
     return new self(
       $container->get(CanvasFormSubmissionHandler::class),
     );

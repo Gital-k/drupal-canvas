@@ -65,7 +65,7 @@ export function useFormBuilderAutoSave() {
   const autoSavesHash = useAppSelector(selectAutoSavesHash);
   const clientInstanceId = useAppSelector(selectClientInstanceId);
 
-  // Only allow autosave once the GET has resolved and seeded the hash.
+  // Only allow auto-save once the GET has resolved and seeded the hash.
   const { isSuccess: hashReady } = useGetAutoSaveQuery(formId ?? '', {
     skip: !formId,
   });

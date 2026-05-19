@@ -20,7 +20,7 @@ class CanvasFormSubmissionsController extends ControllerBase {
   public function apiList(CanvasForm $canvas_form): JsonResponse {
     $submissions = $this->submissionHandler->getSubmissionsForForm((string) $canvas_form->id());
     usort($submissions, fn($a, $b) => $b['submitted_at'] <=> $a['submitted_at']);
-    return new JsonResponse(array_values($submissions));
+    return new JsonResponse($submissions);
   }
 
   public function apiDelete(CanvasForm $canvas_form, string $submission_id): JsonResponse {

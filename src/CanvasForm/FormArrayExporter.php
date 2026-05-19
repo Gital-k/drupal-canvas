@@ -13,7 +13,6 @@ use Drupal\canvas\Entity\CanvasForm;
  */
 class FormArrayExporter {
 
-  // @phpstan-ignore shipmonk.deadMethod
   public static function export(CanvasForm $form): array {
     return $form->toRenderArray();
   }

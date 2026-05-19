@@ -12,7 +12,7 @@ namespace Drupal\canvas\CanvasForm;
  */
 class FormElementSchemaProvider {
 
-  public function getElementSchemas(): array {
+  public static function getElementSchemas(): array {
     return [
       'textfield' => self::textfield(),
       'textarea' => self::textarea(),
@@ -34,8 +34,8 @@ class FormElementSchemaProvider {
     ];
   }
 
-  public function getElementSchema(string $type): ?array {
-    return $this->getElementSchemas()[$type] ?? NULL;
+  public static function getElementSchema(string $type): ?array {
+    return self::getElementSchemas()[$type] ?? NULL;
   }
 
   private static function commonInputProperties(): array {
