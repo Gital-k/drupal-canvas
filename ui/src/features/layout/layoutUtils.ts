@@ -325,6 +325,46 @@ export function getComponentTypeIndex(
 }
 
 /**
+ * Count how many components of a given base type exist anywhere on the page.
+ *
+ * Used by display logic to decide whether an unnamed component instance needs
+ * a disambiguating positional index appended. When only one instance of a type
+ * exists, the bare type name is unambiguous and the number is omitted.
+ *
+ * @param roots - The layout regions to walk.
+ * @param type - The type to count, with or without a trailing `@version`.
+ * @returns The total count across all regions and nested slots.
+ */
+export function getComponentTypeCount(
+  roots: Array<RegionNode>,
+  type: string,
+): number {
+  const baseType = type.split('@')[0];
+  let counter = 0;
+
+  const visitComponents = (components: ComponentNode[]): void => {
+    for (const component of components) {
+      if (component.type.split('@')[0] === baseType) {
+        counter += 1;
+      }
+      visitSlots(component.slots);
+    }
+  };
+
+  const visitSlots = (slots: SlotNode[]): void => {
+    for (const slot of slots) {
+      visitComponents(slot.components);
+    }
+  };
+
+  for (const region of roots) {
+    visitComponents(region.components);
+  }
+
+  return counter;
+}
+
+/**
  * Find the path to a node by its UUID.
  * @param nodes - The nodes to search through.
  * @param id - The UUID of the node to find.
@@ -822,11 +862,15 @@ export function getDisplayNameForNode(
     if (node.name) return node.name;
     const [nodeType] = node.type.split('@');
     const typeName = componentsData?.[nodeType]?.name || 'Component';
-    // Append the per-page index when the full layout is available, so unnamed
-    // siblings of the same type are distinguishable on the Layers panel.
+    // Append the per-page index only when there are 2+ instances of the same
+    // type. A lone instance shows the bare type name; the number appears as
+    // soon as a second sibling is added.
     if (layout) {
-      const index = getComponentTypeIndex(layout, node.uuid, node.type);
-      if (index > 0) return `${typeName} ${index}`;
+      const total = getComponentTypeCount(layout, node.type);
+      if (total > 1) {
+        const index = getComponentTypeIndex(layout, node.uuid, node.type);
+        if (index > 0) return `${typeName} ${index}`;
+      }
     }
     return typeName;
   } else {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { NodeType } from '@/features/layout/layoutModelSlice';
 import {
+  getComponentTypeCount,
   getComponentTypeIndex,
   getDisplayNameForNode,
 } from '@/features/layout/layoutUtils';
@@ -320,5 +321,64 @@ describe('getDisplayNameForNode with layout (auto-numbered fallback)', () => {
     expect(
       getDisplayNameForNode(orphan, null, componentsRegistry, layout),
     ).toBe('Section Wrapper');
+  });
+
+  it('omits the index when only one instance of the type exists on the page', () => {
+    // A lone instance shows the bare type name; the disambiguating number
+    // appears only when a second sibling of the same type is added.
+    const solo = makeSectionWrapper('only-one');
+    const layout = [makeRegion([solo, makeHero('h')])];
+    expect(getDisplayNameForNode(solo, null, componentsRegistry, layout)).toBe(
+      'Section Wrapper',
+    );
+  });
+});
+
+describe('getComponentTypeCount', () => {
+  it('returns 0 for a type that does not appear in the layout', () => {
+    const layout = [makeRegion([makeHero('h')])];
+    expect(getComponentTypeCount(layout, 'test_module:section_wrapper')).toBe(
+      0,
+    );
+  });
+
+  it('returns 1 for a solo instance', () => {
+    const layout = [makeRegion([makeSectionWrapper('only-one')])];
+    expect(getComponentTypeCount(layout, 'test_module:section_wrapper')).toBe(
+      1,
+    );
+  });
+
+  it('counts all instances across regions and nested slots', () => {
+    const inner = makeSectionWrapper('inner');
+    const outer: ComponentNode = {
+      nodeType: NodeType.Component,
+      uuid: 'outer',
+      type: 'test_module:section_wrapper',
+      slots: [
+        {
+          nodeType: NodeType.Slot,
+          id: 'content',
+          name: 'content',
+          components: [inner],
+        },
+      ],
+    };
+    const layout = [
+      makeRegion([outer, makeSectionWrapper('top-level')]),
+      makeRegion([makeSectionWrapper('side')]),
+    ];
+    expect(getComponentTypeCount(layout, 'test_module:section_wrapper')).toBe(
+      4,
+    );
+  });
+
+  it('strips an @version suffix from the requested type before matching', () => {
+    const layout = [
+      makeRegion([makeSectionWrapper('a'), makeSectionWrapper('b')]),
+    ];
+    expect(
+      getComponentTypeCount(layout, 'test_module:section_wrapper@abc123'),
+    ).toBe(2);
   });
 });

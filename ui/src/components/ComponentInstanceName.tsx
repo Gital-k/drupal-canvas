@@ -23,6 +23,7 @@ import {
 } from '@/features/layout/layoutModelSlice';
 import {
   findComponentByUuid,
+  getComponentTypeCount,
   getComponentTypeIndex,
 } from '@/features/layout/layoutUtils';
 import { selectSelectedComponentUuid } from '@/features/ui/uiSlice';
@@ -77,9 +78,12 @@ const ComponentInstanceName: React.FC = () => {
   const [nodeType] = node.type.split('@');
   const typeName = components?.[nodeType]?.name || 'Component';
   // The placeholder matches what the Layers panel would display if the user
-  // left the field blank — i.e. the per-page positional index appended to
-  // the component-type name. See #3527952.
-  const typeIndex = getComponentTypeIndex(layout, selectedUuid, node.type);
+  // left the field blank — bare type name when this is the only instance of
+  // its type on the page, type name + index when there are 2+ instances.
+  // See #3527952.
+  const typeCount = getComponentTypeCount(layout, node.type);
+  const typeIndex =
+    typeCount > 1 ? getComponentTypeIndex(layout, selectedUuid, node.type) : 0;
   const placeholderName = typeIndex > 0 ? `${typeName} ${typeIndex}` : typeName;
 
   return (
