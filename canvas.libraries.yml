@@ -11,10 +11,6 @@ canvas-ui:
   dependencies:
     - core/drupal
     - core/drupalSettings
-    # The next three libraries are largely the same as the core libraries they
-    # would be without the 'canvas.' in their name, but they take into account theme
-    # overrides.
-    # @see \Drupal\canvas\Hook\LibraryHooks::customizeDialogLibrary()
     - canvas/canvas.drupal.ajax
     - canvas/canvas.drupal.dialog.ajax
     - core/drupal.states

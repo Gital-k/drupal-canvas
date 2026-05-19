@@ -9,6 +9,7 @@ import { configurationSlice } from '@/features/configuration/configurationSlice'
 import { queryErrorSlice } from '@/features/error-handling/queryErrorSlice';
 import { extensionsSlice } from '@/features/extensions/extensionsSlice';
 import { formStateSlice } from '@/features/form/formStateSlice';
+import formBuilderSlice from '@/features/formBuilder/formBuilderSlice';
 import {
   layoutModelReducer,
   setInitialized,
@@ -24,6 +25,7 @@ import { previewSlice } from '@/features/pagePreview/previewSlice';
 import { personalizationSlice } from '@/features/personalization/personalizationSlice';
 import { codeComponentDialogSlice } from '@/features/ui/codeComponentDialogSlice';
 import { dialogSlice } from '@/features/ui/dialogSlice';
+import { formDialogSlice } from '@/features/ui/formDialogSlice';
 import { primaryPanelSlice } from '@/features/ui/primaryPanelSlice';
 import {
   clearUndoRedoHistory,
@@ -34,6 +36,7 @@ import {
 } from '@/features/ui/uiSlice';
 import { assetLibraryApi } from '@/services/assetLibrary';
 import { brandKitApi } from '@/services/brandKit';
+import { canvasFormApi } from '@/services/canvasFormApi';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import { componentInstanceFormApi } from '@/services/componentInstanceForm';
 import { contentApi } from '@/services/content';
@@ -138,6 +141,7 @@ const rootReducer = combineSlices(
       }),
       'pageData',
     ),
+    formBuilder: formBuilderSlice.reducer,
   },
   patternApi,
   assetLibraryApi,
@@ -154,6 +158,7 @@ const rootReducer = combineSlices(
   codeComponentDialogSlice,
   uiSlice,
   formStateSlice,
+  formDialogSlice,
   extensionsSlice,
   notificationsApi,
   notificationsSlice,
@@ -164,6 +169,7 @@ const rootReducer = combineSlices(
   previewSlice,
   queryErrorSlice,
   personalizationSlice,
+  canvasFormApi,
 );
 // Infer the `RootState` type from the root reducer
 export type RootState = ReturnType<typeof rootReducer>;
@@ -248,7 +254,8 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
         undoRedoActionIdMiddleware,
         pendingChangesApi.middleware,
         contentApi.middleware,
-        rtkQueryErrorHandler, // Add the error handling middleware
+        canvasFormApi.middleware,
+        rtkQueryErrorHandler,
       );
     },
     ...(import.meta.env.DEV && {

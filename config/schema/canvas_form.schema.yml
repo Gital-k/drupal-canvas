@@ -1,0 +1,58 @@
+canvas.canvas_form.*:
+  type: config_entity
+  label: 'Canvas Form'
+  mapping:
+    id:
+      type: machine_name
+      label: 'ID'
+    label:
+      type: required_label
+      label: 'Label'
+    status:
+      type: boolean
+      label: 'Status'
+    form_elements:
+      type: sequence
+      label: 'Form elements'
+      sequence:
+        type: canvas.canvas_form.element
+    submit_settings:
+      type: canvas.canvas_form.submit_settings
+
+canvas.canvas_form.element:
+  type: mapping
+  label: 'Form element'
+  mapping:
+    uuid:
+      type: string
+      label: 'UUID'
+    type:
+      type: string
+      label: 'Element type'
+    machine_name:
+      type: machine_name
+      label: 'Machine name'
+    properties:
+      type: ignore
+      label: 'Element properties'
+    weight:
+      type: integer
+      label: 'Weight'
+    parent:
+      type: string
+      label: 'Parent element UUID'
+      nullable: true
+
+canvas.canvas_form.submit_settings:
+  type: mapping
+  label: 'Submit settings'
+  mapping:
+    button_text:
+      type: label
+      label: 'Submit button text'
+    confirmation_message:
+      type: text
+      label: 'Confirmation message'
+    redirect_url:
+      type: string
+      label: 'Redirect URL'

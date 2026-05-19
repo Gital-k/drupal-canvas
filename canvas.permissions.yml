@@ -43,6 +43,11 @@ delete canvas_page:
   title: 'Delete Canvas Page'
   description: 'Delete a Drupal Canvas page.'
 
+# @see \Drupal\canvas\Entity\CanvasForm::ADMIN_PERMISSION
+administer canvas forms:
+  title: 'Administer Canvas Forms'
+  description: 'Create, edit and delete Canvas Forms and view their submissions.'
+
 publish auto-saves:
   title: 'Publish Drupal Canvas Content'
   description: 'Update entities with auto-saved changes in Drupal Canvas (requires "update" access for those entities).'

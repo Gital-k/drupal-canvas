@@ -8,6 +8,7 @@ import {
 } from '@radix-ui/react-icons';
 import { Button, DropdownMenu, Flex, Text, TextField } from '@radix-ui/themes';
 
+import AddFormButton from '@/components/formBuilder/AddFormButton';
 import PermissionCheck from '@/components/PermissionCheck';
 import AddCodeComponentButton from '@/features/code-editor/AddCodeComponentButton';
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
@@ -184,7 +185,9 @@ const LibraryToolbar = ({
           </TextField.Root>
         </form>
         {showNewMenu && (
-          <PermissionCheck hasPermissions={['codeComponents', 'folders']}>
+          <PermissionCheck
+            hasAnyPermission={['codeComponents', 'folders', 'forms']}
+          >
             <DropdownMenu.Root>
               <DropdownMenu.Trigger>
                 <Button
@@ -199,8 +202,6 @@ const LibraryToolbar = ({
               </DropdownMenu.Trigger>
               <DropdownMenu.Content
                 onCloseAutoFocus={(e) => {
-                  // Prevent the dropdown from returning focus to the trigger
-                  // when we're creating a folder, so our input can receive focus.
                   if (shouldFocusInputRef.current) {
                     e.preventDefault();
                     shouldFocusInputRef.current = false;
@@ -209,6 +210,9 @@ const LibraryToolbar = ({
               >
                 <PermissionCheck hasPermission="codeComponents">
                   <AddCodeComponentButton />
+                </PermissionCheck>
+                <PermissionCheck hasPermission="forms">
+                  <AddFormButton />
                 </PermissionCheck>
                 <PermissionCheck hasPermission="folders">
                   <DropdownMenu.Item

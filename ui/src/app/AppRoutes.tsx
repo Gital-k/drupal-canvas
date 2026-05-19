@@ -12,6 +12,8 @@ import ComponentInstanceForm from '@/components/ComponentInstanceForm';
 import { RouteErrorBoundary } from '@/components/error/ErrorBoundary';
 import ErrorCard from '@/components/error/ErrorCard';
 import ExtensionDialog from '@/components/extensions/ExtensionDialog';
+import AddFormDialog from '@/components/formBuilder/AddFormDialog';
+import { FormBuilderApp } from '@/components/formBuilder/FormBuilderApp';
 import PermissionCheck from '@/components/PermissionCheck';
 import SideMenu from '@/components/sideMenu/SideMenu';
 import PrimaryPanel from '@/components/sidePanel/PrimaryPanel';
@@ -66,6 +68,7 @@ const Dialogs = () => (
     <PatternDialogs />
     <CodeComponentDialogs />
     <ExtensionDialog />
+    <AddFormDialog />
   </div>
 );
 
@@ -92,6 +95,10 @@ const AppRoutes: React.FC<AppRoutesInterface> = ({ basePath }) => {
               ) : (
                 <Navigate to="/editor" replace />
               ),
+          },
+          {
+            path: '/form-builder/:formId',
+            element: <FormBuilderApp />,
           },
           {
             path: '/editor/',

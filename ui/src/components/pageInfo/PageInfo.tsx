@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
-import { NavLink, useLocation, useParams } from 'react-router-dom';
+import { Link, NavLink, useLocation, useParams } from 'react-router-dom';
 import TemplateIcon from '@assets/icons/template.svg?react';
 import {
   ChevronLeftIcon,
@@ -8,6 +8,7 @@ import {
   CubeIcon,
   FileTextIcon,
   HomeIcon,
+  InputIcon,
   SectionIcon,
   StackIcon,
 } from '@radix-ui/react-icons';
@@ -16,7 +17,10 @@ import {
   Button,
   ChevronDownIcon,
   Flex,
+  Heading,
   Popover,
+  Separator,
+  Text,
 } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -42,6 +46,7 @@ import { useEntityTitle } from '@/hooks/useEntityTitle';
 import { usePaginatedContentList } from '@/hooks/usePaginatedContentList';
 import { useSmartRedirect } from '@/hooks/useSmartRedirect';
 import { useTemplateCaption } from '@/hooks/useTemplateCaption';
+import { useGetFormsQuery } from '@/services/canvasFormApi';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import {
   useCreateContentMutation,
@@ -61,6 +66,8 @@ import {
 import type { ReactElement } from 'react';
 import type { ContentStub } from '@/types/Content';
 
+import styles from '@/components/navigation/Navigation.module.css';
+
 interface PageType {
   [key: string]: ReactElement;
 }
@@ -77,6 +84,45 @@ const iconMap: PageType = {
 const canvasSettings = getCanvasSettings();
 
 export const HOMEPAGE_CONFIG_ID = 'canvas_set_homepage';
+
+const FormsGroup = ({ onClose }: { onClose: () => void }) => {
+  const { data: forms, isLoading, isError } = useGetFormsQuery();
+  const formList = forms ? Object.values(forms) : [];
+
+  if (isLoading || isError || !formList.length) return null;
+
+  return (
+    <>
+      <Separator size="4" my="3" />
+      <Heading as="h5" size="1" color="gray" mb="2">
+        Forms
+      </Heading>
+      <Flex direction="column" gap="1">
+        {formList.map((form) => (
+          <Link
+            key={form.id}
+            to={`/form-builder/${form.id}`}
+            className={styles.pageLink}
+            onClick={onClose}
+          >
+            <Flex
+              align="center"
+              gap="2"
+              p="1"
+              px="2"
+              style={{ borderRadius: 4 }}
+            >
+              <InputIcon style={{ flexShrink: 0, color: 'var(--gray-9)' }} />
+              <Text as="span" size="1">
+                {form.name}
+              </Text>
+            </Flex>
+          </Link>
+        ))}
+      </Flex>
+    </>
+  );
+};
 
 const PageInfo = () => {
   const { showBoundary } = useErrorBoundary();
@@ -374,6 +420,7 @@ const PageInfo = () => {
                   error={getQueryErrorMessage(pageItemsError)}
                 />
               )}
+              <FormsGroup onClose={() => setPopoverOpen(false)} />
             </Panel>
           </Popover.Content>
         </Popover.Root>
