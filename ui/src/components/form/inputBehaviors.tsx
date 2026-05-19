@@ -258,7 +258,8 @@ export const InputBehaviorsCommon = ({
       if (
         fieldName &&
         (newValue || newValue === '') &&
-        e.target instanceof HTMLInputElement &&
+        (e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLTextAreaElement) &&
         e.target.form instanceof HTMLFormElement
       ) {
         const validationResult = validateNewValue(e, newValue);
