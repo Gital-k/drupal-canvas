@@ -100,7 +100,7 @@ describe('pushRegions', () => {
     const results = await pushRegions(
       [{ index: 0, result: makePrepared('header') }],
       new Map(),
-      { createRegion, updateRegion },
+      { createRegion, updateRegion, deleteRegion: vi.fn() },
     );
 
     expect(createRegion).toHaveBeenCalledExactlyOnceWith({
@@ -130,7 +130,7 @@ describe('pushRegions', () => {
     const results = await pushRegions(
       [{ index: 0, result: makePrepared('header') }],
       new Map([['header', 'olivero.header']]),
-      { createRegion, updateRegion },
+      { createRegion, updateRegion, deleteRegion: vi.fn() },
     );
 
     expect(updateRegion).toHaveBeenCalledWith('olivero.header', {
@@ -141,6 +141,34 @@ describe('pushRegions', () => {
     expect(results[0]).toMatchObject({
       success: true,
       result: { id: 'olivero.header', operation: 'Updated' },
+    });
+  });
+
+  it('DELETEs remote regions absent locally', async () => {
+    const createRegion = vi.fn();
+    const updateRegion = vi.fn();
+    const deleteRegion = vi.fn(async (): Promise<void> => {});
+
+    const results = await pushRegions(
+      [],
+      new Map(),
+      { createRegion, updateRegion, deleteRegion },
+      ['olivero.footer', 'olivero.sidebar'],
+    );
+
+    expect(createRegion).not.toHaveBeenCalled();
+    expect(updateRegion).not.toHaveBeenCalled();
+    expect(deleteRegion).toHaveBeenCalledTimes(2);
+    expect(deleteRegion).toHaveBeenCalledWith('olivero.footer');
+    expect(deleteRegion).toHaveBeenCalledWith('olivero.sidebar');
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({
+      success: true,
+      result: { id: 'olivero.footer', operation: 'Deleted' },
+    });
+    expect(results[1]).toMatchObject({
+      success: true,
+      result: { id: 'olivero.sidebar', operation: 'Deleted' },
     });
   });
 });

@@ -690,7 +690,7 @@ export class ApiService {
   }
 
   /**
-   * Get a single region by composite ID `{theme}.{region}`.
+   * Get a single region.
    */
   async getRegion(id: string): Promise<Region> {
     try {
@@ -739,6 +739,17 @@ export class ApiService {
         payload,
       );
       return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Delete a region.
+   */
+  async deleteRegion(id: string): Promise<void> {
+    try {
+      await this.client.delete(`/canvas/api/v0/config/page_region/${id}`);
     } catch (error) {
       this.handleApiError(error);
     }
