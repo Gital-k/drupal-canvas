@@ -48,8 +48,6 @@ final class CanvasForm extends ConfigEntityBase implements CanvasHttpApiEligible
 
   /**
    * Flat list of form element definitions.
-   *
-   * Each item: uuid, type, machine_name, properties (keyed without #), weight, parent (uuid or null).
    */
   protected array $form_elements = [];
 
@@ -96,7 +94,7 @@ final class CanvasForm extends ConfigEntityBase implements CanvasHttpApiEligible
   }
 
   /**
-   * Converts the stored form element definitions to a Drupal Form API render array.
+   * Converts form element definitions to a render array.
    */
   public function toRenderArray(): array {
     $elements_by_uuid = [];
