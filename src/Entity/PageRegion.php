@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Theme\ThemeManagerInterface;
+use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
@@ -45,7 +49,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
     ],
   ],
 )]
-final class PageRegion extends ComponentTreeConfigEntityBase {
+final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHttpApiEligibleConfigEntityInterface {
 
   public const string ENTITY_TYPE_ID = 'page_region';
   public const string ADMIN_PERMISSION = 'administer page template';
@@ -138,6 +142,65 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
     $field_items->setValue(\array_values($this->component_tree ?? []));
 
     return $field_items;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function normalizeForClientSide(): ClientSideRepresentation {
+    return ClientSideRepresentation::create(
+      values: [
+        'id' => $this->id(),
+        'theme' => $this->theme,
+        'region' => $this->region,
+        'status' => $this->status(),
+        'component_tree' => \array_values($this->component_tree ?? []),
+      ],
+      preview: NULL,
+    )->addCacheableDependency($this);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function createFromClientSide(array $data): static {
+    // Default `theme` to the active theme when the client omits it,
+    // so single-theme consumers (Canvas CLI) don't have to
+    // discover and send the theme name themselves.
+    if (!\array_key_exists('theme', $data)) {
+      $data['theme'] = \Drupal::service(ThemeManagerInterface::class)->getActiveTheme()->getName();
+    }
+    $values = [];
+    foreach (['theme', 'region'] as $key) {
+      if (\array_key_exists($key, $data)) {
+        $values[$key] = $data[$key];
+      }
+    }
+    $entity = static::create($values);
+    $entity->updateFromClientSide($data);
+    return $entity;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function updateFromClientSide(array $data): void {
+    if (\array_key_exists('component_tree', $data)) {
+      $this->set('component_tree', $data['component_tree'] ?? []);
+    }
+    if (\array_key_exists('status', $data)) {
+      $this->set('status', $data['status']);
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function refineListQuery(QueryInterface &$query, RefinableCacheableDependencyInterface $cacheability): void {
+    // Only the active theme regions render on the site.
+    $active_theme = \Drupal::service(ThemeManagerInterface::class)->getActiveTheme()->getName();
+    $query->condition('theme', $active_theme);
+    $cacheability->addCacheContexts(['theme']);
   }
 
   /**
