@@ -18,27 +18,28 @@ class CanvasFormSubmissionsController extends ControllerBase {
   ) {}
 
   public function apiList(CanvasForm $canvas_form): JsonResponse {
-    $submissions = $this->submissionHandler->getSubmissionsForForm($canvas_form->id());
+    $submissions = $this->submissionHandler->getSubmissionsForForm((string) $canvas_form->id());
     usort($submissions, fn($a, $b) => $b['submitted_at'] <=> $a['submitted_at']);
     return new JsonResponse(array_values($submissions));
   }
 
   public function apiDelete(CanvasForm $canvas_form, string $submission_id): JsonResponse {
     $this->submissionHandler->delete($submission_id);
-    return new JsonResponse(null, 204);
+    return new JsonResponse(NULL, 204);
   }
 
   public function exportCsv(CanvasForm $canvas_form): Response {
-    $submissions = $this->submissionHandler->getSubmissionsForForm($canvas_form->id());
+    $submissions = $this->submissionHandler->getSubmissionsForForm((string) $canvas_form->id());
     usort($submissions, fn($a, $b) => $a['submitted_at'] <=> $b['submitted_at']);
 
     $columns = ['submitted_at', 'ip'];
     foreach ($submissions as $submission) {
-      $columns = array_unique(array_merge($columns, array_keys($submission['values'] ?? [])));
+      $columns = array_unique(array_merge($columns, \array_keys($submission['values'] ?? [])));
     }
 
     $response = new StreamedResponse(function () use ($submissions, $columns) {
       $handle = fopen('php://output', 'w');
+      \assert($handle !== FALSE);
       fputcsv($handle, $columns);
       foreach ($submissions as $submission) {
         $row = [];
@@ -51,7 +52,7 @@ class CanvasFormSubmissionsController extends ControllerBase {
           }
           else {
             $value = $submission['values'][$col] ?? '';
-            $row[] = is_array($value) ? implode(', ', $value) : $value;
+            $row[] = \is_array($value) ? implode(', ', $value) : $value;
           }
         }
         fputcsv($handle, $row);

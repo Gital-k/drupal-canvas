@@ -44,7 +44,7 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
     return $this->getValue()?->getGeneratedUrl();
   }
 
-  private static function getParametrizedImageStyle(): ?ParametrizedImageStyle {
+  private static function getParametrizedImageStyle(): ParametrizedImageStyle {
     // @phpstan-ignore-next-line
     return ParametrizedImageStyle::load('canvas_parametrized_width');
   }
@@ -92,8 +92,10 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
    * {@inheritdoc}
    */
   public function calculateDependencies() {
-    $style = $this->getParametrizedImageStyle();
-    if ($style === NULL) {
+    try {
+      $style = self::getParametrizedImageStyle();
+    }
+    catch (\Throwable) {
       return [];
     }
     return [

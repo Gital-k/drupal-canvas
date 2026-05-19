@@ -26,7 +26,7 @@ final class CanvasFormDiscovery implements ComponentCandidatesDiscoveryInterface
   }
 
   public function discover(): array {
-    /** @var CanvasForm[] $forms */
+    /** @var \Drupal\canvas\Entity\CanvasForm[] $forms */
     $forms = $this->entityTypeManager->getStorage(CanvasForm::ENTITY_TYPE_ID)->loadMultiple();
     return array_filter($forms, fn(CanvasForm $form) => $form->status());
   }

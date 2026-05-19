@@ -12,6 +12,7 @@ use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\canvas\ClientSideRepresentation;
+use Drupal\canvas\EntityHandlers\CanvasFormStorage;
 use Drupal\canvas\EntityHandlers\ContentCreatorVisibleCanvasConfigEntityAccessControlHandler;
 
 #[ConfigEntityType(
@@ -22,7 +23,7 @@ use Drupal\canvas\EntityHandlers\ContentCreatorVisibleCanvasConfigEntityAccessCo
   label_collection: new TranslatableMarkup('Canvas Forms'),
   admin_permission: self::ADMIN_PERMISSION,
   handlers: [
-    'storage' => \Drupal\canvas\EntityHandlers\CanvasFormStorage::class,
+    'storage' => CanvasFormStorage::class,
     'access' => ContentCreatorVisibleCanvasConfigEntityAccessControlHandler::class,
   ],
   entity_keys: [
@@ -59,7 +60,7 @@ final class CanvasForm extends ConfigEntityBase implements CanvasHttpApiEligible
   ];
 
   public static function preCreate(EntityStorageInterface $storage, array &$values): void {
-    if (!array_key_exists('id', $values)) {
+    if (!\array_key_exists('id', $values)) {
       $values['id'] = self::generateId();
     }
     parent::preCreate($storage, $values);
@@ -69,10 +70,12 @@ final class CanvasForm extends ConfigEntityBase implements CanvasHttpApiEligible
     return 'form_' . (new Random())->machineName(8);
   }
 
+  // @phpstan-ignore shipmonk.deadMethod
   public function getFormElements(): array {
     return $this->form_elements;
   }
 
+  // @phpstan-ignore shipmonk.deadMethod
   public function setFormElements(array $elements): static {
     $this->form_elements = $elements;
     return $this;
@@ -86,6 +89,7 @@ final class CanvasForm extends ConfigEntityBase implements CanvasHttpApiEligible
     ];
   }
 
+  // @phpstan-ignore shipmonk.deadMethod
   public function setSubmitSettings(array $settings): static {
     $this->submit_settings = $settings;
     return $this;
@@ -141,14 +145,14 @@ final class CanvasForm extends ConfigEntityBase implements CanvasHttpApiEligible
       values: [
         'id' => $this->id(),
         'name' => $this->label(),
-        'formElements' => array_map([$this, 'elementToClientSide'], $this->form_elements),
-        'submitSettings' => $this->submitSettingsToClientSide($this->submit_settings),
+        'formElements' => \array_map([self::class, 'elementToClientSide'], $this->form_elements),
+        'submitSettings' => self::submitSettingsToClientSide($this->submit_settings),
       ],
       preview: NULL,
     )->addCacheableDependency($this);
   }
 
-  private function elementToClientSide(array $element): array {
+  private static function elementToClientSide(array $element): array {
     return [
       'uuid' => $element['uuid'],
       'type' => $element['type'],
@@ -159,7 +163,7 @@ final class CanvasForm extends ConfigEntityBase implements CanvasHttpApiEligible
     ];
   }
 
-  private function submitSettingsToClientSide(array $settings): array {
+  private static function submitSettingsToClientSide(array $settings): array {
     return [
       'button_text' => $settings['button_text'] ?? 'Submit',
       'confirmation_message' => $settings['confirmation_message'] ?? 'Thank you for your submission.',
@@ -185,14 +189,14 @@ final class CanvasForm extends ConfigEntityBase implements CanvasHttpApiEligible
       $this->set('label', $data['name']);
     }
     if (isset($data['formElements'])) {
-      $this->form_elements = array_map([$this, 'elementFromClientSide'], $data['formElements']);
+      $this->form_elements = \array_map([self::class, 'elementFromClientSide'], $data['formElements']);
     }
     if (isset($data['submitSettings'])) {
       $this->submit_settings = $data['submitSettings'];
     }
   }
 
-  private function elementFromClientSide(array $element): array {
+  private static function elementFromClientSide(array $element): array {
     return [
       'uuid' => $element['uuid'],
       'type' => $element['type'],

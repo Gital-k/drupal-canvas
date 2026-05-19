@@ -8,7 +8,6 @@ use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\Entity\CanvasForm;
 use Drupal\canvas\Entity\Component;
-use Drupal\canvas\MissingComponentInputsException;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormBuilderInterface;

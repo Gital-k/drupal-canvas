@@ -14,23 +14,23 @@ class FormElementSchemaProvider {
 
   public function getElementSchemas(): array {
     return [
-      'textfield' => $this->textfield(),
-      'textarea' => $this->textarea(),
-      'email' => $this->email(),
-      'tel' => $this->tel(),
-      'number' => $this->number(),
-      'url' => $this->url(),
-      'date' => $this->date(),
-      'select' => $this->select(),
-      'radios' => $this->radios(),
-      'checkboxes' => $this->checkboxes(),
-      'checkbox' => $this->checkbox(),
-      'hidden' => $this->hidden(),
-      'container' => $this->container(),
-      'fieldset' => $this->fieldset(),
-      'details' => $this->details(),
-      'submit' => $this->submit(),
-      'button' => $this->button(),
+      'textfield' => self::textfield(),
+      'textarea' => self::textarea(),
+      'email' => self::email(),
+      'tel' => self::tel(),
+      'number' => self::number(),
+      'url' => self::url(),
+      'date' => self::date(),
+      'select' => self::select(),
+      'radios' => self::radios(),
+      'checkboxes' => self::checkboxes(),
+      'checkbox' => self::checkbox(),
+      'hidden' => self::hidden(),
+      'container' => self::container(),
+      'fieldset' => self::fieldset(),
+      'details' => self::details(),
+      'submit' => self::submit(),
+      'button' => self::button(),
     ];
   }
 
@@ -38,7 +38,7 @@ class FormElementSchemaProvider {
     return $this->getElementSchemas()[$type] ?? NULL;
   }
 
-  private function commonInputProperties(): array {
+  private static function commonInputProperties(): array {
     return [
       'title' => ['type' => 'string', 'label' => 'Label', 'group' => 'basic', 'required' => TRUE],
       'description' => ['type' => 'text', 'label' => 'Help text', 'group' => 'basic'],
@@ -51,14 +51,14 @@ class FormElementSchemaProvider {
     ];
   }
 
-  private function textfield(): array {
+  private static function textfield(): array {
     return [
       'type' => 'textfield',
       'label' => 'Text field',
       'category' => 'text',
       'icon' => 'type',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         'placeholder' => ['type' => 'string', 'label' => 'Placeholder', 'group' => 'basic'],
         'maxlength' => ['type' => 'number', 'label' => 'Max length', 'group' => 'validation'],
         'pattern' => ['type' => 'string', 'label' => 'Pattern (regex)', 'group' => 'validation'],
@@ -67,58 +67,64 @@ class FormElementSchemaProvider {
     ];
   }
 
-  private function textarea(): array {
+  private static function textarea(): array {
     return [
       'type' => 'textarea',
       'label' => 'Textarea',
       'category' => 'text',
       'icon' => 'align-left',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         'placeholder' => ['type' => 'string', 'label' => 'Placeholder', 'group' => 'basic'],
         'rows' => ['type' => 'number', 'label' => 'Rows', 'group' => 'advanced', 'default' => 5],
         'maxlength' => ['type' => 'number', 'label' => 'Max length', 'group' => 'validation'],
-        'resizable' => ['type' => 'select', 'label' => 'Resizable', 'group' => 'advanced', 'options' => ['vertical' => 'Vertical', 'horizontal' => 'Horizontal', 'both' => 'Both', 'none' => 'None'], 'default' => 'vertical'],
+        'resizable' => [
+          'type' => 'select',
+          'label' => 'Resizable',
+          'group' => 'advanced',
+          'options' => ['vertical' => 'Vertical', 'horizontal' => 'Horizontal', 'both' => 'Both', 'none' => 'None'],
+          'default' => 'vertical',
+        ],
       ]),
     ];
   }
 
-  private function email(): array {
+  private static function email(): array {
     return [
       'type' => 'email',
       'label' => 'Email',
       'category' => 'text',
       'icon' => 'at-sign',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         'placeholder' => ['type' => 'string', 'label' => 'Placeholder', 'group' => 'basic'],
         'maxlength' => ['type' => 'number', 'label' => 'Max length', 'group' => 'validation'],
       ]),
     ];
   }
 
-  private function tel(): array {
+  private static function tel(): array {
     return [
       'type' => 'tel',
       'label' => 'Phone',
       'category' => 'text',
       'icon' => 'phone',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         'placeholder' => ['type' => 'string', 'label' => 'Placeholder', 'group' => 'basic'],
         'pattern' => ['type' => 'string', 'label' => 'Pattern (regex)', 'group' => 'validation'],
       ]),
     ];
   }
 
-  private function number(): array {
+  private static function number(): array {
     return [
       'type' => 'number',
       'label' => 'Number',
       'category' => 'text',
       'icon' => 'hash',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         'placeholder' => ['type' => 'string', 'label' => 'Placeholder', 'group' => 'basic'],
         'min' => ['type' => 'number', 'label' => 'Minimum', 'group' => 'validation'],
         'max' => ['type' => 'number', 'label' => 'Maximum', 'group' => 'validation'],
@@ -127,41 +133,41 @@ class FormElementSchemaProvider {
     ];
   }
 
-  private function url(): array {
+  private static function url(): array {
     return [
       'type' => 'url',
       'label' => 'URL',
       'category' => 'text',
       'icon' => 'link',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         'placeholder' => ['type' => 'string', 'label' => 'Placeholder', 'group' => 'basic'],
         'maxlength' => ['type' => 'number', 'label' => 'Max length', 'group' => 'validation'],
       ]),
     ];
   }
 
-  private function date(): array {
+  private static function date(): array {
     return [
       'type' => 'date',
       'label' => 'Date',
       'category' => 'text',
       'icon' => 'calendar',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         '#date_date_format' => ['type' => 'string', 'label' => 'Date format', 'group' => 'advanced'],
       ]),
     ];
   }
 
-  private function select(): array {
+  private static function select(): array {
     return [
       'type' => 'select',
       'label' => 'Select',
       'category' => 'selection',
       'icon' => 'chevron-down',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         'options' => ['type' => 'options', 'label' => 'Options', 'group' => 'basic', 'required' => TRUE],
         'empty_option' => ['type' => 'string', 'label' => 'Empty option label', 'group' => 'basic'],
         'multiple' => ['type' => 'boolean', 'label' => 'Allow multiple', 'group' => 'basic', 'default' => FALSE],
@@ -169,33 +175,33 @@ class FormElementSchemaProvider {
     ];
   }
 
-  private function radios(): array {
+  private static function radios(): array {
     return [
       'type' => 'radios',
       'label' => 'Radio buttons',
       'category' => 'selection',
       'icon' => 'circle-dot',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         'options' => ['type' => 'options', 'label' => 'Options', 'group' => 'basic', 'required' => TRUE],
       ]),
     ];
   }
 
-  private function checkboxes(): array {
+  private static function checkboxes(): array {
     return [
       'type' => 'checkboxes',
       'label' => 'Checkboxes',
       'category' => 'selection',
       'icon' => 'list-checks',
       'canContainChildren' => FALSE,
-      'properties' => array_merge($this->commonInputProperties(), [
+      'properties' => array_merge(self::commonInputProperties(), [
         'options' => ['type' => 'options', 'label' => 'Options', 'group' => 'basic', 'required' => TRUE],
       ]),
     ];
   }
 
-  private function checkbox(): array {
+  private static function checkbox(): array {
     return [
       'type' => 'checkbox',
       'label' => 'Checkbox',
@@ -205,7 +211,12 @@ class FormElementSchemaProvider {
       'properties' => [
         'title' => ['type' => 'string', 'label' => 'Label', 'group' => 'basic', 'required' => TRUE],
         'description' => ['type' => 'text', 'label' => 'Help text', 'group' => 'basic'],
-        'default_value' => ['type' => 'boolean', 'label' => 'Checked by default', 'group' => 'basic', 'default' => FALSE],
+        'default_value' => [
+          'type' => 'boolean',
+          'label' => 'Checked by default',
+          'group' => 'basic',
+          'default' => FALSE,
+        ],
         'return_value' => ['type' => 'string', 'label' => 'Value when checked', 'group' => 'advanced', 'default' => '1'],
         'required' => ['type' => 'boolean', 'label' => 'Required', 'group' => 'validation', 'default' => FALSE],
         'disabled' => ['type' => 'boolean', 'label' => 'Disabled', 'group' => 'advanced', 'default' => FALSE],
@@ -214,7 +225,7 @@ class FormElementSchemaProvider {
     ];
   }
 
-  private function hidden(): array {
+  private static function hidden(): array {
     return [
       'type' => 'hidden',
       'label' => 'Hidden field',
@@ -227,7 +238,7 @@ class FormElementSchemaProvider {
     ];
   }
 
-  private function container(): array {
+  private static function container(): array {
     return [
       'type' => 'container',
       'label' => 'Container',
@@ -240,7 +251,7 @@ class FormElementSchemaProvider {
     ];
   }
 
-  private function fieldset(): array {
+  private static function fieldset(): array {
     return [
       'type' => 'fieldset',
       'label' => 'Fieldset',
@@ -255,7 +266,7 @@ class FormElementSchemaProvider {
     ];
   }
 
-  private function details(): array {
+  private static function details(): array {
     return [
       'type' => 'details',
       'label' => 'Details',
@@ -271,7 +282,7 @@ class FormElementSchemaProvider {
     ];
   }
 
-  private function submit(): array {
+  private static function submit(): array {
     return [
       'type' => 'submit',
       'label' => 'Submit button',
@@ -280,13 +291,19 @@ class FormElementSchemaProvider {
       'canContainChildren' => FALSE,
       'properties' => [
         'value' => ['type' => 'string', 'label' => 'Button text', 'group' => 'basic', 'default' => 'Submit'],
-        'button_type' => ['type' => 'select', 'label' => 'Style', 'group' => 'basic', 'options' => ['primary' => 'Primary', 'danger' => 'Danger', '' => 'Default'], 'default' => 'primary'],
+        'button_type' => [
+          'type' => 'select',
+          'label' => 'Style',
+          'group' => 'basic',
+          'options' => ['primary' => 'Primary', 'danger' => 'Danger', '' => 'Default'],
+          'default' => 'primary',
+        ],
         'attributes' => ['type' => 'attributes', 'label' => 'HTML attributes', 'group' => 'advanced'],
       ],
     ];
   }
 
-  private function button(): array {
+  private static function button(): array {
     return [
       'type' => 'button',
       'label' => 'Button',
@@ -295,7 +312,13 @@ class FormElementSchemaProvider {
       'canContainChildren' => FALSE,
       'properties' => [
         'value' => ['type' => 'string', 'label' => 'Button text', 'group' => 'basic', 'default' => 'Click me'],
-        'button_type' => ['type' => 'select', 'label' => 'Style', 'group' => 'basic', 'options' => ['primary' => 'Primary', 'danger' => 'Danger', '' => 'Default'], 'default' => ''],
+        'button_type' => [
+          'type' => 'select',
+          'label' => 'Style',
+          'group' => 'basic',
+          'options' => ['primary' => 'Primary', 'danger' => 'Danger', '' => 'Default'],
+          'default' => '',
+        ],
         'attributes' => ['type' => 'attributes', 'label' => 'HTML attributes', 'group' => 'advanced'],
       ],
     ];

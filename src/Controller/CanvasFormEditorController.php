@@ -8,8 +8,8 @@ use Drupal\canvas\CanvasForm\FormElementSchemaProvider;
 use Drupal\canvas\Entity\CanvasForm;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Render\HtmlResponse;
+use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Response;
 
 class CanvasFormEditorController extends ControllerBase {
 
@@ -22,7 +22,7 @@ class CanvasFormEditorController extends ControllerBase {
     $response = ($this->canvasController)(NULL, NULL);
 
     $attachments = $response->getAttachments();
-    $attachments['drupalSettings']['canvas']['base'] = \Drupal\Core\Url::fromRoute('canvas.boot.empty')->getInternalPath();
+    $attachments['drupalSettings']['canvas']['base'] = Url::fromRoute('canvas.boot.empty')->getInternalPath();
     $attachments['drupalSettings']['canvasFormBuilder'] = [
       'formId' => $canvas_form->id(),
       'formData' => $canvas_form->normalizeForClientSide()->values,

@@ -40,6 +40,7 @@ class CanvasFormSubmissionHandler {
     return array_filter($all, fn($s) => ($s['form_id'] ?? '') === $form_id);
   }
 
+  // @phpstan-ignore shipmonk.deadMethod
   public function getSubmission(string $id): ?array {
     return $this->keyValueFactory->get(self::COLLECTION)->get($id);
   }

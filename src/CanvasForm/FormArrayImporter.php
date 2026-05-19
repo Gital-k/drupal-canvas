@@ -21,9 +21,11 @@ class FormArrayImporter {
     private readonly UuidInterface $uuid,
   ) {}
 
+  // @phpstan-ignore shipmonk.deadMethod
   public function import(array $renderArray, string $label = 'Imported form'): CanvasForm {
     $elements = [];
-    $this->parseElements($renderArray, NULL, 0, $elements);
+    $weight = 0;
+    $this->parseElements($renderArray, NULL, $weight, $elements);
 
     return CanvasForm::create([
       'label' => $label,
@@ -33,7 +35,7 @@ class FormArrayImporter {
 
   private function parseElements(array $items, ?string $parentUuid, int &$weight, array &$elements): void {
     foreach ($items as $key => $item) {
-      if (!is_array($item) || str_starts_with((string) $key, '#')) {
+      if (!\is_array($item) || str_starts_with((string) $key, '#')) {
         continue;
       }
 
@@ -50,7 +52,7 @@ class FormArrayImporter {
           continue;
         }
         $propName = substr($prop, 1);
-        if ($this->isStaticValue($value)) {
+        if (self::isStaticValue($value)) {
           $properties[$propName] = $value;
         }
       }
@@ -72,16 +74,16 @@ class FormArrayImporter {
     }
   }
 
-  private function isStaticValue(mixed $value): bool {
-    if (is_object($value)) {
+  private static function isStaticValue(mixed $value): bool {
+    if (\is_object($value)) {
       return FALSE;
     }
-    if (is_callable($value) && !is_string($value) && !is_array($value)) {
+    if (\is_callable($value) && !\is_string($value) && !\is_array($value)) {
       return FALSE;
     }
-    if (is_array($value)) {
+    if (\is_array($value)) {
       foreach ($value as $v) {
-        if (is_callable($v) && !is_string($v)) {
+        if (\is_callable($v) && !\is_string($v)) {
           return FALSE;
         }
       }

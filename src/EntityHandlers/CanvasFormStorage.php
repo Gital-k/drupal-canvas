@@ -26,7 +26,7 @@ final class CanvasFormStorage extends ConfigEntityStorage implements EntityHandl
   protected function doPostSave(EntityInterface $entity, $update): void {
     parent::doPostSave($entity, $update);
     \assert($entity instanceof CanvasForm);
-    $this->componentSourceManager->generateComponents(CanvasFormComponent::SOURCE_PLUGIN_ID, [$entity->id()]);
+    $this->componentSourceManager->generateComponents(CanvasFormComponent::SOURCE_PLUGIN_ID, [(string) $entity->id()]);
   }
 
 }
