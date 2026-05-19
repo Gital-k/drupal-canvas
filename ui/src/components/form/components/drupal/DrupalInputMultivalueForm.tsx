@@ -6,6 +6,7 @@ import { Box, Button, Flex, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
+import TextArea from '@/components/form/components/TextArea';
 import { toPropName } from '@/components/form/formUtil';
 import { removeFieldValue } from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
@@ -20,12 +21,15 @@ import {
   triggerDrupalRemoveButton,
 } from './multivalueFormUtils';
 
-import type { NumericInputAttributes } from '@/types/DrupalAttribute';
+import type {
+  Attributes,
+  NumericInputAttributes,
+} from '@/types/DrupalAttribute';
 
 import styles from './DrupalInputMultivalueForm.module.css';
 
 type MultivalueRefs = {
-  popoverInput: HTMLInputElement | null;
+  popoverInput: HTMLInputElement | HTMLTextAreaElement | null;
   popoverContainer: HTMLDivElement | null;
   triggerRow: HTMLDivElement | null;
   triggerButton: HTMLButtonElement | null;
@@ -60,6 +64,8 @@ const DrupalInputMultivalueForm = ({
   const isAutocomplete =
     attributes?.class instanceof Array &&
     attributes?.class?.includes('form-autocomplete');
+  const isTextInput = (attributes.type ?? 'text') === 'text';
+  const useTextArea = isTextInput && !isAutocomplete;
   const initialValue = attributes.value ?? attributes.defaultValue ?? '';
   const refs = useRef<MultivalueRefs>({
     triggerRow: null,
@@ -117,8 +123,10 @@ const DrupalInputMultivalueForm = ({
     });
   }, [isAutocomplete, refs.current.popoverInput, popoverOpen]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Escape' || e.key === 'Enter') {
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    if (e.key === 'Escape' || (!useTextArea && e.key === 'Enter')) {
       handlePopoverOpenChange(false);
       e.preventDefault();
       return;
@@ -129,8 +137,8 @@ const DrupalInputMultivalueForm = ({
     if (open) {
       setTimeout(() => {
         const input = refs.current.popoverContainer?.querySelector(
-          'input',
-        ) as HTMLInputElement | null;
+          'input, textarea',
+        ) as HTMLInputElement | HTMLTextAreaElement | null;
         if (input) {
           refs.current.popoverInput = input;
           input.select();
@@ -273,17 +281,31 @@ const DrupalInputMultivalueForm = ({
           </Popover.Close>
         </Flex>
         <Box>
-          <DrupalInput
-            attributes={{
-              ...attributes,
-              onKeyDown: handleKeyDown,
-              onInput: (e: any) => {
-                setTimeout(() => {
-                  if (!hasError()) setDisplayValue(e.target.value);
-                });
-              },
-            }}
-          />
+          {useTextArea ? (
+            <MultivalueTextArea
+              attributes={{
+                ...attributes,
+                onKeyDown: handleKeyDown,
+                onInput: (e: any) => {
+                  setTimeout(() => {
+                    if (!hasError()) setDisplayValue(e.target.value);
+                  });
+                },
+              }}
+            />
+          ) : (
+            <DrupalInput
+              attributes={{
+                ...attributes,
+                onKeyDown: handleKeyDown,
+                onInput: (e: any) => {
+                  setTimeout(() => {
+                    if (!hasError()) setDisplayValue(e.target.value);
+                  });
+                },
+              }}
+            />
+          )}
         </Box>
         <Flex justify="center" className={styles.removeButtonContainer}>
           <Button
@@ -300,6 +322,28 @@ const DrupalInputMultivalueForm = ({
         </Flex>
       </Popover.Content>
     </Popover.Root>
+  );
+};
+
+const MultivalueTextArea = ({ attributes }: { attributes: Attributes }) => {
+  const textareaAttributes = { ...attributes };
+  const textAreaClassName = clsx(
+    textareaAttributes.class,
+    textareaAttributes.className,
+    styles.textArea,
+  );
+  delete textareaAttributes.type;
+  delete textareaAttributes.value;
+  delete textareaAttributes.className;
+
+  return (
+    <TextArea
+      value={attributes.value?.toString() ?? ''}
+      attributes={{
+        ...textareaAttributes,
+        class: textAreaClassName,
+      }}
+    />
   );
 };
 
