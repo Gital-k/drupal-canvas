@@ -2,6 +2,22 @@ services:
   _defaults:
     autoconfigure: true
     autowire: true
+  Drupal\canvas\CanvasForm\FormElementSchemaProvider:
+    public: true
+  Drupal\canvas\CanvasForm\FormArrayImporter:
+    public: true
+    arguments:
+      $uuid: '@uuid'
+  Drupal\canvas\CanvasForm\FormArrayExporter:
+    public: true
+  Drupal\canvas\CanvasForm\CanvasFormSubmissionHandler:
+    public: true
+    arguments:
+      $keyValueFactory: '@keyvalue'
+      $time: '@datetime.time'
+      $requestStack: '@request_stack'
+  Drupal\canvas\CanvasForm\CanvasFormRenderer:
+    public: true
   Drupal\canvas\Audit\ComponentAudit:
     public: true
   Drupal\canvas\PropExpressions\StructuredData\Labeler:

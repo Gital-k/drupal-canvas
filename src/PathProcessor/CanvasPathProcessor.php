@@ -23,11 +23,7 @@ class CanvasPathProcessor implements InboundPathProcessorInterface {
    * {@inheritdoc}
    */
   public function processInbound($path, Request $request): string {
-    // Only rewrite if not /canvas/api and starts with /canvas/.
-    // For this to work, our routes require that no route normalization happens
-    // when the redirect module is enabled.
-    // @see \Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber::preventRouteNormalization.
-    if (str_starts_with($path, '/canvas/') && !str_starts_with($path, '/canvas/api')) {
+    if (str_starts_with($path, '/canvas/') && !str_starts_with($path, '/canvas/api') && !str_starts_with($path, '/canvas/form-builder')) {
       return '/canvas';
     }
     return $path;

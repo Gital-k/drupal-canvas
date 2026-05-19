@@ -204,6 +204,7 @@ HTML;
               'contentTemplates' => $this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION),
               'publishChanges' => $this->currentUser->hasPermission(AutoSaveManager::PUBLISH_PERMISSION),
               'folders' => $this->currentUser->hasPermission(Folder::ADMIN_PERMISSION),
+              'forms' => $this->currentUser->hasPermission(\Drupal\canvas\Entity\CanvasForm::ADMIN_PERMISSION),
             ],
             'contentEntityCreateOperations' => $content_entity_create_operations,
             'homepagePath' => $system_site_config->get('page.front'),
