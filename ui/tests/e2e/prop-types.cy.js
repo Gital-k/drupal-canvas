@@ -275,7 +275,7 @@ describe('Prop types editing', () => {
     cy.get(timeSelector).should('have.value', '07:21:35');
     cy.waitForElementContentInIframe(
       '#test-string-format-date-time',
-      '2017-06-28T07:21:35.000Z',
+      '2017-06-27T21:21:35',
     );
   });
 
@@ -440,12 +440,6 @@ describe('Prop types editing', () => {
     () => {
       // @todo The time prop isn't appearing in the form so this is just date
       // for now.
-      // @todo these tests confirm that the date+time inputs can be changed and the
-      // preview updates in response. It is not yet confirmed if the values found
-      // in the form and preview are *correct*. This may require time zone/locale
-      // adjustments - do not interpret the presence of this test as evidence that
-      // time zone offsets are working as they should.
-
       const dateSelector =
         '[name$="[test_string_format_date][0][value][date]"]';
       cy.get(dateSelector).should('have.value', '2018-11-12');

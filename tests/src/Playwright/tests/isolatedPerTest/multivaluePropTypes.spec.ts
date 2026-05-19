@@ -8,7 +8,25 @@ test.use({
 });
 
 test.describe('Multivalue Prop Types', () => {
-  test.beforeEach(async ({ drupal, canvas }) => {
+  test.beforeEach(async ({ drupal, canvas, page }) => {
+    // Pin the site's default timezone to Australia/Sydney so wall-clock →
+    // UTC normalization is deterministic in the datetime tests below. This
+    // mirrors what web/core/tests/bootstrap.php pins for PHPUnit.
+    await drupal.loginAsAdmin();
+    await page.goto('/admin/config/regional/settings');
+    await page
+      .locator('[data-drupal-selector="edit-date-default-timezone"]')
+      .selectOption('Australia/Sydney');
+    await page
+      .locator(
+        'form[data-drupal-selector="system-regional-settings"] [data-drupal-selector="edit-submit"]',
+      )
+      .click();
+    await expect(page.locator('[data-drupal-messages]')).toContainText(
+      'configuration options have been saved',
+    );
+    await drupal.logout();
+
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.createCanvas();
     await canvas.openLibraryPanel();
@@ -541,7 +559,7 @@ test.describe('Multivalue Prop Types', () => {
       0,
     );
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
-      await expect(items.nth(0)).toContainText('2025-12-24');
+      await expect(items.nth(0)).toContainText('2025-12-23T21:00:00');
     });
 
     await dateTimeUnlimitedField
@@ -557,8 +575,8 @@ test.describe('Multivalue Prop Types', () => {
     );
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
       await expect(items).toHaveCount(2);
-      await expect(items.nth(0)).toContainText('2025-12-24');
-      await expect(items.nth(1)).toContainText('2025-12-25');
+      await expect(items.nth(0)).toContainText('2025-12-23T21:00:00');
+      await expect(items.nth(1)).toContainText('2025-12-25T03:30:00');
     });
 
     // Verify popover header label.
@@ -581,6 +599,9 @@ test.describe('Multivalue Prop Types', () => {
     await dateTimeUnlimitedField
       .getByRole('button', { name: '+ Add new' })
       .click();
+    await expect(dateTimeUnlimitedField.locator('tr.draggable')).toHaveCount(2);
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
     await canvas.editMultiValueDatetimeProp(
       'DateTime (Unlimited)',
       '2025-12-26',
@@ -588,11 +609,11 @@ test.describe('Multivalue Prop Types', () => {
       1,
     );
 
-    // Drag row 1 (2025-12-26) before row 0 (2025-12-25).
+    // Drag row 1 (2025-12-25T23:00:00) before row 0 (2025-12-25T03:30:00).
     await canvas.reorderMultiValueProp('DateTime (Unlimited)', 1, 0);
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
-      await expect(items.nth(0)).toContainText('2025-12-26');
-      await expect(items.nth(1)).toContainText('2025-12-25');
+      await expect(items.nth(0)).toContainText('2025-12-25T23:00:00');
+      await expect(items.nth(1)).toContainText('2025-12-25T03:30:00');
     });
 
     // Verify no ghost rows appear when deleting from bottom to top.
@@ -708,6 +729,9 @@ test.describe('Multivalue Prop Types', () => {
 
     // Add a new item and reorder.
     await dateUnlimitedField.getByRole('button', { name: '+ Add new' }).click();
+    await expect(dateUnlimitedField.locator('tr.draggable')).toHaveCount(2);
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
     await canvas.editMultiValueDateProp('Date (Unlimited)', '2026-05-01', 1);
 
     // Drag row 1 (2026-05-01) before row 0 (2026-04-28).
@@ -972,9 +996,9 @@ test.describe('Multivalue Prop Types', () => {
       // Review changes: verify all values appear in preview frame.
       await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
         await expect(items).toHaveCount(initialRowCount);
-        await expect(items.nth(0)).toContainText('2025-12-24');
-        await expect(items.nth(1)).toContainText('2025-12-25');
-        await expect(items.nth(2)).toContainText('2025-12-26');
+        await expect(items.nth(0)).toContainText('2025-12-23T21:00:00');
+        await expect(items.nth(1)).toContainText('2025-12-24T21:30:00');
+        await expect(items.nth(2)).toContainText('2025-12-25T23:00:00');
       });
 
       // Now proceed with deletion: Remove the last row (delete from bottom to top).
@@ -997,8 +1021,8 @@ test.describe('Multivalue Prop Types', () => {
       // Verify the deleted row is no longer in preview
       await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
         await expect(items).toHaveCount(initialRowCount - 1);
-        await expect(items.nth(0)).toContainText('2025-12-24');
-        await expect(items.nth(1)).toContainText('2025-12-25');
+        await expect(items.nth(0)).toContainText('2025-12-23T21:00:00');
+        await expect(items.nth(1)).toContainText('2025-12-24T21:30:00');
       });
 
       // Remove the new last row (continuing bottom-to-top).
@@ -1023,7 +1047,7 @@ test.describe('Multivalue Prop Types', () => {
       // Verify final state in preview
       await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
         await expect(items).toHaveCount(initialRowCount - 2);
-        await expect(items.nth(0)).toContainText('2025-12-24');
+        await expect(items.nth(0)).toContainText('2025-12-23T21:00:00');
       });
     });
   });

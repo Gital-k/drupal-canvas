@@ -576,7 +576,7 @@ describe('Transforms - dateRange', () => {
     });
   });
 
-  it('should map datetime range form values to UTC ISO date strings', () => {
+  it('should map datetime range form values to date and time strings', () => {
     const dateTimeFieldData = {
       sourceTypeSettings: {
         storage: {
@@ -597,8 +597,8 @@ describe('Transforms - dateRange', () => {
         dateTimeFieldData,
       ),
     ).to.deep.equal({
-      value: '2026-05-02T07:21:35.000Z',
-      end_value: '2026-06-02T09:45:12.000Z',
+      value: '2026-05-02 07:21:35',
+      end_value: '2026-06-02 09:45:12',
     });
   });
 });

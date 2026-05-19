@@ -20,6 +20,7 @@ use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -51,6 +52,8 @@ use Drupal\canvas\PropSource\PropSourceBase;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher;
 use Drupal\canvas\Utility\TypedDataHelper;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
 use Symfony\Component\Validator\ConstraintViolation;
@@ -1371,6 +1374,17 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
             $prop_source['value'] = 0;
           }
         }
+        // Normalize datetime input from the Canvas UI to the canonical UTC
+        // storage format, mirroring what the date widgets do on entity forms.
+        if (
+          ($prop_source['sourceType'] ?? NULL) === 'static:field_item:datetime'
+          && ($prop_source['sourceTypeSettings']['storage']['datetime_type'] ?? NULL) === DateTimeItem::DATETIME_TYPE_DATETIME
+          && \array_key_exists('value', $prop_source)
+          && $prop_source['value'] !== NULL
+        ) {
+          $prop_source['value'] = self::normalizeDatetimeValue($prop_source['value']);
+        }
+
         $source = PropSource::parse($prop_source);
         if ($source instanceof EntityFieldPropSource) {
           if ($host_entity === NULL) {
@@ -1602,6 +1616,57 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // phpcs:ignore
     /** @var PropSourceArray $value */
     return PropSource::parse($value);
+  }
+
+  /**
+   * Converts datetime input to canonical UTC storage format.
+   *
+   * The browser-side `dateTime` form transformer submits a string
+   * (`YYYY-MM-DD HH:MM:SS`) representing what the user typed in the form
+   * widget. We mirror what the datetime widget does on a normal entity form:
+   * parse the string in the request user's timezone, then convert to UTC and
+   * format using the field type's canonical storage format. The result is
+   * identical to what Drupal would have stored if the user had submitted the
+   * value via the regular widget.
+   *
+   * Values that already look canonical (carry an offset, `Z`, or match the
+   * storage format exactly) pass through unchanged so this is idempotent.
+   *
+   * @param array|string $value
+   *   A static prop source value as submitted by the Canvas UI.
+   *
+   * @return array|string
+   *   The prop source with `value` normalized when applicable.
+   *
+   * @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase::massageFormValues()
+   */
+  private static function normalizeDatetimeValue(array|string $value): array|string {
+    if (\is_array($value)) {
+      return \array_map([self::class, 'normalizeDatetimeValue'], $value);
+    }
+    if ($value === '') {
+      return $value;
+    }
+    // Already canonical UTC storage format — pass through.
+    if (\preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/', $value)) {
+      return $value;
+    }
+    // Already carries an explicit offset or Z — pass through.
+    if (\preg_match('/(Z|[+-](?:2[0-3]|[01][0-9])(?::?[0-5][0-9])?)$/', $value)) {
+      return $value;
+    }
+    // Parse in the request user's timezone, then convert to UTC.
+    // DrupalDateTime defaults to the current user's timezone (or site default).
+    // @see \Drupal\Core\Datetime\DrupalDateTime::prepareTimezone()
+    try {
+      $date = new DrupalDateTime($value);
+    }
+    catch (\Exception) {
+      // Unparsable input: let validation catch it downstream.
+      return $value;
+    }
+    $date->setTimezone(new \DateTimeZone(DateTimeItemInterface::STORAGE_TIMEZONE));
+    return $date->format(DateTimeItemInterface::DATETIME_STORAGE_FORMAT);
   }
 
 }
