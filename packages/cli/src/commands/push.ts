@@ -476,23 +476,21 @@ export function pushCommand(program: Command): void {
         const remoteRegions = includesRegions
           ? await apiService.listRegions()
           : {};
-        // Map each remote region's short name to its full `{theme}.{region}`
-        // id so the push step can resolve the PATCH target without needing
+        // Map each remote region's name to its full `{theme}.{region}` id so
+        // the push step can resolve the PATCH/DELETE target without needing
         // the theme in the local file.
-        const remoteRegionIdsByShortName = new Map(
+        const remoteRegionIdsByName = new Map(
           Object.values(remoteRegions).map(
             (r) => [r.region, `${r.theme}.${r.region}`] as const,
           ),
         );
-        const localRegionShortNames = new Set(
+        const localRegionNames = new Set(
           discoveredRegions.map((r) => r.region),
         );
         // Remote regions absent locally are deleted on push.
-        const remoteRegionIdsToDelete = Array.from(
-          remoteRegionIdsByShortName.entries(),
-        )
-          .filter(([shortName]) => !localRegionShortNames.has(shortName))
-          .map(([, id]) => id);
+        const remoteRegionNamesToDelete = Array.from(
+          remoteRegionIdsByName.keys(),
+        ).filter((name) => !localRegionNames.has(name));
 
         // Build a preview of planned operations.
         const operationLabels: Record<string, string> = {
@@ -560,14 +558,14 @@ export function pushCommand(program: Command): void {
             success: true,
             details: [
               {
-                content: remoteRegionIdsByShortName.has(region.region)
+                content: remoteRegionIdsByName.has(region.region)
                   ? operationLabels.update
                   : operationLabels.create,
               },
             ],
           })),
-          ...remoteRegionIdsToDelete.map((id) => ({
-            itemName: id,
+          ...remoteRegionNamesToDelete.map((name) => ({
+            itemName: name,
             itemType: 'Global region',
             success: true,
             details: [{ content: operationLabels.delete }],
@@ -943,7 +941,7 @@ export function pushCommand(program: Command): void {
         // Validate and push global regions.
         if (
           discoveredRegions.length > 0 ||
-          remoteRegionIdsToDelete.length > 0
+          remoteRegionNamesToDelete.length > 0
         ) {
           let validRegions: Awaited<
             ReturnType<typeof prepareRegions>
@@ -1014,9 +1012,9 @@ export function pushCommand(program: Command): void {
           regionPushSpinner.start('Pushing global regions');
           const regionPushResults = await pushRegions(
             validRegions,
-            remoteRegionIdsByShortName,
+            remoteRegionIdsByName,
             apiService,
-            remoteRegionIdsToDelete,
+            remoteRegionNamesToDelete,
           );
           regionPushSpinner.stop(
             chalk.green(
