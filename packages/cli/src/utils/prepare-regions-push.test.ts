@@ -111,11 +111,11 @@ describe('pushRegions', () => {
     expect(updateRegion).not.toHaveBeenCalled();
     expect(results[0]).toMatchObject({
       success: true,
-      result: { id: 'stark.header', operation: 'Created' },
+      result: { region: 'header', operation: 'Created' },
     });
   });
 
-  it('PATCHes an existing region using the full id from the short-name map', async () => {
+  it('PATCHes an existing region using the full id from the name map', async () => {
     const createRegion = vi.fn();
     const updateRegion = vi.fn(
       async (): Promise<Region> => ({
@@ -140,20 +140,23 @@ describe('pushRegions', () => {
     expect(createRegion).not.toHaveBeenCalled();
     expect(results[0]).toMatchObject({
       success: true,
-      result: { id: 'olivero.header', operation: 'Updated' },
+      result: { region: 'header', operation: 'Updated' },
     });
   });
 
-  it('DELETEs remote regions absent locally', async () => {
+  it('DELETEs remote regions absent locally using the name map to resolve the backend id', async () => {
     const createRegion = vi.fn();
     const updateRegion = vi.fn();
     const deleteRegion = vi.fn(async (): Promise<void> => {});
 
     const results = await pushRegions(
       [],
-      new Map(),
+      new Map([
+        ['footer', 'olivero.footer'],
+        ['sidebar', 'olivero.sidebar'],
+      ]),
       { createRegion, updateRegion, deleteRegion },
-      ['olivero.footer', 'olivero.sidebar'],
+      ['footer', 'sidebar'],
     );
 
     expect(createRegion).not.toHaveBeenCalled();
@@ -164,11 +167,11 @@ describe('pushRegions', () => {
     expect(results).toHaveLength(2);
     expect(results[0]).toMatchObject({
       success: true,
-      result: { id: 'olivero.footer', operation: 'Deleted' },
+      result: { region: 'footer', operation: 'Deleted' },
     });
     expect(results[1]).toMatchObject({
       success: true,
-      result: { id: 'olivero.sidebar', operation: 'Deleted' },
+      result: { region: 'sidebar', operation: 'Deleted' },
     });
   });
 });
