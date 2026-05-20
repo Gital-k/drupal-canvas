@@ -13,8 +13,8 @@ abstract class CanvasUpdatePathTestBase extends UpdatePathTestBase {
   /**
    * Disable entity schema check; dumps predate the canvas_form entity type.
    *
-   * canvas_update_11201 installs it, but tests not specifically testing that
-   * hook should not assert entity schema completeness.
+   * The canvas_update_11201 hook installs it, but tests not specifically
+   * testing that hook should not assert entity schema completeness.
    *
    * @var bool
    * @phpstan-ignore shipmonk.deadProperty.neverRead
