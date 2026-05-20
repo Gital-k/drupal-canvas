@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\EventSubscriber;
 
+use Drupal\canvas\Config\CodeComponentSyncMode;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
@@ -26,13 +27,17 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  *   sync buffer. Canvas CLI is the sole source of truth.
  *
  * "Code components" means `canvas.js_component.*` config entities and the
- * paired `canvas.component.*` entities whose `source` is `js` (created by
- * \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()).
+ * paired `canvas.component.*` entities whose `source` is `js`. Both are
+ * filtered because config sync does not regenerate the paired `component`
+ * entity from `js_component` on its own — that only happens via
+ * \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave().
+ *
+ * @see \Drupal\canvas\Config\CodeComponentSyncMode
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::SOURCE_PLUGIN_ID
+ * @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()
+ * @see \Drupal\canvas\EventSubscriber\ComponentTreeConfigEntityTransformer
  */
 final readonly class CodeComponentSyncTransformer implements EventSubscriberInterface {
-
-  private const string MODE_PRESERVE_PRODUCTION = 'preserve_production';
-  private const string MODE_CLI = 'cli';
 
   private const string JS_COMPONENT_PREFIX = 'canvas.' . JavaScriptComponent::ENTITY_TYPE_ID . '.';
   private const string COMPONENT_PREFIX = 'canvas.' . Component::ENTITY_TYPE_ID . '.';
@@ -58,14 +63,13 @@ final readonly class CodeComponentSyncTransformer implements EventSubscriberInte
       return;
     }
     match ($this->mode()) {
-      self::MODE_CLI => $this->stripAllCodeComponents($sync),
-      self::MODE_PRESERVE_PRODUCTION => $this->copyDbOnlyCodeComponentsInto($sync),
-      default => NULL,
+      CodeComponentSyncMode::Cli => $this->stripAllCodeComponents($sync),
+      CodeComponentSyncMode::PreserveProduction => $this->copyDbOnlyCodeComponentsInto($sync),
     };
   }
 
   public function onExport(StorageTransformEvent $event): void {
-    if ($this->mode() !== self::MODE_CLI) {
+    if ($this->mode() !== CodeComponentSyncMode::Cli) {
       return;
     }
     $sync = $event->getStorage();
@@ -75,9 +79,11 @@ final readonly class CodeComponentSyncTransformer implements EventSubscriberInte
     $this->stripAllCodeComponents($sync);
   }
 
-  private function mode(): string {
-    return $this->configFactory->get('canvas.settings')->get('code_components.sync_mode')
-      ?? self::MODE_PRESERVE_PRODUCTION;
+  private function mode(): CodeComponentSyncMode {
+    $raw = $this->configFactory->get('canvas.settings')->get('code_components.sync_mode');
+    return is_string($raw)
+      ? (CodeComponentSyncMode::tryFrom($raw) ?? CodeComponentSyncMode::PreserveProduction)
+      : CodeComponentSyncMode::PreserveProduction;
   }
 
   private function stripAllCodeComponents(StorageInterface $sync): void {
@@ -85,7 +91,8 @@ final readonly class CodeComponentSyncTransformer implements EventSubscriberInte
       $sync->delete($name);
     }
     foreach ($sync->listAll(self::COMPONENT_PREFIX) as $name) {
-      if ($this->isJsSourced($sync->read($name))) {
+      $raw = $sync->read($name);
+      if (is_array($raw) && $this->isJsSourced($raw)) {
         $sync->delete($name);
       }
     }
@@ -111,8 +118,8 @@ final readonly class CodeComponentSyncTransformer implements EventSubscriberInte
     }
   }
 
-  private function isJsSourced(array|false $raw): bool {
-    return is_array($raw) && ($raw['source'] ?? NULL) === JsComponent::SOURCE_PLUGIN_ID;
+  private function isJsSourced(array $raw): bool {
+    return ($raw['source'] ?? NULL) === JsComponent::SOURCE_PLUGIN_ID;
   }
 
 }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\Config\CodeComponentSyncMode;
 use Drupal\canvas\EventSubscriber\CodeComponentSyncTransformer;
-use Drupal\Core\Config\ConfigEvents;
 use Drupal\Core\Config\MemoryStorage;
 use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Config\StorageTransformEvent;
@@ -14,6 +14,7 @@ use PHPUnit\Framework\Attributes\Group;
 
 /**
  * @covers \Drupal\canvas\EventSubscriber\CodeComponentSyncTransformer
+ * @covers \Drupal\canvas\Config\CodeComponentSyncMode
  */
 #[Group('canvas')]
 final class CodeComponentSyncTransformerTest extends KernelTestBase {
@@ -31,7 +32,7 @@ final class CodeComponentSyncTransformerTest extends KernelTestBase {
   }
 
   public function testPreserveProductionKeepsDbOnlyJsComponentOnImport(): void {
-    $this->setMode('preserve_production');
+    $this->setMode(CodeComponentSyncMode::PreserveProduction);
     $this->activeStorage->write('canvas.js_component.foo', ['machineName' => 'foo']);
 
     $sync = new MemoryStorage();
@@ -41,7 +42,7 @@ final class CodeComponentSyncTransformerTest extends KernelTestBase {
   }
 
   public function testPreserveProductionDoesNotOverwriteSyncEntry(): void {
-    $this->setMode('preserve_production');
+    $this->setMode(CodeComponentSyncMode::PreserveProduction);
     $this->activeStorage->write('canvas.js_component.foo', ['machineName' => 'foo', 'name' => 'DB']);
 
     $sync = new MemoryStorage();
@@ -52,7 +53,7 @@ final class CodeComponentSyncTransformerTest extends KernelTestBase {
   }
 
   public function testPreserveProductionCopiesPairedJsSourcedComponent(): void {
-    $this->setMode('preserve_production');
+    $this->setMode(CodeComponentSyncMode::PreserveProduction);
     $this->activeStorage->write('canvas.component.js.foo', ['id' => 'js.foo', 'source' => 'js']);
     $this->activeStorage->write('canvas.component.block.bar', ['id' => 'block.bar', 'source' => 'block']);
 
@@ -64,7 +65,7 @@ final class CodeComponentSyncTransformerTest extends KernelTestBase {
   }
 
   public function testCliModeStripsJsComponentsOnImport(): void {
-    $this->setMode('cli');
+    $this->setMode(CodeComponentSyncMode::Cli);
     $sync = new MemoryStorage();
     $sync->write('canvas.js_component.foo', ['machineName' => 'foo']);
     $sync->write('canvas.component.js.foo', ['id' => 'js.foo', 'source' => 'js']);
@@ -78,7 +79,7 @@ final class CodeComponentSyncTransformerTest extends KernelTestBase {
   }
 
   public function testCliModeStripsJsComponentsOnExport(): void {
-    $this->setMode('cli');
+    $this->setMode(CodeComponentSyncMode::Cli);
     $sync = new MemoryStorage();
     $sync->write('canvas.js_component.foo', ['machineName' => 'foo']);
     $sync->write('canvas.component.js.foo', ['id' => 'js.foo', 'source' => 'js']);
@@ -90,7 +91,7 @@ final class CodeComponentSyncTransformerTest extends KernelTestBase {
   }
 
   public function testPreserveProductionLeavesExportAlone(): void {
-    $this->setMode('preserve_production');
+    $this->setMode(CodeComponentSyncMode::PreserveProduction);
     $this->activeStorage->write('canvas.js_component.foo', ['machineName' => 'foo']);
 
     $sync = new MemoryStorage();
@@ -102,7 +103,7 @@ final class CodeComponentSyncTransformerTest extends KernelTestBase {
   }
 
   public function testIgnoresNonDefaultCollection(): void {
-    $this->setMode('cli');
+    $this->setMode(CodeComponentSyncMode::Cli);
     $sync = (new MemoryStorage())->createCollection('language.fr');
     $sync->write('canvas.js_component.foo', ['machineName' => 'foo']);
 
@@ -111,9 +112,39 @@ final class CodeComponentSyncTransformerTest extends KernelTestBase {
     self::assertTrue($sync->exists('canvas.js_component.foo'));
   }
 
-  private function setMode(string $mode): void {
+  public function testInvalidModeFallsBackToPreserveProduction(): void {
+    $this->config('canvas.settings')->set('code_components.sync_mode', 'bogus')->save();
+    $this->activeStorage->write('canvas.js_component.foo', ['machineName' => 'foo']);
+
+    $sync = new MemoryStorage();
+    $this->dispatchImport($sync);
+
+    self::assertTrue($sync->exists('canvas.js_component.foo'));
+  }
+
+  /**
+   * Proves the subscriber is wired to the real import transform pipeline.
+   *
+   * @see \Drupal\Core\Config\ImportStorageTransformer::transform()
+   */
+  public function testWiredIntoConfigImportTransformer(): void {
+    $this->setMode(CodeComponentSyncMode::Cli);
+
+    $sync = new MemoryStorage();
+    $sync->write('canvas.js_component.foo', ['machineName' => 'foo']);
+    $sync->write('canvas.component.js.foo', ['id' => 'js.foo', 'source' => 'js']);
+    $sync->write('canvas.component.block.bar', ['id' => 'block.bar', 'source' => 'block']);
+
+    $transformed = $this->container->get('config.import_transformer')->transform($sync);
+
+    self::assertFalse($transformed->exists('canvas.js_component.foo'));
+    self::assertFalse($transformed->exists('canvas.component.js.foo'));
+    self::assertTrue($transformed->exists('canvas.component.block.bar'));
+  }
+
+  private function setMode(CodeComponentSyncMode $mode): void {
     $this->config('canvas.settings')
-      ->set('code_components.sync_mode', $mode)
+      ->set('code_components.sync_mode', $mode->value)
       ->save();
   }
 

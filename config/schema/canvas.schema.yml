@@ -1129,8 +1129,11 @@ canvas.settings:
       mapping:
         sync_mode:
           type: string
-          label: 'Config sync behavior for code components'
+          label: 'Sync mode'
           constraints:
+            # @see \Drupal\canvas\Config\CodeComponentSyncMode
             Choice:
+              # @see \Drupal\canvas\Config\CodeComponentSyncMode::PreserveProduction
               - preserve_production
+              # @see \Drupal\canvas\Config\CodeComponentSyncMode::Cli
               - cli

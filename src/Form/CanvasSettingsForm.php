@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Form;
 
+use Drupal\canvas\Config\CodeComponentSyncMode;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 
@@ -41,13 +42,16 @@ final class CanvasSettingsForm extends ConfigFormBase {
     ];
     $form['code_components']['sync_mode'] = [
       '#type' => 'radios',
-      '#title' => $this->t('Config sync behavior'),
-      '#default_value' => $config->get('code_components.sync_mode') ?? 'preserve_production',
+      '#title' => $this->t('Sync mode'),
+      '#default_value' => $config->get('code_components.sync_mode') ?? CodeComponentSyncMode::PreserveProduction->value,
       '#options' => [
-        'preserve_production' => $this->t('Preserve production-created components (recommended)'),
-        'cli' => $this->t('Manage exclusively via Canvas CLI'),
+        CodeComponentSyncMode::PreserveProduction->value => $this->t('Preserve production-created components (recommended)'),
+        CodeComponentSyncMode::Cli->value => $this->t('Manage exclusively via Canvas CLI'),
       ],
-      '#description' => $this->t('<strong>Preserve production-created:</strong> code components present in the active site but missing from the config sync directory are kept on import. Components tracked in sync still update from sync. <strong>Manage via Canvas CLI:</strong> code components are completely ignored by config import and export. Use this when the Canvas CLI is the sole source of truth.'),
+      '#options_descriptions' => [
+        CodeComponentSyncMode::PreserveProduction->value => $this->t('Code components present in the active site but missing from the config sync directory are kept on import. Components tracked in sync still update from sync.'),
+        CodeComponentSyncMode::Cli->value => $this->t('Code components are completely ignored by config import and export. Use this when the Canvas CLI is the sole source of truth.'),
+      ],
     ];
 
     return parent::buildForm($form, $form_state);
