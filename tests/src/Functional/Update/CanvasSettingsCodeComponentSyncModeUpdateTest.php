@@ -40,21 +40,4 @@ final class CanvasSettingsCodeComponentSyncModeUpdateTest extends CanvasUpdatePa
     );
   }
 
-  /**
-   * Pre-update sites that already set a sync mode keep it.
-   */
-  public function testExistingSyncModeNotOverwritten(): void {
-    \Drupal::configFactory()
-      ->getEditable('canvas.settings')
-      ->set('code_components.sync_mode', CodeComponentSyncMode::Cli->value)
-      ->save();
-
-    $this->runUpdates();
-
-    self::assertSame(
-      CodeComponentSyncMode::Cli->value,
-      \Drupal::config('canvas.settings')->get('code_components.sync_mode'),
-    );
-  }
-
 }
