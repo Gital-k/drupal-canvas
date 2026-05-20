@@ -7,9 +7,8 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Url;
-use Symfony\Component\HttpFoundation\Request;
+use GuzzleHttp\ClientInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Yaml\Yaml;
 use Drupal\Component\Utility\DiffArray;
 use Drupal\Component\Uuid\UuidInterface;
@@ -37,8 +36,8 @@ class CanvasAiPageBuilderHelper {
    *   The entity type manager.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory.
-   * @param \Symfony\Component\HttpKernel\HttpKernelInterface $httpKernel
-   *   The HTTP kernel.
+   * @param \GuzzleHttp\ClientInterface $httpClient
+   *   The HTTP client.
    * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
    *   The stack of requests.
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
@@ -54,7 +53,7 @@ class CanvasAiPageBuilderHelper {
     private readonly ComponentPluginManager $componentPluginManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly ConfigFactoryInterface $configFactory,
-    private readonly HttpKernelInterface $httpKernel,
+    private readonly ClientInterface $httpClient,
     private readonly RequestStack $requestStack,
     private readonly UuidInterface $uuidService,
     private readonly CanvasAiTempStore $canvasAiTempstore,
@@ -249,24 +248,34 @@ class CanvasAiPageBuilderHelper {
   public function getAllComponentsKeyedBySource(): array {
     $output = [];
     $current_request = $this->requestStack->getCurrentRequest();
-    $sub_request = Request::create(
-      Url::fromRoute('canvas.api.config.list', ['canvas_config_entity_type_id' => Component::ENTITY_TYPE_ID])->toString(),
-      'GET',
-      [],
-      $current_request?->cookies->all() ?? [],
-      [],
-      $current_request?->server->all() ?? []
-    );
-    $sub_request->attributes->set('_format', 'json');
+    $headers = ['Accept' => 'application/json'];
+    if ($current_request !== NULL) {
+      $cookie_header = [];
+      foreach ($current_request->cookies->all() as $cookie_name => $cookie_value) {
+        $cookie_header[] = $cookie_name . '=' . rawurlencode((string) $cookie_value);
+      }
+      if (!empty($cookie_header)) {
+        $headers['Cookie'] = implode('; ', $cookie_header);
+      }
+    }
+
+    $url = Url::fromRoute('canvas.api.config.list', ['canvas_config_entity_type_id' => Component::ENTITY_TYPE_ID], ['absolute' => TRUE])->toString();
     try {
-      $available_components_response = $this->httpKernel->handle($sub_request, HttpKernelInterface::SUB_REQUEST);
-      $available_components = (string) $available_components_response->getContent();
-      $available_components = Json::decode($available_components);
+      $response = $this->httpClient->request('GET', $url, [
+        'headers' => $headers,
+        'http_errors' => FALSE,
+      ]);
     }
     catch (\Exception) {
       return [];
     }
-    if (empty($available_components)) {
+
+    if ($response->getStatusCode() >= 400) {
+      return [];
+    }
+
+    $available_components = Json::decode((string) $response->getBody());
+    if (!\is_array($available_components) || empty($available_components)) {
       return [];
     }
 
@@ -287,7 +296,8 @@ class CanvasAiPageBuilderHelper {
         $this->processSdc($component, $sdc_definitions, $output);
       }
       elseif ($source === JsComponent::SOURCE_PLUGIN_ID) {
-        $this->processCodeComponents($component, $output, $available_components[$component_id]);
+        $component_data = $available_components[$component_id] ?? [];
+        $this->processCodeComponents($component, $output, \is_array($component_data) ? $component_data : []);
       }
       else {
         // Other sources: id, name, description (description = name)

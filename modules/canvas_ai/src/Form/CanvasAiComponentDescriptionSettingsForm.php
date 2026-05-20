@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas_ai\Form;
 
+use Drupal\Component\Serialization\Json;
 use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -116,9 +117,12 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
         }
       }
 
+      $components_data = $available_components[$source]['components'] ?? [];
+      $components_data = Json::decode(Json::encode($components_data));
+
       $this->config('canvas_ai.component_description.settings')
         ->set('component_context.' . $source . '.enabled', $components['enabled'])
-        ->set('component_context.' . $source . '.data', Yaml::encode($available_components[$source]['components']))
+        ->set('component_context.' . $source . '.data', Yaml::encode(\is_array($components_data) ? $components_data : []))
         ->save();
     }
     parent::submitForm($form, $form_state);
