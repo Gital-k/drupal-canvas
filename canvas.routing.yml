@@ -816,7 +816,7 @@ canvas.settings:
   path: '/admin/config/canvas/settings'
   defaults:
     _form: '\Drupal\canvas\Form\CanvasSettingsForm'
-    _title: 'Canvas code components'
+    _title: 'Canvas settings'
   requirements:
     _permission: 'administer code components'
   options:
