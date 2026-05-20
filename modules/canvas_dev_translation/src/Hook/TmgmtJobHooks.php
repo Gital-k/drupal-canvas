@@ -48,7 +48,7 @@ class TmgmtJobHooks {
   /**
    * Implements hook_entity_delete().
    *
-   * Schedules deletion of any pending TMGMT jobs for the removed canvas_page.
+   * Deletes any pending TMGMT job items for the removed canvas_page immediately.
    */
   #[Hook('entity_delete')]
   public function entityDelete(EntityInterface $entity): void {
@@ -59,8 +59,7 @@ class TmgmtJobHooks {
       return;
     }
 
-    $this->schedule([
-      'op'              => 'delete_pending_jobs',
+    $this->deletePendingJobItems([
       'entity_type'     => $entity->getEntityTypeId(),
       'entity_id'       => $entity->id(),
       'source_langcode' => $entity->language()->getId(),
@@ -108,9 +107,8 @@ class TmgmtJobHooks {
 
     foreach ($pending as $item) {
       match ($item['op']) {
-        'create'             => $this->createJobs($item),
-        'delete_pending_jobs' => $this->deletePendingJobs($item),
-        default              => NULL,
+        'create'  => $this->createJobs($item),
+        default   => NULL,
       };
     }
   }
@@ -206,7 +204,7 @@ class TmgmtJobHooks {
    * Empty parent jobs are deleted as well since TMGMT does not do this
    * automatically.
    */
-  private function deletePendingJobs(array $item): void {
+  private function deletePendingJobItems(array $item): void {
     $job_items = tmgmt_job_item_load_latest('content', $item['entity_type'], (string) $item['entity_id'], $item['source_langcode']);
 
     if (empty($job_items)) {
