@@ -11,6 +11,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\language\ConfigurableLanguageManagerInterface;
@@ -692,7 +693,7 @@ class TranslationTest extends FunctionalTestBase {
     $regions = PageRegion::createFromBlockLayout($default_theme);
     $new_region = reset($regions);
     \assert($new_region instanceof PageRegion);
-    $existing = $this->container->get('entity_type.manager')
+    $existing = $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage(PageRegion::ENTITY_TYPE_ID)
       ->load($new_region->id());
     $region = $existing instanceof PageRegion ? $existing : $new_region;
