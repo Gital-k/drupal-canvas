@@ -1,16 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  pushRegions,
-  stripNullableKeysForRegion,
-} from './prepare-regions-push';
+import { stripNullableKeysForConfigComponentTree } from './component-tree-payload';
+import { pushRegions } from './prepare-regions-push';
 
 import type { Region } from '../types/Region';
 import type { PreparedRegion } from './prepare-regions-push';
 
-describe('stripNullableKeysForRegion', () => {
+describe('stripNullableKeysForConfigComponentTree', () => {
   it('omits null parent_uuid, slot, and label for root-level components', () => {
-    const stripped = stripNullableKeysForRegion([
+    const stripped = stripNullableKeysForConfigComponentTree([
       {
         uuid: 'root-uuid',
         component_id: 'js.hero',
@@ -33,7 +31,7 @@ describe('stripNullableKeysForRegion', () => {
   });
 
   it('preserves parent_uuid and slot for nested components, drops null label', () => {
-    const stripped = stripNullableKeysForRegion([
+    const stripped = stripNullableKeysForConfigComponentTree([
       {
         uuid: 'child',
         component_id: 'js.button',
@@ -58,7 +56,7 @@ describe('stripNullableKeysForRegion', () => {
   });
 
   it('keeps non-empty label', () => {
-    const stripped = stripNullableKeysForRegion([
+    const stripped = stripNullableKeysForConfigComponentTree([
       {
         uuid: 'node',
         component_id: 'js.heading',
