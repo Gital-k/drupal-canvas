@@ -66,11 +66,11 @@ final readonly class CodeComponentSyncTransformer implements EventSubscriberInte
   }
 
   public function onExport(StorageTransformEvent $event): void {
-    if ($this->mode() !== CodeComponentSyncMode::Cli) {
-      return;
-    }
     $sync = $event->getStorage();
     if ($sync->getCollectionName() !== StorageInterface::DEFAULT_COLLECTION) {
+      return;
+    }
+    if ($this->mode() === CodeComponentSyncMode::PreserveProduction) {
       return;
     }
     $this->stripAllCodeComponents($sync);
