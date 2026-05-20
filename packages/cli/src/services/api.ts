@@ -27,11 +27,8 @@ import type {
   ContentTemplateListItem,
 } from '../types/ContentTemplate';
 import type { Page, PageListItem } from '../types/Page';
-import type {
-  Region,
-  RegionComponentTreePayload,
-  RegionListItem,
-} from '../types/Region';
+import type { Region, RegionListItem } from '../types/Region';
+import type { ConfigComponentTreePayload } from '../utils/component-tree-payload';
 
 export interface ApiOptions {
   siteUrl: string;
@@ -536,9 +533,14 @@ export class ApiService {
   /**
    * Create a new content template.
    */
-  async createContentTemplate(
-    template: ContentTemplate,
-  ): Promise<ContentTemplate> {
+  async createContentTemplate(template: {
+    label: string;
+    entityType: string;
+    bundle: string;
+    viewMode: string;
+    status: boolean;
+    component_tree: ConfigComponentTreePayload;
+  }): Promise<ContentTemplate> {
     try {
       const response = await this.client.post(
         '/canvas/api/v0/config/content_template',
@@ -555,7 +557,11 @@ export class ApiService {
    */
   async updateContentTemplate(
     id: string,
-    template: Partial<ContentTemplate>,
+    template: {
+      label?: string;
+      status?: boolean;
+      component_tree?: ConfigComponentTreePayload;
+    },
   ): Promise<ContentTemplate> {
     try {
       const response = await this.client.patch(
@@ -706,16 +712,16 @@ export class ApiService {
   /**
    * Create a new region.
    */
-  async createRegion(payload: {
+  async createRegion(region: {
     theme?: string;
     region: string;
     status: boolean;
-    component_tree: RegionComponentTreePayload;
+    component_tree: ConfigComponentTreePayload;
   }): Promise<Region> {
     try {
       const response = await this.client.post(
         '/canvas/api/v0/config/page_region',
-        payload,
+        region,
       );
       return response.data;
     } catch (error) {
@@ -728,15 +734,15 @@ export class ApiService {
    */
   async updateRegion(
     id: string,
-    payload: {
+    region: {
       status?: boolean;
-      component_tree?: RegionComponentTreePayload;
+      component_tree?: ConfigComponentTreePayload;
     },
   ): Promise<Region> {
     try {
       const response = await this.client.patch(
         `/canvas/api/v0/config/page_region/${id}`,
-        payload,
+        region,
       );
       return response.data;
     } catch (error) {
