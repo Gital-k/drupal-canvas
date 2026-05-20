@@ -13,12 +13,6 @@ services:
       - { name: cache_tags_invalidator }
       - { name: needs_destruction }
   Drupal\canvas\PropShape\EphemeralPropShapeRepository: {}
-  Drupal\canvas\EventSubscriber\CodeComponentSyncTransformer:
-    arguments:
-      $configFactory: '@config.factory'
-      $activeStorage: '@config.storage'
-    tags:
-      - { name: event_subscriber }
   Drupal\canvas\ComponentIncompatibilityReasonRepository: {}
   Drupal\canvas\JsonSchemaDefinitionsStreamwrapper:
     public: true
@@ -119,6 +113,7 @@ services:
     tags:
       - { name: 'event_subscriber' }
   Drupal\canvas\EventSubscriber\ComponentTreeConfigEntityTransformer: ~
+  Drupal\canvas\EventSubscriber\CodeComponentSyncTransformer: ~
   canvas.image_style.route_alter:
     class: Drupal\canvas\EventSubscriber\ImageStyleRoutesEventSubscriber
     tags:

@@ -12,6 +12,7 @@ use Drupal\Core\Config\ConfigEvents;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Config\StorageTransformEvent;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -44,6 +45,7 @@ final readonly class CodeComponentSyncTransformer implements EventSubscriberInte
 
   public function __construct(
     private ConfigFactoryInterface $configFactory,
+    #[Autowire(service: 'config.storage')]
     private StorageInterface $activeStorage,
   ) {}
 
