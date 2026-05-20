@@ -29,15 +29,11 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  *   storage passed to the transform event so neither side touches them. Canvas
  *   CLI is the sole source of truth.
  *
- * "Code components" means `canvas.js_component.*` config entities and the
- * paired `canvas.component.*` entities whose `source` is `js`. Both are
- * filtered because config sync does not regenerate the paired `component`
- * entity from `js_component` on its own — that only happens via
- * \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave().
+ * "Code components" means `canvas.js_component.*` entities and the paired
+ * `canvas.component.*` entities whose `source` is `js`.
  *
  * @see \Drupal\canvas\Config\CodeComponentSyncMode
  * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::SOURCE_PLUGIN_ID
- * @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()
  * @see \Drupal\canvas\EventSubscriber\ComponentTreeConfigEntityTransformer
  */
 final readonly class CodeComponentSyncTransformer implements EventSubscriberInterface {
