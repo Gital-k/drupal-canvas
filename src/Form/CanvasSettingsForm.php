@@ -13,8 +13,6 @@ use Drupal\Core\Form\FormStateInterface;
  */
 final class CanvasSettingsForm extends ConfigFormBase {
 
-  private const string SETTINGS = 'canvas.settings';
-
   /**
    * {@inheritdoc}
    */
@@ -26,15 +24,13 @@ final class CanvasSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   protected function getEditableConfigNames(): array {
-    return [self::SETTINGS];
+    return ['canvas.settings'];
   }
 
   /**
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state): array {
-    $config = $this->config(self::SETTINGS);
-
     $form['code_components'] = [
       '#type' => 'details',
       '#title' => $this->t('Code components'),
@@ -43,7 +39,7 @@ final class CanvasSettingsForm extends ConfigFormBase {
     $form['code_components']['sync_mode'] = [
       '#type' => 'radios',
       '#title' => $this->t('Sync mode'),
-      '#default_value' => CodeComponentSyncMode::fromSettings($config)->value,
+      '#config_target' => 'canvas.settings:' . CodeComponentSyncMode::CONFIG_KEY,
       '#options' => [
         CodeComponentSyncMode::PreserveProduction->value => $this->t('Preserve production-created components (recommended)'),
         CodeComponentSyncMode::Cli->value => $this->t('Manage exclusively via Canvas CLI'),
@@ -55,16 +51,6 @@ final class CanvasSettingsForm extends ConfigFormBase {
     ];
 
     return parent::buildForm($form, $form_state);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function submitForm(array &$form, FormStateInterface $form_state): void {
-    $this->config(self::SETTINGS)
-      ->set(CodeComponentSyncMode::CONFIG_KEY, $form_state->getValue('sync_mode'))
-      ->save();
-    parent::submitForm($form, $form_state);
   }
 
 }
