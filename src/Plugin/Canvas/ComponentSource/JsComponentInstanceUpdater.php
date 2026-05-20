@@ -96,35 +96,6 @@ final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComp
   }
 
   /**
-   * Extracts top-level prop names with validation errors.
-   *
-   * @param iterable $violations
-   *   Constraint violations returned by validateComponentInput().
-   * @param string $component_instance_uuid
-   *   Component instance UUID.
-   *
-   * @return list<string>
-   *   Invalid top-level prop names.
-   */
-  private static function getInvalidPropNames(iterable $violations, string $component_instance_uuid): array {
-    $invalid_prop_names = [];
-    $prefix = "inputs.$component_instance_uuid.";
-    foreach ($violations as $violation) {
-      $path = $violation->getPropertyPath();
-      if (!str_starts_with($path, $prefix)) {
-        continue;
-      }
-      $relative_path = substr($path, \strlen($prefix));
-      if ($relative_path === '') {
-        continue;
-      }
-      $segments = explode('.', $relative_path);
-      $invalid_prop_names[$segments[0]] = TRUE;
-    }
-    return \array_keys($invalid_prop_names);
-  }
-
-  /**
    * Returns names of props whose stored field type changed between versions.
    *
    * @param array $from_props

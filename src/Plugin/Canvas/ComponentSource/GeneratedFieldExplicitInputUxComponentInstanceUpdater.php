@@ -209,6 +209,35 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
   }
 
   /**
+   * Extracts top-level prop names with validation errors.
+   *
+   * @param iterable $violations
+   *   Constraint violations returned by validateComponentInput().
+   * @param string $component_instance_uuid
+   *   Component instance UUID.
+   *
+   * @return list<string>
+   *   Invalid top-level prop names.
+   */
+  protected static function getInvalidPropNames(iterable $violations, string $component_instance_uuid): array {
+    $invalid_prop_names = [];
+    $prefix = "inputs.$component_instance_uuid.";
+    foreach ($violations as $violation) {
+      $path = $violation->getPropertyPath();
+      if (!str_starts_with($path, $prefix)) {
+        continue;
+      }
+      $relative_path = substr($path, \strlen($prefix));
+      if ($relative_path === '') {
+        continue;
+      }
+      $segments = explode('.', $relative_path);
+      $invalid_prop_names[$segments[0]] = TRUE;
+    }
+    return \array_keys($invalid_prop_names);
+  }
+
+  /**
    * Determines if a prop definition stores multiple values.
    */
   protected static function isMultiValuePropDefinition(array $prop_definition): bool {
