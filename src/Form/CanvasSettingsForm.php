@@ -49,7 +49,7 @@ final class CanvasSettingsForm extends ConfigFormBase {
         CodeComponentSyncMode::Cli->value => $this->t('Manage exclusively via Canvas CLI'),
       ],
       '#options_descriptions' => [
-        CodeComponentSyncMode::PreserveProduction->value => $this->t('Code components present in the active site but missing from the config sync directory are kept on import. Components tracked in sync still update from sync.'),
+        CodeComponentSyncMode::PreserveProduction->value => $this->t('On import, code components in the active site that are missing from the config sync directory are kept. Components tracked in sync still update from sync. Export is unchanged: running <code>drush config:export</code> writes every active code component to the sync directory, so review the diff before committing.'),
         CodeComponentSyncMode::Cli->value => $this->t('Code components are completely ignored by config import and export. Use this when the Canvas CLI is the sole source of truth.'),
       ],
     ];
