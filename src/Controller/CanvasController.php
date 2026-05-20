@@ -31,6 +31,7 @@ use Drupal\Core\Template\Attribute;
 use Drupal\Core\Theme\ThemeInitializationInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
+use Drupal\path_alias\AliasManagerInterface;
 use Drupal\canvas\AssetRenderer;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\BrandKit;
@@ -39,6 +40,7 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Psr\Container\ContainerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 final class CanvasController {
@@ -58,6 +60,8 @@ final class CanvasController {
     private readonly EntityFieldManagerInterface $entityFieldManager,
     private readonly EntityTypeBundleInfoInterface $entityTypeBundleInfo,
     private readonly UrlGeneratorInterface $urlGenerator,
+    #[Autowire(service: 'service_container')]
+    private readonly ContainerInterface $container,
     private readonly CanvasExtensionPluginManager $extensionPluginManager,
     private readonly ThemeSettingsDiscovery $themeSettingsDiscovery,
     private readonly GlobalImports $globalImports,
@@ -125,6 +129,14 @@ HTML;
     // ⚠️ This is highly experimental and *will* be refactored.
     $personalization_extension_available = $this->moduleHandler->moduleExists('canvas_personalization');
     $system_site_config = $this->configFactory->get('system.site');
+    $homepage_path = $system_site_config->get('page.front');
+    \assert(\is_string($homepage_path));
+    $homepage_internal_path = $homepage_path;
+    if ($this->container->has('path_alias.manager')) {
+      $path_alias_manager = $this->container->get('path_alias.manager');
+      \assert($path_alias_manager instanceof AliasManagerInterface);
+      $homepage_internal_path = $path_alias_manager->getPathByAlias($homepage_path);
+    }
     $entity_types_with_keys = [];
     $entity_type_labels = [];
     foreach ($this->entityTypeManager->getDefinitions() as $entity_type_id => $entity_type_definition) {
@@ -206,7 +218,7 @@ HTML;
               'folders' => $this->currentUser->hasPermission(Folder::ADMIN_PERMISSION),
             ],
             'contentEntityCreateOperations' => $content_entity_create_operations,
-            'homepagePath' => $system_site_config->get('page.front'),
+            'homepagePath' => $homepage_internal_path,
             'loginUrl' => $this->urlGenerator->generateFromRoute('user.login'),
             'viewports' => $theme_settings['viewports'] ?? [],
           ],

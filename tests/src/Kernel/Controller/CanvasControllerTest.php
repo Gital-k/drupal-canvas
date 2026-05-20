@@ -18,6 +18,7 @@ use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\canvas\Entity\Folder;
 use Drupal\node\Entity\NodeType;
+use Drupal\path_alias\Entity\PathAlias;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
@@ -442,6 +443,42 @@ final class CanvasControllerTest extends CanvasKernelTestBase {
         'personalizationExtensionAvailable' => TRUE,
       ],
     ];
+  }
+
+  public function testControllerExposedHomepagePathAsInternalPath(): void {
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $this->setUpCurrentUser([], [
+      'access content',
+      Page::CREATE_PERMISSION,
+      Page::EDIT_PERMISSION,
+      Page::DELETE_PERMISSION,
+    ]);
+
+    $page = Page::create([
+      'title' => 'Homepage',
+      'status' => 1,
+      'components' => [],
+    ]);
+    self::assertSaveWithoutViolations($page);
+
+    PathAlias::create([
+      'path' => "/page/{$page->id()}",
+      'alias' => '/homepage',
+    ])->save();
+
+    $this->config('system.site')
+      ->set('page.front', '/homepage')
+      ->save();
+
+    $canvas_url = Url::fromRoute('canvas.boot.empty', [
+      'entity_type' => '',
+      'entity' => '',
+    ])->toString();
+    self::assertEquals('/canvas', $canvas_url);
+
+    $this->request(Request::create($canvas_url));
+
+    self::assertSame("/page/{$page->id()}", $this->drupalSettings['canvas']['homepagePath']);
   }
 
 }
