@@ -21,11 +21,13 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  * Two modes, switched via `canvas.settings:code_components.sync_mode`:
  *
  * - `preserve_production` (default): on import, a code component that exists in
- *   the active store but not in the incoming sync storage is copied into the
- *   sync buffer so the importer treats it as already present and never deletes
- *   it. Tracked components (present in both) still update from sync.
+ *   active config but not in sync is preserved — the subscriber writes it into
+ *   the storage passed to the transform event so the importer treats it as
+ *   already present and never deletes it. Components present in both active
+ *   and sync still update from sync.
  * - `cli`: on both import and export, every code component is removed from the
- *   sync buffer. Canvas CLI is the sole source of truth.
+ *   storage passed to the transform event so neither side touches them. Canvas
+ *   CLI is the sole source of truth.
  *
  * "Code components" means `canvas.js_component.*` config entities and the
  * paired `canvas.component.*` entities whose `source` is `js`. Both are
