@@ -11,8 +11,12 @@ import {
 } from '@drupal-canvas/vite-compat';
 
 import { isTopLevelContentTemplateSpecPath } from '../lib/content-template-spec-path';
-import { isTopLevelPageSpecPath } from '../lib/page-spec-path';
+import {
+  isTopLevelPageSpecPath,
+  isTopLevelRegionSpecPath,
+} from '../lib/page-spec-path';
 import { buildPreviewManifest } from '../lib/preview-contract';
+import { parseRegionSpec } from '../lib/region-spec';
 import {
   toDiscoveredContentTemplateName,
   toDiscoveredPageName,
@@ -379,6 +383,67 @@ async function loadPreviewContentTemplateSpec(
   };
 }
 
+async function loadPreviewRegionSpec(
+  discoveryResult: DiscoveryResult,
+  id: string,
+): Promise<{
+  spec: unknown | null;
+  status: number;
+  error: string | null;
+}> {
+  const region = discoveryResult.regions.find(
+    (candidate) => candidate.region === id,
+  );
+  if (!region) {
+    return {
+      spec: null,
+      status: 404,
+      error: `No global region found for id "${id}".`,
+    };
+  }
+
+  let fileContent: string;
+  try {
+    fileContent = await fs.readFile(region.path, 'utf-8');
+  } catch {
+    return {
+      spec: null,
+      status: 404,
+      error: `Failed to read region file: ${region.path}`,
+    };
+  }
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(fileContent);
+  } catch {
+    return {
+      spec: null,
+      status: 400,
+      error: `Failed to parse region JSON file: ${region.path}`,
+    };
+  }
+
+  const parsedRegion = parseRegionSpec(parsedJson, region.path, {
+    componentNames: discoveryResult.components.map((c) => c.name),
+  });
+  if (!parsedRegion.region) {
+    return {
+      spec: null,
+      status: 400,
+      error:
+        parsedRegion.issues[0]?.message ??
+        `Region spec is invalid: ${region.path}`,
+    };
+  }
+
+  return {
+    spec: parsedRegion.region.spec,
+    status: 200,
+    error: null,
+  };
+}
+
 async function loadWorkbenchHtmlTemplate(
   appHtmlPath: string,
   url: string,
@@ -406,6 +471,7 @@ export function createWorkbenchPlugin(paths: WorkbenchPaths): Plugin {
         componentRoot: paths.componentDiscoveryRoot,
         pagesRoot: paths.pagesDiscoveryRoot,
         contentTemplatesRoot: paths.contentTemplatesDiscoveryRoot,
+        regionsRoot: paths.regionsDiscoveryRoot,
         projectRoot: paths.hostProjectRoot,
       });
     })();
@@ -494,9 +560,22 @@ export function createWorkbenchPlugin(paths: WorkbenchPaths): Plugin {
           const responseResult =
             await enrichDiscoveredContentTemplates(withEnrichedPages);
 
+          let layoutAvailable = false;
+          try {
+            await fs.access(paths.layoutPath);
+            layoutAvailable = true;
+          } catch {
+            layoutAvailable = false;
+          }
+
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify(responseResult));
+          res.end(
+            JSON.stringify({
+              ...responseResult,
+              layoutPath: layoutAvailable ? paths.layoutPath : null,
+            }),
+          );
         })().catch((error) => {
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');
@@ -611,6 +690,48 @@ export function createWorkbenchPlugin(paths: WorkbenchPaths): Plugin {
       });
 
       server.middlewares.use(
+        '/__canvas/region-preview-spec',
+        (req, res, next) => {
+          if (req.method !== 'GET') {
+            next();
+            return;
+          }
+
+          void (async () => {
+            await refresh();
+
+            const requestUrl = new URL(req.url ?? '', 'http://localhost');
+            const id = requestUrl.searchParams.get('id');
+            if (!id) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(
+                JSON.stringify({ error: 'Missing required id parameter.' }),
+              );
+              return;
+            }
+
+            const result = await loadPreviewRegionSpec(cachedResult!, id);
+            res.statusCode = result.status;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(
+              JSON.stringify(
+                result.error ? { error: result.error } : result.spec,
+              ),
+            );
+          })().catch((error) => {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(
+              JSON.stringify({
+                error: error instanceof Error ? error.message : String(error),
+              }),
+            );
+          });
+        },
+      );
+
+      server.middlewares.use(
         '/__canvas/page-preview-spec',
         (req, res, next) => {
           if (req.method !== 'GET') {
@@ -714,12 +835,17 @@ export function createWorkbenchPlugin(paths: WorkbenchPaths): Plugin {
         const pageChanged = isTopLevelPageSpecPath(filePath);
         const contentTemplateChanged =
           isTopLevelContentTemplateSpecPath(filePath);
+        const regionChanged = isTopLevelRegionSpecPath(filePath);
+        const layoutChanged =
+          path.resolve(filePath) === path.resolve(paths.layoutPath);
         const mockChanged = isMockSpecPath(filePath);
         if (
           !metadataChanged &&
           !sourceChanged &&
           !pageChanged &&
           !contentTemplateChanged &&
+          !regionChanged &&
+          !layoutChanged &&
           !mockChanged
         ) {
           return;
@@ -730,6 +856,8 @@ export function createWorkbenchPlugin(paths: WorkbenchPaths): Plugin {
           mockChanged ||
           pageChanged ||
           contentTemplateChanged ||
+          regionChanged ||
+          layoutChanged ||
           (sourceChanged && event !== 'change');
         if (!requiresManifestRefresh) {
           server.ws.send({

@@ -11,6 +11,7 @@ use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\PageRegion;
 use Drupal\simple_oauth\Authentication\Provider\SimpleOauthAuthenticationProvider;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
@@ -88,6 +89,7 @@ class CanvasOauthAuthenticationProvider implements AuthenticationProviderInterfa
       AssetLibrary::ENTITY_TYPE_ID,
       BrandKit::ENTITY_TYPE_ID,
       ContentTemplate::ENTITY_TYPE_ID,
+      PageRegion::ENTITY_TYPE_ID,
     ];
 
     if ($entity_type_id !== NULL && \in_array($entity_type_id, $protected_config_entity_types, TRUE)) {
