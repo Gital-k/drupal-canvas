@@ -7,3 +7,9 @@ navigation.pages:
     icon:
       pack_id: navigation
       icon_id: file
+
+canvas.settings:
+  title: 'Canvas'
+  description: 'Configure Drupal Canvas, including how code components flow through config sync.'
+  route_name: canvas.settings
+  parent: system.admin_config_user_interface

@@ -1116,3 +1116,21 @@ plugin.plugin_configuration.search_api_processor.canvas_component_tree_inputs:
       sequence:
         type: string
         label: 'Prop name'
+
+canvas.settings:
+  type: config_object
+  label: 'Canvas settings'
+  constraints:
+    FullyValidatable: ~
+  mapping:
+    code_components:
+      type: mapping
+      label: 'Code components'
+      mapping:
+        sync_mode:
+          type: string
+          label: 'Config sync behaviour for code components'
+          constraints:
+            Choice:
+              - preserve_production
+              - cli
