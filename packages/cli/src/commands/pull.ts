@@ -39,7 +39,7 @@ import type { Component } from '../types/Component';
 import type { ContentTemplateListItem } from '../types/ContentTemplate';
 import type { Metadata } from '../types/Metadata';
 import type { PageListItem } from '../types/Page';
-import type { Region, RegionListItem } from '../types/Region';
+import type { RegionListItem } from '../types/Region';
 import type { Result } from '../types/Result';
 
 interface PullOptions {
@@ -515,17 +515,19 @@ export function createRegionsPullTask(
     async execute(): Promise<PullTaskResult> {
       const results: Result[] = [];
 
-      for (const region of Object.values(regions) as Region[]) {
+      for (const listItem of Object.values(regions)) {
         try {
-          const discovered = localRegionMap.get(region.region);
+          const discovered = localRegionMap.get(listItem.region);
           if (discovered && skipOverwrite) {
             results.push({
-              itemName: region.region,
+              itemName: listItem.region,
               success: true,
               details: [{ content: 'Skipped (already exists)' }],
             });
             continue;
           }
+
+          const region = await apiService.getRegion(listItem.id);
 
           const nonJsComponents = region.component_tree.filter(
             (c) => !c.component_id.startsWith('js.'),
@@ -559,7 +561,7 @@ export function createRegionsPullTask(
           results.push({ itemName: region.region, success: true });
         } catch (error) {
           results.push({
-            itemName: region.region,
+            itemName: listItem.region,
             success: false,
             details: [
               {
