@@ -11,10 +11,12 @@ use Symfony\Component\Validator\ConstraintViolation;
 abstract class CanvasUpdatePathTestBase extends UpdatePathTestBase {
 
   /**
-   * Database dumps predate the canvas_form entity type. canvas_update_11201
-   * installs it, but tests that don't specifically test that hook should not
-   * assert entity schema completeness — the update hook covers it.
+   * Disable entity schema check; dumps predate the canvas_form entity type.
    *
+   * canvas_update_11201 installs it, but tests not specifically testing that
+   * hook should not assert entity schema completeness.
+   *
+   * @var bool
    * @phpstan-ignore shipmonk.deadProperty.neverRead
    */
   protected $checkEntityFieldDefinitionUpdates = FALSE;
