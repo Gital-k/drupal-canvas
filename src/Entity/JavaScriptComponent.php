@@ -34,6 +34,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
 use Drupal\canvas\AutoSaveEntity;
 use Drupal\canvas\ClientSideRepresentation;
+use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\EntityHandlers\JavascriptComponentStorage;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Exception\ConstraintViolationException;
@@ -726,6 +727,18 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     //    be recalculated.
     // @see \canvas_library_info_build()
     Cache::invalidateTags(['library_info']);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function preDelete(EntityStorageInterface $storage, array $entities): void {
+    // If a Code Component is deleted, remove it from the Folder it was in.
+    foreach ($entities as $entity) {
+      /** @var \Drupal\canvas\Entity\JavaScriptComponent $entity */
+      Folder::loadByItemAndConfigEntityTypeId((string) $entity->id(), self::ENTITY_TYPE_ID)?->removeItem($entity->id())?->save();
+    }
+    parent::preDelete($storage, $entities);
   }
 
   /**
