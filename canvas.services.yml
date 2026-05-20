@@ -54,6 +54,8 @@ services:
     public: false
   Drupal\canvas\ShapeMatcher\HostEntityUrlPropSourceMatcher:
     public: false
+  Drupal\canvas\ShapeMatcher\HostEntityPropSourceMatcher:
+    public: false
 
   # Utilities.
   Drupal\canvas\CanvasNotificationHandler: {}
@@ -198,6 +200,7 @@ services:
   Drupal\canvas\Controller\ApiArtifactController: {}
   Drupal\canvas\Controller\ApiNotificationController: {}
   Drupal\canvas\Controller\ApiPushController: {}
+  Drupal\canvas\Controller\SiteDataController: {}
 
   # Decorators.
   Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor:
