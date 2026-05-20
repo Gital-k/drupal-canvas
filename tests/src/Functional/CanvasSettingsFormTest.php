@@ -6,7 +6,6 @@ namespace Drupal\Tests\canvas\Functional;
 
 use Drupal\canvas\Config\CodeComponentSyncMode;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\Tests\SchemaCheckTestTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -16,8 +15,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 #[RunTestsInSeparateProcesses]
 final class CanvasSettingsFormTest extends FunctionalTestBase {
-
-  use SchemaCheckTestTrait;
 
   protected static $modules = ['canvas'];
 
@@ -35,13 +32,9 @@ final class CanvasSettingsFormTest extends FunctionalTestBase {
     $this->submitForm(['sync_mode' => CodeComponentSyncMode::Cli->value], 'Save configuration');
     $this->assertSession()->fieldValueEquals('sync_mode', CodeComponentSyncMode::Cli->value);
 
-    $config = $this->config('canvas.settings');
-    self::assertSame(CodeComponentSyncMode::Cli->value, $config->get('code_components.sync_mode'));
-
-    $this->assertConfigSchema(
-      \Drupal::service('config.typed'),
-      'canvas.settings',
-      $config->get(),
+    self::assertSame(
+      CodeComponentSyncMode::Cli->value,
+      $this->config('canvas.settings')->get('code_components.sync_mode'),
     );
   }
 

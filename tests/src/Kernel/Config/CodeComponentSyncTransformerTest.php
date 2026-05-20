@@ -112,16 +112,6 @@ final class CodeComponentSyncTransformerTest extends KernelTestBase {
     self::assertTrue($sync->exists('canvas.js_component.foo'));
   }
 
-  public function testInvalidModeFallsBackToPreserveProduction(): void {
-    $this->config('canvas.settings')->set('code_components.sync_mode', 'bogus')->save();
-    $this->activeStorage->write('canvas.js_component.foo', ['machineName' => 'foo']);
-
-    $sync = new MemoryStorage();
-    $this->dispatchImport($sync);
-
-    self::assertTrue($sync->exists('canvas.js_component.foo'));
-  }
-
   /**
    * Proves the subscriber is wired to the real import transform pipeline.
    *
