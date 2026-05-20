@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropShape;
 
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
+use Drupal\canvas\Plugin\ComponentPluginManager as CanvasComponentPluginManager;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 
 /**
@@ -242,8 +242,10 @@ final class PropShape {
     return \Drupal::service(ThemeHandlerInterface::class);
   }
 
-  private static function componentPluginManager(): ComponentPluginManager {
-    return \Drupal::service(ComponentPluginManager::class);
+  private static function componentPluginManager(): CanvasComponentPluginManager {
+    $manager = \Drupal::service(CanvasComponentPluginManager::class);
+    \assert($manager instanceof CanvasComponentPluginManager);
+    return $manager;
   }
 
   /**

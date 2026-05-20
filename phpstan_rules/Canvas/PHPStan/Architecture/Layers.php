@@ -10,8 +10,8 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\MissingHostEntityException;
 use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\canvas\Plugin\AdapterManager;
+use Drupal\canvas\Plugin\ComponentPluginManager as CanvasComponentPluginManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\PropExpressions\PropExpressionInterface;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
@@ -19,6 +19,7 @@ use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser;
 use Drupal\Core\ProxyClass\File\MimeType\ExtensionMimeTypeGuesser as LazyExtensionMimeTypeGuesser;
 use Drupal\Core\Theme\Component\ComponentMetadata;
+use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\file\Plugin\Field\FieldType\FileItem;
 use Drupal\file\Plugin\Field\FieldType\FileUriItem;
 use Drupal\options\Plugin\Field\FieldType\ListFloatItem;
@@ -169,8 +170,9 @@ final class Layers {
         // With one exception: a Canvas-provided fix for broken core infra.
         // @see https://www.drupal.org/project/drupal/issues/2169813
         Selector::classname(BetterEntityDataDefinition::class),
-        // @todo Remove in https://www.drupal.org/project/canvas/issues/3552818
-        Selector::classname(ComponentPluginManager::class)
+        Selector::classname(ComponentPluginManager::class),
+        // @todo Remove this once Canvas relies on a Drupal core version that includes https://www.drupal.org/i/3352063.
+        Selector::classname(CanvasComponentPluginManager::class)
       )
       ->because("The entire ShapeMatcher infrastructure should depend only on core + Canvas' PropExpressions + PropShape + PropSource + JSON schema interpreter + adapters + select classes.");
   }

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\canvas\ShapeMatcher;
 
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\FieldItemAnalyzer;
@@ -50,6 +49,7 @@ use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Drupal\Core\Validation\ConstraintManager;
 use Drupal\Core\Validation\Plugin\Validation\Constraint\ComplexDataConstraint;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
+use Drupal\canvas\Plugin\ComponentPluginManager as CanvasComponentPluginManager;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
@@ -1253,8 +1253,10 @@ final class EntityFieldPropSourceMatcher {
     return FieldItemAnalyzer::getReferenceDependency($data_definition) !== NULL;
   }
 
-  private static function componentPluginManager(): ComponentPluginManager {
-    return \Drupal::service(ComponentPluginManager::class);
+  private static function componentPluginManager(): CanvasComponentPluginManager {
+    $manager = \Drupal::service(CanvasComponentPluginManager::class);
+    \assert($manager instanceof CanvasComponentPluginManager);
+    return $manager;
   }
 
 }
