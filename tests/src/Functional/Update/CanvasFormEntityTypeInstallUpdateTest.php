@@ -16,9 +16,12 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class CanvasFormEntityTypeInstallUpdateTest extends CanvasUpdatePathTestBase {
 
-  // Re-enable the entity schema check for this test specifically — verifying
-  // that after canvas_update_11201 runs there are no pending entity updates
-  // is the entire point of this test.
+  /**
+   * Re-enable the entity schema check — verifying no pending entity updates
+   * remain after canvas_update_11201 is the point of this test.
+   *
+   * @phpstan-ignore shipmonk.deadProperty.neverRead
+   */
   protected $checkEntityFieldDefinitionUpdates = TRUE;
 
   /**
