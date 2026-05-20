@@ -50,7 +50,7 @@ export function stripNullableKeysForRegion(
 }
 
 export interface RegionPushResult {
-  id: string;
+  region: string;
   operation: 'Created' | 'Updated' | 'Deleted';
 }
 
@@ -129,12 +129,12 @@ export async function prepareRegions(
  */
 export async function pushRegions(
   preparedRegions: Array<{ index: number; result: PreparedRegion }>,
-  remoteIdsByShortName: Map<string, string>,
+  remoteIdsByName: Map<string, string>,
   apiService: Pick<
     ApiService,
     'createRegion' | 'updateRegion' | 'deleteRegion'
   >,
-  remoteIdsToDelete: string[] = [],
+  remoteNamesToDelete: string[] = [],
 ): Promise<
   Array<{
     success: boolean;
@@ -145,7 +145,7 @@ export async function pushRegions(
 > {
   const upsertResults = await processInPool(preparedRegions, async (entry) => {
     const region = entry.result;
-    const remoteId = remoteIdsByShortName.get(region.region);
+    const remoteId = remoteIdsByName.get(region.region);
 
     const component_tree = stripNullableKeysForRegion(region.components);
 
@@ -154,26 +154,33 @@ export async function pushRegions(
         status: region.status,
         component_tree,
       });
-      return { id: remoteId, operation: 'Updated' as const };
+      return { region: region.region, operation: 'Updated' as const };
     }
 
     // Omit `theme`: the server fills it in from the site's default theme.
-    const created = await apiService.createRegion({
+    await apiService.createRegion({
       region: region.region,
       status: region.status,
       component_tree,
     });
-    return { id: created.id, operation: 'Created' as const };
+    return { region: region.region, operation: 'Created' as const };
   });
 
-  if (remoteIdsToDelete.length === 0) {
+  if (remoteNamesToDelete.length === 0) {
     return upsertResults;
   }
 
-  const deleteResults = await processInPool(remoteIdsToDelete, async (id) => {
-    await apiService.deleteRegion(id);
-    return { id, operation: 'Deleted' as const };
-  });
+  const deleteResults = await processInPool(
+    remoteNamesToDelete,
+    async (name) => {
+      const fullId = remoteIdsByName.get(name);
+      if (!fullId) {
+        throw new Error(`Unknown remote region: ${name}`);
+      }
+      await apiService.deleteRegion(fullId);
+      return { region: name, operation: 'Deleted' as const };
+    },
+  );
 
   return [
     ...upsertResults,
@@ -182,7 +189,7 @@ export async function pushRegions(
       result:
         r.result ??
         ({
-          id: remoteIdsToDelete[r.index],
+          region: remoteNamesToDelete[r.index],
           operation: 'Deleted' as const,
         } satisfies RegionPushResult),
     })),
@@ -204,17 +211,17 @@ export function collectRegionResults(
   for (const result of pushResults) {
     if (result.success && result.result) {
       results.push({
-        itemName: result.result.id,
+        itemName: result.result.region,
         success: true,
         details: [{ content: result.result.operation }],
       });
     } else {
-      const id =
-        result.result?.id ??
+      const name =
+        result.result?.region ??
         discoveredRegions[result.index]?.region ??
         'unknown';
       results.push({
-        itemName: id,
+        itemName: name,
         success: false,
         details: [{ content: result.error?.message || 'Unknown error' }],
       });
