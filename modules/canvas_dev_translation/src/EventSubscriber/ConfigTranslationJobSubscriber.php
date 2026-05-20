@@ -81,7 +81,7 @@ class ConfigTranslationJobSubscriber implements EventSubscriberInterface {
     $uid = $this->currentUser->isAnonymous() ? 1 : $this->currentUser->id();
 
     foreach ($target_languages as $target_language) {
-      $this->deleteExistingPendingJob($item_type, $config_name, $source_langcode, $target_language->getId());
+      $this->deleteExistingPendingJobItem($item_type, $config_name, $source_langcode, $target_language->getId());
 
       /** @var \Drupal\tmgmt\JobInterface $job */
       $job = tmgmt_job_create($source_langcode, $target_language->getId(), $uid);
@@ -130,12 +130,18 @@ class ConfigTranslationJobSubscriber implements EventSubscriberInterface {
     }
 
     foreach ($job_items as $target_langcode => $job_item) {
+      $job = $job_item->getJob();
+
       try {
-        $job_item->getJob()->delete();
+        $job_item->delete();
+
+        if ($job && empty($job->getItems())) {
+          $job->delete();
+        }
       }
       catch (\Exception $e) {
         $this->logger->error(
-          'Failed to delete TMGMT job for deleted config @name targeting @lang: @msg',
+          'Failed to delete TMGMT job item for deleted config @name targeting @lang: @msg',
           ['@name' => $config_name, '@lang' => $target_langcode, '@msg' => $e->getMessage()],
         );
       }
@@ -158,22 +164,33 @@ class ConfigTranslationJobSubscriber implements EventSubscriberInterface {
   }
 
   /**
-   * Deletes any unprocessed TMGMT job for the config entity and target language
-   * so stale content is not queued for translation.
+   * Deletes any unprocessed TMGMT job item for the config entity and target
+   * language so stale content is not queued for translation.
+   *
+   * Only the specific job item is removed. If that leaves the parent job with
+   * no remaining items, the now-empty job is also deleted — TMGMT does not do
+   * this automatically.
    */
-  private function deleteExistingPendingJob(string $item_type, string $config_name, string $source_langcode, string $target_langcode): void {
+  private function deleteExistingPendingJobItem(string $item_type, string $config_name, string $source_langcode, string $target_langcode): void {
     $existing = tmgmt_job_item_load_latest('config', $item_type, $config_name, $source_langcode);
 
     if (empty($existing[$target_langcode])) {
       return;
     }
 
+    $job_item = $existing[$target_langcode];
+    $job = $job_item->getJob();
+
     try {
-      $existing[$target_langcode]->getJob()->delete();
+      $job_item->delete();
+
+      if ($job && empty($job->getItems())) {
+        $job->delete();
+      }
     }
     catch (\Exception $e) {
       $this->logger->error(
-        'Failed to delete stale TMGMT job for config @name targeting @lang: @msg',
+        'Failed to delete stale TMGMT job item for config @name targeting @lang: @msg',
         ['@name' => $config_name, '@lang' => $target_langcode, '@msg' => $e->getMessage()],
       );
     }

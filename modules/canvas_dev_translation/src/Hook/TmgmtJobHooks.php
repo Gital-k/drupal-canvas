@@ -139,7 +139,7 @@ class TmgmtJobHooks {
     }
 
     foreach ($target_languages as $target_language) {
-      $this->deleteExistingPendingJob($entity, $source_langcode, $target_language->getId());
+      $this->deleteExistingPendingJobItem($entity, $source_langcode, $target_language->getId());
 
       /** @var \Drupal\tmgmt\JobInterface $job */
       $job = tmgmt_job_create($source_langcode, $target_language->getId(), $item['uid']);
@@ -166,29 +166,45 @@ class TmgmtJobHooks {
   }
 
   /**
-   * Deletes any unprocessed or active TMGMT job for the given entity and
-   * target language so it is not translated with stale content.
+   * Deletes any unprocessed or active TMGMT job item for the given entity and
+   * target language so stale content is not queued for translation.
+   *
+   * Only the specific job item is removed. If that leaves the parent job with
+   * no remaining items, the now-empty job is also deleted — TMGMT does not do
+   * this automatically.
    */
-  private function deleteExistingPendingJob(EntityInterface $entity, string $source_langcode, string $target_langcode): void {
+  private function deleteExistingPendingJobItem(EntityInterface $entity, string $source_langcode, string $target_langcode): void {
     $existing = tmgmt_job_item_load_latest('content', $entity->getEntityTypeId(), (string) $entity->id(), $source_langcode);
 
     if (empty($existing[$target_langcode])) {
       return;
     }
 
+    $job_item = $existing[$target_langcode];
+    $job = $job_item->getJob();
+
     try {
-      $existing[$target_langcode]->getJob()->delete();
+      $job_item->delete();
+
+      // TMGMT does not clean up jobs that have been left with no items, so we
+      // do it ourselves to avoid zombie UNPROCESSED jobs appearing in the UI.
+      if ($job && empty($job->getItems())) {
+        $job->delete();
+      }
     }
     catch (\Exception $e) {
       $this->logger->error(
-        'Failed to delete stale TMGMT job for canvas_page @id targeting @lang: @msg',
+        'Failed to delete stale TMGMT job item for canvas_page @id targeting @lang: @msg',
         ['@id' => $entity->id(), '@lang' => $target_langcode, '@msg' => $e->getMessage()],
       );
     }
   }
 
   /**
-   * Deletes all unprocessed or active TMGMT jobs for a deleted canvas_page.
+   * Deletes all unprocessed or active TMGMT job items for a deleted canvas_page.
+   *
+   * Empty parent jobs are deleted as well since TMGMT does not do this
+   * automatically.
    */
   private function deletePendingJobs(array $item): void {
     $job_items = tmgmt_job_item_load_latest('content', $item['entity_type'], (string) $item['entity_id'], $item['source_langcode']);
@@ -198,12 +214,18 @@ class TmgmtJobHooks {
     }
 
     foreach ($job_items as $target_langcode => $job_item) {
+      $job = $job_item->getJob();
+
       try {
-        $job_item->getJob()->delete();
+        $job_item->delete();
+
+        if ($job && empty($job->getItems())) {
+          $job->delete();
+        }
       }
       catch (\Exception $e) {
         $this->logger->error(
-          'Failed to delete TMGMT job for deleted canvas_page @id targeting @lang: @msg',
+          'Failed to delete TMGMT job item for deleted canvas_page @id targeting @lang: @msg',
           ['@id' => $item['entity_id'], '@lang' => $target_langcode, '@msg' => $e->getMessage()],
         );
       }
