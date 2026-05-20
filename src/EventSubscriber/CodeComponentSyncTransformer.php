@@ -77,10 +77,7 @@ final readonly class CodeComponentSyncTransformer implements EventSubscriberInte
   }
 
   private function mode(): CodeComponentSyncMode {
-    $raw = $this->configFactory->get('canvas.settings')->get('code_components.sync_mode');
-    return is_string($raw)
-      ? (CodeComponentSyncMode::tryFrom($raw) ?? CodeComponentSyncMode::PreserveProduction)
-      : CodeComponentSyncMode::PreserveProduction;
+    return CodeComponentSyncMode::fromSettings($this->configFactory->get('canvas.settings'));
   }
 
   private function stripAllCodeComponents(StorageInterface $sync): void {

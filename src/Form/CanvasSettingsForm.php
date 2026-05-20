@@ -43,7 +43,7 @@ final class CanvasSettingsForm extends ConfigFormBase {
     $form['code_components']['sync_mode'] = [
       '#type' => 'radios',
       '#title' => $this->t('Sync mode'),
-      '#default_value' => $config->get('code_components.sync_mode') ?? CodeComponentSyncMode::PreserveProduction->value,
+      '#default_value' => CodeComponentSyncMode::fromSettings($config)->value,
       '#options' => [
         CodeComponentSyncMode::PreserveProduction->value => $this->t('Preserve production-created components (recommended)'),
         CodeComponentSyncMode::Cli->value => $this->t('Manage exclusively via Canvas CLI'),
@@ -62,7 +62,7 @@ final class CanvasSettingsForm extends ConfigFormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state): void {
     $this->config(self::SETTINGS)
-      ->set('code_components.sync_mode', $form_state->getValue('sync_mode'))
+      ->set(CodeComponentSyncMode::CONFIG_KEY, $form_state->getValue('sync_mode'))
       ->save();
     parent::submitForm($form, $form_state);
   }
