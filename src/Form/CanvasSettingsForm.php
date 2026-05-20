@@ -41,7 +41,7 @@ final class CanvasSettingsForm extends ConfigFormBase {
     ];
     $form['code_components']['sync_mode'] = [
       '#type' => 'radios',
-      '#title' => $this->t('Config sync behaviour'),
+      '#title' => $this->t('Config sync behavior'),
       '#default_value' => $config->get('code_components.sync_mode') ?? 'preserve_production',
       '#options' => [
         'preserve_production' => $this->t('Preserve production-created components (recommended)'),

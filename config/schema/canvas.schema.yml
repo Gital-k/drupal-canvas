@@ -1129,7 +1129,7 @@ canvas.settings:
       mapping:
         sync_mode:
           type: string
-          label: 'Config sync behaviour for code components'
+          label: 'Config sync behavior for code components'
           constraints:
             Choice:
               - preserve_production
