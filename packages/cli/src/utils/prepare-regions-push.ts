@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
 import { authoredElementMapToComponentTree } from './authored-elements';
+import { stripNullableKeysForConfigComponentTree } from './component-tree-payload';
 import {
   collectUnreconciledMediaProps,
   serializeElementMapForServer,
@@ -12,42 +13,10 @@ import type {
   DiscoveredRegion,
   DiscoveryResult,
 } from '@drupal-canvas/discovery';
-import type {
-  AuthoredSpecElementMap,
-  CanvasComponentTree,
-} from 'drupal-canvas/json-render-utils';
+import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
 import type { ApiService } from '../services/api';
-import type { Region, RegionComponentTreeNodePayload } from '../types/Region';
+import type { Region } from '../types/Region';
 import type { Result } from '../types/Result';
-
-/**
- * PageRegion is a config entity; its component_tree schema rejects null
- * values for `parent_uuid`, `slot`, and `label` (unlike the page content
- * entity, which tolerates nulls). Omit these keys when they have no value
- * so the server-side config schema validation accepts the payload.
- */
-export function stripNullableKeysForRegion(
-  components: CanvasComponentTree,
-): RegionComponentTreeNodePayload[] {
-  return components.map((node) => {
-    const result: RegionComponentTreeNodePayload = {
-      uuid: node.uuid,
-      component_id: node.component_id,
-      component_version: node.component_version ?? '',
-      inputs: node.inputs,
-    };
-    if (node.parent_uuid !== null && node.parent_uuid !== undefined) {
-      result.parent_uuid = node.parent_uuid;
-    }
-    if (node.slot !== null && node.slot !== undefined) {
-      result.slot = node.slot;
-    }
-    if (node.label !== null && node.label !== undefined && node.label !== '') {
-      result.label = node.label;
-    }
-    return result;
-  });
-}
 
 export interface RegionPushResult {
   region: string;
@@ -147,7 +116,9 @@ export async function pushRegions(
     const region = entry.result;
     const remoteId = remoteIdsByName.get(region.region);
 
-    const component_tree = stripNullableKeysForRegion(region.components);
+    const component_tree = stripNullableKeysForConfigComponentTree(
+      region.components,
+    );
 
     if (remoteId) {
       await apiService.updateRegion(remoteId, {
