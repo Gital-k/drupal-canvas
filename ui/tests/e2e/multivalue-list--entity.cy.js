@@ -1,9 +1,4 @@
 /**
- * Comprehensive tests for multi-value form design for List (Text) and
- * List (Integer) fields.
- */
-
-/**
  * Loads the Canvas editor for node/2 and creates a scoped Cypress alias for
  * the React Select container of the field under test.
  *
@@ -172,7 +167,7 @@ configs.forEach((config) => {
   const { fieldType } = config;
   const fieldTypeLower = fieldType.toLowerCase();
 
-  describe(`Multi-value Form Design – ${fieldType}`, () => {
+  describe(`Multi-value Form Widget – ${fieldType}`, () => {
     before(() => {
       cy.drupalCanvasInstall(['canvas_test_article_fields']);
     });

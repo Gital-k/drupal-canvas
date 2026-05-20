@@ -1,12 +1,5 @@
 /**
- * Comprehensive test for multivalue form.
- *
- * This test covers the new popover-based multivalue form UI.
- *
- * The new design features:
- * - Collapsed list items showing text previews.
- * - Popover-based editing (click item → popover with input).
- * - Custom drag handles and remove buttons via DrupalInputMultivalueForm component.
+ * Tests for the multivalue form with popover-based UI.
  */
 
 describe('Multivalue Form Design', () => {
@@ -23,9 +16,6 @@ describe('Multivalue Form Design', () => {
     cy.drupalUninstall();
   });
 
-  /**
-   * Helper function to open popover for a specific row and type text.
-   */
   /**
    * Types a value into the text input of the currently open popover dialog.
    *
@@ -106,7 +96,7 @@ describe('Multivalue Form Design', () => {
     });
   };
 
-  it('renders multivalue fields with new popover-based UI', () => {
+  it('renders multivalue fields with popover-based UI', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
 
     cy.findByTestId('canvas-contextual-panel--page-data').should(
@@ -126,7 +116,7 @@ describe('Multivalue Form Design', () => {
     cy.get('@unlimited-text').find('table').should('be.visible');
     cy.get('@unlimited-text').find('tbody tr').should('have.length', 2);
 
-    // Verify initial values using the new UI.
+    // Verify initial values.
     confirmTextInputs('@unlimited-text', ['Marshmallow Coast', '']);
 
     // Verify list items are visible (collapsed state).
@@ -153,7 +143,7 @@ describe('Multivalue Form Design', () => {
     // Log all ajax form requests to help with debugging.
     cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
 
-    // Populate the empty second item using the new popover interface.
+    // Populate the empty second item using the popover interface.
     typeInRowAwaitPreview('@unlimited-text', 1, 'Neutral Milk Hotel');
     cy.findByLabelText('Loading Preview').should('not.exist');
 
@@ -268,7 +258,7 @@ describe('Multivalue Form Design', () => {
       dndDefaults,
     );
 
-    cy.assertMultivalueReorder({
+    cy.assertReorderEntityFieldRequest({
       alias: 'previewUpdate',
       fieldName: 'field_cvt_unlimited_text',
       expectedOrder: [
@@ -285,9 +275,7 @@ describe('Multivalue Form Design', () => {
       'The Olivia Tremor Control',
       'Neutral Milk Hotel',
     ]);
-    // Wait to ensure order is auto saved before reloading.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(10000);
+
     cy.log('Refresh the page to ensure the update persists.');
     cy.reload();
     confirmTextInputs('@unlimited-text', [
@@ -311,7 +299,7 @@ describe('Multivalue Form Design', () => {
       dndDefaults,
     );
 
-    cy.assertMultivalueReorder({
+    cy.assertReorderEntityFieldRequest({
       alias: 'previewUpdateAfterReload',
       fieldName: 'field_cvt_unlimited_text',
       expectedOrder: [

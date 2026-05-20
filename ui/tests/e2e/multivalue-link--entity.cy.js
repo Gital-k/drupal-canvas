@@ -1,15 +1,4 @@
-/**
- * Comprehensive tests for multi-value form design for link fields.
- *
- * This test covers the new popover-based multi-value form UI for
- * link fields.
- *
- * The new design features:
- * - Popover-based editing (click item → popover with input).
- * - Custom drag handles and remove buttons via DrupalInputMultivalueForm.
- */
-
-describe('Multivalue Form Design – Link Field', () => {
+describe('Multivalue Link Field - Entity', () => {
   before(() => {
     cy.drupalCanvasInstall([
       'canvas_test_article_fields',
@@ -27,20 +16,7 @@ describe('Multivalue Form Design – Link Field', () => {
   });
 
   /**
-   * Helper function to open the URL sub-field popover for a specific row and
-   * type a value, then commit it either via autocomplete selection or Enter key.
-   *
-   * @param {string} fieldAlias - The Cypress alias for the field container.
-   * @param {number} rowIndex - The zero-based row index.
-   * @param {string} title - The value to type (node title or plain URL).
-   * @param {boolean} [useAutocomplete=false] - When true, waits for the jQuery
-   *   UI autocomplete dropdown (.ui-menu-item-wrapper) and clicks the matching
-   *   suggestion. When false (default), commits the value by pressing Enter.
-   */
-  /**
-   * Types a value into the first input of the currently open popover dialog,
-   * using select-all to replace any existing content without triggering a
-   * debounced commit of the intermediate empty value.
+   * Types a value into the first input of the currently open popover dialog.
    *
    * @param {string} value - The value to type.
    */
@@ -78,9 +54,6 @@ describe('Multivalue Form Design – Link Field', () => {
 
   /**
    * Types into a row and waits for the resulting preview update.
-   *
-   * Registers the intercept before typeUrlInRow so the preview POST triggered
-   * by the {enter} keypress (or the autocomplete selection) is reliably captured.
    */
   const typeUrlInRowAwaitPreview = (
     fieldAlias,
@@ -111,7 +84,7 @@ describe('Multivalue Form Design – Link Field', () => {
   };
 
   /**
-   * Helper to trigger Enter key in the open popover dialog.
+   * Triggers Enter key in the open popover dialog.
    */
   const keyOutOfPopover = () => {
     cy.get('[role="dialog"][data-state="open"]')
@@ -127,8 +100,7 @@ describe('Multivalue Form Design – Link Field', () => {
   };
 
   /**
-   * Helper function to confirm the URL values displayed in all rows.
-   * Uses per-row retryable assertions to avoid stale DOM issues.
+   * Confirms the URL values are displayed in all rows.
    */
   const confirmUrlInputs = (fieldAlias, expectedUrls) => {
     cy.get(fieldAlias)
@@ -148,8 +120,8 @@ describe('Multivalue Form Design – Link Field', () => {
   };
 
   /**
-   * Helper function to verify preview iframe shows expected values for all four
-   * fields in the Four Multiple Links component.
+   * Verifies preview iframe shows expected values for all four fields in the
+   * Four Multiple Links component.
    *
    * @param {string} relativeValue - Expected value for Relative field item 0
    * @param {string} relativeTwoValue - Expected value for Relative Two field item 0
@@ -212,8 +184,6 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.openMultivaluePopover('@relative-field', 0);
 
     // Type an invalid URI-reference value containing '>'.
-    // Use select-all + type rather than .clear() to avoid triggering a
-    // debounced commit of the intermediate empty value.
     typeInPopover('invalid>value');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
@@ -225,7 +195,8 @@ describe('Multivalue Form Design – Link Field', () => {
       .find('[data-prop-message="true"]')
       .should('contain.text', '❌ data/0 must match format "uri-reference"');
 
-    // The list item text should be unchanged (error should not propagate).
+    // The list item text should be unchanged (invalid values should not
+    // propagate).
     // The display (and preview) only show the most recent valid value.
     // The user typed "invalid>value", and it became invalid with the ">".
     verifyUrlRowText('@relative-field', 0, 'invalid');
@@ -261,8 +232,6 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.openMultivaluePopover('@relative-field', 0);
 
     // Type an invalid URI-reference value.
-    // Use select-all + type rather than .clear() to avoid triggering a
-    // debounced commit of the intermediate empty value.
     typeInPopover('apple test');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
@@ -294,8 +263,6 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.openMultivaluePopover('@absolute-field', 0);
 
     // Type a single-character value (not a valid absolute URI).
-    // Use select-all + type rather than .clear() to avoid triggering a
-    // debounced commit of the intermediate empty value.
     typeInPopover('x');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
@@ -321,9 +288,7 @@ describe('Multivalue Form Design – Link Field', () => {
       'https://github.com',
     );
 
-    // --- Edit valid values and confirm the preview updates ---
-    // (Relative fields use entity autocomplete and require node selection;
-    // we test valid edits on the absolute URL fields which accept plain input.)
+    // Edit valid values and confirm the preview updates.
 
     // Edit the Absolute field row 0: change to a new valid absolute URL.
     typeInPopover('https://www.example.com');
@@ -508,18 +473,6 @@ describe('Multivalue Form Design – Link Field', () => {
       .should('have.length', 3);
     cy.get('@unlimited-link').scrollIntoView({ offset: { top: -400 } });
 
-    // The drag-handle reorder does NOT submit a Drupal form AJAX POST (unlike
-    // typing into a popover, which posts to /canvas/api/v0/form/content-entity).
-    // It dispatches only through the preview pathway: POST
-    // /canvas/api/v0/layout/node/2 → ApiLayoutController::post →
-    // autoSaveManager->saveEntity(), which is what cy.reload() below reads.
-    //
-    // Multiple preview POSTs can fire around a drag (debounced updates from
-    // typing's tail end, intermediate drag-state updates, and the final
-    // reorder POST). We can't rely on "the first /layout/node/2 POST after
-    // realDnd" being the one with the reorder — it's often a stale POST from
-    // an earlier action. Instead, inspect every intercepted request body and
-    // assert that at least one carries the expected post-reorder sort order.
     cy.intercept('POST', '**/canvas/api/v0/layout/node/2').as('previewUpdate');
 
     cy.get(
@@ -529,7 +482,7 @@ describe('Multivalue Form Design – Link Field', () => {
       dndDefaults,
     );
 
-    cy.assertMultivalueReorder({
+    cy.assertReorderEntityFieldRequest({
       alias: 'previewUpdate',
       fieldName: 'field_cvt_unlimited_link',
       valueKey: 'uri',
@@ -546,9 +499,7 @@ describe('Multivalue Form Design – Link Field', () => {
       'https://www.cypress.io',
       'https://www.example.com',
     ]);
-    // Wait to ensure order is auto saved before reloading.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(10000);
+
     // Refresh the page to ensure the update persists.
     cy.reload();
     confirmUrlInputs('@unlimited-link', [

@@ -271,7 +271,6 @@ test.describe('Multivalue Prop Types', () => {
       has: page.getByRole('heading', { name: 'Text (Unlimited)' }),
     });
     await expect(textField).toBeVisible();
-    // An extra "Empty" item is added.
     await expect(textField.locator('tr.draggable')).toHaveCount(3);
     labels = textField.locator('[data-canvas-multivalue-label="true"]');
     await expect(labels.nth(0)).toHaveText('Catbro');

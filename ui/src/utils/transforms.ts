@@ -216,11 +216,7 @@ const cast: Transformer<
   if (multiple) {
     return returnValue;
   }
-  const singleValue = returnValue.shift();
-  if (singleValue === undefined) {
-    return null;
-  }
-  return singleValue;
+  return returnValue[0] ?? null;
 };
 
 interface DateFieldPropSource extends StaticPropSource {
@@ -271,22 +267,16 @@ const dateTime: Transformer<
     }
 
     try {
+      // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
       return new Date(`${dateString} ${timeString}+0000`).toISOString();
     } catch (e) {
       return null;
     }
-
-    // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
-    return new Date(`${dateString} ${timeString}+0000`).toISOString();
   });
   if (options.multiple) {
     return returnValue.filter(Boolean);
   }
-  const singleValue = returnValue.shift();
-  if (singleValue === undefined) {
-    return null;
-  }
-  return singleValue;
+  return returnValue[0] ?? null;
 };
 
 const dateRange: Transformer<
@@ -298,7 +288,7 @@ const dateRange: Transformer<
   if (propSource === null || propSource === undefined) {
     return null;
   }
-  if (value === null) {
+  if (value == null) {
     return null;
   }
   let first = value as PropsValues;

@@ -1,18 +1,5 @@
 /**
- * Comprehensive tests for multi-value form design for number and integer fields.
- *
- * This test covers the popover-based multi-value form UI for:
- * - Number (float) fields
- * - Integer fields
- *
- * The design features:
- * - Collapsed list items showing numeric previews.
- * - Popover-based editing (click item → popover with input).
- * - Custom drag handles and remove buttons via DrupalInputMultivalueForm component.
- */
-
-/**
- * Helper function to open popover for a specific row and type a value.
+ * Open popover for a specific row and type a value.
  */
 const typeInRow = (alias, rowIndex, value) => {
   cy.get(alias)
@@ -33,7 +20,7 @@ const typeInRow = (alias, rowIndex, value) => {
 };
 
 /**
- * Helper to verify the displayed text in a row's item.
+ * Verify the displayed text in a row's item.
  */
 const verifyRowText = (alias, rowIndex, expectedText) => {
   cy.get(alias)
@@ -45,9 +32,6 @@ const verifyRowText = (alias, rowIndex, expectedText) => {
 
 /**
  * Types into a row and waits for the resulting preview update.
- *
- * The intercept MUST be registered before the {enter} keypress inside typeInRow,
- * otherwise the preview POST can fire before the alias exists and cy.wait hangs.
  */
 const typeInRowAwaitPreview = (alias, rowIndex, value) => {
   cy.intercept({
@@ -60,10 +44,7 @@ const typeInRowAwaitPreview = (alias, rowIndex, value) => {
 };
 
 /**
- * Helper to confirm the contents of all rows.
- *
- * Uses retryable `should` assertions on each row's text so it waits for the DOM
- * to settle after an async update (e.g. preview POST, drag reorder).
+ * Confirms the contents of all rows.
  */
 const confirmInputs = (alias, inputContent) => {
   cy.get(alias)
@@ -119,9 +100,6 @@ configs.forEach((config) => {
   const fieldTypeLower = fieldType.toLowerCase();
 
   describe(`Multi-value Form Design – ${fieldType}`, () => {
-    // Destructuring inside describe but outside hooks can trigger mocha/no-setup-in-describe
-    // in some strict configs. To be safe, we access via config.* or destructure inside hooks.
-
     before(() => {
       cy.drupalCanvasInstall(['canvas_test_article_fields']);
     });
@@ -277,9 +255,8 @@ configs.forEach((config) => {
         .find('.canvas-drag-handle a.tabledrag-handle')
         .should('have.length', 3);
 
-      // Register intercept before the drag so we capture every preview POST
-      // the reorder triggers (multiple can fire; the one that carries the
-      // reordered `_weight` values is what we wait for below).
+      // Register intercept before the drag to capture every preview POST
+      // the reorder triggers.
       cy.intercept('POST', '**/canvas/api/v0/layout/node/2').as(
         'previewUpdate',
       );
@@ -297,7 +274,7 @@ configs.forEach((config) => {
       const fieldName = config.drupalSelector
         .replace(/^edit-/, '')
         .replace(/-/g, '_');
-      cy.assertMultivalueReorder({
+      cy.assertReorderEntityFieldRequest({
         alias: 'previewUpdate',
         fieldName,
         expectedOrder: config.reorderedValues,
@@ -306,9 +283,7 @@ configs.forEach((config) => {
       cy.waitForAjax();
 
       confirmInputs(`@${config.fieldAlias}`, config.reorderedValues);
-      // Wait to ensure order is auto saved before reloading.
-      // eslint-disable-next-line cypress/no-unnecessary-waiting
-      cy.wait(10000);
+
       // Refresh the page to ensure the update persists.
       cy.reload();
       confirmInputs(`@${config.fieldAlias}`, [...config.reorderedValues, '']);

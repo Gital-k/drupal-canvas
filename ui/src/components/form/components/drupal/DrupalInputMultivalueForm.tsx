@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
-import { Box, Button, Flex, Text } from '@radix-ui/themes';
+import { Button, Flex, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
@@ -24,13 +24,6 @@ import type { NumericInputAttributes } from '@/types/DrupalAttribute';
 
 import styles from './DrupalInputMultivalueForm.module.css';
 
-type MultivalueRefs = {
-  popoverInput: HTMLInputElement | null;
-  popoverContainer: HTMLDivElement | null;
-  triggerRow: HTMLDivElement | null;
-  triggerButton: HTMLButtonElement | null;
-  preventEnter: boolean;
-};
 /**
  * DrupalInputMultivalueForm component for inputs within multivalue widgets.
  *
@@ -61,61 +54,51 @@ const DrupalInputMultivalueForm = ({
     attributes?.class instanceof Array &&
     attributes?.class?.includes('form-autocomplete');
   const initialValue = attributes.value ?? attributes.defaultValue ?? '';
-  const refs = useRef<MultivalueRefs>({
-    triggerRow: null,
-    triggerButton: null,
-    popoverInput: null,
-    popoverContainer: null,
-    preventEnter: false,
-  });
-
+  const triggerRowRef = useRef<HTMLDivElement | null>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [popoverContainer, setPopoverContainer] =
+    useState<HTMLDivElement | null>(null);
   const [displayValue, setDisplayValue] = useState<string>(
     String(initialValue ?? ''),
   );
 
-  const hasError = () =>
-    refs.current.popoverInput &&
-    !!refs.current.popoverInput.closest('[data-has-field-error="true"]');
-
-  // Controlled popover state so we can close it programmatically on remove.
-  const [popoverOpen, setPopoverOpen] = useState(false);
   const fieldLabel = attributes['data-field-label'] || '';
   const displayText = displayValue === '' ? 'Empty' : String(displayValue);
+
+  const hasError = () =>
+    popoverContainer &&
+    !!popoverContainer.querySelector('[data-has-field-error="true"]');
 
   const setPopoverOpenAndRefocus = (open: boolean) => {
     setPopoverOpen(open);
     if (!open) {
-      setTimeout(() => refs.current.triggerButton?.focus(), 30);
+      setTimeout(() => triggerButtonRef.current?.focus(), 30);
     }
   };
 
   useEffect(() => {
     // Listen for the custom autocomplete-selected event dispatched by
     // autocomplete.extend.js when the user picks a suggestion.
-    setTimeout(() => {
-      if (
-        isAutocomplete &&
-        refs.current.popoverInput &&
-        popoverOpen &&
-        !(refs.current.popoverInput as any).__listenersAdded
-      ) {
-        (refs.current.popoverInput as any).__listenersAdded = true;
-        refs.current.popoverInput.addEventListener(
-          'data-canvas-autocomplete-selected',
-          (e: Event) => {
-            const customEvent = e as CustomEvent<{
-              value: string;
-            }>;
-            setTimeout(() => {
-              const selection = customEvent.detail.value;
-              setDisplayValue(selection);
-              setPopoverOpenAndRefocus(false);
-            });
-          },
-        );
-      }
+    const input = popoverContainer?.querySelector(
+      'input',
+    ) as HTMLInputElement | null;
+    if (
+      !isAutocomplete ||
+      !input ||
+      !popoverOpen ||
+      (input as any).__listenersAdded
+    )
+      return;
+    (input as any).__listenersAdded = true;
+    input.addEventListener('data-canvas-autocomplete-selected', (e: Event) => {
+      const customEvent = e as CustomEvent<{ value: string }>;
+      setTimeout(() => {
+        setDisplayValue(customEvent.detail.value);
+        setPopoverOpenAndRefocus(false);
+      });
     });
-  }, [isAutocomplete, refs.current.popoverInput, popoverOpen]);
+  }, [isAutocomplete, popoverContainer, popoverOpen]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape' || e.key === 'Enter') {
@@ -128,27 +111,20 @@ const DrupalInputMultivalueForm = ({
   const handlePopoverOpenChange = (open: boolean) => {
     if (open) {
       setTimeout(() => {
-        const input = refs.current.popoverContainer?.querySelector(
+        const input = popoverContainer?.querySelector(
           'input',
         ) as HTMLInputElement | null;
-        if (input) {
-          refs.current.popoverInput = input;
-          input.select();
-        }
+        input?.select();
       }, 0);
-    } else {
-      if (!hasError()) {
-        setPopoverOpenAndRefocus(false);
-      }
-      return;
     }
-
-    setPopoverOpenAndRefocus(true);
+    if (!hasError()) {
+      setPopoverOpenAndRefocus(open);
+    }
   };
 
   const handleRemove = (e: React.MouseEvent) => {
     e.preventDefault();
-    const triggerElement = refs.current.triggerRow;
+    const triggerElement = triggerRowRef.current;
     if (!triggerElement) return;
     setPopoverOpenAndRefocus(false);
     setTimeout(() => {
@@ -208,9 +184,7 @@ const DrupalInputMultivalueForm = ({
   return (
     <Popover.Root open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
       <Flex
-        ref={(node) => {
-          refs.current.triggerRow = node;
-        }}
+        ref={triggerRowRef}
         align="center"
         gap="2"
         className={styles.itemRow}
@@ -219,9 +193,7 @@ const DrupalInputMultivalueForm = ({
         <Popover.Trigger asChild>
           <button
             data-multivalue-popover-trigger
-            ref={(node) => {
-              refs.current.triggerButton = node;
-            }}
+            ref={triggerButtonRef}
             className={styles.listItem}
             type="button"
             aria-label={`Edit ${fieldLabel}: ${displayText}`}
@@ -240,9 +212,7 @@ const DrupalInputMultivalueForm = ({
 
       <Popover.Content
         forceMount={true}
-        ref={(node) => {
-          refs.current.popoverContainer = node;
-        }}
+        ref={setPopoverContainer}
         side="left"
         align="start"
         sideOffset={36}
@@ -272,19 +242,17 @@ const DrupalInputMultivalueForm = ({
             <Cross2Icon />
           </Popover.Close>
         </Flex>
-        <Box>
-          <DrupalInput
-            attributes={{
-              ...attributes,
-              onKeyDown: handleKeyDown,
-              onInput: (e: any) => {
-                setTimeout(() => {
-                  if (!hasError()) setDisplayValue(e.target.value);
-                });
-              },
-            }}
-          />
-        </Box>
+        <DrupalInput
+          attributes={{
+            ...attributes,
+            onKeyDown: handleKeyDown,
+            onInput: (e: any) => {
+              setTimeout(() => {
+                if (!hasError()) setDisplayValue(e.target.value);
+              });
+            },
+          }}
+        />
         <Flex justify="center" className={styles.removeButtonContainer}>
           <Button
             data-multivalue-remove-item="true"
@@ -292,7 +260,7 @@ const DrupalInputMultivalueForm = ({
             color="red"
             size="1"
             onClick={handleRemove}
-            disabled={!isRemoveButtonEnabled(refs.current.triggerRow)}
+            disabled={!isRemoveButtonEnabled(triggerRowRef.current)}
           >
             <TrashIcon />
             Remove
