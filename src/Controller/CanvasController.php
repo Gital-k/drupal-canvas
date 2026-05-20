@@ -34,6 +34,7 @@ use Drupal\Core\Url;
 use Drupal\canvas\AssetRenderer;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\CanvasForm;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageRegion;
@@ -204,6 +205,7 @@ HTML;
               'contentTemplates' => $this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION),
               'publishChanges' => $this->currentUser->hasPermission(AutoSaveManager::PUBLISH_PERMISSION),
               'folders' => $this->currentUser->hasPermission(Folder::ADMIN_PERMISSION),
+              'forms' => $this->currentUser->hasPermission(CanvasForm::ADMIN_PERMISSION),
             ],
             'contentEntityCreateOperations' => $content_entity_create_operations,
             'homepagePath' => $system_site_config->get('page.front'),

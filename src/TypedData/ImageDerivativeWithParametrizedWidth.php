@@ -92,8 +92,14 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
    * {@inheritdoc}
    */
   public function calculateDependencies() {
+    try {
+      $style = self::getParametrizedImageStyle();
+    }
+    catch (\Throwable) {
+      return [];
+    }
     return [
-      'config' => [$this->getParametrizedImageStyle()->getConfigDependencyName()],
+      'config' => [$style->getConfigDependencyName()],
     ];
   }
 

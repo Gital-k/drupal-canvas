@@ -209,6 +209,7 @@ final class CanvasControllerTest extends CanvasKernelTestBase {
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
           'folders' => FALSE,
+          'forms' => FALSE,
         ],
       ],
       [
@@ -225,6 +226,7 @@ final class CanvasControllerTest extends CanvasKernelTestBase {
           'contentTemplates' => FALSE,
           'publishChanges' => TRUE,
           'folders' => FALSE,
+          'forms' => FALSE,
         ],
       ],
       [
@@ -241,6 +243,7 @@ final class CanvasControllerTest extends CanvasKernelTestBase {
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
           'folders' => FALSE,
+          'forms' => FALSE,
         ],
       ],
       [
@@ -258,6 +261,7 @@ final class CanvasControllerTest extends CanvasKernelTestBase {
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
           'folders' => FALSE,
+          'forms' => FALSE,
         ],
       ],
       [
@@ -278,6 +282,7 @@ final class CanvasControllerTest extends CanvasKernelTestBase {
           'contentTemplates' => TRUE,
           'publishChanges' => TRUE,
           'folders' => TRUE,
+          'forms' => FALSE,
         ],
       ],
     ];

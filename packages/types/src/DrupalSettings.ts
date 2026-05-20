@@ -69,6 +69,16 @@ export interface DrupalSettings {
       };
     };
   };
+  canvasFormBuilder?: {
+    formId: string;
+    formData: {
+      id: string;
+      name: string;
+      formElements: unknown[];
+      submitSettings: Record<string, string>;
+    };
+    elementSchemas: Record<string, unknown>;
+  };
   canvasExtension: object;
   path: {
     baseUrl: string;
