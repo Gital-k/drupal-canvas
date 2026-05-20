@@ -1008,7 +1008,7 @@ class TranslationTest extends FunctionalTestBase {
 
     // After adding a French node translation, EntityFieldPropSource must now
     // resolve to the French title on the French URL. The static ContentTemplate
-    // CTA and English-URL behaviour is already covered by
+    // CTA and English-URL behavior is already covered by
     // ::testContentTemplateTranslationRendered() and is not repeated here.
     $node_fresh = Node::load($nid);
     self::assertNotNull($node_fresh);
