@@ -520,7 +520,7 @@ export function createRegionsPullTask(
           const discovered = localRegionMap.get(region.region);
           if (discovered && skipOverwrite) {
             results.push({
-              itemName: region.id,
+              itemName: region.region,
               success: true,
               details: [{ content: 'Skipped (already exists)' }],
             });
@@ -535,7 +535,7 @@ export function createRegionsPullTask(
               ...new Set(nonJsComponents.map((c) => c.component_id)),
             ].join(', ');
             results.push({
-              itemName: region.id,
+              itemName: region.region,
               success: false,
               details: [
                 {
@@ -556,10 +556,10 @@ export function createRegionsPullTask(
             'utf-8',
           );
 
-          results.push({ itemName: region.id, success: true });
+          results.push({ itemName: region.region, success: true });
         } catch (error) {
           results.push({
-            itemName: region.id,
+            itemName: region.region,
             success: false,
             details: [
               {
