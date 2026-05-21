@@ -4,16 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Drupal\Component\Utility\Html;
-use Drupal\Component\Uuid\UuidInterface;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Config\Schema\Mapping;
-use Drupal\Core\Config\Schema\SchemaIncompleteException;
-use Drupal\Core\Config\TypedConfigManagerInterface;
-use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Entity\Component;
@@ -24,6 +14,16 @@ use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputSchemaChangePoc;
+use Drupal\canvas_test_block_simulate_input_schema_change\Plugin\Block\SimulatedInputSchemaChangeBlock;
+use Drupal\Component\Utility\Html;
+use Drupal\Component\Uuid\UuidInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\Schema\Mapping;
+use Drupal\Core\Config\Schema\SchemaIncompleteException;
+use Drupal\Core\Config\TypedConfigManagerInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\link\LinkItemInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
@@ -33,8 +33,8 @@ use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
-use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputSchemaChangePoc;
-use Drupal\canvas_test_block_simulate_input_schema_change\Plugin\Block\SimulatedInputSchemaChangeBlock;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -406,8 +406,18 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     $active_version = match(TRUE) {
       // The 11.3.x version.
       version_compare(\Drupal::VERSION, "11.3", '>=') => "ecbfb3dfb7ce5717",
-      // The 11.2.10 version.
-      default => "ec03b64ff4f992b9",
+      // The 11.2.10 version, for the original implementation + schema of the
+      // block being tested, because:
+      // - no new version should be generated thanks to the Block
+      //   ComponentSource plugin's ::checkRequirements() observing that the
+      //   value returned by ::defaultConfiguration() is not valid according to
+      //   the updated config schema
+      // - but the config schema has still been altered, and hence the existing
+      //   Component config entity (that was previously valid and working fine)
+      //   now cannot pass validation anymore: that's what the validation errors
+      //   are about
+      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::checkRequirements()
+      default => "7cc894b85e93a7d8",
     };
     $expected_version = match(TRUE) {
       // The 11.3.x version.
