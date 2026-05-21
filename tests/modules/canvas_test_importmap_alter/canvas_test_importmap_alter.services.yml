@@ -1,0 +1,5 @@
+
+services:
+  Drupal\canvas_test_importmap_alter\Hook\CanvasTestImportmapAlterHooks:
+    class: Drupal\canvas_test_importmap_alter\Hook\CanvasTestImportmapAlterHooks
+    autowire: true

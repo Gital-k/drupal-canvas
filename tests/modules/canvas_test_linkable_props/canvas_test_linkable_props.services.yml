@@ -1,0 +1,5 @@
+
+services:
+  Drupal\canvas_test_linkable_props\Hook\CanvasTestLinkablePropsHooks:
+    class: Drupal\canvas_test_linkable_props\Hook\CanvasTestLinkablePropsHooks
+    autowire: true

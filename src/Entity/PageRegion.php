@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Exception\ConstraintViolationException;
@@ -87,7 +88,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
    */
   public function label(): TranslatableMarkup {
     \assert(\is_string($this->theme));
-    $regions = system_region_list($this->theme);
+    $regions = DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => \Drupal::service('theme_handler')->getTheme($this->theme)->listAllRegions(), fn() => system_region_list($this->theme));
     return new TranslatableMarkup('@region region', [
       '@region' => $regions[$this->get('region')],
     ]);

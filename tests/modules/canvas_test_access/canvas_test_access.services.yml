@@ -1,0 +1,5 @@
+
+services:
+  Drupal\canvas_test_access\Hook\CanvasTestAccessHooks:
+    class: Drupal\canvas_test_access\Hook\CanvasTestAccessHooks
+    autowire: true

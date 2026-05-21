@@ -222,3 +222,7 @@ services:
     public: false
     decorates: plugin.manager.block
     arguments: ['@.inner']
+
+  Drupal\canvas\Hook\CanvasHooks:
+    class: Drupal\canvas\Hook\CanvasHooks
+    autowire: true

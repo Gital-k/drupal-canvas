@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
+use Drupal\Component\Utility\DeprecationHelper;
+use Drupal\Core\Extension\ThemeSettingsProvider;
 use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
@@ -153,11 +155,11 @@ readonly final class CodeComponentDataProvider {
       self::V0 => [
         'themeAssets' => [
           'logo' => [
-            'url' => theme_get_setting('logo.url') ?? '',
+            'url' => DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.3.0', fn() => \Drupal::service(ThemeSettingsProvider::class)->getSetting('logo.url'), fn() => theme_get_setting('logo.url')) ?? '',
           ],
           'favicon' => [
-            'url' => theme_get_setting('favicon.url') ?? '',
-            'mimeType' => theme_get_setting('favicon.mimetype') ?? '',
+            'url' => DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.3.0', fn() => \Drupal::service(ThemeSettingsProvider::class)->getSetting('favicon.url'), fn() => theme_get_setting('favicon.url')) ?? '',
+            'mimeType' => DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.3.0', fn() => \Drupal::service(ThemeSettingsProvider::class)->getSetting('favicon.mimetype'), fn() => theme_get_setting('favicon.mimetype')) ?? '',
           ],
         ],
       ],

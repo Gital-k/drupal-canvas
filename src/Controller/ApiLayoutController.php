@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ClientDataToEntityConverter;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
@@ -57,7 +58,7 @@ final class ApiLayoutController {
     private readonly ComponentSourceManager $componentSourceManager,
   ) {
     $theme = $this->themeManager->getActiveTheme()->getName();
-    $theme_regions = system_region_list($theme);
+    $theme_regions = DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => \Drupal::service('theme_handler')->getTheme($theme)->listAllRegions(), fn() => system_region_list($theme));
 
     // The PageRegion config entities get a corresponding `nodeType: region` in
     // the client-side representation. Their IDs match that of the server-side

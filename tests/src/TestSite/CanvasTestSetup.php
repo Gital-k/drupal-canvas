@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\TestSite;
 
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -148,7 +149,7 @@ class CanvasTestSetup implements TestSetupInterface {
     $config_factory = \Drupal::configFactory();
     $config = $config_factory->getEditable('system.logging');
     $config->set('error_level', ERROR_REPORTING_DISPLAY_VERBOSE);
-    $config->save(TRUE);
+    DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => $config->save(), fn() => $config->save(TRUE));
 
     if (getenv('CANVAS_DISABLE_AGGREGATION') !== 'true') {
       $config = \Drupal::service('config.factory')->getEditable('system.performance');
