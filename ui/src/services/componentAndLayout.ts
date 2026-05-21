@@ -235,11 +235,6 @@ export const componentAndLayoutApi = createApi({
             dispatch(setSnapshotHTML(''));
             dispatch(setSnapshotTitle(''));
             dispatch(setHtml(html));
-            // Refresh the in-memory layout model so server-side mutations made
-            // during hook_entity_presave / hook_canvas_page_presave (which the
-            // Publish flow invalidates Layout for) actually surface in the
-            // editor without a full page reload.
-            // @see services/pendingChangesApi.ts -> publishAllPendingChanges
             dispatch(setLayoutModel({ layout, model, updatePreview: false }));
           }
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
@@ -335,11 +330,6 @@ export const componentAndLayoutApi = createApi({
           // masks the pattern editor frame.
           dispatch(setSnapshotHTML(''));
           dispatch(setHtml(html));
-          // Refresh the in-memory layout model so server-side mutations made
-          // during hook_entity_presave / hook_canvas_page_presave (which the
-          // Publish flow invalidates Layout for) actually surface in the
-          // editor without a full page reload.
-          // @see services/pendingChangesApi.ts -> publishAllPendingChanges
           dispatch(setLayoutModel({ layout, model, updatePreview: false }));
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         } catch (err) {
