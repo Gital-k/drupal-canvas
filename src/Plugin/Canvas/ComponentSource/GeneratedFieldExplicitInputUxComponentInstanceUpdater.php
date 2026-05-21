@@ -13,6 +13,7 @@ use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInt
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
 
