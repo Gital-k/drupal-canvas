@@ -2,16 +2,14 @@
 
 declare(strict_types=1);
 
-use Drupal\Core\Hook\Attribute\LegacyHook;
 use Drupal\canvas_force_publish_error\Hook\CanvasForcePublishErrorHooks;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityStorageException;
+use Drupal\Core\Hook\Attribute\LegacyHook;
 
 /**
  * Implements hook_entity_presave().
  */
 #[LegacyHook]
-function canvas_force_publish_error_entity_presave(EntityInterface $entity): void
-{
-    \Drupal::service(CanvasForcePublishErrorHooks::class)->entityPresave($entity);
+function canvas_force_publish_error_entity_presave(EntityInterface $entity): void {
+  \Drupal::service(CanvasForcePublishErrorHooks::class)->entityPresave($entity);
 }

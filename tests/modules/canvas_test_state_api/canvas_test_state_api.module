@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use Drupal\Core\Hook\Attribute\LegacyHook;
 use Drupal\canvas_test_state_api\Hook\CanvasTestStateApiHooks;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Hook\Attribute\LegacyHook;
 
 /**
  * Implements hook_form_alter().

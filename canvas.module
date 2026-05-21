@@ -1,24 +1,12 @@
 <?php
 
-use Drupal\Core\Hook\Attribute\LegacyHook;
-use Drupal\canvas\Hook\CanvasHooks;
-
-/**
- * @file
- * Hook implementations for Drupal Canvas's foundational functionality.
- *
- * Other hook implementations live in include files.
- */
-
-// @todo Re-evaluate this when A) tagging a stable release, B) https://www.drupal.org/project/drupal/issues/3398033 is fixed in Drupal core.
-ini_set('assert.active', 1);
-
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Hook\CanvasHooks;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\PropSource\FieldStorageDefinition;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\Core\Render\Markup;
+use Drupal\Core\Hook\Attribute\LegacyHook;
 
 /**
  * Provides allowed values for a 'list_*' field used in a StaticPropSource.
@@ -62,25 +50,22 @@ function canvas_load_allowed_values_for_component_prop(FieldStorageDefinitionInt
  * @see \Drupal\canvas\Render\MainContent\CanvasPreviewRenderer::prepare()
  */
 #[LegacyHook]
-function canvas_preprocess_region(array &$variables): void
-{
-    \Drupal::service(CanvasHooks::class)->preprocessRegion($variables);
+function canvas_preprocess_region(array &$variables): void {
+  \Drupal::service(CanvasHooks::class)->preprocessRegion($variables);
 }
 
 /**
  * Implements hook_preprocess_form_element().
  */
 #[LegacyHook]
-function canvas_preprocess_form_element(array &$variables): void
-{
-    \Drupal::service(CanvasHooks::class)->preprocessFormElement($variables);
+function canvas_preprocess_form_element(array &$variables): void {
+  \Drupal::service(CanvasHooks::class)->preprocessFormElement($variables);
 }
 
 /**
  * Implements hook_preprocess_HOOK() for html.
  */
 #[LegacyHook]
-function canvas_preprocess_html(array &$variables): void
-{
-    \Drupal::service(CanvasHooks::class)->preprocessHtml($variables);
+function canvas_preprocess_html(array &$variables): void {
+  \Drupal::service(CanvasHooks::class)->preprocessHtml($variables);
 }

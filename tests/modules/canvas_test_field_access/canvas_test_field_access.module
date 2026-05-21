@@ -2,20 +2,17 @@
 
 declare(strict_types=1);
 
-use Drupal\Core\Hook\Attribute\LegacyHook;
 use Drupal\canvas_test_field_access\Hook\CanvasTestFieldAccessHooks;
-use Drupal\canvas\Entity\Page;
-use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Hook\Attribute\LegacyHook;
 use Drupal\Core\Session\AccountInterface;
 
 /**
  * Implements hook_entity_field_access().
  */
 #[LegacyHook]
-function canvas_test_field_access_entity_field_access(string $operation, FieldDefinitionInterface $field_definition, AccountInterface $account, ?FieldItemListInterface $items = NULL): AccessResultInterface
-{
-    return \Drupal::service(CanvasTestFieldAccessHooks::class)->entityFieldAccess($operation, $field_definition, $account, $items);
+function canvas_test_field_access_entity_field_access(string $operation, FieldDefinitionInterface $field_definition, AccountInterface $account, ?FieldItemListInterface $items = NULL): AccessResultInterface {
+  return \Drupal::service(CanvasTestFieldAccessHooks::class)->entityFieldAccess($operation, $field_definition, $account, $items);
 }

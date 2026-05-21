@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
-use Drupal\Component\Utility\DeprecationHelper;
-use Drupal\Core\Database\Statement\FetchAs;
 use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Database\DatabaseException;
 use Drupal\Core\Database\Query\SelectInterface;
+use Drupal\Core\Database\Statement\FetchAs;
 use Drupal\Core\Database\StatementInterface;
 
 /**

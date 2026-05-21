@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\TestSite;
 
-use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -15,6 +14,7 @@ use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\Component\FileCache\FileCacheFactory;
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;

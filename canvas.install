@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use Drupal\Component\Utility\DeprecationHelper;
-use Drupal\Core\Extension\Requirement\RequirementSeverity;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasNotificationHandler;
+use Drupal\Component\Utility\DeprecationHelper;
+use Drupal\Core\Extension\Requirement\RequirementSeverity;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 
