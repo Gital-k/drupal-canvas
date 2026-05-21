@@ -37,10 +37,14 @@ export function parseValue(
   element: HTMLInputElement | HTMLSelectElement,
   schema: PropsValues | null,
 ) {
-  if (schema?.type === 'string') {
+  // Determine the effective type, accounting for array items.
+  const effectiveType =
+    schema?.type === 'array' ? schema.items?.type : schema?.type;
+
+  if (effectiveType === 'string') {
     return `${value}`;
   }
-  if (schema?.type === 'number') {
+  if (effectiveType === 'number') {
     const parsed = Number(value);
     return isNaN(parsed) ? value : parsed;
   }
