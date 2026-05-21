@@ -717,24 +717,42 @@ CLI Test:
     - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
     - mkdir -p test-results
-  # This job must pass, but must also not disrupt Canvas's CI if dependencies have a security vulnerability.
-  allow_failure:
-    exit_codes:
-      # `npm audit …` fails (implies upstream security vulnerability that may or may not affect Canvas)
-      - 100
   script:
     - npm ci
     - npm run test --workspace=@drupal-canvas/cli
     - npm run build --workspace=@drupal-canvas/cli
     - npm version 0.0.1 --workspace=@drupal-canvas/cli
     - npm pack --pack-destination=test-results --workspace=@drupal-canvas/cli
-    - npm audit --audit-level=moderate --production || exit 100
   artifacts:
     expose_as: 'CLI package'
     when: always
     expire_in: 6 mos
     paths:
       - test-results/
+
+npm audit:
+  stage: validate
+  image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
+  needs: []
+  rules:
+    - changes:
+        - package.json
+        - package-lock.json
+        - "packages/*/package.json"
+        - "ui/package.json"
+    - *nightly-rule
+    - *manual-rule
+  # Allow this job to fail without blocking the pipeline, as security vulnerabilities
+  # in dependencies may not directly affect Canvas and should not disrupt CI.
+  allow_failure: true
+  script:
+    - npm ci
+    - npm audit --audit-level=moderate --production
+  artifacts:
+    when: on_failure
+    expire_in: 6 mos
+    paths:
+      - npm-audit.log
 
 CLI Publish:
   stage: publish
