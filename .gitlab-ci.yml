@@ -278,7 +278,7 @@ phpcs-rules-match-drupal:
   allow_failure: true
 
 # @see https://dri.es/ai-generated-rector-rules-for-drupal
-rector-chase-upstream-changes:
+chase-upstream:
   stage: development
   rules:
     - *nightly-rule
@@ -286,11 +286,14 @@ rector-chase-upstream-changes:
   before_script:
     - !reference [ .drupal-with-dev-dependencies ]
   script:
-    - pwd
-    - cd $CI_PROJECT_DIR/_drupal
-    - ls -al
-    - git clone https://github.com/dbuytaert/drupal-digests.git
-    - vendor/bin/rector process web/modules/contrib/$CI_PARENT_PROJECT_NAME --config drupal-digests/rector/all.php --dry-run
+    - |
+      composer run lint:chase-upstream || EXIT_CODE=$?
+      if [ $EXIT_CODE -ne 0 ]; then
+        echo "🥳 New upstream changes that can be chased automatically."
+        echo "Run `composer run chase-upstream` locally, push the result as an MR."
+        echo "Issue template: https://www.drupal.org/node/add/project-issue/canvas?title=Chase%20upstream%20core%20changes&categories=2&priorities=200&status=1&version=1.x-dev&assigned=0&tags=Drupal%2012%20compatibility"
+      fi
+      exit $EXIT_CODE
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
 
