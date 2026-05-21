@@ -864,7 +864,6 @@ npm audit:
   # in dependencies may not directly affect Canvas and should not disrupt CI.
   allow_failure: true
   script:
-    - npm ci
     - npm audit --audit-level=moderate --production
   artifacts:
     when: on_failure
