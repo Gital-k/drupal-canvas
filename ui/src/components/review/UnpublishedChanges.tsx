@@ -228,11 +228,32 @@ const UnpublishedChanges = () => {
 
     try {
       await discardChange(selectedChange).unwrap();
-      // After discarding, refresh the editor state from canonical server data.
+      
+      // When the discarded change is for the current page, we need to reload
+      // the layout and model from the server to reflect the published state.
+      const isCurrentPage =
+        entityId &&
+        entityType &&
+        selectedChange.entity_type === entityType &&
+        String(selectedChange.entity_id) === entityId;
+      
+      if (isCurrentPage) {
+        // Clear the editor state BEFORE invalidating cache to prevent
+        // stale data from being applied during the transition.
+        dispatch(clearFieldValues(FORM_TYPES.COMPONENT_INSTANCE_FORM));
+        dispatch(clearFieldValues(FORM_TYPES.ENTITY_FORM));
+        dispatch(clearSelection());
+        dispatch(setInitialized(false));
+      }
+      
+      // After discarding, invalidate cache tags to trigger refetch with fresh data.
+      // This must happen AFTER clearing state to ensure the refetched data
+      // is applied cleanly without interference from stale state.
       dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
       dispatch(
         contentApi.util.invalidateTags([{ type: 'Content', id: 'LIST' }]),
       );
+      
       if (selectedChange.entity_type === 'js_component') {
         const discardedCodeComponentId = String(selectedChange.entity_id);
         dispatch(
@@ -248,6 +269,7 @@ const UnpublishedChanges = () => {
           dispatch(resetCodeEditor());
         }
       }
+      
       if (selectedChange.entity_type === 'brand_kit') {
         const discardedBrandKitId = String(selectedChange.entity_id);
         dispatch(
@@ -258,23 +280,9 @@ const UnpublishedChanges = () => {
           ]),
         );
       }
-      // When the discarded change is for the current page, re-apply the
-      // refetched layout and model so the canvas, sidebar, and form fields
-      // show the published state instead of stale discarded values.
-      const isCurrentPage =
-        entityId &&
-        entityType &&
-        selectedChange.entity_type === entityType &&
-        String(selectedChange.entity_id) === entityId;
-      if (isCurrentPage) {
-        dispatch(setInitialized(false));
-        // Clear cached form values so the props and entity forms reflect the
-        // refetched layout and model.
-        dispatch(clearFieldValues(FORM_TYPES.COMPONENT_INSTANCE_FORM));
-        dispatch(clearFieldValues(FORM_TYPES.ENTITY_FORM));
-        dispatch(clearSelection());
-      }
-      refetch();
+      
+      // Refetch pending changes list to update the UI.
+      await refetch();
     } catch {
       // Error state is handled in pendingChangesApi.discardPendingChange.
     }
