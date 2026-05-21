@@ -53,6 +53,7 @@
         "phpunit": "./tests/scripts/phpunit.sh",
         "lint:phpcs": "@phpcs",
         "lint:phpstan": "@phpstan",
+        "lint:chase-upstream:rector-core": "ROOT=$(composer run composer-root) && composer --working-dir=${ROOT} exec rector -- process --config ${ROOT}/vendor/dbuytaert/drupal-digests/rector/all.php --dry-run $(pwd)",
         "lint": [
             "@lint:phpstan",
             "@lint:phpcs"
@@ -60,6 +61,11 @@
         "fix:phpcbf": "@phpcbf",
         "fix": [
             "@fix:phpcbf"
+        ],
+        "chase-upstream:rector-core": "ROOT=$(composer run composer-root) && composer --working-dir=${ROOT} exec rector -- process --config ${ROOT}/vendor/dbuytaert/drupal-digests/rector/all.php $(pwd)",
+        "chase-upstream": [
+            "@chase-upstream:rector-core",
+            "@fix"
         ]
     },
     "scripts-descriptions": {
@@ -69,6 +75,7 @@
         "phpcbf": "(deprecated), use `fix:phpcbf`.",
         "phpstan": "(deprecated), use `lint:phpstan`.",
         "lint:phpcs": "Runs PHPCS using Canvas' rules, generates CI artifact.",
+        "lint:chase-upstream:rector-core": "Detects upstream (Drupal core) change records with ",
         "fix:phpcbf": "Fixes all auto-fixable PHPCS errors.",
         "lint:phpstan": "Runs PHPStan using Canvas' rules, generates CI artifact.",
         "phpstan-regenerate-ignores-for-11.3-and-higher": "Regenerates PHPStan baseline for Drupal 11.3 and higher.",
