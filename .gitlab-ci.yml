@@ -277,6 +277,23 @@ phpcs-rules-match-drupal:
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
 
+# @see https://dri.es/ai-generated-rector-rules-for-drupal
+rector-chase-upstream-changes:
+  stage: development
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - *manual-rule
+  before_script:
+    - !reference [ .drupal-with-dev-dependencies ]
+  script:
+    - pwd
+    - cd $CI_PROJECT_DIR/_drupal
+    - ls -al
+    - git clone https://github.com/dbuytaert/drupal-digests.git
+    - vendor/bin/rector process web/modules/contrib/$CI_PARENT_PROJECT_NAME --config drupal-digests/rector/all.php --dry-run
+  # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
+  allow_failure: true
+
 lint (php):
   stage: validate
   needs: []

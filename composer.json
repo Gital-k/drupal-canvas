@@ -22,6 +22,7 @@
         "jangregor/phpstan-prophecy": "2.3.0",
         "league/openapi-psr7-validator": "^0.22.0",
         "mglaman/phpstan-drupal": "2.0.15",
+        "palantirnet/drupal-rector": "*",
         "phpat/phpat": "0.12.4",
         "phpstan/phpstan": "2.1.53",
         "phpstan/phpstan-strict-rules": "2.0.10",
