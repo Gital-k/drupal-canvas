@@ -829,7 +829,12 @@ export function App() {
       void (async () => {
         try {
           const layoutPath = discoveryResult.layoutPath;
-          const regionsToRender = layoutPath ? discoveryResult.regions : [];
+          // Global regions wrap the preview only for the "full" view mode
+          // template; other templates render their body without page chrome.
+          const includeGlobalRegions =
+            selectedContentTemplate.viewMode === 'full';
+          const regionsToRender =
+            layoutPath && includeGlobalRegions ? discoveryResult.regions : [];
 
           const [templateResponse, ...regionSpecs] = await Promise.all([
             fetchPreviewContentTemplateSpec(
@@ -848,7 +853,7 @@ export function App() {
           }
 
           const layoutPayload =
-            layoutPath && regionsToRender.length > 0
+            layoutPath && includeGlobalRegions
               ? {
                   jsEntryUrl: toViteFsUrl(layoutPath),
                   regions: Object.fromEntries(
@@ -858,9 +863,7 @@ export function App() {
                     ]),
                   ),
                 }
-              : layoutPath
-                ? { jsEntryUrl: toViteFsUrl(layoutPath), regions: {} }
-                : undefined;
+              : undefined;
 
           // Resolve all prop sources (entity-field expressions,
           // host-entity-url, adapters, static, etc.) server-side. Drupal
