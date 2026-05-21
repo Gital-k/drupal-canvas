@@ -1513,6 +1513,7 @@ HTML
       'expected_validation_errors' => [],
       'expected_exception' => NULL,
       'expected_output_selector' => 'h1:contains("test")',
+      'component_version' => NULL,
     ];
 
     // Garbage (non-existent) prop should result in:
@@ -1541,6 +1542,7 @@ HTML
         'message' => '\'hydration_should_fail_on_this_non_existent_value\' is not a prop on this version of the Component \'Single-directory component: <em class="placeholder">Canvas test SDC that crashes when &#039;crash&#039; prop is TRUE</em>\'.',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
 
     yield "SDC with valid props, with exception" => [
@@ -1554,6 +1556,7 @@ HTML
         'message' => 'Intentional test exception in "canvas_test_sdc:crash" at line 2.',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
 
     yield "SDC with invalid prop type is cast by typed data, raises exception" => [
@@ -1567,6 +1570,7 @@ HTML
         'message' => 'Intentional test exception in "canvas_test_sdc:crash" at line 2.',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
 
     // @see \Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint
@@ -1585,6 +1589,7 @@ HTML
         'message' => 'An exception has been thrown during the rendering of a template ("[canvas_test_sdc:card-with-stream-wrapper-image/src] The "private" URI scheme is not allowed. The provided value is: "private://test/image.png".") in "canvas_test_sdc:card-with-stream-wrapper-image" at line 1.',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
 
     // Missing required props from the active version will be assigned on
@@ -1597,6 +1602,7 @@ HTML
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => 'h1:contains("test")',
+      'component_version' => NULL,
     ];
 
     yield "SDC with invalid Twig (due to filter)" => [
@@ -1610,6 +1616,7 @@ HTML
         'message' => 'Unknown "invalidFilter" filter',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
 
     yield "SDC with valid prop, but invalid Twig (due to printing an object-shaped prop)" => [
@@ -1625,6 +1632,7 @@ HTML
         'message' => 'An exception has been thrown during the rendering of a template (""src" is an invalid render array key. Value should be an array but got a string.") in "canvas_broken_sdcs:malformed-image" at line 2.',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
   }
 

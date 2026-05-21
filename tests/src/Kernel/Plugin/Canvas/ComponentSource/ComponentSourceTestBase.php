@@ -429,7 +429,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    * @see ::alterEnvironmentForCrashTestDummyComponentTree()
    */
   #[DataProvider('providerRenderComponentFailure')]
-  public function testRenderComponentFailure(string $component_id, array $inputs, array $expected_validation_errors, ?array $expected_exception, ?string $expected_output_selector, ?string $component_version = NULL): void {
+  public function testRenderComponentFailure(string $component_id, array $inputs, array $expected_validation_errors, ?array $expected_exception, ?string $expected_output_selector, ?string $component_version): void {
     $this->setUpCurrentUser(permissions: ['view media']);
     $component_tree = $this->generateCrashTestDummyComponentTree($component_id, $inputs, component_version: $component_version);
     // Child implementations of ::generateCrashTestDummyComponentTree may

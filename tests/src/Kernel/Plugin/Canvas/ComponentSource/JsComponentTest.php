@@ -1391,6 +1391,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'expected_validation_errors' => [],
       'expected_exception' => NULL,
       'expected_output_selector' => \sprintf('canvas-island[uid="%s"][props*="Tilly"][props*="19"]', self::UUID_CRASH_TEST_DUMMY),
+      'component_version' => NULL,
     ];
 
     // Garbage (non-existent) prop should result in:
@@ -1419,6 +1420,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         'message' => '\'hydration_should_fail_on_this_non_existent_value\' is not a prop on this version of the Component \'Code component: <em class="placeholder">With props</em>\'.',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
 
     yield "JS Component with valid props, JSON encoding exception" => [
@@ -1433,6 +1435,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         'message' => 'Wilson is a ball, not a person',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
 
     yield "JS Component with invalid props (wrong shape: string instead of integer!), validation error" => [
@@ -1449,6 +1452,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         'message' => 'String value found, but an integer or an object is required.',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
     // Missing required props from the active version will be assigned on
     // hydration so no exception occurs.
@@ -1460,6 +1464,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => \sprintf('canvas-island[uid="%s"][props*="Canvas"]', self::UUID_CRASH_TEST_DUMMY),
+      'component_version' => NULL,
     ];
   }
 
