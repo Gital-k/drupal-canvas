@@ -861,7 +861,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     self::assertSame([$region_id, $second_region_id], \array_keys($body));
 
     // Switch default theme to olivero; list should now only return olivero.
-    \Drupal::service('config.factory')->getEditable('system.theme')->set('default', 'olivero')->save();
+    $this->config('system.theme')->set('default', 'olivero')->save();
 
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
       'config:page_region_list',
