@@ -854,6 +854,7 @@ npm audit:
         - package-lock.json
         - "packages/*/package.json"
         - "ui/package.json"
+    - *nightly-rule
     - *manual-rule
   # Allow this job to fail without blocking the pipeline, as security vulnerabilities
   # in dependencies may not directly affect Canvas and should not disrupt CI.
