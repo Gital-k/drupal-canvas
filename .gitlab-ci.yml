@@ -279,7 +279,7 @@ phpcs-rules-match-drupal:
 
 # @see https://dri.es/ai-generated-rector-rules-for-drupal
 chase-upstream:
-  stage: development
+  stage: validate
   rules:
     - *nightly-rule
     - *manual-rule
