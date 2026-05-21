@@ -8,12 +8,11 @@ use Drupal\canvas\ComponentSource\ComponentInstanceUpdateAttemptResult;
 use Drupal\canvas\ComponentSource\ComponentInstanceUpdaterInterface;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
 
@@ -49,7 +48,6 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
    * - Changing a prop matched prop shape field widget (but only the widget!)
    * - Changing default values in prop_field_definitions
    * - Changing slot examples
-   * - Changing cardinality of array props (UI constraint only, not storage)
    *
    * Unsafe changes (that prevent auto-update) include:
    * - Changing prop shapes

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ShapeMatcher;
 
+use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\Labeler;
@@ -12,7 +14,7 @@ use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropSource\HostEntityUrlPropSource;
-use Drupal\canvas\PropSource\LinkedPropSourceInterface;
+use Drupal\canvas\PropSource\LinkablePropSourceInterface;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\Component\Utility\NestedArray;
@@ -22,8 +24,6 @@ use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Theme\Component\ComponentMetadata;
-use Drupal\canvas\Plugin\Adapter\AdapterInterface;
-use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 
 /**
  * Suggests prop sources for a component's props in a host entity type + bundle.
@@ -293,7 +293,7 @@ final readonly class PropSourceSuggester {
         // populate the component prop.
         fn (array $prop_sources): array => array_combine(
           \array_map(
-            fn (LinkedPropSourceInterface $prop_source): string => \hash('xxh64', $prop_source->asChoice()),
+            fn (LinkablePropSourceInterface $prop_source): string => \hash('xxh64', $prop_source->asChoice()),
             array_values($prop_sources),
           ),
           // Values: objects with "label" and "source" keys, with:
@@ -303,7 +303,7 @@ final readonly class PropSourceSuggester {
           //   selected by the human, the client should use verbatim as the
           //   source to populate this component instance's prop.
           \array_map(
-            function (string $label, LinkedPropSourceInterface $prop_source) {
+            function (string $label, LinkablePropSourceInterface $prop_source) {
               return [
                 'label' => $label,
                 'source' => $prop_source->toArray(),

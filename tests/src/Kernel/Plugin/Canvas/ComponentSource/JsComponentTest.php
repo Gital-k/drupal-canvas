@@ -4,22 +4,27 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
-// cspell:ignore Bwidth Fitok Synx Tilly anzut nhsy sxnz Umso Dzyawdvr Mafgg Royu Cmsy Pmsg Lgfkq ergmkgy Ptgi Ltxk maxitems
+// cspell:ignore Bwidth Fitok Synx Tilly anzut nhsy sxnz Umso Dzyawdvr Mafgg Royu Cmsy Pmsg Lgfkq ergmkgy Ptgi Ltxk
 
-use Drupal\Tests\canvas\Traits\ComponentTreeItemInstantiatorTrait;
-use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\Depends;
-use PHPUnit\Framework\Attributes\TestWith;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
+use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropSource\PropSource;
+use Drupal\canvas\PropSource\StaticPropSource;
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
+use Drupal\canvas_test_code_components\Hook\IslandCastaway;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\NestedArray;
@@ -30,36 +35,31 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\StorageInterface;
-use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
 use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
-use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
-use Drupal\link\LinkItemInterface;
-use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\AssetLibrary;
-use Drupal\canvas\Entity\BrandKit;
-use Drupal\canvas\Entity\Component;
-use Drupal\file\Entity\File;
-use Drupal\file\FileInterface;
-use Drupal\canvas\Entity\ComponentInterface;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
-use Drupal\canvas\PropSource\PropSource;
-use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\file\Entity\File;
+use Drupal\file\FileInterface;
+use Drupal\link\LinkItemInterface;
+use Drupal\media\Entity\MediaType;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
-use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
-use Drupal\media\Entity\MediaType;
-use Drupal\canvas_test_code_components\Hook\IslandCastaway;
+use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
+use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
+use Drupal\Tests\canvas\Traits\ComponentTreeItemInstantiatorTrait;
+use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Depends;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\TestWith;
 
 /**
  * Tests JsComponent.
@@ -2804,63 +2804,6 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       $test_case[0] = 'js.my-cta';
       yield $label => $test_case;
     }
-  }
-
-  /**
-   * Tests that rendering with more array values than maxItems does not throw.
-   *
-   * When a multivalue prop's maxItems is tightened after content was already
-   * saved, the stored values can exceed the new limit. Rendering should
-   * truncate to maxItems rather than throw an exception.
-   */
-  public function testRenderComponentTruncatesArrayExceedingMaxItems(): void {
-    $js_component = JavaScriptComponent::create([
-      'machineName' => 'test_maxitems',
-      'name' => 'Test MaxItems Component',
-      'status' => TRUE,
-      'props' => [
-        'features' => [
-          'type' => 'array',
-          'title' => 'Features',
-          'maxItems' => 3,
-          'items' => [
-            'type' => 'string',
-          ],
-          'examples' => [['Feature A', 'Feature B']],
-        ],
-      ],
-      'slots' => [],
-      'js' => [
-        'original' => 'console.log("test")',
-        'compiled' => 'console.log("test")',
-      ],
-      'css' => [
-        'original' => '',
-        'compiled' => '',
-      ],
-      'dataDependencies' => [],
-    ]);
-    $js_component->save();
-
-    $component = Component::load('js.test_maxitems');
-    $this->assertInstanceOf(Component::class, $component);
-
-    $source = $component->getComponentSource();
-    $this->assertInstanceOf(JsComponent::class, $source);
-
-    // Simulate stored content with 4 items saved before maxItems was tightened
-    // to 3. This is the exact scenario from the bug report.
-    $island = $source->renderComponent([
-      'props' => [
-        'features' => new EvaluationResult(['Feature A', 'Feature B', 'Feature C', 'Feature D']),
-      ],
-    ], $source->getSlotDefinitions(), 'test-uuid-maxitems');
-
-    // Excess values should be silently truncated to maxItems, not throw.
-    $this->assertSame(
-      ['Feature A', 'Feature B', 'Feature C'],
-      $island['#props']['features'],
-    );
   }
 
   public static function providerResolvedComponentInputs(): \Generator {

@@ -4,12 +4,22 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\Attribute\ComponentSource;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSaveEntity;
+use Drupal\canvas\ComponentSource\UrlRewriteInterface;
+use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\GlobalImports;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
+use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
@@ -22,16 +32,6 @@ use Drupal\Core\Plugin\Component as ComponentPlugin;
 use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
-use Drupal\canvas\Attribute\ComponentSource;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\AutoSaveEntity;
-use Drupal\canvas\Entity\AssetLibrary;
-use Drupal\canvas\Entity\BrandKit;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\GlobalImports;
-use Drupal\canvas\ComponentSource\UrlRewriteInterface;
-use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
-use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -360,14 +360,6 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     if ($isPreview) {
       $props += $published_required_props;
       $props_cacheability->merge($published_required_props_cacheability);
-    }
-
-    // Truncate array props that exceed their maxItems schema constraint.
-    $schema_properties = $this->getComponentPlugin()->metadata->schema['properties'] ?? [];
-    foreach ($schema_properties as $prop_name => $prop_schema) {
-      if (isset($prop_schema['maxItems'], $props[$prop_name]) && \is_array($props[$prop_name]) && \count($props[$prop_name]) > $prop_schema['maxItems']) {
-        $props[$prop_name] = \array_slice($props[$prop_name], 0, $prop_schema['maxItems']);
-      }
     }
 
     // Match SDC's developer-only validation of props.

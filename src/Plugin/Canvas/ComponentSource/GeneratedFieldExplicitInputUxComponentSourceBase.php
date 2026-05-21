@@ -4,17 +4,32 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
-use Drupal\canvas\InvalidComponentInputsPropSourceException;
+use Drupal\canvas\ComponentSource\ComponentSourceBase;
+use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\PropSource\EntityFieldPropSource;
-use Drupal\canvas\PropSource\LinkedPropSourceInterface;
+use Drupal\canvas\InvalidComponentInputsPropSourceException;
+use Drupal\canvas\MissingHostEntityException;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
-use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
-use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
+use Drupal\canvas\PropShape\StorablePropShape;
+use Drupal\canvas\PropSource\DefaultRelativeUrlPropSource;
+use Drupal\canvas\PropSource\EntityFieldPropSource;
+use Drupal\canvas\PropSource\LinkablePropSourceInterface;
+use Drupal\canvas\PropSource\PropSource;
+use Drupal\canvas\PropSource\PropSourceBase;
+use Drupal\canvas\PropSource\StaticPropSource;
+use Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher;
 use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\canvas\Utility\ComponentMetadataHelper;
+use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
@@ -36,21 +51,6 @@ use Drupal\Core\Render\Element;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Theme\Component\ComponentValidator;
-use Drupal\canvas\ComponentSource\ComponentSourceBase;
-use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\MissingHostEntityException;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
-use Drupal\canvas\PropShape\PropShape;
-use Drupal\canvas\PropShape\StorablePropShape;
-use Drupal\canvas\PropSource\DefaultRelativeUrlPropSource;
-use Drupal\canvas\PropSource\PropSource;
-use Drupal\canvas\PropSource\PropSourceBase;
-use Drupal\canvas\PropSource\StaticPropSource;
-use Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher;
-use Drupal\canvas\Utility\TypedDataHelper;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
 use Symfony\Component\Validator\ConstraintViolation;
@@ -827,7 +827,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         ));
       }
       $disabled = FALSE;
-      $linked_prop_source = $source instanceof LinkedPropSourceInterface ? $source : NULL;
+      $linkable_prop_source = $source instanceof LinkablePropSourceInterface ? $source : NULL;
       if (!$source instanceof StaticPropSource) {
         // @todo Build EntityFieldPropSource UX in https://www.drupal.org/i/3541037. Related: https://www.drupal.org/project/canvas/issues/3459234
         // @todo Design is undefined for the AdaptedPropSource UX.
@@ -864,14 +864,14 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // If the prop is already linked, replace the widget entirely. The
         // replacement will show the linker by the field label, and replace the
         // form elements with a linked field badge.
-        if ($linked_prop_source) {
+        if ($linkable_prop_source) {
           // This full replacement of the widget ensures that the resulting form
           // has consistent and valid html, regardless of field type and widget.
           $form[$sdc_prop_name]['widget'] = [
-            '#type' => 'linked_prop_source',
+            '#type' => 'linked_prop',
             '#sdc_prop_name' => $sdc_prop_name,
             '#sdc_prop_label' => $label,
-            '#linked_prop_source' => $linked_prop_source,
+            '#prop_source' => $linkable_prop_source,
             '#entity_data_definition' => $entity->getTargetEntityDataDefinition(),
             '#field_link_suggestions' => $suggestions[$sdc_prop_name],
             '#description' => $component_schema['properties'][$sdc_prop_name]['description'] ?? NULL,
