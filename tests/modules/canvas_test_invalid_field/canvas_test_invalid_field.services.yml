@@ -1,0 +1,5 @@
+
+services:
+  Drupal\canvas_test_invalid_field\Hook\CanvasTestInvalidFieldHooks:
+    class: Drupal\canvas_test_invalid_field\Hook\CanvasTestInvalidFieldHooks
+    autowire: true

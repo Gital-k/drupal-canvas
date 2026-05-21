@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Drupal\Component\Utility\DeprecationHelper;
+
 /**
  * Rebuild the router.
  *
@@ -23,6 +25,6 @@ function canvas_ai_post_update_0002_chat_history_max_messages(): void {
   // preserve current behavior. New installations get the newer default of
   // 10 from config/install/canvas_ai.settings.yml.
   if (!$config->isNew()) {
-    $config->set('chat_history_max_messages', 3)->save(TRUE);
+    DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => $config->set('chat_history_max_messages', 3)->save(), fn() => $config->set('chat_history_max_messages', 3)->save(TRUE));
   }
 }

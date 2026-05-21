@@ -1,0 +1,5 @@
+
+services:
+  Drupal\canvas_test_rendering\Hook\CanvasTestRenderingHooks:
+    class: Drupal\canvas_test_rendering\Hook\CanvasTestRenderingHooks
+    autowire: true

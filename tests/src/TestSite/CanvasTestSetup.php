@@ -14,6 +14,7 @@ use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\Component\FileCache\FileCacheFactory;
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
@@ -148,7 +149,7 @@ class CanvasTestSetup implements TestSetupInterface {
     $config_factory = \Drupal::configFactory();
     $config = $config_factory->getEditable('system.logging');
     $config->set('error_level', ERROR_REPORTING_DISPLAY_VERBOSE);
-    $config->save(TRUE);
+    DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => $config->save(), fn() => $config->save(TRUE));
 
     if (getenv('CANVAS_DISABLE_AGGREGATION') !== 'true') {
       $config = \Drupal::service('config.factory')->getEditable('system.performance');

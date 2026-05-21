@@ -1,0 +1,5 @@
+
+services:
+  Drupal\canvas_test_state_api\Hook\CanvasTestStateApiHooks:
+    class: Drupal\canvas_test_state_api\Hook\CanvasTestStateApiHooks
+    autowire: true

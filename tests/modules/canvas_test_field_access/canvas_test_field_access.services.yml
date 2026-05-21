@@ -1,0 +1,5 @@
+
+services:
+  Drupal\canvas_test_field_access\Hook\CanvasTestFieldAccessHooks:
+    class: Drupal\canvas_test_field_access\Hook\CanvasTestFieldAccessHooks
+    autowire: true

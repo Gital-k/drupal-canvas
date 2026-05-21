@@ -1,21 +1,12 @@
 <?php
 
-/**
- * @file
- * Hook implementations for Drupal Canvas's foundational functionality.
- *
- * Other hook implementations live in include files.
- */
-
-// @todo Re-evaluate this when A) tagging a stable release, B) https://www.drupal.org/project/drupal/issues/3398033 is fixed in Drupal core.
-ini_set('assert.active', 1);
-
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Hook\CanvasHooks;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\PropSource\FieldStorageDefinition;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\Core\Render\Markup;
+use Drupal\Core\Hook\Attribute\LegacyHook;
 
 /**
  * Provides allowed values for a 'list_*' field used in a StaticPropSource.
@@ -58,47 +49,23 @@ function canvas_load_allowed_values_for_component_prop(FieldStorageDefinitionInt
  *
  * @see \Drupal\canvas\Render\MainContent\CanvasPreviewRenderer::prepare()
  */
-function canvas_preprocess_region(array &$variables):void {
-  if (!\array_key_exists('#canvas_region_preview', $variables['elements'])) {
-    // Nothing to do: this is a region being rendered outside of a Canvas
-    // preview context.
-    return;
-  }
-
-  $region = $variables['region'];
-  assert(is_string($region) && strlen($region) >= 1);
-
-  $content = (string) $variables['content'];
-
-  // Additional `content-start` and `content-end` comment annotations to
-  // surround just the {{ content }} output to allow Canvas's UI to more
-  // accurately render the region overlays.
-  $variables['content'] = Markup::create(<<<HTML
-<!-- canvas-region-content-start-$region -->
-$content
-<!-- canvas-region-content-end-$region -->
-HTML);
+#[LegacyHook]
+function canvas_preprocess_region(array &$variables): void {
+  \Drupal::service(CanvasHooks::class)->preprocessRegion($variables);
 }
 
 /**
  * Implements hook_preprocess_form_element().
  */
+#[LegacyHook]
 function canvas_preprocess_form_element(array &$variables): void {
-  if (!isset($variables['label'])) {
-    return;
-  }
-
-  if (isset($variables['element']['#form_id'])) {
-    $variables['label']['#form_id'] = $variables['element']['#form_id'];
-  }
+  \Drupal::service(CanvasHooks::class)->preprocessFormElement($variables);
 }
 
 /**
  * Implements hook_preprocess_HOOK() for html.
  */
+#[LegacyHook]
 function canvas_preprocess_html(array &$variables): void {
-  $current_route = \Drupal::routeMatch()->getRouteName();
-  if ($current_route === 'entity.canvas_page.canonical') {
-    $variables['attributes']['class'][] = 'canvas-page';
-  }
+  \Drupal::service(CanvasHooks::class)->preprocessHtml($variables);
 }
