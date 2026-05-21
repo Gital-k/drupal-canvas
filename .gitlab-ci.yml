@@ -163,14 +163,25 @@ variables:
       # ⚠️Imperfect, because validation constraints can be added to entity type classes, altered in, etc. However, it
       # is very unlikely that an MR would add or change validation constraints without also changing one of these files.
 
+.JS-deps-change-rule: &JS-deps-change-rule
+  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
+    changes:
+      - package.json
+      - package-lock.json
+      # Workspace packages can affect dependency hoisting to the root node_modules.
+      # MUST be in sync with the workspaces listed in the root package.json.
+      - ui/package.json
+      - packages/*/package.json
+      - docs/user/package.json
+      - tests/modules/canvas_test_extension/package.json
+    when: on_success
+
 .UI-files-change-rule: &UI-files-change-rule
   - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
     changes:
       # Customizations to Drupal's JS.
       - js/**/*
       # The Canvas UI.
-      - package.json
-      - package-lock.json
       - ui/**/*
       # Dependencies of the Canvas UI.
       - packages/astro-hydration
@@ -192,6 +203,7 @@ variables:
   - *e2e-tests-must-not-be-disabled-rule
   - *is-push-rule
   - *backend-files-change-rule
+  - *JS-deps-change-rule
   - *UI-files-change-rule
   - *manual-rule
 
@@ -530,6 +542,7 @@ vitest:
   needs: []
   rules:
     - *is-push-rule
+    - *JS-deps-change-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - ui/src/**/*
@@ -539,10 +552,6 @@ vitest:
         - ui/vitest.config.js
         - ui/vite.config.ts
         - ui/package.json
-        - package.json
-        - package-lock.json
-        # Workspace packages can affect dependency hoisting to the root node_modules.
-        - packages/*/package.json
     - *UI-fixtures-files-change-rule
     - *manual-rule
   script:
@@ -807,10 +816,9 @@ CLI Test:
   needs: []
   rules:
     - *e2e-tests-must-not-be-disabled-rule
+    - *JS-deps-change-rule
     - changes:
         - "packages/cli/**/*"
-        - package.json
-        - package-lock.json
         - openapi.yml
         # Everything below is a subset of .backend-files-change-rule.
         - src/Entity/**/*
@@ -849,11 +857,7 @@ npm audit:
   image: ghcr.io/drupal-canvas/drupal-testing:2.1.1
   needs: []
   rules:
-    - changes:
-        - package.json
-        - package-lock.json
-        - "packages/*/package.json"
-        - "ui/package.json"
+    - *JS-deps-change-rule
     - *nightly-rule
     - *manual-rule
   # Allow this job to fail without blocking the pipeline, as security vulnerabilities
