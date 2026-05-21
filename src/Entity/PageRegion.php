@@ -154,7 +154,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
         'theme' => $this->theme,
         'region' => $this->region,
         'status' => $this->status(),
-        'component_tree' => \array_values($this->component_tree ?? []),
+        'component_tree' => $this->getComponentTree()->getValue(),
       ],
       preview: NULL,
     )->addCacheableDependency($this);
@@ -186,10 +186,10 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
    */
   public function updateFromClientSide(array $data): void {
     if (\array_key_exists('component_tree', $data)) {
-      $this->set('component_tree', $data['component_tree'] ?? []);
+      $this->setComponentTree($data['component_tree'] ?? []);
     }
     if (\array_key_exists('status', $data)) {
-      $this->set('status', $data['status']);
+      $this->setStatus($data['status']);
     }
   }
 
