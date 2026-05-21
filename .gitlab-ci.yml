@@ -281,7 +281,7 @@ phpcs-rules-match-drupal:
 rector-chase-upstream-changes:
   stage: development
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - *nightly-rule
     - *manual-rule
   before_script:
     - !reference [ .drupal-with-dev-dependencies ]
