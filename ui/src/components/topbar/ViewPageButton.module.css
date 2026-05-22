@@ -1,0 +1,17 @@
+.triggerWrap {
+  display: inline-flex;
+}
+
+.linkAsIcon {
+  text-decoration: none;
+}
+
+.disabledState:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.disabledState:disabled:hover {
+  color: var(--gray-11);
+  background: var(--gray-3);
+}

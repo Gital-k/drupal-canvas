@@ -3,9 +3,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--space-6);
+  box-sizing: border-box;
+  min-width: calc(16px + 2 * var(--space-2));
   height: var(--space-6);
-  padding: 0;
+  padding: 0 var(--space-2);
   cursor: pointer;
   color: var(--gray-11);
   border: none;

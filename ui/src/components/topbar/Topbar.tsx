@@ -18,6 +18,7 @@ import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout
 import { getDrupalSettings } from '@/utils/drupal-globals';
 
 import PageInfo from '../pageInfo/PageInfo';
+import ViewPageButton from './ViewPageButton';
 
 import styles from './Topbar.module.css';
 
@@ -80,13 +81,13 @@ const Topbar = () => {
         className={clsx(styles.root, styles.topBar, {
           [styles.inPreview]: isPreview,
         })}
-        pr="4"
+        pr="3"
       >
         <Grid
-          columns="max-content 1fr max-content"
+          columns={`${leftRightColumnWidth} 1fr ${leftRightColumnWidth}`}
           gap="0"
-          width="auto"
           height="100%"
+          width="100%"
         >
           <Flex align="center" gap="2" width={leftRightColumnWidth}>
             <Tooltip content="Exit Drupal Canvas">
@@ -152,13 +153,11 @@ const Topbar = () => {
               />
             )}
           </Flex>
-          <Flex
-            align="center"
-            justify="end"
-            gap="2"
-            width={leftRightColumnWidth}
-          >
-            <NotificationBell />
+          <Flex align="center" justify="end" gap="2" pl="3">
+            <Flex align="center" gap="0">
+              <NotificationBell />
+              <ViewPageButton />
+            </Flex>
             <PreviewControls isPreview={isPreview} />
             <UnpublishedChanges />
           </Flex>
