@@ -275,4 +275,24 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
     }, $prop_field_definitions);
   }
 
+  /**
+   * Returns names of props whose stored field type changed between versions.
+   *
+   * @param array $from_props
+   *   Prop field definitions for the from-version.
+   * @param array $to_props
+   *   Prop field definitions for the to-version.
+   *
+   * @return list<string>
+   */
+  protected static function getShapeChangedPropNames(array $from_props, array $to_props): array {
+    $from_storable = self::toStorablePropShapes($from_props);
+    $to_storable = self::toStorablePropShapes($to_props);
+    $common = \array_keys(\array_intersect_key($from_storable, $to_storable));
+    return \array_values(\array_filter(
+      $common,
+      fn (string $prop_name): bool => !$from_storable[$prop_name]->fieldDataFitsIn($to_storable[$prop_name]),
+    ));
+  }
+
 }
