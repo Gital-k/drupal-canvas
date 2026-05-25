@@ -1,0 +1,16 @@
+canvas_dev_translation.api.content.translation.delete:
+  path: '/canvas/api/v0/content/canvas_page/{canvas_page}/translations/{language}'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\ApiContentTranslationControllers::delete'
+  requirements:
+    _canvas_authentication_required: TRUE
+    _entity_access: 'canvas_page.delete'
+  options:
+    parameters:
+      canvas_page:
+        type: entity:canvas_page
+      language:
+        type: language
+    _format: 'json'
+  methods: [DELETE]
+

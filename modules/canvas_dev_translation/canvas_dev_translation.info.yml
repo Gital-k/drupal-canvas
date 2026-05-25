@@ -6,3 +6,5 @@ type: module
 package: Drupal Canvas
 dependencies:
   - canvas:canvas
+  - drupal:content_translation
+  - drupal:language

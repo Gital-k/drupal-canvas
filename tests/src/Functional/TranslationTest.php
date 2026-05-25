@@ -29,6 +29,7 @@ use Drupal\Tests\content_translation\Traits\ContentTranslationTestTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Tests Translation.
@@ -1147,6 +1148,52 @@ class TranslationTest extends FunctionalTestBase {
     // English PageRegion text must appear because no Hindi translation exists.
     $this->assertSession()->pageTextContains('Hello from region');
 
+  }
+
+  /**
+   * Tests the Canvas API delete translation endpoint.
+   *
+   * The route is gated behind the `canvas_dev_translation` module, so this
+   * test installs it before making requests.
+   *
+   * Covers:
+   *  - 204 response when deleting a non-default translation.
+   *  - 400 response when attempting to delete the original (default) translation.
+   *  - 404 response when the requested language translation does not exist.
+   *
+   * @see \Drupal\canvas\Controller\ApiContentTranslationControllers::delete()
+   */
+  public function testDeleteTranslation(): void {
+    $module_installer = $this->container->get(ModuleInstallerInterface::class);
+    $module_installer->install(['canvas_dev_translation']);
+    $this->rebuildContainer();
+
+    $page = $this->createCanvasTranslationTestPage();
+    $page_id = $page->id();
+    self::assertIsInt($page_id);
+
+    // The French translation was added in createCanvasTranslationTestPage().
+    self::assertTrue($page->hasTranslation('fr'));
+
+    // Deleting a non-default translation removes it and returns 204.
+    $delete_url = Url::fromUri("base:/canvas/api/v0/content/canvas_page/{$page_id}/translations/fr");
+    $response = $this->makeApiRequest('DELETE', $delete_url, []);
+    self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+
+    // Only the French translation is gone; the English original is untouched.
+    $reloaded = Page::load($page_id);
+    self::assertInstanceOf(Page::class, $reloaded);
+    self::assertFalse($reloaded->hasTranslation('fr'));
+    self::assertTrue($reloaded->hasTranslation('en'));
+
+    // Trying to delete the default/source language is not allowed.
+    $delete_default_url = Url::fromUri("base:/canvas/api/v0/content/canvas_page/{$page_id}/translations/en");
+    $response = $this->makeApiRequest('DELETE', $delete_default_url, []);
+    self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+
+    // Trying to delete a translation that no longer exists returns 404.
+    $response = $this->makeApiRequest('DELETE', $delete_url, []);
+    self::assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
   }
 
 }
