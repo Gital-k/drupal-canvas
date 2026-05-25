@@ -301,6 +301,7 @@ HTML,
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => 'div',
+      'component_version' => NULL,
     ];
     yield 'p13n.switch with no variants' => [
       'component_id' => 'p13n.switch',
@@ -312,6 +313,7 @@ HTML,
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => 'div',
+      'component_version' => NULL,
     ];
     yield 'p13n.case with no inputs' => [
       'component_id' => 'p13n.switch',
@@ -321,6 +323,7 @@ HTML,
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => 'div',
+      'component_version' => NULL,
     ];
     yield 'p13n.case with invalid variant_id' => [
       'component_id' => 'p13n.case',
@@ -333,6 +336,7 @@ HTML,
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => 'div',
+      'component_version' => NULL,
     ];
     yield 'p13n.case with no variant_id' => [
       'component_id' => 'p13n.case',
@@ -344,6 +348,7 @@ HTML,
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => 'div',
+      'component_version' => NULL,
     ];
     yield 'p13n.case with empty segments' => [
       'component_id' => 'p13n.case',
@@ -356,6 +361,7 @@ HTML,
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => 'div',
+      'component_version' => NULL,
     ];
     yield 'p13n.case pointing to a non-existing Segment config entity' => [
       'component_id' => 'p13n.case',
@@ -370,6 +376,7 @@ HTML,
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => 'div',
+      'component_version' => NULL,
     ];
   }
 
