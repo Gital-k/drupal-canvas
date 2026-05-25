@@ -275,5 +275,4 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
     }, $prop_field_definitions);
   }
 
-
 }
