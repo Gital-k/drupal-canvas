@@ -1303,16 +1303,21 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
   }
 
   public function testRenderComponentFailureWhenPropsValidForPriorVersionButInvalidForActiveVersion(): void {
+    $this->generateComponentConfig();
+    $this->expectedDefaultComponentInstallCount = \count($this->componentStorage->loadMultiple());
+
     $component_id = JsComponent::componentIdFromJavascriptComponentId('canvas_test_code_components_with_props');
     $prior_string_version = $this->createPriorStringVersionAndNewActiveIntegerVersion($component_id);
 
     parent::testRenderComponentFailure(
       component_id: $component_id,
       inputs: [
-        'age' => "It's rude to ask",
+        'age' => 'thirty two',
         'name' => 'Tilly',
       ],
-      expected_validation_errors: [],
+      expected_validation_errors: [
+        '2.inputs.' . self::UUID_CRASH_TEST_DUMMY . '.age' => 'String value found, but an integer or an object is required. The provided value is: "thirty two".',
+      ],
       expected_exception: [
         'class' => InvalidComponentException::class,
         'message' => 'String value found, but an integer or an object is required.',
