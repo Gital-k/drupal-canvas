@@ -3,23 +3,23 @@
 namespace Drupal\canvas_ai\Controller;
 
 use Drupal\ai\AiProviderPluginManager;
-use Drupal\ai_agents\Enum\AiAgentStatusItemTypes;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai\OperationType\GenericType\ImageFile;
+use Drupal\ai_agents\Enum\AiAgentStatusItemTypes;
+use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
 use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
+use Drupal\canvas_ai\CanvasAiChatHelper;
+use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\canvas_ai\CanvasAiTempStore;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface;
 use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Controller\ControllerBase;
-use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
-use Drupal\canvas_ai\CanvasAiChatHelper;
-use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
-use Drupal\canvas_ai\CanvasAiTempStore;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -153,8 +153,15 @@ final class CanvasBuilder extends ControllerBase {
       ]);
     }
     $task_message = array_pop($prompt['messages']);
+
+    // Generate verbose context for orchestrator.
+    $context = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
+
+    // Append the necessary context to the user message.
+    $message_xml = $this->canvasAiPageBuilderHelper->formatMessageWithContext($context, $task_message['text']);
+
     $agent->setChatInput(new ChatInput([
-      new ChatMessage($task_message['role'], $task_message['text'], $image_files),
+      new ChatMessage($task_message['role'], $message_xml, $image_files),
     ]));
 
     // Store the current layout in the temp store. This will be later used by
@@ -205,7 +212,6 @@ final class CanvasBuilder extends ControllerBase {
       'menu_fetch_source' => $this->getMenuFetchSource(),
       'json_api_module_status' => $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled',
       'available_regions' => Json::encode($this->canvasAiPageBuilderHelper->getAvailableRegions(Json::encode($prompt['current_layout']))) ?? NULL,
-      'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
       'custom_libraries' => $this->getSupportedLibraries(),
     ]);
     try {

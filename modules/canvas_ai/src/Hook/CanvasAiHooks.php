@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas_ai\Hook;
 
-use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\canvas_ai\CanvasAiPermissions;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\canvas_ai\CanvasAiPermissions;
 
 /**
  * Hook implementations for canvas_ai tokens.
@@ -83,10 +83,6 @@ class CanvasAiHooks {
             'name' => $this->t('Available Regions'),
             'description' => $this->t('Returns the available regions.'),
           ],
-          'verbose_context_for_orchestrator' => [
-            'name' => $this->t('Verbose Context for Orchestrator'),
-            'description' => $this->t('Returns a detailed context summary for the AI Orchestrator.'),
-          ],
           'custom_libraries' => [
             'name' => $this->t('Custom libraries in Canvas.'),
             'description' => $this->t('Returns the custom libraries in Canvas.'),
@@ -157,10 +153,6 @@ class CanvasAiHooks {
 
           case 'available_regions':
             $replacements[$original] = !empty($data['available_regions']) ? $data['available_regions'] : NULL;
-            break;
-
-          case 'verbose_context_for_orchestrator':
-            $replacements[$original] = !empty($data['verbose_context_for_orchestrator']) ? $data['verbose_context_for_orchestrator'] : NULL;
             break;
 
           case 'custom_libraries':

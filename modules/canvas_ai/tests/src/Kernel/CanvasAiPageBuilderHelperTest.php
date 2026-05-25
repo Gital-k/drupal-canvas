@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel;
 
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -306,6 +306,27 @@ YAML;
   #[DataProvider('generateVerboseContextProvider')]
   public function testGenerateVerboseContextForOrchestrator(array $prompt, string $expected): void {
     $result = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
+    $this->assertEquals($expected, $result);
+  }
+
+  /**
+   * Tests the formatMessageWithContext method.
+   */
+  public function testFormatMessageWithContext(): void {
+    $context = 'This is system context';
+    $userMessage = 'User wants to add a heading component';
+
+    $expected = <<<XML
+<context>
+This is system context
+</context>
+
+<user_message>
+User wants to add a heading component
+</user_message>
+XML;
+
+    $result = $this->canvasAiPageBuilderHelper->formatMessageWithContext($context, $userMessage);
     $this->assertEquals($expected, $result);
   }
 

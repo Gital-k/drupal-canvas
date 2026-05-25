@@ -2,24 +2,24 @@
 
 namespace Drupal\canvas_ai;
 
+use Drupal\canvas\Component\Schema\PropMetadataNormalizer;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\DiffArray;
+use Drupal\Component\Utility\NestedArray;
+use Drupal\Component\Uuid\UuidInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Theme\ComponentPluginManager;
+use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Yaml\Yaml;
-use Drupal\Component\Utility\DiffArray;
-use Drupal\Component\Uuid\UuidInterface;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Extension\ThemeHandlerInterface;
-use Drupal\canvas\Component\Schema\PropMetadataNormalizer;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
-use Drupal\Component\Utility\NestedArray;
 
 /**
  * Provides helper methods for AI page builder.
@@ -1342,6 +1342,23 @@ class CanvasAiPageBuilderHelper {
 
     // For any other entity_type.
     return 'User has not created any entities';
+  }
+
+  /**
+   * Formats user message and context into XML structure.
+   *
+   * @param string $context
+   *   The system context text.
+   * @param string $userMessage
+   *   The user message text.
+   *
+   * @return string
+   *   The formatted XML string with context and user message.
+   *
+   * @internal
+   */
+  public function formatMessageWithContext(string $context, string $userMessage): string {
+    return "<context>\n{$context}\n</context>\n\n<user_message>\n{$userMessage}\n</user_message>";
   }
 
 }
