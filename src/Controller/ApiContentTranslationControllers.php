@@ -8,8 +8,6 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * HTTP API for interacting with Canvas content entity translations.
@@ -34,12 +32,9 @@ final class ApiContentTranslationControllers extends ApiControllerBase {
    *   route parameter via the 'language' param converter.
    *
    * @return \Symfony\Component\HttpFoundation\JsonResponse
-   *   204 No Content on success.
+   *   204 No Content on success, 400 if attempting to delete the default
+   *   translation, 404 if the requested translation does not exist.
    *
-   * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
-   *   When attempting to delete the default (original) translation.
-   * @throws \Symfony\Component\HttpKernel\Exception\NotFoundHttpException
-   *   When the requested translation does not exist on the entity.
    * @throws \Drupal\Core\Entity\EntityStorageException
    *   When saving the entity after removing the translation fails.
    */
@@ -52,23 +47,17 @@ final class ApiContentTranslationControllers extends ApiControllerBase {
     // Guard: cannot delete the default (original/untranslated) language via
     // this endpoint. Callers should use the full entity delete route instead.
     if ($canvas_page->getUntranslated()->language()->getId() === $langcode) {
-      throw new BadRequestHttpException(
-        \sprintf(
-          'Cannot delete the original translation "%s" for canvas_page %s. Use the entity delete endpoint to remove the whole entity.',
-          $langcode,
-          $canvas_page->id(),
-        ),
+      return new JsonResponse(
+        ['message' => \sprintf('Cannot delete the original translation "%s" for canvas_page %s. Use the entity delete endpoint to remove the whole entity.', $langcode, $canvas_page->id())],
+        Response::HTTP_BAD_REQUEST,
       );
     }
 
     // Guard: the requested translation must exist.
     if (!$canvas_page->hasTranslation($langcode)) {
-      throw new NotFoundHttpException(
-        \sprintf(
-          'Translation "%s" not found for canvas_page %s.',
-          $langcode,
-          $canvas_page->id(),
-        ),
+      return new JsonResponse(
+        ['message' => \sprintf('Translation "%s" not found for canvas_page %s.', $langcode, $canvas_page->id())],
+        Response::HTTP_NOT_FOUND,
       );
     }
 
