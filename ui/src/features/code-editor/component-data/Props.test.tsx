@@ -2312,10 +2312,6 @@ describe('props in code editor', () => {
         const prop = selectCodeComponentProperty('props')(store.getState())[0];
         expect(prop.allowMultiple).toBe(true);
       });
-
-      // Verify the prefix is just "/" and not the full window.location.origin URL.
-      const propId = selectCodeComponentProperty('props')(store.getState())[0]
-        .id;
       const exampleValueLabel = screen.getByText('Example value');
       const exampleSection = exampleValueLabel.closest('div')!.parentElement!;
       expect(exampleSection).toHaveTextContent('/');
