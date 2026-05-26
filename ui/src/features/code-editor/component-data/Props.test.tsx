@@ -649,7 +649,7 @@ describe('props in code editor', () => {
 
     it('full URL link prop does not show any prefix', async () => {
       await addProp('Link', 'Link');
-      
+
       await userEvent.click(
         screen.getByRole('combobox', { name: 'Link type' }),
       );
@@ -2299,6 +2299,65 @@ describe('props in code editor', () => {
           screen.getByRole('checkbox', { name: 'Allow multiple values' }),
         ).toBeInTheDocument();
       });
+    });
+
+    it('multivalue relative link prop shows only "/" prefix, not the full BASE_URL', async () => {
+      await addProp('Link', 'Links');
+      const checkbox = await screen.findByRole('checkbox', {
+        name: 'Allow multiple values',
+      });
+      fireEvent.click(checkbox);
+
+      await waitFor(() => {
+        const prop = selectCodeComponentProperty('props')(store.getState())[0];
+        expect(prop.allowMultiple).toBe(true);
+      });
+
+      // Verify the prefix is just "/" and not the full window.location.origin URL.
+      const propId = selectCodeComponentProperty('props')(store.getState())[0]
+        .id;
+      const exampleValueLabel = screen.getByText('Example value');
+      const exampleSection = exampleValueLabel.closest('div')!.parentElement!;
+      expect(exampleSection).toHaveTextContent('/');
+      // Ensure the full origin URL is NOT rendered as a prefix.
+      expect(exampleSection).not.toHaveTextContent(
+        window.location.origin + '/',
+      );
+    });
+
+    it('multivalue full URL link prop does not show any prefix', async () => {
+      await addProp('Link', 'Links');
+      await userEvent.click(
+        screen.getByRole('combobox', { name: 'Link type' }),
+      );
+      const fullUrlOption = await screen.findByRole('option', {
+        name: 'Full URL',
+      });
+      await userEvent.click(fullUrlOption);
+
+      await waitFor(() => {
+        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      });
+      const checkbox = await screen.findByRole('checkbox', {
+        name: 'Allow multiple values',
+      });
+      fireEvent.click(checkbox);
+
+      await waitFor(() => {
+        const prop = selectCodeComponentProperty('props')(store.getState())[0];
+        expect(prop.allowMultiple).toBe(true);
+      });
+
+      // Verify no "/" prefix is shown for full URL mode in multivalue.
+      const propId = selectCodeComponentProperty('props')(store.getState())[0]
+        .id;
+      const arrayItem = screen
+        .getByTestId(`array-prop-value-${propId}-0`)
+        .closest('div')!.parentElement!;
+      const prefixElements = arrayItem.querySelectorAll(
+        '[data-accent-color="gray"]',
+      );
+      expect(prefixElements).toHaveLength(0);
     });
 
     it('shows allow multiple checkbox for image prop type', async () => {
