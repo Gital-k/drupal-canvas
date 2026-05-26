@@ -1169,8 +1169,7 @@ class TranslationTest extends FunctionalTestBase {
     $this->rebuildContainer();
 
     $page = $this->createCanvasTranslationTestPage();
-    $page_id = $page->id();
-    self::assertIsInt($page_id);
+    $page_id = (int) $page->id();
 
     // The French translation was added in createCanvasTranslationTestPage().
     self::assertTrue($page->hasTranslation('fr'));
