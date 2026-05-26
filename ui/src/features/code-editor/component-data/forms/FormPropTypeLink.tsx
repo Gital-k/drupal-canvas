@@ -33,8 +33,6 @@ import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
 
 import styles from '@/features/code-editor/component-data/FormElement.module.css';
 
-const BASE_URL = window.location.origin;
-
 export const linkFormatMap = {
   'uri-reference': 'relative',
   uri: 'full',
@@ -183,7 +181,7 @@ export default function FormPropTypeLink({
       {linkType === 'relative' && (
         <Flex flexShrink="0" align="center">
           <Text size="1" color="gray">
-            {BASE_URL}/
+            /
           </Text>
         </Flex>
       )}
@@ -260,7 +258,7 @@ export default function FormPropTypeLink({
             {linkType === 'relative' && (
               <Flex flexShrink="0" align="center">
                 <Text size="1" color="gray">
-                  {BASE_URL}/
+                  /
                 </Text>
               </Flex>
             )}
