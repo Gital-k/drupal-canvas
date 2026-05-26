@@ -630,6 +630,47 @@ describe('props in code editor', () => {
       });
     });
 
+    it('relative link prop shows only "/" prefix, not the full BASE_URL', async () => {
+      await addProp('Link', 'Link');
+
+      // Verify the prefix is just "/" and not the full window.location.origin URL
+      const exampleValueLabel = screen.getByText('Example value');
+      const exampleSection = exampleValueLabel.closest('div')!.parentElement!;
+      expect(exampleSection).toHaveTextContent('/');
+      expect(exampleSection).not.toHaveTextContent(
+        window.location.origin + '/',
+      );
+
+      // The input field should still be accessible and usable
+      const input = screen.getByRole('textbox', { name: 'Example value' });
+      expect(input).toBeVisible();
+      expect(input).toHaveAttribute('placeholder', 'Enter a path');
+    });
+
+    it('full URL link prop does not show any prefix', async () => {
+      await addProp('Link', 'Link');
+      
+      await userEvent.click(
+        screen.getByRole('combobox', { name: 'Link type' }),
+      );
+      const fullUrlOption = await screen.findByRole('option', {
+        name: 'Full URL',
+      });
+      await userEvent.click(fullUrlOption);
+
+      await waitFor(() => {
+        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      });
+
+      // Verify no "/" prefix is shown for full URL mode
+      const exampleValueLabel = screen.getByText('Example value');
+      const exampleSection = exampleValueLabel.closest('div')!.parentElement!;
+      const prefixElements = exampleSection.querySelectorAll(
+        '[data-accent-color="gray"]',
+      );
+      expect(prefixElements).toHaveLength(0);
+    });
+
     it('creates a new image prop', async () => {
       await addProp('Image', 'Image');
       await waitFor(() => {
