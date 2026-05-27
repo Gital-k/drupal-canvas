@@ -52,6 +52,15 @@ export interface ComponentNode {
   nodeType: NodeType.Component;
   uuid: UUID;
   type: string;
+  /**
+   * Optional Content-Creator-provided instance label. When set, displayed in
+   * the Layers panel and other UI surfaces in place of the component-type name.
+   * Falls back to the component-type name when null/undefined/empty.
+   *
+   * Wired to the existing backend `name` field on LayoutComponent (see
+   * openapi.yml — `LayoutComponent.name`). Part of Drupal.org issue #3527952.
+   */
+  name?: string | null;
   slots: SlotNode[];
 }
 
@@ -225,6 +234,37 @@ export const layoutModelSlice = createSlice({
         ...state,
         updatePreview: action.payload,
       }),
+    ),
+    /**
+     * Set (or clear) the Content-Creator-provided instance name on a single
+     * component node, identified by uuid.
+     *
+     * Trims whitespace; an empty/whitespace-only string is stored as null so
+     * the display falls back to the component-type name. Flags
+     * `updatePreview` so the next render of <Preview/> triggers the POST that
+     * persists the rename via the auto-save hash.
+     *
+     * Refs: Drupal.org issue #3527952.
+     */
+    setComponentName: create.reducer(
+      (state, action: PayloadAction<{ uuid: string; name: string | null }>) => {
+        const { uuid, name } = action.payload;
+        const node = findComponentByUuid(state.layout, uuid);
+        if (!node) {
+          console.error(
+            `Cannot set name on component ${uuid}. Check the uuid is valid.`,
+          );
+          return;
+        }
+        const trimmed = typeof name === 'string' ? name.trim() : name;
+        // Canonical "no name" is null (matches the OpenAPI contract:
+        // LayoutComponent.name has type [string, "null"]).
+        node.name = trimmed ? trimmed : null;
+        // Flag a preview update so the change is persisted via auto-save.
+        // The rendered HTML is unaffected by `name`, but the auto-save POST
+        // is what carries the rename to the server.
+        state.updatePreview = true;
+      },
     ),
     deleteNode: create.reducer((state, action: PayloadAction<string>) => {
       const deletedComponent = findComponentByUuid(
@@ -824,6 +864,7 @@ export const {
   shiftNode,
   sortNode,
   setUpdatePreview,
+  setComponentName,
   insertNodes,
 } = layoutModelSlice.actions;
 

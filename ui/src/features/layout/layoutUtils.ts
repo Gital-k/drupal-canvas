@@ -750,6 +750,8 @@ export function getDisplayNameForNode(
   if (!node) return '';
   if ('type' in node) {
     // ComponentNode
+    // Prefer the Content-Creator-provided instance name when set. See #3527952.
+    if (node.name) return node.name;
     const [nodeType] = node.type.split('@');
     return componentsData?.[nodeType]?.name || 'Component';
   } else {

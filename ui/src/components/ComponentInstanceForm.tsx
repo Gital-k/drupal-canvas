@@ -9,6 +9,7 @@ import { useErrorBoundary } from 'react-error-boundary';
 import { Spinner, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import ComponentInstanceName from '@/components/ComponentInstanceName';
 import { getPropsValues } from '@/components/form/formUtil';
 import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
 import twigToJSXComponentMap from '@/components/form/twig-to-jsx-component-map';
@@ -431,17 +432,24 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     model,
   ]);
   return (
-    formQueryString &&
-    renderComponentId === selectedComponent && (
-      <>
-        <ComponentInstanceFormRenderer queryString={formQueryString} />
-        {componentSource === 'Module component' && emptyProp ? (
-          <Text size="4">This component has no props.</Text>
-        ) : (
-          ''
-        )}
-      </>
-    )
+    <>
+      {/*
+        Per-instance "Layer name" input (Drupal.org #3527952). Always rendered
+        when a single component is selected — independent of the prop form,
+        which can take a moment to fetch from the server.
+      */}
+      <ComponentInstanceName />
+      {formQueryString && renderComponentId === selectedComponent && (
+        <>
+          <ComponentInstanceFormRenderer queryString={formQueryString} />
+          {componentSource === 'Module component' && emptyProp ? (
+            <Text size="4">This component has no props.</Text>
+          ) : (
+            ''
+          )}
+        </>
+      )}
+    </>
   );
 };
 
