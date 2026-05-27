@@ -17,6 +17,7 @@ import SideMenu from '@/components/sideMenu/SideMenu';
 import PrimaryPanel from '@/components/sidePanel/PrimaryPanel';
 import CodeEditorContainer from '@/features/code-editor/CodeEditorContainer';
 import CodeComponentDialogs from '@/features/code-editor/dialogs/CodeComponentDialogs';
+import ConflictResolutionPage from '@/features/conflict/ConflictResolutionPage';
 import EditorLayout from '@/features/editor/EditorLayout';
 import TemplateRoot from '@/features/editor/TemplateRoot';
 import PagePreview from '@/features/pagePreview/PagePreview';
@@ -36,6 +37,16 @@ const UiShell = ({ children }: { children: React.ReactNode }) => (
   <>
     <SideMenu />
     <PrimaryPanel />
+    <Flex flexGrow="1" style={{ overflow: 'hidden', position: 'relative' }}>
+      {children}
+    </Flex>
+    <Dialogs />
+  </>
+);
+
+const ConflictUiShell = ({ children }: { children: React.ReactNode }) => (
+  <>
+    <SideMenu />
     <Flex flexGrow="1" style={{ overflow: 'hidden', position: 'relative' }}>
       {children}
     </Flex>
@@ -160,6 +171,22 @@ const AppRoutes: React.FC<AppRoutesInterface> = ({ basePath }) => {
           {
             path: 'preview/:entityType/:entityId/:width',
             element: <PagePreview />,
+          },
+          {
+            path: '/conflict',
+            element: (
+              <ConflictUiShell>
+                <ConflictResolutionPage />
+              </ConflictUiShell>
+            ),
+          },
+          {
+            path: '/conflict/:entityType/:entityId',
+            element: (
+              <ConflictUiShell>
+                <ConflictResolutionPage />
+              </ConflictUiShell>
+            ),
           },
           {
             // belt and braces to catch navigation to /code-editor without component id rather than showing a 404

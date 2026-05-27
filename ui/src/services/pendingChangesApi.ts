@@ -46,8 +46,7 @@ export interface ConflictError {
 }
 
 export interface ConflictMetadata {
-  status: boolean;
-  conflictId: string;
+  conflict_id: string;
   timestamp: number;
 }
 
@@ -57,7 +56,6 @@ export interface ConflictErrorMeta {
   label?: string;
   api_auto_save_key?: string;
   conflict?: ConflictMetadata;
-  resolvable?: boolean;
 }
 
 export interface PendingChangesResponse {
@@ -170,12 +168,9 @@ export const pendingChangesApi = createApi({
     getAllPendingChanges: builder.query<PendingChanges, void>({
       query: () => ({
         url: `/canvas/api/v0/auto-saves/pending`,
-        // Treat HTTP 409 (conflict) as a successful response, not an error
-        // This prevents the error boundary from triggering when conflicts are detected
-        validateStatus: (response, result) => {
-          // Accept both 200 (success) and 409 (conflict) as valid responses
-          return response.status === 200 || response.status === 409;
-        },
+        // A 409 response contains usable pending changes plus conflict metadata.
+        validateStatus: (response) =>
+          response.status === 200 || response.status === 409,
       }),
       providesTags: () => [{ type: 'PendingChanges', id: 'LIST' }],
       transformResponse: (response: PendingChangesApiResponse) =>

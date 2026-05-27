@@ -1,7 +1,8 @@
+import { getCanvasSettings } from '@/utils/drupal-globals';
+
 import type { Notification } from '@/services/notificationsApi';
 import type { PendingChanges } from '@/services/pendingChangesApi';
 import type { UnpublishedChange } from '@/types/Review';
-import { getCanvasSettings } from '@/utils/drupal-globals';
 
 export interface ConflictResolverItem {
   pointer: string;
@@ -16,6 +17,11 @@ export interface ConflictResolverItem {
 export const GLOBAL_CONFLICT_CONTEXT_KEY = 'global';
 export const CONFLICT_NOTIFICATION_ID_PREFIX = 'canvas_conflict_detected';
 export const CONFLICT_NOTIFICATION_HREF = '/canvas/conflict';
+
+export const getConflictRouteForChange = (
+  change: Pick<UnpublishedChange, 'entity_type' | 'entity_id'>,
+): string =>
+  `/conflict/${change.entity_type}/${encodeURIComponent(String(change.entity_id))}`;
 
 export const getConflictContextKey = (
   entityType: string,
@@ -92,7 +98,8 @@ export const getConflictedUnpublishedChangesForContext = (
     (change) =>
       change.hasConflict &&
       (!contextKey ||
-        getConflictContextKey(change.entity_type, change.entity_id) === contextKey),
+        getConflictContextKey(change.entity_type, change.entity_id) ===
+          contextKey),
   );
 
 export const toConflictResolverItems = (
@@ -119,7 +126,8 @@ export const getConflictNotificationFromPendingChanges = (
   const entries = Object.entries(pendingChanges).filter(
     ([, change]) =>
       change.hasConflict &&
-      getConflictContextKey(change.entity_type, change.entity_id) === contextKey,
+      getConflictContextKey(change.entity_type, change.entity_id) ===
+        contextKey,
   );
 
   if (!entries.length) {

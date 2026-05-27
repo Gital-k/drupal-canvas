@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
 import { useParams } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import PublishReview from '@/components/review/PublishReview';
@@ -15,12 +16,13 @@ import {
   resetCodeEditor,
   setForceRefresh,
 } from '@/features/code-editor/codeEditorSlice';
+import { markConflictNotificationRead } from '@/features/conflict/conflictUiSlice';
 import {
   getConflictContextKey,
   getConflictNotificationId,
+  getConflictRouteForChange,
   isConflictUxEnabled,
 } from '@/features/conflict/conflictUtils';
-import { markConflictNotificationRead } from '@/features/conflict/conflictUiSlice';
 import { FORM_TYPES } from '@/features/form/constants';
 import { clearFieldValues } from '@/features/form/formStateSlice';
 import {
@@ -84,6 +86,7 @@ const UnpublishedChanges = () => {
   });
   const { entityType, entityId, codeComponentId } = useParams();
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { showBoundary } = useErrorBoundary();
   const entity_form_fields = useAppSelector(selectPageData);
   // Fetch content list to get status information for all pages
@@ -295,23 +298,7 @@ const UnpublishedChanges = () => {
   if (conflictUxEnabled && !isFetching && conflicts && conflicts.length) {
     window.setTimeout(() => {
       conflicts.forEach((conflict) => {
-        if (conflict.code === CONFLICT_CODE.UNEXPECTED) {
-          dispatch(
-            pendingChangesApi.util.updateQueryData(
-              'getAllPendingChanges',
-              undefined,
-              (draft) => {
-                if (previousPendingChanges) {
-                  draft[conflict.source.pointer] = {
-                    ...previousPendingChanges[conflict.source.pointer],
-                    hasConflict: true,
-                  };
-                }
-              },
-            ),
-          );
-        }
-        if (conflict.code === CONFLICT_CODE.EXPECTED) {
+        if (conflict.code === CONFLICT_CODE.DETECTED) {
           dispatch(
             pendingChangesApi.util.updateQueryData(
               'getAllPendingChanges',
@@ -370,6 +357,7 @@ const UnpublishedChanges = () => {
               }),
             );
           }
+          navigate(change ? getConflictRouteForChange(change) : '/conflict');
         }}
         isPublishing={isPublishing}
         isDiscarding={isDiscarding}

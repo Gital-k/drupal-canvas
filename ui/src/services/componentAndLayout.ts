@@ -29,6 +29,8 @@ type LayoutApiResponse = RootLayoutModel & {
   entity_form_fields: Record<string, any>;
   isNew: boolean;
   isPublished: boolean;
+  publishedVersion?: boolean;
+  updated?: number;
   hasUnsavedStatusChange?: boolean;
   html: string;
   autoSaves: AutoSavesHash;
@@ -203,6 +205,18 @@ export const componentAndLayoutApi = createApi({
           dispatch(setPageData({}));
         }
       },
+    }),
+    getConflictPageLayout: builder.query<
+      LayoutApiResponse,
+      {
+        entityId: string;
+        entityType: 'canvas_page';
+        publishedVersion?: boolean;
+      }
+    >({
+      query: ({ entityId, entityType, publishedVersion = false }) =>
+        `canvas/api/v0/layout/${entityType}/${entityId}${publishedVersion ? '?status=true' : ''}`,
+      providesTags: () => [{ type: 'Layout' }],
     }),
     getTemplateLayout: builder.query<
       LayoutApiResponse,
@@ -612,6 +626,7 @@ export const {
   useGetComponentUsageDetailsQuery,
   useGetComponentUsageListQuery,
   useGetPageLayoutQuery,
+  useGetConflictPageLayoutQuery,
   useGetTemplateLayoutQuery,
   usePostTemplateLayoutMutation,
   useUpdateComponentInTemplateMutation,
