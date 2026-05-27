@@ -204,6 +204,30 @@ class ClientDataToEntityConverter {
       }
     }
 
+    // Normalize multi-value field items that are flat strings into proper
+    // arrays. This can happen when the client sends back entity_form_fields
+    // that were updated via AJAX (e.g. media library add/remove), where the
+    // hidden input for a field delta has a flat value (e.g.
+    // field_media[0] = "5") instead of a nested array
+    // (e.g. field_media[0][target_id] = "5"). Without this normalization,
+    // WidgetBase::massageFormValues() receives a string instead of an array,
+    // causing a TypeError.
+    // @see \Drupal\Core\Field\WidgetBase::extractFormValues()
+    // @see https://www.drupal.org/project/canvas/issues/3584433
+    foreach ($entity->getFields() as $field_name => $field_item_list) {
+      if (!isset($entity_form_fields[$field_name]) || !\is_array($entity_form_fields[$field_name])) {
+        continue;
+      }
+      foreach ($entity_form_fields[$field_name] as $delta => $value) {
+        if (\is_string($value)) {
+          // A flat string value at a delta position means the widget expected
+          // a nested array (e.g. ['target_id' => '5']) but received a plain
+          // string. Wrap it so downstream widget processing doesn't fail.
+          $entity_form_fields[$field_name][$delta] = ['target_id' => $value];
+        }
+      }
+    }
+
     $form_object = $this->entityTypeManager->getFormObject($entity->getEntityTypeId(), 'default');
     $form_object->setEntity($entity);
     // Flag this as a programmatic build of the entity form - but do not flag

@@ -627,6 +627,53 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     self::assertSame('No more gravy', $autoSaveEntity->label());
   }
 
+  /**
+   * Tests that flat string field values in entity_form_fields don't cause a
+   * TypeError in WidgetBase::massageFormValues().
+   *
+   * This can happen after a media library AJAX interaction where the client
+   * sends back entity_form_fields with a field delta value as a flat string
+   * (e.g. field_media[0] = "5") instead of a nested array
+   * (e.g. field_media[0][target_id] = "5").
+   *
+   * @see https://www.drupal.org/project/canvas/issues/3584433
+   */
+  public function testFlatStringFieldValuesNormalized(): void {
+    $this->setUpCurrentUser(permissions: [
+      'access administration pages',
+      'edit any article content',
+    ]);
+    $node = Node::load(1);
+    \assert($node instanceof NodeInterface);
+
+    $url = Url::fromRoute('canvas.api.layout.get', [
+      'entity' => $node->id(),
+      'entity_type' => 'node',
+    ]);
+    $response = $this->request(Request::create($url->toString()));
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+    $json = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
+
+    // Simulate what happens when the client sends back entity_form_fields
+    // where a multi-value field delta is a flat string instead of a nested
+    // array. This mimics the scenario where a media library AJAX interaction
+    // updates a hidden input with name="field_name[0]" and value="5" (flat)
+    // rather than name="field_name[0][target_id]" and value="5" (nested).
+    $json['entity_form_fields']['title[0]'] = 'Flat string value';
+    unset($json['isNew'], $json['isPublished'], $json['html'], $json['hasUnsavedStatusChange']);
+    $json += $this->getPostContentsDefaults($node);
+
+    // This should NOT throw a TypeError: massageFormValues() Argument #1
+    // ($values) must be of type array, string given.
+    $response = $this->request(Request::create(
+      '/canvas/api/v0/layout/node/1',
+      method: 'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode($json, \JSON_THROW_ON_ERROR),
+    ));
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+  }
+
 }
 
 class TestWidgetManager extends WidgetPluginManager {
