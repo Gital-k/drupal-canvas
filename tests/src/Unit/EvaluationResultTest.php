@@ -6,6 +6,7 @@ namespace Drupal\Tests\canvas\Unit;
 
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Tests\UnitTestCase;
 use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -236,6 +237,94 @@ class EvaluationResultTest extends UnitTestCase {
       ],
     ];
     return $cases;
+  }
+
+  public function testGetAttachmentsIsEmptyWhenCacheableMetadataIsUsed(): void {
+    $result = new EvaluationResult('hello', new CacheableMetadata());
+    self::assertSame([], $result->getAttachments());
+  }
+
+  public function testGetAttachmentsIsEmptyWhenBubbleableMetadataHasNoAttachments(): void {
+    $result = new EvaluationResult('hello', new BubbleableMetadata());
+    self::assertSame([], $result->getAttachments());
+  }
+
+  public function testGetAttachmentsFromBubbleableMetadata(): void {
+    $cacheability = (new BubbleableMetadata())
+      ->addAttachments(['library' => ['canvas/filter-assets']]);
+    $result = new EvaluationResult('hello', $cacheability);
+    self::assertSame(['library' => ['canvas/filter-assets']], $result->getAttachments());
+  }
+
+  public function testGetAttachmentsAreMergedWhenWrappingInnerResult(): void {
+    $inner_cacheability = (new BubbleableMetadata())
+      ->addAttachments(['library' => ['canvas/inner-lib']]);
+    $inner = new EvaluationResult('hello', $inner_cacheability);
+
+    $outer_cacheability = (new BubbleableMetadata())
+      ->addAttachments(['library' => ['canvas/outer-lib']]);
+    $outer = new EvaluationResult($inner, $outer_cacheability);
+
+    self::assertSame(
+      ['library' => ['canvas/inner-lib', 'canvas/outer-lib']],
+      $outer->getAttachments(),
+    );
+  }
+
+  public function testGetAttachmentsAreMergedWhenHoistingFromArray(): void {
+    $cacheability_a = (new BubbleableMetadata())
+      ->addAttachments(['library' => ['canvas/lib-a']]);
+    $cacheability_b = (new BubbleableMetadata())
+      ->addAttachments(['library' => ['canvas/lib-b']]);
+
+    $result = new EvaluationResult(
+      [
+        'prop_a' => new EvaluationResult('value-a', $cacheability_a),
+        'prop_b' => new EvaluationResult('value-b', $cacheability_b),
+      ],
+      new CacheableMetadata(),
+    );
+
+    self::assertSame(['prop_a' => 'value-a', 'prop_b' => 'value-b'], $result->value);
+    self::assertSame(
+      ['library' => ['canvas/lib-a', 'canvas/lib-b']],
+      $result->getAttachments(),
+    );
+  }
+
+  public function testGetAttachmentsAreMergedFromMultipleCardinalityResults(): void {
+    $cacheability_0 = (new BubbleableMetadata())
+      ->addAttachments(['library' => ['canvas/lib-0']]);
+    $cacheability_1 = (new BubbleableMetadata())
+      ->addAttachments(['library' => ['canvas/lib-1']]);
+
+    $result = new EvaluationResult(
+      [
+        0 => new EvaluationResult('first', $cacheability_0),
+        1 => new EvaluationResult('second', $cacheability_1),
+      ],
+      new CacheableMetadata(),
+    );
+
+    self::assertSame(['first', 'second'], $result->value);
+    self::assertSame(
+      ['library' => ['canvas/lib-0', 'canvas/lib-1']],
+      $result->getAttachments(),
+    );
+  }
+
+  public function testGetAttachmentsBubbleUpThroughDeepNesting(): void {
+    $inner_cacheability = (new BubbleableMetadata())
+      ->addAttachments(['library' => ['canvas/deep-lib']]);
+    $inner = new EvaluationResult('deep', $inner_cacheability);
+
+    // Wrap in an array-hoisted result (object-shaped).
+    $mid = new EvaluationResult(['key' => $inner], new CacheableMetadata());
+    self::assertSame(['library' => ['canvas/deep-lib']], $mid->getAttachments());
+
+    // Wrap that result itself.
+    $outer = new EvaluationResult($mid, new CacheableMetadata());
+    self::assertSame(['library' => ['canvas/deep-lib']], $outer->getAttachments());
   }
 
 }
