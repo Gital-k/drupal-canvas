@@ -169,6 +169,7 @@ const EnabledConflictResolutionPage = () => {
           )}
           <PageConflictComparison
             entityId={String(activeChange.entity_id)}
+            entityType={activeChange.entity_type}
             selectedVersion={selectedVersion}
             onSelectVersion={handleSelectVersion}
           />
@@ -194,10 +195,12 @@ const EnabledConflictResolutionPage = () => {
 
 const PageConflictComparison = ({
   entityId,
+  entityType,
   selectedVersion,
   onSelectVersion,
 }: {
   entityId: string;
+  entityType: string;
   selectedVersion: ConflictVersionSelection;
   onSelectVersion: (
     version: Exclude<ConflictVersionSelection, undefined>,
@@ -238,6 +241,8 @@ const PageConflictComparison = ({
 
   return (
     <PageConflictComparisonView
+      entityId={entityId}
+      entityType={entityType}
       publishedVersion={{
         html: publishedLayout?.html || EMPTY_HTML,
         props: {

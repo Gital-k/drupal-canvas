@@ -120,6 +120,12 @@ const StoryFrame = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+const STORY_ENTITY_TYPE = 'canvas_page';
+const STORY_ENTITY_ID = '1';
+
+const onPublishedPreviewClick = fn().mockName('onPublishedPreviewClick');
+const onNewPreviewClick = fn().mockName('onNewPreviewClick');
+
 const PageComparison = ({
   loading = false,
   selectedVersion,
@@ -132,10 +138,14 @@ const PageComparison = ({
   ) => void;
 }) => (
   <PageConflictComparisonView
+    entityType={STORY_ENTITY_TYPE}
+    entityId={STORY_ENTITY_ID}
     publishedVersion={{ ...publishedVersion, loading }}
     newVersion={{ ...newVersion, loading }}
     selectedVersion={selectedVersion}
     onSelectVersion={onSelectVersion}
+    onPublishedPreviewClick={onPublishedPreviewClick}
+    onNewPreviewClick={onNewPreviewClick}
   />
 );
 

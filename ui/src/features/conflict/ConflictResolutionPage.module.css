@@ -141,6 +141,11 @@
   background: var(--gray-2);
 }
 
+.cardHeaderActions {
+  position: relative;
+  z-index: 1;
+}
+
 .cardHeaderSelected {
   background: #e5f4ff;
 }

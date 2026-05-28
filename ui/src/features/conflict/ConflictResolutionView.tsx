@@ -141,21 +141,45 @@ export interface PageConflictVersion {
 }
 
 export interface PageConflictComparisonViewProps {
+  entityId: string;
+  entityType: string;
   publishedVersion: PageConflictVersion;
   newVersion: PageConflictVersion;
   selectedVersion?: ConflictVersionSelection;
   onSelectVersion?: (version: ConflictVersion) => void;
+  onPublishedPreviewClick?: () => void;
+  onNewPreviewClick?: () => void;
 }
 
 const stringifyComparisonProps = (value: unknown): string =>
   typeof value === 'string' ? value : JSON.stringify(value ?? {}, null, 2);
 
+const buildConflictPreviewUrl = (
+  entityType: string,
+  entityId: string,
+  published: boolean,
+): string => {
+  // Derive the SPA base path (e.g. '/canvas') from the current URL by
+  // stripping everything from '/conflict/' onward.
+  const basePath = window.location.pathname.split('/conflict/')[0];
+  const versionParam = published ? '?version=published' : '';
+  return `${window.location.origin}${basePath}/conflict-preview/${entityType}/${entityId}/full${versionParam}`;
+};
+
 export const PageConflictComparisonView = ({
+  entityId,
+  entityType,
   publishedVersion,
   newVersion,
   selectedVersion,
   onSelectVersion,
+  onPublishedPreviewClick,
+  onNewPreviewClick,
 }: PageConflictComparisonViewProps) => {
+  const handlePublishedPreview = onPublishedPreviewClick
+    ?? (() => window.open(buildConflictPreviewUrl(entityType, entityId, true), '_blank'));
+  const handleNewPreview = onNewPreviewClick
+    ?? (() => window.open(buildConflictPreviewUrl(entityType, entityId, false), '_blank'));
   const [tab, setTab] = useState('visual');
   const publishedContentHtml = useMemo(
     () => buildContentOnlyPreviewDocument(publishedVersion.html || EMPTY_HTML),
@@ -206,6 +230,7 @@ export const PageConflictComparisonView = ({
             version="published"
             selected={selectedVersion === 'published'}
             onSelect={onSelectVersion}
+            onPreviewClick={handlePublishedPreview}
           >
             <VisualFrame
               html={publishedContentHtml}
@@ -219,6 +244,7 @@ export const PageConflictComparisonView = ({
             version="new"
             selected={selectedVersion === 'new'}
             onSelect={onSelectVersion}
+            onPreviewClick={handleNewPreview}
           >
             <VisualFrame html={newContentHtml} loading={!!newVersion.loading} />
           </PreviewCard>
@@ -232,6 +258,7 @@ export const PageConflictComparisonView = ({
             version="published"
             selected={selectedVersion === 'published'}
             onSelect={onSelectVersion}
+            onPreviewClick={handlePublishedPreview}
           >
             <TextPanel value={publishedText} />
           </PreviewCard>
@@ -242,6 +269,7 @@ export const PageConflictComparisonView = ({
             version="new"
             selected={selectedVersion === 'new'}
             onSelect={onSelectVersion}
+            onPreviewClick={handleNewPreview}
           >
             <TextPanel value={newText} />
           </PreviewCard>
@@ -255,6 +283,7 @@ export const PageConflictComparisonView = ({
             version="published"
             selected={selectedVersion === 'published'}
             onSelect={onSelectVersion}
+            onPreviewClick={handlePublishedPreview}
           >
             <JsonPanel value={publishedProps} />
           </PreviewCard>
@@ -265,6 +294,7 @@ export const PageConflictComparisonView = ({
             version="new"
             selected={selectedVersion === 'new'}
             onSelect={onSelectVersion}
+            onPreviewClick={handleNewPreview}
           >
             <JsonPanel value={newProps} />
           </PreviewCard>
@@ -300,6 +330,7 @@ interface PreviewCardProps {
   selected?: boolean;
   changed?: boolean;
   onSelect?: (version: ConflictVersion) => void;
+  onPreviewClick?: () => void;
 }
 
 const PreviewCard = ({
@@ -310,6 +341,7 @@ const PreviewCard = ({
   selected = false,
   changed = false,
   onSelect,
+  onPreviewClick,
 }: PreviewCardProps) => {
   const cardClassName = [
     styles.card,
@@ -336,6 +368,13 @@ const PreviewCard = ({
     handleSelect();
   };
 
+  const handlePreviewButtonClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.stopPropagation();
+    onPreviewClick?.();
+  };
+
   return (
     <section
       className={cardClassName}
@@ -353,8 +392,19 @@ const PreviewCard = ({
             </Text>
           )}
         </Box>
-        <Flex align="center" gap="3">
-          <ExternalLinkIcon />
+        <Flex align="center" gap="3" className={styles.cardHeaderActions}>
+          <Tooltip content="Open preview in new tab">
+            <IconButton
+              variant="ghost"
+              color="gray"
+              size="1"
+              aria-label="Open preview in new tab"
+              onClick={handlePreviewButtonClick}
+              style={{cursor:'pointer'}}
+            >
+              <ExternalLinkIcon />
+            </IconButton>
+          </Tooltip>
           {changed && (
             <Badge color="yellow" radius="small">
               Changed
