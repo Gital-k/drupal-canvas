@@ -20,7 +20,6 @@ use Drupal\media\Entity\MediaType;
 use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -38,7 +37,6 @@ use Symfony\Component\HttpFoundation\Response;
 #[Group('canvas_component_sources')]
 final class FallbackInputTest extends ApiLayoutControllerTestBase {
 
-  use MediaTypeCreationTrait;
   use CanvasFieldTrait;
   use ConstraintViolationsTestTrait;
 
@@ -177,7 +175,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
       'title' => $this->randomMachineName(),
       'components' => $tree,
     ]);
-    self::assertSame([], self::violationsToArray($page->validate()));
+    self::assertEntityIsValid($page);
     $page->save();
     $api_endpoint_uri = \sprintf('/canvas/api/v0/layout/%s/%d', Page::ENTITY_TYPE_ID, $page->id());
     // Load the original data.
