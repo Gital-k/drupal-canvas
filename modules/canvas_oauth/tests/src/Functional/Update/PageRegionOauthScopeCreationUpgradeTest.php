@@ -12,7 +12,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 /**
  * Tests Canvas Oauth scope for global regions is created.
  *
- * @legacy-covers \canvas_oauth_post_update_0005_page_region_scope
+ * @legacy-covers \canvas_oauth_post_update_0006_page_region_scope
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas_oauth')]
