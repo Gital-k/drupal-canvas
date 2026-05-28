@@ -26,6 +26,8 @@ import {
   PageConflictComparisonView,
 } from './ConflictResolutionView';
 
+import type { ConflictVersionSelection } from './ConflictResolutionView';
+
 import styles from './ConflictResolutionPage.module.css';
 
 const EMPTY_HTML = '<main></main>';
@@ -46,11 +48,13 @@ const EnabledConflictResolutionPage = () => {
   const dispatch = useAppDispatch();
   const { data: pendingChanges, refetch } =
     useGetAllPendingChangesQuery(undefined);
-  const [discardChange, { isLoading: isDiscarding }] =
-    useDiscardPendingChangeMutation();
   const [resolveConflict, { isLoading: isResolving }] =
     useUpdateContentMutation();
+  const [discardChange, { isLoading: isDiscarding }] =
+    useDiscardPendingChangeMutation();
   const [resolutionFailed, setResolutionFailed] = useState(false);
+  const [selectedVersion, setSelectedVersion] =
+    useState<ConflictVersionSelection>();
 
   const conflictQueue = useMemo(
     () => getConflictQueue(pendingChanges),
@@ -78,6 +82,12 @@ const EnabledConflictResolutionPage = () => {
       ? reviewPointers.indexOf(currentEntry.pointer)
       : currentIndex;
   const reviewTotal = Math.max(reviewPointers.length, conflictQueue.length);
+  const isResolutionInProgress = isResolving || isDiscarding;
+
+  useEffect(() => {
+    setSelectedVersion(undefined);
+    setResolutionFailed(false);
+  }, [currentEntry?.pointer]);
 
   if (!entityType || !entityId || !currentEntry) {
     return conflictQueue.length > 0 ? (
@@ -97,32 +107,40 @@ const EnabledConflictResolutionPage = () => {
     navigate(nextEntry ? getConflictRouteFromEntry(nextEntry) : '/conflict');
   };
 
-  const handleUsePublishedVersion = async () => {
-    setResolutionFailed(false);
-    try {
-      await discardChange({
-        ...activeChange,
-        pointer: currentEntry.pointer,
-      }).unwrap();
-      await finishResolution();
-    } catch {
-      setResolutionFailed(true);
-    }
+  const handleSelectVersion = (
+    version: Exclude<ConflictVersionSelection, undefined>,
+  ) => {
+    setSelectedVersion((currentVersion) =>
+      currentVersion === version ? undefined : version,
+    );
   };
 
-  const handleUseNewVersion = async () => {
-    const conflictId = activeChange.conflict?.conflict_id;
+  const handleResolveConflict = async () => {
     setResolutionFailed(false);
-    if (!conflictId) {
+
+    if (!selectedVersion) {
       setResolutionFailed(true);
       return;
     }
+
     try {
-      await resolveConflict({
-        entityType: 'canvas_page',
-        entityId: String(activeChange.entity_id),
-        conflictToResolve: conflictId,
-      }).unwrap();
+      if (selectedVersion === 'new') {
+        const conflictId = activeChange.conflict?.conflict_id;
+        if (!conflictId) {
+          setResolutionFailed(true);
+          return;
+        }
+        await resolveConflict({
+          entityType: 'canvas_page',
+          entityId: String(activeChange.entity_id),
+          conflictToResolve: conflictId,
+        }).unwrap();
+      } else {
+        await discardChange({
+          ...activeChange,
+          pointer: currentEntry.pointer,
+        }).unwrap();
+      }
       await finishResolution();
     } catch {
       setResolutionFailed(true);
@@ -149,7 +167,11 @@ const EnabledConflictResolutionPage = () => {
               </Text>
             </Flex>
           )}
-          <PageConflictComparison entityId={String(activeChange.entity_id)} />
+          <PageConflictComparison
+            entityId={String(activeChange.entity_id)}
+            selectedVersion={selectedVersion}
+            onSelectVersion={handleSelectVersion}
+          />
         </>
       }
       reviewIndex={reviewIndex}
@@ -162,16 +184,25 @@ const EnabledConflictResolutionPage = () => {
       onNext={() =>
         navigate(getConflictRouteFromEntry(conflictQueue[currentIndex + 1]))
       }
-      onUsePublishedVersion={handleUsePublishedVersion}
-      onUseNewVersion={handleUseNewVersion}
+      onResolveConflict={handleResolveConflict}
       onClose={handleClose}
-      isDiscarding={isDiscarding}
-      isResolving={isResolving}
+      isResolving={isResolutionInProgress}
+      canResolveConflict={!!selectedVersion}
     />
   );
 };
 
-const PageConflictComparison = ({ entityId }: { entityId: string }) => {
+const PageConflictComparison = ({
+  entityId,
+  selectedVersion,
+  onSelectVersion,
+}: {
+  entityId: string;
+  selectedVersion: ConflictVersionSelection;
+  onSelectVersion: (
+    version: Exclude<ConflictVersionSelection, undefined>,
+  ) => void;
+}) => {
   const {
     data: draftLayout,
     isFetching: isDraftLoading,
@@ -226,6 +257,8 @@ const PageConflictComparison = ({ entityId }: { entityId: string }) => {
         loading: isDraftLoading,
         changed: true,
       }}
+      selectedVersion={selectedVersion}
+      onSelectVersion={onSelectVersion}
     />
   );
 };

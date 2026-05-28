@@ -48,6 +48,49 @@
   margin-bottom: 16px;
 }
 
+.tabList {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--gray-4);
+  border-radius: 6px;
+  background: var(--gray-3);
+  box-shadow: none !important;
+}
+
+.tabList .tabTrigger {
+  flex: 0 0 74px;
+  justify-content: center;
+  height: 32px;
+  color: var(--gray-12);
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.tabList .tabTrigger:hover {
+  background-color: var(--gray-a3);
+}
+
+.tabList .tabTrigger + .tabTrigger {
+  border-left: 1px solid var(--gray-4);
+}
+
+.tabList .tabTrigger[data-state="active"] {
+  color: var(--gray-12);
+  background: #fff;
+  box-shadow: none;
+}
+
+.tabList .tabTrigger span {
+  background: transparent !important;
+}
+
+.tabTrigger::before,
+.tabTrigger::after {
+  display: none;
+}
+
 .tabContent {
   flex: 1 1 auto;
   min-height: 0;
@@ -78,8 +121,18 @@
   border-color: var(--blue-9);
 }
 
+.cardSelectable {
+  cursor: pointer;
+}
+
+.cardSelectable:focus-visible {
+  outline: 2px solid var(--blue-9);
+  outline-offset: 2px;
+}
+
 .cardHeader,
 .cardHeaderSelected {
+  position: relative;
   display: flex;
   flex: 0 0 70px;
   align-items: center;
@@ -90,6 +143,19 @@
 
 .cardHeaderSelected {
   background: #e5f4ff;
+}
+
+.cardSelectButton {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+}
+
+.cardSelectButton:focus-visible {
+  outline: 2px solid var(--blue-9);
+  outline-offset: -2px;
 }
 
 .cardBody {

@@ -40,6 +40,10 @@ import styles from './ConflictResolutionPage.module.css';
 const EMPTY_HTML = '<main></main>';
 const PREVIEW_FIT_PADDING = 96;
 
+type ConflictVersion = 'published' | 'new';
+
+export type ConflictVersionSelection = ConflictVersion | undefined;
+
 export interface ConflictResolutionViewProps {
   label: string;
   comparison: React.ReactNode;
@@ -47,12 +51,11 @@ export interface ConflictResolutionViewProps {
   reviewIndex: number;
   reviewTotal: number;
   unresolvedTotal: number;
-  isDiscarding?: boolean;
   isResolving?: boolean;
+  canResolveConflict?: boolean;
   onPrevious: () => void;
   onNext: () => void;
-  onUsePublishedVersion: () => void;
-  onUseNewVersion: () => void;
+  onResolveConflict: () => void;
   onClose: () => void;
 }
 
@@ -63,12 +66,11 @@ export const ConflictResolutionView = ({
   reviewIndex,
   reviewTotal,
   unresolvedTotal,
-  isDiscarding = false,
   isResolving = false,
+  canResolveConflict = false,
   onPrevious,
   onNext,
-  onUsePublishedVersion,
-  onUseNewVersion,
+  onResolveConflict,
   onClose,
 }: ConflictResolutionViewProps) => {
   return (
@@ -82,10 +84,9 @@ export const ConflictResolutionView = ({
         unresolvedTotal={unresolvedTotal}
         onPrevious={onPrevious}
         onNext={onNext}
-        onUsePublishedVersion={onUsePublishedVersion}
-        onUseNewVersion={onUseNewVersion}
-        isDiscarding={isDiscarding}
+        onResolveConflict={onResolveConflict}
         isResolving={isResolving}
+        canResolveConflict={canResolveConflict}
       />
     </div>
   );
@@ -142,6 +143,8 @@ export interface PageConflictVersion {
 export interface PageConflictComparisonViewProps {
   publishedVersion: PageConflictVersion;
   newVersion: PageConflictVersion;
+  selectedVersion?: ConflictVersionSelection;
+  onSelectVersion?: (version: ConflictVersion) => void;
 }
 
 const stringifyComparisonProps = (value: unknown): string =>
@@ -150,6 +153,8 @@ const stringifyComparisonProps = (value: unknown): string =>
 export const PageConflictComparisonView = ({
   publishedVersion,
   newVersion,
+  selectedVersion,
+  onSelectVersion,
 }: PageConflictComparisonViewProps) => {
   const [tab, setTab] = useState('visual');
   const publishedContentHtml = useMemo(
@@ -180,10 +185,16 @@ export const PageConflictComparisonView = ({
   return (
     <Tabs.Root value={tab} onValueChange={setTab} className={styles.tabRoot}>
       <Flex justify="between" align="center" className={styles.toolbar}>
-        <Tabs.List size="1">
-          <Tabs.Trigger value="visual">Visual</Tabs.Trigger>
-          <Tabs.Trigger value="text">Text</Tabs.Trigger>
-          <Tabs.Trigger value="props">Props</Tabs.Trigger>
+        <Tabs.List size="1" className={styles.tabList}>
+          <Tabs.Trigger className={styles.tabTrigger} value="visual">
+            Visual
+          </Tabs.Trigger>
+          <Tabs.Trigger className={styles.tabTrigger} value="text">
+            Text
+          </Tabs.Trigger>
+          <Tabs.Trigger className={styles.tabTrigger} value="props">
+            Props
+          </Tabs.Trigger>
         </Tabs.List>
         <ViewportSelector />
       </Flex>
@@ -192,7 +203,9 @@ export const PageConflictComparisonView = ({
           <PreviewCard
             title="Published version"
             updated={publishedVersion.updated}
-            selected
+            version="published"
+            selected={selectedVersion === 'published'}
+            onSelect={onSelectVersion}
           >
             <VisualFrame
               html={publishedContentHtml}
@@ -203,6 +216,9 @@ export const PageConflictComparisonView = ({
             title="New version"
             updated={newVersion.updated}
             changed={!!newVersion.changed}
+            version="new"
+            selected={selectedVersion === 'new'}
+            onSelect={onSelectVersion}
           >
             <VisualFrame html={newContentHtml} loading={!!newVersion.loading} />
           </PreviewCard>
@@ -213,7 +229,9 @@ export const PageConflictComparisonView = ({
           <PreviewCard
             title="Published version"
             updated={publishedVersion.updated}
-            selected
+            version="published"
+            selected={selectedVersion === 'published'}
+            onSelect={onSelectVersion}
           >
             <TextPanel value={publishedText} />
           </PreviewCard>
@@ -221,6 +239,9 @@ export const PageConflictComparisonView = ({
             title="New version"
             updated={newVersion.updated}
             changed={!!newVersion.changed}
+            version="new"
+            selected={selectedVersion === 'new'}
+            onSelect={onSelectVersion}
           >
             <TextPanel value={newText} />
           </PreviewCard>
@@ -231,7 +252,9 @@ export const PageConflictComparisonView = ({
           <PreviewCard
             title="Published version"
             updated={publishedVersion.updated}
-            selected
+            version="published"
+            selected={selectedVersion === 'published'}
+            onSelect={onSelectVersion}
           >
             <JsonPanel value={publishedProps} />
           </PreviewCard>
@@ -239,6 +262,9 @@ export const PageConflictComparisonView = ({
             title="New version"
             updated={newVersion.updated}
             changed={!!newVersion.changed}
+            version="new"
+            selected={selectedVersion === 'new'}
+            onSelect={onSelectVersion}
           >
             <JsonPanel value={newProps} />
           </PreviewCard>
@@ -270,41 +296,85 @@ interface PreviewCardProps {
   title: string;
   updated?: string;
   children: React.ReactNode;
+  version: ConflictVersion;
   selected?: boolean;
   changed?: boolean;
+  onSelect?: (version: ConflictVersion) => void;
 }
 
 const PreviewCard = ({
   title,
   updated,
   children,
+  version,
   selected = false,
   changed = false,
-}: PreviewCardProps) => (
-  <section className={selected ? styles.cardSelected : styles.card}>
-    <div className={selected ? styles.cardHeaderSelected : styles.cardHeader}>
-      <Box>
-        <Text as="p" size="2" weight="medium">
-          {title}
-        </Text>
-        {updated && (
-          <Text as="p" size="1" color="gray">
-            {updated}
+  onSelect,
+}: PreviewCardProps) => {
+  const cardClassName = [
+    styles.card,
+    onSelect ? styles.cardSelectable : undefined,
+    selected ? styles.cardSelected : undefined,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const headerClassName = [
+    styles.cardHeader,
+    selected ? styles.cardHeaderSelected : undefined,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const handleSelect = () => {
+    onSelect?.(version);
+  };
+
+  const handleSelectButtonClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.stopPropagation();
+    handleSelect();
+  };
+
+  return (
+    <section
+      className={cardClassName}
+      data-testid={`conflict-${version}-version-card`}
+      onClick={onSelect ? handleSelect : undefined}
+    >
+      <div className={headerClassName}>
+        <Box>
+          <Text as="p" size="2" weight="medium">
+            {title}
           </Text>
+          {updated && (
+            <Text as="p" size="1" color="gray">
+              {updated}
+            </Text>
+          )}
+        </Box>
+        <Flex align="center" gap="3">
+          <ExternalLinkIcon />
+          {changed && (
+            <Badge color="yellow" radius="small">
+              Changed
+            </Badge>
+          )}
+        </Flex>
+        {onSelect && (
+          <button
+            type="button"
+            aria-pressed={selected}
+            aria-label={`Select ${title}`}
+            className={styles.cardSelectButton}
+            onClick={handleSelectButtonClick}
+          />
         )}
-      </Box>
-      <Flex align="center" gap="3">
-        <ExternalLinkIcon />
-        {changed && (
-          <Badge color="yellow" radius="small">
-            Changed
-          </Badge>
-        )}
-      </Flex>
-    </div>
-    <div className={styles.cardBody}>{children}</div>
-  </section>
-);
+      </div>
+      <div className={styles.cardBody}>{children}</div>
+    </section>
+  );
+};
 
 const VisualFrame = ({ html, loading }: { html: string; loading: boolean }) => {
   const previewScale = useAppSelector(selectEditorViewPortScale);
@@ -418,6 +488,8 @@ const ConflictPreviewControls = ({
       gap="2"
       className={styles.previewControls}
       data-testid="canvas-conflict-preview-controls"
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
     >
       <Tooltip side="bottom" content="Scale to fit">
         <Button
@@ -443,12 +515,11 @@ interface ConflictFooterProps {
   reviewIndex: number;
   reviewTotal: number;
   unresolvedTotal: number;
-  isDiscarding: boolean;
   isResolving: boolean;
+  canResolveConflict: boolean;
   onPrevious: () => void;
   onNext: () => void;
-  onUsePublishedVersion: () => void;
-  onUseNewVersion: () => void;
+  onResolveConflict: () => void;
 }
 
 const ConflictFooter = ({
@@ -456,12 +527,11 @@ const ConflictFooter = ({
   reviewIndex,
   reviewTotal,
   unresolvedTotal,
-  isDiscarding,
   isResolving,
+  canResolveConflict,
   onPrevious,
   onNext,
-  onUsePublishedVersion,
-  onUseNewVersion,
+  onResolveConflict,
 }: ConflictFooterProps) => (
   <div className={styles.footer}>
     <Text size="2" color="gray">
@@ -471,7 +541,7 @@ const ConflictFooter = ({
       <Button
         variant="ghost"
         color="gray"
-        disabled={currentIndex === 0 || isDiscarding || isResolving}
+        disabled={currentIndex === 0 || isResolving}
         onClick={onPrevious}
       >
         <ArrowLeftIcon />
@@ -480,24 +550,17 @@ const ConflictFooter = ({
       <Button
         variant="ghost"
         color="blue"
-        disabled={
-          currentIndex >= unresolvedTotal - 1 || isDiscarding || isResolving
-        }
+        disabled={currentIndex >= unresolvedTotal - 1 || isResolving}
         onClick={onNext}
       >
         Next
         <ArrowRightIcon />
       </Button>
       <Button
-        variant="soft"
-        onClick={onUsePublishedVersion}
-        disabled={isDiscarding || isResolving}
+        onClick={onResolveConflict}
+        disabled={isResolving || !canResolveConflict}
       >
-        Use published version
-        <Spinner loading={isDiscarding} />
-      </Button>
-      <Button onClick={onUseNewVersion} disabled={isDiscarding || isResolving}>
-        Use new version
+        Resolve conflict
         <Spinner loading={isResolving} />
       </Button>
     </Flex>

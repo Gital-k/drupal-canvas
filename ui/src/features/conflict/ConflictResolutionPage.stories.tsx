@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { fn } from '@storybook/test';
@@ -12,6 +12,7 @@ import {
 
 import type React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
+import type { ConflictVersionSelection } from './ConflictResolutionView';
 
 const publishedPageHtml = `
   <!doctype html>
@@ -119,12 +120,54 @@ const StoryFrame = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const PageComparison = ({ loading = false }: { loading?: boolean }) => (
+const PageComparison = ({
+  loading = false,
+  selectedVersion,
+  onSelectVersion,
+}: {
+  loading?: boolean;
+  selectedVersion?: ConflictVersionSelection;
+  onSelectVersion?: (
+    version: Exclude<ConflictVersionSelection, undefined>,
+  ) => void;
+}) => (
   <PageConflictComparisonView
     publishedVersion={{ ...publishedVersion, loading }}
     newVersion={{ ...newVersion, loading }}
+    selectedVersion={selectedVersion}
+    onSelectVersion={onSelectVersion}
   />
 );
+
+const ConflictResolutionStory = ({
+  defaultSelectedVersion,
+  loading = false,
+  ...args
+}: React.ComponentProps<typeof ConflictResolutionView> & {
+  defaultSelectedVersion?: ConflictVersionSelection;
+  loading?: boolean;
+}) => {
+  const [selectedVersion, setSelectedVersion] =
+    useState<ConflictVersionSelection>(defaultSelectedVersion);
+
+  return (
+    <ConflictResolutionView
+      {...args}
+      canResolveConflict={!!selectedVersion}
+      comparison={
+        <PageComparison
+          loading={loading}
+          selectedVersion={selectedVersion}
+          onSelectVersion={(version) =>
+            setSelectedVersion((currentVersion) =>
+              currentVersion === version ? undefined : version,
+            )
+          }
+        />
+      }
+    />
+  );
+};
 
 const meta = {
   title: 'Features/Conflict Resolution/Page Comparison',
@@ -138,7 +181,9 @@ The Page conflict comparison screen is available in development mode for conflic
 
 It compares the published response from \`GET /canvas/api/v0/layout/canvas_page/{id}?status=true\` with the auto-saved response from \`GET /canvas/api/v0/layout/canvas_page/{id}\`.
 
-The user can select **Use published version** to discard the conflicting auto-save, or **Use new version** to resolve the active conflict by sending \`conflictToResolve\` while keeping the auto-saved changes.
+No version is selected by default. The user selects either **Published version** or **New version**, then uses **Resolve conflict**.
+
+Resolving with **Published version** discards the conflicting auto-save. Resolving with **New version** sends \`conflictToResolve\` and keeps the auto-saved changes.
         `,
       },
     },
@@ -150,12 +195,11 @@ The user can select **Use published version** to discard the conflicting auto-sa
     reviewIndex: 0,
     reviewTotal: 1,
     unresolvedTotal: 1,
-    isDiscarding: false,
     isResolving: false,
+    canResolveConflict: false,
     onPrevious: fn(),
     onNext: fn(),
-    onUsePublishedVersion: fn(),
-    onUseNewVersion: fn(),
+    onResolveConflict: fn(),
     onClose: fn(),
   },
   argTypes: {
@@ -183,15 +227,13 @@ The user can select **Use published version** to discard the conflicting auto-sa
       control: 'number',
       description: 'Number of unresolved Page conflicts remaining.',
     },
-    isDiscarding: {
-      control: 'boolean',
-      description:
-        'Whether the Use published version discard request is in progress.',
-    },
     isResolving: {
       control: 'boolean',
-      description:
-        'Whether the Use new version resolve request is in progress.',
+      description: 'Whether the Resolve conflict request is in progress.',
+    },
+    canResolveConflict: {
+      control: false,
+      description: 'Whether a version is selected and can be resolved.',
     },
   },
 } satisfies Meta<typeof ConflictResolutionView>;
@@ -203,7 +245,7 @@ type Story = StoryObj<typeof meta>;
 export const PageConflict: Story = {
   render: (args) => (
     <StoryFrame>
-      <ConflictResolutionView {...args} comparison={<PageComparison />} />
+      <ConflictResolutionStory {...args} />
     </StoryFrame>
   ),
 };
@@ -211,32 +253,34 @@ export const PageConflict: Story = {
 export const LoadingComparison: Story = {
   render: (args) => (
     <StoryFrame>
-      <ConflictResolutionView
-        {...args}
-        comparison={<PageComparison loading />}
-      />
+      <ConflictResolutionStory {...args} loading />
     </StoryFrame>
   ),
 };
 
-export const UsingPublishedVersion: Story = {
-  args: {
-    isDiscarding: true,
-  },
+export const PublishedVersionSelected: Story = {
   render: (args) => (
     <StoryFrame>
-      <ConflictResolutionView {...args} comparison={<PageComparison />} />
+      <ConflictResolutionStory {...args} defaultSelectedVersion="published" />
     </StoryFrame>
   ),
 };
 
-export const UsingNewVersion: Story = {
+export const NewVersionSelected: Story = {
+  render: (args) => (
+    <StoryFrame>
+      <ConflictResolutionStory {...args} defaultSelectedVersion="new" />
+    </StoryFrame>
+  ),
+};
+
+export const ResolvingConflict: Story = {
   args: {
     isResolving: true,
   },
   render: (args) => (
     <StoryFrame>
-      <ConflictResolutionView {...args} comparison={<PageComparison />} />
+      <ConflictResolutionStory {...args} defaultSelectedVersion="new" />
     </StoryFrame>
   ),
 };
