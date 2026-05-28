@@ -41,6 +41,12 @@ cp composer.json composer.json.original
 # Remove any environment-specific files
 ddev cleanup --force
 
+# Install ddev-playwright add-on if not already installed
+if [[ ! -f .ddev/config.playwright.yml ]]; then
+  echo "Installing ddev-playwright add-on..."
+  ddev add-on get Lullabot/ddev-playwright
+fi
+
 # Allow all Composer plugins.
 ddev composer config \
   --no-plugins \
