@@ -1,23 +1,53 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import yaml from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
 import { validateRegions } from './validate-region';
 
 import type {
+  ComponentMetadata,
   DiscoveredRegion,
   DiscoveryResult,
 } from '@drupal-canvas/discovery';
 
+async function writeComponentMetadataFiles(
+  rootDir: string,
+  components: ComponentMetadata[],
+): Promise<DiscoveryResult['components']> {
+  return Promise.all(
+    components.map(async (m) => {
+      const componentDir = path.join(rootDir, m.machineName);
+      await fs.mkdir(componentDir, { recursive: true });
+      const metadataPath = path.join(componentDir, 'component.yml');
+      await fs.writeFile(metadataPath, yaml.dump(m), 'utf-8');
+      return {
+        id: m.machineName,
+        kind: 'named' as const,
+        name: m.name,
+        machineName: m.machineName,
+        status: m.status,
+        directory: componentDir,
+        relativeDirectory: m.machineName,
+        projectRelativeDirectory: m.machineName,
+        metadataPath,
+        jsEntryPath: null,
+        cssEntryPath: null,
+      };
+    }),
+  );
+}
+
 function makeDiscoveryResult(
   tmpDir: string,
   regions: DiscoveredRegion[],
+  components: DiscoveryResult['components'] = [],
 ): DiscoveryResult {
   return {
     componentRoot: tmpDir,
     projectRoot: tmpDir,
-    components: [],
+    components,
     pages: [],
     contentTemplates: [],
     regions,
@@ -121,6 +151,60 @@ describe('validateRegions', () => {
 
       const { results } = await validateRegions(discoveryResult);
       expect(results[0].success).toBe(false);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects elements referencing unreconciled external media URLs', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'canvas-region-'));
+    try {
+      const imageMetadata: ComponentMetadata = {
+        name: 'Image',
+        machineName: 'image',
+        status: true,
+        props: {
+          properties: {
+            image: {
+              title: 'Image',
+              type: 'object',
+              $ref: 'json-schema-definitions://canvas.module/image',
+            },
+          },
+        },
+        required: [],
+        slots: {},
+      };
+      const components = await writeComponentMetadataFiles(tmpDir, [
+        imageMetadata,
+      ]);
+      const regionPath = await writeRegion(tmpDir, 'header.json', {
+        elements: {
+          banner: {
+            type: 'js.image',
+            props: { image: { src: 'https://example.com/photo.jpg' } },
+          },
+        },
+      });
+      const discoveryResult = makeDiscoveryResult(
+        tmpDir,
+        [
+          {
+            region: 'header',
+            path: regionPath,
+            relativePath: 'regions/header.json',
+          },
+        ],
+        components,
+      );
+
+      const { results } = await validateRegions(discoveryResult);
+      expect(results[0].success).toBe(false);
+      expect(
+        results[0].details?.some((d) =>
+          d.content.includes('Unreconciled external media URL'),
+        ),
+      ).toBe(true);
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

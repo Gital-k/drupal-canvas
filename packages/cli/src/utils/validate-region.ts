@@ -5,6 +5,7 @@ import Ajv from 'ajv/dist/2020.js';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
 import regionSpecSchema from '../../../workbench/src/lib/schemas/region-spec.schema.json';
+import { collectUnreconciledMediaProps } from './prop-transforms';
 import {
   buildElementsValidationContext,
   validateElements,
@@ -52,6 +53,17 @@ export async function validateRegions(
       const elementsResult = validateElements(elements, context);
       if (!elementsResult.success && elementsResult.details) {
         details.push(...elementsResult.details);
+      }
+
+      const unreconciledMedia = collectUnreconciledMediaProps(
+        elements,
+        metadata,
+      );
+      for (const entry of unreconciledMedia) {
+        details.push({
+          heading: `elements.${entry.elementId}.props.${entry.propName}`,
+          content: `Unreconciled external media URL "${entry.src}". Run \`npx canvas reconcile-media\` to resolve.`,
+        });
       }
 
       results.push({

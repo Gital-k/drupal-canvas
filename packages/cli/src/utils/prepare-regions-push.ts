@@ -3,10 +3,7 @@ import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
 import { authoredElementMapToComponentTree } from './authored-elements';
 import { stripNullableKeysForConfigComponentTree } from './component-tree-payload';
-import {
-  collectUnreconciledMediaProps,
-  serializeElementMapForServer,
-} from './prop-transforms';
+import { serializeElementMapForServer } from './prop-transforms';
 import { processInPool } from './request-pool';
 
 import type {
@@ -28,12 +25,6 @@ export interface PreparedRegion {
   status: boolean;
   components: Region['component_tree'];
   filePath: string;
-  pendingMediaReconciliations: Array<{
-    elementId: string;
-    propName: string;
-    src: string;
-    mediaType: string;
-  }>;
 }
 
 interface AuthoredRegionFile {
@@ -60,10 +51,6 @@ export async function prepareRegions(
     const fileContent = await fs.readFile(discovered.path, 'utf-8');
     const spec = JSON.parse(fileContent) as AuthoredRegionFile;
 
-    const pendingMediaReconciliations = collectUnreconciledMediaProps(
-      spec.elements ?? {},
-      componentMetadata,
-    );
     const elements = serializeElementMapForServer(
       spec.elements ?? {},
       componentMetadata,
@@ -78,7 +65,6 @@ export async function prepareRegions(
       status: spec.status ?? true,
       components,
       filePath: discovered.path,
-      pendingMediaReconciliations,
     };
   });
 
