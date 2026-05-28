@@ -43,7 +43,7 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
    * {@inheritdoc}
    */
   #[DataProvider('providerUpdate')]
-  public function testUpdate(string $new_latest_version, ?callable $setup_callback, ComponentInstanceUpdateAttemptResult $update_result, ?callable $assertion_callback, array $bc_break_violations = []): void {
+  public function testUpdate(string $new_latest_version, ?callable $setup_callback, ComponentInstanceUpdateAttemptResult $update_result, ?callable $assertion_callback, array $bc_break_violations): void {
     $sut = new JsComponentInstanceUpdater();
     $component_tree_value = [
       [
@@ -96,8 +96,8 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
     string $new_latest_version,
     ?callable $setup_callback,
     ComponentInstanceUpdateAttemptResult $update_result,
-    ?callable $assertion_callback = NULL,
-    array $bc_break_violations = [],
+    ?callable $assertion_callback,
+    array $bc_break_violations,
   ): void {
     $sut = new JsComponentInstanceUpdater();
     $component_tree_value = [
