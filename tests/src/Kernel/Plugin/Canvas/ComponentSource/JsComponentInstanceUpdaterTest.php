@@ -43,7 +43,7 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
    * {@inheritdoc}
    */
   #[DataProvider('providerUpdate')]
-  public function testUpdate(string $new_latest_version, ?callable $setup_callback, ComponentInstanceUpdateAttemptResult $update_result, ?callable $assertion_callback): void {
+  public function testUpdate(string $new_latest_version, ?callable $setup_callback, ComponentInstanceUpdateAttemptResult $update_result, ?callable $assertion_callback, array $bc_break_violations = []): void {
     $sut = new JsComponentInstanceUpdater();
     $component_tree_value = [
       [
@@ -70,7 +70,7 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
     if ($setup_callback !== NULL) {
       call_user_func_array($setup_callback, [&$component_tree_value]);
     }
-    $original_component_tree = self::generateComponentTree($component_tree_value);
+    $original_component_tree = self::generateComponentTree($component_tree_value, $bc_break_violations);
     self::assertCount(2, $original_component_tree);
     $component_instance = $original_component_tree->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
     self::assertNotNull($component_instance);
@@ -96,6 +96,8 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
     string $new_latest_version,
     ?callable $setup_callback,
     ComponentInstanceUpdateAttemptResult $update_result,
+    ?callable $assertion_callback = NULL,
+    array $bc_break_violations = [],
   ): void {
     $sut = new JsComponentInstanceUpdater();
     $component_tree_value = [
@@ -113,7 +115,7 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
     if ($setup_callback !== NULL) {
       call_user_func_array($setup_callback, [&$component_tree_value]);
     }
-    $component_instance = self::generateComponentTree($component_tree_value)->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
+    $component_instance = self::generateComponentTree($component_tree_value, $bc_break_violations)->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
     self::assertNotNull($component_instance);
     $this->assertSame($update_result === ComponentInstanceUpdateAttemptResult::Latest, $sut->canUpdate($component_instance));
     $component = Component::load('js.test');
@@ -148,7 +150,7 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
         ],
       ],
     ];
-    $component_instance = self::generateComponentTree($component_tree_value)->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
+    $component_instance = self::generateComponentTree($component_tree_value, [])->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
     self::assertNotNull($component_instance);
 
     $this->assertTrue($sut->canUpdate($component_instance));
@@ -189,7 +191,7 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
         ],
       ],
     ];
-    $component_instance = self::generateComponentTree($component_tree_value)->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
+    $component_instance = self::generateComponentTree($component_tree_value, [])->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
     self::assertNotNull($component_instance);
 
     $this->assertTrue($sut->canUpdate($component_instance));
@@ -241,7 +243,7 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
 
     $this->addOptionalArrayProp();
 
-    $component_instance = self::generateComponentTree($component_tree_value)->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
+    $component_instance = self::generateComponentTree($component_tree_value, [])->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
     self::assertNotNull($component_instance);
 
     $this->assertTrue($sut->canUpdate($component_instance));
