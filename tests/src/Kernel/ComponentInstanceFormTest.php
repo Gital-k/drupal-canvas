@@ -19,8 +19,6 @@ use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Form\FormState;
 use Drupal\Core\Url;
-use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
-use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use Drupal\Tests\system\Functional\Form\StubForm;
 use Drupal\user\Entity\User;
@@ -43,26 +41,29 @@ use Symfony\Component\HttpFoundation\Request;
 #[Group('canvas')]
 final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
 
-  use CiModulePathTrait;
   use NodeCreationTrait;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $modules = [
+    'canvas_test_sdc',
+    'canvas_test_block',
+  ];
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('theme_installer')->install(['stark']);
-    $this->container->get('module_installer')->install(['system', 'canvas_test_sdc', 'canvas_test_block']);
-    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
-
-    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
-    (new CanvasTestSetup())->setup();
+    $this->container->get('theme_installer')->install(['canvas_stark']);
+    $this->setUpFixture(FALSE);
     $this->setUpCurrentUser(permissions: ['edit any article content', 'administer themes', Page::EDIT_PERMISSION]);
   }
 
   public function testDescription(): void {
     $node = $this->createNode(['type' => 'article', 'title' => 'Test node']);
-    self::assertCount(0, $node->validate());
+    self::assertEntityIsValid($node);
     $node->save();
 
     $component_id = 'sdc.canvas_test_sdc.my-cta';
@@ -70,7 +71,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $component_entity = Component::load($component_id);
     \assert($component_entity instanceof ComponentInterface);
     $crawler = $this->getCrawlerForFormRequest(
-      '/canvas/api/v0/form/component-instance/node/1',
+      '/canvas/api/v0/form/component-instance/node/' . $this->testNode->id(),
       $component_entity,
       $form_canvas_props
     );
@@ -90,7 +91,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
 
     $component_entity = Component::load($component);
     \assert($component_entity instanceof ComponentInterface);
-    $this->getCrawlerForFormRequest('/canvas/api/v0/form/component-instance/node/1', $component_entity, $expected_form_canvas_props);
+    $this->getCrawlerForFormRequest('/canvas/api/v0/form/component-instance/node/' . $this->testNode->id(), $component_entity, $expected_form_canvas_props);
   }
 
   public static function providerOptionalImages(): array {
@@ -331,7 +332,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
 
   public function testDynamicProps(): void {
     $node = $this->createNode(['type' => 'article', 'title' => 'Test node']);
-    self::assertCount(0, $node->validate());
+    self::assertEntityIsValid($node);
     $node->save();
     self::assertEmpty($node->get('media_image_field'));
     $template = ContentTemplate::create([
@@ -429,7 +430,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     // Loading the component instance form initially should be possible.
     $component = Component::load(BlockComponent::SOURCE_PLUGIN_ID . ".$block_plugin_id");
     self::assertInstanceOf(Component::class, $component);
-    self::assertCount(0, $component->getTypedData()->validate());
+    self::assertEntityIsValid($component);
     $response = $this->getCrawlerForFormRequest('/canvas/api/v0/form/component-instance/canvas_page/' . $page->id(), $component, []);
     self::assertSame($expected_form_when_not_broken, $response->text());
 
@@ -441,7 +442,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
         'inputs' => $component->getSettings()['default_settings'],
       ],
     ]);
-    self::assertCount(0, $page->validate());
+    self::assertEntityIsValid($page);
     self::assertSame(SAVED_UPDATED, $page->save());
 
     // Simulate the tested block plugin being broken.
@@ -453,7 +454,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     // Despite the tested block plugin being broken:
     self::assertTrue($component->getComponentSource()->isBroken());
     // - The stored component tree is still valid: it references the Component.
-    self::assertCount(0, $page->validate());
+    self::assertEntityIsValid($page);
     // - The Component became invalid though.
     self::assertGreaterThan(0, $component->getTypedData()->validate()->count());
 
@@ -486,7 +487,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
       ],
       'dataDependencies' => [],
     ]);
-    self::assertCount(0, $code_component->getTypedData()->validate());
+    self::assertEntityIsValid($code_component);
     $code_component->save();
 
     $component = Component::load(JsComponent::componentIdFromJavascriptComponentId($code_component->id()));
@@ -502,7 +503,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
         'inputs' => [],
       ],
     ]);
-    self::assertCount(0, $page->validate());
+    self::assertEntityIsValid($page);
     self::assertSame(SAVED_UPDATED, $page->save());
 
     // Delete the code component through the config factory to avoid normal

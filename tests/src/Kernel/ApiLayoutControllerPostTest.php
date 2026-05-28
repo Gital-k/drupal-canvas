@@ -24,6 +24,7 @@ use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
+use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -41,19 +42,23 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
 
   use AutoSaveRequestTestTrait;
-  use CanvasFieldTrait;
+  use CanvasFieldTrait {
+    setUpCurrentUser as traitSetUpCurrentUser;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUpCurrentUser(array $values = [], array $permissions = [], bool $admin = FALSE): UserInterface {
+    return parent::setUpCurrentUser($values, $permissions, $admin);
+  }
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system', 'block', 'user']);
-    $this->container->get('theme_installer')->install(['stark']);
-    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
-
-    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
-    (new CanvasTestSetup())->setup(TRUE);
+    $this->setUpFixture();
     $this->setUpCurrentUser([], [
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
@@ -90,8 +95,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     ]);
 
     // Ensure 'sticky' is currently false and the user does not have edit access to it.
-    $node = Node::load(1);
-    \assert($node instanceof NodeInterface);
+    $node = $this->testNode;
     $this->assertFalse($node->isSticky());
     $this->assertTrue($node->get('sticky')->access('view'));
     $this->assertFalse($node->get('sticky')->access('edit'));
@@ -107,7 +111,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     // before comparing them to the existing saved values. This causes Form API
     // to ignore the updated value for 'sticky' because the user does not have
     // 'edit' access to it.
-    $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', content: json_encode([
+    $this->request(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id(), method: 'POST', content: json_encode([
       'layout' => [
         [
           'nodeType' => 'region',
@@ -243,8 +247,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       $this->assertResponseAutoSaves($response, [$entity]);
       $autoSave = $this->container->get(AutoSaveManager::class);
       \assert($autoSave instanceof AutoSaveManager);
-      $entity = Node::load(1);
-      \assert($entity instanceof NodeInterface);
+      $entity = $this->testNode;
       self::assertTrue($autoSave->getAutoSaveEntity($entity)->isEmpty());
     }
 
@@ -281,17 +284,17 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       'slots' => [],
     ];
     // And update the first card model to use a URI reference.
-    $json['model'][CanvasTestSetup::UUID_STATIC_CARD1]['resolved']['cta1href'] = 'entity:node/1';
-    $json['model'][CanvasTestSetup::UUID_STATIC_CARD1]['source']['cta1href']['value']['uri'] = 'entity:node/1';
+    $testNodeUri = 'entity:node/' . $this->testNode->id();
+    $json['model'][CanvasTestSetup::UUID_STATIC_CARD1]['resolved']['cta1href'] = $testNodeUri;
+    $json['model'][CanvasTestSetup::UUID_STATIC_CARD1]['source']['cta1href']['value']['uri'] = $testNodeUri;
 
     $json += $this->getPostContentsDefaults($entity);
     // The first card model has been updated, the second is unchanged.
-    self::assertSame('entity:node/1', $json['model'][CanvasTestSetup::UUID_STATIC_CARD1]['source']['cta1href']['value']['uri']);
+    self::assertSame($testNodeUri, $json['model'][CanvasTestSetup::UUID_STATIC_CARD1]['source']['cta1href']['value']['uri']);
     self::assertSame('https://drupal.org', $json['model'][CanvasTestSetup::UUID_STATIC_CARD2]['source']['cta1href']['value']['uri']);
     $response = $this->request(Request::create($url, method: 'POST', content: \json_encode($json, JSON_THROW_ON_ERROR)));
     $crawler = new Crawler($this->getRawContent());
-    $node1 = Node::load(1);
-    \assert($node1 instanceof NodeInterface);
+    $node1 = $this->testNode;
     self::assertCount(1, $crawler->filter(\sprintf('a[href="%s"].my-hero__cta--primary', 'https://drupal.org')));
     self::assertCount(1, $crawler->filter(\sprintf('a[href="%s"].my-hero__cta--primary', $node1->toUrl()->toString())));
     self::assertSame($expected_heading_text, (string) $this->cssSelect('h1[data-component-id="canvas_test_sdc:heading"]')[0]);
@@ -527,8 +530,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->container->get(ConfigFactoryInterface::class)->reset();
 
     unset($json['isNew'], $json['isPublished'], $json['hasUnsavedStatusChange'], $json['html']);
-    $node = Node::load(1);
-    \assert($node instanceof NodeInterface);
+    $node = $this->testNode;
     $json += $this->getPostContentsDefaults($node);
     $this->request(Request::create($url, method: 'POST', content: \json_encode($json, JSON_THROW_ON_ERROR)));
     // Check that regions exist and are wrapped.
@@ -601,7 +603,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
    * @see \Drupal\Tests\canvas\Kernel\Config\ComponentTest::testComponentAutoCreate()
    */
   public function testImageComponentPermutations(string $sdc, string $expected_preview_html): void {
-    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1'))->getContent();
+    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id()))->getContent();
     $this->assertIsString($content);
     $json = json_decode($content, TRUE);
 
@@ -623,8 +625,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     );
     self::assertCount(1, $reference_media);
     $reference_media = \reset($reference_media);
-    $node = Node::load(1);
-    \assert($node instanceof NodeInterface);
+    $node = $this->testNode;
     // Populate its client model, and take advantage of the fact that the client
     // model is allowed to be invalid when previewing: no validation may occur,
     // to ensure even invalid explicit inputs for component instances result in
@@ -675,7 +676,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $expected_preview_html = str_replace('!!REFERENCED_MEDIA!!', $reference_media->field_media_image->src_with_alternate_widths->getGeneratedUrl(), $expected_preview_html);
 
     unset($json['html'], $json['isPublished'], $json['isNew'], $json['hasUnsavedStatusChange']);
-    $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', content: json_encode($json, JSON_THROW_ON_ERROR)));
+    $this->request(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id(), method: 'POST', content: json_encode($json, JSON_THROW_ON_ERROR)));
     // Ensure the component is rendered using the expected markup.
     $this->assertRaw('<!-- canvas-start-166c9eee-35e9-4795-8c6f-24537728e95e -->' . $expected_preview_html . '<!-- canvas-end-166c9eee-35e9-4795-8c6f-24537728e95e -->');
   }
@@ -687,19 +688,17 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       PageRegion::ADMIN_PERMISSION,
       'edit any article content',
     ]);
-    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1'))->getContent();
+    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id()))->getContent();
     self::assertIsString($content);
     $json = \json_decode($content, TRUE);
     self::assertEquals('Anonymous (0)', $json['entity_form_fields']['uid[0][target_id]']);
     unset($json['html'], $json['isPublished'], $json['isNew'], $json['hasUnsavedStatusChange']);
     $json['entity_form_fields']['uid[0][target_id]'] = 'This is not a user';
-    $node = Node::load(1);
-    \assert($node instanceof NodeInterface);
+    $node = $this->testNode;
     $json += $this->getPostContentsDefaults($node);
-    $content = $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', content: json_encode($json, JSON_THROW_ON_ERROR)));
+    $content = $this->request(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id(), method: 'POST', content: json_encode($json, JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $content->getStatusCode());
-    $node = Node::load(1);
-    \assert($node instanceof NodeInterface);
+    $node = $this->testNode;
     $violations = $this->container->get(AutoSaveManager::class)->getEntityFormViolations($node);
     self::assertCount(1, $violations);
     self::assertEquals('This is not a user', $violations[0]?->getInvalidValue());
@@ -707,7 +706,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     // Even though 'This is not a user' is not a valid user, the GET response
     // should still contain the invalid value the user sent so that another user
     // can fix the invalid value.
-    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1'))->getContent();
+    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id()))->getContent();
     self::assertIsString($content);
     $json = \json_decode($content, TRUE);
     self::assertEquals('This is not a user', $json['entity_form_fields']['uid[0][target_id]']);
@@ -720,17 +719,16 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       PageRegion::ADMIN_PERMISSION,
       'edit any article content',
     ]);
-    $node = Node::load(1);
-    \assert($node instanceof NodeInterface);
+    $node = $this->testNode;
     $original_title = $node->label();
     self::assertEquals(0, (int) $node->getOwnerId());
-    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1'))->getContent();
+    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id()))->getContent();
     self::assertIsString($content);
     $json = \json_decode($content, TRUE);
     self::assertEquals('Anonymous (0)', $json['entity_form_fields']['uid[0][target_id]']);
     unset($json['html'], $json['isPublished'], $json['isNew'], $json['hasUnsavedStatusChange']);
     $json['entity_form_fields']['uid[0][target_id]'] = \sprintf('%s (%d)', $admin->getDisplayName(), $admin->id());
-    $response = $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', content: json_encode($json + $this->getPostContentsDefaults($node), JSON_THROW_ON_ERROR)));
+    $response = $this->request(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id(), method: 'POST', content: json_encode($json + $this->getPostContentsDefaults($node), JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
 
     // We should have an entry in auto-save with the new value.
@@ -751,7 +749,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       PageRegion::ADMIN_PERMISSION,
       'edit any article content',
     ]);
-    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1'))->getContent();
+    $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id()))->getContent();
     self::assertIsString($content);
     $json = \json_decode($content, TRUE);
     // The author field should not be in the response for this user because they
@@ -762,7 +760,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     unset($json['html'], $json['isPublished'], $json['isNew'], $json['hasUnsavedStatusChange']);
     $new_title = $this->randomMachineName();
     $json['entity_form_fields']['title[0][value]'] = $new_title;
-    $content = $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', content: json_encode($json + $this->getPostContentsDefaults($node), JSON_THROW_ON_ERROR)));
+    $content = $this->request(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id(), method: 'POST', content: json_encode($json + $this->getPostContentsDefaults($node), JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $content->getStatusCode());
 
     // We should have an entry in auto-save with the new title value, but the

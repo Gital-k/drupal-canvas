@@ -22,6 +22,7 @@ use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
+use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -42,19 +43,24 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 #[Group('#slow')]
 final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
 
-  use CanvasFieldTrait;
+  use CanvasFieldTrait {
+    setUpCurrentUser as traitSetUpCurrentUser;
+  }
   use AutoSaveRequestTestTrait;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUpCurrentUser(array $values = [], array $permissions = [], bool $admin = FALSE): UserInterface {
+    return parent::setUpCurrentUser($values, $permissions, $admin);
+  }
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system', 'block']);
-    $this->container->get('theme_installer')->install(['stark']);
-    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
-
-    (new CanvasTestSetup())->setup(TRUE);
+    $this->setUpFixture();
     $this->setUpCurrentUser([], [
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
@@ -130,7 +136,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     ];
     $contentTemplate->setComponentTree($components)->save();
     // @todo Remove this in favor of using ContribStrictConfigSchemaTestTrait in https://www.drupal.org/project/canvas/issues/3531679
-    self::assertCount(0, $contentTemplate->getTypedData()->validate());
+    self::assertEntityIsValid($contentTemplate);
 
     $assertResponse = function (Response $response, string $expected_heading, $expected_subheading, $expected_text) use ($uuid1, $uuid2) {
       $data = $this->decodeResponse($response);
@@ -214,9 +220,9 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $this->expectExceptionMessage($message);
     if (isset($content['autoSaves'])) {
       unset($content['autoSaves']);
-      $content += $this->getClientAutoSaves([Node::load(1)]);
+      $content += $this->getClientAutoSaves([$this->testNode]);
     }
-    $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1', method: 'PATCH', server: [
+    $this->parentRequest(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id(), method: 'PATCH', server: [
       'CONTENT_TYPE' => 'application/json',
       'HTTP_X_NO_OPENAPI_VALIDATION' => 'turned off because we want to validate the prod response here',
     ], content: \json_encode($content, JSON_FORCE_OBJECT | JSON_THROW_ON_ERROR)));
@@ -625,7 +631,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       ],
       'dataDependencies' => [],
     ]);
-    self::assertCount(0, $code_component->getTypedData()->validate());
+    self::assertEntityIsValid($code_component);
     self::assertSame(SAVED_NEW, $code_component->save());
 
     // Get the version from the Component entity.
@@ -672,7 +678,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         ],
       ],
     ]);
-    self::assertCount(0, $node->getTypedData()->validate());
+    self::assertEntityIsValid($node);
     $node->save();
 
     // Verify node is published with 3 components (parent + 2 children).
@@ -691,7 +697,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'examples' => ['<p>Example sidebar</p>'],
       ],
     ]);
-    self::assertCount(0, $code_component->getTypedData()->validate());
+    self::assertEntityIsValid($code_component);
     self::assertSame(SAVED_UPDATED, $code_component->save());
 
     // Reload to get the new version.
@@ -769,11 +775,11 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     \assert($updatedNode instanceof Node);
     $finalTree = $updatedNode->get('field_canvas_demo')->getValue();
     self::assertCount(2, $finalTree, 'Published node should have parent + sidebar child');
-    self::assertCount(0, $updatedNode->getTypedData()->validate());
+    self::assertEntityIsValid($updatedNode);
 
     // Remove all remaining slots.
     $code_component->set('slots', []);
-    self::assertCount(0, $code_component->getTypedData()->validate());
+    self::assertEntityIsValid($code_component);
     self::assertSame(SAVED_UPDATED, $code_component->save());
 
     // Reload to get the new version.
@@ -839,7 +845,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $finalTree = $updatedNode->get('field_canvas_demo')->getValue();
     self::assertCount(1, $finalTree, 'Published node should only have parent after all slots removed');
     self::assertSame($parent_uuid, $finalTree[0]['uuid']);
-    self::assertCount(0, $updatedNode->getTypedData()->validate());
+    self::assertEntityIsValid($updatedNode);
   }
 
 }
