@@ -265,7 +265,8 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
     foreach ($to_props as $prop_name => $def) {
       // @see \Drupal\canvas\PropSource\StaticPropSource::getCardinality()
       $new_cardinality = $def['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY;
-      // When the new cardinality is unlimited, any number of stored values is valid.
+      // When the new cardinality is unlimited, any number of stored values is
+      // valid.
       if ($new_cardinality === FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
         continue;
       }
