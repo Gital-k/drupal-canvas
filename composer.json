@@ -36,7 +36,7 @@
         "shipmonk/dead-code-detector": "1.2.0"
     },
     "scripts": {
-        "composer-root": "d=.; i=0; while [ $i -lt 10 ]; do if [ -f \"$d/composer.json\" ] && cat \"$d/composer.json\" | grep -q '\"type\"' && cat \"$d/composer.json\" | grep -q '\"project\"'; then readlink -f \"$d\"; break; fi; d=\"../$d\"; i=$((i+1)); done",
+        "composer-root": "if [ \"$(pwd)\" = \"/var/www/html\" ] && [ -f composer.json ]; then pwd; exit 0; fi; d=.; i=0; while [ $i -lt 10 ]; do if [ -f \"$d/composer.json\" ] && cat \"$d/composer.json\" | grep -q '\"type\"' && cat \"$d/composer.json\" | grep -q '\"project\"'; then readlink -f \"$d\"; break; fi; d=\"../$d\"; i=$((i+1)); done",
         "install-dev-deps": "PACKAGES=$(cat composer.json | jq -r '.[\"require-dev\"] // {} | to_entries[] | \"\\(.key):\\(.value)\"' | tr '\\n' ' ') && ROOT=$(composer run composer-root) && CORE_VERSION=$(grep \"const VERSION\" \"${ROOT}/core/lib/Drupal.php\" 2>/dev/null | sed \"s/.*'\\(.*\\)'.*/\\1/\" || echo \"0.0.0\") && COMPOSER_ROOT_VERSION=${CORE_VERSION:-0.0.0} composer --working-dir=${ROOT} require ${PACKAGES} --dev -W",
         "phpcs": "mkdir -p test-results && mkdir -p .cache/phpcs && composer --working-dir=$(composer run composer-root) exec phpcs -- --standard=$(pwd)/phpcs.xml --report-width=auto --colors -s --report-junit=$(pwd)/test-results/phpcs.xml --report-full --report-summary $(pwd)",
         "phpcbf": " mkdir -p .cache/phpc && composer --working-dir=$(composer run composer-root) exec phpcbf -- --standard=$(pwd)/phpcs.xml --colors $(pwd)",
@@ -52,7 +52,9 @@
         "fix:phpcbf": "@phpcbf",
         "fix": [
             "@fix:phpcbf"
-        ]
+        ],
+        "ui-build": "ROOT=$(composer run composer-root) && drush --root=$ROOT pm:uninstall canvas_vite -y > /dev/null 2>&1 || true && npm ci && cd ui && npm run build",
+        "ui-dev": "ROOT=$(composer run composer-root) && drush --root=$ROOT pm:install canvas_vite -y > /dev/null 2>&1 || true && npm ci && cd ui && npm run drupaldev -- --host"
     },
     "scripts-descriptions": {
         "composer-root": "Determines host Drupal project's root.",
@@ -66,8 +68,6 @@
         "phpstan-regenerate-ignores-for-non-min-core-version-features": "Regenerates PHPStan baseline for Canvas-provided features that require a core version beyond the minimum supported version.",
         "phpunit": "Runs Canvas' back-end test suite. Supports running subset, use `composer run phpunit -- --help`.",
         "lint": "Runs all Canvas back-end (PHP) linting. Sibling: `npm run lint`.",
-        "fix": "Runs all Canvas back-end (PHP) auto-fixing. Sibling: `npm run fix`.",
-        "ui-build": "ROOT=$(composer run composer-root) && drush --root=$ROOT pm:uninstall canvas_vite -y > /dev/null 2>&1 || true && npm ci && cd ui && npm run build",
-        "ui-dev": "ROOT=$(composer run composer-root) && drush --root=$ROOT pm:install canvas_vite -y > /dev/null 2>&1 || true && npm ci && cd ui && npm run drupaldev -- --host"
+        "fix": "Runs all Canvas back-end (PHP) auto-fixing. Sibling: `npm run fix`."
     }
 }

@@ -79,30 +79,55 @@ EOF
   fi
 done
 
-# Load defaults, then overrides.
+# Find the module root (where this script lives: MODULE_ROOT/tests/scripts/phpunit.sh).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODULE_ROOT="$(realpath "$SCRIPT_DIR/../..")"
+
+# Load defaults, then overrides from the module root.
 set -a
-load_env_file ".env"
-load_env_file ".env.defaults"
+load_env_file "$MODULE_ROOT/.env"
+load_env_file "$MODULE_ROOT/.env.defaults"
 set +a
 
 # Ensure test results can be written.
-DRUPAL_WEB_ROOT=$(realpath "$(pwd)/../../../")
-mkdir -p test-results
+
+# Find the Drupal project root (where vendor/ lives) and web root (where core/ lives).
+# Case 1: Running from the included .ddev config - module is symlinked but composer root
+#         is at /var/www/html, MODULE_ROOT resolves to /var/www/html, and web root is
+#         /var/www/html/web.
+# Case 2: Running from a 3rd party project - module is at web/modules/contrib/canvas,
+#         vendor is 4 levels up, and web root is 3 levels up.
+if [[ -d "$MODULE_ROOT/vendor" ]]; then
+  # Case 1: Module root IS the composer root (included .ddev config)
+  DRUPAL_PROJECT_ROOT="$MODULE_ROOT"
+  DRUPAL_WEB_ROOT="$MODULE_ROOT/web"
+elif [[ -d "$(realpath "$MODULE_ROOT/../../../..")/vendor" ]]; then
+  # Case 2: Module is at web/modules/contrib/canvas, vendor is 4 levels up
+  DRUPAL_PROJECT_ROOT=$(realpath "$MODULE_ROOT/../../../..")
+  DRUPAL_WEB_ROOT=$(realpath "$MODULE_ROOT/../../..")
+else
+  echo "Error: Could not find Drupal project root (vendor/ directory not found)"
+  echo "  Searched: $MODULE_ROOT/vendor"
+  echo "  Searched: $(realpath "$MODULE_ROOT/../../../..")/vendor"
+  exit 1
+fi
+mkdir -p "$MODULE_ROOT/test-results"
 if [ -n "$DRUPAL_TEST_WEBSERVER_USER" ]; then
-  sudo chown "$DRUPAL_TEST_WEBSERVER_USER" test-results
+  sudo chown "$DRUPAL_TEST_WEBSERVER_USER" "$MODULE_ROOT/test-results"
 fi
 
 # Parse args: .php files run via phpunit directly; directories become --directory
 # for run-tests.sh (parallel); everything else passes through.
 PHPUNIT_DIRECT_FILE=""
-DIRECTORY="$(pwd)"
+DIRECTORY="$MODULE_ROOT"
 PASSTHROUGH_ARGS=()
+INVOCATION_DIR="$(pwd)"
 for arg in "$@"; do
   if [[ "$arg" == *.php ]]; then
-    [[ "$arg" != /* ]] && arg="$(pwd)/$arg"
+    [[ "$arg" != /* ]] && arg="$INVOCATION_DIR/$arg"
     PHPUNIT_DIRECT_FILE="$arg"
   elif [[ -d "$arg" ]]; then
-    [[ "$arg" != /* ]] && arg="$(pwd)/$arg"
+    [[ "$arg" != /* ]] && arg="$INVOCATION_DIR/$arg"
     DIRECTORY="$arg"
   else
     PASSTHROUGH_ARGS+=("$arg")
@@ -110,7 +135,8 @@ for arg in "$@"; do
 done
 
 if [ -n "$PHPUNIT_DIRECT_FILE" ]; then
-  exec php "$DRUPAL_WEB_ROOT/vendor/bin/phpunit" --configuration "$(pwd)" "$PHPUNIT_DIRECT_FILE" "${PASSTHROUGH_ARGS[@]}"
+  echo php "$DRUPAL_PROJECT_ROOT/vendor/bin/phpunit" --configuration "$MODULE_ROOT" "$PHPUNIT_DIRECT_FILE" "${PASSTHROUGH_ARGS[@]}"
+  exec php "$DRUPAL_PROJECT_ROOT/vendor/bin/phpunit" --configuration "$MODULE_ROOT" "$PHPUNIT_DIRECT_FILE" "${PASSTHROUGH_ARGS[@]}"
 fi
 
 DRUPAL_VERSION=$(sed -n "s/.*const VERSION = '\([^']*\)'.*/\1/p" "$DRUPAL_WEB_ROOT/core/lib/Drupal.php")
@@ -126,7 +152,7 @@ RUN_TESTS_ARGS=(
   --concurrency "${DRUPAL_TEST_CONCURRENCY:-$(getconf _NPROCESSORS_ONLN)}"
   --color
   --verbose
-  --xml "$(pwd)/test-results"
+  --xml "$MODULE_ROOT/test-results"
   --directory "$DIRECTORY"
   "${PASSTHROUGH_ARGS[@]}"
 )
@@ -134,7 +160,7 @@ RUN_TESTS_ARGS=(
 # This can be removed when we stop supporting 11.2, --phpunit-configuration
 # isn't an option until 11.3.
 if [[ "$DRUPAL_MINOR" != "11.2" ]]; then
-  RUN_TESTS_ARGS+=(--phpunit-configuration "$(pwd)")
+  RUN_TESTS_ARGS+=(--phpunit-configuration "$MODULE_ROOT")
 fi
 
 # If the database is PostgreSQL pre-create the pg_trgm extension in template1
@@ -167,6 +193,7 @@ fi
 echo "Running with ${DRUPAL_TEST_CONCURRENCY:-$(getconf _NPROCESSORS_ONLN)} parallel workers"
 
 if [ -z "$DRUPAL_TEST_WEBSERVER_USER" ]; then
+  echo "${RUN_TESTS_ARGS[@]}"
   "${RUN_TESTS_ARGS[@]}"
 else
   sudo -E -u "$DRUPAL_TEST_WEBSERVER_USER" "${RUN_TESTS_ARGS[@]}"
