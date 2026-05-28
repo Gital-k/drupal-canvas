@@ -37,7 +37,6 @@
 /config.playwright.yml
 /web-build/Dockerfile.task
 /web-build/Dockerfile.uv
-/web-build/disabled.Dockerfile.playwright
 /web-build/install-kasmvnc.sh
 /web-build/install-task.sh
 /web-build/kasmvnc.yaml

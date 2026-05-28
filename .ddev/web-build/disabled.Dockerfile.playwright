@@ -1,4 +1,3 @@
-#ddev-generated
 # Debian images by default disable apt caching, so turn it on until we finish
 # the build.
 RUN mv /etc/apt/apt.conf.d/docker-clean /etc/apt/docker-clean-disabled
@@ -10,15 +9,12 @@ RUN apt-get update
 # Manual changes to Dockerfile.playwright will be reverted every time ddev
 # start is run. In general, edit this file instead.
 #
-# We want to install whatever browsers are used by the currently locked version
-# of playwright in test/playwright. What this does is:
+# Canvas uses playwright.config.ts at the project root with tests in
+# tests/src/Playwright/. What this does is:
 #
-# 1. Creates a copy of the playwright directory in the image. We need this
-#    because Playwright keeps a hidden .links/<hash> file with the path of
-#    what browsers are installed by what apps. Without it, Playwright will re-
-#    download browsers even though they are in the directory. As the Docker
-#    context is the web-build directory, we have a pre-start hook in
-#    config.yaml that copies in the current test files.
+# 1. Mounts a copy of package.json and package-lock.json from the project root.
+#    We need this to install the correct version of Playwright and its browsers.
+#    The config.playwright.yml pre-start hook copies these files to web-build/playwright/.
 # 2. $username doesn't work in --mount... lines as it's a shell variable set by
 #    ddev. Instead, we mount the .cache cache into /ms-playwright-cache, and
 #    symlink it in. We merge any existing ~/.cache content into the mount first
@@ -37,26 +33,17 @@ RUN apt-get update
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   --mount=type=cache,target=/ms-playwright-cache,sharing=locked \
-  --mount=type=bind,source=./playwright,target=/playwright \
-  sudo -u $username mkdir -p /var/www/html/test \
-  && cp -a /playwright /var/www/html/test \
-  && chown -R $username:$username /var/www/html/test/playwright \
-  && chown -R $username:$username /ms-playwright-cache \
+  --mount=type=bind,source=./playwright,target=/playwright-build \
+  chown -R $username:$username /ms-playwright-cache \
   && cp -an /home/$username/.cache/* /ms-playwright-cache/ 2>/dev/null; \
   rm -rf /home/$username/.cache \
   && sudo -u $username ln -s /ms-playwright-cache /home/$username/.cache \
-  && cd /var/www/html/test/playwright \
-  && if [ -f yarn.lock ]; then \
-       export JS_PKG_MANAGER=yarn; \
-       corepack enable; \
-       sudo -u $username $JS_PKG_MANAGER; \
-     else \
-       export JS_PKG_MANAGER=npx; \
-       sudo -u $username npm install; \
-     fi \
-  && sudo -u $username $JS_PKG_MANAGER playwright install-deps \
-  && sudo -u $username PLAYWRIGHT_SKIP_BROWSER_GC=1 $JS_PKG_MANAGER playwright install \
-  && rm -rf /var/www/html/test/playwright \
+  && cd /var/www/html \
+  && sudo -u $username cp /playwright-build/package.json . \
+  && sudo -u $username cp /playwright-build/package-lock.json . 2>/dev/null || true \
+  && sudo -u $username npm ci \
+  && sudo -u $username npx playwright install-deps \
+  && sudo -u $username PLAYWRIGHT_SKIP_BROWSER_GC=1 npx playwright install \
   && rm /home/$username/.cache \
   && sudo -u $username mkdir -p /home/$username/.cache \
   && sudo -u $username cp -a /ms-playwright-cache/* /home/$username/.cache/

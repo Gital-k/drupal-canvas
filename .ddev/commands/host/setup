@@ -43,8 +43,10 @@ ddev cleanup --force
 
 # Install ddev-playwright add-on if not already installed
 if [[ ! -f .ddev/config.playwright.yml ]]; then
-  echo "Installing ddev-playwright add-on..."
+  echo "Installing ddev-playwright add-on... This will setup playwright and restart ddev one time."
   ddev add-on get Lullabot/ddev-playwright
+  cp .ddev/web-build/disabled.Dockerfile.playwright .ddev/web-build/Dockerfile.playwright
+  ddev restart
 fi
 
 # Allow all Composer plugins.

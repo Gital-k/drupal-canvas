@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+## Description: Run playwright inside the web container
+## Usage: playwright [flags] [args]
+## Example: "ddev playwright"
+## ExecRaw: true
+set -eu -o pipefail
+
+cd ${DDEV_APPROOT}
+
+# Ensure the environment is set up
+if [[ ! -f vendor/autoload.php ]]; then
+  echo "Error: Development environment is not set up."
+  echo "Please run 'ddev setup' first."
+  exit 1
+fi
+
+# Auto-add --host flag for show-report so it's accessible outside the container
+args=("$@")
+if [[ "${1:-}" == "show-report" ]]; then
+  args+=("--host=0.0.0.0")
+fi
+
+DRUPAL_TEST_DRUPAL_ROOT=web npx playwright "${args[@]}"
