@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
@@ -16,26 +17,23 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\State\StateInterface;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
-use Drupal\node\NodeInterface;
+use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
-use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests Client Server Conversion Trait.
- *
- * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
-class ClientServerConversionTraitTest extends KernelTestBase {
+class ClientServerConversionTraitTest extends CanvasKernelTestBase {
 
   private const TOP_LEVEL_SLOT_COMPONENT_UUID = '8caf6e23-8fb4-4524-bdb6-f57a2a6e7858';
 
@@ -49,7 +47,18 @@ class ClientServerConversionTraitTest extends KernelTestBase {
   use ClientServerConversionTrait;
   use ContribStrictConfigSchemaTestTrait;
   use ConstraintViolationsTestTrait;
+  use MediaTypeCreationTrait;
   use VfsPublicStreamUrlTrait;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $modules = [
+    'field',
+    'node',
+  ];
+
+  private Node $testNode;
 
   /**
    * {@inheritdoc}
@@ -131,10 +140,25 @@ class ClientServerConversionTraitTest extends KernelTestBase {
 
   public function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system']);
-    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
-    (new CanvasTestSetup())->setup();
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('file');
+    $this->installSchema('file', ['file_usage']);
+    $this->installEntitySchema('media');
+    $this->installConfig('node');
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+    $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->setUpCurrentUser(permissions: ['view media', 'access content']);
+    $this->createComponentTreeField('node', 'article', 'field_canvas_demo');
     $this->setUpImages();
+    $this->testNode = Node::create([
+      'type' => 'article',
+      'title' => 'Test node',
+      'field_canvas_demo' => [],
+    ]);
+    $this->testNode->save();
   }
 
   public function testConvertClientToServer(): void {
@@ -177,7 +201,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       'title' => '5 amazing uses for old toothbrushes',
       'field_canvas_demo' => $converted_items,
     ]);
-    self::assertSame([], self::violationsToArray($node1->validate()));
+    self::assertEntityIsValid($node1);
     $node1->save();
     // Ensure the field has been updated.
     $this->assertNodeValues(
@@ -313,9 +337,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       '8b4f9376-879f-4a6c-9b10-a12991736995' => [],
       '587334b5-8a05-48f5-9f48-02b5a84e7267' => [],
     ], \array_combine(\array_column($converted_items, 'uuid'), \array_column($converted_items, 'inputs')));
-    $node = Node::load(1);
-    \assert($node instanceof NodeInterface);
-    $item_list = $this->container->get(ComponentTreeLoader::class)->load($node);
+    $item_list = $this->container->get(ComponentTreeLoader::class)->load($this->testNode);
     \assert($item_list instanceof ComponentTreeItemList);
     $item_list->setValue($converted_items);
     self::assertCount(0, $item_list->validate());

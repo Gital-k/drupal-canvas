@@ -7,35 +7,43 @@ namespace Drupal\Tests\canvas\Kernel;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\field\Entity\FieldStorageConfig;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
-use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
+use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests Drupal\canvas\Storage\ComponentTreeLoader.
- *
- * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(ComponentTreeLoader::class)]
 #[Group('canvas')]
-class ComponentTreeLoaderTest extends KernelTestBase {
+class ComponentTreeLoaderTest extends CanvasKernelTestBase {
 
+  use CanvasFieldCreationTrait;
   use VfsPublicStreamUrlTrait;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $modules = [
+    'node',
+    'field',
+  ];
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system']);
-    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
-    (new CanvasTestSetup())->setup();
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('canvas_page');
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+    $this->createComponentTreeField('node', 'article', 'field_canvas_demo');
   }
 
   public function testGetCanvasFieldName(): void {
