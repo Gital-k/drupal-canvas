@@ -54,10 +54,7 @@ trait CanvasFieldTrait {
 
   private function setUpImages(): void {
     $test_image_files = $this->getTestFiles('image');
-    // Start with the second image because
-    // \Drupal\Tests\canvas\TestSite\CanvasTestSetup::setup() already
-    // creates a media image that references the first image.
-    $this->referencedImage = $this->createFileEntity($test_image_files[1]);
+    $this->referencedImage = $this->createFileEntity($test_image_files[0]);
     $media = Media::create([
       'bundle' => 'image',
       'name' => 'The bones are their money',
@@ -72,13 +69,14 @@ trait CanvasFieldTrait {
     $media->save();
     \assert($media instanceof Media);
     $this->mediaEntity = $media;
-    $this->unreferencedImage = $this->createFileEntity($test_image_files[3]);
+    $this->unreferencedImage = $this->createFileEntity($test_image_files[1]);
   }
 
   private static function createFileEntity(object $test_image): File {
     // @phpstan-ignore-next-line
     $uri = $test_image->uri;
     $file = File::create(['uri' => $uri]);
+    $file->setPermanent();
     $file->save();
     \assert($file instanceof File);
     return $file;
