@@ -17,6 +17,7 @@ export interface AuthoredRegionSpec {
 
 export interface NormalizedRegionSpec {
   spec: Spec;
+  status: boolean;
 }
 
 function getTopLevelElementIds(elements: AuthoredSpecElementMap): string[] {
@@ -36,6 +37,7 @@ export function normalizeRegionSpec(
   const elements = normalizeElementMapProps(region.elements);
 
   return {
+    status: region.status ?? true,
     spec: {
       root: 'canvas:component-tree',
       elements: {
@@ -84,6 +86,14 @@ export function parseRegionSpec(
     });
   }
 
+  if ('status' in value && typeof value.status !== 'boolean') {
+    issues.push({
+      code: 'invalid_page_spec',
+      message: `Region "status" must be a boolean in ${sourcePath}.`,
+      path: `${sourcePath}#status`,
+    });
+  }
+
   const parsedElements = parseElementMap(
     value.elements,
     `${sourcePath}#elements`,
@@ -126,6 +136,7 @@ export function parseRegionSpec(
 
   const region = normalizeRegionSpec({
     elements: parsedElements.elements,
+    status: typeof value.status === 'boolean' ? value.status : undefined,
   });
 
   const validationError = validateSpecComponentTypes(region.spec, {

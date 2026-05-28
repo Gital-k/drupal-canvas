@@ -740,14 +740,14 @@ export function App() {
           // discovered region specs in parallel so we can render the page
           // wrapped in its global chrome.
           const layoutPath = discoveryResult.layoutPath;
-          const regionsToRender = layoutPath ? discoveryResult.regions : [];
+          const discoveredRegions = layoutPath ? discoveryResult.regions : [];
 
           const [pageSpec, ...regionSpecs] = await Promise.all([
             fetchPreviewPageSpec(
               selectedPage.slug,
               pageSpecAbortController.signal,
             ),
-            ...regionsToRender.map((region) =>
+            ...discoveredRegions.map((region) =>
               fetchPreviewRegionSpec(
                 region.region,
                 pageSpecAbortController.signal,
@@ -759,14 +759,18 @@ export function App() {
           }
 
           const layoutPayload =
-            layoutPath && regionsToRender.length > 0
+            layoutPath && discoveredRegions.length > 0
               ? {
                   jsEntryUrl: toViteFsUrl(layoutPath),
                   regions: Object.fromEntries(
-                    regionsToRender.map((region, index) => [
-                      region.region,
-                      regionSpecs[index],
-                    ]),
+                    discoveredRegions
+                      .map((region, index) => ({
+                        id: region.region,
+                        regionSpec: regionSpecs[index],
+                      }))
+                      // Don't include disabled regions in page preview.
+                      .filter(({ regionSpec }) => regionSpec.status !== false)
+                      .map(({ id, regionSpec }) => [id, regionSpec.spec]),
                   ),
                 }
               : layoutPath
@@ -833,7 +837,7 @@ export function App() {
           // template; other templates render their body without page chrome.
           const includeGlobalRegions =
             selectedContentTemplate.viewMode === 'full';
-          const regionsToRender =
+          const discoveredRegions =
             layoutPath && includeGlobalRegions ? discoveryResult.regions : [];
 
           const [templateResponse, ...regionSpecs] = await Promise.all([
@@ -841,7 +845,7 @@ export function App() {
               selectedContentTemplate.slug,
               pageSpecAbortController.signal,
             ),
-            ...regionsToRender.map((region) =>
+            ...discoveredRegions.map((region) =>
               fetchPreviewRegionSpec(
                 region.region,
                 pageSpecAbortController.signal,
@@ -857,10 +861,14 @@ export function App() {
               ? {
                   jsEntryUrl: toViteFsUrl(layoutPath),
                   regions: Object.fromEntries(
-                    regionsToRender.map((region, index) => [
-                      region.region,
-                      regionSpecs[index],
-                    ]),
+                    discoveredRegions
+                      .map((region, index) => ({
+                        id: region.region,
+                        regionSpec: regionSpecs[index],
+                      }))
+                      // Don't include disabled regions in content template preview.
+                      .filter(({ regionSpec }) => regionSpec.status !== false)
+                      .map(({ id, regionSpec }) => [id, regionSpec.spec]),
                   ),
                 }
               : undefined;
@@ -1035,7 +1043,7 @@ export function App() {
     if (isRegionRoute && selectedRegion && discoveryResult) {
       void (async () => {
         try {
-          const regionSpec = await fetchPreviewRegionSpec(
+          const regionResponse = await fetchPreviewRegionSpec(
             selectedRegion.region,
             pageSpecAbortController.signal,
           );
@@ -1048,7 +1056,7 @@ export function App() {
             payload: {
               renderId: selectedRegion.region,
               renderType: 'region',
-              spec: regionSpec,
+              spec: regionResponse.spec,
               shellPath,
               registrySources: discoveryResult.components
                 .filter(

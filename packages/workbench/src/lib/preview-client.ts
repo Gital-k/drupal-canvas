@@ -91,10 +91,15 @@ export async function fetchWorkbenchConfig(
   return data;
 }
 
+export interface RegionPreviewResponse {
+  spec: Spec;
+  status: boolean;
+}
+
 export async function fetchPreviewRegionSpec(
   id: string,
   signal?: AbortSignal,
-): Promise<Spec> {
+): Promise<RegionPreviewResponse> {
   const response = await fetch(
     `/__canvas/region-preview-spec?${new URLSearchParams({ id }).toString()}`,
     { signal },
@@ -110,6 +115,6 @@ export async function fetchPreviewRegionSpec(
     );
   }
 
-  const data = (await response.json()) as Spec;
+  const data = (await response.json()) as RegionPreviewResponse;
   return data;
 }
