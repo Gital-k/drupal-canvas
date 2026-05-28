@@ -519,8 +519,7 @@ final class StaticPropSource extends PropSourceBase {
 
     $triggering_element = $form_state->getTriggeringElement();
     $ajax = $triggering_element['#ajax'] ?? NULL;
-    // @todo Handle translation for the "Remove" string.
-    //   https://git.drupalcode.org/project/canvas/-/work_items/3591586
+
     $is_remove = \is_array($ajax) && isset($ajax['callback']) && \is_array($ajax['callback']) && \in_array('deleteAjax', $ajax['callback'], TRUE);
 
     // Special handling for remove operations. The form references
@@ -533,8 +532,6 @@ final class StaticPropSource extends PropSourceBase {
     // item, it will assume the default value of the delta-matching item in
     // $this->fieldItemList. To prevent this, we explicitly remove the item
     // from $this->fieldItemList on remove requests.
-    // @todo Pass a clone instead of mutating $this->fieldItemList directly.
-    //   https://git.drupalcode.org/project/canvas/-/work_items/3591587
     if ($is_remove &&
       isset($triggering_element['#delta'])) {
       $delta = $triggering_element['#delta'];
