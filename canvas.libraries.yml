@@ -11,6 +11,7 @@ canvas-ui:
   dependencies:
     - core/drupal
     - core/drupalSettings
+    - core/drupal.ajax
     # The next three libraries are largely the same as the core libraries they
     # would be without the 'canvas.' in their name, but they take into account theme
     # overrides.
@@ -44,6 +45,7 @@ ajax.custom:
     js/ajax.command.customizations.js: {}
   dependencies:
     - core/drupal
+    - core/drupal.ajax
     - canvas/csstree
 
 csstree:
@@ -250,4 +252,3 @@ multivalue-form:
   dependencies:
     - core/drupal
     - core/drupal.tabledrag
-
