@@ -54,6 +54,8 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
         'inputs' => [
           'required_text' => 'Canvas is large and in charge!',
           'optional_text' => 'shouting',
+          'features' => ['Alpha', 'Beta', 'Gamma', 'Delta'],
+          'favorite_animals' => ['cat', 'dog'],
         ],
       ],
       [
@@ -109,6 +111,8 @@ class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxCompon
         'inputs' => [
           'required_text' => 'Canvas is large and in charge!',
           'optional_text' => 'shouting',
+          'features' => ['Alpha', 'Beta', 'Gamma', 'Delta'],
+          'favorite_animals' => ['cat', 'dog'],
         ],
       ],
     ];

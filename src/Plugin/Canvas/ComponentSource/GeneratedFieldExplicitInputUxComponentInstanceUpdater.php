@@ -124,24 +124,9 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
     // Truncate array inputs exceeding the new finite cardinality. This handles
     // the case where maxItems was tightened after component instances were
     // already created.
-    foreach ($to_props as $prop_name => $def) {
-      // @see \Drupal\canvas\PropSource\StaticPropSource::getCardinality()
-      $new_cardinality = $def['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY;
-      // When the new cardinality is unlimited, no change is necessary because
-      // any number of stored values is valid.
-      if ($new_cardinality === FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
-        continue;
-      }
-      // Skip if prop is absent, not an array, or already within the new limit.
-      if (
-        !isset($inputs[$prop_name]) ||
-        !\is_array($inputs[$prop_name]) ||
-        \count($inputs[$prop_name]) <= $new_cardinality
-      ) {
-        continue;
-      }
-
-      $inputs[$prop_name] = \array_slice($inputs[$prop_name], 0, $new_cardinality);
+    $truncated = self::applyCardinalityTruncation($inputs, $to_props);
+    if ($truncated !== $inputs) {
+      $inputs = $truncated;
       $needs_input_update = TRUE;
     }
 
@@ -263,6 +248,38 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Component
       $invalid_prop_names[$segments[0]] = TRUE;
     }
     return \array_keys($invalid_prop_names);
+  }
+
+  /**
+   * Truncates array inputs that exceed the new finite cardinality.
+   *
+   * @param array $inputs
+   *   Current prop inputs.
+   * @param array $to_props
+   *   Prop field definitions for the target version.
+   *
+   * @return array
+   *   Inputs with oversized arrays sliced to the new cardinality limit.
+   */
+  protected static function applyCardinalityTruncation(array $inputs, array $to_props): array {
+    foreach ($to_props as $prop_name => $def) {
+      // @see \Drupal\canvas\PropSource\StaticPropSource::getCardinality()
+      $new_cardinality = $def['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY;
+      // When the new cardinality is unlimited, any number of stored values is valid.
+      if ($new_cardinality === FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
+        continue;
+      }
+      // Skip if prop is absent, not an array, or already within the new limit.
+      if (
+        !isset($inputs[$prop_name]) ||
+        !\is_array($inputs[$prop_name]) ||
+        \count($inputs[$prop_name]) <= $new_cardinality
+      ) {
+        continue;
+      }
+      $inputs[$prop_name] = \array_slice($inputs[$prop_name], 0, $new_cardinality);
+    }
+    return $inputs;
   }
 
   /**

@@ -74,6 +74,15 @@ final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComp
       $changed = TRUE;
     }
 
+    // Truncate before validating: cardinality-only violations must not cause
+    // inputs to be dropped entirely. parent::update() would truncate too, but
+    // it runs after this validation step.
+    $truncated = self::applyCardinalityTruncation($inputs, $to_props);
+    if ($truncated !== $inputs) {
+      $inputs = $truncated;
+      $changed = TRUE;
+    }
+
     // @todo try to coerce values across compatible types.
     $invalid_prop_names = self::getInvalidPropNames(
       $target_source->validateComponentInput(
