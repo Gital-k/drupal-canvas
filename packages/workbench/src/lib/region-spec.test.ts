@@ -18,6 +18,13 @@ describe('normalizeRegionSpec', () => {
     });
   });
 
+  it('defaults status to true and preserves an explicit status', () => {
+    expect(normalizeRegionSpec({ elements: {} }).status).toBe(true);
+    expect(normalizeRegionSpec({ elements: {}, status: false }).status).toBe(
+      false,
+    );
+  });
+
   it('excludes slot-referenced elements from the synthetic top-level children', () => {
     const normalized = normalizeRegionSpec({
       elements: {
@@ -51,6 +58,36 @@ describe('parseRegionSpec', () => {
     expect(result.issues).toHaveLength(0);
     expect(result.region).not.toBeNull();
     expect(result.region?.spec.root).toBe('canvas:component-tree');
+  });
+
+  it('parses the optional status flag', () => {
+    const result = parseRegionSpec(
+      {
+        status: false,
+        elements: {
+          a: { type: 'js.logo', props: {} },
+        },
+      },
+      '/tmp/regions/header.json',
+      { componentNames: ['js.logo'] },
+    );
+
+    expect(result.issues).toHaveLength(0);
+    expect(result.region?.status).toBe(false);
+  });
+
+  it('rejects a non-boolean status', () => {
+    const result = parseRegionSpec(
+      { status: 'yes', elements: {} },
+      '/tmp/regions/header.json',
+    );
+
+    expect(result.region).toBeNull();
+    expect(
+      result.issues.some((issue) =>
+        issue.message.includes('"status" must be a boolean'),
+      ),
+    ).toBe(true);
   });
 
   it('rejects legacy `theme`/`region` keys with a helpful message', () => {

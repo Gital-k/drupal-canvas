@@ -390,6 +390,7 @@ async function loadPreviewRegionSpec(
   spec: unknown | null;
   status: number;
   error: string | null;
+  enabled: boolean;
 }> {
   const region = discoveryResult.regions.find(
     (candidate) => candidate.region === id,
@@ -399,6 +400,7 @@ async function loadPreviewRegionSpec(
       spec: null,
       status: 404,
       error: `No global region found for id "${id}".`,
+      enabled: true,
     };
   }
 
@@ -410,6 +412,7 @@ async function loadPreviewRegionSpec(
       spec: null,
       status: 404,
       error: `Failed to read region file: ${region.path}`,
+      enabled: true,
     };
   }
 
@@ -421,6 +424,7 @@ async function loadPreviewRegionSpec(
       spec: null,
       status: 400,
       error: `Failed to parse region JSON file: ${region.path}`,
+      enabled: true,
     };
   }
 
@@ -434,6 +438,7 @@ async function loadPreviewRegionSpec(
       error:
         parsedRegion.issues[0]?.message ??
         `Region spec is invalid: ${region.path}`,
+      enabled: true,
     };
   }
 
@@ -441,6 +446,7 @@ async function loadPreviewRegionSpec(
     spec: parsedRegion.region.spec,
     status: 200,
     error: null,
+    enabled: parsedRegion.region.status,
   };
 }
 
@@ -716,7 +722,9 @@ export function createWorkbenchPlugin(paths: WorkbenchPaths): Plugin {
             res.setHeader('Content-Type', 'application/json');
             res.end(
               JSON.stringify(
-                result.error ? { error: result.error } : result.spec,
+                result.error
+                  ? { error: result.error }
+                  : { spec: result.spec, status: result.enabled },
               ),
             );
           })().catch((error) => {
