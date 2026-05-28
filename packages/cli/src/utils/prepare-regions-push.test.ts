@@ -78,7 +78,6 @@ function makePrepared(region: string): PreparedRegion {
     status: true,
     components: [],
     filePath: `/tmp/regions/${region}.json`,
-    pendingMediaReconciliations: [],
   };
 }
 
