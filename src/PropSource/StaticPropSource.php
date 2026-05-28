@@ -519,19 +519,21 @@ final class StaticPropSource extends PropSourceBase {
 
     $triggering_element = $form_state->getTriggeringElement();
     $ajax = $triggering_element['#ajax'] ?? NULL;
-
     $is_remove = \is_array($ajax) && isset($ajax['callback']) && \is_array($ajax['callback']) && \in_array('deleteAjax', $ajax['callback'], TRUE);
 
-    // Special handling for remove operations. The form references
-    // $this->fieldItemList to generate its items, which - unless updated here -
-    // will retain the value as passed to the constructor.
-    // The form contents are primary based on input - so it's largely fine that
-    // this list retains the values as initially passed to the constructor.
-    // However, this is an issue when adding a new item with a delta already
-    // occupied in fieldItemList -- because there is not yet input for that
-    // item, it will assume the default value of the delta-matching item in
-    // $this->fieldItemList. To prevent this, we explicitly remove the item
-    // from $this->fieldItemList on remove requests.
+    // Special handling for remove operations.
+    //
+    // Why: WidgetBase::formMultipleElements() uses `isset($items[$delta])` to
+    // decide whether to populate a delta from $this->fieldItemList or append a
+    // new empty item. Without this, the removed delta remains occupied in
+    // $this->fieldItemList, so the next "Add" shows the old value instead of
+    // an empty one.
+    //
+    // Core avoids this via WidgetBase::deleteSubmit() + EntityFormDisplay::
+    // extractFormValues(), which update the entity's field item list from user
+    // input between AJAX requests. Canvas cannot use this: fieldItemList is
+    // conjured without entity context (see conjureFieldItemList()), so nothing
+    // updates it between requests until the prop is saved.
     if ($is_remove &&
       isset($triggering_element['#delta'])) {
       $delta = $triggering_element['#delta'];
