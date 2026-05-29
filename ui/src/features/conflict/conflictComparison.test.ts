@@ -27,10 +27,7 @@ const makeChange = (
   label: 'Page',
   updated: 100,
   hasConflict: true,
-  conflict: {
-    conflict_id: 'revision-2',
-    timestamp: 1000,
-  },
+  conflict_id: 'revision-2',
   ...overrides,
 });
 

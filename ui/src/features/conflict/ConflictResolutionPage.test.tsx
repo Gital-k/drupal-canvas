@@ -83,10 +83,7 @@ const pendingChanges: PendingChanges = {
     label: 'Homepage',
     updated: 100,
     hasConflict: true,
-    conflict: {
-      conflict_id: 'revision-2',
-      timestamp: 1776892400,
-    },
+    conflict_id: 'revision-2',
   },
   'canvas_page:2:en': {
     owner: {
@@ -102,10 +99,7 @@ const pendingChanges: PendingChanges = {
     label: 'About',
     updated: 50,
     hasConflict: true,
-    conflict: {
-      conflict_id: 'revision-3',
-      timestamp: 1776892500,
-    },
+    conflict_id: 'revision-3',
   },
 };
 

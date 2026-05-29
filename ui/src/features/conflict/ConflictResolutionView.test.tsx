@@ -53,6 +53,8 @@ const ComparisonHarness = () => {
       <TooltipProvider>
         <Provider store={store}>
           <PageConflictComparisonView
+            entityId="1"
+            entityType="canvas_page"
             publishedVersion={publishedVersion}
             newVersion={newVersion}
             selectedVersion={selectedVersion}

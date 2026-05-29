@@ -125,7 +125,7 @@ const EnabledConflictResolutionPage = () => {
 
     try {
       if (selectedVersion === 'new') {
-        const conflictId = activeChange.conflict?.conflict_id;
+        const conflictId = activeChange.conflict_id;
         if (!conflictId) {
           setResolutionFailed(true);
           return;

@@ -25,7 +25,7 @@ export interface PendingChange {
   label: string;
   updated: number;
   hasConflict?: boolean;
-  conflict?: ConflictMetadata;
+  conflict_id?: string;
 }
 
 export type PendingChanges = {
@@ -45,17 +45,12 @@ export interface ConflictError {
   meta?: ConflictErrorMeta;
 }
 
-export interface ConflictMetadata {
-  conflict_id: string;
-  timestamp: number;
-}
-
 export interface ConflictErrorMeta {
   entity_type?: string;
   entity_id?: string | number;
   label?: string;
   api_auto_save_key?: string;
-  conflict?: ConflictMetadata;
+  conflict_id?: string;
 }
 
 export interface PendingChangesResponse {
@@ -72,27 +67,6 @@ const isPendingChangesResponse = (
   return typeof data === 'object' && data !== null && !('owner' in data);
 };
 
-export const normalizeConflictTimestamp = (
-  timestamp?: number,
-): number | undefined => {
-  if (typeof timestamp !== 'number') {
-    return undefined;
-  }
-  return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
-};
-
-export const normalizeConflictMetadata = (
-  conflict?: ConflictMetadata,
-): ConflictMetadata | undefined => {
-  if (!conflict) {
-    return undefined;
-  }
-
-  return {
-    ...conflict,
-    timestamp: normalizeConflictTimestamp(conflict.timestamp) ?? Date.now(),
-  };
-};
 
 export const getAutoSaveKeyFromError = (
   error: ConflictError,
@@ -125,15 +99,14 @@ export const applyConflictStateFromResponse = (
   return Object.fromEntries(
     Object.entries(normalizedResponse.data ?? {}).map(([pointer, change]) => {
       const conflictError = byPointer.get(pointer);
-      const conflictMeta = conflictError?.meta;
-      const conflict = normalizeConflictMetadata(conflictMeta?.conflict);
+      const conflictId = conflictError?.meta?.conflict_id;
 
       return [
         pointer,
         {
           ...change,
-          hasConflict: !!conflict,
-          conflict,
+          hasConflict: !!conflictId,
+          conflict_id: conflictId,
         },
       ];
     }),

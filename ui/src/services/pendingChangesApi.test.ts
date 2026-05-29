@@ -27,10 +27,7 @@ describe('pendingChangesApi conflict normalization', () => {
           source: { pointer: 'canvas_page:1:en' },
           meta: {
             api_auto_save_key: 'canvas_page:1:en',
-            conflict: {
-              conflict_id: '7',
-              timestamp: 1776892400,
-            },
+            conflict_id: '7',
           },
         },
       ],
@@ -38,10 +35,7 @@ describe('pendingChangesApi conflict normalization', () => {
 
     expect(result['canvas_page:1:en']).toMatchObject({
       hasConflict: true,
-      conflict: {
-        conflict_id: '7',
-        timestamp: 1776892400000,
-      },
+      conflict_id: '7',
     });
   });
 
@@ -68,7 +62,7 @@ describe('pendingChangesApi conflict normalization', () => {
 
     expect(result['canvas_page:2:en']).toMatchObject({
       hasConflict: false,
-      conflict: undefined,
+      conflict_id: undefined,
     });
   });
 });

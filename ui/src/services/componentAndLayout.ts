@@ -215,7 +215,7 @@ export const componentAndLayoutApi = createApi({
       }
     >({
       query: ({ entityId, entityType, publishedVersion = false }) =>
-        `canvas/api/v0/layout/${entityType}/${entityId}${publishedVersion ? '?status=true' : ''}`,
+        `canvas/api/v0/layout/${entityType}/${entityId}${publishedVersion ? '?autoSaved=false' : ''}`,
       providesTags: () => [{ type: 'Layout' }],
     }),
     getTemplateLayout: builder.query<

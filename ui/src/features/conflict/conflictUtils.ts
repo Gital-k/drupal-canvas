@@ -11,7 +11,6 @@ export interface ConflictResolverItem {
   entityType: string;
   entityId: string | number;
   updated: number;
-  conflictTimestamp: number;
 }
 
 export const GLOBAL_CONFLICT_CONTEXT_KEY = 'global';
@@ -60,6 +59,7 @@ const normalizeTimestamp = (timestamp?: number): number => {
   }
   return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
 };
+
 
 export const buildConflictNotification = ({
   contextKey,
@@ -112,7 +112,6 @@ export const toConflictResolverItems = (
     entityType: change.entity_type,
     entityId: change.entity_id,
     updated: change.updated,
-    conflictTimestamp: normalizeTimestamp(change.conflict?.timestamp),
   }));
 
 export const getConflictNotificationFromPendingChanges = (
@@ -135,9 +134,7 @@ export const getConflictNotificationFromPendingChanges = (
   }
 
   const latestTimestamp = Math.max(
-    ...entries.map(([, change]) =>
-      normalizeTimestamp(change.conflict?.timestamp ?? change.updated),
-    ),
+    ...entries.map(([, change]) => normalizeTimestamp(change.updated)),
   );
 
   return {
