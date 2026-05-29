@@ -3080,6 +3080,15 @@ components:
                 type: string
               required:
                 type: boolean
+              sourceShapeDiffersFromResolved:
+                type: boolean
+                description: >-
+                  True when the field widget's stored (source) value has a
+                  different shape than the prop's resolved value (e.g. a scalar
+                  entity/file id the server wraps into an object). The client
+                  skips client-side JSON Schema validation for such props and
+                  defers to the server.
+                # @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter()
               default_values:
                 type: object
                 additionalProperties: false

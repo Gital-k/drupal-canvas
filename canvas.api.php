@@ -52,6 +52,11 @@ function hook_canvas_storable_prop_shape_alter(CandidateStorablePropShape $stora
   // for it.
   // ⚠️ Any field widget that is used must have `canvas.transforms` defined on
   // the field widget's plugin definition. See hook_field_widget_info_alter().
+  // If the widget's stored (source) value has a different shape than the
+  // prop's resolved value (e.g. it edits a scalar id the server wraps into an
+  // object), also set `canvas.sourceShapeDiffersFromResolved` so Canvas skips
+  // client-side JSON Schema validation and defers to the server.
+  // @see docs/redux-integrated-field-widgets.md (§3.4.3)
   if (
     $storable_prop_shape->fieldTypeProp === NULL
     && $storable_prop_shape->shape->schema == [

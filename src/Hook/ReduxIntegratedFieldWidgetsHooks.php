@@ -300,31 +300,44 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    */
   #[Hook('field_widget_info_alter')]
   public static function fieldWidgetInfoAlter(array &$info): void {
+    // Per field-widget `canvas` metadata. Each entry is the full `canvas`
+    // metadata block for that widget:
+    // - `transforms`: the client-side transforms to apply to the widget value.
+    // - `sourceShapeDiffersFromResolved` (optional): set when the widget
+    //   edits a single scalar source value (an entity/file id) that the server
+    //   wraps into the prop's resolved (object) shape via
+    //   `PropSource::parse(...)->toArray()` (mirroring the field widget's
+    //   `massageFormValues()`). The client cannot validate that scalar against
+    //   the resolved schema, so it skips client-side validation and defers to
+    //   the server.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getClientSideInfo()
+    // @see ui/src/components/form/react-hook-form/fields/componentFieldValidation.ts
+    // @see docs/redux-integrated-field-widgets.md (§3.4.3)
     $map = [
-      'boolean_checkbox' => ['mainProperty' => []],
-      'datetime_default' => ['mainProperty' => [], 'dateTime' => []],
-      'daterange_default' => ['dateRange' => []],
-      'email_default' => ['mainProperty' => []],
-      'file_generic' => ['mainProperty' => ['name' => 'fids']],
-      'image_image' => ['mainProperty' => ['name' => 'fids']],
-      'link_default' => ['link' => []],
-      'number' => ['mainProperty' => []],
-      'options_select' => [],
-      'string_textarea' => ['mainProperty' => []],
-      'string_textfield' => ['mainProperty' => []],
-      'text_textfield' => [
-        'mainProperty' => ['name' => 'value'],
+      'boolean_checkbox' => ['transforms' => ['mainProperty' => []]],
+      'datetime_default' => ['transforms' => ['mainProperty' => [], 'dateTime' => []]],
+      'daterange_default' => ['transforms' => ['dateRange' => []]],
+      'email_default' => ['transforms' => ['mainProperty' => []]],
+      'file_generic' => [
+        'transforms' => ['mainProperty' => ['name' => 'fids']],
+        'sourceShapeDiffersFromResolved' => TRUE,
       ],
-      'text_textarea' => [
-        'mainProperty' => ['name' => 'value'],
+      'image_image' => [
+        'transforms' => ['mainProperty' => ['name' => 'fids']],
+        'sourceShapeDiffersFromResolved' => TRUE,
       ],
-      'text_textarea_with_summary' => [
-        'mainProperty' => ['name' => 'value'],
-      ],
+      'link_default' => ['transforms' => ['link' => []]],
+      'number' => ['transforms' => ['mainProperty' => []]],
+      'options_select' => ['transforms' => []],
+      'string_textarea' => ['transforms' => ['mainProperty' => []]],
+      'string_textfield' => ['transforms' => ['mainProperty' => []]],
+      'text_textfield' => ['transforms' => ['mainProperty' => ['name' => 'value']]],
+      'text_textarea' => ['transforms' => ['mainProperty' => ['name' => 'value']]],
+      'text_textarea_with_summary' => ['transforms' => ['mainProperty' => ['name' => 'value']]],
     ];
-    foreach ($map as $widget_id => $transforms) {
+    foreach ($map as $widget_id => $canvas_metadata) {
       if (\array_key_exists($widget_id, $info)) {
-        $info[$widget_id]['canvas']['transforms'] = $transforms;
+        $info[$widget_id]['canvas'] = $canvas_metadata;
       }
     }
   }
@@ -339,6 +352,10 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         'mediaSelection' => [],
         'mainProperty' => ['name' => 'target_id'],
       ],
+      // The source value is a scalar media entity id that the server wraps into
+      // the prop's resolved (object) shape; defer validation to the server.
+      // @see ::fieldWidgetInfoAlter()
+      'sourceShapeDiffersFromResolved' => TRUE,
     ];
   }
 

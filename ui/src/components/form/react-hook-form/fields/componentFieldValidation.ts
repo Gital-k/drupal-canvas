@@ -104,6 +104,24 @@ export function getPropSchemas(inputAndUiData: InputUIData) {
 }
 
 /**
+ * Returns the prop-source (field-data) metadata for a prop, if available.
+ *
+ * @param {InputUIData} inputAndUiData
+ * @param {string} propName
+ * @return {FieldDataItem | undefined}
+ */
+function getPropSource(
+  inputAndUiData: InputUIData,
+  propName: string,
+): FieldDataItem | undefined {
+  const { components, selectedComponentType } = inputAndUiData;
+  const component = components?.[selectedComponentType];
+  return isPropSourceComponent(component)
+    ? component.propSources[propName]
+    : undefined;
+}
+
+/**
  * Determines if JSON Schema validation should be skipped for a prop.
  *
  * Ideally, this function can be removed at some point. It's here because the
@@ -148,6 +166,22 @@ export const shouldSkipPropValidation = (
   }
 
   const { selectedComponent } = inputAndUiData;
+
+  // Skip props the widget flagged as source-shape-differs-from-resolved: the
+  // form holds a scalar the server wraps into the resolved object shape, which
+  // can't be validated against the resolved schema. Defer to the server.
+  // @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter
+  // @see docs/redux-integrated-field-widgets.md (§3.4.3)
+  if (
+    getPropSource(inputAndUiData, toPropName(name, selectedComponent))
+      ?.sourceShapeDiffersFromResolved
+  ) {
+    console.warn(
+      `Input ${toPropName(name, selectedComponent)} has a source value whose shape differs from its resolved value (e.g. a scalar id the server wraps into an object). Client-side JSON Schema validation is skipped; the server is the source of truth.`,
+    );
+    return true;
+  }
+
   const formData = new FormData(target.form);
   const formState = Object.fromEntries(formData);
   const { multipleInputsSingleValue } = propInputData(

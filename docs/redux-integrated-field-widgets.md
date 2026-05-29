@@ -384,6 +384,29 @@ When `multiple: true`, the `mainProperty` transform also supports weight-based o
 ["5", "3"]
 ```
 
+#### 3.4.3 Source-vs-resolved widgets (`sourceShapeDiffersFromResolved`)
+
+Some widgets edit a single scalar value (e.g. an entity/file/media id) that the server later wraps into the prop's *resolved* object shape — the "source vs resolved" distinction from [3.2.1](#321-source-vs-resolved-input) (e.g. an `image` source `{ "target_id": 3 }` resolves to `{ src, alt, width, height }`). The client holds only the scalar source value, so it cannot validate it against the prop's resolved (`type: object`) JSON Schema.
+
+To handle this, a widget declares `sourceShapeDiffersFromResolved` alongside its `transforms` in `hook_field_widget_info_alter()`:
+
+```php
+function hook_field_widget_info_alter(array &$info): void {
+  $info['my_entity_reference_widget']['canvas'] = [
+    'transforms' => [
+      'mainProperty' => ['name' => 'target_id'],
+    ],
+    // The widget edits a scalar id that the server wraps into the prop's
+    // resolved object shape, so the resolved schema can't validate it.
+    'sourceShapeDiffersFromResolved' => TRUE,
+  ];
+}
+```
+
+Canvas surfaces this per prop to the client (via `JsonSchemaPropsComponentSourceBase::getClientSideInfo()`), where it skips client-side JSON Schema validation for the prop and defers to server-side validation (which validates the resolved shape and any Canvas-specific keywords). The core `image_image`, `file_generic` and `media_library_widget` widgets set this flag.
+
+This is distinct from the multi-input skip (a value spread across several form controls, which can't be validated until complete): `sourceShapeDiffersFromResolved` applies even to a single-input widget, because the issue is the *shape* of the value, not the number of inputs.
+
 ### 3.5 Limitations / Tradeoffs
 We've already established this system makes it possible to render Drupal render arrays with React. This makes it possible to use existing Drupal core functionality as if it were rendered by Twig. As powerful as this is, this isn't a 100% seamless solution. There are some limitations to be aware of:
 

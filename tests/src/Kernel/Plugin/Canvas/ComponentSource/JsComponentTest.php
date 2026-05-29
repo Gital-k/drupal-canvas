@@ -1664,6 +1664,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
                 'poster' => 'https://placehold.co/1080x1920.png?text=Vertical',
               ],
             ],
+            'sourceShapeDiffersFromResolved' => TRUE,
           ],
           'displayWidth' => [
             'required' => FALSE,
@@ -1825,6 +1826,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
                 'alt' => 'Example image placeholder',
               ],
             ],
+            'sourceShapeDiffersFromResolved' => TRUE,
           ],
         ],
         'transforms' => [],
@@ -2010,6 +2012,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
                 ],
               ],
             ],
+            'sourceShapeDiffersFromResolved' => TRUE,
           ],
         ],
         'transforms' => [],
