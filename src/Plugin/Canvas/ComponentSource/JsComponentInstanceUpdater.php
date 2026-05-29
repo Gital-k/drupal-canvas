@@ -11,13 +11,12 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 /**
  * Updates JS component instances, accepting data loss on prop shape changes.
  *
- * Unlike GeneratedFieldExplicitInputUxComponentInstanceUpdater, this updater
- * allows prop shape changes and existing input data for shape-changed props is
- * dropped.
+ * Unlike JsonSchemaPropsComponentInstanceUpdater, this updater allows prop
+ * shape changes and existing input data for shape-changed props is dropped.
  *
- * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceUpdater
  */
-final class JsComponentInstanceUpdater extends GeneratedFieldExplicitInputUxComponentInstanceUpdater {
+final class JsComponentInstanceUpdater extends JsonSchemaPropsComponentInstanceUpdater {
 
   /**
    * {@inheritdoc}

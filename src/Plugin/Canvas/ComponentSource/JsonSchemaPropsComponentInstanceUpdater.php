@@ -15,7 +15,7 @@ use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
-final class JsonSchemaPropsComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
+class JsonSchemaPropsComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
 
   /**
    * {@inheritdoc}
