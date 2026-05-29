@@ -19,7 +19,7 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('canvas')]
 #[Group('canvas_component_sources')]
 #[Group('canvas_data_model')]
-class JsComponentInstanceUpdaterTest extends GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest {
+class JsComponentInstanceUpdaterTest extends JsonSchemaPropsComponentInstanceUpdaterTest {
 
   /**
    * {@inheritdoc}
