@@ -606,7 +606,7 @@ Unsafe changes (that prevent auto-update) include:
 - Changing prop shapes
 
 See
-- `\Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater::canUpdate`
+- `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceUpdater::canUpdate`
 
 For the `js` component source, Canvas uses
 `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentInstanceUpdater`.
