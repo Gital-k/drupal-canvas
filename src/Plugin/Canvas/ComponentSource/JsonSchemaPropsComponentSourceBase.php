@@ -1185,11 +1185,18 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
         )
     )->fieldItemList;
 
-    return !$example_assigned_to_field_item_list->isEmpty()
-      // The actual value in the field if there is one.
-      ? $example_assigned_to_field_item_list->getValue()
-      // If empty: do not store anything in the Component config entity.
-      : NULL;
+    // If empty: do not store anything in the Component config entity.
+    if ($example_assigned_to_field_item_list->isEmpty()) {
+      return NULL;
+    }
+
+    // The actual value in the field, if there is one, with whatever additional
+    // processing the field type requires.
+    return $example_assigned_to_field_item_list::processDefaultValue(
+      $example_assigned_to_field_item_list->getValue(),
+      $example_assigned_to_field_item_list->getEntity(),
+      $example_assigned_to_field_item_list->getFieldDefinition(),
+    );
   }
 
   /**
