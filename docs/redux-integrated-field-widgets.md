@@ -403,7 +403,7 @@ function hook_field_widget_info_alter(array &$info): void {
 }
 ```
 
-Canvas surfaces this per prop to the client (via `JsonSchemaPropsComponentSourceBase::getClientSideInfo()`), where it skips client-side JSON Schema validation for the prop and defers to server-side validation (which validates the resolved shape and any Canvas-specific keywords). The core `image_image`, `file_generic` and `media_library_widget` widgets set this flag.
+Canvas surfaces this per prop to the client (via `JsonSchemaPropsComponentSourceBase::getClientSideInfo()`), where it skips client-side JSON Schema validation for the prop and defers to server-side validation (which validates the resolved shape and any Canvas-specific keywords). The core `image_image`, `file_generic` and `media_library_widget` widgets are examples that set this flag.
 
 This is distinct from the multi-input skip (a value spread across several form controls, which can't be validated until complete): `sourceShapeDiffersFromResolved` applies even to a single-input widget, because the issue is the *shape* of the value, not the number of inputs.
 
