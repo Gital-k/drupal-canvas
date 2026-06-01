@@ -14,3 +14,18 @@ canvas_dev_translation.api.content.translation.delete:
     _format: 'json'
   methods: [DELETE]
 
+canvas_dev_translation.ui.content.translation.delete:
+  path: '/admin/content/pages/{canvas_page}/translations/{language}/delete'
+  defaults:
+    _entity_form: 'canvas_page.content_translation_deletion'
+    _title: 'Delete translation'
+    entity_type_id: canvas_page
+  requirements:
+    _entity_access: 'canvas_page.delete'
+  options:
+    _admin_route: TRUE
+    parameters:
+      canvas_page:
+        type: entity:canvas_page
+      language:
+        type: language
