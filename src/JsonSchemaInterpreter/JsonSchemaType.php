@@ -392,8 +392,17 @@ enum JsonSchemaType: string {
         // selection to a single bundle via the `default` selection handler.
         // @see docs/shape-matching.md#3.2.3
         // @see \Drupal\canvas\ComponentMetadataRequirementsChecker
-        JsonSchemaObjectRef::isContentEntityReference($schema)
-          && \array_key_exists('x-allowed-entity-type-id', $shape->schema) => new StorablePropShape(
+        // NOTE: SDC YAML props have their `$ref` pre-resolved by
+        // ComponentPluginManager::processDefinition() before reaching here, so
+        // `isContentEntityReference()` (which requires `$ref` to be present)
+        // will not match for SDC-authored props. The second condition handles
+        // that case by checking the resolved schema directly.
+        // @todo Refine as part of https://www.drupal.org/i/3585135.
+        (JsonSchemaObjectRef::isContentEntityReference($schema)
+          && \array_key_exists('x-allowed-entity-type-id', $shape->schema))
+          || ($schema['type'] === JsonSchemaType::Object->value
+          && \array_key_exists('x-allowed-entity-type-id', $schema)
+          && !\array_key_exists('$ref', $schema)) => new StorablePropShape(
             shape: $shape,
             fieldTypeProp: new FieldTypePropExpression('entity_reference', 'entity'),
             fieldWidget: 'entity_reference_autocomplete',

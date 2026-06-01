@@ -163,14 +163,14 @@ export const shouldSkipPropValidation = (
     return true;
   }
 
-  const formData = new FormData(target.form);
-  const formState = Object.fromEntries(formData);
-  const { multipleInputsSingleValue } = propInputData(
-    formState,
-    inputAndUiData,
-  );
+  // const formData = new FormData(target.form);
+  // const formState = Object.fromEntries(formData);
+  // const { multipleInputsSingleValue } = propInputData(
+  //   formState,
+  //   inputAndUiData,
+  // );
 
-  if (multipleInputsSingleValue.includes(propName)) {
+  if (propSchemas[propName]?.type === 'object') {
     console.warn(
       `Input ${propName} is part of a single value prop that corresponds to multiple form fields. This is not yet supported and JSON Schema validation is skipped.`,
     );
