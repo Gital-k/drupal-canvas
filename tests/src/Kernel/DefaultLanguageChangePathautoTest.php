@@ -42,6 +42,7 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
     'language',
     'pathauto',
     'token',
+    'canvas_test_pathauto',
   ];
 
   /**
@@ -61,11 +62,12 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
 
     ConfigurableLanguage::createFromLangcode('fr')->save();
 
-    // Create a Pathauto pattern for Canvas pages so aliases are generated.
+    // Create a Pathauto pattern using a simple ID token provided by
+    // canvas_test_pathauto, ensuring token resolution always succeeds.
     PathautoPattern::create([
       'id' => 'canvas_page',
       'type' => 'canonical_entities:canvas_page',
-      'pattern' => '/pages/[canvas_page:title]',
+      'pattern' => '/pages/[canvas_page:id]',
       'weight' => -10,
     ])->save();
   }
