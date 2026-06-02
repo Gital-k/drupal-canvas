@@ -219,6 +219,9 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
     $en_values = $template->toArray();
     $fr_values = $en_values;
     NestedArray::setValue($fr_values, ['component_tree', self::UUID_CTA, 'inputs', 'text'], [0 => ['value' => 'Texte de secours français']]);
+    // Href must be in widget array format, not the raw stored string.
+    // @see \Drupal\canvas\ConfigTranslation\CanvasStaticPropSourceFieldWidget
+    NestedArray::setValue($fr_values, ['component_tree', self::UUID_CTA, 'inputs', 'href'], [0 => ['uri' => 'https://example.com']]);
     $this->saveConfigEntityTranslation($template, 'fr', $fr_values);
 
     // Add a third language (Spanish) for which NO translation exists.
@@ -286,6 +289,9 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
     $en_values = $template->toArray();
     $fr_values = $en_values;
     NestedArray::setValue($fr_values, ['component_tree', self::UUID_CTA, 'inputs', 'text'], [0 => ['value' => 'Texte du modèle français']]);
+    // Href must be in widget array format, not the raw stored string.
+    // @see \Drupal\canvas\ConfigTranslation\CanvasStaticPropSourceFieldWidget
+    NestedArray::setValue($fr_values, ['component_tree', self::UUID_CTA, 'inputs', 'href'], [0 => ['uri' => 'https://example.com']]);
     $this->saveConfigEntityTranslation($template, 'fr', $fr_values);
 
     // Add Spanish (no translation for this language).
