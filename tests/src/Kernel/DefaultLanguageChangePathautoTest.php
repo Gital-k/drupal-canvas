@@ -66,7 +66,9 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
 
     // Pathauto's pattern query uses accessCheck(TRUE); set the current user to
     // one with the 'administer pathauto' permission so patterns are found.
-    $this->setCurrentUser($this->createUser(['administer pathauto']));
+    $admin = $this->createUser(['administer pathauto']);
+    \assert($admin !== FALSE);
+    $this->setCurrentUser($admin);
 
     ConfigurableLanguage::createFromLangcode('fr')->save();
 

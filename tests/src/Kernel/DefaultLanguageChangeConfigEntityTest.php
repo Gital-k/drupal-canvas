@@ -80,7 +80,7 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
   /**
    * Creates a ContentTemplate with the standard test component tree.
    */
-  private function createContentTemplate(): ContentTemplate {
+  private static function createContentTemplate(): ContentTemplate {
     $template = ContentTemplate::create([
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'article',
@@ -337,9 +337,10 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
     // EN must now be a language override.
     $en_override = $language_manager->getLanguageConfigOverride('en', $config_name);
     self::assertFalse($en_override->isNew(), 'EN must now exist as a PageRegion override.');
+    $en_override_data = $en_override->getRawData();
     self::assertSame(
       'English region text',
-      NestedArray::getValue($en_override->getRawData(), ['component_tree', self::UUID_CTA, 'inputs', 'text'])
+      NestedArray::getValue($en_override_data, ['component_tree', self::UUID_CTA, 'inputs', 'text'])
     );
   }
 
