@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Language\LanguageInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
