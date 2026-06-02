@@ -227,30 +227,53 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that the old default config is discarded when the old language is dropped.
+   * Tests that no override is created for a language not involved in the swap.
+   *
+   * When the old default language (FR) is switched to a new default (DE), only
+   * an FR override should be created from the old base. No override for EN or
+   * any other uninvolved language should be spuriously created.
    *
    * AC4: If the old default language is being dropped entirely, the old default
-   * config translation override should be discarded rather than stored.
+   * config translation override should be discarded rather than stored. More
+   * broadly, overrides must only be created for languages that were the
+   * previous default.
    */
   public function testOldDefaultConfigIsDiscardedWhenOldLanguageIsDropped(): void {
+    // Set up a site where FR is already the default language so we can test
+    // a FR→DE switch without involving EN at all.
+    ConfigurableLanguage::createFromLangcode('de')->save();
+
+    // Directly set FR as the default without triggering the handler (we don't
+    // want Canvas migration to run yet).
+    $this->config('system.site')->set('default_langcode', 'fr')->save();
+
+    // Create a ContentTemplate with a DE translation override.
     $template = $this->createContentTemplate();
-    $this->addFrenchTranslationToTemplate($template);
-
-    // Change default to FR and simultaneously remove EN from the site.
-    $this->changeDefaultLanguageTo('fr');
-    $en_language = ConfigurableLanguage::load('en');
-    // Deleting the default language is normally blocked; we simulate "dropped"
-    // by verifying no EN override is retained when EN no longer exists as a
-    // site language after the switch.
-    // @see \Drupal\language\Entity\ConfigurableLanguage::preDelete()
-    if ($en_language instanceof ConfigurableLanguage && !$en_language->isDefault()) {
-      $en_language->delete();
-    }
-
     $language_manager = $this->container->get(LanguageManagerInterface::class);
     \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
-    $en_override = $language_manager->getLanguageConfigOverride('en', $template->getConfigDependencyName());
-    self::assertTrue($en_override->isNew(), 'EN override must be discarded when EN is dropped from the site.');
+    $config_name = $template->getConfigDependencyName();
+
+    // Manually write a DE override (the "new default" will be DE).
+    $de_override = $language_manager->getLanguageConfigOverride('de', $config_name);
+    $de_override->setData([
+      'component_tree' => [
+        self::UUID_CTA => [
+          'inputs' => ['text' => 'Powered auf Deutsch'],
+        ],
+      ],
+    ])->save();
+
+    // Now switch the default from FR to DE. The handler should:
+    // - promote DE override to base config
+    // - create a FR override for the old FR base values
+    // - NOT create an EN override (EN was never the default in this scenario)
+    $this->changeDefaultLanguageTo('de');
+
+    $en_override = $language_manager->getLanguageConfigOverride('en', $config_name);
+    self::assertTrue($en_override->isNew(), 'No EN override must be created when EN is not the old default.');
+
+    $fr_override = $language_manager->getLanguageConfigOverride('fr', $config_name);
+    self::assertFalse($fr_override->isNew(), 'FR override must exist as the old default values.');
   }
 
   // ---------------------------------------------------------------------------
