@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { CheckIcon, Cross2Icon } from '@radix-ui/react-icons';
 import {
@@ -40,6 +40,7 @@ interface PublishReviewProps {
   onViewClick?: (change: UnpublishedChange) => void;
   onResolveConflict?: (change?: UnpublishedChange) => void;
   onOpenChangeCallback: (open: boolean) => void;
+  openReviewSignal?: number;
   isPublishing: boolean;
   isDiscarding: boolean;
   isUpdating: boolean; // indicates if the preview is being updated
@@ -58,12 +59,14 @@ const PublishReview: React.FC<PublishReviewProps> = ({
   onViewClick,
   onResolveConflict,
   onOpenChangeCallback,
+  openReviewSignal = 0,
   isPublishing = false,
   isDiscarding = false,
   isUpdating = false,
   pageStatusMap,
 }) => {
   const conflictUxEnabled = isConflictUxEnabled();
+  const handledOpenReviewSignal = useRef(0);
   // State to manage the open/close state of the popover
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
@@ -93,6 +96,18 @@ const PublishReview: React.FC<PublishReviewProps> = ({
 
   // Used to display the `Published` state, which resets on new selections
   const [hasPublished, setHasPublished] = useState<boolean>(false);
+  useEffect(() => {
+    if (
+      openReviewSignal > 0 &&
+      openReviewSignal !== handledOpenReviewSignal.current
+    ) {
+      handledOpenReviewSignal.current = openReviewSignal;
+      setHasPublished(false);
+      setIsOpen(true);
+      onOpenChangeCallback(true);
+    }
+  }, [onOpenChangeCallback, openReviewSignal]);
+
   useEffect(() => {
     if (!isPublishing && !errors?.errors?.length) {
       setHasPublished(true);

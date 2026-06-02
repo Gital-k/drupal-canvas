@@ -15,6 +15,12 @@ const mocks = vi.hoisted(() => ({
   invalidateLayout: vi.fn(),
   layoutRequests: vi.fn(),
   pendingChanges: undefined as PendingChanges | undefined,
+  publishedLayoutUpdated: Math.floor(
+    new Date(2026, 7, 19, 12, 1).getTime() / 1000,
+  ),
+  draftLayoutUpdated: Math.floor(
+    new Date(2026, 7, 20, 20, 10).getTime() / 1000,
+  ),
   refetch: vi.fn(),
   discardChange: vi.fn(),
   resolveConflict: vi.fn(),
@@ -47,6 +53,9 @@ vi.mock('@/services/componentAndLayout', () => ({
         entity_form_fields: {},
         layout: [],
         model: {},
+        updated: arg.publishedVersion
+          ? mocks.publishedLayoutUpdated
+          : mocks.draftLayoutUpdated,
       },
       isFetching: false,
       isError: false,
@@ -148,8 +157,8 @@ vi.mock('./ConflictResolutionView', () => ({
     selectedVersion,
     onSelectVersion,
   }: {
-    publishedVersion: { html: string };
-    newVersion: { html: string };
+    publishedVersion: { html: string; updated?: string };
+    newVersion: { html: string; updated?: string };
     selectedVersion?: 'published' | 'new';
     onSelectVersion?: (version: 'published' | 'new') => void;
   }) => (
@@ -169,7 +178,9 @@ vi.mock('./ConflictResolutionView', () => ({
         Select new version
       </button>
       <span>{publishedVersion.html}</span>
+      <span>{publishedVersion.updated}</span>
       <span>{newVersion.html}</span>
+      <span>{newVersion.updated}</span>
     </div>
   ),
 }));
@@ -215,6 +226,13 @@ describe('ConflictResolutionPage', () => {
     });
     expect(screen.getByText(/Published version 1 content/)).toBeInTheDocument();
     expect(screen.getByText(/New version 1 content/)).toBeInTheDocument();
+  });
+
+  it('passes formatted updated timestamps to the comparison view', () => {
+    renderPage();
+
+    expect(screen.getByText('Updated 8/19/26 at 12:01 PM')).toBeInTheDocument();
+    expect(screen.getByText('Updated 8/20/26 at 8:10 PM')).toBeInTheDocument();
   });
 
   it('starts with no selected version and disables resolution', () => {
@@ -340,5 +358,30 @@ describe('ConflictResolutionPage', () => {
 
     expect(await screen.findByText('Editor')).toBeVisible();
     expect(mocks.layoutRequests).not.toHaveBeenCalled();
+  });
+
+  it('renders the resolved state with a review changes action', async () => {
+    const user = userEvent.setup();
+    mocks.pendingChanges = {
+      'canvas_page:1:en': {
+        ...pendingChanges['canvas_page:1:en'],
+        hasConflict: false,
+        conflict_id: undefined,
+      },
+    };
+
+    renderPage();
+
+    expect(screen.getByText('All files resolved')).toBeInTheDocument();
+    expect(screen.getByText('Everything is up to date')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'All conflicts have been resolved. Your changes are ready to be published.',
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
+
+    expect(await screen.findByText('Editor')).toBeVisible();
   });
 });

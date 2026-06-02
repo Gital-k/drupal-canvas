@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import BellIcon from '@assets/icons/bell.svg?react';
 import { Popover } from '@radix-ui/themes';
 
@@ -42,6 +43,7 @@ const NotificationBell = () => {
   const devMode = isConflictUxEnabled();
   const contextKey = getCurrentConflictContextKey();
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const isOpen = useAppSelector(selectActivityCenterOpen);
   const currentNotificationId = contextKey
     ? getConflictNotificationId(contextKey)
@@ -157,6 +159,7 @@ const NotificationBell = () => {
 
     if (href === CONFLICT_NOTIFICATION_HREF) {
       dispatch(setActivityCenterOpen(false));
+      navigate('/conflict');
       return;
     }
 

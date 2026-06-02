@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import ScaleToFitIcon from '@assets/icons/justify-stretch.svg?react';
 import {
   ArrowLeftIcon,
@@ -39,10 +39,13 @@ import styles from './ConflictResolutionPage.module.css';
 
 const EMPTY_HTML = '<main></main>';
 const PREVIEW_FIT_PADDING = 96;
+const PREVIEW_DRAG_THRESHOLD = 3;
 
 type ConflictVersion = 'published' | 'new';
 
 export type ConflictVersionSelection = ConflictVersion | undefined;
+
+type VisualScrollAreas = Record<ConflictVersion, HTMLDivElement | null>;
 
 export interface ConflictResolutionViewProps {
   label: string;
@@ -176,10 +179,17 @@ export const PageConflictComparisonView = ({
   onPublishedPreviewClick,
   onNewPreviewClick,
 }: PageConflictComparisonViewProps) => {
-  const handlePublishedPreview = onPublishedPreviewClick
-    ?? (() => window.open(buildConflictPreviewUrl(entityType, entityId, true), '_blank'));
-  const handleNewPreview = onNewPreviewClick
-    ?? (() => window.open(buildConflictPreviewUrl(entityType, entityId, false), '_blank'));
+  const handlePublishedPreview =
+    onPublishedPreviewClick ??
+    (() =>
+      window.open(buildConflictPreviewUrl(entityType, entityId, true), '_blank'));
+  const handleNewPreview =
+    onNewPreviewClick ??
+    (() =>
+      window.open(
+        buildConflictPreviewUrl(entityType, entityId, false),
+        '_blank',
+      ));
   const [tab, setTab] = useState('visual');
   const publishedContentHtml = useMemo(
     () => buildContentOnlyPreviewDocument(publishedVersion.html || EMPTY_HTML),
@@ -204,6 +214,79 @@ export const PageConflictComparisonView = ({
   const newProps = useMemo(
     () => stringifyComparisonProps(newVersion.props),
     [newVersion.props],
+  );
+  const visualScrollAreasRef = useRef<VisualScrollAreas>({
+    published: null,
+    new: null,
+  });
+  const ignoredScrollPositionsRef = useRef(
+    new Map<HTMLDivElement, { scrollLeft: number; scrollTop: number }>(),
+  );
+
+  const handleVisualScrollAreaMount = useCallback(
+    (version: ConflictVersion, node: HTMLDivElement | null) => {
+      visualScrollAreasRef.current[version] = node;
+    },
+    [],
+  );
+
+  const handleVisualScroll = useCallback(
+    (sourceVersion: ConflictVersion, sourceScrollArea: HTMLDivElement) => {
+      const ignoredScrollPosition =
+        ignoredScrollPositionsRef.current.get(sourceScrollArea);
+      if (ignoredScrollPosition) {
+        ignoredScrollPositionsRef.current.delete(sourceScrollArea);
+        if (
+          Math.abs(
+            sourceScrollArea.scrollLeft - ignoredScrollPosition.scrollLeft,
+          ) < 0.5 &&
+          Math.abs(sourceScrollArea.scrollTop - ignoredScrollPosition.scrollTop) <
+            0.5
+        ) {
+          return;
+        }
+      }
+
+      const targetVersion: ConflictVersion =
+        sourceVersion === 'published' ? 'new' : 'published';
+      const targetScrollArea = visualScrollAreasRef.current[targetVersion];
+      if (!targetScrollArea) {
+        return;
+      }
+
+      const sourceMaxLeft =
+        sourceScrollArea.scrollWidth - sourceScrollArea.clientWidth;
+      const sourceMaxTop =
+        sourceScrollArea.scrollHeight - sourceScrollArea.clientHeight;
+      const targetMaxLeft =
+        targetScrollArea.scrollWidth - targetScrollArea.clientWidth;
+      const targetMaxTop =
+        targetScrollArea.scrollHeight - targetScrollArea.clientHeight;
+
+      const nextLeft =
+        sourceMaxLeft > 0 && targetMaxLeft > 0
+          ? (sourceScrollArea.scrollLeft / sourceMaxLeft) * targetMaxLeft
+          : sourceScrollArea.scrollLeft;
+      const nextTop =
+        sourceMaxTop > 0 && targetMaxTop > 0
+          ? (sourceScrollArea.scrollTop / sourceMaxTop) * targetMaxTop
+          : sourceScrollArea.scrollTop;
+
+      if (
+        Math.abs(targetScrollArea.scrollLeft - nextLeft) < 0.5 &&
+        Math.abs(targetScrollArea.scrollTop - nextTop) < 0.5
+      ) {
+        return;
+      }
+
+      ignoredScrollPositionsRef.current.set(targetScrollArea, {
+        scrollLeft: nextLeft,
+        scrollTop: nextTop,
+      });
+      targetScrollArea.scrollLeft = nextLeft;
+      targetScrollArea.scrollTop = nextTop;
+    },
+    [],
   );
 
   return (
@@ -235,6 +318,9 @@ export const PageConflictComparisonView = ({
             <VisualFrame
               html={publishedContentHtml}
               loading={!!publishedVersion.loading}
+              version="published"
+              onScrollAreaMount={handleVisualScrollAreaMount}
+              onScrollAreaScroll={handleVisualScroll}
             />
           </PreviewCard>
           <PreviewCard
@@ -246,7 +332,13 @@ export const PageConflictComparisonView = ({
             onSelect={onSelectVersion}
             onPreviewClick={handleNewPreview}
           >
-            <VisualFrame html={newContentHtml} loading={!!newVersion.loading} />
+            <VisualFrame
+              html={newContentHtml}
+              loading={!!newVersion.loading}
+              version="new"
+              onScrollAreaMount={handleVisualScrollAreaMount}
+              onScrollAreaScroll={handleVisualScroll}
+            />
           </PreviewCard>
         </ComparisonGrid>
       </Tabs.Content>
@@ -400,7 +492,7 @@ const PreviewCard = ({
               size="1"
               aria-label="Open preview in new tab"
               onClick={handlePreviewButtonClick}
-              style={{cursor:'pointer'}}
+              style={{ cursor: 'pointer' }}
             >
               <ExternalLinkIcon />
             </IconButton>
@@ -426,19 +518,139 @@ const PreviewCard = ({
   );
 };
 
-const VisualFrame = ({ html, loading }: { html: string; loading: boolean }) => {
+const VisualFrame = ({
+  html,
+  loading,
+  version,
+  onScrollAreaMount,
+  onScrollAreaScroll,
+}: {
+  html: string;
+  loading: boolean;
+  version: ConflictVersion;
+  onScrollAreaMount?: (
+    version: ConflictVersion,
+    node: HTMLDivElement | null,
+  ) => void;
+  onScrollAreaScroll?: (
+    version: ConflictVersion,
+    scrollArea: HTMLDivElement,
+  ) => void;
+}) => {
   const previewScale = useAppSelector(selectEditorViewPortScale);
   const previewWidth = useAppSelector(selectViewportWidth);
   const previewMinHeight = useAppSelector(selectViewportMinHeight);
-  const previewScrollAreaRef = useRef<HTMLDivElement>(null);
-  const previewFrameWrapperRef = useRef<HTMLDivElement>(null);
+  const previewScrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const previewFrameWrapperRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    scrollLeft: number;
+    scrollTop: number;
+    didDrag: boolean;
+  }>();
+  const suppressNextClickRef = useRef(false);
+  const [isDraggingPreview, setIsDraggingPreview] = useState(false);
+
+  const handleScrollAreaRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      previewScrollAreaRef.current = node;
+      onScrollAreaMount?.(version, node);
+    },
+    [onScrollAreaMount, version],
+  );
+
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      onScrollAreaScroll?.(version, event.currentTarget);
+    },
+    [onScrollAreaScroll, version],
+  );
+
+  const endDrag = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (
+      event.currentTarget.hasPointerCapture?.(event.pointerId) &&
+      event.currentTarget.releasePointerCapture
+    ) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    suppressNextClickRef.current = dragState.didDrag;
+    dragStateRef.current = undefined;
+    setIsDraggingPreview(false);
+  }, []);
+
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0 || loading) {
+        return;
+      }
+
+      dragStateRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        scrollLeft: event.currentTarget.scrollLeft,
+        scrollTop: event.currentTarget.scrollTop,
+        didDrag: false,
+      };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setIsDraggingPreview(true);
+    },
+    [loading],
+  );
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const dragState = dragStateRef.current;
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const deltaX = event.clientX - dragState.startX;
+      const deltaY = event.clientY - dragState.startY;
+      if (
+        Math.abs(deltaX) > PREVIEW_DRAG_THRESHOLD ||
+        Math.abs(deltaY) > PREVIEW_DRAG_THRESHOLD
+      ) {
+        dragState.didDrag = true;
+      }
+
+      event.currentTarget.scrollLeft = dragState.scrollLeft - deltaX;
+      event.currentTarget.scrollTop = dragState.scrollTop - deltaY;
+      onScrollAreaScroll?.(version, event.currentTarget);
+    },
+    [onScrollAreaScroll, version],
+  );
+
+  const handleClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!suppressNextClickRef.current) {
+      return;
+    }
+
+    suppressNextClickRef.current = false;
+    event.stopPropagation();
+    event.preventDefault();
+  }, []);
 
   return (
     <div className={styles.visualSurface}>
       <div
         className={styles.previewScrollArea}
-        ref={previewScrollAreaRef}
+        ref={handleScrollAreaRef}
         data-testid="canvas-conflict-preview-scroll-area"
+        data-dragging={isDraggingPreview ? 'true' : undefined}
+        onClick={handleClick}
+        onPointerCancel={endDrag}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endDrag}
+        onScroll={handleScroll}
       >
         {loading ? (
           <Spinner />
@@ -484,8 +696,8 @@ const JsonPanel = ({ value }: { value: string }) => (
 );
 
 interface ConflictPreviewControlsProps {
-  previewScrollAreaRef: React.RefObject<HTMLDivElement>;
-  previewFrameWrapperRef: React.RefObject<HTMLDivElement>;
+  previewScrollAreaRef: React.RefObject<HTMLDivElement | null>;
+  previewFrameWrapperRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const ConflictPreviewControls = ({

@@ -70,6 +70,7 @@ const newPageHtml = `
 
 const publishedVersion = {
   html: publishedPageHtml,
+  updated: 'Updated 8/19/26 at 12:01 PM',
   props: {
     entity_form_fields: {
       title: 'Homepage',
@@ -86,6 +87,7 @@ const publishedVersion = {
 
 const newVersion = {
   html: newPageHtml,
+  updated: 'Updated 8/20/26 at 8:10 PM',
   props: {
     entity_form_fields: {
       title: 'Homepage',

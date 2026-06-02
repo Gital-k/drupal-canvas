@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
@@ -30,6 +31,7 @@ import styles from './NotificationToastManager.module.css';
 
 const NotificationToastManager = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const conflictUxEnabled = isConflictUxEnabled();
   const contextKey = getCurrentConflictContextKey();
   const { data } = useGetNotificationsQuery();
@@ -95,11 +97,12 @@ const NotificationToastManager = () => {
       }
       dismissToast(id);
       if (href === CONFLICT_NOTIFICATION_HREF) {
+        navigate('/conflict');
         return;
       }
       window.open(href, '_blank', 'noopener,noreferrer');
     },
-    [contextKey, dispatch, dismissToast, markRead],
+    [contextKey, dispatch, dismissToast, markRead, navigate],
   );
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
 import { useParams } from 'react-router';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import PublishReview from '@/components/review/PublishReview';
@@ -57,6 +57,7 @@ import type { PendingChanges } from '@/services/pendingChangesApi';
 import type { UnpublishedChange } from '@/types/Review';
 
 const REFETCH_INTERVAL_MS = 10000;
+const REVIEW_CHANGES_QUERY_KEY = 'reviewChanges';
 
 const UnpublishedChanges = () => {
   const previousPendingChanges = useAppSelector(selectPreviousPendingChanges);
@@ -75,6 +76,7 @@ const UnpublishedChanges = () => {
   });
   const [pollingInterval, setPollingInterval] =
     useState<number>(REFETCH_INTERVAL_MS);
+  const [openReviewSignal, setOpenReviewSignal] = useState(0);
   const {
     data: changes,
     error,
@@ -86,6 +88,7 @@ const UnpublishedChanges = () => {
   });
   const { entityType, entityId, codeComponentId } = useParams();
   const dispatch = useAppDispatch();
+  const location = useLocation();
   const navigate = useNavigate();
   const { showBoundary } = useErrorBoundary();
   const entity_form_fields = useAppSelector(selectPageData);
@@ -98,6 +101,25 @@ const UnpublishedChanges = () => {
 
   // If either the selected component or the preview layout is being updated, disable the Publish button.
   const isUpdating = isUpdatingComponent || isUpdatingPreview;
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get(REVIEW_CHANGES_QUERY_KEY) !== '1') {
+      return;
+    }
+
+    setOpenReviewSignal((signal) => signal + 1);
+    searchParams.delete(REVIEW_CHANGES_QUERY_KEY);
+    const nextSearch = searchParams.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : '',
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (error) {
@@ -306,6 +328,10 @@ const UnpublishedChanges = () => {
               (draft) => {
                 if (draft[conflict.source.pointer]) {
                   draft[conflict.source.pointer].hasConflict = true;
+                  if (conflict.meta?.conflict_id) {
+                    draft[conflict.source.pointer].conflict_id =
+                      conflict.meta.conflict_id;
+                  }
                 }
               },
             ),
@@ -359,6 +385,7 @@ const UnpublishedChanges = () => {
           }
           navigate(change ? getConflictRouteForChange(change) : '/conflict');
         }}
+        openReviewSignal={openReviewSignal}
         isPublishing={isPublishing}
         isDiscarding={isDiscarding}
         pageStatusMap={pageStatusMap}

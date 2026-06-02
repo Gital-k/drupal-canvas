@@ -31,6 +31,40 @@ import type { ConflictVersionSelection } from './ConflictResolutionView';
 import styles from './ConflictResolutionPage.module.css';
 
 const EMPTY_HTML = '<main></main>';
+const REVIEW_CHANGES_QUERY = 'reviewChanges=1';
+
+const versionUpdatedDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'numeric',
+  day: 'numeric',
+  year: '2-digit',
+});
+
+const versionUpdatedTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
+const formatConflictVersionUpdated = (
+  timestamp: number | undefined,
+): string | undefined => {
+  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) {
+    return undefined;
+  }
+
+  const date = new Date(
+    timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp,
+  );
+
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  const formattedDate = versionUpdatedDateFormatter.format(date);
+  const formattedTime = versionUpdatedTimeFormatter.format(date);
+
+  return `Updated ${formattedDate} at ${formattedTime}`;
+};
 
 const ConflictResolutionPage = () =>
   isConflictUxEnabled() ? (
@@ -83,6 +117,7 @@ const EnabledConflictResolutionPage = () => {
       : currentIndex;
   const reviewTotal = Math.max(reviewPointers.length, conflictQueue.length);
   const isResolutionInProgress = isResolving || isDiscarding;
+  const pendingChangesCount = Object.keys(pendingChanges ?? {}).length;
 
   useEffect(() => {
     setSelectedVersion(undefined);
@@ -93,7 +128,11 @@ const EnabledConflictResolutionPage = () => {
     return conflictQueue.length > 0 ? (
       <Navigate to={getConflictRouteFromEntry(conflictQueue[0])} replace />
     ) : (
-      <ResolvedConflictState onClose={() => navigate('/editor')} />
+      <ResolvedConflictState
+        pendingChangesCount={pendingChangesCount}
+        onReviewChanges={() => navigate(`/editor?${REVIEW_CHANGES_QUERY}`)}
+        onClose={() => navigate('/editor')}
+      />
     );
   }
 
@@ -170,6 +209,7 @@ const EnabledConflictResolutionPage = () => {
           <PageConflictComparison
             entityId={String(activeChange.entity_id)}
             entityType={activeChange.entity_type}
+            autoSaveUpdated={activeChange.updated}
             selectedVersion={selectedVersion}
             onSelectVersion={handleSelectVersion}
           />
@@ -196,11 +236,13 @@ const EnabledConflictResolutionPage = () => {
 const PageConflictComparison = ({
   entityId,
   entityType,
+  autoSaveUpdated,
   selectedVersion,
   onSelectVersion,
 }: {
   entityId: string;
   entityType: string;
+  autoSaveUpdated?: number;
   selectedVersion: ConflictVersionSelection;
   onSelectVersion: (
     version: Exclude<ConflictVersionSelection, undefined>,
@@ -251,6 +293,7 @@ const PageConflictComparison = ({
           model: publishedLayout?.model ?? {},
         },
         loading: isPublishedLoading,
+        updated: formatConflictVersionUpdated(publishedLayout?.updated),
       }}
       newVersion={{
         html: draftLayout?.html || EMPTY_HTML,
@@ -261,6 +304,9 @@ const PageConflictComparison = ({
         },
         loading: isDraftLoading,
         changed: true,
+        updated: formatConflictVersionUpdated(
+          draftLayout?.updated ?? autoSaveUpdated,
+        ),
       }}
       selectedVersion={selectedVersion}
       onSelectVersion={onSelectVersion}
@@ -268,7 +314,22 @@ const PageConflictComparison = ({
   );
 };
 
-const ResolvedConflictState = ({ onClose }: { onClose: () => void }) => (
+const getReviewChangesButtonText = (count: number): string => {
+  if (count === 1) {
+    return 'Review 1 change';
+  }
+  return `Review ${count} changes`;
+};
+
+const ResolvedConflictState = ({
+  pendingChangesCount,
+  onReviewChanges,
+  onClose,
+}: {
+  pendingChangesCount: number;
+  onReviewChanges: () => void;
+  onClose: () => void;
+}) => (
   <div className={styles.page} data-testid="conflict-resolved-state">
     <div className={styles.header}>
       <Flex align="center" gap="1">
@@ -282,7 +343,7 @@ const ResolvedConflictState = ({ onClose }: { onClose: () => void }) => (
         <Text size="1" color="gray">
           /
         </Text>
-        <Text size="1">No unresolved page conflicts</Text>
+        <Text size="1">All files resolved</Text>
       </Flex>
       <IconButton
         variant="ghost"
@@ -303,10 +364,20 @@ const ResolvedConflictState = ({ onClose }: { onClose: () => void }) => (
     >
       <CheckCircledIcon className={styles.emptyIcon} />
       <Text size="4" weight="medium">
-        Conflict resolved
+        Everything is up to date
       </Text>
-      <Text size="2">No unresolved Page conflicts remain.</Text>
-      <Button onClick={onClose}>Return to editor</Button>
+      <Text size="2">
+        All conflicts have been resolved. Your changes are ready to be
+        published.
+      </Text>
+      <Flex align="center" gap="2">
+        <Button onClick={onReviewChanges} disabled={pendingChangesCount === 0}>
+          {getReviewChangesButtonText(pendingChangesCount)}
+        </Button>
+        <Button variant="outline" onClick={onClose}>
+          Close
+        </Button>
+      </Flex>
     </Flex>
   </div>
 );
