@@ -188,7 +188,7 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
     $this->enableModules(['node', 'field', 'content_translation']);
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema('user');
-    $this->installConfig(['content_translation', 'node', 'user']);
+    $this->installConfig(['content_translation', 'node']);
     $this->generateComponentConfig();
     NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
 
@@ -262,7 +262,7 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema('user');
     $this->installEntitySchema('node');
-    $this->installConfig(['content_translation', 'node', 'user']);
+    $this->installConfig(['content_translation', 'node']);
     $this->generateComponentConfig();
     NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
 
