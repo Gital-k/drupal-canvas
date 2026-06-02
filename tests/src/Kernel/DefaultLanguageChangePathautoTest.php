@@ -39,7 +39,8 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
    */
   protected static $modules = [
     'language',
-    'content_translation',
+    'pathauto',
+    'token',
   ];
 
   /**
@@ -49,7 +50,7 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
     parent::setUp();
     $this->installEntitySchema('canvas_page');
     $this->installEntitySchema('path_alias');
-    $this->installConfig(['language', 'content_translation']);
+    $this->installConfig(['language', 'pathauto']);
     $this->config('system.theme')->set('default', 'stark')->save();
 
     if (!$this->container->get('module_handler')->moduleExists('pathauto')) {
