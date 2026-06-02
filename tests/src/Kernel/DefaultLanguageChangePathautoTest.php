@@ -62,12 +62,10 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
     ConfigurableLanguage::createFromLangcode('fr')->save();
 
     // Create a Pathauto pattern for Canvas pages so aliases are generated.
-    // Uses [canvas_page:label] which is always available via the token module's
-    // generic entity label token.
     PathautoPattern::create([
       'id' => 'canvas_page',
       'type' => 'canonical_entities:canvas_page',
-      'pattern' => '/pages/[canvas_page:label]',
+      'pattern' => '/pages/[canvas_page:title]',
       'weight' => -10,
     ])->save();
   }
