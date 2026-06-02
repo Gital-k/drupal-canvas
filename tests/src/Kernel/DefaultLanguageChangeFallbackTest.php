@@ -6,6 +6,7 @@ namespace Drupal\Tests\canvas\Kernel;
 
 // cspell:ignore Texte secours modèle
 
+// @phpstan-ignore-next-line (class exists on implementation branch)
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Component\Utility\NestedArray;

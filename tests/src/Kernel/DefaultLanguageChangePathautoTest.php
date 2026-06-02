@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+// @phpstan-ignore-next-line (class exists on implementation branch)
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\Page;
 use Drupal\language\Entity\ConfigurableLanguage;

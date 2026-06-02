@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Kernel;
 // cspell:ignore titre français française Página
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+// @phpstan-ignore-next-line (class exists on implementation branch)
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\Page;
 use Drupal\language\Entity\ConfigurableLanguage;

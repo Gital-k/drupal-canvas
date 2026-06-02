@@ -6,6 +6,7 @@ namespace Drupal\Tests\canvas\Kernel;
 
 // cspell:ignore Aangedreven Propulsé staan Bienvenue Deutsch Texte région
 
+// @phpstan-ignore-next-line (class exists on implementation branch)
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\PageRegion;
