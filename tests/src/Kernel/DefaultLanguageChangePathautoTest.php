@@ -8,6 +8,7 @@ use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\Page;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\pathauto\Entity\PathautoPattern;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -35,6 +36,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas_translation')]
 final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
 
+  use UserCreationTrait;
+
   /**
    * {@inheritdoc}
    */
@@ -53,12 +56,17 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
     $this->installEntitySchema('canvas_page');
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema('pathauto_pattern');
-    $this->installConfig(['language', 'pathauto']);
+    $this->installEntitySchema('user');
+    $this->installConfig(['language', 'pathauto', 'user']);
     $this->config('system.theme')->set('default', 'stark')->save();
 
     if (!$this->container->get('module_handler')->moduleExists('pathauto')) {
       $this->markTestSkipped('The pathauto module is not installed. Skipping AC7 Pathauto tests.');
     }
+
+    // Pathauto's pattern query uses accessCheck(TRUE); set the current user to
+    // one with the 'administer pathauto' permission so patterns are found.
+    $this->setCurrentUser($this->createUser(['administer pathauto']));
 
     ConfigurableLanguage::createFromLangcode('fr')->save();
 
