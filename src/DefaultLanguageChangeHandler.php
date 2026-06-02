@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
+// cspell:ignore bulkupdate
+
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
@@ -205,7 +207,6 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
         \assert($page instanceof Page);
         // Force alias generation bypassing the PathautoState::SKIP value that
         // PageHooks::ensurePathautoSkipped() sets on normal presave.
-        // cspell:ignore bulkupdate
         $pathauto_generator->updateEntityAlias($page, 'bulkupdate', ['force' => TRUE]);
       }
     }
