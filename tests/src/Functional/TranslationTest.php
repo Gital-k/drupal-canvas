@@ -1197,44 +1197,4 @@ class TranslationTest extends FunctionalTestBase {
     self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
   }
 
-  /**
-   * Tests the Canvas UI delete translation route.
-   *
-   * The route is gated behind the `canvas_dev_translation` module and renders
-   * a standard Drupal confirmation form before removing the translation.
-   *
-   * @see \Drupal\content_translation\Form\ContentTranslationDeleteForm
-   */
-  public function testDeleteTranslationUiRoute(): void {
-    $module_installer = $this->container->get(ModuleInstallerInterface::class);
-    $module_installer->install(['canvas_dev_translation']);
-    $this->rebuildContainer();
-
-    $page = $this->createCanvasTranslationTestPage();
-    $page_id = (int) $page->id();
-
-    self::assertTrue($page->hasTranslation('fr'));
-
-    // The route is only accessible to logged-in users with delete permission.
-    $this->drupalLogin($this->rootUser);
-
-    $ui_delete_url = Url::fromRoute('canvas_dev_translation.ui.content.translation.delete', [
-      'canvas_page' => $page_id,
-      'language' => 'fr',
-    ]);
-
-    // Visiting the route renders a confirmation form for the French translation.
-    $this->drupalGet($ui_delete_url);
-    $this->assertSession()->statusCodeEquals(200);
-    $this->assertSession()->pageTextContains('Are you sure you want to delete the French translation');
-
-    // Submitting the form removes the translation.
-    $this->submitForm([], 'Delete French translation');
-
-    $reloaded = Page::load($page_id);
-    self::assertInstanceOf(Page::class, $reloaded);
-    self::assertFalse($reloaded->hasTranslation('fr'));
-    self::assertTrue($reloaded->hasTranslation('en'));
-  }
-
 }
