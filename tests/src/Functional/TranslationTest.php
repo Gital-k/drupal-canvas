@@ -13,6 +13,7 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
@@ -1153,20 +1154,14 @@ class TranslationTest extends FunctionalTestBase {
   /**
    * Tests the Canvas API delete translation endpoint.
    *
-   * Installs canvas_dev_translation to set up the translation configuration
-   * required by the test (content translation enabled, entity types rebuilt).
-   *
    * Covers:
    *  - 204 response when deleting a non-default translation.
    *  - 400 response when attempting to delete the original (default) translation.
-   *  - 400 response when the language prefix resolves to the default translation.
    *
    * @see \Drupal\canvas\Controller\ApiContentTranslationControllers::delete()
    */
   public function testDeleteTranslation(): void {
-    $module_installer = $this->container->get(ModuleInstallerInterface::class);
-    $module_installer->install(['canvas_dev_translation']);
-    $this->rebuildContainer();
+    $page_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Page::ENTITY_TYPE_ID);
 
     $page = $this->createCanvasTranslationTestPage();
     $page_id = (int) $page->id();
@@ -1182,12 +1177,12 @@ class TranslationTest extends FunctionalTestBase {
     ];
 
     // Deleting a non-default translation removes it and returns 204.
-    $delete_url = Url::fromUserInput("/fr/canvas/api/v0/content/canvas_page/{$page_id}/translations");
-    $response = $this->makeApiRequest('DELETE', $delete_url, $request_options);
+    $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/content/canvas_page/{$page_id}/translations");
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
     self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
 
     // Only the French translation is gone; the English original is untouched.
-    $reloaded = Page::load($page_id);
+    $reloaded = $page_storage->loadUnchanged($page_id);
     self::assertInstanceOf(Page::class, $reloaded);
     self::assertFalse($reloaded->hasTranslation('fr'));
     self::assertTrue($reloaded->hasTranslation('en'));
@@ -1196,11 +1191,14 @@ class TranslationTest extends FunctionalTestBase {
     $delete_default_url = Url::fromUserInput("/canvas/api/v0/content/canvas_page/{$page_id}/translations");
     $response = $this->makeApiRequest('DELETE', $delete_default_url, $request_options);
     self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+    $reloaded = $page_storage->loadUnchanged($page_id);
+    self::assertInstanceOf(Page::class, $reloaded);
+    self::assertTrue($reloaded->hasTranslation('en'));
 
     // Trying to delete a translation that no longer exists returns 400 because
     // Drupal's entity translation negotiation will load the default
     // translation.
-    $response = $this->makeApiRequest('DELETE', $delete_url, $request_options);
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
     self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
   }
 
