@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-// cspell:ignore Aangedreven Propulsé staan Bienvenue
+// cspell:ignore Aangedreven Propulsé staan Bienvenue Deutsch Texte région
 
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\ContentTemplate;
