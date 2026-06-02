@@ -60,6 +60,17 @@ export interface PendingChangesResponse {
 
 type PendingChangesApiResponse = PendingChanges | PendingChangesResponse;
 
+export enum STATUS_CODE {
+  CONFLICT = 409,
+  UNPROCESSABLE_ENTITY = 422,
+}
+
+export enum CONFLICT_CODE {
+  UNEXPECTED = 1,
+  EXPECTED = 2,
+  DETECTED = 4,
+}
+
 const isPendingChangesResponse = (
   response: PendingChangesApiResponse,
 ): response is PendingChangesResponse => {
@@ -67,10 +78,12 @@ const isPendingChangesResponse = (
   return typeof data === 'object' && data !== null && !('owner' in data);
 };
 
-
 export const getAutoSaveKeyFromError = (
   error: ConflictError,
 ): string | undefined => error.meta?.api_auto_save_key || error.source.pointer;
+
+const isResolvableConflictError = (error?: ConflictError): boolean =>
+  error?.code === CONFLICT_CODE.DETECTED;
 
 const normalizePendingChangesResponse = (
   response: PendingChangesApiResponse,
@@ -99,13 +112,16 @@ export const applyConflictStateFromResponse = (
   return Object.fromEntries(
     Object.entries(normalizedResponse.data ?? {}).map(([pointer, change]) => {
       const conflictError = byPointer.get(pointer);
-      const conflictId = conflictError?.meta?.conflict_id;
+      const hasConflict = isResolvableConflictError(conflictError);
+      const conflictId = hasConflict
+        ? conflictError?.meta?.conflict_id
+        : undefined;
 
       return [
         pointer,
         {
           ...change,
-          hasConflict: !!conflictId,
+          hasConflict,
           conflict_id: conflictId,
         },
       ];
@@ -120,17 +136,6 @@ export interface ErrorResponse {
 type DiscardPendingChangeArg = PendingChange & {
   pointer?: string;
 };
-
-export enum STATUS_CODE {
-  CONFLICT = 409,
-  UNPROCESSABLE_ENTITY = 422,
-}
-
-export enum CONFLICT_CODE {
-  UNEXPECTED = 1,
-  EXPECTED = 2,
-  DETECTED = 4,
-}
 
 // Define a service using a base URL and expected endpoints
 export const pendingChangesApi = createApi({
