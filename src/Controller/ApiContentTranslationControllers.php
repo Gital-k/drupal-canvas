@@ -19,20 +19,12 @@ final class ApiContentTranslationControllers extends ApiControllerBase {
   /**
    * Deletes a single translation of a canvas_page entity.
    *
-   * Mirrors what ContentTranslationDeleteForm::submitForm() does: removes the
-   * requested translation from the entity and saves it. The original (default)
-   * translation cannot be deleted via this endpoint — use the full entity
-   * delete endpoint instead.
-   *
    * @param \Drupal\Core\Entity\ContentEntityInterface $canvas_page
    *   The entity whose translation should be deleted.
    *
    * @return \Symfony\Component\HttpFoundation\JsonResponse
    *   204 No Content on success, 400 if attempting to delete the default
-   *   translation, 404 if the requested translation does not exist.
-   *
-   * @throws \Drupal\Core\Entity\EntityStorageException
-   *   When saving the entity after removing the translation fails.
+   *   translation.
    */
   public static function delete(
     ContentEntityInterface $canvas_page,
