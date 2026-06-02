@@ -579,15 +579,15 @@ Each `component source` is able to specify an updater class (see `\Drupal\canvas
 This updater will be responsible for:
 
 * Checking if a `component instance` is using the active version.
-* Deciding if a `component instance` not using the active version can be updated automatically according to the rules defined by that source's updater: some might accept data loss like `JsComponent`.
+* Deciding if a `component instance` not using the active version can be updated automatically according to the rules defined by that source's updater: some might accept data loss.
 * Performing that update.
 
 This update of the `component tree`'s`component instance`s will happen automatically
 as soon as we attempt to edit a component tree (see `\Drupal\canvas\Controller\ApiLayoutController::buildRegion()` and
 `\Drupal\canvas\Controller\ApiConfigControllers::normalize()`).
 
-For component sources using
-`\Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater`,
+For component sources using the default
+`\Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceUpdater`,
 the scenarios where such an update is possible without any risk are:
 
 - Adding optional props
@@ -600,19 +600,19 @@ the scenarios where such an update is possible without any risk are:
 - Removing slots
 - Adding a new required prop.
 - Changing props from optional to required
+- Increasing `maxItems` (cardinality) for `type: array` props
+
+Unsafe changes considered acceptable (⚠️ data loss) include:
+
+- Decreasing `maxItems` (cardinality) for `type: array` props: excess stored
+  values are dropped.
 
 Unsafe changes (that prevent auto-update) include:
 
 - Changing prop shapes
 
+Note: a specific `component source` can choose to deviate from this: it can choose to accept some data loss.
+
 See
 - `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceUpdater::canUpdate`
-
-For the `js` component source, Canvas uses
-`\Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentInstanceUpdater`.
-That updater intentionally allows prop shape changes and accepts data loss for
-incompatible existing inputs:
-
-- Inputs for incompatible prop shapes are dropped.
-- Required props missing after that drop are repopulated from default/example
-  values in the target component version.
+- `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentInstanceUpdater`
