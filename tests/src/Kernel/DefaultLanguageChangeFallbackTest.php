@@ -6,7 +6,6 @@ namespace Drupal\Tests\canvas\Kernel;
 
 // cspell:ignore Texte secours modèle
 
-// @phpstan-ignore-next-line (class exists on implementation branch)
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Component\Utility\NestedArray;
@@ -32,6 +31,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  *      to the new default language, not the old one.
  * AC6: The language detection and selection configuration must be updated to
  *      reflect the new default language as the primary negotiation fallback.
+ *
+ * @phpstan-ignore class.notFound (DefaultLanguageChangeHandler exists on implementation branch)
  */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(DefaultLanguageChangeHandler::class)]

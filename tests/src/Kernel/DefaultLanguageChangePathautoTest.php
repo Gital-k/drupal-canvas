@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-// @phpstan-ignore-next-line (class exists on implementation branch)
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\Page;
 use Drupal\language\Entity\ConfigurableLanguage;
@@ -30,6 +29,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * are now stale.
  *
  * @see \Drupal\canvas\Hook\PageHooks::ensurePathautoSkipped()
+ *
+ * @phpstan-ignore class.notFound (DefaultLanguageChangeHandler exists on implementation branch)
  */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(DefaultLanguageChangeHandler::class)]

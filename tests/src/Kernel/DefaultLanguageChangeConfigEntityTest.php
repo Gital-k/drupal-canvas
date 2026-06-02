@@ -6,7 +6,6 @@ namespace Drupal\Tests\canvas\Kernel;
 
 // cspell:ignore Aangedreven Propulsé staan Bienvenue Deutsch Texte région
 
-// @phpstan-ignore-next-line (class exists on implementation branch)
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\PageRegion;
@@ -33,6 +32,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  *      being dropped entirely, in which case it should be discarded.
  * AC9: The symmetric translation layout (component tree structure, keyed by
  *      UUID) must be preserved across the config entity translation swap.
+ *
+ * @phpstan-ignore class.notFound (DefaultLanguageChangeHandler exists on implementation branch)
  */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(DefaultLanguageChangeHandler::class)]
