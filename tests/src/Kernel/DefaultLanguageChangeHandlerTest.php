@@ -433,7 +433,7 @@ class DefaultLanguageChangeHandlerTest extends CanvasKernelTestBase {
     $reloaded_fr = Page::load($fr_id);
     \assert($reloaded_fr instanceof Page);
     self::assertSame('fr', $reloaded_fr->language()->getId());
-    self::assertSame('Already French', (string) $reloaded_fr->getTitle(), 'Existing FR page content must not be altered.');
+    self::assertSame('Already French', (string) $reloaded_fr->label(), 'Existing FR page content must not be altered.');
   }
 
 }
