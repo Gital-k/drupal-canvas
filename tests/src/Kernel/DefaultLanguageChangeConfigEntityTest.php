@@ -107,15 +107,24 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
    */
   private function addFrenchTranslationToTemplate(ContentTemplate $template): void {
     $this->enableModules(['config_translation']);
-    $language_manager = $this->container->get(LanguageManagerInterface::class);
-    \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
 
     $en_stored_values = $template->toArray();
     $fr_form_values = $en_stored_values;
+    // The text prop is being translated.
     NestedArray::setValue(
       $fr_form_values,
       ['component_tree', self::UUID_CTA, 'inputs', 'text'],
       [0 => ['value' => 'Propulsé par Drupal Canvas']]
+    );
+    // The href link prop must be provided in widget format even when untranslated,
+    // as CanvasStaticPropSourceFieldWidget expects a field widget array, not
+    // the raw stored string value.
+    // @see \Drupal\canvas\ConfigTranslation\CanvasStaticPropSourceFieldWidget
+    // @see \Drupal\Tests\canvas\Kernel\Config\ContentTemplateTest::testTranslationLifeCycleInDepth()
+    NestedArray::setValue(
+      $fr_form_values,
+      ['component_tree', self::UUID_CTA, 'inputs', 'href'],
+      [0 => ['uri' => 'https://drupal.org/project/canvas']]
     );
     $this->saveConfigEntityTranslation($template, 'fr', $fr_form_values);
   }
