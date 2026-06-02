@@ -1241,7 +1241,7 @@ class TranslationTest extends FunctionalTestBase {
 
     // Deleting a non-default translation removes it and returns 204.
     $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
-    self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+    self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode(), $response->getBody()->__toString());
 
     $override = $language_manager->getLanguageConfigOverride('fr', $entity->getConfigDependencyName());
     self::assertTrue($override->isNew());

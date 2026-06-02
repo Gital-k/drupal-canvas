@@ -6,6 +6,8 @@ namespace Drupal\canvas\Controller;
 
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\language\ConfigurableLanguageManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -17,6 +19,10 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class ApiTranslationControllers extends ApiControllerBase {
 
+  public function __construct(
+    private readonly LanguageManagerInterface $languageManager,
+  ) {}
+
   /**
    * Deletes a single translation of a canvas_page entity.
    *
@@ -27,7 +33,7 @@ final class ApiTranslationControllers extends ApiControllerBase {
    *   204 No Content on success, 400 if attempting to delete the default
    *   translation.
    */
-  public static function delete(
+  public function delete(
     ContentEntityInterface $canvas_page,
   ): JsonResponse {
 
@@ -56,12 +62,13 @@ final class ApiTranslationControllers extends ApiControllerBase {
    *   204 No Content on success, 400 if no translation exists for the current
    *   language.
    */
-  public static function deleteConfigTranslation(
+  public function deleteConfigTranslation(
     ConfigEntityInterface $config_entity,
   ): JsonResponse {
-    $lang_id = \Drupal::languageManager()->getCurrentLanguage()->getId();
+    $lang_id = $this->languageManager->getCurrentLanguage()->getId();
     $config_name = $config_entity->getConfigDependencyName();
-    $override = \Drupal::languageManager()->getLanguageConfigOverride($lang_id, $config_name);
+    \assert($this->languageManager instanceof ConfigurableLanguageManagerInterface);
+    $override = $this->languageManager->getLanguageConfigOverride($lang_id, $config_name);
     if ($override->isNew()) {
       return new JsonResponse(
         ['message' => \sprintf('No %s translation found for %s %s.', $lang_id, $config_entity->getEntityTypeId(), $config_entity->id())],
