@@ -15,8 +15,9 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * Tests Drupal\canvas\DefaultLanguageChangeHandler for content entity and
- * autosave migration when the site's default language changes.
+ * Tests DefaultLanguageChangeHandler for content entity and autosave migration.
+ *
+ * Covers behavior when the site's default language changes:
  *
  * AC1: Published content (default language) has its langcode updated.
  *      Published translations remain under their original langcodes.
@@ -208,8 +209,9 @@ class DefaultLanguageChangeHandlerTest extends CanvasKernelTestBase {
   // ---------------------------------------------------------------------------
 
   /**
-   * Tests that the autosave key and stored langcode are updated for the default
-   * language when the site default changes.
+   * Tests that the autosave key and stored langcode are updated.
+   *
+   * Verifies the update for the default language when the site default changes.
    *
    * AC3: All Canvas autosave data must be updated to reflect the new default
    * language code.

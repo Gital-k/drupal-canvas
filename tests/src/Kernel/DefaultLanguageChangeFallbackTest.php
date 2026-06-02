@@ -19,8 +19,9 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * Tests Drupal\canvas\DefaultLanguageChangeHandler for language fallback and
- * detection configuration when the site's default language changes.
+ * Tests DefaultLanguageChangeHandler for language fallback and detection config.
+ *
+ * Covers behavior when the site's default language changes:
  *
  * AC5: The fallback language for symmetric translations must automatically
  *      update to the new default language. When a visitor requests content in
@@ -82,8 +83,10 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
   // ---------------------------------------------------------------------------
 
   /**
-   * Tests that the URL prefix negotiation config is updated so the new default
-   * language has an empty prefix (i.e., it becomes the primary fallback).
+   * Tests that URL prefix negotiation config is updated for the new default.
+   *
+   * Verifies the new default language has an empty prefix and becomes the
+   * primary fallback.
    *
    * AC6: The language detection and selection configuration must be updated to
    * reflect the new default language as the primary negotiation fallback.
@@ -121,8 +124,10 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that the language manager reports the correct new default after the
-   * change, so Canvas UI can correctly expose it via drupalSettings.
+   * Tests that the language manager reports the correct new default.
+   *
+   * Verifies this after the change, so Canvas UI can correctly expose the
+   * new default via drupalSettings.
    *
    * AC6: Downstream consumers (including Canvas controller) must observe the
    * new default language immediately after the config is saved.
@@ -145,22 +150,23 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
   // ---------------------------------------------------------------------------
 
   /**
-   * Tests that language.types fallback order is updated to list the new default
-   * first, so content without a translation falls back to the new default.
+   * Tests that language.types fallback is updated to list the new default first.
+   *
+   * Verifies content without a translation falls back to the new default.
    *
    * AC5: The fallback language must automatically update to the new default
    * language.
    */
   public function testLanguageTypesConfigFallbackUpdatedToNewDefault(): void {
     // Verify current fallback chain has EN first (as the default).
-    $language_types = $this->config('language.types');
-    $negotiation = $language_types->get('negotiation');
-    // The fallback for the interface/content type should reflect the default.
-    // After the change, FR must be reachable as the fallback.
-    $this->changeDefaultLanguageTo('fr');
+    $url_prefixes_before = $this->config('language.negotiation')->get('url.prefixes');
+    // The default language typically has no entry or an empty-string entry.
+    self::assertTrue(
+      !isset($url_prefixes_before['en']) || $url_prefixes_before['en'] === '',
+      'EN must have an empty or missing URL prefix before the language change.'
+    );
 
-    // Reload the config.
-    $language_types = $this->config('language.types');
+    $this->changeDefaultLanguageTo('fr');
 
     // The language manager's default must now be FR, which means any system
     // using LanguageInterface::TYPE_INTERFACE or TYPE_CONTENT will fall back
@@ -179,8 +185,9 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that a ContentTemplate for a language with no translation now falls
-   * back to the new default language's config, not the old one.
+   * Tests that a ContentTemplate falls back to the new default language's config.
+   *
+   * Verifies this for a language with no translation, not the old default.
    *
    * AC5: When a visitor requests content in a language for which no translation
    * exists, the system must fall back to the new default language, not the old
@@ -241,8 +248,10 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that ContentTemplateAwareViewBuilder renders the new-default-language
-   * template for a node when a translation into a minority language is missing.
+   * Tests that ContentTemplateAwareViewBuilder falls back to the new default.
+   *
+   * Verifies the new-default-language template is used for a node when a
+   * translation into a minority language is missing.
    *
    * AC5: Canvas-specific fallback — ContentTemplateAwareViewBuilder must use
    * the new default language's template when no better match is found.

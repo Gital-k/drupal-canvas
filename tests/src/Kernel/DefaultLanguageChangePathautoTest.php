@@ -12,8 +12,9 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * Tests Drupal\canvas\DefaultLanguageChangeHandler for URL alias regeneration
- * via Pathauto after the site's default language changes.
+ * Tests DefaultLanguageChangeHandler for URL alias regeneration via Pathauto.
+ *
+ * Covers behavior after the site's default language changes:
  *
  * AC7: URL aliases using language tokens in Pathauto patterns must be
  *      regenerated for all Canvas pages after a default language change.
@@ -70,8 +71,9 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
   // ---------------------------------------------------------------------------
 
   /**
-   * Tests that a Canvas page's URL alias is regenerated after a default
-   * language change, even though Canvas normally suppresses Pathauto.
+   * Tests that a Canvas page's URL alias is regenerated after a language change.
+   *
+   * Verifies this even though Canvas normally suppresses Pathauto on presave.
    *
    * AC7: URL aliases using language tokens in Pathauto patterns must be
    * regenerated for all content after a default language change.
@@ -92,12 +94,6 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
       'components' => [],
     ]);
     $page->save();
-
-    // Record the alias before the language change.
-    $aliases_before = $alias_storage->loadByProperties([
-      'path' => '/canvas_page/' . $page->id(),
-    ]);
-    $alias_before = reset($aliases_before);
 
     $this->changeDefaultLanguageTo('fr');
 
@@ -122,8 +118,7 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that alias regeneration does not create duplicate aliases for the
-   * same Canvas page.
+   * Tests that alias regeneration does not create duplicate aliases.
    *
    * AC7: Aliases must be regenerated cleanly — re-running must not create
    * duplicate entries for the same path.
@@ -147,19 +142,19 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
     ]);
 
     // There must be exactly one alias per language, not duplicates.
-    $langcodes = array_map(
+    $langcodes = \array_map(
       static fn ($alias) => $alias->get('langcode')->value,
       $aliases
     );
     self::assertSame(
-      array_unique($langcodes),
+      \array_unique($langcodes),
       $langcodes,
       'Alias regeneration must not produce duplicate entries for the same path and language.'
     );
   }
 
   /**
-   * Tests that all Canvas pages (not just one) have their aliases regenerated.
+   * Tests that all Canvas pages have their aliases regenerated, not just one.
    *
    * AC7: URL aliases must be regenerated for ALL content, not just the first
    * Canvas page encountered.
@@ -184,8 +179,10 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that a Canvas page with a manually locked alias is regenerated
-   * programmatically even though the UI would normally preserve locked aliases.
+   * Tests that a Canvas page with a manually locked alias is still regenerated.
+   *
+   * Verifies this happens programmatically even though the UI would normally
+   * preserve locked aliases.
    *
    * AC7: The default language change bypasses normal Pathauto suppression and
    * must regenerate aliases even for pages where the alias would normally be

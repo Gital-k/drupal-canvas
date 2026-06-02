@@ -20,8 +20,9 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * Tests Drupal\canvas\DefaultLanguageChangeHandler for config entity
- * translation restructuring when the site's default language changes.
+ * Tests DefaultLanguageChangeHandler for config entity translation restructuring.
+ *
+ * Covers behavior when the site's default language changes:
  *
  * AC4: Config entity translations (content templates, page regions stored as
  *      config overrides in language.{langcode} collections) must be
@@ -124,8 +125,9 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
   // ---------------------------------------------------------------------------
 
   /**
-   * Tests that the old default config becomes a translation override for the
-   * old language after the default language changes.
+   * Tests that the old default config becomes a translation override.
+   *
+   * Verifies the override is for the old language after the default changes.
    *
    * AC4: What was previously the "default" config becomes a translation
    * override for the old language code.
@@ -155,8 +157,9 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that the existing FR translation is promoted to become the new base
-   * config after the default language changes to FR.
+   * Tests that the existing FR translation is promoted to become the new base config.
+   *
+   * Verifies this happens after the default language changes to FR.
    *
    * AC4: The current default-language config becomes the new default when the
    * new default language already has a translation override — that override is
@@ -183,8 +186,10 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that when there is no existing FR override, the default config
-   * simply becomes the new default without creating any orphaned overrides.
+   * Tests that a template with no existing translation remains intact.
+   *
+   * When there is no existing FR override, the default config simply becomes
+   * the new default without creating any orphaned overrides.
    *
    * AC4: When switching default from EN to FR and there is no FR override, the
    * existing base config remains as-is (now representing FR), and no spurious
@@ -213,8 +218,7 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that the old default config is discarded when the old language is
-   * being dropped entirely from the site.
+   * Tests that the old default config is discarded when the old language is dropped.
    *
    * AC4: If the old default language is being dropped entirely, the old default
    * config translation override should be discarded rather than stored.
@@ -245,8 +249,9 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
   // ---------------------------------------------------------------------------
 
   /**
-   * Tests that PageRegion config overrides are restructured the same way as
-   * ContentTemplate overrides when the default language changes.
+   * Tests that PageRegion config overrides are restructured on language change.
+   *
+   * Verifies the same restructuring behavior as ContentTemplate overrides.
    *
    * AC4: Page regions stored as config overrides must undergo the same
    * restructuring: existing FR override promoted, EN becomes an override.
@@ -311,8 +316,7 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
   // ---------------------------------------------------------------------------
 
   /**
-   * Tests that UUID-keyed component tree structure is preserved when config
-   * entity translations are swapped.
+   * Tests that UUID-keyed component tree structure is preserved on config swap.
    *
    * AC9: The symmetric translation layout (component tree structure) must be
    * preserved across this swap. UUID-based keys ensure the translation still
