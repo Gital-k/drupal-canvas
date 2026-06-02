@@ -1162,6 +1162,7 @@ class TranslationTest extends FunctionalTestBase {
    * @see \Drupal\canvas\Controller\ApiTranslationControllers::delete()
    */
   public function testDeleteCanvasPageTranslation(): void {
+    $this->drupalLogin($this->drupalCreateUser([Page::EDIT_PERMISSION]));
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
     $page = $this->createCanvasTranslationTestPage();
@@ -1218,6 +1219,9 @@ class TranslationTest extends FunctionalTestBase {
    */
   #[DataProvider('deleteConfigEntityTranslationProvider')]
   public function testDeleteConfigEntityTranslation(string $entity_type_id): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['config_translation']);
+    $this->rebuildContainer();
+    $this->drupalLogin($this->drupalCreateUser(['translate configuration']));
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
     if ($entity_type_id === 'content_template') {
