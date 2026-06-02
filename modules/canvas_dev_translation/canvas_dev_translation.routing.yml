@@ -1,3 +1,0 @@
-# Routes for the canvas_dev_translation feature-flag module.
-# The content translation delete API route lives in canvas.routing.yml because
-# the Canvas UI that calls it is disabled when this module is not enabled.
