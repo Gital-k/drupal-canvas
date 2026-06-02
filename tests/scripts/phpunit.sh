@@ -101,6 +101,8 @@ if [[ -d "$MODULE_ROOT/vendor" ]]; then
   # Case 1: Module root IS the composer root (included .ddev config)
   DRUPAL_PROJECT_ROOT="$MODULE_ROOT"
   DRUPAL_WEB_ROOT="$MODULE_ROOT/web"
+  # Use the symlinked module path to avoid scanning vendor/
+  MODULE_TEST_DIR="$DRUPAL_WEB_ROOT/modules/contrib/canvas"
 elif [[ -d "$(realpath "$MODULE_ROOT/../../../..")/vendor" ]]; then
   # Case 2: Module is at web/modules/contrib/canvas, vendor is 4 levels up
   DRUPAL_PROJECT_ROOT=$(realpath "$MODULE_ROOT/../../../..")
@@ -119,7 +121,7 @@ fi
 # Parse args: .php files run via phpunit directly; directories become --directory
 # for run-tests.sh (parallel); everything else passes through.
 PHPUNIT_DIRECT_FILE=""
-DIRECTORY="$MODULE_ROOT"
+DIRECTORY="${MODULE_TEST_DIR:-$MODULE_ROOT}"
 PASSTHROUGH_ARGS=()
 INVOCATION_DIR="$(pwd)"
 for arg in "$@"; do

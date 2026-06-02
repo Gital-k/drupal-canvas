@@ -8,9 +8,5 @@
 
 set -eu -o pipefail
 
-if ! command -v phpcs >/dev/null; then
-  echo "phpcs is not available. You may need to run 'ddev setup'"
-  exit 1
-fi
-
+cd "${DDEV_DOCROOT}/${DRUPAL_PROJECTS_PATH}/${DDEV_SITENAME//-/_}"
 composer run phpcs

@@ -9,9 +9,5 @@
 
 set -eu -o pipefail
 
-if ! command -v phpstan >/dev/null; then
-  echo "phpstan is not available. You may need to 'ddev poser'"
-  exit 1
-fi
-
+cd "${DDEV_DOCROOT}/${DRUPAL_PROJECTS_PATH}/${DDEV_SITENAME//-/_}"
 composer run phpstan
