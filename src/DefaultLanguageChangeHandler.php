@@ -19,6 +19,11 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  * Canvas pages whose langcode matches the old default are re-assigned to the
  * new default language code.
  *
+ * When the new default language already has existing translations on a page,
+ * those translations are promoted to become the default (AC9): the
+ * default_langcode flag is flipped rather than changing langcode values, so
+ * all translation data is preserved.
+ *
  * @see \Drupal\language\EventSubscriber\ConfigSubscriber
  */
 final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
@@ -53,14 +58,17 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
   }
 
   /**
-   * Updates the langcode on all Canvas page rows that match the old default.
+   * Migrates Canvas page langcodes from the old default to the new one.
    *
    * Uses direct database updates rather than the entity API to avoid
-   * translation-loading issues when the new langcode has no existing
-   * translation entries on a given entity.
+   * translation-loading issues.
    *
-   * Only rows where default_langcode = 1 are updated, leaving non-default
-   * translation rows untouched.
+   * Two cases are handled per page:
+   * - Page already has a translation in $new_langcode: promote it by flipping
+   *   the default_langcode flag. The old default row stays under $old_langcode
+   *   as a non-default translation (AC9).
+   * - Page has no translation in $new_langcode: update the default row's
+   *   langcode directly to $new_langcode (AC1, AC2).
    *
    * @param string $old_langcode
    *   The previous default language code.
@@ -72,23 +80,80 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
       return;
     }
 
-    // Update the data table (stores per-translation field values).
-    $this->database->update('canvas_page_field_data')
-      ->fields(['langcode' => $new_langcode])
-      ->condition('langcode', $old_langcode)
-      ->condition('default_langcode', 1)
-      ->execute();
+    // Find all page IDs whose current default row is in $old_langcode.
+    $default_ids = $this->database->select('canvas_page_field_data', 'd')
+      ->fields('d', ['id'])
+      ->condition('d.langcode', $old_langcode)
+      ->condition('d.default_langcode', 1)
+      ->execute()
+      ->fetchCol();
 
-    // Update the revision data table so historical revisions are consistent.
-    if ($this->database->schema()->tableExists('canvas_page_field_revision')) {
-      $this->database->update('canvas_page_field_revision')
+    if (empty($default_ids)) {
+      return;
+    }
+
+    // Find which of those already have a translation in $new_langcode.
+    $ids_with_new_translation = $this->database->select('canvas_page_field_data', 'd')
+      ->fields('d', ['id'])
+      ->condition('d.id', $default_ids, 'IN')
+      ->condition('d.langcode', $new_langcode)
+      ->execute()
+      ->fetchCol();
+
+    $ids_to_promote = \array_intersect($default_ids, $ids_with_new_translation);
+    $ids_to_relabel = \array_diff($default_ids, $ids_with_new_translation);
+
+    // AC9: Promote existing $new_langcode translation to default.
+    // Flip default_langcode on the two affected rows for each page.
+    if (!empty($ids_to_promote)) {
+      // The new-langcode row becomes the default.
+      $this->database->update('canvas_page_field_data')
+        ->fields(['default_langcode' => 1])
+        ->condition('id', $ids_to_promote, 'IN')
+        ->condition('langcode', $new_langcode)
+        ->execute();
+      // The old-langcode row becomes a non-default translation.
+      $this->database->update('canvas_page_field_data')
+        ->fields(['default_langcode' => 0])
+        ->condition('id', $ids_to_promote, 'IN')
+        ->condition('langcode', $old_langcode)
+        ->execute();
+
+      // Mirror the same changes in the revision table.
+      if ($this->database->schema()->tableExists('canvas_page_field_revision')) {
+        $this->database->update('canvas_page_field_revision')
+          ->fields(['default_langcode' => 1])
+          ->condition('id', $ids_to_promote, 'IN')
+          ->condition('langcode', $new_langcode)
+          ->execute();
+        $this->database->update('canvas_page_field_revision')
+          ->fields(['default_langcode' => 0])
+          ->condition('id', $ids_to_promote, 'IN')
+          ->condition('langcode', $old_langcode)
+          ->execute();
+      }
+    }
+
+    // AC1/AC2: No existing translation — update langcode directly.
+    if (!empty($ids_to_relabel)) {
+      $this->database->update('canvas_page_field_data')
         ->fields(['langcode' => $new_langcode])
+        ->condition('id', $ids_to_relabel, 'IN')
         ->condition('langcode', $old_langcode)
         ->condition('default_langcode', 1)
         ->execute();
+
+      if ($this->database->schema()->tableExists('canvas_page_field_revision')) {
+        $this->database->update('canvas_page_field_revision')
+          ->fields(['langcode' => $new_langcode])
+          ->condition('id', $ids_to_relabel, 'IN')
+          ->condition('langcode', $old_langcode)
+          ->condition('default_langcode', 1)
+          ->execute();
+      }
     }
 
-    // Invalidate the entity cache so reloads reflect the new langcode.
+    // Invalidate the entity cache so reloads reflect the updated rows.
     \Drupal::entityTypeManager()
       ->getStorage(Page::ENTITY_TYPE_ID)
       ->resetCache();
