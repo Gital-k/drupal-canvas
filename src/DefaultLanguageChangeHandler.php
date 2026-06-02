@@ -16,9 +16,9 @@ use Drupal\Core\Config\ConfigEvents;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\language\ConfigurableLanguageManagerInterface;
+use Drupal\pathauto\PathautoGeneratorInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -43,7 +43,7 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
     private readonly Connection $database,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly LanguageManagerInterface $languageManager,
-    private readonly ModuleHandlerInterface $moduleHandler,
+    private readonly ?PathautoGeneratorInterface $pathautoGenerator,
   ) {}
 
   /**
@@ -95,24 +95,24 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
     }
 
     // Find all page IDs whose current default row is in $old_langcode.
-    $default_ids = $this->database->select('canvas_page_field_data', 'd')
+    $result = $this->database->select('canvas_page_field_data', 'd')
       ->fields('d', ['id'])
       ->condition('d.langcode', $old_langcode)
       ->condition('d.default_langcode', 1)
-      ->execute()
-      ->fetchCol();
+      ->execute();
+    $default_ids = $result ? $result->fetchCol() : [];
 
     if (empty($default_ids)) {
       return;
     }
 
     // Find which of those already have a translation in $new_langcode.
-    $ids_with_new_translation = $this->database->select('canvas_page_field_data', 'd')
+    $result = $this->database->select('canvas_page_field_data', 'd')
       ->fields('d', ['id'])
       ->condition('d.id', $default_ids, 'IN')
       ->condition('d.langcode', $new_langcode)
-      ->execute()
-      ->fetchCol();
+      ->execute();
+    $ids_with_new_translation = $result ? $result->fetchCol() : [];
 
     $ids_to_promote = \array_intersect($default_ids, $ids_with_new_translation);
     $ids_to_relabel = \array_diff($default_ids, $ids_with_new_translation);
@@ -182,12 +182,9 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
    * @see \Drupal\canvas\Hook\PageHooks::ensurePathautoSkipped()
    */
   private function regenerateCanvasPageAliases(): void {
-    if (!$this->moduleHandler->moduleExists('pathauto')) {
+    if ($this->pathautoGenerator === NULL) {
       return;
     }
-
-    /** @var \Drupal\pathauto\PathautoGeneratorInterface $pathauto_generator */
-    $pathauto_generator = \Drupal::service('pathauto.generator');
 
     // Temporarily set the Pathauto update action to DELETE (replace existing
     // aliases) so that language-token-based patterns are fully re-evaluated.
@@ -207,7 +204,7 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
         \assert($page instanceof Page);
         // Force alias generation bypassing the PathautoState::SKIP value that
         // PageHooks::ensurePathautoSkipped() sets on normal presave.
-        $pathauto_generator->updateEntityAlias($page, 'bulkupdate', ['force' => TRUE]);
+        $this->pathautoGenerator->updateEntityAlias($page, 'bulkupdate', ['force' => TRUE]);
       }
     }
     finally {
