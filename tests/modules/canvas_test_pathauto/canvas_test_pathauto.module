@@ -1,0 +1,48 @@
+<?php
+
+declare(strict_types=1);
+
+use Drupal\Core\Render\BubbleableMetadata;
+
+/**
+ * Implements hook_token_info().
+ *
+ * Provides a simple [canvas_page:id] token for Pathauto kernel tests,
+ * bypassing the need for the token module to auto-discover canvas_page tokens.
+ */
+function canvas_test_pathauto_token_info(): array {
+  return [
+    'types' => [
+      'canvas_page' => [
+        'name' => t('Canvas Pages'),
+        'needs-data' => 'canvas_page',
+        'module' => 'canvas_test_pathauto',
+      ],
+    ],
+    'tokens' => [
+      'canvas_page' => [
+        'id' => [
+          'name' => t('Page ID'),
+          'description' => t('The numeric ID of the Canvas page.'),
+          'module' => 'canvas_test_pathauto',
+        ],
+      ],
+    ],
+  ];
+}
+
+/**
+ * Implements hook_tokens().
+ */
+function canvas_test_pathauto_tokens(string $type, array $tokens, array $data, array $options, BubbleableMetadata $bubbleable_metadata): array {
+  $replacements = [];
+  if ($type === 'canvas_page' && !empty($data['canvas_page'])) {
+    $page = $data['canvas_page'];
+    foreach ($tokens as $name => $original) {
+      if ($name === 'id') {
+        $replacements[$original] = $page->id();
+      }
+    }
+  }
+  return $replacements;
+}

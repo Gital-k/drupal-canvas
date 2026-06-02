@@ -1,0 +1,7 @@
+name: 'Canvas Test Pathauto'
+type: module
+description: 'Provides a simple token for Pathauto kernel tests.'
+dependencies:
+  - canvas:canvas
+  - pathauto:pathauto
+package: Testing
