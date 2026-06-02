@@ -1596,6 +1596,17 @@ paths:
       responses:
         '204':
           description: Content deleted successfully
+  '/canvas/api/v0/content/canvas_page/{entityId}/translations':
+    description: Endpoint for deleting a specific translation of a canvas_page content entity.
+    delete:
+      summary: Deletes a single translation of a canvas_page entity.
+      parameters:
+        - $ref: '#/components/parameters/entityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: Cannot delete the default translation. Use the entity delete endpoint to remove the whole entity.
   '/canvas/api/v0/content/{entity_type}':
     get:
       summary: Provides api for page listing.
