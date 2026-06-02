@@ -49,7 +49,6 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
    */
   protected static $modules = [
     'language',
-    'config_translation',
     'node',
     'field',
   ];
@@ -107,6 +106,7 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
    * Saves a French translation override for a ContentTemplate.
    */
   private function addFrenchTranslationToTemplate(ContentTemplate $template): void {
+    $this->enableModules(['config_translation']);
     $language_manager = $this->container->get(LanguageManagerInterface::class);
     \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
 
