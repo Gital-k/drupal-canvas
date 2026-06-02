@@ -187,16 +187,29 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
     /** @var \Drupal\pathauto\PathautoGeneratorInterface $pathauto_generator */
     $pathauto_generator = \Drupal::service('pathauto.generator');
 
-    $storage = $this->entityTypeManager->getStorage(Page::ENTITY_TYPE_ID);
-    $page_ids = $storage->getQuery()
-      ->accessCheck(FALSE)
-      ->execute();
+    // Temporarily set the Pathauto update action to DELETE (replace existing
+    // aliases) so that language-token-based patterns are fully re-evaluated.
+    // The default UPDATE_ACTION_NO_NEW would leave existing aliases untouched.
+    $pathauto_config = $this->configFactory->getEditable('pathauto.settings');
+    $original_update_action = $pathauto_config->get('update_action');
+    // PathautoGeneratorInterface::UPDATE_ACTION_DELETE = 2.
+    $pathauto_config->set('update_action', 2)->save(TRUE);
 
-    foreach ($storage->loadMultiple($page_ids) as $page) {
-      \assert($page instanceof Page);
-      // Force alias generation bypassing the PathautoState::SKIP value that
-      // PageHooks::ensurePathautoSkipped() sets on normal presave.
-      $pathauto_generator->updateEntityAlias($page, 'bulkupdate', ['force' => TRUE]);
+    try {
+      $storage = $this->entityTypeManager->getStorage(Page::ENTITY_TYPE_ID);
+      $page_ids = $storage->getQuery()
+        ->accessCheck(FALSE)
+        ->execute();
+
+      foreach ($storage->loadMultiple($page_ids) as $page) {
+        \assert($page instanceof Page);
+        // Force alias generation bypassing the PathautoState::SKIP value that
+        // PageHooks::ensurePathautoSkipped() sets on normal presave.
+        $pathauto_generator->updateEntityAlias($page, 'bulkupdate', ['force' => TRUE]);
+      }
+    }
+    finally {
+      $pathauto_config->set('update_action', $original_update_action)->save(TRUE);
     }
   }
 
