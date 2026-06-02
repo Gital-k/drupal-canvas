@@ -14,6 +14,7 @@ use Drupal\Core\Config\ConfigEvents;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -40,6 +41,7 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
     private readonly Connection $database,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly LanguageManagerInterface $languageManager,
+    private readonly ModuleHandlerInterface $moduleHandler,
   ) {}
 
   /**
@@ -64,6 +66,7 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
     $this->migrateCanvasPages($old_langcode, $new_langcode);
     $this->autoSaveManager->migrateCanvasPageAutoSaves($old_langcode, $new_langcode);
     $this->migrateConfigEntityTranslations($old_langcode, $new_langcode);
+    $this->regenerateCanvasPageAliases();
   }
 
   /**
@@ -161,6 +164,48 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
     $this->entityTypeManager
       ->getStorage(Page::ENTITY_TYPE_ID)
       ->resetCache();
+  }
+
+  /**
+   * Regenerates Pathauto URL aliases for all Canvas pages.
+   *
+   * Canvas normally suppresses Pathauto auto-generation on page presave so
+   * that aliases are managed via the UI. After a default language change,
+   * however, language tokens in Pathauto patterns may resolve differently, so
+   * aliases must be regenerated programmatically regardless of the stored
+   * PathautoState.
+   *
+   * This is a no-op if the pathauto module is not installed.
+   *
+   * @see \Drupal\canvas\Hook\PageHooks::ensurePathautoSkipped()
+   */
+  private function regenerateCanvasPageAliases(): void {
+    if (!$this->moduleHandler->moduleExists('pathauto')) {
+      return;
+    }
+
+    /** @var \Drupal\pathauto\PathautoGeneratorInterface $pathauto_generator */
+    $pathauto_generator = \Drupal::service('pathauto.generator');
+
+    $storage = $this->entityTypeManager->getStorage(Page::ENTITY_TYPE_ID);
+    $page_ids = $storage->getQuery()
+      ->accessCheck(FALSE)
+      ->execute();
+
+    foreach ($storage->loadMultiple($page_ids) as $page) {
+      \assert($page instanceof Page);
+      // Force alias generation by temporarily overriding the PathautoState,
+      // bypassing the SKIP value set by PageHooks::ensurePathautoSkipped().
+      if ($page->hasField('path') && !$page->get('path')->isEmpty()) {
+        $path_item = $page->get('path')->first();
+        if (\method_exists($path_item, 'set')) {
+          // PathautoState::CREATE = 1. Using the constant directly would
+          // require a conditional import since pathauto is optional.
+          $path_item->set('pathauto', 1);
+        }
+      }
+      $pathauto_generator->updateEntityAlias($page, 'bulkupdate');
+    }
   }
 
   /**
