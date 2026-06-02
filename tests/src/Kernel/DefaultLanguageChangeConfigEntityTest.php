@@ -361,12 +361,16 @@ final class DefaultLanguageChangeConfigEntityTest extends CanvasKernelTestBase {
     // Reorder the component tree before the language change to verify
     // UUID-keyed targeting still works after the swap.
     $tree_items = $template->getComponentTree()->getValue();
-    // Add a second component to make the reorder meaningful.
+    // Add a second CTA component to make the two-component tree meaningful.
+    // Using the same component type avoids required-input schema violations.
     $tree_items[] = [
       'uuid' => self::UUID_BRANDING,
-      'component_id' => 'block.system_branding_block',
-      'component_version' => \Drupal::entityTypeManager()->getStorage('component')->load('block.system_branding_block')?->getActiveVersion(),
-      'inputs' => ['label' => 'Branding'],
+      'component_id' => 'sdc.canvas_test_sdc.my-cta',
+      'component_version' => '89881c04a0fde367',
+      'inputs' => [
+        'text' => 'Second CTA',
+        'href' => 'https://example.com',
+      ],
     ];
     $template->setComponentTree($tree_items)->save();
 
