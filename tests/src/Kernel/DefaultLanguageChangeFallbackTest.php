@@ -46,9 +46,6 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
   protected static $modules = [
     'language',
     'config_translation',
-    'content_translation',
-    'node',
-    'field',
   ];
 
   /**
@@ -56,14 +53,8 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installEntitySchema('canvas_page');
-    $this->installEntitySchema('path_alias');
-    $this->installEntitySchema('node');
-    $this->installEntitySchema('user');
-    $this->installConfig(['language', 'content_translation', 'node', 'user']);
-    $this->generateComponentConfig();
+    $this->installConfig(['language']);
     $this->config('system.theme')->set('default', 'stark')->save();
-    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
 
     ConfigurableLanguage::createFromLangcode('fr')->save();
   }
@@ -194,6 +185,13 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
    * one.
    */
   public function testContentTemplateFallsBackToNewDefaultLanguage(): void {
+    $this->enableModules(['node', 'field', 'content_translation']);
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema('user');
+    $this->installConfig(['content_translation', 'node']);
+    $this->generateComponentConfig();
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+
     $language_manager = $this->container->get(LanguageManagerInterface::class);
     \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
 
@@ -260,8 +258,13 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
    * the new default language's template when no better match is found.
    */
   public function testContentTemplateAwareViewBuilderFallsBackToNewDefault(): void {
+    $this->enableModules(['node', 'field', 'content_translation']);
+    $this->installEntitySchema('path_alias');
     $this->installEntitySchema('user');
     $this->installEntitySchema('node');
+    $this->installConfig(['content_translation', 'node']);
+    $this->generateComponentConfig();
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
 
     $template = ContentTemplate::create([
       'content_entity_type_id' => 'node',
