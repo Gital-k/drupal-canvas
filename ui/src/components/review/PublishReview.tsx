@@ -16,8 +16,9 @@ import {
 import PermissionCheck from '@/components/PermissionCheck';
 import ReviewErrors from '@/components/review/ReviewErrors';
 import { getReviewGroupKey } from '@/components/review/utils';
-import { isConflictUxEnabled } from '@/features/conflict/conflictUtils';
 import { Divider } from '@/features/code-editor/component-data/FormElement';
+import { isConflictUxEnabled } from '@/features/conflict/conflictUtils';
+
 import ChangeList from './changes/ChangeList';
 import ConflictBanner from './ConflictBanner';
 
@@ -292,7 +293,9 @@ const PublishReview: React.FC<PublishReviewProps> = ({
                       setSelectedChanges={setSelectedChanges}
                       onDiscardClick={handleDiscardClick}
                       onViewClick={onViewClick}
-                      onResolveConflict={(change) => onResolveConflict?.(change)}
+                      onResolveConflict={(change) =>
+                        onResolveConflict?.(change)
+                      }
                       pageStatusMap={pageStatusMap}
                     />
                   </>

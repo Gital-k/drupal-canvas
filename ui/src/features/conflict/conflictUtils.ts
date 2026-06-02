@@ -60,7 +60,6 @@ const normalizeTimestamp = (timestamp?: number): number => {
   return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
 };
 
-
 export const buildConflictNotification = ({
   contextKey,
   hasRead,

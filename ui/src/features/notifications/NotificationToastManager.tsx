@@ -9,11 +9,11 @@ import {
 import {
   buildConflictNotification,
   CONFLICT_NOTIFICATION_HREF,
-  getCurrentConflictContextKey,
   getConflictNotificationFromPendingChanges,
   getConflictNotificationId,
-  isConflictUxEnabled,
+  getCurrentConflictContextKey,
   isConflictNotificationId,
+  isConflictUxEnabled,
 } from '@/features/conflict/conflictUtils';
 import { selectPageOpenedAt } from '@/features/notifications/notificationsSlice';
 import {
@@ -46,11 +46,7 @@ const NotificationToastManager = () => {
     : undefined;
   const hasReadConflictNotification = useAppSelector((state) =>
     currentNotificationId
-      ? selectConflictNotificationRead(
-          state,
-          currentNotificationId,
-          contextKey,
-        )
+      ? selectConflictNotificationRead(state, currentNotificationId, contextKey)
       : false,
   );
   const shownIds = useRef(new Set<string>());

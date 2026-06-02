@@ -16,9 +16,10 @@ import {
   Tooltip,
 } from '@radix-ui/themes';
 
+import { isConflictUxEnabled } from '@/features/conflict/conflictUtils';
+
 import { getAvatarInitialColor, getChangeLabel, getTimeAgo } from '../utils';
 import ChangeIcon from './ChangeIcon';
-import { isConflictUxEnabled } from '@/features/conflict/conflictUtils';
 
 import type { UnpublishedChange } from '@/types/Review';
 

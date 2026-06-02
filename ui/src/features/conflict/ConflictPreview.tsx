@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Spinner } from '@radix-ui/themes';
 
@@ -14,7 +14,7 @@ import styles from './ConflictPreview.module.css';
  * editor's Redux preview-update cycle. It fetches the layout HTML directly
  * via `useGetConflictPageLayoutQuery` (which has no side-effects) and renders
  * it in an iframe. The `?version=published` search param controls whether the
- * published version or the autosave (new) version is displayed.
+ * published version or the auto-save (new) version is displayed.
  */
 const ConflictPreview = () => {
   const { entityId, entityType, width } = useParams<{
@@ -24,8 +24,15 @@ const ConflictPreview = () => {
   }>();
   const [searchParams] = useSearchParams();
   const isPublished = searchParams.get('version') === 'published';
-  const [widthVal, setWidthVal] = useState('100%');
   const viewportSizes = useMemo(() => getViewportSizes(), []);
+  const widthVal = useMemo(() => {
+    if (!width || width === 'full') {
+      return '100%';
+    }
+
+    const viewportSize = viewportSizes.find((v) => v.id === width);
+    return viewportSize ? `${viewportSize.width}px` : '100%';
+  }, [width, viewportSizes]);
 
   const { data, isFetching, isError } = useGetConflictPageLayoutQuery(
     entityId && entityType
@@ -38,23 +45,11 @@ const ConflictPreview = () => {
     { skip: !entityId || !entityType },
   );
 
-  // Handle viewport width from URL param.
-  useMemo(() => {
-    if (!width || width === 'full') {
-      setWidthVal('100%');
-    } else {
-      const vs = viewportSizes.find((v) => v.id === width);
-      if (vs) {
-        setWidthVal(`${vs.width}px`);
-      }
-    }
-  }, [width, viewportSizes]);
-
   if (isError) {
     return (
       <div className={styles.container}>
         <p className={styles.error}>
-          Unable to load the {isPublished ? 'published' : 'autosave'} version
+          Unable to load the {isPublished ? 'published' : 'auto-save'} version
           preview.
         </p>
       </div>

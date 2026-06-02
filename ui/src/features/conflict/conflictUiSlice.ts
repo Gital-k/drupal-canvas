@@ -26,7 +26,10 @@ export const conflictUiSlice = createSlice({
       state.resolverOpenByContext[contextKey] = true;
       state.resolverStartPointerByContext[contextKey] = pointer;
     },
-    closeConflictResolver(state, action: PayloadAction<{ contextKey: string }>) {
+    closeConflictResolver(
+      state,
+      action: PayloadAction<{ contextKey: string }>,
+    ) {
       const { contextKey } = action.payload;
       state.resolverOpenByContext[contextKey] = false;
       state.resolverStartPointerByContext[contextKey] = undefined;

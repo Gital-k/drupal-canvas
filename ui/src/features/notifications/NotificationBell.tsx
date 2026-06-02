@@ -12,11 +12,11 @@ import {
 import {
   buildConflictNotification,
   CONFLICT_NOTIFICATION_HREF,
-  getCurrentConflictContextKey,
   getConflictNotificationFromPendingChanges,
   getConflictNotificationId,
-  isConflictUxEnabled,
+  getCurrentConflictContextKey,
   isConflictNotificationId,
+  isConflictUxEnabled,
 } from '@/features/conflict/conflictUtils';
 import {
   selectActivityCenterOpen,
@@ -29,6 +29,7 @@ import {
   useMarkNotificationsReadMutation,
 } from '@/services/notificationsApi';
 import { useGetAllPendingChangesQuery } from '@/services/pendingChangesApi';
+
 import ActivityCenter from './ActivityCenter';
 import {
   AUTO_READ_TYPES,
@@ -50,11 +51,7 @@ const NotificationBell = () => {
     : undefined;
   const hasReadConflictNotification = useAppSelector((state) =>
     currentNotificationId
-      ? selectConflictNotificationRead(
-          state,
-          currentNotificationId,
-          contextKey,
-        )
+      ? selectConflictNotificationRead(state, currentNotificationId, contextKey)
       : false,
   );
   const isTabFocused = useDocumentVisibility();
@@ -112,9 +109,7 @@ const NotificationBell = () => {
 
   const handleMarkAllRead = () => {
     const unreadIds = notifications
-      .filter(
-        (n) => !n.hasRead && !isConflictNotificationId(n.id, contextKey),
-      )
+      .filter((n) => !n.hasRead && !isConflictNotificationId(n.id, contextKey))
       .map((n) => n.id);
     if (unreadIds.length > 0) {
       markRead({ ids: unreadIds });

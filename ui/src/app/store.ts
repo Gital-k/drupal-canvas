@@ -5,8 +5,8 @@ import { setupListeners } from '@reduxjs/toolkit/query';
 
 import { publishReviewSlice } from '@/components/review/PublishReview.slice';
 import codeEditorSlice from '@/features/code-editor/codeEditorSlice';
-import { conflictUiSlice } from '@/features/conflict/conflictUiSlice';
 import { configurationSlice } from '@/features/configuration/configurationSlice';
+import { conflictUiSlice } from '@/features/conflict/conflictUiSlice';
 import { queryErrorSlice } from '@/features/error-handling/queryErrorSlice';
 import { extensionsSlice } from '@/features/extensions/extensionsSlice';
 import { formStateSlice } from '@/features/form/formStateSlice';

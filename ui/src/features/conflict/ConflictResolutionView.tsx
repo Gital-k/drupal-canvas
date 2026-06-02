@@ -182,7 +182,10 @@ export const PageConflictComparisonView = ({
   const handlePublishedPreview =
     onPublishedPreviewClick ??
     (() =>
-      window.open(buildConflictPreviewUrl(entityType, entityId, true), '_blank'));
+      window.open(
+        buildConflictPreviewUrl(entityType, entityId, true),
+        '_blank',
+      ));
   const handleNewPreview =
     onNewPreviewClick ??
     (() =>
@@ -240,8 +243,9 @@ export const PageConflictComparisonView = ({
           Math.abs(
             sourceScrollArea.scrollLeft - ignoredScrollPosition.scrollLeft,
           ) < 0.5 &&
-          Math.abs(sourceScrollArea.scrollTop - ignoredScrollPosition.scrollTop) <
-            0.5
+          Math.abs(
+            sourceScrollArea.scrollTop - ignoredScrollPosition.scrollTop,
+          ) < 0.5
         ) {
           return;
         }

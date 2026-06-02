@@ -61,11 +61,11 @@
   flex: 0 0 74px;
   justify-content: center;
   height: 32px;
+  cursor: pointer;
   color: var(--gray-12);
   border-radius: 4px;
   background: transparent;
   box-shadow: none;
-  cursor: pointer;
 }
 
 .tabList .tabTrigger:hover {
