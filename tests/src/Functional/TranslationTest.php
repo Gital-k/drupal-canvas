@@ -1152,54 +1152,151 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
+   * Data provider for testDeleteTranslation().
+   *
+   * @return array<string, array{string}>
+   *   Keyed by entity type, value is [entity_type_id].
+   */
+  public static function deleteTranslationProvider(): array {
+    return [
+      'canvas_page' => ['canvas_page'],
+      'content_template' => ['content_template'],
+      'page_region' => ['page_region'],
+    ];
+  }
+
+  /**
    * Tests the Canvas API delete translation endpoint.
    *
    * Covers:
    *  - 204 response when deleting a non-default translation.
-   *  - 400 response when attempting to delete the original (default) translation.
+   *  - 400 response when no translation exists (already deleted or never
+   *    existed).
+   *  - For canvas_page only: 400 when attempting to delete the default
+   *    translation.
    *
-   * @see \Drupal\canvas\Controller\ApiContentTranslationControllers::delete()
+   * @see \Drupal\canvas\Controller\ApiTranslationControllers::delete()
+   * @see \Drupal\canvas\Controller\ApiTranslationControllers::deleteConfigTranslation()
    */
-  public function testDeleteTranslation(): void {
-    $page_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Page::ENTITY_TYPE_ID);
-
-    $page = $this->createCanvasTranslationTestPage();
-    $page_id = (int) $page->id();
-
-    // The French translation was added in createCanvasTranslationTestPage().
-    self::assertTrue($page->hasTranslation('fr'));
-
+  #[DataProvider('deleteTranslationProvider')]
+  public function testDeleteTranslation(string $entity_type_id): void {
     // Fetch the CSRF token required for state-changing API requests.
-    $request_options = [
-      'headers' => [
-        'X-CSRF-Token' => $this->drupalGet('session/token'),
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
+
+    if ($entity_type_id === 'canvas_page') {
+      $page = $this->createCanvasTranslationTestPage();
+      $page_id = (int) $page->id();
+      self::assertTrue($page->hasTranslation('fr'));
+
+      $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/content/canvas_page/{$page_id}/translations");
+
+      // Deleting a non-default translation removes it and returns 204.
+      $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+      self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+
+      $page_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Page::ENTITY_TYPE_ID);
+      $reloaded = $page_storage->loadUnchanged($page_id);
+      self::assertInstanceOf(Page::class, $reloaded);
+      self::assertFalse($reloaded->hasTranslation('fr'));
+      self::assertTrue($reloaded->hasTranslation('en'));
+
+      // Trying to delete the default/source language is not allowed.
+      $delete_default_url = Url::fromUserInput("/canvas/api/v0/content/canvas_page/{$page_id}/translations");
+      $response = $this->makeApiRequest('DELETE', $delete_default_url, $request_options);
+      self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+      $reloaded = $page_storage->loadUnchanged($page_id);
+      self::assertInstanceOf(Page::class, $reloaded);
+      self::assertTrue($reloaded->hasTranslation('en'));
+
+      // Trying to delete a translation that no longer exists returns 400.
+      $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+      self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+    }
+    elseif ($entity_type_id === 'content_template') {
+      $template = $this->createContentTemplateWithFrenchOverride();
+      $template_id = $template->id();
+
+      $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/config/content_template/{$template_id}/translations");
+
+      // Deleting a non-default translation removes it and returns 204.
+      $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+      self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+
+      $language_manager = $this->container->get(LanguageManagerInterface::class);
+      self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
+      $template_object = ContentTemplate::load($template_id);
+      self::assertNotNull($template_object);
+      $override = $language_manager->getLanguageConfigOverride('fr', $template_object->getConfigDependencyName());
+      self::assertTrue($override->isNew());
+
+      // Trying to delete a translation that no longer exists returns 400.
+      $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+      self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+    }
+    elseif ($entity_type_id === 'page_region') {
+      $region = $this->createPageRegionWithFrenchOverride();
+      $region_id = $region->id();
+
+      $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/config/page_region/{$region_id}/translations");
+
+      // Deleting a non-default translation removes it and returns 204.
+      $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+      self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+
+      $language_manager = $this->container->get(LanguageManagerInterface::class);
+      self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
+      $region_object = PageRegion::load($region_id);
+      self::assertNotNull($region_object);
+      $override = $language_manager->getLanguageConfigOverride('fr', $region_object->getConfigDependencyName());
+      self::assertTrue($override->isNew());
+
+      // Trying to delete a translation that no longer exists returns 400.
+      $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+      self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+    }
+  }
+
+  /**
+   * Creates a ContentTemplate with a French language config override.
+   *
+   * @return \Drupal\canvas\Entity\ContentTemplate
+   *   The saved ContentTemplate entity.
+   */
+  private function createContentTemplateWithFrenchOverride(): ContentTemplate {
+    $version = $this->getHeadingComponentVersion();
+
+    $template = ContentTemplate::create([
+      'id' => 'canvas_test_translation_delete',
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'teaser',
+      'component_tree' => [
+        [
+          'uuid' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          'component_id' => 'sdc.canvas_test_sdc.heading',
+          'component_version' => $version,
+          'inputs' => [
+            'text' => 'English heading',
+            'element' => 'h2',
+          ],
+          'label' => 'English heading',
+        ],
       ],
-    ];
+    ]);
+    $template->save();
 
-    // Deleting a non-default translation removes it and returns 204.
-    $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/content/canvas_page/{$page_id}/translations");
-    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
-    self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+    $language_manager = $this->container->get(LanguageManagerInterface::class);
+    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
+    $override = $language_manager->getLanguageConfigOverride('fr', $template->getConfigDependencyName());
+    $override->setData([
+      'component_tree' => [
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' => [
+          'inputs' => ['text' => 'Titre en français'],
+        ],
+      ],
+    ])->save();
 
-    // Only the French translation is gone; the English original is untouched.
-    $reloaded = $page_storage->loadUnchanged($page_id);
-    self::assertInstanceOf(Page::class, $reloaded);
-    self::assertFalse($reloaded->hasTranslation('fr'));
-    self::assertTrue($reloaded->hasTranslation('en'));
-
-    // Trying to delete the default/source language is not allowed.
-    $delete_default_url = Url::fromUserInput("/canvas/api/v0/content/canvas_page/{$page_id}/translations");
-    $response = $this->makeApiRequest('DELETE', $delete_default_url, $request_options);
-    self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
-    $reloaded = $page_storage->loadUnchanged($page_id);
-    self::assertInstanceOf(Page::class, $reloaded);
-    self::assertTrue($reloaded->hasTranslation('en'));
-
-    // Trying to delete a translation that no longer exists returns 400 because
-    // Drupal's entity translation negotiation will load the default
-    // translation.
-    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
-    self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+    return $template;
   }
 
 }

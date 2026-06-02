@@ -341,14 +341,33 @@ canvas.api.content.patch:
 canvas.api.content.translation.delete:
   path: '/canvas/api/v0/content/canvas_page/{canvas_page}/translations'
   defaults:
-    _controller: 'Drupal\canvas\Controller\ApiContentTranslationControllers::delete'
+    _controller: 'Drupal\canvas\Controller\ApiTranslationControllers::delete'
   requirements:
     _canvas_authentication_required: TRUE
-    _entity_access: 'canvas_page.delete'
+    # Removing a translation modifies the entity, so update access is the
+    # correct check. _access_content_translation_manage is intentionally not
+    # used: it forbids access when the user already has entity-level delete
+    # access (it targets translators-without-edit-rights), which is the
+    # opposite of Canvas's permission model.
+    _entity_access: 'canvas_page.update'
   options:
     parameters:
       canvas_page:
         type: entity:canvas_page
+    _format: 'json'
+  methods: [DELETE]
+canvas.api.config.translation.delete:
+  path: '/canvas/api/v0/config/{entity_type_id}/{config_entity}/translations'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\ApiTranslationControllers::deleteConfigTranslation'
+  requirements:
+    _canvas_authentication_required: TRUE
+    entity_type_id: '(content_template|page_region)'
+    _permission: 'translate configuration'
+  options:
+    parameters:
+      config_entity:
+        type: entity:{entity_type_id}
     _format: 'json'
   methods: [DELETE]
 canvas.api.extension.list:
