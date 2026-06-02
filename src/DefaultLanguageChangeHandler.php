@@ -194,17 +194,9 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
 
     foreach ($storage->loadMultiple($page_ids) as $page) {
       \assert($page instanceof Page);
-      // Force alias generation by temporarily overriding the PathautoState,
-      // bypassing the SKIP value set by PageHooks::ensurePathautoSkipped().
-      if ($page->hasField('path') && !$page->get('path')->isEmpty()) {
-        $path_item = $page->get('path')->first();
-        if (\method_exists($path_item, 'set')) {
-          // PathautoState::CREATE = 1. Using the constant directly would
-          // require a conditional import since pathauto is optional.
-          $path_item->set('pathauto', 1);
-        }
-      }
-      $pathauto_generator->updateEntityAlias($page, 'bulkupdate');
+      // Force alias generation bypassing the PathautoState::SKIP value that
+      // PageHooks::ensurePathautoSkipped() sets on normal presave.
+      $pathauto_generator->updateEntityAlias($page, 'bulkupdate', ['force' => TRUE]);
     }
   }
 

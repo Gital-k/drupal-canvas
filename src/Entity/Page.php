@@ -63,6 +63,9 @@ use Drupal\views\EntityViewsData;
     data_table: "canvas_page_field_data",
     revision_data_table: "canvas_page_field_revision",
     show_revision_ui: TRUE,
+    additional: [
+      'token_type' => 'canvas_page',
+    ],
     links: [
       "canonical" => "/page/{canvas_page}",
       "delete-form" => "/page/{canvas_page}/delete",
