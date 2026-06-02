@@ -33,7 +33,7 @@ final class ApiTranslationControllers extends ApiControllerBase {
    *   204 No Content on success, 400 if attempting to delete the default
    *   translation.
    */
-  public function delete(
+  public static function delete(
     ContentEntityInterface $canvas_page,
   ): JsonResponse {
 

@@ -27,6 +27,7 @@ use Drupal\Tests\ApiRequestTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\content_translation\Traits\ContentTranslationTestTrait;
+use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -1162,7 +1163,9 @@ class TranslationTest extends FunctionalTestBase {
    * @see \Drupal\canvas\Controller\ApiTranslationControllers::delete()
    */
   public function testDeleteCanvasPageTranslation(): void {
-    $this->drupalLogin($this->drupalCreateUser([Page::EDIT_PERMISSION]));
+    $user = $this->drupalCreateUser([Page::EDIT_PERMISSION]);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
     $page = $this->createCanvasTranslationTestPage();
@@ -1221,7 +1224,9 @@ class TranslationTest extends FunctionalTestBase {
   public function testDeleteConfigEntityTranslation(string $entity_type_id): void {
     $this->container->get(ModuleInstallerInterface::class)->install(['config_translation']);
     $this->rebuildContainer();
-    $this->drupalLogin($this->drupalCreateUser(['translate configuration']));
+    $user = $this->drupalCreateUser(['translate configuration']);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
     if ($entity_type_id === 'content_template') {
