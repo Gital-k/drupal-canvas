@@ -330,12 +330,12 @@ class DefaultLanguageChangeHandlerTest extends CanvasKernelTestBase {
 
     // FR must now be the default translation.
     self::assertSame('fr', $page->language()->getId(), 'FR must become the default translation.');
-    self::assertSame('Titre français', (string) $page->getTitle(), 'FR title must be the default content.');
+    self::assertSame('Titre français', (string) $page->label(), 'FR title must be the default content.');
 
     // EN must now exist as a (non-default) translation.
     self::assertTrue($page->hasTranslation('en'), 'EN must still exist as a translation after swap.');
     $en_translation = $page->getTranslation('en');
-    self::assertSame('English source title', (string) $en_translation->getTitle(), 'EN translation must preserve the original title.');
+    self::assertSame('English source title', (string) $en_translation->label(), 'EN translation must preserve the original title.');
   }
 
   /**
