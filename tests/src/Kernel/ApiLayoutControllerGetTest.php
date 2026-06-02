@@ -767,7 +767,8 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     //   canvas field is not present.
     // @see \Drupal\canvas\Storage\ComponentTreeLoader::getCanvasFieldName
     $this->expectExceptionMessage('For now Canvas only works if the entity is a canvas_page! Other entity types and bundles must use content templates for now, see https://drupal.org/i/3498525');
-    $controller->get($node);
+    $request = Request::create('/api/canvas/content/canvas_page/' . $node->id());
+    $controller->get(request: $request, entity: $node);
   }
 
   /**
