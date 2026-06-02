@@ -154,6 +154,7 @@
   --bg-selected-dots-hover: var(--blue-5);
 
   composes: default;
+  cursor: grab;
 
   .dots {
     &:hover {

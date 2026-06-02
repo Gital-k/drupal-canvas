@@ -24,7 +24,11 @@
 
 .folderTrigger {
   width: 100%;
+  cursor: grab;
   border-radius: var(--radius-2);
+  button {
+    cursor: pointer;
+  }
   .chevron {
     cursor: pointer;
     &:hover {

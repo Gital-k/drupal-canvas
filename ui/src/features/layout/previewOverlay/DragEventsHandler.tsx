@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
+import FolderIcon from '@assets/icons/folder.svg?react';
 import { DragOverlay, useDndMonitor } from '@dnd-kit/core';
 import {
   restrictToFirstScrollableAncestor,
@@ -231,7 +232,14 @@ const DragEventsHandler: React.FC = () => {
       className={clsx(styles.dragOverlay)}
       dropAnimation={null}
     >
-      {!isDraggingFolder && <div>{componentName}</div>}
+      {isDraggingFolder ? (
+        <div className={styles.folderDragOverlay}>
+          <FolderIcon className={styles.folderDragOverlayIcon} />
+          {componentName}
+        </div>
+      ) : (
+        <div className={styles.componentDragOverlay}>{componentName}</div>
+      )}
     </DragOverlay>
   );
 };
