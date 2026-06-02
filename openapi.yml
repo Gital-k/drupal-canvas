@@ -861,6 +861,17 @@ paths:
       responses:
         '204':
           description: Deleted individual ContentTemplate entity.
+  '/canvas/api/v0/config/content_template/{entityId}/translations':
+    description: Endpoint for deleting a specific translation of a content_template config entity.
+    delete:
+      summary: Deletes the language config override (translation) for a content_template config entity.
+      parameters:
+        - $ref: '#/components/parameters/entityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: No translation exists for the current language.
   /canvas/api/v0/config/folder:
     description: TODO
     get:
@@ -1186,6 +1197,17 @@ paths:
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
+  '/canvas/api/v0/config/page_region/{entityId}/translations':
+    description: Endpoint for deleting a specific translation of a page_region config entity.
+    delete:
+      summary: Deletes the language config override (translation) for a page_region config entity.
+      parameters:
+        - $ref: '#/components/parameters/entityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: No translation exists for the current language.
   /canvas/api/v0/config/pattern:
     description: TODO
     get:
@@ -1607,26 +1629,6 @@ paths:
           description: Translation deleted successfully.
         '400':
           description: Cannot delete the default translation. Use the entity delete endpoint to remove the whole entity.
-  '/canvas/api/v0/config/{entity_type_id}/{entityId}/translations':
-    description: Endpoint for deleting a specific translation of a config entity (content_template or page_region).
-    delete:
-      summary: Deletes the language config override (translation) for a config entity.
-      parameters:
-        - in: path
-          name: entity_type_id
-          required: true
-          description: The config entity type. Must be content_template or page_region.
-          schema:
-            type: string
-            enum:
-              - content_template
-              - page_region
-        - $ref: '#/components/parameters/entityId'
-      responses:
-        '204':
-          description: Translation deleted successfully.
-        '400':
-          description: No translation exists for the current language.
   '/canvas/api/v0/content/{entity_type}':
     get:
       summary: Provides api for page listing.
