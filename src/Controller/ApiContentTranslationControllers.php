@@ -27,9 +27,6 @@ final class ApiContentTranslationControllers extends ApiControllerBase {
    *
    * @param \Drupal\Core\Entity\ContentEntityInterface $canvas_page
    *   The entity whose translation should be deleted.
-   * @param \Drupal\Core\Language\LanguageInterface $language
-   *   The language of the translation to delete, resolved from the {language}
-   *   route parameter via the 'language' param converter.
    *
    * @return \Symfony\Component\HttpFoundation\JsonResponse
    *   204 No Content on success, 400 if attempting to delete the default
@@ -40,29 +37,19 @@ final class ApiContentTranslationControllers extends ApiControllerBase {
    */
   public static function delete(
     ContentEntityInterface $canvas_page,
-    LanguageInterface $language,
   ): JsonResponse {
-    $langcode = $language->getId();
 
     // Guard: cannot delete the default (original/untranslated) language via
     // this endpoint. Callers should use the full entity delete route instead.
-    if ($canvas_page->getUntranslated()->language()->getId() === $langcode) {
+    if ($canvas_page->isDefaultTranslation()) {
       return new JsonResponse(
-        ['message' => \sprintf('Cannot delete the original translation "%s" for canvas_page %s. Use the entity delete endpoint to remove the whole entity.', $langcode, $canvas_page->id())],
+        ['message' => \sprintf('Cannot delete the default translation for canvas_page %s. Use the entity delete endpoint to remove the whole entity.', $canvas_page->id())],
         Response::HTTP_BAD_REQUEST,
       );
     }
-
-    // Guard: the requested translation must exist.
-    if (!$canvas_page->hasTranslation($langcode)) {
-      return new JsonResponse(
-        ['message' => \sprintf('Translation "%s" not found for canvas_page %s.', $langcode, $canvas_page->id())],
-        Response::HTTP_NOT_FOUND,
-      );
-    }
-
-    $canvas_page->removeTranslation($langcode);
-    $canvas_page->save();
+    $untranslated_page = $canvas_page->getUntranslated();
+    $untranslated_page->removeTranslation($canvas_page->language()->getId());
+    $untranslated_page->save();
 
     return new JsonResponse(status: Response::HTTP_NO_CONTENT);
   }

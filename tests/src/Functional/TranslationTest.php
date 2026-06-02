@@ -14,6 +14,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Language\Language;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Url;
@@ -1175,7 +1176,7 @@ class TranslationTest extends FunctionalTestBase {
     self::assertTrue($page->hasTranslation('fr'));
 
     // Deleting a non-default translation removes it and returns 204.
-    $delete_url = Url::fromUri("base:/canvas/api/v0/content/canvas_page/{$page_id}/translations/fr");
+    $delete_url = Url::fromUserInput("/fr/canvas/api/v0/content/canvas_page/{$page_id}/translations");
     $response = $this->makeApiRequest('DELETE', $delete_url, []);
     self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
 
@@ -1186,13 +1187,15 @@ class TranslationTest extends FunctionalTestBase {
     self::assertTrue($reloaded->hasTranslation('en'));
 
     // Trying to delete the default/source language is not allowed.
-    $delete_default_url = Url::fromUri("base:/canvas/api/v0/content/canvas_page/{$page_id}/translations/en");
+    $delete_default_url = Url::fromUserInput("/canvas/api/v0/content/canvas_page/{$page_id}/translations");
     $response = $this->makeApiRequest('DELETE', $delete_default_url, []);
     self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
 
-    // Trying to delete a translation that no longer exists returns 404.
+    // Trying to delete a translation that no longer exists returns 400 because
+    // Drupal's entity translation negotiation will load the default
+    // translation.
     $response = $this->makeApiRequest('DELETE', $delete_url, []);
-    self::assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
+    self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
   }
 
   /**
