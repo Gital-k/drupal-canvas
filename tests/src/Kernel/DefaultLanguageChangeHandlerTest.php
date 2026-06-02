@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-// cspell:ignore titre français
+// cspell:ignore titre français française Página
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\DefaultLanguageChangeHandler;
@@ -15,7 +15,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * Tests DefaultLanguageChangeHandler for content entity and autosave migration.
+ * Tests DefaultLanguageChangeHandler for content entity and auto-save migration.
  *
  * Covers behavior when the site's default language changes:
  *
@@ -23,7 +23,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  *      Published translations remain under their original langcodes.
  * AC2: Unpublished/draft content (default language) has its langcode updated.
  *      Draft translations remain untouched.
- * AC3: Canvas autosave data is updated to reflect the new default langcode.
+ * AC3: Canvas auto-save data is updated to reflect the new default langcode.
  * AC9: When the new default language already has translations, the translation
  *      data is promoted to become the default, and the former default becomes a
  *      translation. The symmetric translation layout (component tree) is
@@ -205,15 +205,15 @@ class DefaultLanguageChangeHandlerTest extends CanvasKernelTestBase {
   }
 
   // ---------------------------------------------------------------------------
-  // AC3: Canvas autosave migration
+  // AC3: Canvas auto-save migration
   // ---------------------------------------------------------------------------
 
   /**
-   * Tests that the autosave key and stored langcode are updated.
+   * Tests that the auto-save key and stored langcode are updated.
    *
    * Verifies the update for the default language when the site default changes.
    *
-   * AC3: All Canvas autosave data must be updated to reflect the new default
+   * AC3: All Canvas auto-save data must be updated to reflect the new default
    * language code.
    */
   public function testAutoSaveKeyAndLangcodeAreUpdated(): void {
@@ -221,15 +221,15 @@ class DefaultLanguageChangeHandlerTest extends CanvasKernelTestBase {
     \assert($auto_save_manager instanceof AutoSaveManager);
 
     $page = Page::create([
-      'title' => 'Autosave page',
+      'title' => 'Auto-save page',
       'langcode' => 'en',
       'status' => TRUE,
       'components' => [],
     ]);
     $page->save();
 
-    // Simulate an autosave entry in the default (EN) language.
-    $page->set('title', 'Autosaved title change');
+    // Simulate an auto-save entry in the default (EN) language.
+    $page->set('title', 'Auto-saved title change');
     $auto_save_manager->saveEntity($page);
 
     $old_key = AutoSaveManager::getAutoSaveKey($page);
@@ -240,18 +240,18 @@ class DefaultLanguageChangeHandlerTest extends CanvasKernelTestBase {
 
     // The old EN key must no longer exist.
     $all = $auto_save_manager->getAllAutoSaveList();
-    self::assertArrayNotHasKey($old_key, $all, 'Old EN autosave key must be removed after language change.');
+    self::assertArrayNotHasKey($old_key, $all, 'Old EN auto-save key must be removed after language change.');
 
     // A new FR key must exist with the updated langcode.
     $new_key = 'canvas_page:' . $page->id() . ':fr';
-    self::assertArrayHasKey($new_key, $all, 'New FR autosave key must exist after language change.');
-    self::assertSame('fr', $all[$new_key]['langcode'], 'Stored langcode in autosave entry must be updated to FR.');
+    self::assertArrayHasKey($new_key, $all, 'New FR auto-save key must exist after language change.');
+    self::assertSame('fr', $all[$new_key]['langcode'], 'Stored langcode in auto-save entry must be updated to FR.');
   }
 
   /**
-   * Tests that an autosave entry for an existing translation is not affected.
+   * Tests that an auto-save entry for an existing translation is not affected.
    *
-   * AC3: Canvas autosave (translations) remain unchanged under their respective
+   * AC3: Canvas auto-save (translations) remain unchanged under their respective
    * language keys.
    */
   public function testAutoSaveForTranslationIsUntouched(): void {
@@ -274,7 +274,7 @@ class DefaultLanguageChangeHandlerTest extends CanvasKernelTestBase {
     ]);
     $fr_page->save();
 
-    // Simulate autosaves for both language translations.
+    // Simulate auto-saves for both language translations.
     $page->set('title', 'Changed EN title');
     $auto_save_manager->saveEntity($page);
     $fr_page->set('title', 'Changed French title');
@@ -283,15 +283,15 @@ class DefaultLanguageChangeHandlerTest extends CanvasKernelTestBase {
     $fr_key = AutoSaveManager::getAutoSaveKey($fr_page);
     self::assertStringEndsWith(':fr', $fr_key);
 
-    // Add Spanish so the "new default" is a language that had no autosave.
+    // Add Spanish so the "new default" is a language that had no auto-save.
     ConfigurableLanguage::createFromLangcode('es')->save();
     $this->changeDefaultLanguageTo('es');
 
     $all = $auto_save_manager->getAllAutoSaveList();
 
-    // The FR translation autosave key must remain completely untouched.
-    self::assertArrayHasKey($fr_key, $all, 'French translation autosave must remain after unrelated language change.');
-    self::assertSame('fr', $all[$fr_key]['langcode'], 'French translation autosave langcode must be unchanged.');
+    // The FR translation auto-save key must remain completely untouched.
+    self::assertArrayHasKey($fr_key, $all, 'French translation auto-save must remain after unrelated language change.');
+    self::assertSame('fr', $all[$fr_key]['langcode'], 'French translation auto-save langcode must be unchanged.');
   }
 
   // ---------------------------------------------------------------------------

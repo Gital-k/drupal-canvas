@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+// cspell:ignore Texte secours modèle
+
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Component\Utility\NestedArray;
