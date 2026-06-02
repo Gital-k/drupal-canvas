@@ -1,14 +1,3 @@
-canvas_dev_translation.api.content.translation.delete:
-  path: '/canvas/api/v0/content/canvas_page/{canvas_page}/translations'
-  defaults:
-    _controller: 'Drupal\canvas\Controller\ApiContentTranslationControllers::delete'
-  requirements:
-    _canvas_authentication_required: TRUE
-    _entity_access: 'canvas_page.delete'
-  options:
-    parameters:
-      canvas_page:
-        type: entity:canvas_page
-    _format: 'json'
-  methods: [DELETE]
-
+# Routes for the canvas_dev_translation feature-flag module.
+# The content translation delete API route lives in canvas.routing.yml because
+# the Canvas UI that calls it is disabled when this module is not enabled.

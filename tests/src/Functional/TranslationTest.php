@@ -1153,9 +1153,6 @@ class TranslationTest extends FunctionalTestBase {
   /**
    * Tests the Canvas API delete translation endpoint.
    *
-   * The route is gated behind the `canvas_dev_translation` module, so this
-   * test installs it before making requests.
-   *
    * Covers:
    *  - 204 response when deleting a non-default translation.
    *  - 400 response when attempting to delete the original (default) translation.
@@ -1164,9 +1161,6 @@ class TranslationTest extends FunctionalTestBase {
    * @see \Drupal\canvas\Controller\ApiContentTranslationControllers::delete()
    */
   public function testDeleteTranslation(): void {
-    $module_installer = $this->container->get(ModuleInstallerInterface::class);
-    $module_installer->install(['canvas_dev_translation']);
-    $this->rebuildContainer();
 
     $page = $this->createCanvasTranslationTestPage();
     $page_id = (int) $page->id();

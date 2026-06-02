@@ -338,6 +338,19 @@ canvas.api.content.patch:
     # Indicate that external applications may use this route. For authentication, see `modules/canvas_oauth/README.md`.
     canvas_external_api: true
   methods: [PATCH]
+canvas.api.content.translation.delete:
+  path: '/canvas/api/v0/content/canvas_page/{canvas_page}/translations'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\ApiContentTranslationControllers::delete'
+  requirements:
+    _canvas_authentication_required: TRUE
+    _entity_access: 'canvas_page.delete'
+  options:
+    parameters:
+      canvas_page:
+        type: entity:canvas_page
+    _format: 'json'
+  methods: [DELETE]
 canvas.api.extension.list:
   path: '/canvas/api/v0/extensions'
   defaults:
