@@ -1174,9 +1174,16 @@ class TranslationTest extends FunctionalTestBase {
     // The French translation was added in createCanvasTranslationTestPage().
     self::assertTrue($page->hasTranslation('fr'));
 
+    // Fetch the CSRF token required for state-changing API requests.
+    $request_options = [
+      'headers' => [
+        'X-CSRF-Token' => $this->drupalGet('session/token'),
+      ],
+    ];
+
     // Deleting a non-default translation removes it and returns 204.
     $delete_url = Url::fromUserInput("/fr/canvas/api/v0/content/canvas_page/{$page_id}/translations");
-    $response = $this->makeApiRequest('DELETE', $delete_url, []);
+    $response = $this->makeApiRequest('DELETE', $delete_url, $request_options);
     self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
 
     // Only the French translation is gone; the English original is untouched.
@@ -1187,13 +1194,13 @@ class TranslationTest extends FunctionalTestBase {
 
     // Trying to delete the default/source language is not allowed.
     $delete_default_url = Url::fromUserInput("/canvas/api/v0/content/canvas_page/{$page_id}/translations");
-    $response = $this->makeApiRequest('DELETE', $delete_default_url, []);
+    $response = $this->makeApiRequest('DELETE', $delete_default_url, $request_options);
     self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
 
     // Trying to delete a translation that no longer exists returns 400 because
     // Drupal's entity translation negotiation will load the default
     // translation.
-    $response = $this->makeApiRequest('DELETE', $delete_url, []);
+    $response = $this->makeApiRequest('DELETE', $delete_url, $request_options);
     self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
   }
 
