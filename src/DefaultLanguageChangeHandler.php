@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Config\ConfigCrudEvent;
 use Drupal\Core\Config\ConfigEvents;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Database\Connection;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -23,7 +24,8 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
 
   public function __construct(
-    private readonly EntityTypeManagerInterface $entityTypeManager,
+    private readonly Connection $database,
+    private readonly AutoSaveManager $autoSaveManager,
   ) {}
 
   /**
@@ -47,10 +49,18 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
     }
 
     $this->migrateCanvasPages($old_langcode, $new_langcode);
+    $this->autoSaveManager->migrateCanvasPageAutoSaves($old_langcode, $new_langcode);
   }
 
   /**
-   * Updates all Canvas pages whose langcode matches the old default.
+   * Updates the langcode on all Canvas page rows that match the old default.
+   *
+   * Uses direct database updates rather than the entity API to avoid
+   * translation-loading issues when the new langcode has no existing
+   * translation entries on a given entity.
+   *
+   * Only rows where default_langcode = 1 are updated, leaving non-default
+   * translation rows untouched.
    *
    * @param string $old_langcode
    *   The previous default language code.
@@ -58,23 +68,30 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
    *   The new default language code.
    */
   private function migrateCanvasPages(string $old_langcode, string $new_langcode): void {
-    $storage = $this->entityTypeManager->getStorage(Page::ENTITY_TYPE_ID);
+    if (!$this->database->schema()->tableExists('canvas_page_field_data')) {
+      return;
+    }
 
-    $page_ids = $storage->getQuery()
-      ->accessCheck(FALSE)
+    // Update the data table (stores per-translation field values).
+    $this->database->update('canvas_page_field_data')
+      ->fields(['langcode' => $new_langcode])
       ->condition('langcode', $old_langcode)
       ->condition('default_langcode', 1)
       ->execute();
 
-    if (empty($page_ids)) {
-      return;
+    // Update the revision data table so historical revisions are consistent.
+    if ($this->database->schema()->tableExists('canvas_page_field_revision')) {
+      $this->database->update('canvas_page_field_revision')
+        ->fields(['langcode' => $new_langcode])
+        ->condition('langcode', $old_langcode)
+        ->condition('default_langcode', 1)
+        ->execute();
     }
 
-    foreach ($storage->loadMultiple($page_ids) as $page) {
-      \assert($page instanceof Page);
-      $page->set('langcode', $new_langcode);
-      $page->save();
-    }
+    // Invalidate the entity cache so reloads reflect the new langcode.
+    \Drupal::entityTypeManager()
+      ->getStorage(Page::ENTITY_TYPE_ID)
+      ->resetCache();
   }
 
   /**
