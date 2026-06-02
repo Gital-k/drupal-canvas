@@ -5,39 +5,47 @@ declare(strict_types=1);
 namespace Drupal\canvas;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\ConfigCrudEvent;
 use Drupal\Core\Config\ConfigEvents;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\language\ConfigurableLanguageManagerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
  * Reacts to a site default language change and migrates Canvas content.
  *
  * Subscribes to ConfigEvents::SAVE and watches for changes to
- * system.site:default_langcode. When the default language changes, all
- * Canvas pages whose langcode matches the old default are re-assigned to the
- * new default language code.
- *
- * When the new default language already has existing translations on a page,
- * those translations are promoted to become the default (AC9): the
- * default_langcode flag is flipped rather than changing langcode values, so
- * all translation data is preserved.
+ * system.site:default_langcode. When the default language changes:
+ * - Canvas pages are re-assigned to the new default language code (AC1, AC2).
+ * - When the new default already has translations, they are promoted to the
+ *   default and the former default becomes a translation (AC9).
+ * - Config entity translations (ContentTemplate, PageRegion) are restructured
+ *   so the new default language becomes the base config (AC4).
+ * - Canvas page autosave keys are updated (AC3).
  *
  * @see \Drupal\language\EventSubscriber\ConfigSubscriber
  */
 final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
 
   public function __construct(
-    private readonly Connection $database,
     private readonly AutoSaveManager $autoSaveManager,
+    private readonly ConfigFactoryInterface $configFactory,
+    private readonly Connection $database,
+    private readonly EntityTypeManagerInterface $entityTypeManager,
+    private readonly LanguageManagerInterface $languageManager,
   ) {}
 
   /**
    * Responds to a system.site config save.
    *
-   * When default_langcode changes, migrates Canvas pages from the old default
-   * language to the new one.
+   * When default_langcode changes, migrates Canvas content and config.
    */
   public function onConfigSave(ConfigCrudEvent $event): void {
     $config = $event->getConfig();
@@ -55,6 +63,7 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
 
     $this->migrateCanvasPages($old_langcode, $new_langcode);
     $this->autoSaveManager->migrateCanvasPageAutoSaves($old_langcode, $new_langcode);
+    $this->migrateConfigEntityTranslations($old_langcode, $new_langcode);
   }
 
   /**
@@ -104,22 +113,18 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
     $ids_to_relabel = \array_diff($default_ids, $ids_with_new_translation);
 
     // AC9: Promote existing $new_langcode translation to default.
-    // Flip default_langcode on the two affected rows for each page.
     if (!empty($ids_to_promote)) {
-      // The new-langcode row becomes the default.
       $this->database->update('canvas_page_field_data')
         ->fields(['default_langcode' => 1])
         ->condition('id', $ids_to_promote, 'IN')
         ->condition('langcode', $new_langcode)
         ->execute();
-      // The old-langcode row becomes a non-default translation.
       $this->database->update('canvas_page_field_data')
         ->fields(['default_langcode' => 0])
         ->condition('id', $ids_to_promote, 'IN')
         ->condition('langcode', $old_langcode)
         ->execute();
 
-      // Mirror the same changes in the revision table.
       if ($this->database->schema()->tableExists('canvas_page_field_revision')) {
         $this->database->update('canvas_page_field_revision')
           ->fields(['default_langcode' => 1])
@@ -153,10 +158,129 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
       }
     }
 
-    // Invalidate the entity cache so reloads reflect the updated rows.
-    \Drupal::entityTypeManager()
+    $this->entityTypeManager
       ->getStorage(Page::ENTITY_TYPE_ID)
       ->resetCache();
+  }
+
+  /**
+   * Restructures config translations for ContentTemplates and PageRegions.
+   *
+   * For each entity that has a language override for $new_langcode:
+   * - The override values are merged with the base config to produce the full
+   *   new-default values, which are saved back as the base config.
+   * - The original base values are stored as an override for $old_langcode
+   *   (unless the old language is no longer a site language).
+   * - The $new_langcode override is deleted since it is now the base.
+   *
+   * For entities with no override for $new_langcode, nothing changes.
+   *
+   * @param string $old_langcode
+   *   The previous default language code.
+   * @param string $new_langcode
+   *   The new default language code.
+   */
+  private function migrateConfigEntityTranslations(
+    string $old_langcode,
+    string $new_langcode,
+  ): void {
+    $language_manager = $this->languageManager;
+    \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
+
+    $old_language_exists = (bool) $language_manager->getLanguage($old_langcode);
+
+    $entity_type_ids = [
+      ContentTemplate::ENTITY_TYPE_ID,
+      PageRegion::ENTITY_TYPE_ID,
+    ];
+
+    foreach ($entity_type_ids as $entity_type_id) {
+      $entities = $this->entityTypeManager
+        ->getStorage($entity_type_id)
+        ->loadMultiple();
+
+      foreach ($entities as $entity) {
+        $config_name = $entity->getConfigDependencyName();
+
+        $new_override = $language_manager
+          ->getLanguageConfigOverride($new_langcode, $config_name);
+
+        // Nothing to do if the new default language has no override.
+        if ($new_override->isNew()) {
+          continue;
+        }
+
+        // Get the original base config values (the old default language data).
+        $base_config = $this->configFactory->getEditable($config_name);
+        $original_base_data = $base_config->getRawData();
+
+        // Merge the new-langcode override onto base to get full new values.
+        $new_base_data = NestedArray::mergeDeepArray([
+          $original_base_data,
+          $new_override->getRawData(),
+        ], TRUE);
+
+        // Save the merged values as the new base config.
+        $base_config->setData($new_base_data)->save(TRUE);
+
+        // Store the original base values as an override for the old language,
+        // but only if the old language still exists on the site.
+        if ($old_language_exists) {
+          $old_override = $language_manager
+            ->getLanguageConfigOverride($old_langcode, $config_name);
+          // Build a minimal diff: only the keys present in the new-langcode
+          // override (the translatable fields), with the original base values.
+          $diff = $this->extractTranslatableDiff(
+            $new_override->getRawData(),
+            $original_base_data,
+          );
+          if (!empty($diff)) {
+            $old_override->setData($diff)->save();
+          }
+        }
+
+        // Delete the new-langcode override — it is now the base config.
+        $new_override->delete();
+      }
+    }
+  }
+
+  /**
+   * Extracts original values for the keys present in a reference override.
+   *
+   * Given the shape of a translation override (which keys were translated) and
+   * the original base config values, returns an array in the same shape but
+   * populated with values from the original base.
+   *
+   * @param array $override_shape
+   *   The shape of the existing translation override (new-langcode override).
+   * @param array $original_base
+   *   The original base config values (old-langcode values).
+   *
+   * @return array
+   *   An array in the same shape as $override_shape, with values from
+   *   $original_base.
+   */
+  private function extractTranslatableDiff(
+    array $override_shape,
+    array $original_base,
+  ): array {
+    $diff = [];
+    foreach ($override_shape as $key => $value) {
+      if (!\array_key_exists($key, $original_base)) {
+        continue;
+      }
+      if (\is_array($value) && \is_array($original_base[$key])) {
+        $nested = $this->extractTranslatableDiff($value, $original_base[$key]);
+        if (!empty($nested)) {
+          $diff[$key] = $nested;
+        }
+      }
+      else {
+        $diff[$key] = $original_base[$key];
+      }
+    }
+    return $diff;
   }
 
   /**
