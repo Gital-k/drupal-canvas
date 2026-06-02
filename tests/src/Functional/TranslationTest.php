@@ -1197,13 +1197,13 @@ class TranslationTest extends FunctionalTestBase {
   /**
    * Data provider for testDeleteConfigEntityTranslation().
    *
-   * @return array<string, array{string, string}>
-   *   Keyed by label, each value is [entity_type_id, api_path_segment].
+   * @return array<string, array{string}>
+   *   Keyed by label, each value is [entity_type_id].
    */
   public static function deleteConfigEntityTranslationProvider(): array {
     return [
-      'content_template' => ['content_template', 'config/content_template'],
-      'page_region' => ['page_region', 'config/page_region'],
+      'content_template' => ['content_template'],
+      'page_region' => ['page_region'],
     ];
   }
 
@@ -1217,7 +1217,7 @@ class TranslationTest extends FunctionalTestBase {
    * @see \Drupal\canvas\Controller\ApiTranslationControllers::deleteConfigTranslation()
    */
   #[DataProvider('deleteConfigEntityTranslationProvider')]
-  public function testDeleteConfigEntityTranslation(string $entity_type_id, string $api_path_segment): void {
+  public function testDeleteConfigEntityTranslation(string $entity_type_id): void {
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
     if ($entity_type_id === 'content_template') {
@@ -1228,7 +1228,7 @@ class TranslationTest extends FunctionalTestBase {
     }
     $entity_id = $entity->id();
 
-    $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/{$api_path_segment}/{$entity_id}/translations");
+    $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/config/{$entity_type_id}/{$entity_id}/translations");
 
     // Deleting a non-default translation removes it and returns 204.
     $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
