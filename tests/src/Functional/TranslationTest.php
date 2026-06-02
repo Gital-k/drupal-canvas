@@ -1228,14 +1228,17 @@ class TranslationTest extends FunctionalTestBase {
     }
     $entity_id = $entity->id();
 
+    $language_manager = $this->container->get(LanguageManagerInterface::class);
+    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
+    $override = $language_manager->getLanguageConfigOverride('fr', $entity->getConfigDependencyName());
+    self::assertFalse($override->isNew());
+
     $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/config/{$entity_type_id}/{$entity_id}/translations");
 
     // Deleting a non-default translation removes it and returns 204.
     $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
     self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
 
-    $language_manager = $this->container->get(LanguageManagerInterface::class);
-    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
     $override = $language_manager->getLanguageConfigOverride('fr', $entity->getConfigDependencyName());
     self::assertTrue($override->isNew());
 
