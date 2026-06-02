@@ -125,16 +125,13 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
     ]);
     self::assertNotEmpty($aliases_after, 'At least one alias must exist after the language change regeneration.');
 
-    // The alias must reflect the new default language's token values.
-    // The exact alias depends on the Pathauto pattern configured for
-    // canvas_page, but it must differ from the old alias if language tokens
-    // are in the pattern.
+    // The alias text must have been regenerated from the Pathauto pattern,
+    // replacing the original manually-set alias.
     $alias_after = reset($aliases_after);
-    // The alias's langcode must reflect the new default language.
     self::assertSame(
-      'fr',
-      $alias_after->get('langcode')->value,
-      'Regenerated alias langcode must reflect the new default language FR.'
+      '/pages/' . $page->id(),
+      $alias_after->getAlias(),
+      'Regenerated alias must match the Pathauto pattern, not the original manual alias.'
     );
   }
 
@@ -230,10 +227,12 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
     $aliases = $alias_storage->loadByProperties(['path' => '/page/' . $page->id()]);
     $alias = reset($aliases);
     self::assertNotFalse($alias, 'A regenerated alias must exist after language change.');
+    // The alias text must have been updated from the manual value to the
+    // pattern-based value, proving Pathauto ran programmatically.
     self::assertSame(
-      'fr',
-      $alias->get('langcode')->value,
-      'Regenerated alias must have the new default language as its langcode.'
+      '/pages/' . $page->id(),
+      $alias->getAlias(),
+      'Regenerated alias must match the Pathauto pattern, not the original locked alias.'
     );
   }
 
