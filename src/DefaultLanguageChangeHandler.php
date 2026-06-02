@@ -29,7 +29,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  *   default and the former default becomes a translation (AC9).
  * - Config entity translations (ContentTemplate, PageRegion) are restructured
  *   so the new default language becomes the base config (AC4).
- * - Canvas page autosave keys are updated (AC3).
+ * - Canvas page auto-save keys are updated (AC3).
  *
  * @see \Drupal\language\EventSubscriber\ConfigSubscriber
  */
@@ -205,6 +205,7 @@ final class DefaultLanguageChangeHandler implements EventSubscriberInterface {
         \assert($page instanceof Page);
         // Force alias generation bypassing the PathautoState::SKIP value that
         // PageHooks::ensurePathautoSkipped() sets on normal presave.
+        // cspell:ignore bulkupdate
         $pathauto_generator->updateEntityAlias($page, 'bulkupdate', ['force' => TRUE]);
       }
     }

@@ -377,10 +377,10 @@ class AutoSaveManager implements EventSubscriberInterface {
   }
 
   /**
-   * Re-keys Canvas page autosave entries when the default langcode changes.
+   * Re-keys Canvas page auto-save entries when the default langcode changes.
    *
    * Only entries whose stored langcode matches $old_langcode are migrated.
-   * Autosave entries for non-default translations (stored under their own
+   * Auto-save entries for non-default translations (stored under their own
    * langcode) are left untouched.
    *
    * @param string $old_langcode
