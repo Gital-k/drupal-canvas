@@ -1607,6 +1607,26 @@ paths:
           description: Translation deleted successfully.
         '400':
           description: Cannot delete the default translation. Use the entity delete endpoint to remove the whole entity.
+  '/canvas/api/v0/config/{entity_type_id}/{entityId}/translations':
+    description: Endpoint for deleting a specific translation of a config entity (content_template or page_region).
+    delete:
+      summary: Deletes the language config override (translation) for a config entity.
+      parameters:
+        - in: path
+          name: entity_type_id
+          required: true
+          description: The config entity type. Must be content_template or page_region.
+          schema:
+            type: string
+            enum:
+              - content_template
+              - page_region
+        - $ref: '#/components/parameters/entityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: No translation exists for the current language.
   '/canvas/api/v0/content/{entity_type}':
     get:
       summary: Provides api for page listing.
