@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Kernel;
 use Drupal\canvas\DefaultLanguageChangeHandler;
 use Drupal\canvas\Entity\Page;
 use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\pathauto\Entity\PathautoPattern;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -50,6 +51,7 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
     parent::setUp();
     $this->installEntitySchema('canvas_page');
     $this->installEntitySchema('path_alias');
+    $this->installEntitySchema('pathauto_pattern');
     $this->installConfig(['language', 'pathauto']);
     $this->config('system.theme')->set('default', 'stark')->save();
 
@@ -58,6 +60,14 @@ final class DefaultLanguageChangePathautoTest extends CanvasKernelTestBase {
     }
 
     ConfigurableLanguage::createFromLangcode('fr')->save();
+
+    // Create a Pathauto pattern for Canvas pages so aliases are generated.
+    PathautoPattern::create([
+      'id' => 'canvas_page',
+      'type' => 'canonical_entities:canvas_page',
+      'pattern' => '/canvas/[canvas_page:title]',
+      'weight' => -10,
+    ])->save();
   }
 
   /**
