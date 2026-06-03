@@ -1206,8 +1206,8 @@ class TranslationTest extends FunctionalTestBase {
    */
   public static function deleteConfigEntityTranslationProvider(): array {
     return [
-      'content_template' => ['content_template'],
-      'page_region' => ['page_region'],
+      'Content Template' => [ContentTemplate::ENTITY_TYPE_ID],
+      'Page Region' => [PageRegion::ENTITY_TYPE_ID],
     ];
   }
 
