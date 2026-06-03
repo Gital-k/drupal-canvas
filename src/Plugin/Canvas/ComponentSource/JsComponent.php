@@ -24,6 +24,7 @@ use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileUrlGeneratorInterface;
@@ -42,12 +43,12 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   label: new TranslatableMarkup('Code Components'),
   supportsImplicitInputs: FALSE,
   discovery: JsComponentDiscovery::class,
-  updater: GeneratedFieldExplicitInputUxComponentInstanceUpdater::class,
-  inputs_config_schema_generator: GeneratedFieldExplicitInputUxComponentInstanceInputsConfigSchemaGenerator::class,
+  updater: JsonSchemaPropsComponentInstanceUpdater::class,
+  inputs_config_schema_generator: JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator::class,
   // @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()
   discoveryCacheTags: ['config:js_component_list'],
 )]
-final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase implements UrlRewriteInterface {
+final class JsComponent extends JsonSchemaPropsComponentSourceBase implements UrlRewriteInterface {
 
   public const SOURCE_PLUGIN_ID = 'js';
 
@@ -66,6 +67,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   protected FileUrlGeneratorInterface $fileUrlGenerator;
   protected ?JavaScriptComponent $jsComponent = NULL;
   protected GlobalImports $globalImports;
+  protected EntityTypeManagerInterface $entityTypeManager;
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
@@ -73,6 +75,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $instance->autoSaveManager = $container->get(AutoSaveManager::class);
     $instance->fileUrlGenerator = $container->get(FileUrlGeneratorInterface::class);
     $instance->globalImports = $container->get(GlobalImports::class);
+    $instance->entityTypeManager = $container->get(EntityTypeManagerInterface::class);
     return $instance;
   }
 
@@ -380,6 +383,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       '#uuid' => $componentUuid,
       '#import_maps' => $import_maps,
       '#name' => $component->label(),
+      '#machine_name' => $component->id(),
       '#component_url' => $component_url,
       '#props' => $props + [
         'canvas_uuid' => $componentUuid,

@@ -17,6 +17,7 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
@@ -148,9 +149,8 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
           ],
         ],
         // Simulate the reality prior to `required` becoming a required key in
-        // `type: canvas.generated_field_explicit_input_ux`. This is considered
-        // valid thanks to `type: canvas.component.versioned.*.*` not validating
-        // `settings`.
+        // `type: canvas.json_schema_props`. This is considered valid thanks to
+        // `type: canvas.component.versioned.*.*` not validating `settings`.
         // Note: this is a subset of the active version, with a single SDC prop
         // and NO `required` key.
         'nonsensical' => [
@@ -200,7 +200,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   /**
    * Tests all ComponentSource plugin-specific settings.
    *
-   * - `canvas.generated_field_explicit_input_ux` extends the
+   * - `canvas.json_schema_props` extends the
    * fallback `canvas.component_source_settings.*`
    * - The "sdc" and "js" ones both extend
    *   `canvas.component_source_settings.*`
@@ -208,7 +208,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
    *
    * See the base type (`type: canvas.component_source_settings.*`) and all
    * source-specific subtypes:
-   * - `type: canvas.generated_field_explicit_input_ux`
+   * - `type: canvas.json_schema_props`
    * - `type: canvas.component_source_settings.sdc`
    * - `type: canvas.component_source_settings.js`
    * - `type: canvas.component_source_settings.block`
@@ -467,7 +467,10 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     // Manually create a Component config entity that this source's discovery
     // would not have created because it does not meet requirements. This is
     // considered valid as long as the Component is disabled (`status=FALSE`).
-    $discovery = new SingleDirectoryComponentDiscovery($this->container->get(ComponentPluginManager::class));
+    $discovery = new SingleDirectoryComponentDiscovery(
+      $this->container->get(PropShapeRepositoryInterface::class),
+      $this->container->get(ComponentPluginManager::class),
+    );
     try {
       $discovery->checkRequirements($source_specific_component_id);
       $this->fail("$source_specific_component_id should not meet requirements for the purposes of this test.");
@@ -773,8 +776,8 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   /**
    * Tests invalid prop field definition expression.
    *
-   * @see `type:canvas.generated_field_explicit_input_ux`
-   * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+   * @see `type:canvas.json_schema_props`
+   * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase
    */
   #[TestWith(["ℹ︎non_existing_field_type␟value", NULL])]
   #[TestWith(["ℹ︎string␟non_existing_field_property", NULL])]

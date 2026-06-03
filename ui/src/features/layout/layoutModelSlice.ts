@@ -82,6 +82,7 @@ export type ComponentModels = Record<
 export interface LayoutModelSliceState extends RootLayoutModel {
   updatePreview: boolean;
   isInitialized?: boolean;
+  translations?: Record<string, any>;
 }
 
 export const initialState: LayoutModelSliceState = {
@@ -89,6 +90,7 @@ export const initialState: LayoutModelSliceState = {
   model: {},
   updatePreview: false,
   isInitialized: false,
+  translations: {},
 };
 
 // This wrapper is necessary because when using slices with redux-undo,
@@ -201,7 +203,7 @@ export interface EvaluatedComponentModel extends ComponentModel {
   // (PropSources are used by ComponentSources without an explicit input UX, but only a schema — such as SDCs. The
   // schema is mapped to PropSources that are able to meet the schema expectations, and to resolve the values stored in
   // those PropSources, evaluation is needed.)
-  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase
   // @see docs/components.md#3.1.1
   // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
   // @see docs/components.md#3.3.1
@@ -516,11 +518,13 @@ export const layoutModelSlice = createSlice({
           model,
           updatePreview,
           isInitialized = true,
+          translations,
         } = action.payload;
         state.layout = layout;
         state.model = model;
         state.updatePreview = updatePreview;
         state.isInitialized = isInitialized;
+        state.translations = translations || {};
       },
     ),
   }),
@@ -901,6 +905,8 @@ export const selectUpdatePreview = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.updatePreview;
 export const selectIsInitialized = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.isInitialized;
+export const selectTranslations = (state: StateWithHistoryWrapper) =>
+  state.layoutModel.present.translations;
 const selectRegion = (state: RootState, regionName: string) => regionName;
 
 export const selectLayoutForRegion = createSelector(

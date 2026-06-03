@@ -2156,6 +2156,8 @@ paths:
                       'uid[0][target_id]': Anonymous (0)
                       'langcode[0][value]': en
                       'revision_log[0][value]': ''
+                    translations:
+                      available: [en, fr]
                     isNew: false
                     isPublished: true
               schema:
@@ -2167,6 +2169,7 @@ paths:
                   - isNew
                   - isPublished
                   - html
+                  - translations
                 properties:
                   html:
                     type: string
@@ -2183,6 +2186,17 @@ paths:
                   entity_form_fields:
                     type: object
                     description: Entity field values that the user has edit access to.
+                  translations:
+                    type: object
+                    description: Translation metadata for the entity.
+                    required:
+                      - available
+                    properties:
+                      available:
+                        type: array
+                        description: Language codes with existing translations.
+                        items:
+                          type: string
                   isNew:
                     type: boolean
                     # @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew()
@@ -2972,8 +2986,8 @@ components:
       type: object
       description: Component transforms keyed by prop name.
       # Names of Components' inputs, *if* they use field widgets.
-      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getExplicitInputDefinitions()
-      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getClientSideInfo()
+      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getExplicitInputDefinitions()
+      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getClientSideInfo()
       additionalProperties:
         type: object
         # Client-side transforms for those inputs' field widgets.
@@ -3316,6 +3330,17 @@ components:
           description: Client instance ID for the layout preview
         entity_form_fields:
           type: object
+        translations:
+          type: object
+          description: Translation metadata for the entity.
+          required:
+            - available
+          properties:
+            available:
+              type: array
+              description: Language codes with existing translations.
+              items:
+                type: string
         isNew:
           type: boolean
         isPublished:
