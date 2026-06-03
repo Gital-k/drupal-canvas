@@ -33,10 +33,7 @@ final class ApiTranslationControllers extends ApiControllerBase {
    *   204 No Content on success, 400 if attempting to delete the default
    *   translation.
    */
-  public static function delete(
-    ContentEntityInterface $canvas_page,
-  ): JsonResponse {
-
+  public static function delete(ContentEntityInterface $canvas_page): JsonResponse {
     // Guard: cannot delete the default (original/untranslated) language via
     // this endpoint. Callers should use the full entity delete route instead.
     // @see \Drupal\canvas\Controller\ApiContentControllers::delete()
@@ -49,7 +46,6 @@ final class ApiTranslationControllers extends ApiControllerBase {
     $untranslated = $canvas_page->getUntranslated();
     $untranslated->removeTranslation($canvas_page->language()->getId());
     $untranslated->save();
-
     return new JsonResponse(status: Response::HTTP_NO_CONTENT);
   }
 
@@ -63,9 +59,7 @@ final class ApiTranslationControllers extends ApiControllerBase {
    *   204 No Content on success, 400 if no translation exists for the current
    *   language.
    */
-  public function deleteConfigTranslation(
-    ConfigEntityInterface $config_entity,
-  ): JsonResponse {
+  public function deleteConfigTranslation(ConfigEntityInterface $config_entity): JsonResponse {
     $lang_id = $this->languageManager->getCurrentLanguage()->getId();
     $config_name = $config_entity->getConfigDependencyName();
     \assert($this->languageManager instanceof ConfigurableLanguageManagerInterface);
@@ -77,7 +71,6 @@ final class ApiTranslationControllers extends ApiControllerBase {
       );
     }
     $override->delete();
-
     return new JsonResponse(status: Response::HTTP_NO_CONTENT);
   }
 
