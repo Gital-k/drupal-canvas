@@ -82,7 +82,8 @@ final class JsComponentInstanceUpdater extends JsonSchemaPropsComponentInstanceU
       $changed = TRUE;
     }
 
-    // @todo try to coerce values across compatible types.
+    // @todo coerce values across compatible types:
+    // https://git.drupalcode.org/project/canvas/-/work_items/3591618
     $invalid_prop_names = self::getInvalidPropNames(
       $target_source->validateComponentInput(
         inputValues: $inputs,
