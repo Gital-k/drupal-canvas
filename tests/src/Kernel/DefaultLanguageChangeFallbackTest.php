@@ -104,9 +104,6 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
     $this->changeDefaultLanguageTo('fr');
 
     // After the change: FR must have no/empty prefix; EN must now have 'en'.
-    // Reset the config factory cache so we read the updated language.negotiation
-    // (core saves it with trusted data, bypassing config events and static cache).
-    $this->container->get('config.factory')->reset('language.negotiation');
     $negotiation = $this->config('language.negotiation');
     $url_prefixes_after = $negotiation->get('url.prefixes');
 
