@@ -848,7 +848,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('PATCH', $url, $request_options, 500, NULL, NULL, NULL, NULL);
     $this->assertSame([
       'message' => 'Body does not match schema for content-type "application/json" for Request [patch /canvas/api/v0/content/auto-save/canvas_page/{entityId}]. [Keyword validation failed: Data has additional properties (unexpected_field) which are not allowed in ]',
-    ], $body, 'Fails with nexpected fields in request body');
+    ], $body, 'Fails with unexpected fields in request body');
 
     // Unpublish page 1 (published -> unpublished).
     $request_options[RequestOptions::JSON] = ['status' => FALSE];

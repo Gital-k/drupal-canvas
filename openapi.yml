@@ -2189,11 +2189,9 @@ paths:
             type: boolean
           examples:
             "true":
-              dataValue: true
-              serializedValue: autoSaved=true
+              value: true
             "false":
-              dataValue: false
-              serializedValue: autoSaved=false
+              value: false
       responses:
         '200':
           description: "The layout that the current user is allowed to edit: regions not editable by the current user are omitted."
