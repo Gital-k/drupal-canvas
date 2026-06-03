@@ -28,7 +28,7 @@ class JsComponentInstanceUpdaterTest extends JsonSchemaPropsComponentInstanceUpd
   /**
    * {@inheritdoc}
    */
-  protected function createUpdater(): JsComponentInstanceUpdater {
+  protected static function createUpdater(): JsComponentInstanceUpdater {
     return new JsComponentInstanceUpdater();
   }
 
@@ -58,7 +58,7 @@ class JsComponentInstanceUpdaterTest extends JsonSchemaPropsComponentInstanceUpd
    * no default is injected.
    */
   public function testOptionalPropTypeChangedDataLossAccepted(): void {
-    $sut = $this->createUpdater();
+    $sut = static::createUpdater();
     $this->changePropType();
 
     $component = Component::load('js.test');
@@ -99,7 +99,7 @@ class JsComponentInstanceUpdaterTest extends JsonSchemaPropsComponentInstanceUpd
    * the new version, the default value from prop_field_definitions is injected.
    */
   public function testRequiredPropTypeChangedDefaultInjected(): void {
-    $sut = $this->createUpdater();
+    $sut = static::createUpdater();
     $this->changeRequiredPropType();
 
     $component = Component::load('js.test');
