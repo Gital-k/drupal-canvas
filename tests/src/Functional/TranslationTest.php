@@ -1230,7 +1230,8 @@ class TranslationTest extends FunctionalTestBase {
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
     if ($entity_type_id === 'content_template') {
-      $entity = $this->createContentTemplateWithFrenchOverride();
+      $entity = ContentTemplate::load('node.article.full');
+      self::assertInstanceOf(ContentTemplate::class, $entity);
     }
     else {
       $entity = $this->createPageRegionWithFrenchOverride();
@@ -1254,49 +1255,6 @@ class TranslationTest extends FunctionalTestBase {
     // Trying to delete a translation that no longer exists returns 400.
     $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
     self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
-  }
-
-  /**
-   * Creates a ContentTemplate with a French language config override.
-   *
-   * @return \Drupal\canvas\Entity\ContentTemplate
-   *   The saved ContentTemplate entity.
-   */
-  private function createContentTemplateWithFrenchOverride(): ContentTemplate {
-    $version = $this->getHeadingComponentVersion();
-
-    $template = ContentTemplate::create([
-      'id' => 'canvas_test_translation_delete',
-      'content_entity_type_id' => 'node',
-      'content_entity_type_bundle' => 'article',
-      'content_entity_type_view_mode' => 'teaser',
-      'component_tree' => [
-        [
-          'uuid' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-          'component_id' => 'sdc.canvas_test_sdc.heading',
-          'component_version' => $version,
-          'inputs' => [
-            'text' => 'English heading',
-            'element' => 'h2',
-          ],
-          'label' => 'English heading',
-        ],
-      ],
-    ]);
-    $template->save();
-
-    $language_manager = $this->container->get(LanguageManagerInterface::class);
-    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
-    $override = $language_manager->getLanguageConfigOverride('fr', $template->getConfigDependencyName());
-    $override->setData([
-      'component_tree' => [
-        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' => [
-          'inputs' => ['text' => 'Titre en français'],
-        ],
-      ],
-    ])->save();
-
-    return $template;
   }
 
 }
