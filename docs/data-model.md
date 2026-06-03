@@ -586,32 +586,6 @@ This update of the `component tree`'s`component instance`s will happen automatic
 as soon as we attempt to edit a component tree (see `\Drupal\canvas\Controller\ApiLayoutController::buildRegion()` and
 `\Drupal\canvas\Controller\ApiConfigControllers::normalize()`).
 
-For component sources using the default
-`\Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceUpdater`,
-the scenarios where such an update is possible without any risk are:
-
-- Adding optional props
-- Adding slots
-- Changing props from required to optional
-- Changing a prop matched prop shape field widget (but only the widget!)
-- Changing default values in prop_field_definitions
-- Changing slot examples
-- Removing props (required or optional)
-- Removing slots
-- Adding a new required prop.
-- Changing props from optional to required
-- Increasing `maxItems` (cardinality) for `type: array` props
-
-Unsafe changes considered acceptable (⚠️ data loss) include:
-
-- Decreasing `maxItems` (cardinality) for `type: array` props: excess stored
-  values are dropped.
-
-Unsafe changes (that prevent auto-update) include:
-
-- Changing prop shapes
-
-Note: a specific `component source` can choose to deviate from this: it can choose to accept some data loss.
 
 See
 - `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceUpdater::canUpdate`
