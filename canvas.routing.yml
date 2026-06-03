@@ -246,7 +246,7 @@ canvas.api.config.translation.delete:
   options:
     parameters:
       config_entity:
-        type: entity:{entity_type_id}
+        type: entity:{canvas_config_entity_type_id}
     _format: 'json'
   methods: [DELETE]
 

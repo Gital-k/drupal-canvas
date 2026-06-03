@@ -52,21 +52,21 @@ final class ApiTranslationControllers extends ApiControllerBase {
   /**
    * Deletes the language config override (translation) for a config entity.
    *
-   * @param \Drupal\Core\Config\Entity\ConfigEntityInterface $canvas_config_entity
+   * @param \Drupal\Core\Config\Entity\ConfigEntityInterface $config_entity
    *   The Canvas config entity whose translation should be deleted.
    *
    * @return \Symfony\Component\HttpFoundation\JsonResponse
    *   204 No Content on success, 400 if no translation exists for the current
    *   language.
    */
-  public function deleteConfigTranslation(ConfigEntityInterface $canvas_config_entity): JsonResponse {
+  public function deleteConfigTranslation(ConfigEntityInterface $config_entity): JsonResponse {
     $lang_id = $this->languageManager->getCurrentLanguage()->getId();
-    $config_name = $canvas_config_entity->getConfigDependencyName();
+    $config_name = $config_entity->getConfigDependencyName();
     \assert($this->languageManager instanceof ConfigurableLanguageManagerInterface);
     $override = $this->languageManager->getLanguageConfigOverride($lang_id, $config_name);
     if ($override->isNew()) {
       return new JsonResponse(
-        ['message' => \sprintf('No %s translation found for %s %s.', $lang_id, $canvas_config_entity->getEntityTypeId(), $canvas_config_entity->id())],
+        ['message' => \sprintf('No %s translation found for %s %s.', $lang_id, $config_entity->getEntityTypeId(), $config_entity->id())],
         Response::HTTP_BAD_REQUEST,
       );
     }
