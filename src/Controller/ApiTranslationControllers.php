@@ -39,9 +39,10 @@ final class ApiTranslationControllers extends ApiControllerBase {
 
     // Guard: cannot delete the default (original/untranslated) language via
     // this endpoint. Callers should use the full entity delete route instead.
+    // @see \Drupal\canvas\Controller\ApiContentControllers::delete()
     if ($canvas_page->isDefaultTranslation()) {
       return new JsonResponse(
-        ['message' => \sprintf('Cannot delete the default translation for %s %s. Use the entity delete endpoint to remove the whole entity.', $canvas_page->getEntityTypeId(), $canvas_page->id())],
+        ['message' => \sprintf('Cannot delete the default translation for %s %s.', $canvas_page->getEntityTypeId(), $canvas_page->id())],
         Response::HTTP_BAD_REQUEST,
       );
     }
