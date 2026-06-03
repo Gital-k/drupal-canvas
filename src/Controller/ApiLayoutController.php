@@ -484,8 +484,6 @@ final class ApiLayoutController {
     // Determine if we are working with auto-save or published version of the
     // entity.
     $auto_saved = $request->query->getBoolean('autoSaved', default: TRUE);
-    // Store the original entity for comparison purposes.
-    $original_entity = $entity;
     if ($auto_saved) {
       // Get title from auto saved data if available.
       $auto_save_data = $this->autoSaveManager->getAutoSaveEntity($entity);
