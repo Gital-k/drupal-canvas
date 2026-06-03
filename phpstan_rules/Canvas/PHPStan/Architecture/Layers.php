@@ -22,6 +22,7 @@ use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\canvas\Plugin\AdapterManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentInstanceUpdater;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentDiscoveryBase;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceUpdater;
@@ -319,6 +320,7 @@ final class Layers {
         Selector::classname(JsonSchemaPropsComponentDiscoveryBase::class),
         Selector::classname(JsonSchemaPropsComponentInstanceUpdater::class),
         Selector::classname(JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator::class),
+        Selector::classname(JsComponentInstanceUpdater::class),
         // Config entity types powering code components.
         Selector::classname(ConfigEntityStorageInterface::class),
         Selector::classname(EntityTypeManagerInterface::class),
