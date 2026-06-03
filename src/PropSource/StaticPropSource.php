@@ -521,13 +521,17 @@ final class StaticPropSource extends PropSourceBase {
     $ajax = $triggering_element['#ajax'] ?? NULL;
     $is_remove = \is_array($ajax) && isset($ajax['callback']) && \is_array($ajax['callback']) && \in_array('deleteAjax', $ajax['callback'], TRUE);
 
+    // A field widget needs a FieldItemListInterface object. Use cloning to
+    // prevent the field widget plugin from being able to modify this
+    // StaticPropSource's field item list by reference.
+    $field = clone $this->fieldItemList;
+
     // Special handling for remove operations.
     //
     // Why: WidgetBase::formMultipleElements() uses `isset($items[$delta])` to
-    // decide whether to populate a delta from $this->fieldItemList or append a
-    // new empty item. Without this, the removed delta remains occupied in
-    // $this->fieldItemList, so the next "Add" shows the old value instead of
-    // an empty one.
+    // decide whether to populate a delta from the field item list or append a
+    // new empty item. Without this, the removed delta remains occupied, so the
+    // next "Add" shows the old value instead of an empty one.
     //
     // Core avoids this via WidgetBase::deleteSubmit() + EntityFormDisplay::
     // extractFormValues(), which update the entity's field item list from user
@@ -537,9 +541,9 @@ final class StaticPropSource extends PropSourceBase {
     if ($is_remove &&
       isset($triggering_element['#delta'])) {
       $delta = $triggering_element['#delta'];
-      $values = $this->fieldItemList->getValue();
+      $values = $field->getValue();
       unset($values[$delta]);
-      $this->fieldItemList->setValue(array_values($values));
+      $field->setValue(array_values($values));
     }
 
     // A field widget needs a FieldItemListInterface object. Use cloning to
