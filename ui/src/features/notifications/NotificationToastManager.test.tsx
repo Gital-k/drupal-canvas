@@ -4,6 +4,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { makeStore } from '@/app/store';
+import { CONFLICT_NOTIFICATION_HREF } from '@/features/conflict/conflictUtils';
 
 import NotificationToastManager from './NotificationToastManager';
 
@@ -26,6 +27,15 @@ vi.mock('@/hooks/useDocumentVisibility', () => ({
 
 let mockNotifications: Notification[] = [];
 const mockMarkRead = vi.fn();
+const mockNavigate = vi.fn();
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 vi.mock('@/services/notificationsApi', async () => {
   const actual = await vi.importActual('@/services/notificationsApi');
@@ -35,6 +45,16 @@ vi.mock('@/services/notificationsApi', async () => {
       data: { data: { notifications: mockNotifications } },
     }),
     useMarkNotificationsReadMutation: () => [mockMarkRead],
+  };
+});
+
+vi.mock('@/services/pendingChangesApi', async () => {
+  const actual = await vi.importActual('@/services/pendingChangesApi');
+  return {
+    ...actual,
+    useGetAllPendingChangesQuery: () => ({
+      data: undefined,
+    }),
   };
 });
 
@@ -162,5 +182,29 @@ describe('NotificationToastManager', () => {
       screen.getByRole('button', { name: 'Dismiss notification' }),
     );
     expect(mockMarkRead).toHaveBeenCalledWith({ ids: ['mark1'] });
+  });
+
+  it('navigates to the conflict queue when a conflict action is clicked', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockNotifications = [
+      makeNotification({
+        id: 'conflict-action',
+        type: 'warning',
+        title: 'File conflict detected',
+        timestamp: now + 5000,
+        actions: [
+          {
+            label: 'Resolve conflicts',
+            href: CONFLICT_NOTIFICATION_HREF,
+          },
+        ],
+      }),
+    ];
+    renderManager();
+
+    await user.click(screen.getByRole('button', { name: 'Resolve conflicts' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/conflict');
+    expect(mockMarkRead).toHaveBeenCalledWith({ ids: ['conflict-action'] });
   });
 });

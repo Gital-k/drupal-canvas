@@ -1,8 +1,23 @@
 import { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import BellIcon from '@assets/icons/bell.svg?react';
 import { Popover } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import {
+  markAllConflictNotificationsRead,
+  markConflictNotificationRead,
+  selectConflictNotificationRead,
+} from '@/features/conflict/conflictUiSlice';
+import {
+  buildConflictNotification,
+  CONFLICT_NOTIFICATION_HREF,
+  getConflictNotificationFromPendingChanges,
+  getConflictNotificationId,
+  getCurrentConflictContextKey,
+  isConflictNotificationId,
+  isConflictUxEnabled,
+} from '@/features/conflict/conflictUtils';
 import {
   selectActivityCenterOpen,
   setActivityCenterOpen,
@@ -13,7 +28,7 @@ import {
   useGetNotificationsQuery,
   useMarkNotificationsReadMutation,
 } from '@/services/notificationsApi';
-import { getCanvasSettings } from '@/utils/drupal-globals';
+import { useGetAllPendingChangesQuery } from '@/services/pendingChangesApi';
 
 import ActivityCenter from './ActivityCenter';
 import {
@@ -26,9 +41,19 @@ import {
 import styles from './NotificationBell.module.css';
 
 const NotificationBell = () => {
-  const devMode = getCanvasSettings()?.devMode;
+  const devMode = isConflictUxEnabled();
+  const contextKey = getCurrentConflictContextKey();
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const isOpen = useAppSelector(selectActivityCenterOpen);
+  const currentNotificationId = contextKey
+    ? getConflictNotificationId(contextKey)
+    : undefined;
+  const hasReadConflictNotification = useAppSelector((state) =>
+    currentNotificationId
+      ? selectConflictNotificationRead(state, currentNotificationId, contextKey)
+      : false,
+  );
   const isTabFocused = useDocumentVisibility();
   const [markRead] = useMarkNotificationsReadMutation();
   const hasProcessingRef = useRef(false);
@@ -37,8 +62,31 @@ const NotificationBell = () => {
     pollingInterval: getPollingInterval(isTabFocused, hasProcessingRef.current),
     skip: !devMode,
   });
+  const { data: pendingChanges } = useGetAllPendingChangesQuery(undefined, {
+    pollingInterval: 10000,
+    skipPollingIfUnfocused: true,
+    skip: !devMode,
+  });
 
-  const notifications = data?.data.notifications ?? [];
+  const conflictNotificationData = getConflictNotificationFromPendingChanges(
+    pendingChanges,
+    contextKey,
+  );
+
+  const apiNotifications = data?.data.notifications ?? [];
+  const notifications = [
+    ...apiNotifications,
+    ...(conflictNotificationData && contextKey
+      ? [
+          buildConflictNotification({
+            contextKey,
+            hasRead: hasReadConflictNotification,
+            timestamp: conflictNotificationData.timestamp,
+            conflictCount: conflictNotificationData.count,
+          }),
+        ]
+      : []),
+  ];
   hasProcessingRef.current = notifications.some((n) => n.type === 'processing');
   const badgeCount = computeBadgeCount(notifications);
 
@@ -46,7 +94,12 @@ const NotificationBell = () => {
     dispatch(setActivityCenterOpen(open));
     if (open) {
       const autoReadIds = notifications
-        .filter((n) => AUTO_READ_TYPES.has(n.type) && !n.hasRead)
+        .filter(
+          (n) =>
+            AUTO_READ_TYPES.has(n.type) &&
+            !n.hasRead &&
+            !isConflictNotificationId(n.id, contextKey),
+        )
         .map((n) => n.id);
       if (autoReadIds.length > 0) {
         markRead({ ids: autoReadIds });
@@ -55,14 +108,57 @@ const NotificationBell = () => {
   };
 
   const handleMarkAllRead = () => {
-    const unreadIds = notifications.filter((n) => !n.hasRead).map((n) => n.id);
+    const unreadIds = notifications
+      .filter((n) => !n.hasRead && !isConflictNotificationId(n.id, contextKey))
+      .map((n) => n.id);
     if (unreadIds.length > 0) {
       markRead({ ids: unreadIds });
+    }
+    const unreadConflictIds = notifications
+      .filter((n) => isConflictNotificationId(n.id, contextKey) && !n.hasRead)
+      .map((n) => n.id);
+    if (unreadConflictIds.length > 0 && contextKey) {
+      dispatch(
+        markAllConflictNotificationsRead({
+          contextKey,
+          ids: unreadConflictIds,
+        }),
+      );
     }
   };
 
   const handleMarkRead = (id: string) => {
+    if (contextKey && isConflictNotificationId(id, contextKey)) {
+      dispatch(
+        markConflictNotificationRead({
+          contextKey,
+          id,
+        }),
+      );
+      return;
+    }
     markRead({ ids: [id] });
+  };
+
+  const handleAction = (id: string, href: string) => {
+    if (contextKey && isConflictNotificationId(id, contextKey)) {
+      dispatch(
+        markConflictNotificationRead({
+          contextKey,
+          id,
+        }),
+      );
+    } else {
+      markRead({ ids: [id] });
+    }
+
+    if (href === CONFLICT_NOTIFICATION_HREF) {
+      dispatch(setActivityCenterOpen(false));
+      navigate('/conflict');
+      return;
+    }
+
+    window.open(href, '_blank', 'noopener,noreferrer');
   };
 
   if (!devMode) return null;
@@ -85,6 +181,7 @@ const NotificationBell = () => {
           onClose={() => handleOpenChange(false)}
           onMarkAllRead={handleMarkAllRead}
           onMarkRead={handleMarkRead}
+          onAction={handleAction}
         />
       </Popover.Content>
     </Popover.Root>

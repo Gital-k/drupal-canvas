@@ -17,6 +17,7 @@ interface ChangeGroupProps {
   setSelectedChanges: (changes: UnpublishedChange[]) => void;
   onDiscardClick: (change: UnpublishedChange) => void;
   onViewClick?: (change: UnpublishedChange) => void;
+  onResolveConflict?: (change: UnpublishedChange) => void;
   pageStatusMap?: Record<
     string,
     { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
@@ -31,20 +32,30 @@ const ChangeGroup = ({
   setSelectedChanges,
   onDiscardClick,
   onViewClick,
+  onResolveConflict,
   pageStatusMap,
 }: ChangeGroupProps) => {
+  const selectableChanges = useMemo(
+    () => changes.filter((change) => !change.hasConflict),
+    [changes],
+  );
+
   const isGroupSelected = useMemo(() => {
-    const groupSelectionCount = changes.filter((change) =>
+    if (!selectableChanges.length) {
+      return false;
+    }
+
+    const groupSelectionCount = selectableChanges.filter((change) =>
       selectedChanges.some((selected) => selected.pointer === change.pointer),
     ).length;
 
     if (groupSelectionCount === 0) return false;
-    if (groupSelectionCount < changes.length) return 'indeterminate';
+    if (groupSelectionCount < selectableChanges.length) return 'indeterminate';
     return true;
-  }, [changes, selectedChanges]);
+  }, [selectableChanges, selectedChanges]);
 
   const handleGroupSelection = useCallback(() => {
-    const groupPointers = changes.map((change) => change.pointer);
+    const groupPointers = selectableChanges.map((change) => change.pointer);
     // If the group is fully selected, deselect all changes in the group
     if (isGroupSelected === true) {
       setSelectedChanges(
@@ -57,14 +68,14 @@ const ChangeGroup = ({
     // If the group is not fully selected, select remaining changes in the group
     setSelectedChanges([
       ...selectedChanges,
-      ...changes.filter(
+      ...selectableChanges.filter(
         (change) =>
           !selectedChanges.some(
             (selected) => selected.pointer === change.pointer,
           ),
       ),
     ]);
-  }, [isGroupSelected, changes, selectedChanges, setSelectedChanges]);
+  }, [isGroupSelected, selectableChanges, selectedChanges, setSelectedChanges]);
 
   const groupLabel = getGroupLabel(entityType);
 
@@ -74,7 +85,7 @@ const ChangeGroup = ({
         <Flex as="div" direction="row" align="center" gap="2" mb="2">
           <Checkbox
             size="1"
-            disabled={isBusy}
+            disabled={isBusy || selectableChanges.length === 0}
             checked={isGroupSelected}
             onCheckedChange={handleGroupSelection}
             aria-label={`Select all changes in ${groupLabel}`}
@@ -83,7 +94,7 @@ const ChangeGroup = ({
         </Flex>
       </Text>
       <ul className={styles.changeList}>
-        {changes.map((change: UnpublishedChange, index: number) => (
+        {changes.map((change: UnpublishedChange) => (
           <ChangeRow
             key={`${kebabCase(change.label + change.updated)}`}
             change={change}
@@ -92,6 +103,7 @@ const ChangeGroup = ({
             setSelectedChanges={setSelectedChanges}
             onDiscardClick={onDiscardClick}
             onViewClick={onViewClick}
+            onResolveConflict={onResolveConflict}
             pageStatusMap={pageStatusMap}
           />
         ))}

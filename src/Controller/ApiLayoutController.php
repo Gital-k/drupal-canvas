@@ -10,6 +10,7 @@ use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
@@ -80,16 +81,20 @@ final class ApiLayoutController {
   /**
    * Returns JSON for the entity layout and fields that the user can edit.
    */
-  public function get((ContentEntityInterface&EntityPublishedInterface)|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): PreviewEnvelope {
+  public function get(Request $request, (ContentEntityInterface&EntityPublishedInterface)|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): PreviewEnvelope {
     \assert(!$entity instanceof ContentTemplate || !\is_null($preview_entity));
     $regions = self::shouldIncludeGlobalRegions($entity) ? PageRegion::loadForActiveTheme() : [];
-
+    // Determine if we are working with auto-save or published version of the
+    // entity.
+    $auto_saved = $request->query->getBoolean('autoSaved', default: TRUE);
     // Store the original entity for comparison purposes.
     $original_entity = $entity;
-    $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($entity);
-    if (!$autoSaveData->isEmpty()) {
-      $entity = $autoSaveData->entity;
-      \assert($entity instanceof ContentEntityInterface || $entity instanceof ContentTemplate);
+    if ($auto_saved) {
+      $auto_save_data = $this->autoSaveManager->getAutoSaveEntity($entity);
+      if (!$auto_save_data->isEmpty()) {
+        $entity = $auto_save_data->entity;
+        \assert($entity instanceof ContentEntityInterface || $entity instanceof ContentTemplate);
+      }
     }
 
     $model = [];
@@ -147,6 +152,18 @@ final class ApiLayoutController {
       if ($original_entity instanceof EntityPublishedInterface
         && $entity !== $original_entity) {
         $data['hasUnsavedStatusChange'] = $entity->isPublished() !== $original_entity->isPublished();
+      }
+    }
+
+    // @todo Revisit as part of https://www.drupal.org/project/canvas/issues/3591544
+    if ($entity instanceof Page) {
+      // For published entities use actual entity revision time.
+      if (!$auto_saved) {
+        $data['updated'] = (int) $entity->getRevisionCreationTime();
+      }
+      // For auto-save items use 'updated' property of auto-save entry itself.
+      elseif (!$auto_save_data->isEmpty()) {
+        $data['updated'] = $auto_save_data->updated;
       }
     }
     return new PreviewEnvelope($this->buildPreviewRenderable($entity, $preview_entity), $data);
@@ -459,17 +476,23 @@ final class ApiLayoutController {
     return $build;
   }
 
-  public function getLabel((ContentEntityInterface&EntityPublishedInterface)|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): string {
+  public function getLabel(Request $request, (ContentEntityInterface&EntityPublishedInterface)|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): string {
     if ($entity instanceof ContentTemplate) {
       \assert($preview_entity !== NULL);
       return (string) $preview_entity->label();
     }
-    // Get title from auto saved data if available.
-    $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($entity);
-    if (!$autoSaveData->isEmpty()) {
-      \assert($autoSaveData->entity instanceof EntityInterface);
-      return (string) $autoSaveData->entity->label();
+    // Determine if we are working with auto-save or published version of the
+    // entity.
+    $auto_saved = $request->query->getBoolean('autoSaved', default: TRUE);
+    if ($auto_saved) {
+      // Get title from auto saved data if available.
+      $auto_save_data = $this->autoSaveManager->getAutoSaveEntity($entity);
+      if (!$auto_save_data->isEmpty()) {
+        \assert($auto_save_data->entity instanceof EntityInterface);
+        return (string) $auto_save_data->entity->label();
+      }
     }
+
     return (string) $entity->label();
   }
 

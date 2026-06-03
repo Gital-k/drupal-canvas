@@ -26,11 +26,13 @@ const SHOW_READ_INDICATOR = new Set(['info', 'warning', 'error']);
 interface NotificationCardProps {
   notification: Notification;
   onMarkRead: (id: string) => void;
+  onAction?: (id: string, href: string) => void;
 }
 
 const NotificationCard = ({
   notification,
   onMarkRead,
+  onAction,
 }: NotificationCardProps) => {
   const Icon = TYPE_ICONS[notification.type];
   const showReadIndicator = SHOW_READ_INDICATOR.has(notification.type);
@@ -53,14 +55,24 @@ const NotificationCard = ({
             {notification.actions.map((action, i) => (
               <span key={action.href}>
                 {i > 0 && <span className={styles.actionSeparator}> | </span>}
-                <a
-                  href={action.href}
-                  className={styles.actionLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {action.label}
-                </a>
+                {action.href.startsWith('canvas://') ? (
+                  <button
+                    type="button"
+                    className={styles.actionButton}
+                    onClick={() => onAction?.(notification.id, action.href)}
+                  >
+                    {action.label}
+                  </button>
+                ) : (
+                  <a
+                    href={action.href}
+                    className={styles.actionLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {action.label}
+                  </a>
+                )}
               </span>
             ))}
           </div>

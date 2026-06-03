@@ -27,6 +27,36 @@ vi.mock('@/hooks/useDocumentVisibility', () => ({
 }));
 
 const mockGetCanvasSettings = vi.mocked(getCanvasSettings);
+const mockNavigate = vi.fn();
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
+vi.mock('@/services/notificationsApi', async () => {
+  const actual = await vi.importActual('@/services/notificationsApi');
+  return {
+    ...actual,
+    useGetNotificationsQuery: () => ({
+      data: { data: { notifications: [] } },
+    }),
+    useMarkNotificationsReadMutation: () => [vi.fn()],
+  };
+});
+
+vi.mock('@/services/pendingChangesApi', async () => {
+  const actual = await vi.importActual('@/services/pendingChangesApi');
+  return {
+    ...actual,
+    useGetAllPendingChangesQuery: () => ({
+      data: undefined,
+    }),
+  };
+});
 
 const renderWithStore = () => {
   const store = makeStore();

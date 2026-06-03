@@ -32,6 +32,7 @@ export interface UpdateContentRequest {
   entityType: string;
   entityId: string;
   status?: boolean;
+  conflictToResolve?: string;
 }
 
 export interface ContentListResult {
@@ -170,10 +171,15 @@ export const contentApi = createApi({
       },
     }),
     updateContent: builder.mutation<void, UpdateContentRequest>({
-      query: ({ entityType, entityId, status }) => ({
+      query: ({ entityType, entityId, status, conflictToResolve }) => ({
         url: `/canvas/api/v0/content/auto-save/${entityType}/${entityId}`,
         method: 'PATCH',
-        body: status !== undefined ? { status } : {},
+        body:
+          conflictToResolve !== undefined
+            ? { conflictToResolve }
+            : status !== undefined
+              ? { status }
+              : {},
       }),
       invalidatesTags: [
         { type: 'Content', id: 'LIST' },
