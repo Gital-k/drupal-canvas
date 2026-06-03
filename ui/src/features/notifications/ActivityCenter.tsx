@@ -13,6 +13,7 @@ interface ActivityCenterProps {
   onClose: () => void;
   onMarkAllRead: () => void;
   onMarkRead: (id: string) => void;
+  onAction?: (id: string, href: string) => void;
 }
 
 const ActivityCenter = ({
@@ -20,6 +21,7 @@ const ActivityCenter = ({
   onClose,
   onMarkAllRead,
   onMarkRead,
+  onAction,
 }: ActivityCenterProps) => {
   const sorted = sortNotifications(notifications);
 
@@ -61,6 +63,7 @@ const ActivityCenter = ({
               key={notification.id}
               notification={notification}
               onMarkRead={onMarkRead}
+              onAction={onAction}
             />
           ))}
         </div>

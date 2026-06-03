@@ -14,6 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class ApiContentAutoSaveControllers {
 
+  private const string CONFLICT_RESOLUTION_KEY = 'conflictToResolve';
+
   public function __construct(
     private readonly AutoSaveManager $autoSaveManager,
     private readonly HomePageHelper $homePageHelper,
@@ -40,7 +42,7 @@ final class ApiContentAutoSaveControllers {
     \assert(\is_string($published_key), 'Entity type must have a `published` key');
 
     // Validate that only supported fields are present in the request body.
-    $allowed_fields = [$published_key, 'clientInstanceId'];
+    $allowed_fields = [$published_key, 'clientInstanceId', self::CONFLICT_RESOLUTION_KEY];
     $unexpected_fields = array_diff(\array_keys($body), $allowed_fields);
     if (!empty($unexpected_fields)) {
       return new JsonResponse(
@@ -49,10 +51,25 @@ final class ApiContentAutoSaveControllers {
       );
     }
 
+    if (isset($body[self::CONFLICT_RESOLUTION_KEY])) {
+      if (!\is_string($body[self::CONFLICT_RESOLUTION_KEY]) || empty($body[self::CONFLICT_RESOLUTION_KEY])) {
+        return new JsonResponse(
+          data: ['error' => \sprintf("Invalid format: %s", self::CONFLICT_RESOLUTION_KEY)],
+          status: Response::HTTP_BAD_REQUEST
+        );
+      }
+
+      $conflict = $this->autoSaveManager->getUnresolvedConflictForEntity($canvas_page);
+      if ($conflict === $body[self::CONFLICT_RESOLUTION_KEY]) {
+        $this->autoSaveManager->saveResolvedConflictId($canvas_page, $body[self::CONFLICT_RESOLUTION_KEY]);
+      }
+      return new JsonResponse(status: Response::HTTP_NO_CONTENT);
+    }
+
     // Check if this is an unpublish operation or publish operation.
     if (!isset($body[$published_key])) {
       return new JsonResponse(
-        data: ['error' => "Missing required field: {$published_key}"],
+        data: ['error' => \sprintf("At least one of the fields is required: %s, %s", $published_key, self::CONFLICT_RESOLUTION_KEY)],
         status: Response::HTTP_BAD_REQUEST
       );
     }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
 import { useParams } from 'react-router';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import PublishReview from '@/components/review/PublishReview';
@@ -15,6 +16,13 @@ import {
   resetCodeEditor,
   setForceRefresh,
 } from '@/features/code-editor/codeEditorSlice';
+import { markConflictNotificationRead } from '@/features/conflict/conflictUiSlice';
+import {
+  getConflictContextKey,
+  getConflictNotificationId,
+  getConflictRouteForChange,
+  isConflictUxEnabled,
+} from '@/features/conflict/conflictUtils';
 import { FORM_TYPES } from '@/features/form/constants';
 import { clearFieldValues } from '@/features/form/formStateSlice';
 import {
@@ -49,6 +57,7 @@ import type { PendingChanges } from '@/services/pendingChangesApi';
 import type { UnpublishedChange } from '@/types/Review';
 
 const REFETCH_INTERVAL_MS = 10000;
+const REVIEW_CHANGES_QUERY_KEY = 'reviewChanges';
 
 const UnpublishedChanges = () => {
   const previousPendingChanges = useAppSelector(selectPreviousPendingChanges);
@@ -67,6 +76,7 @@ const UnpublishedChanges = () => {
   });
   const [pollingInterval, setPollingInterval] =
     useState<number>(REFETCH_INTERVAL_MS);
+  const [openReviewSignal, setOpenReviewSignal] = useState(0);
   const {
     data: changes,
     error,
@@ -78,6 +88,8 @@ const UnpublishedChanges = () => {
   });
   const { entityType, entityId, codeComponentId } = useParams();
   const dispatch = useAppDispatch();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { showBoundary } = useErrorBoundary();
   const entity_form_fields = useAppSelector(selectPageData);
   // Fetch content list to get status information for all pages
@@ -85,9 +97,29 @@ const UnpublishedChanges = () => {
     entityType: 'canvas_page',
   });
   const pageItems = contentListData?.items;
+  const conflictUxEnabled = isConflictUxEnabled();
 
   // If either the selected component or the preview layout is being updated, disable the Publish button.
   const isUpdating = isUpdatingComponent || isUpdatingPreview;
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get(REVIEW_CHANGES_QUERY_KEY) !== '1') {
+      return;
+    }
+
+    setOpenReviewSignal((signal) => signal + 1);
+    searchParams.delete(REVIEW_CHANGES_QUERY_KEY);
+    const nextSearch = searchParams.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : '',
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (error) {
@@ -104,6 +136,11 @@ const UnpublishedChanges = () => {
         }))
         .sort((a, b) => b.updated - a.updated),
     [changes],
+  );
+
+  const changesWithConflicts: UnpublishedChange[] = useMemo(
+    () => unpublishedChanges,
+    [unpublishedChanges],
   );
 
   useEffect(() => {
@@ -280,26 +317,10 @@ const UnpublishedChanges = () => {
     }
   };
 
-  if (!isFetching && conflicts && conflicts.length) {
+  if (conflictUxEnabled && !isFetching && conflicts && conflicts.length) {
     window.setTimeout(() => {
       conflicts.forEach((conflict) => {
-        if (conflict.code === CONFLICT_CODE.UNEXPECTED) {
-          dispatch(
-            pendingChangesApi.util.updateQueryData(
-              'getAllPendingChanges',
-              undefined,
-              (draft) => {
-                if (previousPendingChanges) {
-                  draft[conflict.source.pointer] = {
-                    ...previousPendingChanges[conflict.source.pointer],
-                    hasConflict: true,
-                  };
-                }
-              },
-            ),
-          );
-        }
-        if (conflict.code === CONFLICT_CODE.EXPECTED) {
+        if (conflict.code === CONFLICT_CODE.DETECTED) {
           dispatch(
             pendingChangesApi.util.updateQueryData(
               'getAllPendingChanges',
@@ -307,6 +328,10 @@ const UnpublishedChanges = () => {
               (draft) => {
                 if (draft[conflict.source.pointer]) {
                   draft[conflict.source.pointer].hasConflict = true;
+                  if (conflict.meta?.conflict_id) {
+                    draft[conflict.source.pointer].conflict_id =
+                      conflict.meta.conflict_id;
+                  }
                 }
               },
             ),
@@ -336,18 +361,36 @@ const UnpublishedChanges = () => {
   }, [pageItems]);
 
   return (
-    <PublishReview
-      isUpdating={isUpdating}
-      isFetching={isFetching}
-      changes={unpublishedChanges}
-      errors={errorResponse}
-      onOpenChangeCallback={onOpenChangeHandler}
-      onPublishClick={onPublishClick}
-      onDiscardClick={onDiscardClick}
-      isPublishing={isPublishing}
-      isDiscarding={isDiscarding}
-      pageStatusMap={pageStatusMap}
-    />
+    <>
+      <PublishReview
+        isUpdating={isUpdating}
+        changes={changesWithConflicts}
+        errors={errorResponse}
+        onOpenChangeCallback={onOpenChangeHandler}
+        onPublishClick={onPublishClick}
+        onDiscardClick={onDiscardClick}
+        onResolveConflict={(change) => {
+          if (change && conflictUxEnabled) {
+            dispatch(
+              markConflictNotificationRead({
+                contextKey: getConflictContextKey(
+                  change.entity_type,
+                  change.entity_id,
+                ),
+                id: getConflictNotificationId(
+                  getConflictContextKey(change.entity_type, change.entity_id),
+                ),
+              }),
+            );
+          }
+          navigate(change ? getConflictRouteForChange(change) : '/conflict');
+        }}
+        openReviewSignal={openReviewSignal}
+        isPublishing={isPublishing}
+        isDiscarding={isDiscarding}
+        pageStatusMap={pageStatusMap}
+      />
+    </>
   );
 };
 

@@ -8,6 +8,7 @@ use Drupal\canvas\Entity\EntityConstraintViolationList;
 use Drupal\canvas\EventSubscriber\ApiExceptionSubscriber;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Validator\ConstraintViolationInterface;
@@ -67,15 +68,21 @@ class ApiControllerBase {
       return NULL;
     }
 
-    return new JsonResponse(status: 422, data: [
-      'errors' => \array_reduce($violationSets, static fn(array $carry, ConstraintViolationListInterface $violationList): array => [
-        ...$carry,
-        ...\array_map(static fn(ConstraintViolationInterface $violation) => ApiExceptionSubscriber::violationToJsonApiStyleErrorObject(
+    $errors = \array_reduce($violationSets, static fn(array $carry, ConstraintViolationListInterface $violationList): array => [
+      ...$carry,
+      ...\array_map(static fn(ConstraintViolationInterface $violation) => ApiExceptionSubscriber::violationToJsonApiStyleErrorObject(
           $violation,
           $violationList instanceof EntityConstraintViolationList ? $violationList->entity : NULL,
-        ), \iterator_to_array($violationList)),
-      ], []),
-    ]);
+        ),
+        \iterator_to_array($violationList)
+      ),
+    ],
+      []
+    );
+    $conflict_detected = !\is_null(\array_find($errors, static fn(array $error): bool => isset($error['code']) && $error['code'] === ErrorCodesEnum::AutoSaveItemEntityConflict->value));
+
+    return new JsonResponse(data: ['errors' => $errors], status: $conflict_detected ? Response::HTTP_CONFLICT : Response::HTTP_UNPROCESSABLE_ENTITY
+    );
   }
 
 }

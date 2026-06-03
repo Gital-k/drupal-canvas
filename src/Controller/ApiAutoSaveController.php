@@ -100,6 +100,33 @@ final class ApiAutoSaveController extends ApiControllerBase {
         ], $unmatched_keys),
       ], status: Response::HTTP_CONFLICT);
     }
+
+    $auto_saves_with_conflicts = \array_filter(
+      \array_intersect_key($all_auto_saves, $expected_auto_saves),
+      fn ($entry) => isset($entry['conflict_id'])
+    );
+
+    if (!empty($auto_saves_with_conflicts)) {
+      return new JsonResponse(data: [
+        'errors' => \array_map(static fn(string $key) => [
+          'detail' => ErrorCodesEnum::AutoSaveItemEntityConflict->getMessage(),
+          'source' => [
+            'pointer' => $key,
+          ],
+          'code' => ErrorCodesEnum::AutoSaveItemEntityConflict->value,
+          'meta' => \array_intersect_key($all_auto_saves[$key], \array_flip([
+            'entity_type',
+            'entity_id',
+            'label',
+            'conflict_id',
+          ])) + [
+            self::AUTO_SAVE_KEY => $key,
+          ],
+        ],
+        \array_keys($auto_saves_with_conflicts)),
+      ], status: Response::HTTP_CONFLICT);
+    }
+
     // If any JavaScriptComponents are being published ensure dependent global
     // config surfaces are also being published.
     // @todo Improve this in https://www.drupal.org/project/canvas/issues/3535038
@@ -144,7 +171,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
     $cache = new CacheableMetadata();
 
     // Filter those the user has access to.
-    $filtered = \array_filter($this->autoSaveManager->getAllAutoSaveList(TRUE), function (array $item) use ($cache) {
+    $filtered = \array_filter($this->autoSaveManager->getAllAutoSaveList(with_entities: TRUE, with_conflicts: TRUE), function (array $item) use ($cache) {
       \assert($item['entity'] instanceof EntityInterface);
       $access = $item['entity']->access('view label', return_as_object: TRUE);
       // @todo This will result in the cache tag for this entity being returned
@@ -170,15 +197,40 @@ final class ApiAutoSaveController extends ApiControllerBase {
     }
     // User display names depend on configuration.
     $cache->addCacheableDependency($this->configFactory->get('user.settings'));
+    $status = Response::HTTP_OK;
 
-    // Remove 'data', 'client_id', 'entity' keys because this will reduce the
-    // amount of data sent to the client and back to the server. Also,
-    // 'client_id' is only used to determine if the client has the latest
-    // changes when editing an entity in Drupal Canvas and not needed for the
-    // publishing process.
-    $filtered = \array_map(fn(array $item) => \array_diff_key($item, \array_flip(['data', 'client_id', 'entity'])), $filtered);
+    $body = [];
+    if (self::autoSaveListHasConflicts($filtered)) {
+      $status = Response::HTTP_CONFLICT;
+      foreach ($filtered as $key => $entry) {
+        if (isset($entry['conflict_id'])) {
+          $body['errors'][] = [
+            'detail' => ErrorCodesEnum::AutoSaveItemEntityConflict->getMessage(),
+            'source' => [
+              'pointer' => $key,
+            ],
+            'code' => ErrorCodesEnum::AutoSaveItemEntityConflict->value,
+            'meta' => [
+              'entity_type' => $entry['entity_type'],
+              'entity_id' => $entry['entity_id'],
+              'label' => $entry['label'],
+              'conflict_id' => $entry['conflict_id'],
+              self::AUTO_SAVE_KEY => $key,
+            ],
+          ];
+        }
+      }
+    }
 
-    $withUserDetails = \array_map(fn(array $item) => [
+    // Remove internal auto-save properties that are not used client side (like
+    // 'data', 'client_id', 'entity', etc.). This will reduce the amount of data
+    // sent to the client and back to the server.
+    $filtered = \array_map(fn (array $item) =>
+      \array_diff_key($item, \array_flip(AutoSaveManager::AUTO_SAVE_INTERNAL_PROPERTIES)),
+      $filtered
+    );
+
+    $body['data'] = \array_map(fn(array $item) => [
       // @phpstan-ignore-next-line
       'owner' => \array_key_exists($item['owner'], $users) ? [
         'name' => $users[$item['owner']]->getDisplayName(),
@@ -192,7 +244,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
         'id' => $item['owner'],
       ],
     ] + $item, $filtered);
-    return (new CacheableJsonResponse(['data' => $withUserDetails]))->addCacheableDependency($cache->addCacheTags([AutoSaveManager::CACHE_TAG]));
+
+    return (new CacheableJsonResponse(data: $body, status: $status))->addCacheableDependency($cache->addCacheTags([AutoSaveManager::CACHE_TAG]));
   }
 
   /**
@@ -203,7 +256,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
   public function post(Request $request): JsonResponse {
     $client_auto_saves = \json_decode($request->getContent(), TRUE);
     \assert(\is_array($client_auto_saves));
-    $all_auto_saves = $this->autoSaveManager->getAllAutoSaveList(TRUE);
+    $all_auto_saves = $this->autoSaveManager->getAllAutoSaveList(with_entities: TRUE, with_conflicts: TRUE);
     if ($validation_response = self::validateExpectedAutoSaves($client_auto_saves, $all_auto_saves)) {
       return $validation_response;
     }
@@ -507,6 +560,17 @@ final class ApiAutoSaveController extends ApiControllerBase {
       $map,
       ($violations instanceof EntityConstraintViolationListInterface) ? EntityConstraintViolationList::fromCoreConstraintViolationList($violations) : $violations,
     );
+  }
+
+  /**
+   * Checks if any entries in the list have 'conflict_id' property.
+   *
+   * @param array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, data_hash: string, client_id: ?string, langcode: ?string, entity: ?EntityInterface, conflict_id?: string,}> $auto_save_entries
+   *
+   * @return bool
+   */
+  private static function autoSaveListHasConflicts(array $auto_save_entries): bool {
+    return !empty(\array_column($auto_save_entries, 'conflict_id'));
   }
 
 }
