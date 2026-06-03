@@ -365,6 +365,7 @@ canvas.api.content.translation.delete:
     # used: it forbids access when the user already has entity-level delete
     # access (it targets translators-without-edit-rights), which is the
     # opposite of Canvas's permission model.
+    # @see \Drupal\content_translation\Access\ContentTranslationManageAccessCheck
     _entity_access: 'canvas_page.update'
   options:
     parameters:
