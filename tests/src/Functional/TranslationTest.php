@@ -1163,22 +1163,34 @@ class TranslationTest extends FunctionalTestBase {
    * @see \Drupal\canvas\Controller\ApiTranslationControllers::delete()
    */
   public function testDeleteCanvasPageTranslation(): void {
+    $page_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Page::ENTITY_TYPE_ID);
+    $page = $this->createCanvasTranslationTestPage();
+    $page_id = (int) $page->id();
+    self::assertTrue($page->hasTranslation('fr'));
+    $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/content/canvas_page/{$page_id}/translations");
+
+    $user = $this->drupalCreateUser([]);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
+    // Attempting to delete non-default translation without the correct
+    // permission returns a 403.
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+    self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+    // Ensure the translation was not removed.
+    $reloaded = $page_storage->loadUnchanged($page_id);
+    self::assertInstanceOf(Page::class, $reloaded);
+    self::assertTrue($reloaded->hasTranslation('fr'));
+
     $user = $this->drupalCreateUser([Page::EDIT_PERMISSION]);
     \assert($user instanceof UserInterface);
     $this->drupalLogin($user);
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
-    $page = $this->createCanvasTranslationTestPage();
-    $page_id = (int) $page->id();
-    self::assertTrue($page->hasTranslation('fr'));
-
-    $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/content/canvas_page/{$page_id}/translations");
-
     // Deleting a non-default translation removes it and returns 204.
     $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
     self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
 
-    $page_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Page::ENTITY_TYPE_ID);
     $reloaded = $page_storage->loadUnchanged($page_id);
     self::assertInstanceOf(Page::class, $reloaded);
     self::assertFalse($reloaded->hasTranslation('fr'));
@@ -1224,10 +1236,6 @@ class TranslationTest extends FunctionalTestBase {
   public function testDeleteConfigEntityTranslation(string $entity_type_id): void {
     $this->container->get(ModuleInstallerInterface::class)->install(['config_translation']);
     $this->rebuildContainer();
-    $user = $this->drupalCreateUser(['translate configuration']);
-    \assert($user instanceof UserInterface);
-    $this->drupalLogin($user);
-    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
     if ($entity_type_id === ContentTemplate::ENTITY_TYPE_ID) {
       $entity = ContentTemplate::load('node.article.full');
@@ -1244,6 +1252,23 @@ class TranslationTest extends FunctionalTestBase {
     self::assertFalse($override->isNew());
 
     $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/config/{$entity_type_id}/{$entity_id}/translations");
+
+    $user = $this->drupalCreateUser([]);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
+    // Attempting to delete non-default translation without the correct
+    // permission returns a 403.
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+    self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+    // Ensure the translation was not removed.
+    $override = $language_manager->getLanguageConfigOverride('fr', $entity->getConfigDependencyName());
+    self::assertFalse($override->isNew());
+
+    $user = $this->drupalCreateUser(['translate configuration']);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
     // Deleting a non-default translation removes it and returns 204.
     $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
