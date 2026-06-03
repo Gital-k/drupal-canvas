@@ -10,6 +10,19 @@ import type { Metadata } from '../types/Metadata';
 
 const NAMED_SUFFIX = '.component.yml';
 
+interface DiscoveredComponentFilePaths {
+  metadataPath?: string;
+  jsEntryPath?: string | null;
+  cssEntryPath?: string | null;
+}
+
+function hasDiscoveredPath(
+  paths: DiscoveredComponentFilePaths,
+  key: keyof DiscoveredComponentFilePaths,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(paths, key);
+}
+
 /**
  * Get files in a directory
  * @param dirPath Directory path
@@ -81,12 +94,14 @@ export function findCssEntryPoint(componentDir: string): string | null {
  * @param componentDir Component directory path
  * @param componentName Optional component name for locating build output
  * @param componentKind Optional component kind ('index' or 'named')
+ * @param discoveredPaths Exact file paths returned by component discovery
  * @returns Processed component files and paths
  */
 export async function processComponentFiles(
   componentDir: string,
   componentName?: string,
   componentKind: 'index' | 'named' = 'index',
+  discoveredPaths: DiscoveredComponentFilePaths = {},
 ): Promise<{
   sourceCodeJs: string;
   compiledJs: string;
@@ -95,11 +110,17 @@ export async function processComponentFiles(
   metadata: Metadata | undefined;
 }> {
   const config = getConfig();
-  const metadataPath = findMetadataPath(componentDir);
+  const metadataPath =
+    hasDiscoveredPath(discoveredPaths, 'metadataPath') &&
+    discoveredPaths.metadataPath
+      ? discoveredPaths.metadataPath
+      : findMetadataPath(componentDir);
   const metadata = await readComponentMetadata(metadataPath);
 
   // Find and read the JS/TS entry point
-  const jsEntryPath = findJsEntryPoint(componentDir);
+  const jsEntryPath = hasDiscoveredPath(discoveredPaths, 'jsEntryPath')
+    ? discoveredPaths.jsEntryPath
+    : findJsEntryPoint(componentDir);
   if (!jsEntryPath) {
     throw new Error(
       `No JS/TS entry point found in ${componentDir}. Expected [name].{jsx,tsx,js,ts} or index.{jsx,tsx,js,ts}`,
@@ -122,7 +143,9 @@ export async function processComponentFiles(
   let compiledCss = '';
 
   // Find and read the CSS entry point if it exists
-  const cssEntryPath = findCssEntryPoint(componentDir);
+  const cssEntryPath = hasDiscoveredPath(discoveredPaths, 'cssEntryPath')
+    ? discoveredPaths.cssEntryPath
+    : findCssEntryPoint(componentDir);
   if (cssEntryPath) {
     try {
       sourceCodeCss = await fs.readFile(cssEntryPath, 'utf-8');
