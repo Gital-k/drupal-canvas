@@ -1229,7 +1229,7 @@ class TranslationTest extends FunctionalTestBase {
     $this->drupalLogin($user);
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
 
-    if ($entity_type_id === 'content_template') {
+    if ($entity_type_id === ContentTemplate::ENTITY_TYPE_ID) {
       $entity = ContentTemplate::load('node.article.full');
       self::assertInstanceOf(ContentTemplate::class, $entity);
     }
