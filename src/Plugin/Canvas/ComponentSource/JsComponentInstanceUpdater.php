@@ -46,12 +46,12 @@ final class JsComponentInstanceUpdater extends JsonSchemaPropsComponentInstanceU
     $target_source = $component->loadVersion($to_version)->getComponentSource();
     $default_explicit_input = $target_source->getDefaultExplicitInput();
     $inputs = $component_instance->getInputs() ?? [];
-    $changed = FALSE;
+    $needs_input_update = FALSE;
     $shape_changed_prop_names = self::getShapeChangedPropNames($from_props, $to_props);
     foreach ($shape_changed_prop_names as $prop_name) {
       if (\array_key_exists($prop_name, $inputs)) {
         unset($inputs[$prop_name]);
-        $changed = TRUE;
+        $needs_input_update = TRUE;
       }
     }
 
@@ -70,7 +70,7 @@ final class JsComponentInstanceUpdater extends JsonSchemaPropsComponentInstanceU
         $value = [$value];
       }
       $inputs[$prop_name] = $value;
-      $changed = TRUE;
+      $needs_input_update = TRUE;
     }
 
     // Truncate before validating: cardinality-only violations must not cause
@@ -79,7 +79,7 @@ final class JsComponentInstanceUpdater extends JsonSchemaPropsComponentInstanceU
     $truncated = self::applyCardinalityTruncation($inputs, $to_props);
     if ($truncated !== $inputs) {
       $inputs = $truncated;
-      $changed = TRUE;
+      $needs_input_update = TRUE;
     }
 
     // @todo coerce values across compatible types:
@@ -94,10 +94,10 @@ final class JsComponentInstanceUpdater extends JsonSchemaPropsComponentInstanceU
     );
     if (!empty($invalid_prop_names)) {
       $inputs = \array_diff_key($inputs, \array_flip($invalid_prop_names));
-      $changed = TRUE;
+      $needs_input_update = TRUE;
     }
 
-    if ($changed) {
+    if ($needs_input_update) {
       $component_instance->setInput($inputs);
     }
 
