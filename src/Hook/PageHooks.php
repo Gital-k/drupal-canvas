@@ -143,4 +143,21 @@ final class PageHooks {
     return ['canvas_page_form'];
   }
 
+  /**
+   * Implements hook_entity_type_alter().
+   *
+   * Override EntityChanged constraint to handle conflicts.
+   *
+   * @todo This needs to cover other content entities with component tree field.
+   */
+  #[Hook('entity_type_alter')]
+  public static function entityTypeAlter(array &$entity_types) : void {
+    // Swap out the default EntityChanged constraint with a custom one with
+    // different logic for inline blocks.
+    $constraints = $entity_types['canvas_page']->getConstraints();
+    unset($constraints['EntityChanged']);
+    $constraints['OverriddenEntityChanged'] = NULL;
+    $entity_types['canvas_page']->setConstraints($constraints);
+  }
+
 }

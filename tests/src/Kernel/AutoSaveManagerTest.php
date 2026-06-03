@@ -30,6 +30,7 @@ use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
@@ -133,7 +134,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
 
     self::assertFalse($autoSave->getAutoSaveEntity($entity)->isEmpty());
     $autoSaveKey = AutoSaveManager::getAutoSaveKey($entity);
-    $autoSaveEntry = $autoSave->getAllAutoSaveList()[$autoSaveKey];
+    $autoSaveEntry = $autoSave->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE)[$autoSaveKey];
     self::assertArrayHasKey('data_hash', $autoSaveEntry);
     $hashInitial = $autoSaveEntry['data_hash'];
     self::assertNotEmpty($hashInitial);
@@ -142,7 +143,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     $autoSaveEntity = $this->convertClientData($entity, self::recursiveReverseSort($updated_client_data));
     $autoSave->saveEntity($autoSaveEntity);
     self::assertFalse($autoSave->getAutoSaveEntity($entity)->isEmpty());
-    $autoSaveEntry = $autoSave->getAllAutoSaveList()[$autoSaveKey];
+    $autoSaveEntry = $autoSave->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE)[$autoSaveKey];
     self::assertArrayHasKey('data_hash', $autoSaveEntry);
     $hashReversedData = $autoSaveEntry['data_hash'];
     self::assertNotEmpty($hashReversedData);
@@ -153,9 +154,9 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
       // auto-save being wiped, but in it being updated.
       $status_key = $entity->getEntityType()->getKey('status');
       if ($status_key) {
-        self::assertTrue($autoSave->getAllAutoSaveList()[$autoSaveKey]['data'][$status_key]);
+        self::assertTrue($autoSave->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE)[$autoSaveKey]['data'][$status_key]);
         $entity->disable()->save();
-        self::assertFalse($autoSave->getAllAutoSaveList()[$autoSaveKey]['data'][$status_key]);
+        self::assertFalse($autoSave->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE)[$autoSaveKey]['data'][$status_key]);
         // We also have to update the original client data so that a new auto
         // save entry deletes the existing (matching) data.
         $matching_client_data[$status_key] = FALSE;
@@ -165,9 +166,9 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
       // auto-save being wiped, but in it being updated.
       $label_key = $entity->getEntityType()->getKey('label');
       if ($label_key) {
-        self::assertSame($updated_client_data[$label_key], $autoSave->getAllAutoSaveList()[$autoSaveKey]['data'][$label_key]);
+        self::assertSame($updated_client_data[$label_key], $autoSave->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE)[$autoSaveKey]['data'][$label_key]);
         $entity->set($label_key, 'magic 🪄')->save();
-        self::assertSame('magic 🪄', $autoSave->getAllAutoSaveList()[$autoSaveKey]['data'][$label_key]);
+        self::assertSame('magic 🪄', $autoSave->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE)[$autoSaveKey]['data'][$label_key]);
         // We also have to update the original client data so that a new auto
         // save entry deletes the existing (matching) data.
         $matching_client_data[$label_key] = 'magic 🪄';
@@ -190,8 +191,9 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     ]);
     self::assertEntityIsValid($canvas_page);
     self::assertSame(SAVED_NEW, $canvas_page->save());
+    $request = Request::create('/api/canvas/content/canvas_page/' . $canvas_page->id());
 
-    $envelope = \Drupal::classResolver(ApiLayoutController::class)->get($canvas_page);
+    $envelope = \Drupal::classResolver(ApiLayoutController::class)->get(request: $request, entity: $canvas_page);
     \assert($envelope instanceof PreviewEnvelope);
     $matching_client_data = \array_intersect_key(
       $envelope->additionalData,
@@ -266,7 +268,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
 
     // Verify only English auto-save is in the list.
-    $list = $auto_save_manager->getAllAutoSaveList();
+    $list = $auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE);
     self::assertEquals([$key_en], \array_keys($list));
     self::assertEquals('Modified English title', $list[$key_en]['label']);
 
@@ -279,7 +281,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     self::assertFalse($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
 
     // Verify both auto-saves are in the list with correct labels.
-    $list = $auto_save_manager->getAllAutoSaveList();
+    $list = $auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE);
     $keys = \array_keys($list);
     asort($keys);
     self::assertEquals([$key_en, $key_fr], $keys);
@@ -298,7 +300,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
     self::assertFalse($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
 
-    $list = $auto_save_manager->getAllAutoSaveList();
+    $list = $auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE);
     self::assertEquals([$key_fr], \array_keys($list));
 
     // Delete the French auto-save.
@@ -307,7 +309,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     // Verify all auto-saves are gone.
     self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
     self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
-    self::assertEmpty($auto_save_manager->getAllAutoSaveList());
+    self::assertEmpty($auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE));
   }
 
   public function testPageRegion(): void {
@@ -408,8 +410,8 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     ]);
     self::assertEntityIsValid($node);
     $this->assertSame(SAVED_NEW, $node->save());
-
-    $envelope = \Drupal::classResolver(ApiLayoutController::class)->get($node);
+    $request = Request::create('/api/canvas/content/canvas_page/' . $node->id());
+    $envelope = \Drupal::classResolver(ApiLayoutController::class)->get(request: $request, entity: $node);
     \assert($envelope instanceof PreviewEnvelope);
     $matching_client_data = \array_intersect_key(
       $envelope->additionalData,
@@ -445,7 +447,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
       ],
     ])->save();
 
-    $list = $sut->getAllAutoSaveList();
+    $list = $sut->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE);
     self::assertCount(1, $list);
     self::assertArrayHasKey('staged_config_update:canvas_change_site_name', $list);
     self::assertEquals([
@@ -467,7 +469,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
         ],
       ],
     ])->save();
-    $list = $sut->getAllAutoSaveList();
+    $list = $sut->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE);
     self::assertCount(1, $list);
     self::assertArrayHasKey('staged_config_update:canvas_change_site_name', $list);
     self::assertEquals([
@@ -488,7 +490,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
         ],
       ],
     ])->save();
-    $list = $sut->getAllAutoSaveList();
+    $list = $sut->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE);
     self::assertCount(2, $list);
     self::assertArrayHasKey('staged_config_update:canvas_set_homepage', $list);
     self::assertEquals([
@@ -509,7 +511,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     $config_manager = $this->container->get(ConfigManagerInterface::class);
     \assert($config_manager instanceof ConfigManagerInterface);
     $config_manager->getConfigFactory()->getEditable('system.site')->delete();
-    $list = $sut->getAllAutoSaveList();
+    $list = $sut->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE);
     self::assertEmpty($list);
   }
 
@@ -584,7 +586,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
 
     // Verify the auto-save exists.
     $auto_save_key = AutoSaveManager::getAutoSaveKey($page);
-    $list = $auto_save_manager->getAllAutoSaveList();
+    $list = $auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE);
     self::assertCount(1, $list);
     self::assertArrayHasKey($auto_save_key, $list);
     self::assertFalse($auto_save_manager->getAutoSaveEntity($page)->isEmpty());
@@ -596,7 +598,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     AutoSaveManagerTestTime::$offset = $tempstore_expire + 24 * 60;
 
     // Verify the auto-save entry still persists after the tempstore has expired.
-    $list = $auto_save_manager->getAllAutoSaveList();
+    $list = $auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE);
     self::assertCount(1, $list);
     self::assertArrayHasKey($auto_save_key, $list);
     self::assertFalse($auto_save_manager->getAutoSaveEntity($page)->isEmpty());

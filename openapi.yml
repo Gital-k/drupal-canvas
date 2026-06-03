@@ -217,6 +217,107 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/AutoSaveCollection'
+        '409':
+          description: '409 response returned when any of the auto-save entries with "conflict" property have "status: true"'
+          content:
+            application/json:
+              examples:
+                multipleEntries:
+                  value:
+                    errors:
+                      - detail: Conflict detected
+                        source:
+                          pointer: canvas_page:1:en
+                        code: 4
+                        meta:
+                          entity_type: canvas_page
+                          entity_id: "1"
+                          label: Demo Canvas Page
+                          api_auto_save_key : canvas_page:1:en
+                          conflict_id: "2"
+                      - detail: Conflict detected
+                        source:
+                          pointer: canvas_page:7:en
+                        code: 4
+                        meta:
+                          entity_type: canvas_page
+                          entity_id: "7"
+                          label: Demo Canvas Page
+                          api_auto_save_key: canvas_page:7:en
+                          conflict_id: '7'
+                    data:
+                      canvas_page:1:en:
+                        owner:
+                          name: Garrett Bobby Ferguson, Jr
+                          avatar: /sites/default/files/user-pictures/garrett.jpg
+                          uri: /user/12
+                          id: 12
+                        updated: 1732763679
+                        entity_type: canvas_page
+                        langcode: en
+                        data_hash: 4711efecf75d2d1a
+                        entity_id: 1
+                        label: First Canvas page
+                      canvas_page:7:en:
+                        owner:
+                          name: Garrett Bobby Ferguson, Jr
+                          avatar: /sites/default/files/user-pictures/garrett.jpg
+                          uri: /user/12
+                          id: 12
+                        updated: 1732764679
+                        entity_type: canvas_page
+                        langcode: en
+                        data_hash: 4711efecf75d2d1a
+                        entity_id: 7
+                        label: Second Canvas page
+                      asset_library:global:
+                        owner:
+                          name: Gracie Dog
+                          avatar: /sites/default/files/user-pictures/good-dog.jpg
+                          uri: /user/13
+                          id: 13
+                        updated: 1732763680
+                        entity_type: asset_library
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: global
+                        label: Global asset library
+                      js_component:hero:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: js_component
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: hero
+                        label: Hero component
+                      segment:test_segment:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: test_segment
+                        langcode: NULL
+                        data_hash: a95cf01fd2e9c59e
+                        entity_id: test_segment
+                        label: Test segment
+              schema:
+                type: object
+                required:
+                  - errors
+                properties:
+                  errors:
+                    type: array
+                    description: Error items
+                    items:
+                      $ref: '#/components/schemas/Error'
+                  data:
+                    $ref: '#/components/schemas/AutoSaveCollection'
   /canvas/api/v0/auto-saves/publish:
     description: TODO
     post:
@@ -1394,6 +1495,10 @@ paths:
                 clientInstanceId:
                   type: string
                   description: Client instance ID for concurrency control
+                conflictToResolve:
+                  type: string
+                  description: Conflict id to resolve and store the result in the auto-save.
+              additionalProperties: false
             examples:
               publishPage:
                 summary: Publish a page
@@ -2070,12 +2175,25 @@ paths:
                     type: string
                     description: Error message indicating the conflict.
   '/canvas/api/v0/layout/{entityTypeId}/{entityId}':
-    description: TODO
+    description: Entity layout and previews endpoint.
     get:
-      summary: TODO
+      summary: Gets html markup, layout, model, entity form fields and various meta properties for a specified entity type and id.
       parameters:
         - $ref: '#/components/parameters/entityTypeId'
         - $ref: '#/components/parameters/entityId'
+        - in: query
+          name: autoSaved
+          required: false
+          description: Entity status, defaults to TRUE when not provided. On TRUE - the entity version stored in auto-save is used, on FALSE - the published entity is used to generate the response.
+          schema:
+            type: boolean
+          examples:
+            "true":
+              dataValue: true
+              serializedValue: autoSaved=true
+            "false":
+              dataValue: false
+              serializedValue: autoSaved=false
       responses:
         '200':
           description: "The layout that the current user is allowed to edit: regions not editable by the current user are omitted."
@@ -2207,6 +2325,12 @@ paths:
                     # @see \Drupal\Core\Entity\EntityPublishedInterface
                     # @see https://www.drupal.org/node/3505118#comment-15982801
                     description: Whether the edited content entity is marked as published.
+                  updated:
+                    type: integer
+                    title: Updated timestamp
+                    description: Unix timestamp for entity last updated time
+                    examples:
+                      - 1732763679
         '401':
           description: Unauthorized (unauthenticated) response.
           $ref: '#/components/responses/UnauthorizedErrorResponse'
@@ -3803,6 +3927,9 @@ components:
               examples:
                 - 'node:4:en'
               title: The corresponding key in the pending changes API
+            conflict_id:
+              type: string
+              description: String containing conflict id.
           additionalProperties: false
     Model:
       title: model
