@@ -546,10 +546,6 @@ final class StaticPropSource extends PropSourceBase {
       $field->setValue(array_values($values));
     }
 
-    // A field widget needs a FieldItemListInterface object. Use cloning to
-    // prevent the field widget plugin from being able to modify this
-    // StaticPropSource's field item list by reference.
-    $field = clone $this->fieldItemList;
     // Remove empty or invalid items.
     $field->filterEmptyItems();
     // Widgets assume there is at least one field item present for editing.
