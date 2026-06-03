@@ -235,12 +235,13 @@ canvas.api.config.post:
   methods: [POST]
 
 canvas.api.config.translation.delete:
-  path: '/canvas/api/v0/config/{entity_type_id}/{config_entity}/translations'
+  path: '/canvas/api/v0/config/{canvas_config_entity_type_id}/{config_entity}/translations'
   defaults:
     _controller: 'Drupal\canvas\Controller\ApiTranslationControllers::deleteConfigTranslation'
   requirements:
     _canvas_authentication_required: TRUE
-    entity_type_id: '(content_template|page_region)'
+    # Symmetrical translations are only supported for Content Templates and Page Regions.
+    canvas_config_entity_type_id: '(content_template|page_region)'
     _permission: 'translate configuration'
   options:
     parameters:
