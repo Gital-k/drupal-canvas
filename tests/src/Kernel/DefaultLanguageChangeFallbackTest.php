@@ -92,14 +92,14 @@ final class DefaultLanguageChangeFallbackTest extends CanvasKernelTestBase {
    * with that behavior after the default language change is processed.
    */
   public function testLanguageNegotiationUrlPrefixesReflectNewDefault(): void {
-    // Before the change: EN has no prefix (it is the default), FR has 'fr'.
-    $negotiation = $this->config('language.negotiation');
-    $url_prefixes_before = $negotiation->get('url.prefixes');
-    // The default language typically has no entry or an empty-string entry.
-    self::assertTrue(
-      !isset($url_prefixes_before['en']) || $url_prefixes_before['en'] === '',
-      'EN must have an empty or missing URL prefix before the language change.'
-    );
+    // Set up the URL prefix state as it would be on a real site: EN has no
+    // prefix (it is the default) and FR has no prefix yet (it was just added
+    // as a new language). Core's ConfigSubscriber only updates prefixes when
+    // the current prefix is empty, so we need to start in that state.
+    $this->config('language.negotiation')
+      ->set('url.prefixes.en', '')
+      ->set('url.prefixes.fr', '')
+      ->save();
 
     $this->changeDefaultLanguageTo('fr');
 
