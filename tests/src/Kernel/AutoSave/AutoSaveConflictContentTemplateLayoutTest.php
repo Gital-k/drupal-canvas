@@ -26,6 +26,22 @@ class AutoSaveConflictContentTemplateLayoutTest extends ApiLayoutControllerTestB
 
   use AutoSaveConflictTestTrait;
 
+  /**
+   * {@inheritdoc}
+   *
+   * Overrides AutoSaveConflictTestTrait::setUp() to use setUpFixture() instead
+   * of CanvasTestSetup::setup(). AutoSaveConflictTestTrait installs modules via
+   * module_installer->install(), but ApiLayoutControllerTestBase extends
+   * CanvasKernelTestBase which pre-loads those modules without creating their
+   * entity schemas, causing a "no such table" conflict.
+   */
+  protected function setUp(): void {
+    parent::setUp();
+    $this->setUpFixture(createContentTemplate: FALSE);
+    $this->setUpEntity();
+    $this->setUpCurrentUser(permissions: self::getPermissions());
+  }
+
   protected static function getPermissions(): array {
     return [
       ContentTemplate::ADMIN_PERMISSION,
