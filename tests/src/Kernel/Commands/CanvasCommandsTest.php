@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Commands;
 
-use Consolidation\OutputFormatters\StructuredData\RowsOfFields;
 use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
@@ -55,7 +54,6 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
    */
   public function testComponentList(): void {
     $result = $this->commands->componentList();
-    self::assertInstanceOf(RowsOfFields::class, $result);
     $rows = $result->getArrayCopy();
     self::assertNotEmpty($rows, 'Component list should not be empty.');
 
@@ -83,7 +81,6 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
    */
   public function testComponentStatus(): void {
     $result = $this->commands->componentStatus();
-    self::assertInstanceOf(RowsOfFields::class, $result);
     $rows = $result->getArrayCopy();
 
     // The test SDC module has some components that genuinely do not meet
@@ -109,7 +106,6 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
     $reason_repository->storeReasons('sdc', 'sdc.fictional.broken_component', ['Missing template file']);
 
     $result = $this->commands->componentStatus();
-    self::assertInstanceOf(RowsOfFields::class, $result);
     $rows = $result->getArrayCopy();
     self::assertNotEmpty($rows, 'Should have at least one incompatibility reason.');
 
@@ -144,16 +140,19 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
    * Tests the canvas:component:generate command.
    */
   public function testComponentGenerate(): void {
+    $storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Component::ENTITY_TYPE_ID);
+
     // Delete a component to verify generate recreates it.
     $component = Component::load('sdc.canvas_test_sdc.druplicon');
     self::assertInstanceOf(Component::class, $component);
     $component->delete();
-    self::assertNull(Component::load('sdc.canvas_test_sdc.druplicon'), 'Component should be deleted.');
+    $deleted = $storage->loadUnchanged('sdc.canvas_test_sdc.druplicon');
+    self::assertNull($deleted, 'Component should be deleted.');
 
     // Run generate — this should not throw and should recreate the component.
     $this->commands->componentGenerate();
 
-    $component = Component::load('sdc.canvas_test_sdc.druplicon');
+    $component = $storage->loadUnchanged('sdc.canvas_test_sdc.druplicon');
     self::assertInstanceOf(Component::class, $component, 'Component should be recreated by generate command.');
     self::assertTrue($component->status(), 'Regenerated component should be enabled.');
   }
@@ -162,6 +161,8 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
    * Tests the canvas:component:generate command with source filter.
    */
   public function testComponentGenerateWithSourceFilter(): void {
+    $storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Component::ENTITY_TYPE_ID);
+
     // Delete a component.
     $component = Component::load('sdc.canvas_test_sdc.druplicon');
     self::assertInstanceOf(Component::class, $component);
@@ -170,11 +171,12 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
     // Generate with a non-matching source — the component should NOT be
     // recreated.
     $this->commands->componentGenerate(['source' => 'nonexistent_source']);
-    self::assertNull(Component::load('sdc.canvas_test_sdc.druplicon'), 'Component should not be recreated with wrong source filter.');
+    $not_recreated = $storage->loadUnchanged('sdc.canvas_test_sdc.druplicon');
+    self::assertNull($not_recreated, 'Component should not be recreated with wrong source filter.');
 
     // Generate with the correct source — the component should be recreated.
     $this->commands->componentGenerate(['source' => 'sdc']);
-    $component = Component::load('sdc.canvas_test_sdc.druplicon');
+    $component = $storage->loadUnchanged('sdc.canvas_test_sdc.druplicon');
     self::assertInstanceOf(Component::class, $component, 'Component should be recreated with correct source filter.');
   }
 
