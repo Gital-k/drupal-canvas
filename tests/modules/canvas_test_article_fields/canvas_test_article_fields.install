@@ -46,6 +46,10 @@ function canvas_test_article_fields_install(): void {
         ->format(DateTimeItemInterface::DATETIME_STORAGE_FORMAT),
     ],
   ];
+  // Find an existing node to use as a default value reference, rather than
+  // hardcoding an ID that only exists in the CanvasTestSetup fixture.
+  $existing_nids = \Drupal::entityQuery('node')->accessCheck(FALSE)->range(0, 1)->execute();
+  $first_nid = reset($existing_nids) ?: 0;
   $vocabulary = Vocabulary::create([
     'vid' => 'artists',
     'name' => 'Artists',
@@ -168,9 +172,7 @@ function canvas_test_article_fields_install(): void {
           'placeholder' => '',
         ],
       ],
-      'default_value' => [
-        ['target_id' => 3],
-      ],
+      'default_value' => $first_nid ? [['target_id' => $first_nid]] : [],
     ],
     'field_cvt_entity_ref_tags' => [
       'type' => 'entity_reference',
@@ -384,11 +386,7 @@ function canvas_test_article_fields_install(): void {
         'weight' => 0,
         'settings' => [],
       ],
-      'default_value' => [
-        [
-          'uri' => 'internal:/node/1',
-        ],
-      ],
+      'default_value' => $first_nid ? [['uri' => 'internal:/node/' . $first_nid]] : [],
     ],
     'field_cvt_unlimited_text' => [
       'type' => 'string',
