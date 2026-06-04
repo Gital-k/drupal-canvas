@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Commands;
 
+use Consolidation\OutputFormatters\StructuredData\RowsOfFields;
 use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
@@ -13,6 +14,7 @@ use Drupal\canvas\Entity\Page;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use Drush\Commands\DrushCommands;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -77,63 +79,93 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests the canvas:component:status command reports real incompatibilities.
+   * Tests status reports every component with a state and a stable structure.
    */
-  public function testComponentStatus(): void {
-    $result = $this->commands->componentStatus();
-    $rows = $result->getArrayCopy();
+  public function testComponentStatusReportsState(): void {
+    [$rows] = $this->statusResult();
+    self::assertNotEmpty($rows);
 
-    // The test SDC module has some components that genuinely do not meet
-    // requirements (e.g. missing example values, unsupported prop shapes).
-    // Verify the output structure for each row.
     foreach ($rows as $row) {
       self::assertArrayHasKey('id', $row);
+      self::assertArrayHasKey('state', $row);
       self::assertArrayHasKey('reasons', $row);
-      self::assertNotEmpty($row['reasons'], 'Each status row should have at least one reason.');
+      self::assertContains($row['state'], ['compatible', 'incompatible', 'disabled']);
     }
+
+    // An enabled, compatible component is reported as compatible with no reason.
+    $druplicon = self::rowFor($rows, 'sdc.canvas_test_sdc.druplicon');
+    self::assertSame('compatible', $druplicon['state']);
+    self::assertSame('', $druplicon['reasons']);
   }
 
   /**
-   * Tests the canvas:component:status command with manually stored reasons.
+   * Tests an incompatible component is flagged and forces a non-zero exit.
    */
-  public function testComponentStatusWithStoredReasons(): void {
-    $reason_repository = $this->container->get(ComponentIncompatibilityReasonRepository::class);
-    \assert($reason_repository instanceof ComponentIncompatibilityReasonRepository);
+  public function testComponentStatusReportsIncompatible(): void {
+    // A discovered component without a config entity, simulating one that
+    // failed requirements during generation.
+    $this->reasonRepository()->storeReasons('sdc', 'sdc.fictional.broken_component', ['Missing template file']);
 
-    // Store incompatibility reasons for a non-existent component (simulating
-    // a component that was discovered but does not have a Component config
-    // entity — these should show up in the status output).
-    $reason_repository->storeReasons('sdc', 'sdc.fictional.broken_component', ['Missing template file']);
+    [$rows, $exit_code] = $this->statusResult();
 
-    $result = $this->commands->componentStatus();
-    $rows = $result->getArrayCopy();
-    self::assertNotEmpty($rows, 'Should have at least one incompatibility reason.');
-
-    $broken_rows = \array_filter($rows, static fn(array $row): bool => $row['id'] === 'sdc.fictional.broken_component');
-    self::assertCount(1, $broken_rows);
-    $broken = \reset($broken_rows);
+    $broken = self::rowFor($rows, 'sdc.fictional.broken_component');
+    self::assertSame('incompatible', $broken['state']);
     self::assertStringContainsString('Missing template file', $broken['reasons']);
+    self::assertSame(DrushCommands::EXIT_FAILURE, $exit_code, 'Incompatibilities must force a non-zero exit.');
   }
 
   /**
-   * Tests the canvas:component:status command filters out disabled components.
+   * Tests disabled components are reported, not silently skipped.
    */
-  public function testComponentStatusFiltersDisabled(): void {
-    // Disable a real component and add incompatibility reasons for it.
+  public function testComponentStatusReportsDisabled(): void {
+    // A site owner manually disables an otherwise compatible component.
     $component = Component::load('sdc.canvas_test_sdc.druplicon');
     self::assertInstanceOf(Component::class, $component);
     $component->disable()->save();
+    $this->reasonRepository()->storeReasons('sdc', 'sdc.canvas_test_sdc.druplicon', [ComponentIncompatibilityReasonRepository::MANUALLY_DISABLED_REASON]);
 
-    $reason_repository = $this->container->get(ComponentIncompatibilityReasonRepository::class);
-    \assert($reason_repository instanceof ComponentIncompatibilityReasonRepository);
-    $reason_repository->storeReasons('sdc', 'sdc.canvas_test_sdc.druplicon', ['Disabled by test']);
+    [$rows] = $this->statusResult();
+    $druplicon = self::rowFor($rows, 'sdc.canvas_test_sdc.druplicon');
+    self::assertSame('disabled', $druplicon['state'], 'Disabled components must appear with the disabled state.');
 
-    $result = $this->commands->componentStatus();
-    $rows = $result->getArrayCopy();
+    // A disabled component is a site-owner decision, not an incompatibility, so
+    // a lookup scoped to it exits zero.
+    [, $exit_code] = $this->statusResult('sdc.canvas_test_sdc.druplicon');
+    self::assertSame(DrushCommands::EXIT_SUCCESS, $exit_code, 'A disabled component is not an incompatibility.');
+  }
 
-    // Disabled components with reasons should be filtered out.
-    $druplicon_rows = \array_filter($rows, static fn(array $row): bool => $row['id'] === 'sdc.canvas_test_sdc.druplicon');
-    self::assertEmpty($druplicon_rows, 'Disabled components should not appear in status output.');
+  /**
+   * Tests status reports a single component when given an ID.
+   */
+  public function testComponentStatusSingleComponent(): void {
+    [$rows, $exit_code] = $this->statusResult('sdc.canvas_test_sdc.druplicon');
+
+    self::assertCount(1, $rows);
+    self::assertSame('sdc.canvas_test_sdc.druplicon', $rows[0]['id']);
+    self::assertSame('compatible', $rows[0]['state']);
+    self::assertSame(DrushCommands::EXIT_SUCCESS, $exit_code);
+  }
+
+  /**
+   * Tests a single incompatible component lookup exits non-zero.
+   */
+  public function testComponentStatusSingleIncompatible(): void {
+    $this->reasonRepository()->storeReasons('sdc', 'sdc.fictional.broken_component', ['Missing template file']);
+
+    [$rows, $exit_code] = $this->statusResult('sdc.fictional.broken_component');
+
+    self::assertCount(1, $rows);
+    self::assertSame('incompatible', $rows[0]['state']);
+    self::assertSame(DrushCommands::EXIT_FAILURE, $exit_code);
+  }
+
+  /**
+   * Tests an unknown component ID is rejected.
+   */
+  public function testComponentStatusUnknownComponent(): void {
+    $this->expectException(\InvalidArgumentException::class);
+    $this->expectExceptionMessage('Unknown component: sdc.does_not.exist');
+    $this->commands->componentStatus('sdc.does_not.exist');
   }
 
   /**
@@ -232,6 +264,47 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
     $component = $storage->loadUnchanged('sdc.canvas_test_sdc.druplicon');
     self::assertInstanceOf(Component::class, $component);
     self::assertFalse($component->status(), 'Manually disabled component should stay disabled.');
+  }
+
+  /**
+   * Runs the status command and returns its rows and exit code.
+   *
+   * @return array{list<array<string, mixed>>, int}
+   *   The status rows and the command exit code.
+   */
+  private function statusResult(?string $component_id = NULL): array {
+    $result = $component_id === NULL
+      ? $this->commands->componentStatus()
+      : $this->commands->componentStatus($component_id);
+    $data = $result->getOutputData();
+    \assert($data instanceof RowsOfFields);
+    return [\array_values($data->getArrayCopy()), $result->getExitCode()];
+  }
+
+  /**
+   * Returns the single status row for a component ID.
+   *
+   * @param list<array<string, mixed>> $rows
+   *   The status rows.
+   * @param string $component_id
+   *   The component ID to find.
+   *
+   * @return array<string, mixed>
+   *   The matching row.
+   */
+  private static function rowFor(array $rows, string $component_id): array {
+    $matches = \array_values(\array_filter($rows, static fn(array $row): bool => $row['id'] === $component_id));
+    self::assertCount(1, $matches, \sprintf('Expected exactly one row for %s.', $component_id));
+    return $matches[0];
+  }
+
+  /**
+   * Returns the incompatibility reason repository.
+   */
+  private function reasonRepository(): ComponentIncompatibilityReasonRepository {
+    $repository = $this->container->get(ComponentIncompatibilityReasonRepository::class);
+    \assert($repository instanceof ComponentIncompatibilityReasonRepository);
+    return $repository;
   }
 
 }
