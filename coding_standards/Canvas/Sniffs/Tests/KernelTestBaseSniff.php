@@ -53,8 +53,8 @@ class KernelTestBaseSniff implements Sniff {
     SegmentValidationTest::class,
     // Similarly: when extending contrib tests.
     'Drupal\Tests\simple_oauth\Kernel\AuthorizedRequestBase',
-    // AutoSaveConflictConfigTestBase is not yet migrated to CanvasKernelTestBase.
-    // @todo Migrate in https://www.drupal.org/project/canvas/issues/3531679
+    // AutoSaveConflictConfigTestBase extends KernelTestBase directly because it
+    // must work with Drupal's config testing infrastructure that predates Canvas.
     AutoSaveConflictConfigTestBase::class,
   ];
 

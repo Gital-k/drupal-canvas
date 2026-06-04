@@ -57,8 +57,6 @@ use Symfony\Component\HttpFoundation\Response;
  * has 12+ transitive dependencies (content_moderation, comment, language,
  * taxonomy, …) that require a full runtime module_installer->install() chain
  * rather than individual installEntitySchema() calls.
- *
- * @todo Decouple from CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
@@ -84,7 +82,6 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     // Full site bootstrap needed: canvas_test_article_fields has 12+ transitive
     // deps (content_moderation, comment, language, taxonomy, …) that cannot be
     // installed via manual installEntitySchema() calls in a kernel test.
-    // @todo Decouple from CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
     $this->setUpImages();
     $testNode = Node::load(1);
@@ -535,7 +532,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       $this->container->get(ClientDataToEntityConverter::class)->convert($client_json, $node);
       self::assertCount(0, $expected_errors);
       // If no violations occurred, the node should be valid.
-      self::assertCount(0, $node->validate());
+      $this->assertCount(0, $node->validate());
       $this->assertSame(SAVED_UPDATED, $node->save());
     }
     catch (ConstraintViolationException $e) {

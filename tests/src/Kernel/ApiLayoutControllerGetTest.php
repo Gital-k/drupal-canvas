@@ -122,7 +122,6 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       ],
     ];
     $contentTemplate->setComponentTree($components)->save();
-    // @todo Remove this in favor of using ContribStrictConfigSchemaTestTrait in https://www.drupal.org/project/canvas/issues/3531679
     self::assertEntityIsValid($contentTemplate);
     $get_layout_api_request = Request::create($this->getLayoutUrl($contentTemplate)->toString());
     $this->setUpCurrentUser([], [self::getAdminPermission($contentTemplate)]);

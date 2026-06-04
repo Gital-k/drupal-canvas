@@ -135,7 +135,6 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       ],
     ];
     $contentTemplate->setComponentTree($components)->save();
-    // @todo Remove this in favor of using ContribStrictConfigSchemaTestTrait in https://www.drupal.org/project/canvas/issues/3531679
     self::assertEntityIsValid($contentTemplate);
 
     $assertResponse = function (Response $response, string $expected_heading, $expected_subheading, $expected_text) use ($uuid1, $uuid2) {
