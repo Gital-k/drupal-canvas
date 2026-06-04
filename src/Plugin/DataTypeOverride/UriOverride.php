@@ -31,7 +31,7 @@ class UriOverride extends Uri {
       $uri .= '?' . $components['query'];
     }
     if (\array_key_exists('fragment', $components)) {
-      $uri .= '#' . $components['fragment'];
+      $uri .= '#' . rawurlencode($components['fragment']);
     }
 
     \assert(UrlHelper::isValid($uri));
