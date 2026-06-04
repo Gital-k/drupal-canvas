@@ -1598,19 +1598,6 @@ paths:
           $ref: '#/components/responses/ContentEntityResponse'
         '404':
           description: Content entity not found.
-        '409':
-          description: Conflict because existing auto-saved data exists.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-              examples:
-                "existing auto-saved data":
-                  value:
-                    error: "Page with ID 23 has existing auto-saved data. Please use the UI to publish it or discard it."
     delete:
       summary: Deletes a content entity.
       parameters:
