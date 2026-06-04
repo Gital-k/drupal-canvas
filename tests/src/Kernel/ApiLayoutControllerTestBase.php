@@ -7,8 +7,10 @@ namespace Drupal\Tests\canvas\Kernel;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\Entity\Pattern;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Url;
@@ -31,6 +33,8 @@ use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
+use Drupal\user\Entity\Role;
+use Drupal\user\Entity\User;
 use Drupal\user\UserInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -323,6 +327,41 @@ abstract class ApiLayoutControllerTestBase extends CanvasKernelTestBase {
       'title' => 'Page without a path',
       'description' => 'This is a page without a path',
     ])->save();
+
+    Role::create([
+      'id' => 'canvas',
+      'label' => 'canvas',
+      'permissions' => [
+        'access content',
+        'administer media',
+        'access media overview',
+        'view media',
+        'create media',
+        'edit any article content',
+        'create article content',
+        Page::CREATE_PERMISSION,
+        Page::EDIT_PERMISSION,
+        Page::DELETE_PERMISSION,
+        AutoSaveManager::PUBLISH_PERMISSION,
+        'administer url aliases',
+        'create url aliases',
+        JavaScriptComponent::ADMIN_PERMISSION,
+        Pattern::ADMIN_PERMISSION,
+        'administer themes',
+        'administer permissions',
+        PageRegion::ADMIN_PERMISSION,
+        'administer site configuration',
+      ],
+    ])->save();
+
+    $canvasUser = User::create();
+    $canvasUser->setUsername('canvasUser');
+    $canvasUser->setPassword('canvasUser');
+    $canvasUser->setEmail('canvas@test.com');
+    $canvasUser->addRole('canvas');
+    $canvasUser->enforceIsNew();
+    $canvasUser->activate();
+    $canvasUser->save();
 
     $this->placeBlock('page_title_block', ['region' => 'highlighted']);
     $this->placeBlock('system_messages_block');
