@@ -217,6 +217,107 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/AutoSaveCollection'
+        '409':
+          description: 'Returned if at least one of the auto-save entries has the entity it is based on updated outside of Canvas. Response contains both "errors" and "data" top level properties.'
+          content:
+            application/json:
+              examples:
+                multipleEntries:
+                  value:
+                    errors:
+                      - detail: Conflict detected
+                        source:
+                          pointer: canvas_page:1:en
+                        code: 4
+                        meta:
+                          entity_type: canvas_page
+                          entity_id: "1"
+                          label: Demo Canvas Page
+                          api_auto_save_key : canvas_page:1:en
+                          conflict_id: "2"
+                      - detail: Conflict detected
+                        source:
+                          pointer: canvas_page:7:en
+                        code: 4
+                        meta:
+                          entity_type: canvas_page
+                          entity_id: "7"
+                          label: Demo Canvas Page
+                          api_auto_save_key: canvas_page:7:en
+                          conflict_id: '7'
+                    data:
+                      canvas_page:1:en:
+                        owner:
+                          name: Garrett Bobby Ferguson, Jr
+                          avatar: /sites/default/files/user-pictures/garrett.jpg
+                          uri: /user/12
+                          id: 12
+                        updated: 1732763679
+                        entity_type: canvas_page
+                        langcode: en
+                        data_hash: 4711efecf75d2d1a
+                        entity_id: 1
+                        label: First Canvas page
+                      canvas_page:7:en:
+                        owner:
+                          name: Garrett Bobby Ferguson, Jr
+                          avatar: /sites/default/files/user-pictures/garrett.jpg
+                          uri: /user/12
+                          id: 12
+                        updated: 1732764679
+                        entity_type: canvas_page
+                        langcode: en
+                        data_hash: 4711efecf75d2d1a
+                        entity_id: 7
+                        label: Second Canvas page
+                      asset_library:global:
+                        owner:
+                          name: Gracie Dog
+                          avatar: /sites/default/files/user-pictures/good-dog.jpg
+                          uri: /user/13
+                          id: 13
+                        updated: 1732763680
+                        entity_type: asset_library
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: global
+                        label: Global asset library
+                      js_component:hero:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: js_component
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: hero
+                        label: Hero component
+                      segment:test_segment:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: test_segment
+                        langcode: NULL
+                        data_hash: a95cf01fd2e9c59e
+                        entity_id: test_segment
+                        label: Test segment
+              schema:
+                type: object
+                required:
+                  - errors
+                properties:
+                  errors:
+                    type: array
+                    description: Error items
+                    items:
+                      $ref: '#/components/schemas/Error'
+                  data:
+                    $ref: '#/components/schemas/AutoSaveCollection'
   /canvas/api/v0/auto-saves/publish:
     description: TODO
     post:
@@ -760,6 +861,17 @@ paths:
       responses:
         '204':
           description: Deleted individual ContentTemplate entity.
+  '/canvas/api/v0/config/content_template/{configEntityId}/translations':
+    description: Endpoint for deleting a specific translation of a Content Template. Note that the path can be prefixed with a langcode to negotiate deleting that particular translation.
+    delete:
+      summary: Deletes the language config override (translation) for a content_template config entity.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: No translation exists for the current language.
   /canvas/api/v0/config/folder:
     description: TODO
     get:
@@ -1085,6 +1197,17 @@ paths:
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
+  '/canvas/api/v0/config/page_region/{configEntityId}/translations':
+    description: Endpoint for deleting a specific translation of a Page Region. Note that the path can be prefixed with a langcode to negotiate deleting that particular translation.
+    delete:
+      summary: Deletes the language config override (translation) for a page_region config entity.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: No translation exists for the current language.
   /canvas/api/v0/config/pattern:
     description: TODO
     get:
@@ -1495,6 +1618,17 @@ paths:
       responses:
         '204':
           description: Content deleted successfully
+  '/canvas/api/v0/content/canvas_page/{entityId}/translations':
+    description: Endpoint for deleting a specific translation of a Page content entity. Note that the path can be prefixed with a langcode to negotiate deleting that particular translation.
+    delete:
+      summary: Deletes a single translation of a canvas_page entity.
+      parameters:
+        - $ref: '#/components/parameters/entityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: Cannot delete the default translation. Use the entity delete endpoint to remove the whole entity.
   '/canvas/api/v0/content/{entity_type}':
     get:
       summary: Provides api for page listing.
@@ -2156,6 +2290,8 @@ paths:
                       'uid[0][target_id]': Anonymous (0)
                       'langcode[0][value]': en
                       'revision_log[0][value]': ''
+                    translations:
+                      available: [en, fr]
                     isNew: false
                     isPublished: true
               schema:
@@ -2167,6 +2303,7 @@ paths:
                   - isNew
                   - isPublished
                   - html
+                  - translations
                 properties:
                   html:
                     type: string
@@ -2183,6 +2320,17 @@ paths:
                   entity_form_fields:
                     type: object
                     description: Entity field values that the user has edit access to.
+                  translations:
+                    type: object
+                    description: Translation metadata for the entity.
+                    required:
+                      - available
+                    properties:
+                      available:
+                        type: array
+                        description: Language codes with existing translations.
+                        items:
+                          type: string
                   isNew:
                     type: boolean
                     # @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew()
@@ -2972,8 +3120,8 @@ components:
       type: object
       description: Component transforms keyed by prop name.
       # Names of Components' inputs, *if* they use field widgets.
-      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getExplicitInputDefinitions()
-      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getClientSideInfo()
+      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getExplicitInputDefinitions()
+      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getClientSideInfo()
       additionalProperties:
         type: object
         # Client-side transforms for those inputs' field widgets.
@@ -3316,6 +3464,17 @@ components:
           description: Client instance ID for the layout preview
         entity_form_fields:
           type: object
+        translations:
+          type: object
+          description: Translation metadata for the entity.
+          required:
+            - available
+          properties:
+            available:
+              type: array
+              description: Language codes with existing translations.
+              items:
+                type: string
         isNew:
           type: boolean
         isPublished:
@@ -3778,6 +3937,9 @@ components:
               examples:
                 - 'node:4:en'
               title: The corresponding key in the pending changes API
+            conflict_id:
+              type: string
+              description: Only available in HTTP 409 responses. Contains the id of the conflict detected due to external updates to the entity on which the auto-save item was based.
           additionalProperties: false
     Model:
       title: model

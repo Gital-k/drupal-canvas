@@ -14,7 +14,7 @@ use Drupal\Tests\canvas\Kernel\Config\BetterConfigEntityValidationTestBase;
 use Drupal\Tests\canvas\Kernel\Config\ConfigWithComponentTreeTestBase;
 use Drupal\Tests\canvas\Kernel\EcosystemSupport\EcosystemSupportTestBase;
 use Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase;
-use Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBaseTestBase;
+use Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBaseTestBase;
 use Drupal\Tests\canvas\Kernel\PropShapeRepositoryTest;
 use Drupal\Tests\canvas\Kernel\PropSource\PropSourceTestBase;
 use Drupal\Tests\canvas\Kernel\ShapeMatcher\PropSourceMatcherTestBase;
@@ -37,7 +37,7 @@ class KernelTestBaseSniff implements Sniff {
     ComponentSourceTestBase::class,
     ConfigWithComponentTreeTestBase::class,
     EcosystemSupportTestBase::class,
-    GeneratedFieldExplicitInputUxComponentSourceBaseTestBase::class,
+    JsonSchemaPropsComponentSourceBaseTestBase::class,
     PropSourceTestBase::class,
     PropShapeRepositoryTest::class,
     PropSourceMatcherTestBase::class,
