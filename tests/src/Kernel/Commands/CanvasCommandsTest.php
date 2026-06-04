@@ -6,9 +6,9 @@ namespace Drupal\Tests\canvas\Kernel\Commands;
 
 use Consolidation\OutputFormatters\StructuredData\RowsOfFields;
 use Drupal\canvas\Audit\ComponentAudit;
-use Drupal\canvas\Commands\CanvasCommands;
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Drush\Commands\CanvasCommands;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -20,7 +20,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 /**
  * Tests the Canvas Drush commands.
  *
- * @legacy-covers \Drupal\canvas\Commands\CanvasCommands
+ * @legacy-covers \Drupal\canvas\Drush\Commands\CanvasCommands
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
