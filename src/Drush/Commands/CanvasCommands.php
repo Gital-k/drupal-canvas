@@ -91,7 +91,7 @@ final class CanvasCommands extends DrushCommands {
   }
 
   #[CLI\Command(name: 'canvas:component:generate', aliases: ['canvas-component-generate'])]
-  #[CLI\Help(description: 'Generate Canvas component config entities from discovered sources.')]
+  #[CLI\Help(description: 'Generate Canvas component config entities from discovered sources. Also reconciles incompatibility reasons: clears auto-disable reasons for components that now meet requirements and stores reasons for those that do not. A site owner\'s manual disable is preserved.')]
   #[CLI\Usage(name: 'canvas:component:generate', description: 'Generate component entities for all sources.')]
   #[CLI\Usage(name: 'canvas:component:generate --source=sdc', description: 'Generate only SDC-sourced component entities.')]
   #[CLI\Option(name: 'source', description: 'Limit generation to a specific ComponentSource plugin ID.')]

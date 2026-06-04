@@ -178,4 +178,58 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
     self::assertInstanceOf(Component::class, $component, 'Component should be recreated with correct source filter.');
   }
 
+  /**
+   * Tests generate clears a stale auto-disable reason when eligible again.
+   *
+   * The component stays disabled — re-enabling is the site owner's choice.
+   */
+  public function testComponentGenerateClearsAutoDisabledReason(): void {
+    $storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Component::ENTITY_TYPE_ID);
+    $reason_repository = $this->container->get(ComponentIncompatibilityReasonRepository::class);
+    \assert($reason_repository instanceof ComponentIncompatibilityReasonRepository);
+
+    // Simulate a prior auto-disable: store a requirement-failure reason and
+    // disable the entity, as the normal flow does when checkRequirements()
+    // throws.
+    $component = Component::load('sdc.canvas_test_sdc.druplicon');
+    self::assertInstanceOf(Component::class, $component);
+    $reason_repository->storeReasons('sdc', 'sdc.canvas_test_sdc.druplicon', ['Prop "logo_url" has contentMediaType which is not supported.']);
+    $component->disable()->save();
+
+    // The component meets requirements, so generate must clear its reason.
+    $this->commands->componentGenerate();
+
+    self::assertArrayNotHasKey('sdc.canvas_test_sdc.druplicon', $reason_repository->getReasons()['sdc'] ?? []);
+    $component = $storage->loadUnchanged('sdc.canvas_test_sdc.druplicon');
+    self::assertInstanceOf(Component::class, $component);
+    self::assertFalse($component->status(), 'Component should stay disabled after its reason is cleared.');
+  }
+
+  /**
+   * Tests generate preserves a site owner's manual disable.
+   */
+  public function testComponentGeneratePreservesManualDisable(): void {
+    $storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Component::ENTITY_TYPE_ID);
+    $reason_repository = $this->container->get(ComponentIncompatibilityReasonRepository::class);
+    \assert($reason_repository instanceof ComponentIncompatibilityReasonRepository);
+
+    // Simulate a site owner manually disabling an eligible component.
+    $component = Component::load('sdc.canvas_test_sdc.druplicon');
+    self::assertInstanceOf(Component::class, $component);
+    $component->disable()->save();
+    $reason_repository->storeReasons('sdc', 'sdc.canvas_test_sdc.druplicon', [ComponentIncompatibilityReasonRepository::MANUALLY_DISABLED_REASON]);
+
+    // Even though the component is eligible, generate must respect the manual
+    // disable and leave both the reason and the disabled status intact.
+    $this->commands->componentGenerate();
+
+    self::assertSame(
+      [ComponentIncompatibilityReasonRepository::MANUALLY_DISABLED_REASON],
+      $reason_repository->getReasons()['sdc']['sdc.canvas_test_sdc.druplicon'] ?? []
+    );
+    $component = $storage->loadUnchanged('sdc.canvas_test_sdc.druplicon');
+    self::assertInstanceOf(Component::class, $component);
+    self::assertFalse($component->status(), 'Manually disabled component should stay disabled.');
+  }
+
 }
