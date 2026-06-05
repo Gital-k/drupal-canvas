@@ -357,7 +357,19 @@ lint (node):
 
 phpunit (11.2 sqlite):
   rules:
-    - when: never
+    - *push-rule
+    - <<: *mr-rule
+      changes:
+        paths: *backend-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-rule
+      changes:
+        paths:
+          - .env.defaults
+          - phpunit.xml.dist
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - *nightly-rule
+    - *manual-rule
   parallel:
     matrix:
       # The KUBERNETES_CPU_REQUEST and DRUPAL_TEST_CONCURRENCY values match core.
@@ -557,7 +569,14 @@ cypress E2E:
   extends: .cypress-base
   rules:
     - *push-rule
-    - *mr-rule
+    - <<: *mr-e2e-rule
+      changes:
+        paths: *backend-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-e2e-rule
+      changes:
+        paths: *ui-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
     - *manual-rule
   parallel: 4
   script:
@@ -587,8 +606,27 @@ cypress unit:
 
 playwright:
   stage: test
+  parallel:
+    matrix:
+      - SHARD: [ "1/6", "2/6", "3/6", "4/6", "5/6", "6/6" ]
+        #PROJECT: [ "chromium", "firefox", "webkit" ]
   rules:
-    - when: never
+    - *push-rule
+    - <<: *mr-e2e-rule
+      changes:
+        paths: *backend-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-e2e-rule
+      changes:
+        paths: *ui-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-e2e-rule
+      changes:
+        paths:
+          - tests/fixtures/**/*
+          - tests/src/Playwright/**/*
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - *manual-rule
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       fallback_keys:
