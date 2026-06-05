@@ -29,8 +29,8 @@ The most common commands in the development process are:
 6. Tests and linting: The commands `ddev eslint`, `ddev phpcs`, `ddev phpstan` and `ddev phpunit` must be used before any commit to ensure code looks good and pass tests.
 7. Cypress tests: `ddev cypress run`
 8. Playwright tests: `ddev playwright test`
-   - Watch tests run in the browser via VNC: https://canvas.ddev.site:8444
-   - View test reports dashboard: https://canvas.ddev.site:9324
+   - Watch tests run in the browser via VNC: https://canvas.ddev.site:8444 (username: your local username, password: `secret`)
+   - View test reports: Run `ddev playwright show-report` after tests complete, then open https://canvas.ddev.site:9324
 
 Tip: Use `ddev help <command>` for additional information about the command and arguments available.
 ## Setting up your local environment manually
