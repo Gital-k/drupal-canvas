@@ -33,7 +33,6 @@ describe('Date + Time widget — this branch repeated', () => {
     '[name$="[test_string_format_date_time][0][value][time]"]';
 
   const runTest = (label) => {
-
     it(label, { retries: { openMode: 0, runMode: 0 } }, () => {
       cy.findByText(
         'This is the description of String, format=date-time',
