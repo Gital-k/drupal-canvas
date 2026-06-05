@@ -444,7 +444,7 @@ export async function promptForConfig(key: ConfigKey): Promise<void> {
     case 'componentDir': {
       const value = await p.text({
         message: 'Enter the component directory',
-        placeholder: './components',
+        placeholder: 'components',
         validate: (value) => {
           if (!value) return 'Component directory is required';
           return;
