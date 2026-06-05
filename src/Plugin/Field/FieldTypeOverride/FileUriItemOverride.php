@@ -24,14 +24,18 @@ class FileUriItemOverride extends FileUriItem {
     $properties['value']
       ->setClass(UriOverride::class)
       // The `file_uri` field type stores a URI that uses a stream wrapper URI.
-      // Avoid making this constraint depend on the installed stream wrappers by
-      // simply stating that the scheme of this URI is NOT a browser-accessible
-      // scheme like `http`, `https`, nor a root-relative URL.
-      // @todo should respect the `uri_scheme` field storage setting of \Drupal\file\Plugin\Field\FieldType\FileItem
+      // The intent is that the scheme of this URI is NOT a browser-accessible
+      // scheme like `http`, `https`, nor a root-relative URL — it must be a
+      // local, Drupal-managed file scheme. Both `public` and `private` are
+      // valid local file schemes (the `uri_scheme` field storage setting of
+      // \Drupal\file\Plugin\Field\FieldType\FileItem defaults to `public` but
+      // may be `private`), so both must be allowed; hardcoding `public` only
+      // breaks private file fields. `temporary://` is permitted during upload
+      // by UriSchemeConstraintValidator itself.
       // @see \Drupal\file\Plugin\Field\FieldType\FileItem::defaultStorageSettings()
       ->addConstraint(UriConstraint::PLUGIN_ID, ['allowReferences' => FALSE])
       ->addConstraint(UriSchemeConstraint::PLUGIN_ID, [
-        'allowedSchemes' => ['public'],
+        'allowedSchemes' => ['private', 'public'],
       ]);
     $properties['url']
       ->setClass(ComputedFileUrlOverride::class)
