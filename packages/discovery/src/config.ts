@@ -10,12 +10,12 @@ export function resolveCanvasConfig(options: {
     aliasBaseDir: 'src',
     outputDir: 'dist',
     componentDir: 'src/components',
-    pagesDir: './pages',
-    contentTemplatesDir: './content-templates',
-    regionsDir: './regions',
-    deprecatedComponentDir: './components',
-    globalCssPath: './src/components/global.css',
-    layoutPath: './src/layout.jsx',
+    pagesDir: 'pages',
+    contentTemplatesDir: 'content-templates',
+    regionsDir: 'regions',
+    deprecatedComponentDir: 'components',
+    globalCssPath: 'src/global.css',
+    layoutPath: 'src/layout.jsx',
   };
 
   const configPath = resolve(options.hostRoot, 'canvas.config.json');
