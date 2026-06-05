@@ -35,6 +35,10 @@ fi
 
 echo "Setting up Canvas development environment..."
 
+# Mark config.yaml as skip-worktree so local changes don't show in git status.
+# This file must exist for ddev to work, but DDEV modifies it on start.
+git update-index --skip-worktree .ddev/config.yaml 2>/dev/null || true
+
 # Save original composer.json to restore after setup
 cp composer.json composer.json.original
 
