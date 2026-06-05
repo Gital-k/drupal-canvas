@@ -559,14 +559,8 @@ cypress E2E:
     - *push-rule
     - *mr-rule
     - *manual-rule
-  # Run both stress-test specs in parallel: one shard each.
-  parallel: 2
-  variables:
-    DATETIME_SPECS: "tests/e2e/dateTime1xRepeated.cy.js,tests/e2e/dateTimeThisBranchRepeated.cy.js"
   script:
-    - |
-      SPECS=$(echo "$DATETIME_SPECS" | tr ',' '\n' | awk "NR == $CI_NODE_INDEX")
-      npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec="$SPECS"
+    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec="tests/e2e/dateTime1xRepeated.cy.js,tests/e2e/dateTimeThisBranchRepeated.cy.js"
 
 cypress unit:
   extends: .cypress-base
