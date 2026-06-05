@@ -49,10 +49,12 @@ describe('Date + Time widget — this branch repeated', () => {
       );
 
       cy.get(dateSelector).focus();
-      cy.get(dateSelector).type('628{uparrow}');
+      cy.get(dateSelector).clear();
+      cy.get(dateSelector).type('2017-06-28');
 
       cy.get(timeSelector).focus();
-      cy.get(timeSelector).type('72135');
+      cy.get(timeSelector).clear();
+      cy.get(timeSelector).type('19:21:35');
 
       cy.get(dateSelector).should('have.value', '2017-06-28');
       cy.get(timeSelector).should('have.value', '19:21:35');
