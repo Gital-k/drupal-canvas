@@ -560,7 +560,7 @@ cypress E2E:
     - *mr-rule
     - *manual-rule
   script:
-    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec="tests/e2e/dateTime1xRepeated.cy.js,tests/e2e/dateTimeThisBranchRepeated.cy.js"
+    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec="tests/e2e/prop-types.cy.js,tests/e2e/dateTime1xRepeated.cy.js,tests/e2e/dateTimeThisBranchRepeated.cy.js"
 
 cypress unit:
   extends: .cypress-base
