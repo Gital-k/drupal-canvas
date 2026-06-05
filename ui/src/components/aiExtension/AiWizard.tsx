@@ -19,7 +19,10 @@ import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
-import { deserializeProps } from '@/features/code-editor/utils/utils';
+import {
+  deserializeProps,
+  getPropMachineName,
+} from '@/features/code-editor/utils/utils';
 import {
   selectModel,
   setUpdatePreview,
@@ -467,9 +470,19 @@ const AiWizard = () => {
   const codeComponentName = useAppSelector(
     selectCodeComponentProperty('machineName'),
   );
-  const codeComponentRequiredProps = useAppSelector(
+  const codeComponentRequiredPropIds = useAppSelector(
     selectCodeComponentProperty('required'),
   );
+  const codeComponentProps = useAppSelector(
+    selectCodeComponentProperty('props'),
+  );
+  // Convert required prop IDs to prop names for backend
+  const codeComponentRequiredProps = codeComponentRequiredPropIds
+    .map((propId) => {
+      const prop = codeComponentProps.find((p) => p.id === propId);
+      return prop ? getPropMachineName(prop.name) : null;
+    })
+    .filter((name): name is string => name !== null);
   const model = useAppSelector(selectModel);
   const textPropsMap = Object.fromEntries(
     Object.entries(model).map(([uuid, comp]) => [uuid, comp.resolved]),

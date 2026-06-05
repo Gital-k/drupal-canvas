@@ -488,9 +488,20 @@ export function deserializeSlots(
 export function deserializeCodeComponent(
   codeComponent: CodeComponentSerialized,
 ): CodeComponent {
+  const props = deserializeProps(codeComponent.props);
+  
+  // Convert required prop names to prop IDs for internal use
+  const requiredPropIds = codeComponent.required
+    .map((propName) => {
+      const prop = props.find((p) => getPropMachineName(p.name) === propName);
+      return prop?.id;
+    })
+    .filter((id): id is string => id !== undefined);
+
   return {
     ...codeComponent,
-    props: deserializeProps(codeComponent.props),
+    props,
+    required: requiredPropIds,
     slots: deserializeSlots(codeComponent.slots),
     dataFetches: {},
   };

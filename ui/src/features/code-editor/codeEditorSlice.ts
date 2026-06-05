@@ -222,19 +222,15 @@ export const codeEditorSlice = createSlice({
       }>,
     ) => {
       const { propId } = action.payload;
-      const propToRemove = state.codeComponent.props.find(
-        (prop) => prop.id === propId,
-      );
       state.codeComponent.props = state.codeComponent.props.filter(
         (prop) => prop.id !== propId,
       );
-      if (propToRemove) {
-        state.codeComponent.required = state.codeComponent.required.filter(
-          (name) => name !== getPropMachineName(propToRemove.name),
-        );
-        // Set auto-save to true when removing a prop.
-        state.status.needsAutoSave = true;
-      }
+      // Remove from required array using prop ID.
+      state.codeComponent.required = state.codeComponent.required.filter(
+        (id) => id !== propId,
+      );
+      // Set auto-save to true when removing a prop.
+      state.status.needsAutoSave = true;
     },
 
     reorderProps: (
@@ -262,13 +258,13 @@ export const codeEditorSlice = createSlice({
       const prop = state.codeComponent.props.find((p) => p.id === propId);
       if (!prop) return;
 
-      const propName = getPropMachineName(prop.name);
-      if (state.codeComponent.required.includes(propName)) {
+      // Use prop ID instead of prop name to handle unnamed props correctly.
+      if (state.codeComponent.required.includes(propId)) {
         state.codeComponent.required = state.codeComponent.required.filter(
-          (name) => name !== propName,
+          (id) => id !== propId,
         );
       } else {
-        state.codeComponent.required.push(propName);
+        state.codeComponent.required.push(propId);
       }
       // Set auto-save to true when toggling required.
       state.status.needsAutoSave = true;
@@ -448,20 +444,30 @@ export const selectCodeComponentProperty =
 
 export const selectCodeComponentSerialized = createSelector(
   [(state: RootState) => selectCodeComponent(state)],
-  (codeComponent): CodeComponentSerialized => ({
-    machineName: codeComponent.machineName,
-    name: codeComponent.name,
-    status: codeComponent.status,
-    props: serializeProps(codeComponent.props),
-    required: codeComponent.required,
-    slots: serializeSlots(codeComponent.slots),
-    sourceCodeJs: codeComponent.sourceCodeJs,
-    sourceCodeCss: codeComponent.sourceCodeCss,
-    compiledJs: codeComponent.compiledJs,
-    compiledCss: codeComponent.compiledCss,
-    importedJsComponents: codeComponent.importedJsComponents,
-    dataDependencies: codeComponent.dataDependencies,
-  }),
+  (codeComponent): CodeComponentSerialized => {
+    // Convert required prop IDs to prop names for serialization
+    const requiredPropNames = codeComponent.required
+      .map((propId) => {
+        const prop = codeComponent.props.find((p) => p.id === propId);
+        return prop ? getPropMachineName(prop.name) : null;
+      })
+      .filter((name): name is string => name !== null);
+
+    return {
+      machineName: codeComponent.machineName,
+      name: codeComponent.name,
+      status: codeComponent.status,
+      props: serializeProps(codeComponent.props),
+      required: requiredPropNames,
+      slots: serializeSlots(codeComponent.slots),
+      sourceCodeJs: codeComponent.sourceCodeJs,
+      sourceCodeCss: codeComponent.sourceCodeCss,
+      compiledJs: codeComponent.compiledJs,
+      compiledCss: codeComponent.compiledCss,
+      importedJsComponents: codeComponent.importedJsComponents,
+      dataDependencies: codeComponent.dataDependencies,
+    };
+  },
 );
 
 // Select the entire global asset library, or a specific property.
