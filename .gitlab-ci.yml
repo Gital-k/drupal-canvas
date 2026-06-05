@@ -357,19 +357,7 @@ lint (node):
 
 phpunit (11.2 sqlite):
   rules:
-    - *push-rule
-    - <<: *mr-rule
-      changes:
-        paths: *backend-files
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
-    - <<: *mr-rule
-      changes:
-        paths:
-          - .env.defaults
-          - phpunit.xml.dist
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
-    - *nightly-rule
-    - *manual-rule
+    - when: never
   parallel:
     matrix:
       # The KUBERNETES_CPU_REQUEST and DRUPAL_TEST_CONCURRENCY values match core.
@@ -569,28 +557,16 @@ cypress E2E:
   extends: .cypress-base
   rules:
     - *push-rule
-    - <<: *mr-e2e-rule
-      changes:
-        paths: *backend-files
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
-    - <<: *mr-e2e-rule
-      changes:
-        paths: *ui-files
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - *mr-rule
     - *manual-rule
-  parallel: 4
+  # Run both stress-test specs in parallel: one shard each.
+  parallel: 2
+  variables:
+    DATETIME_SPECS: "tests/e2e/dateTime1xRepeated.cy.js,tests/e2e/dateTimeThisBranchRepeated.cy.js"
   script:
-    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log; EXIT_CODE=${PIPESTATUS[0]}
-    # Auto-retry when known frequent random failures occur.
-    - grep "✖.*autocomplete-props" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
-    - grep "✖.*copy-and-paste" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
-    - grep "✖.*global-regions-interact" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
-    - grep "✖.*media-library-component-instance" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
-    # If no auto-retry was attempted, use the original exit code.
-    - exit $EXIT_CODE
-  retry:
-    max: 2
-    exit_codes: 112
+    - |
+      SPECS=$(echo "$DATETIME_SPECS" | tr ',' '\n' | awk "NR == $CI_NODE_INDEX")
+      npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec="$SPECS"
 
 cypress unit:
   extends: .cypress-base
@@ -606,27 +582,8 @@ cypress unit:
 
 playwright:
   stage: test
-  parallel:
-    matrix:
-      - SHARD: [ "1/6", "2/6", "3/6", "4/6", "5/6", "6/6" ]
-        #PROJECT: [ "chromium", "firefox", "webkit" ]
   rules:
-    - *push-rule
-    - <<: *mr-e2e-rule
-      changes:
-        paths: *backend-files
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
-    - <<: *mr-e2e-rule
-      changes:
-        paths: *ui-files
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
-    - <<: *mr-e2e-rule
-      changes:
-        paths:
-          - tests/fixtures/**/*
-          - tests/src/Playwright/**/*
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
-    - *manual-rule
+    - when: never
   cache:
     - key: ${CI_PARENT_PROJECT_NAME}-default-${CI_COMMIT_REF_NAME}
       fallback_keys:
