@@ -1,6 +1,7 @@
 import { IconButton, Tooltip } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { saveAiPanelState } from '@/components/aiExtension/AiPanelState';
 import {
   selectAiPanelOpen,
   setAiPanelClosed,
@@ -14,8 +15,10 @@ const AiToggleButton = () => {
   function handleToggle() {
     if (isAiPanelOpen) {
       dispatch(setAiPanelClosed());
+      saveAiPanelState(false, true);
     } else {
       dispatch(setAiPanelOpen());
+      saveAiPanelState(true, true);
     }
   }
 

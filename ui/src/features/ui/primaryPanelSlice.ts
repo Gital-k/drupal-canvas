@@ -1,4 +1,5 @@
 import { createAppSlice } from '@/app/createAppSlice';
+import { loadAiPanelOpenState } from '@/components/aiExtension/AiPanelState';
 
 import type { PayloadAction } from '@reduxjs/toolkit';
 
@@ -37,8 +38,8 @@ const savedState = loadSavedState();
 const initialState: PrimaryPanelState = {
   activePanel: savedState.activePanel || '',
   isHidden: false,
-  aiPanelOpen: false,
   manageLibraryTab: null,
+  aiPanelOpen: loadAiPanelOpenState(),
 };
 
 // Temporary workaround to persist primary panel state when switching between entities until

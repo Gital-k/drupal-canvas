@@ -16,6 +16,10 @@ import { Box, Flex, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
+  AI_PANEL_STATE_KEY,
+  saveAiPanelState,
+} from '@/components/aiExtension/AiPanelState';
+import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
@@ -971,8 +975,20 @@ const AiWizard = () => {
           onInput={handleTextInput}
           onComponentRender={() => {
             if (!isComponentRendered) {
-              chatElementRef.current.clearMessages();
-              historyStore.clearHistory();
+              // Chat history should be cleared only when panel is explicitly closed.
+              try {
+                const aiPanelState = localStorage.getItem(AI_PANEL_STATE_KEY);
+                if (aiPanelState) {
+                  const state = JSON.parse(aiPanelState);
+                  if (state.shouldClearHistory) {
+                    chatElementRef.current.clearMessages();
+                    historyStore.clearHistory();
+                    saveAiPanelState(true, false);
+                  }
+                }
+              } catch (e) {
+                console.warn('Failed to read AI panel state:', e);
+              }
               chatElementRef.current.disableSubmitButton();
               isComponentRendered = true;
             }
