@@ -585,19 +585,14 @@ cypress E2E:
         paths: *ui-files
         compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
     - *manual-rule
-  parallel: 4
+  parallel:
+    matrix:
+      - DATETIME_SPEC: tests/e2e/dateTime1xRepeated.cy.js
+        CI_JOB_NAME_SUFFIX: 1x
+      - DATETIME_SPEC: tests/e2e/dateTimeThisBranchRepeated.cy.js
+        CI_JOB_NAME_SUFFIX: this-branch
   script:
-    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log; EXIT_CODE=${PIPESTATUS[0]}
-    # Auto-retry when known frequent random failures occur.
-    - grep "✖.*autocomplete-props" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
-    - grep "✖.*copy-and-paste" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
-    - grep "✖.*global-regions-interact" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
-    - grep "✖.*media-library-component-instance" $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/ui/cypress.log && exit 112 || true
-    # If no auto-retry was attempted, use the original exit code.
-    - exit $EXIT_CODE
-  retry:
-    max: 2
-    exit_codes: 112
+    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec="$DATETIME_SPEC"
 
 cypress unit:
   extends: .cypress-base
