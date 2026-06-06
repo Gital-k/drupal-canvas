@@ -633,7 +633,9 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   /**
    * Sets value for props.
    *
-   * @param array<string, array{type: string, format?: string, examples?: string|array<string>, title: string}> $props
+   * @phpstan-param array<string, array{type: string, format?: string, examples?: array<mixed>|mixed, title: string}> $props
+   *
+   * @param array $props
    *   Value for Props.
    */
   public function setProps(array $props): self {
@@ -658,6 +660,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
 
   /**
    * Gets component props.
+   *
+   * @phpstan-return array<string, array{type: string, format?: string, examples?: array<mixed>|mixed, title: string}>|null
    *
    * @return array|null
    *   Component props.
