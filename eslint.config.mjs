@@ -11,6 +11,14 @@ import tseslint from 'typescript-eslint';
 import js from '@eslint/js';
 import vitest from '@vitest/eslint-plugin';
 
+// Temporary stress-test specs — exempt from all lint rules.
+const debugSpecIgnores = {
+  ignores: [
+    'ui/tests/e2e/dateTime1xRepeated.cy.js',
+    'ui/tests/e2e/dateTimeThisBranchRepeated.cy.js',
+  ],
+};
+
 const drupalGlobals = {
   Drupal: true,
   drupalSettings: true,
@@ -195,4 +203,5 @@ export default defineConfig([
       '.cache/**',
     ],
   },
+  debugSpecIgnores,
 ]);
