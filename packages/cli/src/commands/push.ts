@@ -13,6 +13,7 @@ import {
 import { createApiService, ensureAuthConfig } from '../services/api.js';
 import { buildCanvasProject } from '../utils/build-project';
 import {
+  applySyncOptionAliasesAndWarnings,
   parseBooleanOption,
   pluralize,
   pluralizeComponent,
@@ -63,6 +64,9 @@ interface PushOptions {
   includePages?: boolean;
   includeContentTemplates?: boolean;
   includeRegions?: boolean;
+  pages?: boolean;
+  contentTemplates?: boolean;
+  regions?: boolean;
   includeBrandKit?: boolean;
   dir?: string;
   yes?: boolean;
@@ -315,6 +319,12 @@ export function pushCommand(program: Command): void {
         .argParser(parseBooleanOption)
         .default(undefined),
     )
+    .option('--no-pages', 'Exclude pages from the push operation')
+    .option(
+      '--no-content-templates',
+      'Exclude content templates from the push operation',
+    )
+    .option('--no-regions', 'Exclude global regions from the push operation')
     .addOption(
       new Option(
         '--include-brand-kit [enabled]',
@@ -331,6 +341,7 @@ export function pushCommand(program: Command): void {
       try {
         p.intro(chalk.bold('Drupal Canvas CLI: push'));
         // Update config with CLI options.
+        applySyncOptionAliasesAndWarnings(options);
         updateConfigFromOptions(options);
 
         await ensureAuthConfig();
