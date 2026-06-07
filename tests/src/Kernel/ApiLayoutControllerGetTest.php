@@ -196,7 +196,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // "content" region unless it has permissions to edit the global regions.
     $this->assertRegions(1, $entity);
 
-    $this->setUpCurrentUser([], [$admin_permission, PageRegion::ADMIN_PERMISSION]);
+    $this->setUpCurrentUser([], [$admin_permission, PageRegion::ADMIN_PERMISSION, 'edit canvas global regions']);
 
     // … and the corresponding client-side representation contains all regions
     // plus one more (the "content" region) once it has the required permission.
@@ -383,7 +383,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     self::assertInstanceOf(ContentEntityInterface::class, $this->previewEntity);
     $entity = ContentTemplate::load('node.article.teaser');
     self::assertInstanceOf(ContentTemplate::class, $entity);
-    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, PageRegion::ADMIN_PERMISSION]);
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, PageRegion::ADMIN_PERMISSION, 'edit canvas global regions']);
     $this->enableGlobalRegions();
 
     $url = $this->getLayoutUrl($entity);

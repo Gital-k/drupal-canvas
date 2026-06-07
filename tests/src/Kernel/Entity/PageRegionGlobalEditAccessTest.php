@@ -46,7 +46,13 @@ final class PageRegionGlobalEditAccessTest extends CanvasKernelTestBase {
    */
   #[DataProvider('accessProvider')]
   public function testGlobalRegionAccess(string $region_id, string $operation, array $permissions, bool $expected_forbidden): void {
-    $region = PageRegion::load($region_id);
+    [$theme, $region_name] = explode('.', $region_id, 2);
+    // A "content" PageRegion can never be saved (see PageRegion::preSave()).
+    $region = PageRegion::load($region_id) ?? PageRegion::create([
+      'id' => $region_id,
+      'theme' => $theme,
+      'region' => $region_name,
+    ]);
     self::assertInstanceOf(PageRegion::class, $region);
 
     $account = $this->createMock(AccountInterface::class);

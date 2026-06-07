@@ -579,6 +579,7 @@ class CanvasTestSetup implements TestSetupInterface {
         'post comments',
         'administer permissions',
         PageRegion::ADMIN_PERMISSION,
+        'edit canvas global regions',
         'administer site configuration',
       ],
     ]);

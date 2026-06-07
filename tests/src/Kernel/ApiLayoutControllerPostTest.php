@@ -60,6 +60,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->setUpCurrentUser([], [
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
       'edit any article content',
     ]);
   }
@@ -330,6 +331,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       [],
       [
         PageRegion::ADMIN_PERMISSION,
+        'edit canvas global regions',
         self::getAdminPermission($entity),
       ]
     );
@@ -688,6 +690,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       'administer nodes',
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
       'edit any article content',
     ]);
     $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1'))->getContent();
@@ -721,6 +724,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       'administer nodes',
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
       'edit any article content',
     ]);
     $node = Node::load(1);
@@ -752,6 +756,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->setUpCurrentUser([], [
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
       'edit any article content',
     ]);
     $content = $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1'))->getContent();

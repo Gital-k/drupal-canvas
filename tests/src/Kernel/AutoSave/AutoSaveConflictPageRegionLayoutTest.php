@@ -50,6 +50,7 @@ final class AutoSaveConflictPageRegionLayoutTest extends ApiLayoutControllerTest
       Page::EDIT_PERMISSION,
       AutoSaveManager::PUBLISH_PERMISSION,
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
     ];
   }
 
@@ -92,7 +93,7 @@ final class AutoSaveConflictPageRegionLayoutTest extends ApiLayoutControllerTest
     // If we try to post back the same `autoSaves` including the regions
     // when the user does not have access to 'update' regions, we should get
     // a conflict.
-    $permissions = array_diff(self::getPermissions(), [PageRegion::ADMIN_PERMISSION]);
+    $permissions = array_diff(self::getPermissions(), [PageRegion::ADMIN_PERMISSION, 'edit canvas global regions']);
     $this->setUpCurrentUser(permissions: $permissions);
     $this->assertRequestAutoSaveConflict($this->getUpdateAutoSaveRequest($getJson));
 

@@ -108,6 +108,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       Page::EDIT_PERMISSION,
       // We need access to page regions even for seeing there are changes.
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
     ];
     $anonAccountContent = Node::create([
       'type' => 'article',
@@ -760,6 +761,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $autoSave = \Drupal::service(AutoSaveManager::class);
     $permissions = [
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
       // @todo 'bypass node access' is a very powerful permission and could have
       //   side effects. Determine a way to give the user just the access they
       //   need in https://drupal.org/i/3535354.
@@ -1735,6 +1737,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
   public function testEnforceGlobalAssetPublish(bool $global_asset_library_auto_save_exists, array $auto_save_keys_to_publish, int $expected_status_code, ?string $expected_message = NULL): void {
     $this->setUpCurrentUser(permissions: [
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
       'edit any article content',
       AssetLibrary::ADMIN_PERMISSION,
       JavaScriptComponent::ADMIN_PERMISSION,
