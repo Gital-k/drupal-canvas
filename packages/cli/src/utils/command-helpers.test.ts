@@ -25,8 +25,10 @@ describe('command-helpers', () => {
       clientId: '',
       clientSecret: '',
       scope:
-        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
-      includePages: false,
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:content_template canvas:page_region',
+      includePages: true,
+      includeContentTemplates: true,
+      includeRegions: true,
       componentDir: 'components',
       userAgent: '',
       aliasBaseDir: '',
@@ -108,8 +110,8 @@ describe('command-helpers', () => {
       expect(config.scope).toBe('custom:scope');
     });
 
-    it('should update includePages when provided', () => {
-      updateConfigFromOptions({ includePages: true });
+    it('should update includePages when sync.pages is provided', () => {
+      updateConfigFromOptions({ sync: { pages: true } });
 
       const config = getConfig();
       expect(config.includePages).toBe(true);
@@ -137,34 +139,36 @@ describe('command-helpers', () => {
       applySyncOptionAliasesAndWarnings(options);
 
       expect(options).toMatchObject({
-        includePages: false,
-        includeContentTemplates: false,
-        includeRegions: false,
+        sync: {
+          pages: false,
+          contentTemplates: false,
+          regions: false,
+        },
       });
     });
 
     it('should update the default scope when includePages changes', () => {
-      updateConfigFromOptions({ includePages: true });
+      updateConfigFromOptions({ sync: { pages: false } });
 
       const config = getConfig();
       expect(config.scope).toBe(
-        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:content_template canvas:page_region',
       );
     });
 
     it('should update the default scope when includeRegions changes', () => {
-      updateConfigFromOptions({ includeRegions: true });
+      updateConfigFromOptions({ sync: { regions: false } });
 
       const config = getConfig();
       expect(config.scope).toBe(
-        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page_region',
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:content_template',
       );
     });
 
-    it('should preserve an explicit scope when includePages changes', () => {
+    it('should preserve an explicit scope when sync.pages changes', () => {
       setConfig({ scope: 'custom:scope' });
 
-      updateConfigFromOptions({ includePages: true });
+      updateConfigFromOptions({ sync: { pages: true } });
 
       const config = getConfig();
       expect(config.scope).toBe('custom:scope');
