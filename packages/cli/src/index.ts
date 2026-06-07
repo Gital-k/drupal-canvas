@@ -49,9 +49,12 @@ program.hook('preAction', async (command, actionCommand) => {
     return;
   }
   const commandOptions = command.opts?.() as { yes?: boolean };
-  const actionOptions = actionCommand.opts?.() as { dir?: string };
+  const actionOptions = actionCommand.opts?.() as {
+    dir?: string;
+    yes?: boolean;
+  };
   const migrationOptions = {
-    skipPrompt: Boolean(commandOptions?.yes),
+    skipPrompt: Boolean(actionOptions?.yes ?? commandOptions?.yes),
   };
   await handleLegacySyncEnvMigration(migrationOptions);
   if (!actionOptions?.dir) {
