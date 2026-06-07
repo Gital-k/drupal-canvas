@@ -1,12 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as p from '@clack/prompts';
 
 import { getConfig, setConfig } from '../config';
 import {
+  applySyncOptionAliasesAndWarnings,
   parseBooleanOption,
   pluralizeComponent,
   updateConfigFromOptions,
   validateComponentOptions,
 } from './command-helpers';
+
+vi.mock('@clack/prompts', () => ({
+  log: {
+    warn: vi.fn(),
+  },
+}));
 
 describe('command-helpers', () => {
   beforeEach(() => {
@@ -105,6 +113,34 @@ describe('command-helpers', () => {
 
       const config = getConfig();
       expect(config.includePages).toBe(true);
+    });
+
+    it('should warn when deprecated include options are used', () => {
+      applySyncOptionAliasesAndWarnings({ includePages: true });
+
+      expect(p.log.warn).toHaveBeenCalledWith(
+        '--include-pages is deprecated because pages are included by default. Remove this flag.',
+      );
+    });
+
+    it('should warn with the no-pages replacement for deprecated false include options', () => {
+      applySyncOptionAliasesAndWarnings({ includePages: false });
+
+      expect(p.log.warn).toHaveBeenCalledWith(
+        '--include-pages=false is deprecated and will be removed in a future release. Use --no-pages to exclude pages.',
+      );
+    });
+
+    it('should map friendly no options to include exclusions', () => {
+      const options = { pages: false, contentTemplates: false, regions: false };
+
+      applySyncOptionAliasesAndWarnings(options);
+
+      expect(options).toMatchObject({
+        includePages: false,
+        includeContentTemplates: false,
+        includeRegions: false,
+      });
     });
 
     it('should update the default scope when includePages changes', () => {
