@@ -44,3 +44,64 @@ drupal-html-fragment, element-prop {
   display: flex;
   align-items: center;
 }
+
+/* Display Datetime as a single row within a fieldset */
+fieldset:has(.canvas-datetime-single-row) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border: none;
+  padding: 0;
+  margin: 0 0 var(--space-4) 0;
+}
+
+fieldset:has(.canvas-datetime-single-row) legend {
+  margin: 0 0 var(--space-1) 0;
+  padding-inline-start: 0;
+}
+
+fieldset:has(.canvas-datetime-single-row) .fieldset-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0;
+  margin: 0;
+}
+
+.canvas-datetime-single-row,
+.canvas-datetime-single-row > div {
+  padding-inline-start: 0;
+  margin-inline-start: 0;
+}
+
+.field--type-datetime:not(:has(fieldset)) {
+  margin-bottom: var(--space-4);
+}
+
+.field--type-datetime > .canvas-datetime-single-row {
+  margin-top: var(--space-1);
+}
+
+/* Row layout only when date + time (two form-items); date-only stays single column. */
+.canvas-datetime-single-row > div:has(.form-item + .form-item) {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.canvas-datetime-single-row > div:has(.form-item + .form-item) .form-item {
+  flex: 1 1 0;
+  min-width: 8rem;
+  margin-bottom: 0;
+}
+
+.canvas-datetime-single-row > div:not(:has(.form-item + .form-item)) .form-item {
+  margin-bottom: var(--space-1);
+}
+
+/* Override description negative margin so date-only input–description gap matches date-time. */
+.field--type-datetime:not(:has(fieldset)) .description-unwrapped {
+  margin-top: 0;
+}

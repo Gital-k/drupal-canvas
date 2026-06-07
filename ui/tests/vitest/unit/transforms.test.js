@@ -457,6 +457,23 @@ describe('Transforms - firstRecord', () => {
   });
 });
 
+describe('Transforms - mainProperty', () => {
+  it('extracts value from object-shaped form state when list is true (qs-style delta)', () => {
+    // qs parses prop[0][value][date]=x as { 0: { value: { date: 'x' } } }, not an array.
+    const objectShaped = { 0: { value: { date: '2017-06-28' } } };
+    expect(
+      transforms.mainProperty(objectShaped, { name: 'value', list: true }, {}),
+    ).to.deep.equal({ date: '2017-06-28' });
+  });
+
+  it('still supports array-shaped form state when list is true', () => {
+    const arrayShaped = [{ value: { date: '2018-11-13' } }];
+    expect(
+      transforms.mainProperty(arrayShaped, { name: 'value', list: true }, {}),
+    ).to.deep.equal({ date: '2018-11-13' });
+  });
+});
+
 describe('Transforms - dateTime', () => {
   const datePropSource = {
     sourceType: 'static:field_item:datetime',

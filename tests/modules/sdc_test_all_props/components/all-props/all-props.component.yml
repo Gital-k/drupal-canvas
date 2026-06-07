@@ -438,4 +438,5 @@ props:
       type: array
       items:
         type: string
+
     # @todo finish adding all other types + formats supported by JSON schema

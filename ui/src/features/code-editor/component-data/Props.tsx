@@ -386,7 +386,7 @@ export default function Props() {
                 <FormPropTypeDate
                   id={prop.id}
                   example={prop.example as string | string[]}
-                  format={prop.format as string}
+                  format={(prop.format ?? 'date') as 'date' | 'date-time'}
                   isDisabled={disabledPropIds.has(prop.id)}
                   required={required.includes(propName)}
                   allowMultiple={prop.allowMultiple}

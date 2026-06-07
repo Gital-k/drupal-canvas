@@ -3,11 +3,7 @@ import clsx from 'clsx';
 import { Box, Flex, Select, Text, TextField } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
-import {
-  Divider,
-  FormElement,
-  Label,
-} from '@/features/code-editor/component-data/FormElement';
+import { FormElement, Label } from '@/features/code-editor/component-data/FormElement';
 import { PropValuesSortableList } from '@/features/code-editor/component-data/forms/PropValuesSortableList';
 import {
   DEFAULT_EXAMPLES,
@@ -37,7 +33,15 @@ import {
 
 import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
 
-import styles from '@/features/code-editor/component-data/FormElement.module.css';
+import formElementStyles from '@/features/code-editor/component-data/FormElement.module.css';
+import dateFormStyles from '@/features/code-editor/component-data/forms/FormPropTypeDate.module.css';
+import dateTimeInputStyles from '@/styles/DateTimeInput.module.css';
+
+function initialDateType(
+  format: CodeComponentProp['format'] | undefined,
+): 'date' | 'date-time' {
+  return format === 'date' || format === 'date-time' ? format : 'date';
+}
 
 export default function FormPropTypeDate({
   id,
@@ -50,7 +54,7 @@ export default function FormPropTypeDate({
   limitedCount = 1,
 }: Pick<CodeComponentProp, 'id'> & {
   example: string | string[];
-  format: string;
+  format?: 'date' | 'date-time';
   isDisabled?: boolean;
   required: boolean;
   allowMultiple?: boolean;
@@ -58,8 +62,9 @@ export default function FormPropTypeDate({
   limitedCount?: number;
 }) {
   const dispatch = useAppDispatch();
-  // @ts-ignore
-  const [dateType, setDateType] = useState<'date' | 'date-time'>(format);
+  const [dateType, setDateType] = useState<'date' | 'date-time'>(() =>
+    initialDateType(format),
+  );
   const [isExampleValueValid, setIsExampleValueValid] = useState(true);
 
   // The datetime format the server requires is in UTC ISO string, but the input element of type "datetime-local"
@@ -119,6 +124,17 @@ export default function FormPropTypeDate({
     boolean[]
   >(() => displayArray.map(() => true));
 
+  // Sync single-value date-time from Redux/undo into local display value.
+  useEffect(() => {
+    if (
+      !allowMultiple &&
+      dateType === 'date-time' &&
+      typeof example === 'string'
+    ) {
+      setDatetimeLocalForInput(utcToLocalTimeConversion(example));
+    }
+  }, [allowMultiple, dateType, example]);
+
   // Sync validity states with displayArray length changes
   useEffect(() => {
     setMultiValueValidityStates((prev) => {
@@ -158,7 +174,7 @@ export default function FormPropTypeDate({
   };
 
   const renderInputField = (index: number) => (
-    <Box flexGrow="1">
+    <Box flexGrow="1" className={dateTimeInputStyles.dateTimeInputWrap}>
       <TextField.Root
         data-testid={`array-prop-value-${id}-${index}`}
         id={`array-prop-value-${id}-${index}`}
@@ -171,7 +187,9 @@ export default function FormPropTypeDate({
         type={dateType === 'date' ? 'date' : 'datetime-local'}
         onChange={(e) => handleMultiValueChange(index, e.target.value)}
         onBlur={(e) => handleMultiValueBlur(index, e)}
-        className={clsx({ [styles.error]: !multiValueValidityStates[index] })}
+        className={clsx({
+          [formElementStyles.error]: !multiValueValidityStates[index],
+        })}
       />
     </Box>
   );
@@ -213,121 +231,131 @@ export default function FormPropTypeDate({
 
   return (
     <Flex direction="column" gap="4" flexGrow="1">
-      <FormElement>
-        <Label htmlFor={`prop-date-type-${id}`}>Date type</Label>
-        <Select.Root
-          value={dateType}
-          onValueChange={(value: 'date' | 'date-time') => {
-            setIsExampleValueValid(true);
-            setDateType(value);
+      <Flex
+        direction="row"
+        gap="4"
+        wrap="wrap"
+        align="start"
+        className={dateFormStyles.singleRow}
+      >
+        <FormElement>
+          <Label htmlFor={`prop-date-type-${id}`}>Date type</Label>
+          <Select.Root
+            value={dateType}
+            onValueChange={(value: 'date' | 'date-time') => {
+              setIsExampleValueValid(true);
+              setDateType(value);
 
-            // Only prefill a default example when the prop is required;
-            // otherwise leave the example empty (matching behavior in Props.tsx).
-            const newDefaultValue = required
-              ? (DEFAULT_EXAMPLES[value] as string)
-              : '';
+              // Only prefill a default example when the prop is required;
+              // otherwise leave the example empty (matching behavior in Props.tsx).
+              const newDefaultValue = required
+                ? (DEFAULT_EXAMPLES[value] as string)
+                : '';
 
-            // In multi-value mode, reset the array to a single default value
-            if (allowMultiple) {
-              setMultiValueValidityStates([true]);
+              // In multi-value mode, reset the array to a single default value
+              if (allowMultiple) {
+                setMultiValueValidityStates([true]);
 
-              dispatchUpdateProp(dispatch, id, {
-                example: [newDefaultValue],
-                format: value,
-                valueMode: VALUE_MODE_UNLIMITED,
-                limitedCount: undefined,
-              });
-            } else {
-              // Single value mode - just update format and example
-              dispatchUpdateProp(dispatch, id, {
-                example: newDefaultValue,
-                format: value,
-              });
-              if (value === 'date-time') {
-                setDatetimeLocalForInput(
-                  utcToLocalTimeConversion(newDefaultValue),
-                );
+                dispatchUpdateProp(dispatch, id, {
+                  example: [newDefaultValue],
+                  format: value,
+                  valueMode: VALUE_MODE_UNLIMITED,
+                  limitedCount: undefined,
+                });
+              } else {
+                // Single value mode - just update format and example
+                dispatchUpdateProp(dispatch, id, {
+                  example: newDefaultValue,
+                  format: value,
+                });
+                if (value === 'date-time') {
+                  setDatetimeLocalForInput(
+                    utcToLocalTimeConversion(newDefaultValue),
+                  );
+                }
               }
-            }
-          }}
-          size="1"
-          disabled={isDisabled}
-        >
-          <Select.Trigger id={`prop-date-type-${id}`} />
-          <Select.Content>
-            <Select.Item value="date">Date only</Select.Item>
-            <Select.Item value="date-time">Date and time</Select.Item>
-          </Select.Content>
-        </Select.Root>
-      </FormElement>
-      <Divider />
-      <FormElement>
-        <Label htmlFor={`prop-example-${id}`}>Example value</Label>
-        {/* Single value mode */}
-        {!allowMultiple && (
-          <TextField.Root
-            id={`prop-example-${id}`}
+            }}
             size="1"
-            value={
-              dateType === 'date' ? (example as string) : datetimeLocalForInput
-            }
-            type={dateType === 'date' ? 'date' : 'datetime-local'}
-            onChange={(e) => {
-              const value = e.target.value;
-              // Show/hide error based on whether field is empty while required
-              setShowRequiredError(required && !value);
-              // Convert the datetime-local value to UTC ISO string for the server.
-              const convertedValue =
-                dateType === 'date-time'
-                  ? localTimeToUtcConversion(value)
-                  : value;
-              dispatchUpdateProp(dispatch, id, {
-                example: convertedValue,
-                format: dateType,
-              });
-              if (dateType === 'date-time') {
-                setDatetimeLocalForInput(value);
-              }
-            }}
-            onBlur={(e) => {
-              setIsExampleValueValid(e.target.validity.valid);
-            }}
-            className={clsx({
-              [styles.error]: !isExampleValueValid || showRequiredError,
-            })}
-            {...(!isExampleValueValid || showRequiredError
-              ? { 'data-invalid-prop-value': true }
-              : {})}
-          />
-        )}
+            disabled={isDisabled}
+          >
+            <Select.Trigger id={`prop-date-type-${id}`} />
+            <Select.Content>
+              <Select.Item value="date">Date only</Select.Item>
+              <Select.Item value="date-time">Date and time</Select.Item>
+            </Select.Content>
+          </Select.Root>
+        </FormElement>
+        <FormElement>
+          <Label htmlFor={`prop-example-${id}`}>Example value</Label>
+          {/* Single value mode */}
+          {!allowMultiple && (
+            <div className={dateTimeInputStyles.dateTimeInputWrap}>
+              <TextField.Root
+                id={`prop-example-${id}`}
+                size="1"
+                value={
+                  dateType === 'date' ? (example as string) : datetimeLocalForInput
+                }
+                type={dateType === 'date' ? 'date' : 'datetime-local'}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Show/hide error based on whether field is empty while required
+                  setShowRequiredError(required && !value);
+                  // Convert the datetime-local value to UTC ISO string for the server.
+                  const convertedValue =
+                    dateType === 'date-time'
+                      ? localTimeToUtcConversion(value)
+                      : value;
+                  dispatchUpdateProp(dispatch, id, {
+                    example: convertedValue,
+                    format: dateType,
+                  });
+                  if (dateType === 'date-time') {
+                    setDatetimeLocalForInput(value);
+                  }
+                }}
+                onBlur={(e) => {
+                  setIsExampleValueValid(e.target.validity.valid);
+                }}
+                className={clsx({
+                  [formElementStyles.error]:
+                    !isExampleValueValid || showRequiredError,
+                })}
+                {...(!isExampleValueValid || showRequiredError
+                  ? { 'data-invalid-prop-value': true }
+                  : {})}
+              />
+            </div>
+          )}
 
-        {/* Multiple values mode */}
-        {allowMultiple && (
-          <PropValuesSortableList
-            items={displayArray.map((_, index) => index)}
-            renderItem={renderInputField}
-            onDragEnd={handleDragEnd}
-            onRemove={
-              valueMode === VALUE_MODE_UNLIMITED ? handleRemove : undefined
-            }
-            onAdd={valueMode === VALUE_MODE_UNLIMITED ? handleAdd : undefined}
-            isDisabled={isDisabled}
-            mode={valueMode}
-            errorMessage={
-              showRequiredError && (
-                <Text color="red" size="1">
-                  {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-                </Text>
-              )
-            }
-          />
-        )}
-        {!allowMultiple && showRequiredError && (
-          <Text color="red" size="1">
-            {REQUIRED_EXAMPLE_ERROR_MESSAGE}
-          </Text>
-        )}
-      </FormElement>
+          {/* Multiple values mode */}
+          {allowMultiple && (
+            <PropValuesSortableList
+              items={displayArray.map((_, index) => index)}
+              renderItem={renderInputField}
+              onDragEnd={handleDragEnd}
+              onRemove={
+                valueMode === VALUE_MODE_UNLIMITED ? handleRemove : undefined
+              }
+              onAdd={valueMode === VALUE_MODE_UNLIMITED ? handleAdd : undefined}
+              isDisabled={isDisabled}
+              mode={valueMode}
+              errorMessage={
+                showRequiredError && (
+                  <Text color="red" size="1">
+                    {REQUIRED_EXAMPLE_ERROR_MESSAGE}
+                  </Text>
+                )
+              }
+            />
+          )}
+          {!allowMultiple && showRequiredError && (
+            <Text color="red" size="1">
+              {REQUIRED_EXAMPLE_ERROR_MESSAGE}
+            </Text>
+          )}
+        </FormElement>
+      </Flex>
     </Flex>
   );
 }

@@ -1,0 +1,45 @@
+/* Shared datetime input styling so Chrome calendar icon is visible (avoid flex on input). */
+.dateTimeInputWrap input[type='date'],
+.dateTimeInputWrap input[type='datetime-local'] {
+  position: relative;
+  min-height: calc(2rem - 2px);
+  padding-inline-start: 3px;
+  padding-inline-end: 2rem;
+  text-indent: 0;
+  cursor: pointer;
+}
+
+.dateTimeInputWrap input[type='time'] {
+  position: relative;
+  min-height: calc(2rem - 2px);
+  padding-inline-start: 0;
+  padding-inline-end: 2.5rem;
+  text-indent: 0;
+  cursor: pointer;
+}
+
+.dateTimeInputWrap input[type='date']::-webkit-datetime-edit,
+.dateTimeInputWrap input[type='time']::-webkit-datetime-edit,
+.dateTimeInputWrap input[type='datetime-local']::-webkit-datetime-edit {
+  padding-inline-start: 7px;
+}
+
+.dateTimeInputWrap input[type='date']::-webkit-calendar-picker-indicator,
+.dateTimeInputWrap input[type='time']::-webkit-calendar-picker-indicator,
+.dateTimeInputWrap input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  opacity: 0.7;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+.dateTimeInputWrap input[type='date']::-webkit-datetime-edit,
+.dateTimeInputWrap input[type='datetime-local']::-webkit-datetime-edit {
+  padding-inline-start: 3px;
+}

@@ -6,6 +6,7 @@ import { interceptNativeSetter } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
+import dateTimeInputStyles from '@/styles/DateTimeInput.module.css';
 import styles from './TextField.module.css';
 
 const TextField = ({
@@ -15,8 +16,18 @@ const TextField = ({
   className?: string;
   attributes?: Attributes;
 }) => {
+  const isDateTimeInput =
+    attributes?.type === 'date' ||
+    attributes?.type === 'datetime-local' ||
+    attributes?.type === 'time';
+
   return (
-    <div className={styles.wrap}>
+    <div
+      className={clsx(
+        styles.wrap,
+        isDateTimeInput && dateTimeInputStyles.dateTimeInputWrap,
+      )}
+    >
       <input
         autoComplete="off"
         {...a2p(attributes)}
