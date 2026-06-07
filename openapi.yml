@@ -1772,6 +1772,8 @@ paths:
                         autoSaveLabel: Homer
                         autoSavePath: /updated-path
                         internalPath: /page/1
+                        isNew: false
+                        hasUnsavedStatusChange: false
                         links:
                           edit-form: /canvas/editor/canvas_page/1
                       - id: 2
@@ -1782,6 +1784,8 @@ paths:
                         autoSaveLabel: About who?
                         autoSavePath: /page/1
                         internalPath: /page/2
+                        isNew: false
+                        hasUnsavedStatusChange: true
                         links:
                           edit-form: /canvas/editor/canvas_page/2
                     meta:
@@ -1816,6 +1820,7 @@ paths:
                 summary: "Duplicate existing page"
                 value:
                   entity_id: "1"
+                  clientInstanceId: "8a1f1b2c-3d4e-5f60-7a8b-9c0d1e2f3a4b"
               "An empty page":
                 summary: A page with no components
                 value:
