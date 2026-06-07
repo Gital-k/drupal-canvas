@@ -278,15 +278,16 @@ export function getConfig(): Config {
 
 let emittedCanvasConfigWarnings = false;
 
-export function emitCanvasConfigWarnings(): void {
+export function emitCanvasConfigWarnings(): boolean {
   if (emittedCanvasConfigWarnings) {
-    return;
+    return false;
   }
 
   emittedCanvasConfigWarnings = true;
   for (const warning of canvasConfigWarnings) {
     p.log.warn(warning.message);
   }
+  return canvasConfigWarnings.length > 0;
 }
 
 export function setConfig(newConfig: Partial<Config>): void {
@@ -405,7 +406,7 @@ function writeCanvasConfigFile(
 
 export async function handleLegacySyncEnvMigration(
   options: LegacyMigrationOptions = {},
-): Promise<void> {
+): Promise<boolean> {
   const legacyValues = LEGACY_SYNC_ENV_SETTINGS.map((setting) => {
     const value = process.env[setting.envName];
     return {
@@ -416,7 +417,7 @@ export async function handleLegacySyncEnvMigration(
   }).filter((setting) => setting.value !== undefined);
 
   if (legacyValues.length === 0) {
-    return;
+    return false;
   }
 
   const { configPath, parsedConfig, configParseError } = readCanvasConfigFile();
@@ -443,7 +444,7 @@ export async function handleLegacySyncEnvMigration(
     p.log.warn(
       'canvas.config.json exists but is invalid. Deprecated sync environment settings will apply for this run only. Fix canvas.config.json if you want to persist them.',
     );
-    return;
+    return true;
   }
 
   const missingSettings = legacyValues.filter(
@@ -453,7 +454,7 @@ export async function handleLegacySyncEnvMigration(
   );
 
   if (missingSettings.length === 0) {
-    return;
+    return true;
   }
 
   const additions = missingSettings
@@ -464,7 +465,7 @@ export async function handleLegacySyncEnvMigration(
     p.log.info(
       `Add ${additions} to canvas.config.json to persist this setting.`,
     );
-    return;
+    return true;
   }
 
   const confirmed = await p.confirm({
@@ -473,7 +474,7 @@ export async function handleLegacySyncEnvMigration(
   });
 
   if (p.isCancel(confirmed) || !confirmed) {
-    return;
+    return true;
   }
 
   const nextSync = { ...existingSync };
@@ -483,6 +484,7 @@ export async function handleLegacySyncEnvMigration(
   const nextConfig = { ...(parsedConfig ?? {}), sync: nextSync };
   writeCanvasConfigFile(configPath, nextConfig);
   p.log.info('Updated canvas.config.json with sync settings.');
+  return true;
 }
 
 /**
@@ -495,7 +497,7 @@ export async function handleLegacySyncEnvMigration(
  */
 export async function handleLegacyComponentDirMigration(
   options: LegacyMigrationOptions = {},
-): Promise<void> {
+): Promise<boolean> {
   const { configPath, hasConfigFile, parsedConfig, configParseError } =
     readCanvasConfigFile();
 
@@ -504,7 +506,7 @@ export async function handleLegacyComponentDirMigration(
     parsedConfig.componentDir.trim().length > 0;
 
   if (hasComponentDirConfig) {
-    return;
+    return false;
   }
 
   const legacyComponentDir =
@@ -526,14 +528,14 @@ export async function handleLegacyComponentDirMigration(
     p.log.warn(
       'canvas.config.json exists but is invalid. Update it manually by adding a componentDir key.',
     );
-    return;
+    return true;
   }
 
   if (options.skipPrompt) {
     p.log.info(
       `Add "componentDir": "${legacyComponentDir}" to canvas.config.json to persist this setting.`,
     );
-    return;
+    return true;
   }
 
   const componentDir = await p.text({
@@ -558,6 +560,7 @@ export async function handleLegacyComponentDirMigration(
   writeCanvasConfigFile(configPath, nextConfig);
   p.log.info('Updated canvas.config.json with componentDir.');
   setConfig({ componentDir });
+  return true;
 }
 
 export type ConfigKey = keyof Config;

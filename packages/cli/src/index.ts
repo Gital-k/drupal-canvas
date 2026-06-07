@@ -56,11 +56,17 @@ program.hook('preAction', async (command, actionCommand) => {
   const migrationOptions = {
     skipPrompt: Boolean(actionOptions?.yes ?? commandOptions?.yes),
   };
-  await handleLegacySyncEnvMigration(migrationOptions);
+  let emittedPreActionOutput =
+    await handleLegacySyncEnvMigration(migrationOptions);
   if (!actionOptions?.dir) {
-    await handleLegacyComponentDirMigration(migrationOptions);
+    emittedPreActionOutput =
+      (await handleLegacyComponentDirMigration(migrationOptions)) ||
+      emittedPreActionOutput;
   }
-  emitCanvasConfigWarnings();
+  emittedPreActionOutput = emitCanvasConfigWarnings() || emittedPreActionOutput;
+  if (emittedPreActionOutput) {
+    console.log();
+  }
 });
 
 // Handle errors
