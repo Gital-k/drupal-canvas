@@ -62,9 +62,12 @@ Workbench reads these options:
 | `aliasBaseDir` | `"src"` | Base directory for resolving `@/` imports inside component source files. |
 | `globalCssPath` | `"src/global.css"` | Global CSS entrypoint loaded into the preview iframe. This is where Workbench picks up shared styles and Tailwind setup. |
 
-If `canvas.config.json` is not present, Workbench uses those defaults.
-`outputDir` is part of the wider Canvas config surface, but Workbench does not
-use it.
+If `canvas.config.json` is not present, Workbench uses those defaults. For
+existing projects, if `globalCssPath` is not set and `src/global.css` is missing,
+Workbench temporarily falls back to `src/components/global.css` when that file
+exists. Move the file to `src/global.css`, or set `globalCssPath` explicitly to
+keep the legacy location. `outputDir` is part of the wider Canvas config
+surface, but Workbench does not use it.
 
 ## What Workbench discovers
 

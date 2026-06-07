@@ -71,7 +71,10 @@ properties:
 | `globalCssPath`       | `"src/global.css"`    | Path to the global CSS file.                                                                                              |
 
 If `canvas.config.json` is not present, the CLI will use the default values
-shown above.
+shown above. For existing projects, if `globalCssPath` is not set and
+`src/global.css` is missing, the CLI temporarily falls back to
+`src/components/global.css` when that file exists. Move the file to
+`src/global.css`, or set `globalCssPath` explicitly to keep the legacy location.
 
 #### canvas.brand-kit.json (Optional)
 
