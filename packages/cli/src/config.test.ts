@@ -295,6 +295,50 @@ describe('config', () => {
       });
     });
 
+    it('should prefer canvas.config.json sync settings over deprecated env vars', async () => {
+      vi.stubEnv('CANVAS_INCLUDE_PAGES', 'true');
+      vi.stubEnv('CANVAS_INCLUDE_CONTENT_TEMPLATES', 'true');
+      vi.stubEnv('CANVAS_INCLUDE_REGIONS', 'true');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          sync: {
+            pages: false,
+            contentTemplates: false,
+            regions: false,
+          },
+        }),
+      );
+
+      const { getConfig } = await import('./config');
+
+      expect(getConfig().includePages).toBe(false);
+      expect(getConfig().includeContentTemplates).toBe(false);
+      expect(getConfig().includeRegions).toBe(false);
+      expect(getConfig().scope).toBe(
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
+      );
+    });
+
+    it('should use deprecated env vars when sync settings are omitted from canvas.config.json', async () => {
+      vi.stubEnv('CANVAS_INCLUDE_PAGES', 'false');
+      vi.stubEnv('CANVAS_INCLUDE_CONTENT_TEMPLATES', 'false');
+      vi.stubEnv('CANVAS_INCLUDE_REGIONS', 'false');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({ componentDir: 'src/components' }),
+      );
+
+      const { getConfig } = await import('./config');
+
+      expect(getConfig().includePages).toBe(false);
+      expect(getConfig().includeContentTemplates).toBe(false);
+      expect(getConfig().includeRegions).toBe(false);
+      expect(getConfig().scope).toBe(
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
+      );
+    });
+
     it('should use default config values when no environment files exist', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
@@ -412,6 +456,21 @@ describe('config', () => {
           pages: false,
         },
       });
+    });
+
+    it('should not override existing sync config during legacy env migration', async () => {
+      vi.stubEnv('CANVAS_INCLUDE_PAGES', 'false');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({ sync: { pages: true } }),
+      );
+      setConfig({ includePages: true });
+
+      await handleLegacySyncEnvMigration();
+
+      expect(getConfig().includePages).toBe(true);
+      expect(p.confirm).not.toHaveBeenCalled();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
     });
 
     it('should show sync config instructions in non-interactive mode', async () => {
