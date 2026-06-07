@@ -109,14 +109,19 @@ function makeDiscoveryResult(projectRoot: string): DiscoveryResult {
 function makeCanvasConfig(): CanvasConfig {
   return {
     aliasBaseDir: 'src',
-    outputDir: './dist',
-    componentDir: './components',
-    pagesDir: './pages',
-    contentTemplatesDir: './content-templates',
-    regionsDir: './regions',
-    deprecatedComponentDir: './components',
-    globalCssPath: './src/global.css',
-    layoutPath: './src/layout.jsx',
+    outputDir: 'dist',
+    componentDir: 'components',
+    pagesDir: 'pages',
+    contentTemplatesDir: 'content-templates',
+    regionsDir: 'regions',
+    deprecatedComponentDir: 'components',
+    globalCssPath: 'src/global.css',
+    layoutPath: 'src/layout.jsx',
+    sync: {
+      pages: true,
+      contentTemplates: true,
+      regions: true,
+    },
   };
 }
 
@@ -472,7 +477,7 @@ describe('preview-build', () => {
       expect.objectContaining({
         code: 'artifact_build_failed',
         message: expect.stringContaining(
-          'configured componentDir ("./components")',
+          'configured componentDir ("components")',
         ),
       }),
     ]);

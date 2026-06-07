@@ -2,7 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import * as p from '@clack/prompts';
-import { resolveCanvasConfig } from '@drupal-canvas/discovery';
+import {
+  DEFAULT_CANVAS_CONFIG,
+  resolveCanvasConfig,
+} from '@drupal-canvas/discovery';
+
+import type { CanvasConfigWarning } from '@drupal-canvas/discovery';
 
 // Load environment variables.
 export function loadEnvFiles() {
@@ -132,6 +137,7 @@ function loadFontsFromBrandKitFile(hostRoot: string): FontsConfig | undefined {
   return undefined;
 }
 
+const canvasConfigWarnings: CanvasConfigWarning[] = [];
 const {
   aliasBaseDir,
   outputDir,
@@ -142,11 +148,12 @@ const {
   deprecatedComponentDir,
   globalCssPath,
   layoutPath,
-} = resolveCanvasConfig({ hostRoot: process.cwd() });
+  sync,
+} = resolveCanvasConfig({
+  hostRoot: process.cwd(),
+  onWarning: (warning) => canvasConfigWarnings.push(warning),
+});
 
-export const DEFAULT_INCLUDE_PAGES = false;
-export const DEFAULT_INCLUDE_CONTENT_TEMPLATES = false;
-export const DEFAULT_INCLUDE_REGIONS = false;
 export const DEFAULT_INCLUDE_BRAND_KIT = false;
 
 const DEFAULT_SCOPES =
@@ -213,20 +220,22 @@ function getEnvBoolean(value: string | undefined, fallback: boolean): boolean {
   return parseBooleanSetting(value) ?? fallback;
 }
 
-const includePages = getEnvBoolean(
-  process.env.CANVAS_INCLUDE_PAGES,
-  DEFAULT_INCLUDE_PAGES,
-);
+const configuredSync = readConfiguredSyncSettings();
 
-const includeContentTemplates = getEnvBoolean(
-  process.env.CANVAS_INCLUDE_CONTENT_TEMPLATES,
-  DEFAULT_INCLUDE_CONTENT_TEMPLATES,
-);
+const includePages =
+  configuredSync.pages ??
+  getEnvBoolean(process.env.CANVAS_INCLUDE_PAGES, sync.pages);
 
-const includeRegions = getEnvBoolean(
-  process.env.CANVAS_INCLUDE_REGIONS,
-  DEFAULT_INCLUDE_REGIONS,
-);
+const includeContentTemplates =
+  configuredSync.contentTemplates ??
+  getEnvBoolean(
+    process.env.CANVAS_INCLUDE_CONTENT_TEMPLATES,
+    sync.contentTemplates,
+  );
+
+const includeRegions =
+  configuredSync.regions ??
+  getEnvBoolean(process.env.CANVAS_INCLUDE_REGIONS, sync.regions);
 
 const includeBrandKit = getEnvBoolean(
   process.env.CANVAS_INCLUDE_BRAND_KIT,
@@ -267,6 +276,19 @@ export function getConfig(): Config {
   return config;
 }
 
+let emittedCanvasConfigWarnings = false;
+
+export function emitCanvasConfigWarnings(): void {
+  if (emittedCanvasConfigWarnings) {
+    return;
+  }
+
+  emittedCanvasConfigWarnings = true;
+  for (const warning of canvasConfigWarnings) {
+    p.log.warn(warning.message);
+  }
+}
+
 export function setConfig(newConfig: Partial<Config>): void {
   config = { ...config, ...newConfig };
 }
@@ -275,18 +297,48 @@ interface LegacyMigrationOptions {
   skipPrompt?: boolean;
 }
 
-/**
- * Ensures that canvas.config.json has a componentDir defined.
- *
- * Resolution order:
- * 1. canvas.config.json has componentDir — done
- * 2. CANVAS_COMPONENT_DIR env var — use it with deprecation warning, offer to persist
- * 3. None — prompt to create canvas.config.json (or show instructions if non-interactive)
- */
-export async function handleLegacyComponentDirMigration(
-  options: LegacyMigrationOptions = {},
-): Promise<void> {
-  const configPath = path.resolve(process.cwd(), 'canvas.config.json');
+interface LegacySyncEnvSetting {
+  envName:
+    | 'CANVAS_INCLUDE_PAGES'
+    | 'CANVAS_INCLUDE_CONTENT_TEMPLATES'
+    | 'CANVAS_INCLUDE_REGIONS';
+  configKey: 'pages' | 'contentTemplates' | 'regions';
+  configPath: 'sync.pages' | 'sync.contentTemplates' | 'sync.regions';
+  setKey: 'includePages' | 'includeContentTemplates' | 'includeRegions';
+}
+
+const LEGACY_SYNC_ENV_SETTINGS: LegacySyncEnvSetting[] = [
+  {
+    envName: 'CANVAS_INCLUDE_PAGES',
+    configKey: 'pages',
+    configPath: 'sync.pages',
+    setKey: 'includePages',
+  },
+  {
+    envName: 'CANVAS_INCLUDE_CONTENT_TEMPLATES',
+    configKey: 'contentTemplates',
+    configPath: 'sync.contentTemplates',
+    setKey: 'includeContentTemplates',
+  },
+  {
+    envName: 'CANVAS_INCLUDE_REGIONS',
+    configKey: 'regions',
+    configPath: 'sync.regions',
+    setKey: 'includeRegions',
+  },
+];
+
+function getCanvasConfigPath(): string {
+  return path.resolve(process.cwd(), 'canvas.config.json');
+}
+
+function readCanvasConfigFile(): {
+  configPath: string;
+  hasConfigFile: boolean;
+  parsedConfig: Record<string, unknown> | null;
+  configParseError: boolean;
+} {
+  const configPath = getCanvasConfigPath();
   const hasConfigFile = fs.existsSync(configPath);
 
   let parsedConfig: Record<string, unknown> | null = null;
@@ -307,6 +359,146 @@ export async function handleLegacyComponentDirMigration(
     }
   }
 
+  return { configPath, hasConfigFile, parsedConfig, configParseError };
+}
+
+function readConfiguredSyncSettings(): Partial<{
+  pages: boolean;
+  contentTemplates: boolean;
+  regions: boolean;
+}> {
+  const { parsedConfig, configParseError } = readCanvasConfigFile();
+  if (configParseError) {
+    return {};
+  }
+  const parsedSync = parsedConfig?.sync;
+  if (
+    !parsedSync ||
+    typeof parsedSync !== 'object' ||
+    Array.isArray(parsedSync)
+  ) {
+    return {};
+  }
+
+  const syncConfig = parsedSync as Record<string, unknown>;
+  return {
+    pages: typeof syncConfig.pages === 'boolean' ? syncConfig.pages : undefined,
+    contentTemplates:
+      typeof syncConfig.contentTemplates === 'boolean'
+        ? syncConfig.contentTemplates
+        : undefined,
+    regions:
+      typeof syncConfig.regions === 'boolean' ? syncConfig.regions : undefined,
+  };
+}
+
+function writeCanvasConfigFile(
+  configPath: string,
+  configContent: Record<string, unknown>,
+): void {
+  fs.writeFileSync(
+    configPath,
+    `${JSON.stringify(configContent, null, 2)}\n`,
+    'utf-8',
+  );
+}
+
+export async function handleLegacySyncEnvMigration(
+  options: LegacyMigrationOptions = {},
+): Promise<void> {
+  const legacyValues = LEGACY_SYNC_ENV_SETTINGS.map((setting) => {
+    const value = process.env[setting.envName];
+    return {
+      ...setting,
+      value,
+      parsed: value === undefined ? undefined : parseBooleanSetting(value),
+    };
+  }).filter((setting) => setting.value !== undefined);
+
+  if (legacyValues.length === 0) {
+    return;
+  }
+
+  const { configPath, parsedConfig, configParseError } = readCanvasConfigFile();
+  const existingSync =
+    parsedConfig?.sync &&
+    typeof parsedConfig.sync === 'object' &&
+    !Array.isArray(parsedConfig.sync)
+      ? (parsedConfig.sync as Record<string, unknown>)
+      : {};
+
+  for (const setting of legacyValues) {
+    p.log.warn(
+      `${setting.envName} is deprecated. Set "${setting.configPath}" in canvas.config.json instead.`,
+    );
+    if (
+      setting.parsed !== undefined &&
+      typeof existingSync[setting.configKey] !== 'boolean'
+    ) {
+      setConfig({ [setting.setKey]: setting.parsed });
+    }
+  }
+
+  if (configParseError) {
+    p.log.warn(
+      'canvas.config.json exists but is invalid. Deprecated sync environment settings will apply for this run only. Fix canvas.config.json if you want to persist them.',
+    );
+    return;
+  }
+
+  const missingSettings = legacyValues.filter(
+    (setting) =>
+      setting.parsed !== undefined &&
+      typeof existingSync[setting.configKey] !== 'boolean',
+  );
+
+  if (missingSettings.length === 0) {
+    return;
+  }
+
+  const additions = missingSettings
+    .map((setting) => `"${setting.configPath}": ${String(setting.parsed)}`)
+    .join(', ');
+
+  if (options.skipPrompt) {
+    p.log.info(
+      `Add ${additions} to canvas.config.json to persist this setting.`,
+    );
+    return;
+  }
+
+  const confirmed = await p.confirm({
+    message: `Sync settings are now managed in canvas.config.json. Move these deprecated environment settings there? (${additions})`,
+    initialValue: true,
+  });
+
+  if (p.isCancel(confirmed) || !confirmed) {
+    return;
+  }
+
+  const nextSync = { ...existingSync };
+  for (const setting of missingSettings) {
+    nextSync[setting.configKey] = setting.parsed;
+  }
+  const nextConfig = { ...(parsedConfig ?? {}), sync: nextSync };
+  writeCanvasConfigFile(configPath, nextConfig);
+  p.log.info('Updated canvas.config.json with sync settings.');
+}
+
+/**
+ * Ensures that canvas.config.json has a componentDir defined.
+ *
+ * Resolution order:
+ * 1. canvas.config.json has componentDir — done
+ * 2. CANVAS_COMPONENT_DIR env var — use it with deprecation warning, offer to persist
+ * 3. None — prompt to create canvas.config.json (or show instructions if non-interactive)
+ */
+export async function handleLegacyComponentDirMigration(
+  options: LegacyMigrationOptions = {},
+): Promise<void> {
+  const { configPath, hasConfigFile, parsedConfig, configParseError } =
+    readCanvasConfigFile();
+
   const hasComponentDirConfig =
     typeof parsedConfig?.componentDir === 'string' &&
     parsedConfig.componentDir.trim().length > 0;
@@ -316,7 +508,8 @@ export async function handleLegacyComponentDirMigration(
   }
 
   const legacyComponentDir =
-    process.env.CANVAS_COMPONENT_DIR?.trim() || 'src/components';
+    process.env.CANVAS_COMPONENT_DIR?.trim() ||
+    DEFAULT_CANVAS_CONFIG.componentDir;
 
   if (process.env.CANVAS_COMPONENT_DIR) {
     p.log.warn(
@@ -362,11 +555,7 @@ export async function handleLegacyComponentDirMigration(
     ? { ...(parsedConfig ?? {}), componentDir }
     : { componentDir };
 
-  fs.writeFileSync(
-    configPath,
-    `${JSON.stringify(nextConfig, null, 2)}\n`,
-    'utf-8',
-  );
+  writeCanvasConfigFile(configPath, nextConfig);
   p.log.info('Updated canvas.config.json with componentDir.');
   setConfig({ componentDir });
 }
@@ -444,7 +633,7 @@ export async function promptForConfig(key: ConfigKey): Promise<void> {
     case 'componentDir': {
       const value = await p.text({
         message: 'Enter the component directory',
-        placeholder: './components',
+        placeholder: 'components',
         validate: (value) => {
           if (!value) return 'Component directory is required';
           return;
