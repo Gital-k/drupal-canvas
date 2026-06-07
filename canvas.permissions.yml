@@ -46,3 +46,8 @@ delete canvas_page:
 publish auto-saves:
   title: 'Publish Drupal Canvas Content'
   description: 'Update entities with auto-saved changes in Drupal Canvas (requires "update" access for those entities).'
+
+edit canvas global regions:
+  title: 'Allow Edit Global Regions'
+  description: 'Edit global Drupal Canvas page regions (such as the header and footer) of the default active theme.'
+  restrict access: true
