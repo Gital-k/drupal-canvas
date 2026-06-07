@@ -1,4 +1,5 @@
 import { InvalidArgumentError } from 'commander';
+import * as p from '@clack/prompts';
 
 import {
   getConfig,
@@ -30,6 +31,47 @@ export function validateComponentOptions(options: {
 /**
  * Updates config with common CLI options
  */
+export function applySyncOptionAliasesAndWarnings(options: {
+  includePages?: boolean;
+  includeContentTemplates?: boolean;
+  includeRegions?: boolean;
+  pages?: boolean;
+  contentTemplates?: boolean;
+  regions?: boolean;
+}): void {
+  if (typeof options.includePages === 'boolean') {
+    p.log.warn(
+      options.includePages
+        ? '--include-pages is deprecated because pages are included by default. Remove this flag.'
+        : '--include-pages=false is deprecated and will be removed in a future release. Use --no-pages to exclude pages.',
+    );
+  }
+  if (typeof options.includeContentTemplates === 'boolean') {
+    p.log.warn(
+      options.includeContentTemplates
+        ? '--include-content-templates is deprecated because content templates are included by default. Remove this flag.'
+        : '--include-content-templates=false is deprecated and will be removed in a future release. Use --no-content-templates to exclude content templates.',
+    );
+  }
+  if (typeof options.includeRegions === 'boolean') {
+    p.log.warn(
+      options.includeRegions
+        ? '--include-regions is deprecated because global regions are included by default. Remove this flag.'
+        : '--include-regions=false is deprecated and will be removed in a future release. Use --no-regions to exclude global regions.',
+    );
+  }
+
+  if (options.pages === false) {
+    options.includePages = false;
+  }
+  if (options.contentTemplates === false) {
+    options.includeContentTemplates = false;
+  }
+  if (options.regions === false) {
+    options.includeRegions = false;
+  }
+}
+
 export function updateConfigFromOptions(options: {
   clientId?: string;
   clientSecret?: string;
