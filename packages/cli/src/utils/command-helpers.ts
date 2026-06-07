@@ -9,6 +9,8 @@ import {
   usesManagedDefaultScope,
 } from '../config';
 
+import type { CanvasSyncConfig } from '@drupal-canvas/discovery';
+
 /**
  * Magic string constant for "all components" selector
  */
@@ -31,14 +33,19 @@ export function validateComponentOptions(options: {
 /**
  * Updates config with common CLI options
  */
-export function applySyncOptionAliasesAndWarnings(options: {
+interface SyncCommandOptions {
   includePages?: boolean;
   includeContentTemplates?: boolean;
   includeRegions?: boolean;
   pages?: boolean;
   contentTemplates?: boolean;
   regions?: boolean;
-}): void {
+  sync?: Partial<CanvasSyncConfig>;
+}
+
+export function applySyncOptionAliasesAndWarnings(
+  options: SyncCommandOptions,
+): void {
   if (typeof options.includePages === 'boolean') {
     p.log.warn(
       options.includePages
@@ -61,15 +68,26 @@ export function applySyncOptionAliasesAndWarnings(options: {
     );
   }
 
+  const syncOptions = options.sync ?? {};
+  if (typeof options.includePages === 'boolean') {
+    syncOptions.pages = options.includePages;
+  }
+  if (typeof options.includeContentTemplates === 'boolean') {
+    syncOptions.contentTemplates = options.includeContentTemplates;
+  }
+  if (typeof options.includeRegions === 'boolean') {
+    syncOptions.regions = options.includeRegions;
+  }
   if (options.pages === false) {
-    options.includePages = false;
+    syncOptions.pages = false;
   }
   if (options.contentTemplates === false) {
-    options.includeContentTemplates = false;
+    syncOptions.contentTemplates = false;
   }
   if (options.regions === false) {
-    options.includeRegions = false;
+    syncOptions.regions = false;
   }
+  options.sync = syncOptions;
 }
 
 export function updateConfigFromOptions(options: {
@@ -78,9 +96,7 @@ export function updateConfigFromOptions(options: {
   siteUrl?: string;
   dir?: string;
   scope?: string;
-  includePages?: boolean;
-  includeContentTemplates?: boolean;
-  includeRegions?: boolean;
+  sync?: Partial<CanvasSyncConfig>;
   includeBrandKit?: boolean;
   all?: boolean;
   aliasBaseDir?: string;
@@ -90,14 +106,14 @@ export function updateConfigFromOptions(options: {
   if (options.clientSecret) setConfig({ clientSecret: options.clientSecret });
   if (options.siteUrl) setConfig({ siteUrl: options.siteUrl });
   if (options.dir) setConfig({ componentDir: options.dir });
-  if (typeof options.includePages === 'boolean') {
-    setConfig({ includePages: options.includePages });
+  if (typeof options.sync?.pages === 'boolean') {
+    setConfig({ includePages: options.sync.pages });
   }
-  if (typeof options.includeContentTemplates === 'boolean') {
-    setConfig({ includeContentTemplates: options.includeContentTemplates });
+  if (typeof options.sync?.contentTemplates === 'boolean') {
+    setConfig({ includeContentTemplates: options.sync.contentTemplates });
   }
-  if (typeof options.includeRegions === 'boolean') {
-    setConfig({ includeRegions: options.includeRegions });
+  if (typeof options.sync?.regions === 'boolean') {
+    setConfig({ includeRegions: options.sync.regions });
   }
   if (typeof options.includeBrandKit === 'boolean') {
     setConfig({ includeBrandKit: options.includeBrandKit });
