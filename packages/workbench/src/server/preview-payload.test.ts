@@ -170,6 +170,55 @@ describe('preview-payload', () => {
     );
   });
 
+  it('warns and uses legacy global css fallback when the new default is missing', async () => {
+    const root = await makeTemporaryDirectory();
+
+    await writeFile(
+      path.join(root, 'src/components/card/component.yml'),
+      'name: Card\n',
+    );
+    await writeFile(
+      path.join(root, 'src/components/card/index.tsx'),
+      'export default function Card() { return null; }',
+    );
+    await writeFile(
+      path.join(root, 'src/components/global.css'),
+      'body { margin: 0; }',
+    );
+
+    let capturedCssEntryPaths: string[] = [];
+
+    const payload = await buildPreviewPayload(
+      {
+        mode: 'component',
+        inputPath: 'src/components/card/component.yml',
+        projectRoot: root,
+      },
+      {
+        bundleInteractivePreview: async (options) => {
+          capturedCssEntryPaths = options.cssEntryPaths;
+          return {
+            js: 'console.log("interactive");',
+            css: 'body{margin:0;}',
+          };
+        },
+      },
+    );
+
+    expect(payload.ok).toBe(true);
+    expect(payload.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'legacy_default_global_css_path',
+          path: './src/components/global.css',
+        }),
+      ]),
+    );
+    expect(capturedCssEntryPaths).toContain(
+      path.resolve(root, 'src/components/global.css'),
+    );
+  });
+
   it('builds interactive page preview payload', async () => {
     const root = await makeTemporaryDirectory();
 
