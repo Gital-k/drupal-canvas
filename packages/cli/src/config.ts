@@ -220,20 +220,22 @@ function getEnvBoolean(value: string | undefined, fallback: boolean): boolean {
   return parseBooleanSetting(value) ?? fallback;
 }
 
-const includePages = getEnvBoolean(
-  process.env.CANVAS_INCLUDE_PAGES,
-  sync.pages,
-);
+const configuredSync = readConfiguredSyncSettings();
 
-const includeContentTemplates = getEnvBoolean(
-  process.env.CANVAS_INCLUDE_CONTENT_TEMPLATES,
-  sync.contentTemplates,
-);
+const includePages =
+  configuredSync.pages ??
+  getEnvBoolean(process.env.CANVAS_INCLUDE_PAGES, sync.pages);
 
-const includeRegions = getEnvBoolean(
-  process.env.CANVAS_INCLUDE_REGIONS,
-  sync.regions,
-);
+const includeContentTemplates =
+  configuredSync.contentTemplates ??
+  getEnvBoolean(
+    process.env.CANVAS_INCLUDE_CONTENT_TEMPLATES,
+    sync.contentTemplates,
+  );
+
+const includeRegions =
+  configuredSync.regions ??
+  getEnvBoolean(process.env.CANVAS_INCLUDE_REGIONS, sync.regions);
 
 const includeBrandKit = getEnvBoolean(
   process.env.CANVAS_INCLUDE_BRAND_KIT,
@@ -360,6 +362,36 @@ function readCanvasConfigFile(): {
   return { configPath, hasConfigFile, parsedConfig, configParseError };
 }
 
+function readConfiguredSyncSettings(): Partial<{
+  pages: boolean;
+  contentTemplates: boolean;
+  regions: boolean;
+}> {
+  const { parsedConfig, configParseError } = readCanvasConfigFile();
+  if (configParseError) {
+    return {};
+  }
+  const parsedSync = parsedConfig?.sync;
+  if (
+    !parsedSync ||
+    typeof parsedSync !== 'object' ||
+    Array.isArray(parsedSync)
+  ) {
+    return {};
+  }
+
+  const syncConfig = parsedSync as Record<string, unknown>;
+  return {
+    pages: typeof syncConfig.pages === 'boolean' ? syncConfig.pages : undefined,
+    contentTemplates:
+      typeof syncConfig.contentTemplates === 'boolean'
+        ? syncConfig.contentTemplates
+        : undefined,
+    regions:
+      typeof syncConfig.regions === 'boolean' ? syncConfig.regions : undefined,
+  };
+}
+
 function writeCanvasConfigFile(
   configPath: string,
   configContent: Record<string, unknown>,
@@ -387,16 +419,25 @@ export async function handleLegacySyncEnvMigration(
     return;
   }
 
+  const { configPath, parsedConfig, configParseError } = readCanvasConfigFile();
+  const existingSync =
+    parsedConfig?.sync &&
+    typeof parsedConfig.sync === 'object' &&
+    !Array.isArray(parsedConfig.sync)
+      ? (parsedConfig.sync as Record<string, unknown>)
+      : {};
+
   for (const setting of legacyValues) {
     p.log.warn(
       `${setting.envName} is deprecated. Set "${setting.configPath}" in canvas.config.json instead.`,
     );
-    if (setting.parsed !== undefined) {
+    if (
+      setting.parsed !== undefined &&
+      typeof existingSync[setting.configKey] !== 'boolean'
+    ) {
       setConfig({ [setting.setKey]: setting.parsed });
     }
   }
-
-  const { configPath, parsedConfig, configParseError } = readCanvasConfigFile();
 
   if (configParseError) {
     p.log.warn(
@@ -405,12 +446,6 @@ export async function handleLegacySyncEnvMigration(
     return;
   }
 
-  const existingSync =
-    parsedConfig?.sync &&
-    typeof parsedConfig.sync === 'object' &&
-    !Array.isArray(parsedConfig.sync)
-      ? (parsedConfig.sync as Record<string, unknown>)
-      : {};
   const missingSettings = legacyValues.filter(
     (setting) =>
       setting.parsed !== undefined &&
