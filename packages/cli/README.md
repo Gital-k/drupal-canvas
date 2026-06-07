@@ -55,20 +55,28 @@ properties:
   "contentTemplatesDir": "content-templates",
   "aliasBaseDir": "src",
   "outputDir": "dist",
-  "globalCssPath": "src/global.css"
+  "globalCssPath": "src/global.css",
+  "sync": {
+    "pages": true,
+    "contentTemplates": true,
+    "regions": true
+  }
 }
 ```
 
 **Properties:**
 
-| Property              | Default               | Description                                                                                                               |
-| --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `componentDir`        | `"src/components"`    | Directory where Code Components are stored in the filesystem. It must be inside `aliasBaseDir` for local builds.          |
-| `pagesDir`            | `"pages"`             | Directory where pages are stored in the filesystem.                                                                       |
-| `contentTemplatesDir` | `"content-templates"` | Directory where content templates are stored in the filesystem.                                                           |
-| `aliasBaseDir`        | `"src"`               | Base directory for module resolution when using path aliases in your components. Tied to your project's import structure. |
-| `outputDir`           | `"dist"`              | Build output directory (similar to Vite's `build.outDir`). Defines where compiled assets are generated.                   |
-| `globalCssPath`       | `"src/global.css"`    | Path to the global CSS file.                                                                                              |
+| Property                | Default               | Description                                                                                                               |
+| ----------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `componentDir`          | `"src/components"`    | Directory where Code Components are stored in the filesystem. It must be inside `aliasBaseDir` for local builds.          |
+| `pagesDir`              | `"pages"`             | Directory where pages are stored in the filesystem.                                                                       |
+| `contentTemplatesDir`   | `"content-templates"` | Directory where content templates are stored in the filesystem.                                                           |
+| `aliasBaseDir`          | `"src"`               | Base directory for module resolution when using path aliases in your components. Tied to your project's import structure. |
+| `outputDir`             | `"dist"`              | Build output directory (similar to Vite's `build.outDir`). Defines where compiled assets are generated.                   |
+| `globalCssPath`         | `"src/global.css"`    | Path to the global CSS file.                                                                                              |
+| `sync.pages`            | `true`                | Include pages in `pull` and `push`. Set to `false` to exclude pages by default.                                           |
+| `sync.contentTemplates` | `true`                | Include content templates in `pull` and `push`. Set to `false` to exclude content templates by default.                   |
+| `sync.regions`          | `true`                | Include global regions in `pull` and `push`. Set to `false` to exclude global regions by default.                         |
 
 If `canvas.config.json` is not present, the CLI will use the default values
 shown above. For existing projects, if `globalCssPath` is not set and
@@ -190,18 +198,18 @@ to get started.
 
 **Note:** When `CANVAS_SCOPE` is unset, the CLI uses the `canvas_oauth`
 defaults. With `--include-brand-kit` or `CANVAS_INCLUDE_BRAND_KIT`, it adds the
-`canvas:brand_kit` scope. With `--include-pages` or `CANVAS_INCLUDE_PAGES`, it
-adds the `canvas:page:*` scopes. With `--include-content-templates` or
-`CANVAS_INCLUDE_CONTENT_TEMPLATES`, it adds the `canvas:content_template` scope.
-With `--include-regions` or `CANVAS_INCLUDE_REGIONS`, it also adds the
-`canvas:page_region` scope.
+`canvas:brand_kit` scope. When pages, content templates, or global regions are
+enabled through `sync` config, defaults, or deprecated env vars, it adds the
+corresponding `canvas:page:*`, `canvas:content_template`, and
+`canvas:page_region` scopes.
 
 #### Configuration Precedence
 
 The CLI uses different precedence rules depending on the type of configuration:
 
-**For canvas.config.json properties** (`componentDir`, `pagesDir`,
-`contentTemplatesDir`, `aliasBaseDir`, `outputDir`, `globalCssPath`):
+**For canvas.config.json path and build properties** (`componentDir`,
+`pagesDir`, `contentTemplatesDir`, `aliasBaseDir`, `outputDir`,
+`globalCssPath`):
 
 Configuration sources are applied in order of precedence from highest to lowest:
 
@@ -209,6 +217,19 @@ Configuration sources are applied in order of precedence from highest to lowest:
    `--output-dir`) - Highest priority
 2. **canvas.config.json** - Values defined in your project's config file
 3. **Default values** - Built-in defaults if nothing else is specified
+
+**For canvas.config.json sync properties** (`sync.pages`,
+`sync.contentTemplates`, and `sync.regions`):
+
+Configuration sources are applied in order of precedence from highest to lowest:
+
+1. **Command-line arguments** (`--no-pages`, `--no-content-templates`, and
+   `--no-regions`) - Highest priority
+2. **Deprecated sync environment variables** (`CANVAS_INCLUDE_PAGES`,
+   `CANVAS_INCLUDE_CONTENT_TEMPLATES`, and `CANVAS_INCLUDE_REGIONS`) -
+   Current-run compatibility only
+3. **canvas.config.json** - Values defined in your project's config file
+4. **Default values** - Built-in defaults if nothing else is specified
 
 Example: If you have `"componentDir": "components"` in `canvas.config.json` but
 run `npx canvas build --dir ./my-components`, the CLI will use
@@ -381,9 +402,9 @@ downloaded by default and can be controlled with `--skip-css` to exclude them or
 
 ### `pull`
 
-Pull code components and global CSS from Drupal to your local filesystem. Pages,
-content templates, and Brand Kit fonts are only included when explicitly
-enabled.
+Pull code components, global CSS, pages, content templates, and global regions
+from Drupal to your local filesystem. Brand Kit fonts are only included when
+explicitly enabled.
 
 **Usage:**
 
@@ -418,10 +439,10 @@ Pull Code Components and global CSS:
 npx canvas pull
 ```
 
-Pull Code Components, global CSS, pages, and content templates:
+Pull Code Components and global CSS without pages or content templates:
 
 ```bash
-npx canvas pull --include-pages --include-content-templates
+npx canvas pull --no-pages --no-content-templates
 ```
 
 Pull Brand Kit fonts:
@@ -442,12 +463,12 @@ Fully non-interactive, only pull new items:
 npx canvas pull --yes --skip-overwrite
 ```
 
-Pulls Code Components and global CSS from your site. Use `--include-pages` or
-`CANVAS_INCLUDE_PAGES=true` to include pages, `--include-content-templates` or
-`CANVAS_INCLUDE_CONTENT_TEMPLATES=true` to include content templates,
-`--include-brand-kit` or `CANVAS_INCLUDE_BRAND_KIT=true` to include Brand Kit
-fonts and `--include-regions` or `CANVAS_INCLUDE_REGIONS=true` to include global
-regions. Use `--skip-overwrite` to skip items that already exist locally.
+Pulls Code Components, global CSS, pages, content templates, and global regions
+from your site by default. Use `--no-pages`, `--no-content-templates`, or
+`--no-regions` to exclude those resources for a single run, or set `sync.*` in
+`canvas.config.json` to change project defaults. Use `--include-brand-kit` or
+`CANVAS_INCLUDE_BRAND_KIT=true` to include Brand Kit fonts. Use
+`--skip-overwrite` to skip items that already exist locally.
 
 **Fonts:** The pull command fetches fonts from the global Brand Kit, downloads
 font files into a `fonts/` directory, and adds local `src` entries to
@@ -725,9 +746,9 @@ the site will be updated if they already exist.
 
 ### `push`
 
-Build and push local components, global CSS, and build artifacts to Drupal.
-Pages, content templates, and Brand Kit fonts are only included when explicitly
-enabled.
+Build and push local components, global CSS, build artifacts, pages, content
+templates, and global regions to Drupal. Brand Kit fonts are only included when
+explicitly enabled.
 
 **Usage:**
 
@@ -753,16 +774,10 @@ Push all discovered components:
 npx canvas push
 ```
 
-Push components and pages:
+Push components without pages or content templates:
 
 ```bash
-npx canvas push --include-pages
-```
-
-Push components and content templates:
-
-```bash
-npx canvas push --include-content-templates
+npx canvas push --no-pages --no-content-templates
 ```
 
 Push Brand Kit fonts:
@@ -796,13 +811,13 @@ Tailwind CSS, and uploads the selected content to your Drupal site including:
 4. **Vendor artifacts** - Bundled third-party dependencies
 5. **Local artifacts** - Bundled local imports (e.g., `@/utils`)
 6. **Shared chunks** - Common code shared between vendor bundles
-7. **Pages** - Canvas pages built from components, when enabled with
-   `--include-pages` or `CANVAS_INCLUDE_PAGES=true`.
+7. **Pages** - Canvas pages built from components, unless excluded with
+   `--no-pages` or `sync.pages: false`.
 8. **Content Templates** - Content templates that define component layouts for
-   entity view modes, when enabled with `--include-content-templates` or
-   `CANVAS_INCLUDE_CONTENT_TEMPLATES=true`.
-9. **Global regions** - Theme global regions, when enabled with
-   `--include-regions` or `CANVAS_INCLUDE_REGIONS=true`.
+   entity view modes, unless excluded with `--no-content-templates` or
+   `sync.contentTemplates: false`.
+9. **Global regions** - Theme global regions, unless excluded with
+   `--no-regions` or `sync.regions: false`.
 
 ---
 
