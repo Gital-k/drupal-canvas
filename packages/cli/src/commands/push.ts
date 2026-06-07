@@ -5,7 +5,7 @@ import { Option } from 'commander';
 import * as p from '@clack/prompts';
 import { discoverCanvasProject } from '@drupal-canvas/discovery';
 
-import { ensureConfig, getConfig } from '../config.js';
+import { ensureConfig, getConfig, parseBooleanSetting } from '../config.js';
 import {
   buildFontPushPlannedResults,
   pushFonts,
@@ -70,6 +70,49 @@ interface PushOptions {
   includeBrandKit?: boolean;
   dir?: string;
   yes?: boolean;
+}
+
+export type SyncExclusionSource = 'flag' | 'deprecated-flag' | 'env' | 'config';
+
+export interface SyncExclusionMessageOptions {
+  noFlag: string;
+  includeFlag: string;
+  envName: string;
+  configPath: string;
+}
+
+export function getSyncExclusionSource(
+  noOption: boolean | undefined,
+  includeOption: boolean | undefined,
+  envValue: string | undefined,
+): SyncExclusionSource {
+  if (noOption === false) {
+    return 'flag';
+  }
+  if (includeOption === false) {
+    return 'deprecated-flag';
+  }
+  if (parseBooleanSetting(envValue ?? '') === false) {
+    return 'env';
+  }
+  return 'config';
+}
+
+export function getSyncExclusionMessage(
+  label: string,
+  source: SyncExclusionSource,
+  options: SyncExclusionMessageOptions,
+): string {
+  switch (source) {
+    case 'flag':
+      return `Local ${label} were found but excluded by ${options.noFlag}. Remove that flag to push them.`;
+    case 'deprecated-flag':
+      return `Local ${label} were found but excluded by deprecated ${options.includeFlag}=false. Remove that flag, or use ${options.noFlag} when you want to exclude them.`;
+    case 'env':
+      return `Local ${label} were found but excluded by deprecated ${options.envName}=false. Remove that environment variable, or set "${options.configPath}" to true in canvas.config.json to push them.`;
+    case 'config':
+      return `Local ${label} were found but excluded by "${options.configPath}": false in canvas.config.json. Set it to true to push them.`;
+  }
 }
 
 /**
@@ -378,6 +421,62 @@ export function pushCommand(program: Command): void {
         const discoveredRegions = includesRegions ? allDiscoveredRegions : [];
         const hasIgnoredRegions =
           !includesRegions && allDiscoveredRegions.length > 0;
+        const logIgnoredLocalResources = () => {
+          if (hasIgnoredPages) {
+            p.log.info(
+              getSyncExclusionMessage(
+                'pages',
+                getSyncExclusionSource(
+                  options.pages,
+                  options.includePages,
+                  process.env.CANVAS_INCLUDE_PAGES,
+                ),
+                {
+                  noFlag: '--no-pages',
+                  includeFlag: '--include-pages',
+                  envName: 'CANVAS_INCLUDE_PAGES',
+                  configPath: 'sync.pages',
+                },
+              ),
+            );
+          }
+          if (hasIgnoredContentTemplates) {
+            p.log.info(
+              getSyncExclusionMessage(
+                'content templates',
+                getSyncExclusionSource(
+                  options.contentTemplates,
+                  options.includeContentTemplates,
+                  process.env.CANVAS_INCLUDE_CONTENT_TEMPLATES,
+                ),
+                {
+                  noFlag: '--no-content-templates',
+                  includeFlag: '--include-content-templates',
+                  envName: 'CANVAS_INCLUDE_CONTENT_TEMPLATES',
+                  configPath: 'sync.contentTemplates',
+                },
+              ),
+            );
+          }
+          if (hasIgnoredRegions) {
+            p.log.info(
+              getSyncExclusionMessage(
+                'global regions',
+                getSyncExclusionSource(
+                  options.regions,
+                  options.includeRegions,
+                  process.env.CANVAS_INCLUDE_REGIONS,
+                ),
+                {
+                  noFlag: '--no-regions',
+                  includeFlag: '--include-regions',
+                  envName: 'CANVAS_INCLUDE_REGIONS',
+                  configPath: 'sync.regions',
+                },
+              ),
+            );
+          }
+        };
 
         if (
           components.length === 0 &&
@@ -386,25 +485,10 @@ export function pushCommand(program: Command): void {
           discoveredRegions.length === 0 &&
           !(includesBrandKit && hasBrandKitFontsConfig)
         ) {
-          if (hasIgnoredPages) {
-            p.log.info(
-              'Ignoring local pages. Use --include-pages or set CANVAS_INCLUDE_PAGES=true to push them.',
-            );
-          }
-          if (hasIgnoredContentTemplates) {
-            p.log.info(
-              'Ignoring local content templates. Use --include-content-templates or set CANVAS_INCLUDE_CONTENT_TEMPLATES=true to push them.',
-            );
-          }
+          logIgnoredLocalResources();
           p.log.warn(
-            'No components, pages, content templates or global regions found.',
+            'No components, pages, content templates, or global regions found for the enabled sync settings.',
           );
-          if (hasIgnoredRegions) {
-            p.log.info(
-              'Ignoring local global regions. Use --include-regions or set CANVAS_INCLUDE_REGIONS=true to push them.',
-            );
-          }
-          p.log.warn('No components, pages, or global regions found.');
           p.outro('Push aborted (nothing to push)');
           return;
         }
@@ -426,23 +510,7 @@ export function pushCommand(program: Command): void {
           p.log.info('No components found. Skipping component push.');
         }
 
-        if (hasIgnoredPages && components.length > 0) {
-          p.log.info(
-            'Ignoring local pages. Use --include-pages or set CANVAS_INCLUDE_PAGES=true to push them.',
-          );
-        }
-
-        if (hasIgnoredContentTemplates && components.length > 0) {
-          p.log.info(
-            'Ignoring local content templates. Use --include-content-templates or set CANVAS_INCLUDE_CONTENT_TEMPLATES=true to push them.',
-          );
-        }
-
-        if (hasIgnoredRegions && components.length > 0) {
-          p.log.info(
-            'Ignoring local global regions. Use --include-regions or set CANVAS_INCLUDE_REGIONS=true to push them.',
-          );
-        }
+        logIgnoredLocalResources();
 
         apiService = await createApiService();
         const existingComponents =
