@@ -225,10 +225,10 @@ Configuration sources are applied in order of precedence from highest to lowest:
 
 1. **Command-line arguments** (`--no-pages`, `--no-content-templates`, and
    `--no-regions`) - Highest priority
-2. **Deprecated sync environment variables** (`CANVAS_INCLUDE_PAGES`,
-   `CANVAS_INCLUDE_CONTENT_TEMPLATES`, and `CANVAS_INCLUDE_REGIONS`) -
-   Current-run compatibility only
-3. **canvas.config.json** - Values defined in your project's config file
+2. **canvas.config.json** - Values defined in your project's config file
+3. **Deprecated sync environment variables** (`CANVAS_INCLUDE_PAGES`,
+   `CANVAS_INCLUDE_CONTENT_TEMPLATES`, and `CANVAS_INCLUDE_REGIONS`) - Used only
+   when the matching `sync.*` key is omitted from `canvas.config.json`
 4. **Default values** - Built-in defaults if nothing else is specified
 
 Example: If you have `"componentDir": "components"` in `canvas.config.json` but
