@@ -149,6 +149,7 @@ export async function pushPages(
       return { title: page.title, operation: 'Updated' as const };
     } else {
       const created = await apiService.createPage({
+        uuid: page.uuid,
         title: page.title,
         description: page.description,
         status: false,

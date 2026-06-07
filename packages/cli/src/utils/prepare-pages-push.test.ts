@@ -314,11 +314,62 @@ describe('pushPages', () => {
     expect(results[0].success).toBe(true);
     expect(results[0].result?.operation).toBe('Created');
     expect(api.createPage).toHaveBeenCalledTimes(1);
+    expect(api.createPage).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: null }),
+    );
     expect(api.updatePage).not.toHaveBeenCalled();
 
     // Verify UUID was written back to the file.
     const content = JSON.parse(await fs.readFile(filePath, 'utf-8'));
     expect(content.uuid).toBe('server-assigned-uuid');
+  });
+
+  it('should pass local UUID when creating a page that has no remote match', async () => {
+    const localUuid = 'local-pre-assigned-uuid';
+    const filePath = path.join(tmpDir, 'local-uuid.json');
+    await fs.writeFile(
+      filePath,
+      JSON.stringify({
+        uuid: localUuid,
+        title: 'Existing Local',
+        elements: {},
+      }),
+      'utf-8',
+    );
+    const prepared = [
+      {
+        index: 0,
+        result: {
+          uuid: localUuid,
+          title: 'Existing Local',
+          description: '',
+          path: '',
+          components: [],
+          filePath,
+          pendingMediaReconciliations: [],
+        },
+      },
+    ];
+
+    const api = {
+      updatePage: vi.fn(),
+      createPage: vi.fn().mockResolvedValue({
+        uuid: localUuid,
+        id: 2,
+        title: 'Existing Local',
+        components: [],
+      }),
+    } as unknown as Pick<ApiService, 'createPage' | 'updatePage'>;
+
+    const results = await pushPages(prepared, new Map(), api);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].success).toBe(true);
+    expect(results[0].result?.operation).toBe('Created');
+    expect(api.createPage).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: localUuid }),
+    );
+    expect(api.updatePage).not.toHaveBeenCalled();
   });
 });
 
