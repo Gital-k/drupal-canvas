@@ -556,8 +556,8 @@ function getHandlersForMessage(message: any) {
 // preserving the user's scroll position: if they were pinned to the bottom we
 // follow the new content, but if they scrolled up to read earlier output we
 // leave them be. The "pinned" check must run BEFORE the mutation (otherwise the
-// grown content has already changed scrollHeight); the scroll runs AFTER, in a
-// macrotask, so DeepChat has painted the new message. DeepChat's scroll
+// grown content has already changed scrollHeight); the scroll runs AFTER,
+// deferred via setTimeout(0), so DeepChat has painted the new message. DeepChat's scroll
 // container lives in its shadow root as `#messages`.
 function withStickyScroll(chatEl: any, mutate: () => void) {
   const container = chatEl?.shadowRoot?.querySelector('#messages');
