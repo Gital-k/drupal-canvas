@@ -750,6 +750,11 @@ describe('Prop types editing', () => {
         'This is the description of String, format=iri-reference',
       ).should('exist');
       cy.findByLabelText('String, format=iri-reference').clear({ force: true });
+      cy.intercept({
+        url: '**/canvas/api/v0/layout/node/1',
+        times: 1,
+        method: 'PATCH',
+      }).as('updatePreview');
       // Autocomplete fields that did not select an autocomplete suggestion
       // must be blurred before the store is updated.
       cy.findByLabelText('String, format=iri-reference').blur();
@@ -758,6 +763,8 @@ describe('Prop types editing', () => {
         .then(($el) => $el[0].checkValidity())
         .should('be.true');
 
+      // Wait for preview to update.
+      cy.wait('@updatePreview');
       cy.waitForElementContentNotInIframe(previewSelector, initialValue);
 
       cy.testInIframe(previewSelector, (preview) => {
@@ -781,11 +788,16 @@ describe('Prop types editing', () => {
 
       cy.get('@theInput').clear({ force: true });
       cy.get('@theInput').focus();
+      cy.intercept({
+        url: '**/canvas/api/v0/layout/node/1',
+        times: 1,
+        method: 'PATCH',
+      }).as('updatePreview');
       cy.realType('/whatever');
       // Autocomplete fields that did not select an autocomplete suggestion
       // must be blurred before the store is updated.
       cy.get('@theInput').blur();
-
+      cy.wait('@updatePreview');
       cy.waitForElementContentInIframe(previewSelector, '/whatever');
     },
   );
