@@ -66,6 +66,8 @@ class CanvasAiPageBuilderHelper {
    *   The logger channel factory.
    * @param \Drupal\Core\Config\TypedConfigManagerInterface $typedConfigManager
    *   The typed config manager.
+   * @param \Drupal\canvas_ai\CanvasAiPlacementDto $placementDto
+   *   Per-request storage for placement results.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
@@ -83,6 +85,7 @@ class CanvasAiPageBuilderHelper {
     #[Autowire(service: 'logger.factory')]
     private readonly LoggerChannelFactoryInterface $loggerFactory,
     private readonly TypedConfigManagerInterface $typedConfigManager,
+    private readonly CanvasAiPlacementDto $placementDto,
   ) {
   }
 
@@ -176,9 +179,12 @@ class CanvasAiPageBuilderHelper {
     ];
     $parsed_yaml = Yaml::parse($yaml_string);
     $parsed_yaml = \is_array($parsed_yaml) ? $parsed_yaml : [];
-    // Add UUIDs to all components in the page builder output, so that their
-    // nodePaths can be extracted later from the expected layout.
+    // Assign backend-generated UUIDs before anything else.
+    // @see \Drupal\canvas_ai\Plugin\AiFunctionCall\PlaceComponents — reads them
+    // back from the DTO and includes them in its tool result, so the model sees
+    // real UUIDs for reference_uuid chaining without an extra round-trip.
     $data_to_process = $this->addUuidToAllComponents($parsed_yaml);
+    $this->placementDto->setComponentStructureWithUuids($data_to_process);
 
     $current_layout = $this->canvasAiTempstore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '';
     $current_layout = Json::decode($current_layout);
@@ -187,6 +193,10 @@ class CanvasAiPageBuilderHelper {
     // Create the final layout structure by adding the components at the expected
     // positions in the layout.
     $predicted_layout = $this->createExpectedPageLayout($current_layout, $data_to_process);
+    // @see \Drupal\canvas_ai\Plugin\AiFunctionCall\PlaceComponents — dumps this
+    // as YAML in the tool result so the model can see where placed components
+    // land and reference their UUIDs in follow-up placements.
+    $this->placementDto->setPredictedLayout($predicted_layout);
 
     // Get the nodePaths of newly added components from the predicted layout.
     // Then append them to the result.
@@ -219,6 +229,7 @@ class CanvasAiPageBuilderHelper {
         // the uuid.
         $node_path = $this->getCalculatedNodepath($predicted_layout, $component_data['uuid'], $target);
         $component_data_to_append['id'] = $id;
+        $component_data_to_append['uuid'] = $component_data['uuid'];
         $component_data_to_append['nodePath'] = $node_path;
         $component_data_to_append['fieldValues'] = $component_data['props'] ?? [];
         $result_components[] = $component_data_to_append;
@@ -1556,7 +1567,7 @@ class CanvasAiPageBuilderHelper {
 
       // Add page title.
       if (empty($prompt['page_title']) || $prompt['page_title'] === 'Untitled page') {
-        $base_message .= 'Page title is empty. GENERATE THE TITLE FOR THE PAGE using canvas_title_generation_agent. This is a **CRITICAL** step to ensure that request is successful. ';
+        $base_message .= 'Page title is empty.';
       }
       else {
         $base_message .= 'Page title: ' . $prompt['page_title'] . '. ';
@@ -1567,7 +1578,7 @@ class CanvasAiPageBuilderHelper {
         $base_message .= 'Page description: ' . $prompt['page_description'];
       }
       else {
-        $base_message .= 'Page description is empty. GENERATE THE DESCRIPTION FOR THE PAGE using canvas_metadata_generation_agent. This is a **CRITICAL** step to ensure that request is successful.';
+        $base_message .= 'Page description is empty.';
       }
 
       return $base_message;

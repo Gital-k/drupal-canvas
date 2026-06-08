@@ -127,6 +127,11 @@ type AddNewNodePayload = {
   to: number[];
   component: CanvasComponent;
   withValues?: Record<string, any>;
+  /**
+   * Pass an optional UUID for the new component instance. Generated when
+   * omitted.
+   */
+  uuid?: string;
 };
 
 type AddNewPatternPayload = {
@@ -601,7 +606,7 @@ export const _addNewComponentToLayout =
     };
 
     const slots: SlotNode[] = [];
-    const uuid = uuidv4();
+    const uuid = payload.uuid ?? uuidv4();
 
     // Create empty slots in the layout data for each child slot the component
     // has. Slot definitions can exist on any component that implements
