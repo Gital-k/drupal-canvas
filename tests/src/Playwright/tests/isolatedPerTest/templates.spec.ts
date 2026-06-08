@@ -74,11 +74,12 @@ test.describe('Templates - General', () => {
     await expect(page.locator(inputLocator)).toHaveValue(defaultHeading);
     await expect(page.locator(linkedBoxLocator)).not.toBeAttached();
 
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText(defaultHeading);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText(defaultHeading);
+      },
+    );
 
     await expect(page.getByTestId('select-content-preview-item')).toContainText(
       'Article One',
@@ -92,21 +93,23 @@ test.describe('Templates - General', () => {
     await expect(page.getByTestId('linked-field-label-heading')).toHaveText(
       'Title',
     );
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toHaveText('Article One');
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toHaveText('Article One');
+      },
+    );
     // Confirm that the heading is still linked after making a change to an
     // unlinked field
     await page
       .locator(`[data-drupal-selector$="-subheading-0-value"]`)
       .fill('submarine');
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] .my-hero__subheading',
-      ),
-    ).toHaveText('submarine');
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] .my-hero__subheading',
+      async (subheading) => {
+        await expect(subheading).toHaveText('submarine');
+      },
+    );
     // Open the full-page preview and verify the template renders correctly.
     await canvas.openPreview();
     const previewFrame = page

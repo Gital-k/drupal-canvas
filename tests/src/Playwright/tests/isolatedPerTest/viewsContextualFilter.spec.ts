@@ -65,16 +65,20 @@ test.describe('Views contextual filter in Canvas preview', () => {
 
     await page.getByTestId('select-content-preview-item').click();
     await page.getByRole('menuitem', { name: 'Article One' }).click();
-    const previewFrameOne = await canvas.getActivePreviewFrame();
-    await expect(
-      previewFrameOne.locator('[data-canvas-uuid] .views-field-name'),
-    ).toContainText('author');
+    await canvas.testInPreviewFrame(
+      '[data-canvas-uuid] .views-field-name',
+      async (field) => {
+        await expect(field).toContainText('author');
+      },
+    );
 
     await page.getByTestId('select-content-preview-item').click();
     await page.getByRole('menuitem', { name: 'Article Two' }).click();
-    const previewFrameTwo = await canvas.getActivePreviewFrame();
-    await expect(
-      previewFrameTwo.locator('[data-canvas-uuid] .views-field-name'),
-    ).toContainText('editor');
+    await canvas.testInPreviewFrame(
+      '[data-canvas-uuid] .views-field-name',
+      async (field) => {
+        await expect(field).toContainText('editor');
+      },
+    );
   });
 });
