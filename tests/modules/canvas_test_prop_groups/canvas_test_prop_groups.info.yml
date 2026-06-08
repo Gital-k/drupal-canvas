@@ -1,0 +1,6 @@
+name: 'Canvas test prop groups'
+type: module
+description: 'Provides SDC test fixtures for the propGroups / x-prop-group feature.'
+dependencies:
+  - canvas:canvas
+package: Testing

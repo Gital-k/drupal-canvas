@@ -14,7 +14,10 @@ import twigToJSXComponentMap from '@/components/form/twig-to-jsx-component-map';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
   clearFieldValues,
+  forceOpenGroups,
+  seedOpenGroups,
   selectFormValues,
+  selectGroupsWithErrors,
 } from '@/features/form/formStateSlice';
 import {
   isEvaluatedComponentModel,
@@ -65,6 +68,7 @@ interface ComponentInstanceFormProps {}
 const ComponentInstanceFormRenderer: React.FC<
   ComponentInstanceFormRendererProps
 > = (props) => {
+  const dispatch = useAppDispatch();
   const formState = useAppSelector((state) =>
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
@@ -77,6 +81,57 @@ const ComponentInstanceFormRenderer: React.FC<
     editorFrameContext,
     components,
   } = inputAndUiData;
+
+  // Seed openGroups state in Redux when the selected component type changes
+  // and when the components data arrives. This must reset every time the
+  // selection changes so that group "open" defaults from a previous component
+  // do not leak into the next.
+  const selectedComponent_ = components?.[selectedComponentType];
+  const propGroups =
+    selectedComponent_ && isPropSourceComponent(selectedComponent_)
+      ? selectedComponent_.propGroups
+      : undefined;
+  useEffect(() => {
+    if (!selectedComponentType) {
+      return;
+    }
+    dispatch(
+      seedOpenGroups({
+        formId: FORM_TYPES.COMPONENT_INSTANCE_FORM,
+        groups: propGroups ?? [],
+      }),
+    );
+  }, [dispatch, selectedComponentType, propGroups]);
+
+  // Auto-expand groups that contain validation errors. Only forces groups open
+  // when the set of errored group ids GROWS — never when it shrinks — so that
+  // a user manually closing a group is not overridden by a stale error set.
+  const propSourcesForErrors = (
+    selectedComponent_ && isPropSourceComponent(selectedComponent_)
+      ? selectedComponent_.propSources
+      : {}
+  ) as Record<string, { group?: string | null }>;
+  const erroredGroupIds = useAppSelector((state) =>
+    selectGroupsWithErrors(state, {
+      formId: FORM_TYPES.COMPONENT_INSTANCE_FORM,
+      propSources: propSourcesForErrors,
+    }),
+  );
+  const previousErroredGroupIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const previous = previousErroredGroupIdsRef.current;
+    const current = new Set(erroredGroupIds);
+    const newIds = erroredGroupIds.filter((id) => !previous.has(id));
+    if (newIds.length > 0) {
+      dispatch(
+        forceOpenGroups({
+          formId: FORM_TYPES.COMPONENT_INSTANCE_FORM,
+          groupIds: newIds,
+        }),
+      );
+    }
+    previousErroredGroupIdsRef.current = current;
+  }, [dispatch, erroredGroupIds]);
 
   const [jsxFormContent, setJsxFormContent] =
     useState<React.ReactElement | null>(null);

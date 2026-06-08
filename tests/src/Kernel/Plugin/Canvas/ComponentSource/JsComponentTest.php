@@ -1643,6 +1643,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
               ],
               '$id' => JsonSchemaObjectRef::Video->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:entity_reference',
             // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
             'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:video␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
@@ -1673,6 +1674,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
               'type' => 'integer',
               'enum' => [200, 300, 400, 500],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_integer',
             'expression' => 'ℹ︎list_integer␟value',
             'sourceTypeSettings' => [
@@ -1692,6 +1694,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -1702,6 +1705,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_interactive' => [
@@ -1724,6 +1728,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -1734,6 +1739,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
@@ -1744,6 +1750,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
         'source' => 'Code component',
         'metadata' => ['slots' => []],
         'propSources' => [],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_using_drupalsettings_get_theme_assets' => [
@@ -1754,6 +1761,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
         'source' => 'Code component',
         'metadata' => ['slots' => []],
         'propSources' => [],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_using_get_page_data' => [
@@ -1764,6 +1772,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
         'source' => 'Code component',
         'metadata' => ['slots' => []],
         'propSources' => [],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_using_imports' => [
@@ -1774,6 +1783,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
         'source' => 'Code component',
         'metadata' => ['slots' => []],
         'propSources' => [],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_vanilla_image' => [
@@ -1816,6 +1826,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
               ],
               '$id' => JsonSchemaObjectRef::Image->value,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
@@ -1829,6 +1840,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_with_array_enums' => [
@@ -1854,6 +1866,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
                 ],
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -1871,6 +1884,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_with_array_props' => [
@@ -1890,6 +1904,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
               ],
               'minItems' => 1,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'sourceTypeSettings' => [
@@ -1914,6 +1929,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
                 'format' => 'uri-reference',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:link',
             'expression' => 'ℹ︎link␟url',
             'sourceTypeSettings' => [
@@ -1940,6 +1956,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
               ],
               'maxItems' => 5,
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:integer',
             'expression' => 'ℹ︎integer␟value',
             'sourceTypeSettings' => [
@@ -1990,6 +2007,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
                 '$id' => JsonSchemaObjectRef::Image->value,
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'sourceTypeSettings' => [
@@ -2014,6 +2032,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_with_enums' => [
@@ -2036,6 +2055,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
                 'blue',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -2062,6 +2082,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
                 'large',
               ],
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
@@ -2079,6 +2100,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_with_link_prop' => [
@@ -2094,6 +2116,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -2109,6 +2132,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
               'type' => 'string',
               'format' => 'uri-reference',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:link',
             'expression' => 'ℹ︎link␟url',
             'sourceTypeSettings' => [
@@ -2128,6 +2152,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_with_no_props' => [
@@ -2138,6 +2163,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
         'source' => 'Code component',
         'metadata' => ['slots' => []],
         'propSources' => [],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_with_props' => [
@@ -2153,6 +2179,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -2167,6 +2194,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             'jsonSchema' => [
               'type' => 'integer',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:integer',
             'expression' => 'ℹ︎integer␟value',
             'default_values' => [
@@ -2177,6 +2205,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
       'js.canvas_test_code_components_with_slots' => [
@@ -2199,6 +2228,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             'jsonSchema' => [
               'type' => 'string',
             ],
+            'group' => NULL,
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
             'default_values' => [
@@ -2209,6 +2239,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
             ],
           ],
         ],
+        'propGroups' => [],
         'transforms' => [],
       ],
     ];

@@ -30,15 +30,62 @@ final class ComponentMetadataRequirementsChecker {
    *   Component metadata.
    * @param string[] $required_props
    *   Array of required prop names.
+   * @param array $prop_groups
+   *   The raw `propGroups` declaration from the component's YAML/definition (or
+   *   the equivalent for code components). Drupal core's ComponentMetadata
+   *   does not retain top-level keys other than its own, so this must be
+   *   passed in by callers that have access to the raw plugin definition.
    *
    * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
    *   When the component does not meet requirements.
    */
-  public static function check(string $component_id, ComponentMetadata $metadata, array $required_props): void {
+  public static function check(string $component_id, ComponentMetadata $metadata, array $required_props, array $prop_groups = []): void {
     $messages = [];
 
     if ($metadata->group == 'Elements') {
       $messages[] = 'Component uses the reserved "Elements" category';
+    }
+
+    // Validate `propGroups`.
+    $declared_group_ids = [];
+    foreach ($prop_groups as $index => $group) {
+      if (!\is_array($group)) {
+        $messages[] = \sprintf('Prop group at index %d must be an associative array.', $index);
+        continue;
+      }
+      $id = $group['id'] ?? NULL;
+      if (!\is_string($id) || $id === '') {
+        $messages[] = \sprintf('Prop group at index %d must have a non-empty string "id".', $index);
+      }
+      elseif (\in_array($id, $declared_group_ids, TRUE)) {
+        $messages[] = \sprintf('Duplicate prop group id "%s".', $id);
+      }
+      else {
+        $declared_group_ids[] = $id;
+      }
+      $title = $group['title'] ?? NULL;
+      if (!\is_string($title) || $title === '') {
+        $label = \is_string($id) && $id !== '' ? $id : "at index $index";
+        $messages[] = \sprintf('Prop group "%s" must have a non-empty string "title".', $label);
+      }
+      if (\array_key_exists('weight', $group) && !\is_numeric($group['weight'])) {
+        $label = \is_string($id) && $id !== '' ? $id : "at index $index";
+        $messages[] = \sprintf('Prop group "%s" "weight" must be numeric.', $label);
+      }
+      if (\array_key_exists('open', $group) && !\is_bool($group['open'])) {
+        $label = \is_string($id) && $id !== '' ? $id : "at index $index";
+        $messages[] = \sprintf('Prop group "%s" "open" must be a boolean.', $label);
+      }
+    }
+    // Every prop's `x-prop-group` must reference a declared group.
+    foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
+      if (!\array_key_exists('x-prop-group', $prop)) {
+        continue;
+      }
+      $referenced = $prop['x-prop-group'];
+      if (!\is_string($referenced) || !\in_array($referenced, $declared_group_ids, TRUE)) {
+        $messages[] = \sprintf('Prop "%s" references undeclared prop group "%s".', $prop_name, (string) $referenced);
+      }
     }
 
     // Every slot must have a title.

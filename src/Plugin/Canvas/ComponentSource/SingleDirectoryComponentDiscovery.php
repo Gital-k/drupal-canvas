@@ -80,6 +80,7 @@ final class SingleDirectoryComponentDiscovery extends JsonSchemaPropsComponentDi
       $definition['id'],
       $component_plugin->metadata,
       $definition['props']['required'] ?? [],
+      $definition['propGroups'] ?? [],
     );
   }
 

@@ -3096,6 +3096,24 @@ components:
                     type: array
                     items:
                       type: string
+        propGroups:
+          type: array
+          description: Optional list of declared prop groups for sidebar grouping.
+          items:
+            type: object
+            required:
+              - id
+              - title
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+              title:
+                type: string
+              weight:
+                type: number
+              open:
+                type: boolean
         propSources:
           type: object
           description: the StaticPropSources to use for each SDC prop

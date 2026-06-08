@@ -159,6 +159,68 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
   }
 
   /**
+   * Reads & normalizes prop group declarations.
+   *
+   * Drupal core's ComponentMetadata does not retain top-level keys other than
+   * those it knows about, so propGroups is read from the SDC plugin definition
+   * (the raw `*.component.yml` array). Each entry's `weight` defaults to 0,
+   * `open` defaults to FALSE. Entries are sorted by (weight ASC, declaration
+   * order ASC). The return value is a list (preserving sort order) of
+   * associative arrays.
+   *
+   * @return array<int, array{id: string, title: string, weight: int|float, open: bool}>
+   *   The normalized, sorted list of prop groups.
+   *
+   * @see \Drupal\canvas\ComponentMetadataRequirementsChecker
+   */
+  protected function getPropGroups(): array {
+    $definition = $this->getComponentPlugin()->getPluginDefinition();
+    \assert(\is_array($definition));
+    $raw_groups = $definition['propGroups'] ?? [];
+    if (!\is_array($raw_groups) || $raw_groups === []) {
+      return [];
+    }
+    // Normalize. Track declarationOrder for stable sorting on weight ties.
+    $normalized = [];
+    foreach (\array_values($raw_groups) as $declaration_order => $group) {
+      if (!\is_array($group) || !isset($group['id'])) {
+        // Validation should have caught this; defensive skip.
+        continue;
+      }
+      $normalized[] = [
+        'id' => (string) $group['id'],
+        'title' => (string) ($group['title'] ?? ''),
+        'weight' => $group['weight'] ?? 0,
+        'open' => (bool) ($group['open'] ?? FALSE),
+        '_declarationOrder' => $declaration_order,
+      ];
+    }
+    \usort($normalized, static function (array $a, array $b): int {
+      return ($a['weight'] <=> $b['weight'])
+        ?: ($a['_declarationOrder'] <=> $b['_declarationOrder']);
+    });
+    // Strip the internal sort key.
+    return \array_map(
+      static fn(array $group): array => \array_diff_key($group, \array_flip(['_declarationOrder'])),
+      $normalized,
+    );
+  }
+
+  /**
+   * Returns the declared prop group id for a prop, or NULL if ungrouped.
+   *
+   * @param string $prop_name
+   *   The SDC prop name.
+   *
+   * @return string|null
+   *   The prop group id, or NULL if no `x-prop-group` is set on the prop.
+   */
+  protected function getPropGroupId(string $prop_name): ?string {
+    $value = $this->getMetadata()->schema['properties'][$prop_name]['x-prop-group'] ?? NULL;
+    return $value === NULL ? NULL : (string) $value;
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function calculateDependencies(): array {
@@ -801,6 +863,24 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       ));
     }
 
+    // Build one `details` element per declared prop group, BEFORE iterating
+    // props. Drupal's `#group` machinery (the same mechanism used by vertical
+    // tabs children) reparents prop elements into their target group at render
+    // time. The `+ 100` weight offset reserves the natural-weight zone (≤ 0)
+    // for ungrouped props, so they render above all groups with no header.
+    // The `data-canvas-prop-group` attribute is consumed by the frontend to
+    // auto-expand groups containing validation errors.
+    // @see ::getPropGroups()
+    foreach ($this->getPropGroups() as $group) {
+      $form[$group['id']] = [
+        '#type' => 'details',
+        '#title' => $group['title'],
+        '#open' => $group['open'],
+        '#weight' => $group['weight'] + 100,
+        '#attributes' => ['data-canvas-prop-group' => $group['id']],
+      ];
+    }
+
     foreach ($prop_field_definitions as $sdc_prop_name => $static_prop_source_field_definition) {
       // Uncollapse if set; otherwise fall back to the default static prop
       // source, but *made empty* instead of the default value.
@@ -911,6 +991,21 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
         ));
       }
     }
+
+    // Physically reparent each grouped prop's form element into its declared
+    // group's `details` container. (Drupal's `#group` machinery is wired for
+    // vertical_tabs and does not move children into a standalone `details`
+    // element.) `#tree` defaults to FALSE on `details`, so nesting does not
+    // change the form-state values path: each prop's value remains addressable
+    // as `$form_state->getValue($sdc_prop_name)`.
+    foreach ($prop_field_definitions as $sdc_prop_name => $_) {
+      $group_id = $this->getPropGroupId($sdc_prop_name);
+      if ($group_id !== NULL && isset($form[$group_id], $form[$sdc_prop_name])) {
+        $form[$group_id][$sdc_prop_name] = $form[$sdc_prop_name];
+        unset($form[$sdc_prop_name]);
+      }
+    }
+
     $form['#attached']['canvas-transforms'] = $transforms;
     if ($entity instanceof ContentTemplate) {
       $form['#after_build'][] = [static::class, 'moveSuggestionsToLabel'];
@@ -1059,6 +1154,11 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       $field_data[$prop_name] = [
         'required' => \in_array($prop_name, $this->getMetadata()->schema['required'] ?? [], TRUE),
         'jsonSchema' => self::stripNonStandardJsonSchemaKeys($prop_shape->resolvedSchema),
+        // The id of the prop group this prop belongs to, or NULL if ungrouped.
+        // Kept as a sibling of `jsonSchema` (NOT inside it) so the JSON schema
+        // remains pure for Ajv on the client.
+        // @see ::getPropGroupId()
+        'group' => $this->getPropGroupId($prop_name),
       ] + \array_diff_key($default_static_prop_source->toArray(), \array_flip(['value']));
       if ($default_resolved->value !== NULL) {
         $field_data[$prop_name]['default_values']['source'] = $default_source_value;
@@ -1102,6 +1202,7 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       // @todo UI does not use any other metadata - should `slots` move to top level?
       'metadata' => ['slots' => $this->getSlotDefinitions()],
       'propSources' => $field_data,
+      'propGroups' => $this->getPropGroups(),
       'transforms' => $transforms,
     ];
   }
