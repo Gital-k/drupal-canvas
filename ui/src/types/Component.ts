@@ -26,6 +26,10 @@ export interface FieldDataItem {
     format?: string;
     maxItems?: number;
   };
+  // Set by the widget when its source value has a different shape than the
+  // prop's resolved value, so client-side validation is skipped for it.
+  // @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter
+  sourceShapeDiffersFromResolved?: boolean;
   default_values: DefaultValues;
   [x: string | number | symbol]: unknown;
 }

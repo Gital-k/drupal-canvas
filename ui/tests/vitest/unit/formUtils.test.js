@@ -1,5 +1,6 @@
 import {
   coerceValueForSchema,
+  shouldSkipPropValidation,
   validateProp,
 } from '@/components/form/react-hook-form/fields/componentFieldValidation';
 import {
@@ -626,4 +627,132 @@ describe('propInputData', () => {
     // Single value props should not have brackets.
     expect(propsInThisForm).to.not.include(']');
   });
+});
+
+describe('shouldSkipPropValidation', () => {
+  const buildTargetInForm = (name, otherInputNames = []) => {
+    const form = document.createElement('form');
+    const input = document.createElement('input');
+    input.name = name;
+    form.appendChild(input);
+    otherInputNames.forEach((extraName) => {
+      const extra = document.createElement('input');
+      extra.name = extraName;
+      form.appendChild(extra);
+    });
+    return input;
+  };
+
+  // Two independent skip rules:
+  //  - `sourceShapeDiffersFromResolved` (set by the widget): the source value is
+  //    a scalar the server wraps into the resolved object shape → skip
+  //    (content-entity-reference, image, file, media);
+  //  - `multipleInputsSingleValue`: the value is assembled from several inputs
+  //    and can't be validated per-keystroke → skip (date range, link).
+  // A plain scalar single-input prop is validated. The flag fires regardless of
+  // input count; an object schema alone does NOT skip.
+  // @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter
+  it.each([
+    {
+      widget: 'string_textfield',
+      prop: 'title',
+      name: 'canvas_component_props[comp1][title][0][value]',
+      extraInputs: [],
+      schema: { type: 'string' },
+      flag: false,
+      skipped: false,
+    },
+    {
+      widget: 'number',
+      prop: 'count',
+      name: 'canvas_component_props[comp1][count][0][value]',
+      extraInputs: [],
+      schema: { type: 'integer' },
+      flag: false,
+      skipped: false,
+    },
+    {
+      widget: 'options_select',
+      prop: 'size',
+      name: 'canvas_component_props[comp1][size]',
+      extraInputs: [],
+      schema: { type: 'string', enum: ['a', 'b'] },
+      flag: false,
+      skipped: false,
+    },
+    // Control: object schema but NOT flagged → still validated.
+    {
+      widget: '(unflagged object prop)',
+      prop: 'obj',
+      name: 'canvas_component_props[comp1][obj][0][value]',
+      extraInputs: [],
+      schema: { type: 'object' },
+      flag: false,
+      skipped: false,
+    },
+    // Flagged → skipped via the flag, even with a single input (the case the
+    // multi-input guard would miss).
+    {
+      widget: '(flagged single-input prop)',
+      prop: 'ref',
+      name: 'canvas_component_props[comp1][ref][0][target_id]',
+      extraInputs: [],
+      schema: { type: 'object' },
+      flag: true,
+      skipped: true,
+    },
+    {
+      widget: 'image_image',
+      prop: 'image',
+      name: 'canvas_component_props[comp1][image][0][fids]',
+      extraInputs: ['canvas_component_props[comp1][image][0][alt]'],
+      schema: { type: 'object' },
+      flag: true,
+      skipped: true,
+    },
+    {
+      widget: 'media_library_widget',
+      prop: 'media',
+      name: 'canvas_component_props[comp1][media][selection][0][target_id]',
+      extraInputs: [
+        'canvas_component_props[comp1][media][selection][0][_weight]',
+      ],
+      schema: { type: 'object' },
+      flag: true,
+      skipped: true,
+    },
+    // Not flagged, but assembled from multiple inputs → skipped via
+    // multipleInputsSingleValue (the separate pattern: date range, link).
+    {
+      widget: 'daterange_default',
+      prop: 'range',
+      name: 'canvas_component_props[comp1][range][0][value][date]',
+      extraInputs: ['canvas_component_props[comp1][range][0][end_value][date]'],
+      schema: { type: 'object' },
+      flag: false,
+      skipped: true,
+    },
+  ])(
+    '$widget → skipped=$skipped',
+    ({ prop, name, extraInputs, schema, flag, skipped }) => {
+      const target = buildTargetInForm(name, extraInputs);
+      const inputAndUiData = {
+        selectedComponent: 'comp1',
+        selectedComponentType: 'js.x',
+        components: {
+          'js.x': {
+            propSources: {
+              [prop]: {
+                jsonSchema: schema,
+                sourceShapeDiffersFromResolved: flag,
+              },
+            },
+          },
+        },
+      };
+      expect(
+        shouldSkipPropValidation(target.name, target, inputAndUiData, '3'),
+      ).to.equal(skipped);
+    },
+  );
 });

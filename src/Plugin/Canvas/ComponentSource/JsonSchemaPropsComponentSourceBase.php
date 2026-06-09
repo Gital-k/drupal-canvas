@@ -1088,6 +1088,14 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
           'https://git.drupalcode.org/project/canvas/-/raw/1.x/canvas.api.php?ref_type=heads',
         ));
       }
+      // Surface to the client when the widget's stored source value has a
+      // different shape than this prop's resolved value (a scalar id the server
+      // wraps into the resolved object shape). The client uses this to skip
+      // client-side JSON Schema validation and defer to the server.
+      // @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter()
+      if (!empty($widget_definition['canvas']['sourceShapeDiffersFromResolved'])) {
+        $field_data[$prop_name]['sourceShapeDiffersFromResolved'] = TRUE;
+      }
     }
 
     return [
