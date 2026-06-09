@@ -21,18 +21,17 @@ test.describe('Components with Children Slots', () => {
     await canvas.waitForContextualPanel();
 
     // Verify the component appears in the preview frame
-    const previewFrame = await canvas.getActivePreviewFrame();
+    await canvas.testInPreviewFrame('body', async (body) => {
+      // Verify the Hero component appears in the preview frame
+      await expect(body.locator('.bg-blue-500')).toBeVisible();
 
-    // Verify the Hero component appears in the preview frame
-    await expect(previewFrame.locator('.bg-blue-500')).toBeVisible();
+      // Verify the Container component (with children slot) is rendered
+      await expect(body.locator('.m-4')).toBeVisible();
 
-    // Verify the Container component (with children slot) is rendered
-    await expect(previewFrame.locator('.m-4')).toBeVisible();
-
-    // Verify the Hero component content renders within Container
-    await expect(previewFrame.locator('.bg-blue-500')).toBeVisible();
-    await expect(previewFrame.locator('h1.text-2xl')).toBeVisible();
-    await expect(previewFrame.locator('p.text-gray-500')).toBeVisible();
+      // Verify the Hero component content renders within Container
+      await expect(body.locator('h1.text-2xl')).toBeVisible();
+      await expect(body.locator('p.text-gray-500')).toBeVisible();
+    });
   });
 
   test('Can add Container component directly and place components in its children slot', async ({
@@ -55,15 +54,15 @@ test.describe('Components with Children Slots', () => {
     await canvas.moveComponent('Plain text', 'children');
 
     // Verify the components render correctly
-    const previewFrame = await canvas.getActivePreviewFrame();
+    await canvas.testInPreviewFrame('body', async (body) => {
+      // Verify Container component is rendered
+      await expect(body.locator('.m-4')).toBeVisible();
 
-    // Verify Container component is rendered
-    await expect(previewFrame.locator('.m-4')).toBeVisible();
-
-    // Verify Plain text component is rendered within the Container
-    // Plain text should render as a simple text element inside Container
-    await expect(
-      previewFrame.locator('.m-4').getByText('Plain text', { exact: false }),
-    ).toBeVisible();
+      // Verify Plain text component is rendered within the Container
+      // Plain text should render as a simple text element inside Container
+      await expect(
+        body.locator('.m-4').getByText('Plain text', { exact: false }),
+      ).toBeVisible();
+    });
   });
 });

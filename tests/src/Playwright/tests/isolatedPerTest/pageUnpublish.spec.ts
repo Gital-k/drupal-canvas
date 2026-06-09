@@ -67,11 +67,12 @@ test.describe('Test race conditions are avoided', () => {
     await canvas.createCanvas();
     await canvas.openLibraryPanel();
     await canvas.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText('There goes my hero');
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText('There goes my hero');
+      },
+    );
 
     // Test AJAX waits for layout PATCH.
     await canvas.editComponentProp('heading', 'Les');

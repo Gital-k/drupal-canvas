@@ -50,42 +50,42 @@ test.describe('Block form', () => {
       'xpath=//img[ancestor::*[starts-with(@id, "block-") and string-length(@id) = 42]]';
     const siteLogoCheckbox = page.getByRole('checkbox', { name: 'Site logo' });
     await expect(siteLogoCheckbox).not.toBeChecked();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(imgLocator),
-    ).toBeHidden();
+    await canvas.testInPreviewFrame(imgLocator, async (img) => {
+      await expect(img).toBeHidden();
+    });
     await siteLogoCheckbox.click();
     await expect(siteLogoCheckbox).toBeChecked();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(imgLocator),
-    ).toBeVisible();
+    await canvas.testInPreviewFrame(imgLocator, async (img) => {
+      await expect(img).toBeVisible();
+    });
     await siteLogoCheckbox.click();
     await expect(siteLogoCheckbox).not.toBeChecked();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(imgLocator),
-    ).toBeHidden();
+    await canvas.testInPreviewFrame(imgLocator, async (img) => {
+      await expect(img).toBeHidden();
+    });
 
     // Add the site name.
     const siteNameLocator =
       'xpath=//a[ancestor::*[starts-with(@id, "block-") and string-length(@id) = 42]]';
     const siteNameCheckbox = page.getByRole('checkbox', { name: 'Site name' });
     await expect(siteNameCheckbox).not.toBeChecked();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(siteNameLocator),
-    ).toBeHidden();
+    await canvas.testInPreviewFrame(siteNameLocator, async (anchor) => {
+      await expect(anchor).toBeHidden();
+    });
     await siteNameCheckbox.click();
     await expect(siteNameCheckbox).toBeChecked();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(siteNameLocator),
-    ).toHaveText('Drupal');
+    await canvas.testInPreviewFrame(siteNameLocator, async (anchor) => {
+      await expect(anchor).toHaveText('Drupal');
+    });
 
     // Verify the component is saved and renders with the new options.
     await canvas.publishAllChanges();
     await page.reload();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(imgLocator),
-    ).toBeHidden();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(siteNameLocator),
-    ).toHaveText('Drupal');
+    await canvas.testInPreviewFrame(imgLocator, async (img) => {
+      await expect(img).toBeHidden();
+    });
+    await canvas.testInPreviewFrame(siteNameLocator, async (anchor) => {
+      await expect(anchor).toHaveText('Drupal');
+    });
   });
 });

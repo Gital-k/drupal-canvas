@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 
 import { isolatedPerTest as test } from '../../fixtures/test.js';
 
-import type { FrameLocator, Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 async function getImageOrder(page: Page): Promise<string[]> {
   const items = await page
@@ -20,10 +20,8 @@ async function getImageOrder(page: Page): Promise<string[]> {
   return alts;
 }
 
-async function getPreviewImageOrder(
-  previewFrame: FrameLocator,
-): Promise<string[]> {
-  const figure = previewFrame.locator('main figure').first();
+async function getPreviewImageOrder(body: Locator): Promise<string[]> {
+  const figure = body.locator('main figure').first();
   const images = await figure.locator('img').all();
   const alts: string[] = [];
   for (const img of images) {
@@ -78,11 +76,12 @@ test.describe('Media Multi-Cardinality', () => {
       'A pub called The Princes Head surrounded by trees and two red London phone boxes',
     );
 
-    const previewFrame = await canvas.getActivePreviewFrame();
-    await expect(previewFrame.locator('main figure img')).toHaveCount(2);
-    const previewInitialOrder = await getPreviewImageOrder(previewFrame);
-    expect(previewInitialOrder).toHaveLength(2);
-    expect(previewInitialOrder).toEqual(initialOrder);
+    await canvas.testInPreviewFrame('body', async (body) => {
+      await expect(body.locator('main figure img')).toHaveCount(2);
+      const previewInitialOrder = await getPreviewImageOrder(body);
+      expect(previewInitialOrder).toHaveLength(2);
+      expect(previewInitialOrder).toEqual(initialOrder);
+    });
   });
 
   test('Adding media after page reload preserves existing items', async ({

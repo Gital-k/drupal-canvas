@@ -25,7 +25,6 @@ test.describe('Video Component', () => {
   }) => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.openCanvas(await canvas.createCanvas());
-    let previewFrame;
 
     const code = await readFile(
       'tests/fixtures/code_components/videos/Video.jsx',
@@ -52,21 +51,25 @@ test.describe('Video Component', () => {
       .getAttribute('value');
 
     // Check hardcoded default values.
-    previewFrame = await canvas.getActivePreviewFrame();
-    expect(await previewFrame.locator('video').getAttribute('src')).toContain(
-      '/ui/assets/videos/mountain_wide',
-    );
-    expect(
-      await previewFrame.locator('video').getAttribute('poster'),
-    ).toContain('https://placehold.co/1920x1080.png?text=Widescreen');
+    await canvas.testInPreviewFrame('video', async (video) => {
+      await expect(video).toHaveAttribute(
+        'src',
+        /\/ui\/assets\/videos\/mountain_wide/,
+      );
+      await expect(video).toHaveAttribute(
+        'poster',
+        /https:\/\/placehold\.co\/1920x1080\.png\?text=Widescreen/,
+      );
+    });
 
     await canvas.editComponentProp(
       'video',
       '../../../../../tests/fixtures/videos/bear.mp4',
       'file',
     );
-    previewFrame = await canvas.getActivePreviewFrame();
-    await expect(previewFrame.locator('video')).not.toHaveAttribute('poster');
+    await canvas.testInPreviewFrame('video', async (video) => {
+      await expect(video).not.toHaveAttribute('poster');
+    });
 
     // Click the remove button to remove the video.
     // @todo Regular .click() doesn't work for some reason.
@@ -93,8 +96,9 @@ test.describe('Video Component', () => {
     ).toBeHidden();
 
     // After removal, optional video prop is NULL, so no video element renders.
-    previewFrame = await canvas.getActivePreviewFrame();
-    await expect(previewFrame.locator('video')).toBeHidden();
+    await canvas.testInPreviewFrame('video', async (video) => {
+      await expect(video).toBeHidden();
+    });
 
     // Add a different video
     await canvas.editComponentProp(
@@ -115,11 +119,10 @@ test.describe('Video Component', () => {
       ),
     ).not.toHaveAttribute('value', formBuildId);
 
-    previewFrame = await canvas.getActivePreviewFrame();
-    await expect(previewFrame.locator('video')).not.toHaveAttribute('poster');
-    expect(await previewFrame.locator('video').getAttribute('src')).toContain(
-      'four-colors',
-    );
+    await canvas.testInPreviewFrame('video', async (video) => {
+      await expect(video).not.toHaveAttribute('poster');
+      await expect(video).toHaveAttribute('src', /four-colors/);
+    });
   });
 
   test('Can use media to populate a video prop', async ({ drupal, canvas }) => {
@@ -155,10 +158,9 @@ test.describe('Video Component', () => {
     await canvas.addComponent({ id: 'js.videomedia' });
 
     await canvas.addMediaFile('../../../../../fixtures/videos/four-colors.mp4');
-    const previewFrame = await canvas.getActivePreviewFrame();
-    await expect(previewFrame.locator('video')).not.toHaveAttribute('poster');
-    expect(await previewFrame.locator('video').getAttribute('src')).toContain(
-      'four-colors',
-    );
+    await canvas.testInPreviewFrame('video', async (video) => {
+      await expect(video).not.toHaveAttribute('poster');
+      await expect(video).toHaveAttribute('src', /four-colors/);
+    });
   });
 });
