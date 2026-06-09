@@ -10,6 +10,7 @@ use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Component\Datetime\TimeInterface;
@@ -373,6 +374,39 @@ class AutoSaveManager implements EventSubscriberInterface {
     $this->autoSaveStore->deleteAll();
     $this->formViolationsStore->deleteAll();
     $this->componentInstanceFormViolationsStore->deleteAll();
+  }
+
+  /**
+   * Re-keys Canvas page auto-save entries when the default langcode changes.
+   *
+   * Only entries whose stored langcode matches $old_langcode are migrated.
+   * Auto-save entries for non-default translations (stored under their own
+   * langcode) are left untouched.
+   *
+   * @param string $old_langcode
+   *   The previous default language code.
+   * @param string $new_langcode
+   *   The new default language code.
+   */
+  public function migrateCanvasPageAutoSaves(string $old_langcode, string $new_langcode): void {
+    $all = $this->autoSaveStore->getAll();
+    foreach ($all as $old_key => $entry) {
+      if (($entry['entity_type'] ?? NULL) !== Page::ENTITY_TYPE_ID) {
+        continue;
+      }
+      if (($entry['langcode'] ?? NULL) !== $old_langcode) {
+        continue;
+      }
+      $new_key = Page::ENTITY_TYPE_ID . ':' . $entry['entity_id'] . ':' . $new_langcode;
+      $entry['langcode'] = $new_langcode;
+      // Update the stored entity data's langcode too.
+      if (isset($entry['data']['langcode'])) {
+        $entry['data']['langcode'][0]['value'] = $new_langcode;
+      }
+      $this->autoSaveStore->set($new_key, $entry);
+      $this->autoSaveStore->delete($old_key);
+    }
+    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
   }
 
   private static function generateHash(array $data): string {
