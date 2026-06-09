@@ -73,7 +73,7 @@ Environment:
   such as SIMPLETEST_BASE_URL, SIMPLETEST_DB, DRUPAL_TEST_CONCURRENCY.
 
 With DDEV:
-  Outside the ddev environment, simply replace above `composer run phpunit` with `ddev phpunit`
+  Outside the ddev environment, simply add `ddev` in front of `composer run phpunit`
 EOF
     exit 0
   fi
