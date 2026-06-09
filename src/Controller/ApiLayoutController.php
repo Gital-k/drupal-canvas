@@ -147,13 +147,24 @@ final class ApiLayoutController {
           // The delete route gates on update access, so emit the link to the
           // same users to avoid offering a link that would return 403.
           // @see canvas.api.content.translation.delete in canvas.routing.yml
+          // @see canvas.api.config.translation.delete in canvas.routing.yml
           if ($translation->access('update')) {
+            $delete_url = $translation_entity === $entity
+              ? Url::fromRoute(
+                  'canvas.api.content.translation.delete',
+                  ['canvas_page' => $entity->id()],
+                  ['language' => $translation->language()],
+                )
+              : Url::fromRoute(
+                  'canvas.api.config.translation.delete',
+                  [
+                    'canvas_config_entity_type_id' => 'content_template',
+                    'config_entity' => $entity->id(),
+                  ],
+                  ['language' => $translation->language()],
+                );
             $links[$langcode] = [
-              CanvasUriDefinitions::LINK_REL_DELETE => Url::fromRoute(
-                'canvas.api.content.translation.delete',
-                ['canvas_page' => $translation_entity->id()],
-                ['language' => $translation->language()],
-              )->toString(),
+              CanvasUriDefinitions::LINK_REL_DELETE => $delete_url->toString(),
             ];
           }
         }
