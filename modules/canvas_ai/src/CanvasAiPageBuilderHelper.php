@@ -949,6 +949,57 @@ class CanvasAiPageBuilderHelper {
   }
 
   /**
+   * Indexes every component in the current layout by its UUID.
+   *
+   * Walks all regions and nested slots, collecting each component's id and its
+   * resolved prop values.
+   *
+   * @param array $current_layout
+   *   The decoded current layout, as stored under
+   *   \Drupal\canvas_ai\CanvasAiTempStore::CURRENT_LAYOUT_KEY.
+   *
+   * @return array
+   *   An array keyed by component UUID, each value being
+   *   ['component_id' => string, 'props' => array].
+   */
+  public function getComponentsByUuid(array $current_layout): array {
+    $components_by_uuid = [];
+    foreach ($current_layout['regions'] ?? [] as $region_data) {
+      if (!\is_array($region_data)) {
+        continue;
+      }
+      $this->collectComponentsByUuid($region_data['components'] ?? [], $components_by_uuid);
+    }
+    return $components_by_uuid;
+  }
+
+  /**
+   * Recursively collects components keyed by UUID.
+   *
+   * @param array $components
+   *   The components at a given region or slot.
+   * @param array &$components_by_uuid
+   *   Reference to the accumulating UUID-keyed array.
+   */
+  private function collectComponentsByUuid(array $components, array &$components_by_uuid): void {
+    foreach ($components as $component) {
+      if (!\is_array($component) || !isset($component['uuid'])) {
+        continue;
+      }
+      $components_by_uuid[$component['uuid']] = [
+        'component_id' => $component['name'] ?? '',
+        'props' => \is_array($component['props'] ?? NULL) ? $component['props'] : [],
+      ];
+      if (isset($component['slots']) && \is_array($component['slots'])) {
+        foreach ($component['slots'] as $slot_payload) {
+          $slot_components = \is_array($slot_payload) ? ($slot_payload['components'] ?? []) : [];
+          $this->collectComponentsByUuid(\is_array($slot_components) ? $slot_components : [], $components_by_uuid);
+        }
+      }
+    }
+  }
+
+  /**
    * Extracts the slot name from slot id.
    *
    * @param string $slot_id

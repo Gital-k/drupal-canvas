@@ -498,6 +498,31 @@ const operationsHandler = {
   },
 };
 
+const editComponentsHandler = {
+  canHandle: (msg: any) => 'component_updates' in msg && msg.component_updates,
+  handle: async ({
+    message,
+    dispatch,
+    layoutUtils,
+  }: {
+    message: any;
+    dispatch: any;
+    layoutUtils: any;
+  }) => {
+    // Updates the props of components already on the page, keyed by UUID.
+    for (const [uuid, values] of Object.entries(message.component_updates)) {
+      dispatch(
+        layoutUtils.updateExistingComponentValues({
+          componentToUpdateId: uuid,
+          values,
+        }),
+      );
+      // Wait for a second before updating the next component.
+      await delay(1000);
+    }
+  },
+};
+
 const messageHandlers = [
   canvasPageDataHandler,
   cssStructureHandler,
@@ -507,6 +532,7 @@ const messageHandlers = [
   slotsMetadataHandler,
   requiredPropsHandler,
   operationsHandler,
+  editComponentsHandler,
 ];
 
 // Renders agent/tool progress for a turn into a single HTML chat message. The
