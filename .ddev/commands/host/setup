@@ -26,20 +26,18 @@ while :; do
   shift
 done
 
-# Exit early if already set up (unless --force)
-if [[ -f vendor/autoload.php ]] && [[ "$FORCE" != true ]]; then
+# Exit early if already set up (unless --force).
+# The Drupal scaffold (vendor/, web/core) lives in a Docker volume, not on the
+# host, so we track completion with a host-side sentinel instead of checking for
+# vendor/autoload.php.
+SENTINEL=.ddev/.scaffold-built
+if [[ -f "$SENTINEL" ]] && [[ "$FORCE" != true ]]; then
   echo "Development environment already set up."
   echo "Run 'ddev setup --force' to reset and start over."
   exit 0
 fi
 
 echo "Setting up Canvas development environment..."
-
-# Ensure composer.json has no uncommitted changes before proceeding
-if ! git diff --quiet composer.json || ! git diff --cached --quiet composer.json; then
-  echo "Error: composer.json has uncommitted changes. Please commit or stash them before running setup." >&2
-  exit 1
-fi
 
 # Mark config.yaml as skip-worktree so local changes don't show in git status.
 # This file must exist for ddev to work, but DDEV modifies it on start.
@@ -56,44 +54,68 @@ if [[ ! -f .ddev/config.playwright.yml ]]; then
   ddev restart
 fi
 
-# Allow all Composer plugins.
+# The Drupal scaffold lives in a Docker volume at /var/www/html; this module is
+# bind-mounted at web/modules/contrib/canvas (see docker-compose.inverted.yaml).
+# Docker creates the intermediate mount-point directories (web, web/modules,
+# web/modules/contrib) in the volume owned by root. Hand them to the container
+# user so Composer can populate web/ during install. Do NOT recurse — that would
+# touch the bind-mounted module's files.
+ddev exec 'sudo chown "$(id -u):$(id -g)" /var/www/html /var/www/html/web /var/www/html/web/modules /var/www/html/web/modules/contrib 2>/dev/null || true'
+
+# Seed the scaffold's Composer root from the module so ddev-drupal-contrib's
+# expand step merges Canvas' own require/require-dev into the installed site.
+ddev exec 'cp web/modules/contrib/canvas/composer.json composer.json'
+
+# Allow all Composer plugins (operates on the scaffold's composer.json).
 ddev composer config \
   --no-plugins \
   allow-plugins.\* \
   true
 
-# Run ddev-drupal-contrib scripts
+# Build the Drupal scaffold (core + dependencies) into the volume.
 ddev poser
-ddev symlink-project
 
-# Regenerate ddev Drupal settings after directory structure is set up
-ddev config --update
+# Mark the scaffold root as a project so `composer run composer-root` resolves
+# to /var/www/html from anywhere beneath it (expand writes a drupal-module type).
+ddev composer config type project
 
-# Create simpletest directory for Playwright/PHPUnit test site installations
-mkdir -p web/sites/simpletest
-chmod 777 web/sites/simpletest
+# `ddev composer run <script>` executes at the scaffold root (/var/www/html),
+# but Canvas' scripts (phpstan, phpcs, phpunit, …) were seeded from the module
+# and resolve their config relative to the module directory. Rewrite the
+# scaffold's copies into delegating shims that `cd` into the module first, so
+# `ddev composer run phpstan` works without an explicit --dir. The module's own
+# composer.json is untouched (see the helper's @file docblock).
+ddev exec 'php /mnt/ddev_config/scripts/shim-scaffold-composer-scripts.php'
 
-# Allow test modules and themes to be installed.
-# shellcheck disable=SC2016
-printf '\n// Allow test modules and themes to be installed.\n$settings["extension_discovery_scan_tests"] = TRUE;' \
-  >> web/sites/default/settings.ddev.php
+# Create simpletest directory for Playwright/PHPUnit test site installations.
+ddev exec 'mkdir -p web/sites/simpletest && chmod 777 web/sites/simpletest'
 
-# Force sqlite
-# shellcheck disable=SC2016
-printf '\n// Force SQL Lite\n$databases["default"]["default"] = \n[\n    "driver" => "sqlite",\n    "database" => "sites/default/files/.ht.sqlite",\n];' \
-  >> web/sites/default/settings.ddev.php
+# Write Drupal settings directly into the scaffold volume. DDEV's own settings
+# management is disabled (disable_settings_management: true) because with
+# no_project_mount it would write settings.php to the empty host docroot instead
+# of the volume's real docroot. The settings files are kept under
+# .ddev/drupal-settings (mounted at /mnt/ddev_config) and copied in here.
+# settings.php includes settings.ddev.php, which holds test-module discovery and
+# a forced SQLite database.
+ddev exec 'cp /mnt/ddev_config/drupal-settings/settings.php /mnt/ddev_config/drupal-settings/settings.ddev.php web/sites/default/'
 
 # Install Drupal and enable the Drupal Canvas module.
 ddev drupal-install
 
+# Node dependencies for Drupal core's JS tooling.
 ddev exec --dir /var/www/html/web/core npm install
 
-ddev composer run ui-build
+# Node dependencies for the Canvas monorepo. The npm workspaces root is the
+# module, so node_modules lives at the module path and is shared with the host.
+ddev exec --dir /var/www/html/web/modules/contrib/canvas npm install
+
+# Build the Canvas UI.
+ddev exec --dir /var/www/html/web/modules/contrib/canvas composer run ui-build
 
 echo "Development environment ready!"
 
-# Restore composer.json to its last committed state
-git checkout composer.json
+# Record that setup completed so it does not re-run on every ddev start.
+touch "$SENTINEL"
 
 # Display a one time login link for user ID 1.
 ddev drush uli

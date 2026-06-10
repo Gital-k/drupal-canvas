@@ -1,0 +1,26 @@
+# Inverted-mount overrides. Sorts last (after config.zzz.canvas.yaml), so its
+# override_config wins. These settings live here (a tracked overlay) rather than
+# in config.yaml, which `ddev setup` marks `skip-worktree` so DDEV's per-start
+# rewrites don't dirty git — edits to config.yaml would not reach a fresh clone.
+#
+# - no_project_mount: stop DDEV emitting the default `../ -> /var/www/html` bind
+#   mount; docker-compose.inverted.yaml mounts the scaffold volume and binds the
+#   module instead.
+# - disable_settings_management: DDEV would write settings.php to the empty host
+#   docroot under no_project_mount; `ddev setup` writes settings into the volume.
+# - fail_on_hook_fail: keep `ddev start` succeeding even if the first-run
+#   `ddev setup` hook fails, so the container stays up to debug or re-run setup.
+no_project_mount: true
+disable_settings_management: true
+fail_on_hook_fail: false
+
+# ddev-drupal-contrib's config.contrib.yaml registers a post-start hook that
+# runs `ddev symlink-project`. With the inverted bind mount we never symlink the
+# project, so that hook must not run. `override_config: true` replaces the
+# accumulated post-start hooks rather than merging, so we re-declare the only
+# post-start hook we still want: `ddev setup` (from config.canvas.yaml).
+override_config: true
+hooks:
+  post-start:
+    - exec-host: |
+        ddev setup

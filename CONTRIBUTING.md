@@ -16,13 +16,67 @@ ddev start
 
 After `ddev start`, you will have a functional Drupal installation at https://canvas.ddev.site with Canvas already installed.
 
+### How the environment is mounted
+
+DDEV runs with `no_project_mount: true`. The Drupal scaffold (core, `vendor/`,
+`index.php`, other contrib) lives in a named Docker volume at `/var/www/html`,
+and this repository is bind-mounted directly at
+`/var/www/html/web/modules/contrib/canvas` (see `.ddev/docker-compose.inverted.yaml`).
+
+This replaces the older `ddev-drupal-contrib` `symlink-project` flow, which
+symlinked each project file into the docroot. Because the module now has a single
+container path, npm workspaces (`node_modules` at the module root) and xdebug path
+mapping both behave exactly as on the host. The trade-off: Drupal core and
+`vendor/` live in the volume, not on the host, so they are not indexable or
+steppable in your IDE — debugging targets the Canvas module itself.
+
+`web/` and `vendor/` no longer appear in the repository working directory, so
+`git status` stays clean.
+
+DDEV's settings management is disabled (`disable_settings_management: true`)
+because it writes `settings.php` to the host docroot path, which is empty under
+`no_project_mount`. The `ddev setup` command instead copies
+`.ddev/drupal-settings/settings.php` and `settings.ddev.php` into the volume's
+docroot; `settings.ddev.php` holds the SQLite database connection and enables
+test-module discovery.
+
+### Composer scripts (DDEV)
+
+`ddev composer ...` runs against the scaffold's `composer.json` at
+`/var/www/html`. During `ddev setup`, every Canvas composer script is also
+copied into that scaffold `composer.json` as a delegating shim that `cd`s into
+the module directory first, so you can run them directly:
+
+```shell
+ddev composer run ui-build
+ddev composer run phpstan
+ddev composer run phpunit -- tests/src/Unit/CoalescerTest.php
+```
+
+Passthrough arguments after `--` are forwarded to the module's own script. The
+module's `composer.json` is never modified — only the scaffold copy is shimmed
+(see `.ddev/scripts/shim-scaffold-composer-scripts.php`), so CI, host, and manual
+setups, which already run from the module root, are unaffected.
+
+The `ddev phpunit`, `ddev phpcs`, `ddev phpstan`, `ddev cypress`, `ddev playwright`
+and `ddev stylelint` commands also target the module directory.
+
+### Debugging with xdebug (PhpStorm / IDE)
+
+1. Enable xdebug: `ddev xdebug on` (disable with `ddev xdebug off`).
+2. In your IDE, map the project to the container module path:
+   - Host project root → `/var/www/html/web/modules/contrib/canvas`
+3. Set the server name to `canvas.ddev.site` (matches `PHP_IDE_CONFIG`).
+
+`.idea/` is not tracked, so this is a per-developer setup.
+
 ### First experience
 After this process, you will get the `drush uli` to login into the admin area. You will see an article created. If you edit the article, you will see a new link "Drupal Canvas: Test" to edit this entity with the new Canvas UI.
 
 ### Usage
 The most common commands in the development process are:
 1. `ddev setup`: Set up the Canvas development environment (installs dependencies, builds UI, installs Drupal). Use `ddev setup --force` to completely reset an existing environment. (Note, this is executed automatically the first time you start ddev)
-2. `ddev cleanup`: Remove environment-specific folders and files ignored by `.gitignore` (web, vendor, node_modules, build artifacts, etc.). Use `ddev cleanup --force` to skip confirmation.
+2. `ddev cleanup`: Empty the Drupal scaffold volume and remove environment-specific folders and files ignored by `.gitignore` (node_modules, build artifacts, etc.). Use `ddev cleanup --force` to skip confirmation.
 3. `ddev drupal-install`: This will reinstall the site. Very useful when you update Canvas and want a fresh installation.
 4. `ddev ui-build`: This will build a production ready canvas UI.
 5. `ddev ui-dev`: This will build a development environment for developing the canvas app itself.
@@ -31,6 +85,9 @@ The most common commands in the development process are:
 8. Playwright tests: `ddev playwright test`
    - Watch tests run in the browser via VNC: https://canvas.ddev.site:8444 (username: your local username, password: `secret`)
    - View test reports: Run `ddev playwright show-report` after tests complete, then open https://canvas.ddev.site:9324
+   - Each test installs its own Drupal test site. With the default SQLite backend,
+     parallel workers share one database file and can time out during setup; pass
+     `--workers=1` to a single spec if that happens.
 
 Tip: Use `ddev help <command>` for additional information about the command and arguments available.
 ## Setting up your local environment manually

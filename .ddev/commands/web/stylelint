@@ -9,7 +9,8 @@
 
 set -eu -o pipefail
 
-cd ${DDEV_APPROOT}
+# The npm workspaces root is the bind-mounted module, not the scaffold root.
+cd ${DDEV_APPROOT}/web/modules/contrib/canvas
 npm ci
 npm run build --workspace=drupal-canvas
 npm run lint:stylelint

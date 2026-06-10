@@ -11,7 +11,10 @@
 set -eu -o pipefail
 
 export COMPOSER=composer.contrib.json
-.ddev/commands/web/expand-composer-json
+# Reference the .ddev config via its container mount point rather than a path
+# relative to the composer root: with no_project_mount the composer root is the
+# scaffold volume, which does not contain .ddev. @see docker-compose.inverted.yaml
+/mnt/ddev_config/commands/web/expand-composer-json
 composer install "$@"
 # The -f flag suppresses errors if lock file does not exist.
 rm -f composer.contrib.json composer.contrib.lock

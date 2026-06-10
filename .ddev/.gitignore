@@ -1,5 +1,8 @@
 ## DDev file ignores:
 
+# Sentinel written by `ddev setup` to mark the scaffold as built.
+/.scaffold-built
+
 /**/*.example
 /.dbimageBuild
 /.ddev-docker-*.yaml

@@ -1,8 +1,16 @@
+name: canvas
 type: drupal11
 docroot: web
 php_version: "8.3"
 webserver_type: nginx-fpm
 xdebug_enabled: false
+no_project_mount: true
+fail_on_hook_fail: false
+# With no_project_mount the real docroot lives in the scaffold volume, not on
+# the host. DDEV's settings management writes settings.php to the host docroot
+# path (which is empty), so manage Drupal settings ourselves in the volume via
+# the setup command instead. @see .ddev/commands/host/setup
+disable_settings_management: true
 additional_hostnames: []
 additional_fqdns: []
 database:
@@ -289,7 +297,3 @@ corepack_enable: true
 # information on the commands that can be extended and the tasks you can define
 # for them. Example:
 #hooks:
-# post-import-db:
-#   - exec: drush sql:sanitize
-#   - exec: drush updatedb
-#   - exec: drush cache:rebuild

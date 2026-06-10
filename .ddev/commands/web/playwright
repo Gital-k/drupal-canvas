@@ -6,10 +6,12 @@
 ## ExecRaw: true
 set -eu -o pipefail
 
-cd ${DDEV_APPROOT}
+# The npm workspaces root (and playwright.config.ts) is the bind-mounted module,
+# not the scaffold root at $DDEV_APPROOT.
+cd ${DDEV_APPROOT}/web/modules/contrib/canvas
 
-# Ensure the environment is set up
-if [[ ! -f vendor/autoload.php ]]; then
+# Ensure the environment is set up (vendor/ lives in the scaffold root).
+if [[ ! -f ${DDEV_APPROOT}/vendor/autoload.php ]]; then
   echo "Error: Development environment is not set up."
   echo "Please run 'ddev setup' first."
   exit 1
@@ -21,4 +23,4 @@ if [[ "${1:-}" == "show-report" ]]; then
   args+=("--host=0.0.0.0")
 fi
 
-DRUPAL_TEST_DRUPAL_ROOT=web npx playwright "${args[@]}"
+DRUPAL_TEST_DRUPAL_ROOT=${DDEV_APPROOT}/web npx playwright "${args[@]}"
