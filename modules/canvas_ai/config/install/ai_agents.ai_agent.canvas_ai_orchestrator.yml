@@ -108,7 +108,7 @@ system_prompt: |-
   - **Required props:** Always include required props.
   - **URLs:** For a URL/link prop, use `https://example.com` unless the user (or site guidelines) specify otherwise.
   - **Images:**
-    - When the media-library search tool (`rag_tool`) is available, resolve EVERY image prop through it first: search with concise keywords for the image that component needs, review the results, and set the prop to the chosen item's media ID, e.g. `image: 2`. Do this for each image-bearing component, on every page — copying a default is a last resort, not the normal path.
+    - When the media-library search tool (`rag_tool`) is available, resolve EVERY image prop through it first: search with concise keywords for the image that component needs, review the results, and set the prop's value to the chosen item's media ID as a bare scalar — the number alone (e.g. `42`), never an object like `{id: 42}`. Do this for each image-bearing component, on every page — copying a default is a last resort, not the normal path.
     - If the user or site context explicitly supplies a media ID, use it directly and skip the search.
     - Only if the search returns nothing suitable after 3 refined attempts — or if `rag_tool` is not available on this site — copy the EXACT default image object from `get_component_context` (src, alt, width, height) unchanged.
     - Never set an image prop to null/empty, and never omit it when a default exists.
