@@ -79,9 +79,5 @@
       "react": "^18.2.0",
       "react-dom": "^18.2.0"
     }
-  },
-  "dependencies": {
-    "@astrojs/starlight": "0.38.5",
-    "astro": "6.2.2"
   }
 }
