@@ -39,7 +39,6 @@ import {
   useCreateCodeComponentMutation,
   useGetComponentsQuery,
 } from '@/services/componentAndLayout';
-import { isPropSourceComponent } from '@/types/Component';
 import { getBaseUrl, getDrupalSettings } from '@/utils/drupal-globals';
 
 import fixtureProps from '../../../../modules/canvas_ai/src/PropsSchema.json';
@@ -50,7 +49,7 @@ import type {
   LayoutModelSliceState,
 } from '@/features/layout/layoutModelSlice';
 import type { CodeComponent } from '@/types/CodeComponent';
-import type { CanvasComponent, PropSourceComponent } from '@/types/Component';
+import type { CanvasComponent } from '@/types/Component';
 
 import styles from './AiWizard.module.css';
 
@@ -417,30 +416,27 @@ const canvasPageDataHandler = {
   },
 };
 
-// Filters out 'media' fields from a js component instance's fieldValues based on the
-// component definition's propSources, forcing the component to use the example
-// image from its definition.
-// Block components do not have propSources, so we cannot set field values while
-// placing them - return unchanged in that case.
-// @todo Refactor this after https://www.drupal.org/i/3552000 is fixed.
+function isEntityId(value: unknown): boolean {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0;
+}
+
+// Strips media fields from AI-supplied fieldValues only when the value is not a
+// numeric entity ID. Placeholder objects from the component catalog
+// (e.g. { src: "...", width: N, height: N, alt: "..." }) are discarded so the
+// component falls back to its example image. Real references (bare integer or
+// string-encoded integer) are kept.
 function removeMediaFields(componentDef: CanvasComponent, componentInst: any) {
-  if (!isPropSourceComponent(componentDef)) {
-    return componentInst;
-  }
-  const newFieldValues = {} as any;
-  const fieldValues = componentInst.fieldValues || {};
-  for (const [key, value] of Object.entries(fieldValues)) {
-    const prop = (componentDef as PropSourceComponent).propSources[key];
-    const isMedia =
-      (prop?.sourceTypeSettings?.storage as any)?.target_type === 'media';
-    if (!isMedia) {
-      newFieldValues[key] = value;
+  const newFieldValues: any = {};
+  for (const [key, value] of Object.entries(componentInst.fieldValues || {})) {
+    const prop = (componentDef as any).propSources?.[key];
+    const isMedia = prop?.sourceTypeSettings?.storage?.target_type === 'media';
+    if (isMedia && !isEntityId(value)) {
+      continue;
     }
+    newFieldValues[key] = value;
   }
-  return {
-    ...componentInst,
-    fieldValues: newFieldValues,
-  };
+  return { ...componentInst, fieldValues: newFieldValues };
 }
 
 // Helper to delay the placement of components.
@@ -472,7 +468,7 @@ const operationsHandler = {
           if (component.id && availableComponents[component.id]) {
             const componentToUse: CanvasComponent =
               availableComponents[component.id];
-            const componentAfterFilteringImageProps = removeMediaFields(
+            const filteredComponent = removeMediaFields(
               componentToUse,
               component,
             );
@@ -484,7 +480,7 @@ const operationsHandler = {
             dispatch(
               layoutUtils.addNewComponentToLayout({
                 component: componentToUse,
-                withValues: componentAfterFilteringImageProps.fieldValues,
+                withValues: filteredComponent.fieldValues,
                 to: component.nodePath,
                 uuid: component.uuid,
               }),

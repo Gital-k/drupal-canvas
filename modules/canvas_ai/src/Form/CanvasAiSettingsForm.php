@@ -48,6 +48,13 @@ final class CanvasAiSettingsForm extends ConfigFormBase {
       '#required' => TRUE,
     ];
 
+    $form['disable_real_time_page_generation'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Disable real-time page generation'),
+      '#default_value' => $this->config('canvas_ai.settings')->get('disable_real_time_page_generation'),
+      '#description' => $this->t('By default the AI builds a page one section at a time, so each part appears in the editor as it is created. Enable this to have the AI plan the whole page and place it in a single step instead. This uses fewer tokens and fewer requests, but the page appears all at once rather than progressively, takes longer before anything is visible, and — because it sends one large request — is more likely to hit a request timeout on big pages.'),
+    ];
+
     return parent::buildForm($form, $form_state);
   }
 
@@ -58,6 +65,7 @@ final class CanvasAiSettingsForm extends ConfigFormBase {
     $this->config('canvas_ai.settings')
       ->set('file_upload_size', $form_state->getValue('file_upload_size'))
       ->set('chat_history_max_messages', (int) $form_state->getValue('chat_history_max_messages'))
+      ->set('disable_real_time_page_generation', (bool) $form_state->getValue('disable_real_time_page_generation'))
       ->save();
 
     parent::submitForm($form, $form_state);

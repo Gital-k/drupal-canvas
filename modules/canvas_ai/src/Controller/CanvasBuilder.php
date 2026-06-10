@@ -11,6 +11,7 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
 use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
 use Drupal\canvas_ai\CanvasAiChatHelper;
+use Drupal\canvas_ai\CanvasAiExecutionStrategy;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Drupal\canvas_ai\CanvasAiTempStore;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface;
@@ -255,6 +256,7 @@ final class CanvasBuilder extends ControllerBase {
       // JSON-encode so the libraries render as readable data in the system
       // prompt token rather than the string "Array".
       'custom_libraries' => Json::encode($this->getSupportedLibraries()),
+      'execution_strategy' => CanvasAiExecutionStrategy::get(!$config->get('disable_real_time_page_generation')),
     ]);
     $agent->setLooped(FALSE);
 

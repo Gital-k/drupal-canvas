@@ -127,8 +127,16 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
       // Tell the model the UUIDs assigned to the placed components and where
       // they will sit once the frontend applies the operations, so it can
       // reference them (e.g. as reference_uuid) in follow-up placements.
+      //
+      // The model tends to read a successful placement as a cue to summarize
+      // progress and reply. In this stack a turn with no tool call is terminal
+      // (see AiAgentEntityWrapper::determineSolvability()), so that reply
+      // freezes an incremental build mid-page. Re-assert the continuation rule
+      // on the result itself — the moment the model decides what to do next.
+      // It is phrased conditionally so it is also correct on the final section
+      // and in batch mode, where nothing remains to place.
       $output = \sprintf(
-        "Components placed successfully.\nThe placed components with their assigned UUIDs:\n%s\nThe expected page layout after placement (UUID tree):\n%s",
+        "Components placed successfully.\nThe placed components with their assigned UUIDs:\n%s\nThe expected page layout after placement (UUID tree):\n%s\n\nThis result is a continuation point, not a stopping point: if any section from your approved plan is still unplaced, your next output MUST be the next place_components call — a turn with text and no tool call would freeze the build here. Only once every planned section is on the page do you stop and write the closing confirmation.",
         Yaml::dump($this->placementDto->getComponentStructureWithUuids(), 10, 2),
         Yaml::dump($this->placementDto->getPredictedLayout(), 10, 2),
       );
