@@ -21,33 +21,41 @@ export default defineConfig({
         '@': path.resolve(__dirname, 'src/'),
       },
     },
+    environments: {
+      client: {
+        build: {
+          rollupOptions: {
+            output: {
+              // Filename pattern for the output files
+              entryFileNames: '[name].js',
+              chunkFileNames: (chunkInfo) => {
+                // Make sure the output chunks for dependencies have useful file
+                // names so we can easily distinguish between them.
+                const matches = {
+                  'astro-hydration/src/lib/jsx-runtime-default.js': 'jsx-runtime-default.js',
+                  'preact-render-to-string': 'preact-render-to-string.js',
+                  clsx: 'clsx.js',
+                  'class-variance-authority': 'class-variance-authority.js',
+                  'tailwind-merge': 'tailwind-merge.js',
+                  'astro-hydration/src/lib/jsonapi-params.ts': 'jsonapi-params.js',
+                  'astro-hydration/src/lib/swr.ts': 'swr.js',
+                  'drupal-canvas': 'drupal-canvas.js',
+                };
+                return Object.entries(matches).reduce((carry, [key, value]) => {
+                  if (chunkInfo.facadeModuleId?.includes(`node_modules/${key}`)) {
+                    return value;
+                  }
+                  return carry;
+                }, '[name].js');
+              },
+              assetFileNames: '[name][extname]',
+            },
+          },
+        },
+      },
+    },
     build: {
       rollupOptions: {
-        output: {
-          // Filename pattern for the output files
-          entryFileNames: '[name].js',
-          chunkFileNames: (chunkInfo) => {
-            // Make sure the output chunks for dependencies have useful file
-            // names so we can easily distinguish between them.
-            const matches = {
-              'astro-hydration/src/lib/jsx-runtime-default.js': 'jsx-runtime-default.js',
-              'preact-render-to-string': 'preact-render-to-string.js',
-              clsx: 'clsx.js',
-              'class-variance-authority': 'class-variance-authority.js',
-              'tailwind-merge': 'tailwind-merge.js',
-              'astro-hydration/src/lib/jsonapi-params.ts': 'jsonapi-params.js',
-              'astro-hydration/src/lib/swr.ts': 'swr.js',
-              'drupal-canvas': 'drupal-canvas.js',
-            };
-            return Object.entries(matches).reduce((carry, [key, value]) => {
-              if (chunkInfo.facadeModuleId?.includes(`node_modules/${key}`)) {
-                return value;
-              }
-              return carry;
-            }, '[name].js');
-          },
-          assetFileNames: '[name][extname]',
-        },
         // @see src/features/code-editor/Preview.tsx
         // @see src/Plugin/Canvas/ComponentSource/JsComponent.php
         external: (id, parent) => {
