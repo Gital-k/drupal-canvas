@@ -16,9 +16,9 @@
     ]
   },
   "dependencies": {
-    "@astrojs/preact": "^4.0.3",
+    "@astrojs/preact": "^5.1.5",
     "@tailwindcss/typography": "^0.5.19",
-    "astro": "^6.2.2",
+    "astro": "^6.4.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drupal-canvas": "^0.4.1",
