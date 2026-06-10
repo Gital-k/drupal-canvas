@@ -2,7 +2,8 @@
 
 ## Description: Remove environment-specific folders and files ignored by .gitignore.
 ## Usage: cleanup [--force]
-## Example: ddev cleanup\nddev cleanup --force
+## Example: ddev cleanup
+## Example: ddev cleanup --force
 ## Flags: [{"Name":"force","Shorthand":"f","Usage":"Skip confirmation prompt"}]
 ## ExecRaw: true
 
