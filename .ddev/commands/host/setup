@@ -35,12 +35,15 @@ fi
 
 echo "Setting up Canvas development environment..."
 
+# Ensure composer.json has no uncommitted changes before proceeding
+if ! git diff --quiet composer.json || ! git diff --cached --quiet composer.json; then
+  echo "Error: composer.json has uncommitted changes. Please commit or stash them before running setup." >&2
+  exit 1
+fi
+
 # Mark config.yaml as skip-worktree so local changes don't show in git status.
 # This file must exist for ddev to work, but DDEV modifies it on start.
 git update-index --skip-worktree .ddev/config.yaml 2>/dev/null || true
-
-# Save original composer.json to restore after setup
-cp composer.json composer.json.original
 
 # Remove any environment-specific files
 ddev cleanup --force
@@ -50,11 +53,6 @@ if [[ ! -f .ddev/config.playwright.yml ]]; then
   echo "Installing ddev-playwright add-on... This will setup playwright and restart ddev one time."
   ddev add-on get Lullabot/ddev-playwright
   cp .ddev/web-build/disabled.Dockerfile.playwright .ddev/web-build/Dockerfile.playwright
-  # Symlink package.json for Playwright Docker build (the add-on hook expects test/playwright/,
-  # but Canvas keeps package.json at the project root). Must be created before ddev restart.
-  mkdir -p .ddev/web-build/playwright
-  ln -sf ../../package.json .ddev/web-build/playwright/package.json
-  ln -sf ../../package-lock.json .ddev/web-build/playwright/package-lock.json
   ddev restart
 fi
 
@@ -94,8 +92,8 @@ ddev composer run ui-build
 
 echo "Development environment ready!"
 
-# Restore original composer.json
-mv composer.json.original composer.json
+# Restore composer.json to its last committed state
+git checkout composer.json
 
 # Display a one time login link for user ID 1.
 ddev drush uli

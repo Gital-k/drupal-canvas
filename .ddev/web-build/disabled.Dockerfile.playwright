@@ -14,7 +14,7 @@ RUN apt-get update
 #
 # 1. Mounts a copy of package.json and package-lock.json from the project root.
 #    We need this to install the correct version of Playwright and its browsers.
-#    The config.playwright.yml pre-start hook copies these files to web-build/playwright/.
+#    The config.zzz.canvas.yaml pre-start hook copies these files to web-build/playwright/.
 # 2. $username doesn't work in --mount... lines as it's a shell variable set by
 #    ddev. Instead, we mount the .cache cache into /ms-playwright-cache, and
 #    symlink it in. We merge any existing ~/.cache content into the mount first

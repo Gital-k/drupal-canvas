@@ -1,0 +1,11 @@
+# Canvas-specific configuration
+# Runs hooks after config.playwright.yml (alphabetical order)
+hooks:
+  pre-start:
+    - exec-host: |
+        # The add-on expects test/playwright/ but Canvas keeps package.json at the project root.
+        # Must copy (not symlink) because Docker bind mounts don't follow symlinks outside the mount.
+        if [[ -f .ddev/web-build/Dockerfile.playwright ]]; then
+          mkdir -p .ddev/web-build/playwright
+          cp package.json package-lock.json .ddev/web-build/playwright/
+        fi
