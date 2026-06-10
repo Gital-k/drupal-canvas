@@ -54,6 +54,8 @@ services:
     public: false
   Drupal\canvas\ShapeMatcher\HostEntityUrlPropSourceMatcher:
     public: false
+  Drupal\canvas\ShapeMatcher\HostEntityPropSourceMatcher:
+    public: false
 
   # Utilities.
   Drupal\canvas\CanvasNotificationHandler: {}
@@ -110,6 +112,7 @@ services:
     class: Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber
     tags:
       - { name: 'event_subscriber' }
+  Drupal\canvas\EventSubscriber\ComponentTreeConfigEntityTransformer: ~
   canvas.image_style.route_alter:
     class: Drupal\canvas\EventSubscriber\ImageStyleRoutesEventSubscriber
     tags:
@@ -186,6 +189,7 @@ services:
   Drupal\canvas\Controller\ApiContentControllers: {}
   Drupal\canvas\Controller\ApiMediaControllers: {}
   Drupal\canvas\Controller\ApiStagedConfigUpdateAutoSaveController: {}
+  Drupal\canvas\Controller\ApiTranslationControllers: {}
   Drupal\canvas\Controller\ComponentStatusController: {}
   Drupal\canvas\Controller\ComponentAuditController: {}
   Drupal\canvas\Controller\CanvasController: {}
@@ -197,6 +201,7 @@ services:
   Drupal\canvas\Controller\ApiArtifactController: {}
   Drupal\canvas\Controller\ApiNotificationController: {}
   Drupal\canvas\Controller\ApiPushController: {}
+  Drupal\canvas\Controller\SiteDataController: {}
 
   # Decorators.
   Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor:

@@ -4,7 +4,15 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\AutoSave;
 
+use Drupal\canvas\AutoSaveEntity;
+use Drupal\canvas\Controller\ApiContentControllers;
+use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\StagedConfigUpdate;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
 use Drupal\Core\Config\ConfigCrudEvent;
@@ -26,14 +34,6 @@ use Drupal\Core\KeyValueStore\KeyValueStoreInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TypedData\PrimitiveInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
-use Drupal\Component\Datetime\TimeInterface;
-use Drupal\canvas\AutoSaveEntity;
-use Drupal\canvas\Controller\ApiContentControllers;
-use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\Entity\BrandKit;
-use Drupal\canvas\Entity\StagedConfigUpdate;
-use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -334,7 +334,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     [
       // Remove the unique session key for anonymous users.
       'owner' => \is_numeric($entry['owner']) ? (int) $entry['owner'] : 0,
-      'entity' => $with_entities ? $this->entityTypeManager->getStorage($entry['entity_type'])->create($entry['data']) : NULL,
+      'entity' => $with_entities ? $this->entityTypeManager->getStorage($entry['entity_type'])->create($entry['data'])->enforceIsNew(FALSE) : NULL,
     ], $entries);
     return $result;
   }

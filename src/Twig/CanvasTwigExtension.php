@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Twig;
 
+use Drupal\canvas\Entity\ParametrizedImageStyle;
+use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
+use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
+use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\UrlHelper;
-use Drupal\Component\Render\MarkupInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Image\ImageFactory;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\Core\Template\Attribute;
-use Drupal\canvas\Entity\ParametrizedImageStyle;
-use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
-use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
@@ -141,12 +141,17 @@ final class CanvasTwigExtension extends AbstractExtension {
 
     \assert(str_contains($template, '{width}'), "Expected '{width}' in template not found");
 
-    // Filter widths greater than the intrinsic width to avoid generating
-    // upscaled images. We still create a srcset candidate when the width is the
-    // same so we can do other things to it like convert it to a more optimized
-    // format.
+    // Include widths up to the target width, plus the next larger allowed
+    // width. This avoids browsers upscaling the largest generated candidate
+    // when the target width falls between two allowed widths.
     // @todo Read this from third-party settings: https://drupal.org/i/3533563
-    $widths = array_filter(ParametrizedImageStyleConverter::ALLOWED_WIDTHS, static fn($w) => $w <= $intrinsicImageWidth);
+    $widths = [];
+    foreach (ParametrizedImageStyleConverter::ALLOWED_WIDTHS as $allowed_width) {
+      $widths[] = $allowed_width;
+      if ($allowed_width > $intrinsicImageWidth) {
+        break;
+      }
+    }
 
     $srcset = \array_map(static fn($w) => str_replace('{width}', (string) $w, $template) . " {$w}w", $widths);
     return implode(', ', $srcset);
@@ -205,7 +210,7 @@ final class CanvasTwigExtension extends AbstractExtension {
    *   JSON-encoded array for compound types, or the original value for other
    *   types.
    */
-  public function jsxAttributes(mixed $attribute): mixed {
+  public static function jsxAttributes(mixed $attribute): mixed {
     if ($attribute instanceof Attribute || \is_object($attribute) && method_exists($attribute, 'toArray')) {
       return Json::encode($attribute->toArray());
     }

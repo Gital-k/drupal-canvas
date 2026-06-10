@@ -91,6 +91,10 @@ final class CanvasPageForm extends ContentEntityForm {
     $this->addTransliterationSettings($form);
     $this->customizePathField($form);
 
+    if (isset($form['langcode'])) {
+      $form['langcode']['#access'] = FALSE;
+    }
+
     return $form;
   }
 
@@ -119,7 +123,7 @@ final class CanvasPageForm extends ContentEntityForm {
    * @param array $form
    *   The form array to modify.
    */
-  private function customizePathField(array &$form): void {
+  private static function customizePathField(array &$form): void {
     // Remove the details wrapper from the path widget to make it a direct form
     // element.
     if (isset($form['path']['widget'][0]['#type']) && $form['path']['widget'][0]['#type'] === 'details') {

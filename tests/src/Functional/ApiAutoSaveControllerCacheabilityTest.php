@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-use PHPUnit\Framework\Attributes\CoversClass;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiAutoSaveController;
-use PHPUnit\Framework\Attributes\Group;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
 use Drupal\dynamic_page_cache\EventSubscriber\DynamicPageCacheSubscriber;
-use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\ApiRequestTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use GuzzleHttp\RequestOptions;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -77,7 +78,9 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
     $url = Url::fromRoute('canvas.api.auto-save.get');
     $this->drupalGet($url);
     $this->assertSession()->responseHeaderEquals(DynamicPageCacheSubscriber::HEADER, 'MISS');
-    $content = \json_decode($this->getSession()->getPage()->getContent() ?: '{}', TRUE);
+    $response_body = \json_decode($this->getSession()->getPage()->getContent() ?: '{}', TRUE);
+    $this->assertArrayHasKey('data', $response_body);
+    $content = $response_body['data'];
     self::assertEquals([
       'node:1:en',
     ], \array_keys($content));
@@ -85,6 +88,12 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
     // Second request should come from DPC.
     $this->drupalGet($url);
     $this->assertSession()->responseHeaderEquals(DynamicPageCacheSubscriber::HEADER, 'HIT');
+
+    $node1->save();
+
+    // Saving node should invalidate cache and cache MISS.
+    $this->drupalGet($url);
+    $this->assertSession()->responseHeaderEquals(DynamicPageCacheSubscriber::HEADER, 'MISS');
 
     // Make another post to preview controller, this should invalidate the
     // cache.
@@ -108,11 +117,22 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
     // Now the cache should be invalidated and we should get a MISS.
     $this->drupalGet($url);
     $this->assertSession()->responseHeaderEquals(DynamicPageCacheSubscriber::HEADER, 'MISS');
-    $content = \json_decode($this->getSession()->getPage()->getContent() ?: '{}', TRUE);
+    $response_body = \json_decode($this->getSession()->getPage()->getContent() ?: '{}', TRUE);
+    $this->assertArrayHasKey('data', $response_body);
+    $content = $response_body['data'];
     self::assertEquals([
       'node:1:en',
       'node:2:en',
     ], \array_keys($content));
+
+    // Repeated request should come from DPC.
+    $this->drupalGet($url);
+    $this->assertSession()->responseHeaderEquals(DynamicPageCacheSubscriber::HEADER, 'HIT');
+
+    // Invalidating node cache tags should result in cache MISS.
+    Cache::invalidateTags($node2->getCacheTags());
+    $this->drupalGet($url);
+    $this->assertSession()->responseHeaderEquals(DynamicPageCacheSubscriber::HEADER, 'MISS');
   }
 
 }

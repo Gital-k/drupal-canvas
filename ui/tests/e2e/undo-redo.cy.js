@@ -19,27 +19,35 @@ describe('Undo/Redo functionality', () => {
     // Assert that the undo button is disabled initially.
     cy.get('button[aria-label="Undo"]').should('be.disabled');
 
-    const heroOverlaySelector =
-      '#canvasPreviewOverlay [data-canvas-component-id="sdc.canvas_test_sdc.my-hero"]';
-
     // Check there are three heroes initially.
-    cy.get(heroOverlaySelector).should('have.length', 3);
-
+    cy.testInIframe(
+      '[data-component-id="canvas_test_sdc:my-hero"]',
+      (myHeroComponent) => {
+        expect(myHeroComponent.length).to.equal(3);
+      },
+    );
     cy.insertComponent({ name: 'Two Column' });
 
-    // Insert by component id to disambiguate from other components also named
-    // "Hero" (e.g. the JS component in canvas_children_slot_component).
-    cy.insertComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
+    // Click on the menu item with data-canvas-name="Hero" inside menu.
+    cy.insertComponent({ name: 'Hero' });
 
-    cy.get(heroOverlaySelector).should('have.length', 4);
+    const heroInPreview = '[data-component-id="canvas_test_sdc:my-hero"]';
 
-    // Undo.
+    // Inserting the Hero adds a fourth my-hero to the preview. Each layout
+    // change re-renders the preview asynchronously and swaps the iframe, so use
+    // a retryable count assertion that re-queries the active iframe and waits
+    // for the render to settle. (The previous version used
+    // `cy.getIframeBody().find(selector, callback)`, whose second argument is
+    // options, not a callback — so the count was never actually asserted.)
+    cy.waitForElementCountInIframe(heroInPreview, 4, undefined, 12000);
+
+    // Undo removes the just-inserted Hero.
     cy.realPress(['Meta', 'Z']);
-    cy.get(heroOverlaySelector).should('have.length', 3);
+    cy.waitForElementCountInIframe(heroInPreview, 3, undefined, 12000);
 
-    // Redo.
+    // Redo adds it back.
     cy.realPress(['Meta', 'Shift', 'Z']);
-    cy.get(heroOverlaySelector).should('have.length', 4);
+    cy.waitForElementCountInIframe(heroInPreview, 4, undefined, 12000);
   });
 
   it('Component instance form values are included in Undo/Redo', () => {

@@ -4,39 +4,39 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Resource\CanvasResourceLink;
+use Drupal\canvas\Resource\CanvasResourceLinkCollection;
+use Drupal\canvas\Resource\OffsetPage;
 use Drupal\canvas\Utility\HomePageHelper;
+use Drupal\Component\Transliteration\TransliterationInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityReferenceSelection\SelectionInterface;
 use Drupal\Core\Entity\EntityReferenceSelection\SelectionPluginManagerInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
-use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\Component\Transliteration\TransliterationInterface;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Resource\OffsetPage;
-use Drupal\canvas\Resource\CanvasResourceLink;
-use Drupal\canvas\Resource\CanvasResourceLinkCollection;
-use Drupal\canvas\CanvasUriDefinitions;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -89,18 +89,6 @@ final class ApiContentControllers extends ApiControllerBase {
   }
 
   public function patch(Request $request, ContentEntityInterface $canvas_page): JsonResponse {
-    // If there's any auto-saved data, we throw a conflict error.
-    $autoSaved = $this->autoSaveManager->getAutoSaveEntity($canvas_page);
-    if (!$autoSaved->isEmpty()) {
-      throw new ConflictHttpException(
-        \sprintf(
-          '%s with ID %s has existing auto-saved data. Please use the Canvas UI to publish or discard it before pushing.',
-          (string) $canvas_page->getEntityType()->getLabel(),
-          $canvas_page->id(),
-        )
-      );
-    }
-
     // Get the request body content
     $content = $request->getContent();
     $body = \json_decode($content, TRUE);
@@ -225,7 +213,7 @@ final class ApiContentControllers extends ApiControllerBase {
    *
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
-  public function delete(ContentEntityInterface $canvas_page): JsonResponse {
+  public static function delete(ContentEntityInterface $canvas_page): JsonResponse {
     $canvas_page->delete();
     return new JsonResponse(status: Response::HTTP_NO_CONTENT);
   }
@@ -343,7 +331,7 @@ final class ApiContentControllers extends ApiControllerBase {
    *
    * @see https://jsonapi.org/format/#fetching-pagination
    */
-  private function buildPaginationLinks(Request $request, int $offset, int $limit, int $total): array {
+  private static function buildPaginationLinks(Request $request, int $offset, int $limit, int $total): array {
     $uri = $request->getSchemeAndHttpHost() . $request->getBaseUrl() . $request->getPathInfo();
     $existing_query = $request->query->all();
     unset($existing_query['page']);

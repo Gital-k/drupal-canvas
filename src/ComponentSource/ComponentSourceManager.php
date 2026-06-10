@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ComponentSource;
 
+use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\Entity\Component;
@@ -18,7 +19,6 @@ use Drupal\Core\DependencyInjection\ClassResolverInterface;
 use Drupal\Core\DrupalKernel;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Plugin\DefaultPluginManager;
-use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\Core\Update\UpdateKernel;
 
 /**
@@ -145,11 +145,22 @@ final class ComponentSourceManager extends DefaultPluginManager {
       // for, if any.
       $component_ids = array_intersect($component_ids, $source_specific_ids);
     }
+    // Load all current reasons once before checking requirements, so we can
+    // distinguish auto-disabled from manually-disabled components below.
+    $all_current_reasons = $this->reasonRepository->getReasons();
+
     $eligible_component_ids = [];
     foreach ($component_ids as $source_specific_component_id) {
       try {
         $discovery->checkRequirements($source_specific_component_id);
         $eligible_component_ids[] = $source_specific_component_id;
+        // Clear any previously stored auto-disable reasons. Leave a manual
+        // disable intact: that is an explicit site-owner decision.
+        $component_id = $discovery::getComponentConfigEntityId($source_specific_component_id);
+        $current_reasons = $all_current_reasons[$source_id][$component_id] ?? [];
+        if ($current_reasons !== [ComponentIncompatibilityReasonRepository::MANUALLY_DISABLED_REASON]) {
+          $this->reasonRepository->removeReason($source_id, $component_id);
+        }
       }
       catch (ComponentDoesNotMeetRequirementsException $e) {
         $this->reasonRepository->storeReasons(

@@ -6,16 +6,6 @@ namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
-use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
-use Drupal\canvas\Plugin\Field\FieldTypeOverride\ListStringItemOverride;
-use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
-use Drupal\Core\Access\AccessResult;
-use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityTypeInterface;
-use Drupal\Core\Hook\Attribute\Hook;
-use Drupal\Core\Session\AccountInterface;
-use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
-use Drupal\editor\EditorInterface;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\DateRangeItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\DateTimeItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\EntityReferenceItemOverride;
@@ -25,6 +15,7 @@ use Drupal\canvas\Plugin\Field\FieldTypeOverride\FloatItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\LinkItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ListIntegerItemOverride;
+use Drupal\canvas\Plugin\Field\FieldTypeOverride\ListStringItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\StringItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\StringLongItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\TextItemOverride;
@@ -33,13 +24,22 @@ use Drupal\canvas\Plugin\Field\FieldTypeOverride\TextWithSummaryItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\UriItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\UuidItemOverride;
 use Drupal\canvas\Plugin\Validation\Constraint\StringSemanticsConstraint;
+use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropShape\CandidateStorablePropShape;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
+use Drupal\editor\EditorInterface;
 use Drupal\filter\FilterFormatInterface;
 use Drupal\media\Entity\MediaType;
 use Drupal\media\MediaTypeInterface;
@@ -68,7 +68,7 @@ class ShapeMatchingHooks {
    * Implements hook_validation_constraint_alter().
    */
   #[Hook('validation_constraint_alter')]
-  public function validationConstraintAlter(array &$definitions): void {
+  public static function validationConstraintAlter(array &$definitions): void {
     // Add the Symfony validation constraints that Drupal core does not add in
     // \Drupal\Core\Validation\ConstraintManager::registerDefinitions() for
     // unknown reasons. Do it defensively, to not break when this changes.
@@ -100,7 +100,7 @@ class ShapeMatchingHooks {
    * Implements hook_field_info_alter().
    */
   #[Hook('field_info_alter')]
-  public function fieldInfoAlter(array &$info): void {
+  public static function fieldInfoAlter(array &$info): void {
     $overrides = [
       'daterange' => DateRangeItemOverride::class,
       'datetime' => DateTimeItemOverride::class,
@@ -134,7 +134,7 @@ class ShapeMatchingHooks {
    * Implements hook_entity_base_field_info_alter().
    */
   #[Hook('entity_base_field_info_alter')]
-  public function entityBaseFieldInfoAlter(array &$fields, EntityTypeInterface $entity_type): void {
+  public static function entityBaseFieldInfoAlter(array &$fields, EntityTypeInterface $entity_type): void {
     // The User entity type uses the "string" field type but then overrides its
     // item class with a custom one, causing the `value` property string
     // semantics to be lost. Explicitly set them again.
@@ -177,7 +177,7 @@ class ShapeMatchingHooks {
    * Prevents any operations on Drupal Canvas's text formats.
    */
   #[Hook('filter_format_access')]
-  public function filterFormatAccess(FilterFormatInterface $format, string $operation, AccountInterface $account): AccessResult {
+  public static function filterFormatAccess(FilterFormatInterface $format, string $operation, AccountInterface $account): AccessResult {
     $protected_formats = [
       'canvas_html_inline',
       'canvas_html_block',
@@ -204,7 +204,7 @@ class ShapeMatchingHooks {
    * Prevents any operations on Drupal Canvas's editors.
    */
   #[Hook('editor_access')]
-  public function editorAccess(EditorInterface $editor, string $operation, AccountInterface $account): AccessResult {
+  public static function editorAccess(EditorInterface $editor, string $operation, AccountInterface $account): AccessResult {
     $protected_editors = [
       'canvas_html_inline',
       'canvas_html_block',
@@ -225,7 +225,7 @@ class ShapeMatchingHooks {
    * list builders.
    */
   #[Hook('entity_operation_alter')]
-  public function entityOperationAlter(array &$operations, EntityInterface $entity): void {
+  public static function entityOperationAlter(array &$operations, EntityInterface $entity): void {
     // Handle FilterFormat entities.
     if ($entity instanceof FilterFormatInterface) {
       $protected_formats = [
@@ -267,7 +267,7 @@ class ShapeMatchingHooks {
    * @todo Move to Media Library module, eventually.
    */
   #[Hook('canvas_storable_prop_shape_alter', module: 'media_library')]
-  public function mediaLibraryStorablePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
+  public static function mediaLibraryStorablePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
     $media_type_ids = NULL;
 
     // @see json-schema-definitions://canvas.module/stream-wrapper-image-uri
@@ -389,7 +389,7 @@ class ShapeMatchingHooks {
    * @see \Drupal\datetime_range\Plugin\Field\FieldType\DateRangeItem
    */
   #[Hook('canvas_storable_prop_shape_alter', module: 'datetime_range')]
-  public function datetimeRangeStorablePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
+  public static function datetimeRangeStorablePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
     if ($storable_prop_shape->shape->schema == [
       'type' => 'object',
       '$ref' => 'json-schema-definitions://canvas.module/date-range',
@@ -434,7 +434,7 @@ class ShapeMatchingHooks {
    *
    * @return non-empty-array<string, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression>
    */
-  protected function getObjectProps(string $media_source_class, BetterEntityDataDefinition $media_entity_type_and_bundle, string $source_field_name): array {
+  protected static function getObjectProps(string $media_source_class, BetterEntityDataDefinition $media_entity_type_and_bundle, string $source_field_name): array {
     return match ($media_source_class) {
       Image::class => [
         // TRICKY: Additional computed property on image fields added by
@@ -455,21 +455,6 @@ class ShapeMatchingHooks {
       ],
       default => throw new \InvalidArgumentException(\sprintf('%s is not a supported Media Source class for shape matching.', $media_source_class)),
     };
-  }
-
-  /**
-   * Returns MediaType Source Plugin field name.
-   *
-   * @param \Drupal\media\MediaTypeInterface $media_type
-   *
-   * @return string
-   */
-  protected function getMediaSourceFieldName(MediaTypeInterface $media_type): string {
-    $source_field_definition = $media_type->getSource()
-      ->getSourceFieldDefinition($media_type);
-    \assert($source_field_definition !== NULL);
-
-    return $source_field_definition->getName();
   }
 
 }

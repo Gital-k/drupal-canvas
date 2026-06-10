@@ -552,6 +552,47 @@ Cypress.Commands.add(
   },
 );
 
+/**
+ * Waits for an iframe to contain exactly `count` elements matching a selector.
+ *
+ * Re-queries the *currently active* preview iframe on every retry, so it
+ * tolerates the iframe swap + asynchronous re-render that follow a layout
+ * change (insert/undo/redo): it resolves as soon as the preview settles on the
+ * expected count, rather than reading a single (possibly mid-render) frame.
+ *
+ * @param {string} selector
+ *   The selector to count inside the iframe.
+ * @param {number} count
+ *   The expected number of matching elements.
+ * @param {string} iframeSelector
+ *   The selector of the iframe to check inside. Defaults to the first preview.
+ * @param {number|null} customTimeout
+ *   Optional override for how long to wait for the count to settle.
+ */
+Cypress.Commands.add(
+  'waitForElementCountInIframe',
+  (
+    selector,
+    count,
+    iframeSelector = initializedReadyPreviewIframeSelector,
+    customTimeout,
+  ) => {
+    cy.document().then((doc) => {
+      cy.get(true, {
+        timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
+      }).should(() => {
+        const elements = doc
+          .querySelector(iframeSelector)
+          ?.contentWindow?.document?.body.querySelectorAll(selector);
+        expect(
+          elements?.length ?? 0,
+          `'${selector}' count in iframe '${iframeSelector}'`,
+        ).to.equal(count);
+      });
+    });
+  },
+);
+
 Cypress.Commands.add(
   'waitForElementHTMLInIframe',
   (
@@ -1279,12 +1320,13 @@ Cypress.Commands.add('returnToContentRegion', () => {
 });
 Cypress.Commands.add('sendComponentToRegion', (componentName, regionName) => {
   cy.findByTestId('canvas-primary-panel').as('layersTree');
+  cy.get('@layersTree').findAllByText(componentName).first().scrollIntoView();
   cy.get('@layersTree')
     .findAllByText(componentName)
     .first()
-    .trigger('contextmenu');
-  cy.findByText('Move to global region').click();
-  cy.get(`[data-region-name="${regionName}"]`).click();
+    .rightclick({ scrollBehavior: false });
+  cy.findByText('Move to global region').click({ scrollBehavior: false });
+  cy.get(`[data-region-name="${regionName}"]`).click({ scrollBehavior: false });
 });
 Cypress.Commands.add(
   'publishAllPendingChanges',
@@ -1493,4 +1535,15 @@ Cypress.Commands.add('insertComponent', (identifier, options = {}) => {
         .should('not.be.empty');
     }
   });
+});
+
+// Represents a wait that does not exceed how long it would take for a real
+// user to proceed with a subsequent action. Intended to be used for actions
+// that would only fail if they occur faster than a user could reasonably
+// perform them.
+// This is especially true for excessive preview requests, which are queued to
+// prevent parallel requests. This works fine at even the fastest human speed,
+// but becomes less stable at automated speeds.
+Cypress.Commands.add('reasonableWait', () => {
+  cy.wait(100);
 });

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Link;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -148,7 +148,7 @@ readonly final class CodeComponentDataProvider {
    *
    * @return array[]
    */
-  public function getCanvasDataThemeAssetsV0(): array {
+  public static function getCanvasDataThemeAssetsV0(): array {
     return [
       self::V0 => [
         'themeAssets' => [
@@ -162,20 +162,6 @@ readonly final class CodeComponentDataProvider {
         ],
       ],
     ];
-  }
-
-  /**
-   * Parses the js code and attach the associated library.
-   *
-   * @param string $jsCode
-   *   The JavaScript code.
-   *
-   * @return array|string[]
-   *   The array of the drupalSettings libraries.
-   */
-  public static function getRequiredCanvasDataLibraries(string $jsCode): array {
-    @trigger_error('Calling ' . __METHOD__ . '() is deprecated in canvas:0.7.3-alpha1 and will be removed from canvas:1.0.0. There is no replacement. See https://www.drupal.org/node/3538276', E_USER_DEPRECATED);
-    return [];
   }
 
   /**

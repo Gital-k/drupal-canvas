@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\TestWith;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Controller\ApiAutoSaveController;
+use Drupal\canvas\Controller\ErrorCodesEnum;
+use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Access\CsrfRequestHeaderAccessCheck;
 use Drupal\Core\Access\CsrfTokenGenerator;
@@ -19,15 +24,6 @@ use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\SessionConfigurationInterface;
 use Drupal\Core\Url;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Controller\ApiAutoSaveController;
-use Drupal\canvas\Controller\ErrorCodesEnum;
-use Drupal\canvas\Entity\AssetLibrary;
-use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Entity\PageRegion;
-use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\image\ImageStyleInterface;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
@@ -45,7 +41,11 @@ use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -215,7 +215,9 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertCount(0, \array_diff($account1->getCacheTags(), $response->getCacheableMetadata()->getCacheTags()));
     self::assertCount(0, \array_diff($account1->getCacheContexts(), $response->getCacheableMetadata()->getCacheContexts()));
     self::assertContains('config:user.settings', $response->getCacheableMetadata()->getCacheTags());
-    $content = \json_decode($response->getContent() ?: '{}', TRUE);
+    $response_body = \json_decode($response->getContent() ?: '{}', TRUE);
+    $this->assertArrayHasKey('data', $response_body);
+    $content = $response_body['data'];
     $anonContentIdentifier = \sprintf('node:%d:en', $anonAccountContent->id());
     self::assertEquals([
       'asset_library:global',
@@ -446,7 +448,9 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertInstanceOf(CacheableJsonResponse::class, $response);
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
     self::assertSame([
+      'canvas_page:2',
       'config:canvas.js_component.test_code',
+      'node:4',
       'config:canvas.page_region.stark.highlighted',
       'config:system.site',
       'user:0',
@@ -455,7 +459,9 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       'http_response',
     ], $response->getCacheableMetadata()->getCacheTags());
     self::assertSame(['user.permissions'], $response->getCacheableMetadata()->getCacheContexts());
-    $content = \json_decode($response->getContent() ?: '{}', TRUE);
+    $response_body = \json_decode($response->getContent() ?: '{}', TRUE);
+    $this->assertArrayHasKey('data', $response_body);
+    $content = $response_body['data'];
     $anonContentIdentifier = \sprintf('node:%d:en', $article->id());
     // Assert we get the keys of auto-save data that we can view (even if maybe
     // we aren't allowed to update).

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\EventSubscriber;
 
-use Drupal\Core\Render\PageDisplayVariantSelectionEvent;
-use Drupal\Core\Render\RenderEvents;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
+use Drupal\Core\Render\PageDisplayVariantSelectionEvent;
+use Drupal\Core\Render\RenderEvents;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -25,7 +25,7 @@ final class PageVariantSelectorSubscriber implements EventSubscriberInterface {
    *
    * @see \Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant
    */
-  public function onSelectPageDisplayVariant(PageDisplayVariantSelectionEvent $event): void {
+  public static function onSelectPageDisplayVariant(PageDisplayVariantSelectionEvent $event): void {
     $regions = PageRegion::loadForActiveTheme();
     if (empty($regions)) {
       // No active page regions for this theme.

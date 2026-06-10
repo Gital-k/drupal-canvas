@@ -10,7 +10,7 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Fallback;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -107,7 +107,6 @@ final class ComponentInstanceForm extends FormBase {
 
     // Make sure these get sent in subsequent AJAX requests.
     // Note: they're prefixed with `form_` to avoid storage in the UI state.
-    // @see ui/src/components/form/inputBehaviors.tsx
     $form['form_canvas_selected'] = [
       '#type' => 'hidden',
       '#value' => $component_instance_uuid,
@@ -124,7 +123,7 @@ final class ComponentInstanceForm extends FormBase {
     // Prevent form submission while specifying values for component instance's
     // inputs, because changes are saved via Redux instead of a traditional
     // submit.
-    // @see ui/src/components/form/inputBehaviors.tsx
+    // @see ui/src/components/form/withRHF-fields/ComponentFormField.tsx
     // @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#method
     $form['#method'] = 'dialog';
 
@@ -148,8 +147,8 @@ final class ComponentInstanceForm extends FormBase {
         // When such a component is broken, the `source` half is too low-level
         // and complex for Canvas content authors to be helpful. So, offer only
         // the resolved values.
-        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::optimizeExplicitInput()
-        $component->getComponentSource() instanceof GeneratedFieldExplicitInputUxComponentSourceBase && \is_array($client_model) && \array_key_exists('resolved', $client_model) => $client_model['resolved'],
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::optimizeExplicitInput()
+        $component->getComponentSource() instanceof JsonSchemaPropsComponentSourceBase && \is_array($client_model) && \array_key_exists('resolved', $client_model) => $client_model['resolved'],
         // @todo This should never occur; remove this in https://www.drupal.org/project/canvas/issues/3558721
         $client_model === json_decode('undefined') => $this->componentTreeLoader->load($entity)
           ->getComponentTreeItemByUuid($component_instance_uuid)

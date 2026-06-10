@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\JsonSchemaInterpreter;
 
-use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\canvas\Plugin\Validation\Constraint\StringSemanticsConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\canvas\ShapeMatcher\DataTypeShapeRequirement;
 use Drupal\canvas\ShapeMatcher\DataTypeShapeRequirements;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 /**
  * Interprets JSON schema types (with type-specific constraints) to Typed Data.
@@ -83,14 +83,6 @@ enum JsonSchemaType: string {
       // @see \Drupal\Core\TypedData\TraversableTypedDataInterface
       self::Array, self::Object => FALSE,
     };
-  }
-
-  public function isIterable(): bool {
-    return !$this->isScalar();
-  }
-
-  public function isTraversable(): bool {
-    return !$this->isScalar();
   }
 
   /**
@@ -395,6 +387,28 @@ enum JsonSchemaType: string {
       },
 
       JsonSchemaType::Object => match (TRUE) {
+        // Content entity reference: at minimum, `x-allowed-entity-type-id` is
+        // required (validated upstream). Optionally `x-allowed-bundle` narrows
+        // selection to a single bundle via the `default` selection handler.
+        // @see docs/shape-matching.md#3.2.3
+        // @see \Drupal\canvas\ComponentMetadataRequirementsChecker
+        JsonSchemaObjectRef::isContentEntityReference($schema)
+          && \array_key_exists('x-allowed-entity-type-id', $shape->schema) => new StorablePropShape(
+            shape: $shape,
+            fieldTypeProp: new FieldTypePropExpression('entity_reference', 'entity'),
+            fieldWidget: 'entity_reference_autocomplete',
+            fieldStorageSettings: [
+              'target_type' => $schema['x-allowed-entity-type-id'],
+            ],
+            fieldInstanceSettings: !\array_key_exists('x-allowed-bundle', $schema)
+              ? NULL
+              : [
+                'handler' => 'default',
+                'handler_settings' => [
+                  'target_bundles' => [$schema['x-allowed-bundle']],
+                ],
+              ],
+        ),
         // For object shapes, it's far simpler to match on the `$ref` than on
         // minutiae.
         \array_key_exists('$ref', $schema) => match (JsonSchemaObjectRef::tryFrom($schema['$ref'])) {

@@ -4,15 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_oauth\Kernel;
 
-use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
-use Drupal\Core\Url;
-use Drupal\Tests\canvas\Kernel\Traits\MockFileUploadTrait;
-use Drupal\Tests\canvas\Kernel\Traits\PredictableImageStyleItokTestTrait;
-use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
-use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
-use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
-use Drupal\Tests\simple_oauth\Kernel\AuthorizedRequestBase;
-use Drupal\image\Entity\ImageStyle;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Component;
@@ -20,9 +11,18 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\consumers\Entity\Consumer;
+use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\Url;
+use Drupal\image\Entity\ImageStyle;
 use Drupal\simple_oauth\Entity\Oauth2Scope;
 use Drupal\simple_oauth\Exception\OAuthUnauthorizedHttpException;
 use Drupal\simple_oauth\Oauth2ScopeInterface;
+use Drupal\Tests\canvas\Kernel\Traits\MockFileUploadTrait;
+use Drupal\Tests\canvas\Kernel\Traits\PredictableImageStyleItokTestTrait;
+use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
+use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use Drupal\Tests\simple_oauth\Kernel\AuthorizedRequestBase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -398,7 +398,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
    * @return \Symfony\Component\HttpFoundation\Request
    *   The request.
    */
-  private function createRequest(string $route_name, array $parameters, string $method, array $data): Request {
+  private static function createRequest(string $route_name, array $parameters, string $method, array $data): Request {
     $request = Request::create(
       Url::fromRoute($route_name, $parameters)->toString(),
       $method,
@@ -446,7 +446,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
    * @return array
    *   The scopes.
    */
-  private function createScopes(array $permissions): array {
+  private static function createScopes(array $permissions): array {
     $scopes = [];
     foreach ($permissions as $index => $permission) {
       $scope = Oauth2Scope::create([

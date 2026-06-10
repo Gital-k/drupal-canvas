@@ -14,29 +14,40 @@ canvas_ai.settings:
       type: integer
       label: 'Maximum image upload size (MB)'
       description: 'Maximum allowed image upload size in megabytes.'
+    chat_history_max_messages:
+      type: integer
+      label: 'Maximum chat history messages'
+      description: 'Maximum number of previous messages passed to the AI as conversation history. -1 means full history, 0 means no history.'
+      constraints:
+        Range:
+          min: -1
 
 canvas_ai.component_description.settings:
   type: config_object
   label: 'Canvas AI Component Description Settings'
   mapping:
     component_context:
-      type: mapping
-      label: 'Component context definitions'
-      mapping:
-        '*':
-          type: component_source_entry
-          label: 'Component source entry'
-
-component_source_entry:
-  type: mapping
-  label: 'Single component source with components'
-  mapping:
-    enabled:
-      type: boolean
-      label: 'Enable components from this source in the context'
-    data:
-      type: text
-      label: 'YAML string of components'
+      type: sequence
+      label: 'Component Source'
+      orderby: key
+      constraints:
+        # Canvas AI agents only work with SDC, block, and JS component sources.
+        SequenceKeysMatchRegex:
+          pattern: '/^(sdc|js|block)$/'
+          message: 'The %value key is not a supported component source plugin ID.'
+      sequence:
+        type: mapping
+        label: 'Source config'
+        mapping:
+          enabled:
+            type: boolean
+            label: 'Enabled'
+          data:
+            type: text
+            label: 'Data'
+            description: 'YAML string containing the component data.'
+            constraints:
+              NotBlank: []
 
 canvas_ai.theme_region.settings:
   type: config_object

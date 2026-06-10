@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Plugin\search_api\processor;
 
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\canvas\Plugin\search_api\processor\ComponentTreeInputs;
 use Drupal\Component\Uuid\Php as UuidGenerator;
 use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Plugin\search_api\processor\ComponentTreeInputs;
 use Drupal\search_api\Entity\Index;
 use Drupal\search_api\Entity\Server;
 use Drupal\search_api\IndexInterface;
@@ -223,7 +223,7 @@ final class ComponentTreeInputsTest extends CanvasKernelTestBase {
     self::assertEmpty($values, 'No values should be extracted when all string props are ignored');
   }
 
-  private function getIndex(): IndexInterface {
+  private static function getIndex(): IndexInterface {
     $index = Index::load(self::INDEX_ID);
     self::assertInstanceOf(IndexInterface::class, $index);
     return $index;

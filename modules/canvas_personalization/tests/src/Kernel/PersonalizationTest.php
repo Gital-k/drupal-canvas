@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Kernel;
 
-use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Recipe\Recipe;
 use Drupal\Core\Recipe\RecipeRunner;
 use Drupal\Core\Render\HtmlResponse;
@@ -15,6 +14,7 @@ use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
@@ -80,7 +80,7 @@ final class PersonalizationTest extends KernelTestBase {
     return $response;
   }
 
-  protected function assertHtmlResponseCacheability(HtmlResponse $response): void {
+  protected static function assertHtmlResponseCacheability(HtmlResponse $response): void {
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
     $cache_tags = $response->getCacheableMetadata()->getCacheTags();
     sort($cache_tags);

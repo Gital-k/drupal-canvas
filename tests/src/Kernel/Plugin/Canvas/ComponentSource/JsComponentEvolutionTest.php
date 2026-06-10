@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
-use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Controller\ApiConfigAutoSaveControllers;
@@ -30,6 +29,7 @@ use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -68,12 +68,12 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     'canvas_test_code_components',
   ];
 
-  protected function reloadJavascriptComponent(): JavaScriptComponent {
+  protected static function reloadJavascriptComponent(): JavaScriptComponent {
     /** @var \Drupal\canvas\Entity\JavaScriptComponent */
     return \Drupal::entityTypeManager()->getStorage(JavaScriptComponent::ENTITY_TYPE_ID)->loadUnchanged(self::JAVASCRIPT_COMPONENT_ID);
   }
 
-  protected function reloadComponent(): ComponentInterface {
+  protected static function reloadComponent(): ComponentInterface {
     /** @var \Drupal\canvas\Entity\ComponentInterface */
     return \Drupal::entityTypeManager()->getStorage(Component::ENTITY_TYPE_ID)->loadUnchanged(self::COMPONENT_ID);
   }
@@ -956,24 +956,10 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     self::assertSame(self::COMPONENT_INSTANCE_UUID, $values[1]['parent_uuid'], 'Child should still reference parent');
   }
 
-  protected function reAddDescriptionSlot(bool $usingHttpRequest = FALSE): void {
-    $js_component = $this->reloadJavascriptComponent();
-    $slots = $js_component->get('slots');
-    $slots['description'] = [
-      'title' => 'Description',
-      'examples' => ['<p>Example description</p>'],
-    ];
-    if (!$usingHttpRequest) {
-      $js_component->set('slots', $slots);
-      self::assertEntityIsValid($js_component);
-      $js_component->save();
-      return;
-    }
-    $data = $js_component->normalizeForClientSide()->values;
-    $data['slots'] = $slots;
-    $this->patchComponent($data);
-  }
-
+  /**
+   * @todo Remove this ignore in https://www.drupal.org/project/canvas/issues/3557271
+   * @phpstan-ignore-next-line shipmonk.deadMethod
+   */
   protected function modifyPropType(bool $usingHttpRequest = FALSE): void {
     $js_component = $this->reloadJavascriptComponent();
     $options = [

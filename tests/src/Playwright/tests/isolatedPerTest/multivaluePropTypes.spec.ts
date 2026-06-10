@@ -134,6 +134,31 @@ test.describe('Multivalue Prop Types', () => {
         .locator('[data-canvas-multivalue-label="true"]'),
     ).toHaveText('Marshmallow Coast');
 
+    // Assert that a very long label text is visually truncated with ellipsis.
+    // The scrollWidth of the label element exceeds its clientWidth when
+    // CSS text-overflow: ellipsis is active and the text is clipped.
+    const longText =
+      'UI for value input breaks on entering string with more than 44 characters and keeps going even further';
+    await firstRow.getByRole('button', { name: /^Edit Text/ }).click();
+    textbox = popover.getByRole('textbox');
+    await textbox.fill(longText);
+    await textbox.press('Enter');
+    const longLabel = textField
+      .locator('tr.draggable')
+      .first()
+      .locator('[data-canvas-multivalue-label="true"]');
+    await expect(longLabel).toHaveText(longText);
+    const isTruncated = await longLabel.evaluate(
+      (el) => el.scrollWidth > el.clientWidth,
+    );
+    expect(isTruncated).toBe(true);
+
+    // Restore the original value before continuing the test.
+    await firstRow.getByRole('button', { name: /^Edit Text/ }).click();
+    textbox = popover.getByRole('textbox');
+    await textbox.fill('Marshmallow Coast');
+    await textbox.press('Enter');
+
     // Verify text in the Preview pane is updated.
     await canvas.testInPreviewFrame('#text-list li', async (textList) => {
       await expect(textList).toHaveCount(2);
@@ -320,8 +345,25 @@ test.describe('Multivalue Prop Types', () => {
       'closed',
     );
 
-    // Add another item and verify that it can now be removed.
-    await canvas.addMultiValueProp('Text (Required Unlimited)*');
+    // Add new rows and populate their values.
+    // @todo we should actually be using canvas.addMultiValueProp, but it will
+    // fail due to a legitimate bug: https://drupal.org/i/3587472
+    await textLimitedField.getByRole('button', { name: '+ Add new' }).click();
+    const rows = textLimitedField.locator('tr.draggable');
+    await expect(rows).toHaveCount(2);
+    await rows
+      .last()
+      .getByRole('button', { name: /^Edit Text \(Required Unlimited\)/ })
+      .click();
+    const removeButton = rows
+      .last()
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Remove' });
+    await expect(removeButton).toBeEnabled();
+    await removeButton.click();
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
+    await expect(rows).toHaveCount(1);
   });
 
   test('Link items', async ({ page, canvas }) => {
@@ -429,10 +471,34 @@ test.describe('Multivalue Prop Types', () => {
     );
 
     await canvas.testInPreviewFrame('#number-list li', async (numberList) => {
-      await expect(numberList).toHaveCount(2);
+      await expect(numberList).toHaveCount(3);
       await expect(numberList.nth(0)).toHaveText('42.5');
       await expect(numberList.nth(1)).toHaveText('100');
+      // Asserts that the 0 is not rendered as "Empty".
+      await expect(numberList.nth(2)).toHaveText('0');
     });
+
+    // Assert that the zero-value row in the Settings pane shows '0', not 'Empty'.
+    const thirdRow = numberField.locator('tr.draggable').nth(2);
+    await expect(
+      thirdRow.locator('[data-canvas-multivalue-label="true"]'),
+    ).toHaveText('0');
+    await expect(
+      thirdRow.locator('[data-canvas-multivalue-label="true"]'),
+    ).not.toHaveText('Empty');
+
+    // Assert that opening the popover for the zero-value row shows '0' in the
+    // input, not a blank/empty field.
+    await thirdRow.getByRole('button', { name: /^Edit Number/ }).click();
+    const thirdRowPopover = thirdRow.getByRole('dialog');
+    await expect(thirdRowPopover.getByRole('spinbutton')).toHaveValue('0');
+    await thirdRowPopover
+      .getByRole('button', { name: 'Close' })
+      .dispatchEvent('click');
+    await expect(thirdRow.getByRole('dialog')).toHaveAttribute(
+      'data-state',
+      'closed',
+    );
 
     // Integer type rejects decimal values.
     const integerField = page.locator('.field--type-integer').filter({
@@ -492,7 +558,7 @@ test.describe('Multivalue Prop Types', () => {
       0,
     );
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
-      await expect(items.nth(0)).toContainText('2025-12-24');
+      await expect(items.nth(0)).toContainText('2025-12-24T08:00:00.000Z');
     });
 
     await dateTimeUnlimitedField
@@ -507,9 +573,10 @@ test.describe('Multivalue Prop Types', () => {
       1,
     );
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
+      await items.nth(0).scrollIntoViewIfNeeded();
       await expect(items).toHaveCount(2);
-      await expect(items.nth(0)).toContainText('2025-12-24');
-      await expect(items.nth(1)).toContainText('2025-12-25');
+      await expect(items.nth(0)).toContainText('2025-12-24T08:00:00.000Z');
+      await expect(items.nth(1)).toContainText('2025-12-25T14:30:00.000Z');
     });
 
     // Verify popover header label.
@@ -525,7 +592,7 @@ test.describe('Multivalue Prop Types', () => {
     await canvas.removeMultiValueProp('DateTime (Unlimited)', 0);
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
       await expect(items).toHaveCount(1);
-      await expect(items.nth(0)).toContainText('2025-12-25');
+      await expect(items.nth(0)).toContainText('2025-12-25T14:30:00.000Z');
     });
 
     // Add a new item and reorder.
@@ -542,8 +609,8 @@ test.describe('Multivalue Prop Types', () => {
     // Drag row 1 (2025-12-26) before row 0 (2025-12-25).
     await canvas.reorderMultiValueProp('DateTime (Unlimited)', 1, 0);
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
-      await expect(items.nth(0)).toContainText('2025-12-26');
-      await expect(items.nth(1)).toContainText('2025-12-25');
+      await expect(items.nth(0)).toContainText('2025-12-26T10:00:00.000Z');
+      await expect(items.nth(1)).toContainText('2025-12-24T08:00:00.000Z');
     });
 
     // Verify no ghost rows appear when deleting from bottom to top.
@@ -653,6 +720,7 @@ test.describe('Multivalue Prop Types', () => {
     // Remove first item.
     await canvas.removeMultiValueProp('Date (Unlimited)', 0);
     await canvas.testInPreviewFrame('#date-list li', async (items) => {
+      await items.nth(0).scrollIntoViewIfNeeded();
       await expect(items).toHaveCount(1);
       await expect(items.nth(0)).toContainText('2026-04-28');
     });
@@ -664,8 +732,9 @@ test.describe('Multivalue Prop Types', () => {
     // Drag row 1 (2026-05-01) before row 0 (2026-04-28).
     await canvas.reorderMultiValueProp('Date (Unlimited)', 1, 0);
     await canvas.testInPreviewFrame('#date-list li', async (items) => {
+      await items.nth(0).scrollIntoViewIfNeeded();
       await expect(items.nth(0)).toContainText('2026-05-01');
-      await expect(items.nth(1)).toContainText('2026-04-28');
+      await expect(items.nth(1)).toContainText('2026-04-27');
     });
 
     // ===== DATE (LIMITED) =====
@@ -849,6 +918,7 @@ test.describe('Multivalue Prop Types', () => {
     const intFieldAfterReload = page.locator('.form-item').filter({
       has: page.locator('label', { hasText: 'List Integer (Unlimited)' }),
     });
+    intFieldAfterReload.scrollIntoViewIfNeeded();
     const intChipsAfterReload = intFieldAfterReload.locator(
       '[class*="multiValue"]',
     );

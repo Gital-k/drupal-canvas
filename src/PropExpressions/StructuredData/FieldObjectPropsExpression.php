@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropExpressions\StructuredData;
 
+use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
@@ -11,7 +12,6 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 
 final class FieldObjectPropsExpression implements EntityFieldBasedPropExpressionInterface, ObjectPropExpressionInterface {
 
@@ -37,7 +37,7 @@ final class FieldObjectPropsExpression implements EntityFieldBasedPropExpression
       return $expr instanceof FieldPropExpression || $expr instanceof ReferenceFieldPropExpression;
     }, $this->objectPropsToFieldProps));
     array_walk($objectPropsToFieldProps, function (EntityFieldBasedPropExpressionInterface $expr) {
-      $targets_same_field_item = $this->hasSameStartingPointAs($expr);
+      $targets_same_field_item = $this->getStartingPointKey() === $expr->getStartingPointKey();
       if (!$targets_same_field_item) {
         throw new \InvalidArgumentException(\sprintf(
           '`%s` is not a valid expression, because it does not map the same field item (entity type `%s`, field name `%s`, delta `%s`).',
@@ -90,15 +90,6 @@ final class FieldObjectPropsExpression implements EntityFieldBasedPropExpression
       $dependencies = NestedArray::mergeDeep($dependencies, $expr->calculateDependencies($host_entity));
     }
     return $dependencies;
-  }
-
-  public function withDelta(int $delta): static {
-    return new static(
-      $this->entityType,
-      $this->fieldName,
-      $delta,
-      $this->objectPropsToFieldProps,
-    );
   }
 
   public static function fromString(string $representation): static {

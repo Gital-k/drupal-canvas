@@ -1,6 +1,6 @@
 {
   "name": "@drupal-canvas/workbench",
-  "version": "0.4.2",
+  "version": "0.8.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "drupal-canvas": "^0.3.2",
+    "drupal-canvas": "^0.4.1",
     "lucide-react": "^0.564.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -41,6 +41,7 @@
     "vite-plugin-svgr": "^4.5.0"
   },
   "devDependencies": {
+    "@drupal-canvas/auth": "*",
     "@drupal-canvas/discovery": "*",
     "@drupal-canvas/vite-compat": "*",
     "@types/node": "^24.10.1",

@@ -8,18 +8,15 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Asset\AssetCollectionRendererInterface;
 use Drupal\Core\Asset\AssetResolverInterface;
+use Drupal\Core\Asset\AttachedAssets;
+use Drupal\Core\Asset\LibraryDiscoveryInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\Core\Render\ElementInfoManagerInterface;
 use Drupal\Core\Render\MainContent\MainContentRendererInterface;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Symfony\Component\HttpFoundation\Request;
-use Drupal\Core\Asset\AttachedAssets;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Drupal\Core\Asset\LibraryDiscoveryInterface;
 
 /**
  * Main content renderer for Canvas endpoints returning React-renderable markup.
@@ -40,14 +37,11 @@ use Drupal\Core\Asset\LibraryDiscoveryInterface;
 final class CanvasTemplateRenderer implements MainContentRendererInterface {
 
   public function __construct(
-    protected ElementInfoManagerInterface $element_info_manager,
     protected RendererInterface $renderer,
     protected AssetResolverInterface $assetResolver,
     protected AssetCollectionRendererInterface $cssCollectionRenderer,
     protected AssetCollectionRendererInterface $jsCollectionRenderer,
-    protected RequestStack $requestStack,
     protected ModuleHandlerInterface $moduleHandler,
-    protected LanguageManagerInterface $languageManager,
     protected LibraryDiscoveryInterface $libraryDiscovery,
   ) {
 

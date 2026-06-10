@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropShape;
 
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 
 /**
@@ -142,11 +142,20 @@ final class PropShape {
     // @see https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-00#rfc.section.9.2
     unset($normalized_prop_schema['default']);
 
-    $normalized_prop_schema['type'] = JsonSchemaType::from(
-    // TRICKY: SDC always allowed `object` for Twig integration reasons.
+    // TRICKY: SDC appends `'object'` to every prop's declared `type` (and then
+    // dedupes) so Twig can defer rendering to the render pipeline.
+    // The originally declared type is therefore always the first element.
     // @see \Drupal\sdc\Component\ComponentMetadata::parseSchemaInfo()
-      \is_array($prop_schema['type']) ? $prop_schema['type'][0] : $prop_schema['type']
-    )->value;
+    //
+    // Prop definitions might not have been validated yet. Their `type` may
+    // therefore be a string that does not correspond to any `JsonSchemaType`
+    // enum case.
+    // If `JsonSchemaType::from()` was called, it would throw `\ValueError` on
+    // such input; this normalization must tolerate it and simply pass it
+    // through (any downstream shape comparison will then not match a known
+    // shape, which is the desired outcome).
+    // @see \Drupal\Tests\canvas\Unit\PropShape\PropShapeNormalizeTest
+    $normalized_prop_schema['type'] = \strtolower(((array) $prop_schema['type'])[0]);
 
     // If this is a `type: object` with not a `$ref` but `properties`, normalize
     // those too.
@@ -157,10 +166,16 @@ final class PropShape {
       );
     }
 
-    // Omit the ID containing the resolved $ref URI.
+    // Omit the resolved $ref URI that schema resolution injects. Canvas uses
+    // the JSON-Schema Draft-07 dialect, whose id keyword is `$id` (not
+    // Draft-04's `id`). justinrainbow/json-schema only emits `$id` as of
+    // 6.9.0; earlier versions injected `id` regardless of dialect. Strip both
+    // so the URI never leaks into the prop shape on either version
+    // (drupal/core-recommended still pins ~6.8.2 until core adopts 6.9.0).
+    // @see https://github.com/jsonrainbow/json-schema/issues/911
     // @see \JsonSchema\SchemaStorage::resolveRefSchema()
     // @see \JsonSchema\Uri\UriRetriever::retrieve()
-    unset($normalized_prop_schema['id']);
+    unset($normalized_prop_schema['id'], $normalized_prop_schema['$id']);
 
     return $normalized_prop_schema;
   }
@@ -245,6 +260,11 @@ final class PropShape {
    *   `x-formatting-context` does not matter. Invalid `x-formatting-contexts`
    *   are blocked during discovery of components from ever making it into
    *   Canvas component trees.
+   *
+   * TRICKY: this is a Canvas concept, not a JSON Schema concept. Hence this
+   * method does not live in:
+   * - \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat
+   * - \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType
    *
    * @param JsonSchema $prop_schema
    *   The JSON schema for a component prop.
