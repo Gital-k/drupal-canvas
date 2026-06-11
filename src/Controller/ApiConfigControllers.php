@@ -14,6 +14,7 @@ use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessCont
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\Core\Access\AccessManagerInterface;
+use Drupal\Core\Access\AccessResultForbidden;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableJsonResponse;
@@ -338,6 +339,20 @@ final class ApiConfigControllers extends ApiControllerBase {
       throw $e->renamePropertyPaths([
         'component_tree.inputs' => 'model',
         'component_tree' => 'layout',
+      ]);
+    }
+    $disable_access = $canvas_config_entity->access('disable', return_as_object: TRUE);
+    if ($disable_access->isForbidden()) {
+      assert($disable_access instanceof AccessResultForbidden);
+      return new JsonResponse(status: 403, data: [
+        'errors' => [
+          [
+            'detail' => $disable_access->getReason(),
+            'source' => [
+              'pointer' => 'status',
+            ],
+          ],
+        ],
       ]);
     }
 

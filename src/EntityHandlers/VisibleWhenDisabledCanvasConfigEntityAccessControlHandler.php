@@ -57,7 +57,7 @@ final class VisibleWhenDisabledCanvasConfigEntityAccessControlHandler extends Ca
     // For all other operations, use the parent implementation.
     $parent_result = parent::checkAccess($entity, $operation, $account);
 
-    if ($operation === 'delete'
+    if (in_array($operation, ['disable', 'delete'], TRUE)
         && $entity instanceof JavaScriptComponent
         && $component = Component::load(JsComponent::componentIdFromJavascriptComponentId($entity->id()))
     ) {
@@ -74,11 +74,17 @@ final class VisibleWhenDisabledCanvasConfigEntityAccessControlHandler extends Ca
       // less I/O.
       return $parent_result->orIf(AccessResult::forbiddenIf(
         $this->componentAudit->hasUsages($component, RevisionAuditEnum::AutoSave),
-        'This code component is in use in a Canvas auto-save and cannot be deleted.'
-      ))->orIf(AccessResult::forbiddenIf(
+        match($operation) {
+          'disable' => 'This code component is in use in a Canvas auto-save and cannot be disabled.',
+          'delete' => 'This code component is in use in a Canvas auto-save and cannot be deleted.',
+        }),
+      )->orIf(AccessResult::forbiddenIf(
         $this->componentAudit->hasUsages($component, RevisionAuditEnum::Default),
-        'This code component is in use in a default revision and cannot be deleted.'
-      ));
+        match($operation) {
+          'disable' => 'This code component is in use in a default revision and cannot be disabled.',
+          'delete' => 'This code component is in use in a default revision and cannot be deleted.',
+        }),
+      );
     }
 
     return $parent_result;
