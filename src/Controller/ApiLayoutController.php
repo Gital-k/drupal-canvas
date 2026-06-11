@@ -139,20 +139,11 @@ final class ApiLayoutController {
     ];
     $available_translations = [];
     $links = [];
-    // ContentTemplate is a config entity that may have its own config
-    // translations (language overrides) AND/OR the preview entity may have
-    // content translations. Use $preview_entity here to collect any
-    // content-entity translations.
-    $translation_entity = $entity instanceof ContentEntityInterface ? $entity : $preview_entity;
-    if ($translation_entity instanceof ContentEntityInterface) {
-      $available_translations = \array_keys($translation_entity->getTranslationLanguages(FALSE));
-      // Delete link should be emitted only when the entity owns its own
-      // translations (i.e. a content entity). When editing a ContentTemplate,
-      // $translation_entity is the preview entity whose content translations
-      // should not be deleted through the Canvas API.
-      if ($translation_entity === $entity && $this->moduleHandler->moduleExists('content_translation')) {
+    if ($entity instanceof ContentEntityInterface) {
+      $available_translations = \array_keys($entity->getTranslationLanguages(FALSE));
+       if($this->moduleHandler->moduleExists('content_translation')) {
         foreach ($available_translations as $langcode) {
-          $translation = $translation_entity->getTranslation($langcode);
+          $translation = $entity->getTranslation($langcode);
           // The delete route gates on update access, so emit the link to the
           // same users to avoid offering a link that would return 403.
           // @see canvas.api.content.translation.delete in canvas.routing.yml
@@ -160,7 +151,7 @@ final class ApiLayoutController {
             $links[$langcode] = [
               CanvasUriDefinitions::LINK_REL_DELETE => Url::fromRoute(
                 'canvas.api.content.translation.delete',
-                ['canvas_page' => $translation_entity->id()],
+                ['canvas_page' => $entity->id()],
                 ['language' => $translation->language()],
               )->toString(),
             ];
