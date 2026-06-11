@@ -6,6 +6,7 @@ namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ClientDataToEntityConverter;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Controller\EntityFormTrait;
 use Drupal\canvas\Entity\Component;
@@ -31,16 +32,17 @@ use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
+use Drupal\node\Entity\NodeType;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
-use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
+use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\content_moderation\Traits\ContentModerationTestTrait;
-use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
+use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
 use Drupal\user\RoleInterface;
@@ -53,32 +55,77 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Tests Client Data To Entity Converter.
- *
- * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
 #[Group('#slow')]
-class ClientDataToEntityConverterTest extends KernelTestBase {
+class ClientDataToEntityConverterTest extends CanvasKernelTestBase {
 
+  use CanvasFieldCreationTrait;
   use CanvasFieldTrait {
     getValidClientJson as traitGetValidClientJson;
   }
   use ConstraintViolationsTestTrait;
-  use UserCreationTrait;
   use EntityFormTrait;
   use ContentModerationTestTrait;
+  use ImageFieldCreationTrait;
+  use MediaTypeCreationTrait;
   use RequestTrait;
   use VfsPublicStreamUrlTrait;
+
+  protected static $modules = [
+    'node',
+    'field',
+  ];
+
+  protected Node $testNode;
 
   private User $otherUser;
 
   public function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system']);
-    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
-    (new CanvasTestSetup())->setup();
+    $this->installEntitySchema('user');
+    $this->installSchema('user', ['users_data']);
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema('node');
+    $this->installSchema('node', ['node_access']);
+    $this->installEntitySchema('file');
+    $this->installSchema('file', ['file_usage']);
+    $this->installEntitySchema('media');
+    $this->installEntitySchema('filter_format');
+    $this->installConfig(['node', 'media', 'user', 'filter']);
+    $this->config('system.site')->set('name', 'Drupal')->save();
+
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+    $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->createComponentTreeField('node', 'article', 'field_canvas_demo');
+    $this->createImageField('field_hero', 'node', 'article');
+
+    Role::create([
+      'id' => 'canvas',
+      'label' => 'canvas',
+      'permissions' => [
+        'access content',
+        'administer media',
+        'access media overview',
+        'view media',
+        'create media',
+        'edit any article content',
+        'create article content',
+      ],
+    ])->save();
+
+    $this->setUpCurrentUser(permissions: ['view media', 'access content']);
     $this->setUpImages();
+
+    $this->testNode = Node::create([
+      'type' => 'article',
+      'title' => 'Canvas Needs This For The Time Being',
+      'uid' => 0,
+    ]);
+    $this->testNode->save();
+
     $other_user = $this->createUser();
     \assert($other_user instanceof User);
     $this->otherUser = $other_user;
@@ -165,6 +212,10 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     ]);
     \assert($account instanceof AccountInterface);
     $this->setCurrentUser($account);
+    // Reset entity access static cache so the new user's permissions are
+    // evaluated fresh (the cache is keyed per-entity, not per-user, and may
+    // contain stale results from the setUp() user).
+    \Drupal::entityTypeManager()->getAccessControlHandler('media')->resetCache();
     $valid_client_json = $this->getValidClientJson(FALSE);
     // The client may not filter out form inputs that are not entity fields.
     $valid_client_json['entity_form_fields']['field_image_0_upload_button'] = 'Not an entity field input';
@@ -245,7 +296,8 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     );
 
     // If the client tries to update a field the user does not have access to edit, the field should remain unchanged.
-    $permissions = [];
+    // view media is needed because $valid_client_json has a static entity_reference image.
+    $permissions = ['view media', 'access content'];
     if ($with_content_moderation) {
       $permissions[] = 'use editorial transition create_new_draft';
     }
@@ -294,7 +346,8 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       ->save();
 
     // If the client has elevated permissions, they can update protected fields.
-    $permissions = ['administer nodes'];
+    // view media is needed because $valid_client_json has a static entity_reference image.
+    $permissions = ['administer nodes', 'view media', 'access content'];
     if ($with_content_moderation) {
       $permissions[] = 'use editorial transition create_new_draft';
     }
@@ -305,8 +358,8 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     self::assertTrue($test_node->get('sticky')->access('edit'));
     self::assertTrue($test_node->get('sticky')->access('view'));
     self::assertFalse($test_node->isSticky());
-    self::assertEquals(3, (int) $test_node->getOwnerId());
-    self::assertNotEquals(3, $limited_user->id());
+    self::assertEquals((int) $this->otherUser->id(), (int) $test_node->getOwnerId());
+    self::assertNotEquals((int) $this->otherUser->id(), $limited_user->id());
     $protected_field_updated_json = $valid_client_json;
     $protected_field_updated_json['entity_form_fields']['sticky[value]'] = TRUE;
     // Test a form element that is more complex and features a validate callback
@@ -324,8 +377,8 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     self::assertEquals($limited_user_id, (int) $test_node->getOwnerId());
 
     $test_node = $this->createTestNode();
-    self::assertEquals(3, (int) $test_node->getOwnerId());
-    self::assertNotEquals(3, $limited_user->id());
+    self::assertEquals((int) $this->otherUser->id(), (int) $test_node->getOwnerId());
+    self::assertNotEquals((int) $this->otherUser->id(), $limited_user->id());
     $invalid_form_callback_client_json = $valid_client_json;
     // Test a form element that has a validate callback, the validation should
     // bubble up from the form. Submit a value that doesn't pass validation.
@@ -341,7 +394,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       $test_node,
     );
     // Owner field will not be updated and will retain the original value.
-    self::assertEquals(3, $test_node->getOwnerId());
+    self::assertEquals((int) $this->otherUser->id(), (int) $test_node->getOwnerId());
 
     $utc = new \DateTimeZone('UTC');
     $test_node = $this->createTestNode([
@@ -354,7 +407,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
         ],
       ],
     ]);
-    self::assertSame([], self::violationsToArray($test_node->validate()));
+    self::assertEntityIsValid($test_node);
     $result = \Drupal::classResolver(ApiLayoutController::class)->get($test_node);
     \assert($result instanceof PreviewEnvelope);
     $invalid_form_callback_client_json = \array_intersect_key($result->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
@@ -404,6 +457,13 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     );
 
     $this->container->get('module_installer')->install(['canvas_test_article_fields']);
+    // Reload testNode to pick up new field definitions and resave to refresh
+    // node access grants (comment module registers its handler on install).
+    $testNodeId = $this->testNode->id();
+    \assert(\is_int($testNodeId) || \is_string($testNodeId));
+    $testNode = \Drupal::entityTypeManager()->getStorage('node')->loadUnchanged($testNodeId);
+    \assert($testNode instanceof Node);
+    $testNode->save();
     // Remove the field_cvt_textarea_summary field installed by
     // canvas_test_article_fields because it is not used in the test and causes
     // unrelated validation errors.
@@ -418,6 +478,8 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       'use editorial transition create_new_draft',
       'use editorial transition publish',
       'use editorial transition archive',
+      'access content',
+      'view media',
     ]);
     $no_view_field_access_client_json = $valid_client_json;
 
@@ -523,7 +585,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       $this->container->get(ClientDataToEntityConverter::class)->convert($client_json, $node);
       self::assertCount(0, $expected_errors);
       // If no violations occurred, the node should be valid.
-      $this->assertCount(0, $node->validate());
+      self::assertEntityIsValid($node);
       $this->assertSame(SAVED_UPDATED, $node->save());
     }
     catch (ConstraintViolationException $e) {
@@ -571,26 +633,34 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       ],
     ] + $values);
     \assert($node instanceof Node);
-    self::assertSame([], self::violationsToArray($node->validate()));
+    self::assertEntityIsValid($node);
     $this->assertSame(SAVED_NEW, $node->save());
     return $node;
   }
 
   public function testBooleanCheckboxesNotForBooleanField(): void {
     \Drupal::service(ModuleInstallerInterface::class)->install(['canvas_test_article_fields']);
+    // Reload to pick up new field definitions added by canvas_test_article_fields,
+    // then resave to rewrite node access grants (comment module, installed as a
+    // dependency, registers its access handler on install).
+    $testNodeId = $this->testNode->id();
+    \assert(\is_int($testNodeId) || \is_string($testNodeId));
+    $testNode = \Drupal::entityTypeManager()->getStorage('node')->loadUnchanged($testNodeId);
+    \assert($testNode instanceof Node);
+    $testNode->save();
     \Drupal::keyValue(CanvasTestArticleFieldsHooks::CANVAS_STATE)->set(CanvasTestArticleFieldsHooks::GRAVY_STATE, TRUE);
     $autoSave = $this->container->get(AutoSaveManager::class);
     \assert($autoSave instanceof AutoSaveManager);
     $this->setUpCurrentUser(permissions: [
       'access administration pages',
+      'access content',
+      'view media',
       'edit any article content',
       'use editorial transition create_new_draft',
       'use editorial transition publish',
     ]);
-    $node = Node::load(1);
-    \assert($node instanceof NodeInterface);
     $url = Url::fromRoute('canvas.api.layout.get', [
-      'entity' => $node->id(),
+      'entity' => $this->testNode->id(),
       'entity_type' => 'node',
     ]);
 
@@ -599,18 +669,17 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
     $json = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
     self::assertEquals(TRUE, $json['entity_form_fields'][CanvasTestArticleFieldsHooks::NO_MORE_GRAVY]);
-    self::assertNull($autoSave->getAutoSaveEntity($node)->entity);
+    self::assertNull($autoSave->getAutoSaveEntity($this->testNode)->entity);
     self::assertEquals('Canvas Needs This For The Time Being', $json['entity_form_fields']['title[0][value]']);
 
     // Uncheck this checkbox. This should change the (auto-saved) entity title.
     // @see \Drupal\canvas_test_article_fields\Hook\CanvasTestArticleFieldsHooks::canvasPageEntityGravyBuilder()
     $json['entity_form_fields'][CanvasTestArticleFieldsHooks::NO_MORE_GRAVY] = FALSE;
     unset($json['isNew'], $json['isPublished'], $json['html'], $json['hasUnsavedStatusChange']);
-    $json += $this->getPostContentsDefaults($node);
-    $response = $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', server: ['CONTENT_TYPE' => 'application/json'], content: \json_encode($json, \JSON_THROW_ON_ERROR)));
+    $json += $this->getPostContentsDefaults($this->testNode);
+    $response = $this->request(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id(), method: 'POST', server: ['CONTENT_TYPE' => 'application/json'], content: \json_encode($json, \JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
-    $autoSaveEntity = $autoSave->getAutoSaveEntity($node)->entity;
-    // @phpstan-ignore-next-line
+    $autoSaveEntity = $autoSave->getAutoSaveEntity($this->testNode)->entity;
     self::assertInstanceOf(NodeInterface::class, $autoSaveEntity);
     self::assertSame('Gravy!', $autoSaveEntity->label());
 
@@ -618,11 +687,10 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     // @see \Drupal\canvas_test_article_fields\Hook\CanvasTestArticleFieldsHooks::canvasPageEntityGravyBuilder()
     $json['entity_form_fields'][CanvasTestArticleFieldsHooks::NO_MORE_GRAVY] = TRUE;
     unset($json['isNew'], $json['isPublished'], $json['html'], $json['hasUnsavedStatusChange']);
-    $json += $this->getPostContentsDefaults($node);
-    $response = $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', server: ['CONTENT_TYPE' => 'application/json'], content: \json_encode($json, \JSON_THROW_ON_ERROR)));
+    $json += $this->getPostContentsDefaults($this->testNode);
+    $response = $this->request(Request::create('/canvas/api/v0/layout/node/' . $this->testNode->id(), method: 'POST', server: ['CONTENT_TYPE' => 'application/json'], content: \json_encode($json, \JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
-    $autoSaveEntity = $autoSave->getAutoSaveEntity($node)->entity;
-    // @phpstan-ignore-next-line
+    $autoSaveEntity = $autoSave->getAutoSaveEntity($this->testNode)->entity;
     self::assertInstanceOf(NodeInterface::class, $autoSaveEntity);
     self::assertSame('No more gravy', $autoSaveEntity->label());
   }

@@ -22,23 +22,16 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Core\Session\SessionConfigurationInterface;
 use Drupal\Core\Url;
 use Drupal\image\ImageStyleInterface;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
-use Drupal\Tests\block\Traits\BlockCreationTrait;
-use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
-use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
-use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
-use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
-use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
-use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -52,44 +45,40 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Tests Drupal\canvas\Controller\ApiAutoSaveController.
- *
- * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(ApiAutoSaveController::class)]
 #[Group('canvas')]
 #[Group('#slow')]
-final class ApiAutoSaveControllerTest extends KernelTestBase {
+final class ApiAutoSaveControllerTest extends ApiLayoutControllerTestBase {
 
-  use AutoSaveManagerTestTrait;
   use AutoSaveRequestTestTrait;
+  use CanvasFieldTrait {
+    setUpCurrentUser as traitSetUpCurrentUser;
+  }
   use ConstraintViolationsTestTrait;
-  use UserCreationTrait;
   use OpenApiSpecTrait;
-  use BlockCreationTrait;
-  use RequestTrait;
-  use CanvasFieldCreationTrait;
-  use CanvasFieldTrait;
-  use VfsPublicStreamUrlTrait;
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
-    'path_alias',
-    'path',
     'test_user_config',
     'canvas_force_publish_error',
   ];
+
+  protected function setUpCurrentUser(array $values = [], array $permissions = [], bool $admin = FALSE): UserInterface {
+    return parent::setUpCurrentUser($values, $permissions, $admin);
+  }
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installEntitySchema('path_alias');
-    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
-    (new CanvasTestSetup())->setup();
+    // testPost() creates its own node.article.full ContentTemplate; passing
+    // FALSE avoids a duplicate-ID storage exception.
+    $this->setUpFixture(FALSE);
   }
 
   public function testApiAutoSaveControllerGet(): void {
@@ -98,15 +87,19 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       Page::EDIT_PERMISSION,
       // We need access to page regions even for seeing there are changes.
       PageRegion::ADMIN_PERMISSION,
+      'access content',
+      'view media',
     ];
     $anonAccountContent = Node::create([
       'type' => 'article',
       'title' => 'Anon, empty',
+      'uid' => 0,
     ]);
     $anonAccountContent->save();
     \assert($anonAccountContent instanceof NodeInterface);
-    // Trigger a new hash.
+    // Trigger a new hash. Save as anonymous so owner=0 in the auto-save data.
     $anonAccountContent->setRevisionUserId(2);
+    $this->setCurrentUser(new AnonymousUserSession());
     /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
     $autoSave->saveEntity($anonAccountContent);
@@ -121,8 +114,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     // Update the page title.
     $new_title = $this->getRandomGenerator()->sentences(10);
-    $account1content = Node::load(1);
-    \assert($account1content instanceof NodeInterface);
+    $account1content = $this->testNode;
     $account1content->setTitle($new_title);
     $autoSave->saveEntity($account1content);
     // Save a draft of the page region.
@@ -148,8 +140,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $region = $region->forAutoSaveData($regionData, validate: TRUE);
     $autoSave->saveEntity($region);
     // Empty data.
-    $account2content = Node::load(2);
-    \assert($account2content instanceof NodeInterface);
+    $account2content = $this->emptyNode;
     $account2content->setRevisionUser($account2);
     $this->setCurrentUser($account2);
     $autoSave->saveEntity($account2content);
@@ -219,26 +210,28 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $this->assertArrayHasKey('data', $response_body);
     $content = $response_body['data'];
     $anonContentIdentifier = \sprintf('node:%d:en', $anonAccountContent->id());
+    $testNodeIdentifier = \sprintf('node:%d:en', $account1content->id());
+    $emptyNodeIdentifier = \sprintf('node:%d:en', $account2content->id());
     self::assertEquals([
       'asset_library:global',
       'js_component:test_code',
-      'node:1:en',
-      'node:2:en',
+      $testNodeIdentifier,
+      $emptyNodeIdentifier,
       $anonContentIdentifier,
       'page_region:stark.highlighted',
       'staged_config_update:canvas_set_homepage',
     ], \array_keys($content));
     // We don't assert the exact value of these because of clock-drift during
     // the test, asserting their presence is enough.
-    \assert(\is_array($content['node:1:en']));
-    \assert(\is_array($content['node:2:en']));
+    \assert(\is_array($content[$testNodeIdentifier]));
+    \assert(\is_array($content[$emptyNodeIdentifier]));
     \assert(\is_array($content['page_region:stark.highlighted']));
     \assert(\is_array($content[$anonContentIdentifier]));
     \assert(\is_array($content['js_component:test_code']));
     \assert(\is_array($content['staged_config_update:canvas_set_homepage']));
     \assert(\is_array($content['asset_library:global']));
-    self::assertArrayHasKey('updated', $content['node:1:en']);
-    self::assertArrayHasKey('updated', $content['node:2:en']);
+    self::assertArrayHasKey('updated', $content[$testNodeIdentifier]);
+    self::assertArrayHasKey('updated', $content[$emptyNodeIdentifier]);
     self::assertArrayHasKey('updated', $content[$anonContentIdentifier]);
     self::assertArrayHasKey('updated', $content['page_region:stark.highlighted']);
     self::assertArrayHasKey('updated', $content['js_component:test_code']);
@@ -259,7 +252,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         'uri' => $account1->toUrl()->toString(),
       ],
       'label' => $new_title,
-    ], \array_diff_key($content['node:1:en'], \array_flip(['updated', 'data_hash'])));
+    ], \array_diff_key($content[$testNodeIdentifier], \array_flip(['updated', 'data_hash'])));
     self::assertEquals([
       'langcode' => 'en',
       'entity_type' => $account2content->getEntityTypeId(),
@@ -271,7 +264,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         'uri' => $account2->toUrl()->toString(),
       ],
       'label' => $account2content->label(),
-    ], \array_diff_key($content['node:2:en'], \array_flip(['updated', 'data_hash'])));
+    ], \array_diff_key($content[$emptyNodeIdentifier], \array_flip(['updated', 'data_hash'])));
     $anonAccount = User::load(0);
     self::assertInstanceOf(AccountInterface::class, $anonAccount);
     self::assertEquals([
@@ -345,21 +338,23 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $permissions = [
       'create article content',
       Page::EDIT_PERMISSION,
+      'access content',
+      'view media',
     ];
     $article = Node::create([
       'type' => 'article',
       'title' => 'Anon, empty',
+      'uid' => 0,
     ]);
     $article->save();
-    \assert($article instanceof NodeInterface);
-    // Trigger a new hash.
+    // Trigger a new hash. Save as anonymous so owner=0 in the auto-save data.
     $article->setRevisionUserId(2);
+    $this->setCurrentUser(new AnonymousUserSession());
     /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
     $autoSave->saveEntity($article);
 
-    $page = Page::load(2);
-    \assert($page instanceof Page);
+    $page = $this->emptyPage;
     // Trigger a new hash.
     $page->set('title', 'New title');
     /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
@@ -448,9 +443,9 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertInstanceOf(CacheableJsonResponse::class, $response);
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
     self::assertSame([
-      'canvas_page:2',
+      'canvas_page:' . $page->id(),
       'config:canvas.js_component.test_code',
-      'node:4',
+      'node:' . $article->id(),
       'config:canvas.page_region.stark.highlighted',
       'config:system.site',
       'user:0',
@@ -468,7 +463,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     // We can view code components, contents and staged config updates
     // but not the page region entity.
     self::assertEquals([
-      'canvas_page:2:en',
+      \sprintf('canvas_page:%d:en', $page->id()),
       'js_component:test_code',
       $anonContentIdentifier,
       'staged_config_update:canvas_set_homepage',
@@ -550,14 +545,14 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       'content_entity_type_view_mode' => 'full',
       'component_tree' => $template_tree,
     ]);
-    self::assertCount(0, $template->getTypedData()->validate());
+    self::assertEntityIsValid($template);
     $template->save();
     $this->assertFalse($template->status());
 
     // Make an update so the auto-save manager will save the entity.
     $template_tree['0']['inputs']['heading'] = 'This is an updated text value';
     $template->setComponentTree($template_tree);
-    self::assertCount(0, $template->getTypedData()->validate());
+    self::assertEntityIsValid($template);
     $autoSave->saveEntity($template);
     self:self::assertInstanceOf(ContentTemplate::class, $autoSave->getAutoSaveEntity($template)->entity);
 
@@ -570,7 +565,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         'alt' => 'A man and a women high five each other in a creepy fashion after finding a use for an old toothbrush',
       ],
     ]);
-    self::assertSame([], self::violationsToArray($node1->validate()));
+    self::assertEntityIsValid($node1);
     $node1_original_title = (string) $node1->getTitle();
     self::assertSame(SAVED_NEW, $node1->save());
     // The 'status' field is expected as `0` and not FALSE because the boolean
@@ -1308,7 +1303,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       ],
       'dataDependencies' => [],
     ]);
-    self::assertCount(0, $code_component->getTypedData()->validate());
+    self::assertEntityIsValid($code_component);
     $this->assertSame(SAVED_NEW, $code_component->save());
 
     // Always create an auto-save for the code component, maybe make one for the

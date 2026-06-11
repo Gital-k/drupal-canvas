@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Canvas\Sniffs\Tests;
 
 use Drupal\KernelTests\Core\Config\ConfigEntityValidationTestBase;
+use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
 use Drupal\Tests\canvas\Kernel\Audit\ComponentAuditTestBase;
+use Drupal\Tests\canvas\Kernel\AutoSave\AutoSaveConflictConfigTestBase;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Config\AssetLibraryStorageTest;
 use Drupal\Tests\canvas\Kernel\Config\BetterConfigEntityValidationTestBase;
@@ -29,6 +31,7 @@ class KernelTestBaseSniff implements Sniff {
   // A valid reason to not extend CanvasKernelTestBase: because it extends
   // another class that does.
   public const KNOWN_SUBCLASSES = [
+    ApiLayoutControllerTestBase::class,
     AssetLibraryStorageTest::class,
     ComponentAuditTestBase::class,
     ComponentSourceTestBase::class,
@@ -50,6 +53,9 @@ class KernelTestBaseSniff implements Sniff {
     SegmentValidationTest::class,
     // Similarly: when extending contrib tests.
     'Drupal\Tests\simple_oauth\Kernel\AuthorizedRequestBase',
+    // AutoSaveConflictConfigTestBase extends KernelTestBase directly because it
+    // must work with Drupal's config testing infrastructure that predates Canvas.
+    AutoSaveConflictConfigTestBase::class,
   ];
 
   public function register() {
@@ -101,16 +107,12 @@ class KernelTestBaseSniff implements Sniff {
         // Detect kernel tests that have a documented reason for not extending
         // CanvasKernelTestBase — such as a Recipe that installs the Canvas module.
         if (!str_contains($php_as_string, 'Note this cannot use CanvasKernelTestBase because')) {
-          // Detect CanvasTestSetup usage.
-          // @todo Remove this early return in https://www.drupal.org/project/canvas/issues/3531679
-          if (!\str_contains($php_as_string, 'CanvasTestSetup') && !\str_contains($php_as_string, 'extends ApiLayoutControllerTestBase') && !\str_contains($php_as_string, 'extends AutoSaveConflictConfigTestBase')) {
-            if ($baseClass !== 'CanvasKernelTestBase') {
-              $phpcsFile->addError(
-                "Kernel test class $className must extend CanvasKernelTestBase, not $baseClass.",
-                $baseClassPtr,
-                'WrongBaseClass'
-              );
-            }
+          if ($baseClass !== 'CanvasKernelTestBase') {
+            $phpcsFile->addError(
+              "Kernel test class $className must extend CanvasKernelTestBase, not $baseClass.",
+              $baseClassPtr,
+              'WrongBaseClass'
+            );
           }
         }
       }

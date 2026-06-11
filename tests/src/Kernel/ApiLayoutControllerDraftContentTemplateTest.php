@@ -7,8 +7,6 @@ namespace Drupal\Tests\canvas\Kernel;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Url;
-use Drupal\node\Entity\Node;
-use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use League\OpenAPIValidation\PSR7\Exception\Validation\InvalidBody;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -40,8 +38,7 @@ class ApiLayoutControllerDraftContentTemplateTest extends ApiLayoutControllerTes
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system']);
-    (new CanvasTestSetup())->setup(TRUE);
+    $this->setUpFixture();
     $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, 'edit any article content']);
   }
 
@@ -51,8 +48,7 @@ class ApiLayoutControllerDraftContentTemplateTest extends ApiLayoutControllerTes
   public function testRendersDraftWithEntityFieldPropSource(): void {
     $contentTemplate = ContentTemplate::load('node.article.full');
     self::assertNotNull($contentTemplate);
-    $previewEntity = Node::load(1);
-    self::assertNotNull($previewEntity);
+    $previewEntity = $this->testNode;
 
     // The draft sends a brand-new component tree the server has never seen.
     $componentUuid = '5f71027b-d9d3-4f3d-8990-a6502c0ba676';
@@ -103,8 +99,7 @@ class ApiLayoutControllerDraftContentTemplateTest extends ApiLayoutControllerTes
    * Rejects a draft whose bundle does not match the preview entity bundle.
    */
   public function testRejectsBundleMismatch(): void {
-    $previewEntity = Node::load(1);
-    self::assertNotNull($previewEntity);
+    $previewEntity = $this->testNode;
     $url = Url::fromRoute('canvas.api.layout.content_template_draft', [
       'entity_type' => 'node',
       'preview_entity' => $previewEntity->id(),
@@ -135,8 +130,7 @@ class ApiLayoutControllerDraftContentTemplateTest extends ApiLayoutControllerTes
    * the controller method runs.
    */
   public function testRejectsMissingBodyFields(): void {
-    $previewEntity = Node::load(1);
-    self::assertNotNull($previewEntity);
+    $previewEntity = $this->testNode;
     $url = Url::fromRoute('canvas.api.layout.content_template_draft', [
       'entity_type' => 'node',
       'preview_entity' => $previewEntity->id(),

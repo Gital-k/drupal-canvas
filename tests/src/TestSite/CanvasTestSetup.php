@@ -36,24 +36,6 @@ use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
 use Symfony\Component\Yaml\Yaml as SymfonyYaml;
 
-if (!\class_exists(TestSetupInterface::class)) {
-  // We're running test-discovery inside run-tests.sh which is before
-  // autoloading for the \Drupal\TestSite namespace has been established.
-  // run-tests.sh has set the cwd to the Drupal root.
-  // @todo Remove in https://drupal.org/i/3531679
-  $root = getcwd();
-  $interface = $root . '/core/tests/Drupal/TestSite/TestSetupInterface.php';
-  // If the site is installed under `web/`, sometimes getcwd returns
-  // /var/www/html but not /var/www/html/web and it fails.
-  if (!\file_exists($interface)) {
-    $interface = $root . '/web/core/tests/Drupal/TestSite/TestSetupInterface.php';
-  }
-  if (!\file_exists($interface)) {
-    $interface = $root . '/tests/Drupal/TestSite/TestSetupInterface.php';
-  }
-  require_once $interface;
-}
-
 class CanvasTestSetup implements TestSetupInterface {
 
   use ConstraintViolationsTestTrait;

@@ -60,8 +60,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system']);
-    (new CanvasTestSetup())->setup(TRUE);
+    $this->setUpFixture();
     $this->setUpCurrentUser([], ['edit any article content']);
   }
 
@@ -123,8 +122,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       ],
     ];
     $contentTemplate->setComponentTree($components)->save();
-    // @todo Remove this in favor of using ContribStrictConfigSchemaTestTrait in https://www.drupal.org/project/canvas/issues/3531679
-    self::assertCount(0, $contentTemplate->getTypedData()->validate(), (string) $contentTemplate->getTypedData()->validate());
+    self::assertEntityIsValid($contentTemplate);
     $get_layout_api_request = Request::create($this->getLayoutUrl($contentTemplate)->toString());
     $this->setUpCurrentUser([], [self::getAdminPermission($contentTemplate)]);
 
@@ -156,7 +154,12 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // Updating the title of the preview entity must propagate throughout.
     \assert($this->previewEntity instanceof Node);
     $this->previewEntity->set('title', 'New title for preview')->save();
-    $response = $this->request($get_layout_api_request);
+    // Reload so the label() assertion in $title_matches_resolved_and_html works.
+    $this->previewEntity = Node::load($this->previewEntity->id());
+    // Create a fresh Request so the param converter re-upcasts preview_entity
+    // from the DB instead of reusing the stale entity object from the first
+    // request's attributes.
+    $response = $this->request(Request::create($this->getLayoutUrl($contentTemplate)->toString()));
     self::assertInstanceOf(JsonResponse::class, $response);
     $title_matches_resolved_and_html('New title for preview', $response);
   }
@@ -365,8 +368,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       ],
     ])->save();
 
-    $this->previewEntity = Node::load(1);
-    self::assertInstanceOf(ContentEntityInterface::class, $this->previewEntity);
+    $this->previewEntity = $this->testNode;
     $entity = ContentTemplate::load('node.article.teaser');
     self::assertInstanceOf(ContentTemplate::class, $entity);
     $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, PageRegion::ADMIN_PERMISSION]);
@@ -391,8 +393,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
   }
 
   protected function assertRegions(int $count, EntityInterface $entity): NodeInterface {
-    $node = Node::load(1);
-    \assert($node instanceof NodeInterface);
+    $node = $this->testNode;
     $url = $this->getLayoutUrl($entity);
     // Draft of highlighted region in global template should be returned even if
     // there is no auto-save data for the node.
@@ -712,7 +713,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $node->save();
 
     // Set up the current user without access to path field.
-    $authenticated_role = $this->createRole(['edit any article content']);
+    $authenticated_role = $this->createRole(['edit any article content', 'access content', 'view media']);
     $limited_user = $this->createUser([], NULL, FALSE, ['roles' => [$authenticated_role]]);
     \assert($limited_user instanceof User);
     $this->setCurrentUser($limited_user);
@@ -842,7 +843,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         ],
       ],
     ]);
-    self::assertSame([], self::violationsToArray($page->validate()));
+    self::assertEntityIsValid($page);
     $page->save();
 
     $url = Url::fromRoute('canvas.api.layout.get', [
@@ -872,7 +873,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       'type' => 'article',
       'title' => $this->randomMachineName(),
     ]);
-    self::assertCount(0, $node->validate());
+    self::assertEntityIsValid($node);
     $node->save();
     NodeType::create([
       'type' => 'page',
@@ -882,7 +883,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       'type' => 'page',
       'title' => $this->randomMachineName(),
     ]);
-    self::assertCount(0, $ineligible_preview_node->validate());
+    self::assertEntityIsValid($ineligible_preview_node);
     $ineligible_preview_node->save();
     $contentTemplate = $this->getTestEntity(ContentTemplate::ENTITY_TYPE_ID);
 
@@ -896,7 +897,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       $this->fail('Expected exception not thrown');
     }
     catch (ParamNotConvertedException $e) {
-      self::assertSame('The "preview_entity" parameter was not converted because the `node` content entity with ID 5 is of the bundle `page`, should be `article`.', $e->getMessage());
+      self::assertSame('The "preview_entity" parameter was not converted because the `node` content entity with ID 4 is of the bundle `page`, should be `article`.', $e->getMessage());
     }
 
     // Non-existing node ID.

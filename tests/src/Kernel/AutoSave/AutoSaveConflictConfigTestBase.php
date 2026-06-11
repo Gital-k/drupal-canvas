@@ -14,7 +14,6 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  * @internal
  */
 abstract class AutoSaveConflictConfigTestBase extends KernelTestBase {
