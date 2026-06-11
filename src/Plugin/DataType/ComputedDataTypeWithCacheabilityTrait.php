@@ -98,4 +98,17 @@ trait ComputedDataTypeWithCacheabilityTrait {
     return $this;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getString() {
+    $computed_value = $this->getValue();
+    // Computed field properties may use a value object that is not stringable;
+    // don't allow this to crash when a string representation is necessary (e.g.
+    // for Drupal's Token system).
+    return $computed_value instanceof \Stringable
+      ? (string) $computed_value
+      : '';
+  }
+
 }

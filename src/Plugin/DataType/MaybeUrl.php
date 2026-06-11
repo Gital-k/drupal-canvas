@@ -70,16 +70,4 @@ final class MaybeUrl extends AccessResult implements AccessResultReasonInterface
     throw new \LogicException(\sprintf("%s objects are immutable, the reason cannot be modified.", __CLASS__));
   }
 
-  /**
-   * Returns the URL string, or empty string if inaccessible.
-   *
-   * Without this, the token system (and any code casting data type values to
-   * string) throws a fatal error "MaybeUrl could not be converted to string"
-   * when resolving chained entity reference URL tokens such as
-   * [current-user:customer:uid:url].
-   */
-  public function __toString(): string {
-    return $this->url ?? '';
-  }
-
 }
