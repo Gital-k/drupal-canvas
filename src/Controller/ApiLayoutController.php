@@ -25,9 +25,11 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
+use Drupal\language\ConfigurableLanguageManagerInterface;
 use GuzzleHttp\Psr7\Query;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -59,6 +61,7 @@ final class ApiLayoutController {
     private readonly ComponentTreeLoader $componentTreeLoader,
     private readonly ComponentSourceManager $componentSourceManager,
     private readonly ModuleHandlerInterface $moduleHandler,
+    private readonly LanguageManagerInterface $languageManager,
   ) {
     $theme = $this->themeManager->getActiveTheme()->getName();
     $theme_regions = system_region_list($theme);
@@ -136,33 +139,55 @@ final class ApiLayoutController {
     ];
     $available_translations = [];
     $links = [];
-    // ContentTemplate is a config entity with no translations of its own, so
-    // fall back to $preview_entity which holds the translatable content.
+    // ContentTemplate is a config entity that may have its own config
+    // translations (language overrides) AND/OR the preview entity may have
+    // content translations. Use $preview_entity here to collect any
+    // content-entity translations.
     $translation_entity = $entity instanceof ContentEntityInterface ? $entity : $preview_entity;
     if ($translation_entity instanceof ContentEntityInterface) {
       $available_translations = \array_keys($translation_entity->getTranslationLanguages(FALSE));
-      if ($this->moduleHandler->moduleExists('content_translation')) {
+      // Delete link should be emitted only when the entity owns its own
+      // translations (i.e. a content entity). When editing a ContentTemplate,
+      // $translation_entity is the preview entity whose content translations
+      // should not be deleted through the Canvas API.
+      if ($translation_entity === $entity && $this->moduleHandler->moduleExists('content_translation')) {
         foreach ($available_translations as $langcode) {
           $translation = $translation_entity->getTranslation($langcode);
           // The delete route gates on update access, so emit the link to the
           // same users to avoid offering a link that would return 403.
           // @see canvas.api.content.translation.delete in canvas.routing.yml
-          // @see canvas.api.config.translation.delete in canvas.routing.yml
           if ($translation->access('update')) {
-            $delete_url = $translation_entity === $entity
-              ? Url::fromRoute(
-                  'canvas.api.content.translation.delete',
-                  ['canvas_page' => $entity->id()],
-                  ['language' => $translation->language()],
-                )
-              : Url::fromRoute(
-                  'canvas.api.config.translation.delete',
-                  [
-                    'canvas_config_entity_type_id' => 'content_template',
-                    'config_entity' => $entity->id(),
-                  ],
-                  ['language' => $translation->language()],
-                );
+            $links[$langcode] = [
+              CanvasUriDefinitions::LINK_REL_DELETE => Url::fromRoute(
+                'canvas.api.content.translation.delete',
+                ['canvas_page' => $entity->id()],
+                ['language' => $translation->language()],
+              )->toString(),
+            ];
+          }
+        }
+      }
+    }
+    // Also collect languages that have config language overrides for the
+    // ContentTemplate.
+    if ($entity instanceof ContentTemplate && $this->languageManager instanceof ConfigurableLanguageManagerInterface) {
+      $config_name = $entity->getConfigDependencyName();
+      foreach ($this->languageManager->getLanguages() as $langcode => $language) {
+        if ($language->isDefault() || in_array($langcode, $available_translations, TRUE)) {
+          continue;
+        }
+        $override = $this->languageManager->getLanguageConfigOverride($langcode, $config_name);
+        if (!$override->isNew()) {
+          $available_translations[] = $langcode;
+          if (!isset($links[$langcode]) && $entity->access('update')) {
+            $delete_url = Url::fromRoute(
+              'canvas.api.config.translation.delete',
+              [
+                'canvas_config_entity_type_id' => 'content_template',
+                'config_entity' => $entity->id(),
+              ],
+              ['language' => $language],
+            );
             $links[$langcode] = [
               CanvasUriDefinitions::LINK_REL_DELETE => $delete_url->toString(),
             ];
