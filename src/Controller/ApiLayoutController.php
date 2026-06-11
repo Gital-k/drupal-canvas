@@ -160,7 +160,7 @@ final class ApiLayoutController {
             $links[$langcode] = [
               CanvasUriDefinitions::LINK_REL_DELETE => Url::fromRoute(
                 'canvas.api.content.translation.delete',
-                ['canvas_page' => $entity->id()],
+                ['canvas_page' => $translation_entity->id()],
                 ['language' => $translation->language()],
               )->toString(),
             ];
