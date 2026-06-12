@@ -7,8 +7,24 @@ web_environment:
   - DISPLAY=host.docker.internal:0
   - DRUPAL_PROJECT_FOLDER=/var/www/html/web/modules/contrib/canvas
   - DRUPAL_TEST_BASE_URL=https://${DDEV_HOSTNAME}
-  - DRUPAL_TEST_DB_URL=sqlite://localhost/sites/default/files/.ht.sqlite
+  # Put per-test SQLite databases on tmpfs (RAM) so concurrent test installs do
+  # not serialize on the scaffold volume's ext4 journal — which otherwise made
+  # `--workers >= 2` time out during setup. /tmp/sqlite is the tmpfs mount
+  # provided by the ddev-playwright add-on (docker-compose.sqlite.yaml), which
+  # `ddev setup` always installs; we reuse it rather than add our own mount. The
+  # per-test SQLite file is the dominant fsync writer, so moving it is enough
+  # even though the per-test site directories stay under sites/simpletest. NOT
+  # the dev-site DB (DB_URL above), which persists at
+  # sites/default/files/.ht.sqlite. Absolute path needs the double slash after
+  # the localhost host token.
+  - DRUPAL_TEST_DB_URL=sqlite://localhost//tmp/sqlite/.ht.sqlite
   - DRUPAL_TEST_DRUPAL_ROOT=/var/www/html/web
+  # Tell Drush the site URI. DDEV normally records this as part of its settings
+  # management, but this project runs disable_settings_management (see
+  # config.zzz.inverted.yaml), so that step is skipped and `drush uli` would
+  # otherwise emit http://default/. Drush reads DRUSH_OPTIONS_URI as its --uri
+  # default.
+  - DRUSH_OPTIONS_URI=https://${DDEV_HOSTNAME}
   - VITE_SERVER_ORIGIN=https://${DDEV_HOSTNAME}:5174
 webimage_extra_packages:
   - libasound2

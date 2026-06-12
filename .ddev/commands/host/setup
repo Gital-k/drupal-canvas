@@ -87,7 +87,10 @@ ddev composer config type project
 # composer.json is untouched (see the helper's @file docblock).
 ddev exec 'php /mnt/ddev_config/scripts/shim-scaffold-composer-scripts.php'
 
-# Create simpletest directory for Playwright/PHPUnit test site installations.
+# Create the simpletest directory that holds per-test Drupal site directories
+# for Playwright/PHPUnit installs. The per-test SQLite databases live on tmpfs
+# at /tmp/sqlite instead (see DRUPAL_TEST_DB_URL in config.canvas.yaml), so the
+# heavy write traffic stays off the journaled scaffold volume.
 ddev exec 'mkdir -p web/sites/simpletest && chmod 777 web/sites/simpletest'
 
 # Write Drupal settings directly into the scaffold volume. DDEV's own settings

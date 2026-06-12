@@ -85,9 +85,12 @@ The most common commands in the development process are:
 8. Playwright tests: `ddev playwright test`
    - Watch tests run in the browser via VNC: https://canvas.ddev.site:8444 (username: your local username, password: `secret`)
    - View test reports: Run `ddev playwright show-report` after tests complete, then open https://canvas.ddev.site:9324
-   - Each test installs its own Drupal test site. With the default SQLite backend,
-     parallel workers share one database file and can time out during setup; pass
-     `--workers=1` to a single spec if that happens.
+   - Each test installs its own throwaway Drupal site. Its SQLite database lives
+     on a tmpfs (RAM) mount at `/tmp/sqlite` so concurrent installs do not
+     contend on the scaffold volume's filesystem journal, so parallel workers
+     (the default) work without a `--workers` override. Test databases reset on
+     every `ddev restart`; the persistent dev-site database at
+     `web/sites/default/files/.ht.sqlite` is unaffected.
 
 Tip: Use `ddev help <command>` for additional information about the command and arguments available.
 ## Setting up your local environment manually
