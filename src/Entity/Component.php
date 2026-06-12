@@ -223,7 +223,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
           // TRICKY: race condition: when creating the fallback version, the
           // `last_active_version` setting won't exist yet.
           // @see ::setSettings()
-          'slots' => \array_key_exists('last_active_version', $this->getSettings())
+          'slots' => \array_key_exists('last_active_version', $this->getSettings()) && isset($this->versioned_properties[$this->getSettings()['last_active_version']])
             ? $this->versioned_properties[$this->getSettings()['last_active_version']]['fallback_metadata']['slot_definitions']
             : [],
           ...$this->getSettings(),
