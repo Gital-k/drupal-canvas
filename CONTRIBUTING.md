@@ -77,6 +77,20 @@ After this process, you will get the `drush uli` to login into the admin area. Y
 The most common commands in the development process are:
 1. `ddev setup`: Set up the Canvas development environment (installs dependencies, builds UI, installs Drupal). Use `ddev setup --force` to completely reset an existing environment. (Note, this is executed automatically the first time you start ddev)
 2. `ddev cleanup`: Empty the Drupal scaffold volume and remove environment-specific folders and files ignored by `.gitignore` (node_modules, build artifacts, etc.). Use `ddev cleanup --force` to skip confirmation.
+   - The Drupal scaffold (core, `vendor/`, the installed site, its SQLite
+     database) lives in a Docker volume, not on the host (see [How the
+     environment is mounted](#how-the-environment-is-mounted)). `ddev cleanup`
+     empties that volume in place; it does not delete the volume itself. To
+     remove the ephemeral container and volume entirely, stop the project and
+     delete the named volume manually:
+     ```shell
+     ddev stop
+     docker volume rm ddev-canvas_drupal_scaffold
+     ```
+     The volume cannot be removed while the project is running (`docker` reports
+     `volume is in use`). The next `ddev start` recreates an empty volume and
+     re-runs `ddev setup` from scratch. Your bind-mounted module code (this
+     repository) is never in the volume, so it is unaffected.
 3. `ddev drupal-install`: This will reinstall the site. Very useful when you update Canvas and want a fresh installation.
 4. `ddev ui-build`: This will build a production ready canvas UI.
 5. `ddev ui-dev`: This will build a development environment for developing the canvas app itself.
