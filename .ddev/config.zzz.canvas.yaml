@@ -1,24 +1,24 @@
 # Hook suppression for the inverted mount + Playwright add-on.
-# Sorts last (zzz), after config.contrib.yaml and config.playwright.yml.
+# Sorts last (zzz), after config.playwright.yml.
 #
-# Two #ddev-generated files we cannot edit each inject a hook that is wrong for
-# Canvas's inverted-mount layout:
-#   - config.contrib.yaml  -> post-start `ddev symlink-project` (we bind-mount the
-#     module instead of symlinking project files into the docroot)
-#   - config.playwright.yml -> pre-start `cp -r test/playwright .ddev/web-build/`
-#     (Canvas keeps package.json at the repo root; there is no test/playwright dir)
+# config.playwright.yml is a #ddev-generated file we cannot edit. It injects
+# hooks that are wrong for Canvas's inverted-mount layout:
+#   - pre-start  `cp -r test/playwright .ddev/web-build/` (Canvas keeps
+#     package.json at the repo root; there is no test/playwright dir)
+#   - post-start `rm -rf .ddev/web-build/playwright` (cleanup of that copy)
 #
 # DDEV merges hook lists, so a normal config cannot remove an inherited hook.
 # `override_config: true` makes this file's declared keys REPLACE the accumulated
 # value instead of merging. It is granular to each leaf key, so declaring
 # hooks.pre-start and hooks.post-start replaces only those two lists, leaving all
 # other merged config (web_environment, ports, etc.) intact. This file must sort
-# after both generated files for its override to win — hence the zzz prefix.
+# after config.playwright.yml for its override to win — hence the zzz prefix.
 #
 # The replacement lists below re-declare only the hooks Canvas actually needs:
 #   pre-start  1. refresh Dockerfile.playwright from the disabled template (add-on)
 #              2. stage package.json/package-lock.json for the Docker build (ours)
-#   post-start    run `ddev setup` (replaces contrib's symlink-project)
+#   post-start    run `ddev setup` (builds the scaffold + installs Drupal on the
+#                 inverted mount)
 override_config: true
 hooks:
   pre-start:
