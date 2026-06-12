@@ -273,8 +273,7 @@ test.describe('Templates - General', () => {
     await page.getByRole('button', { name: 'Save translation' }).click();
 
     await page.goto(editorUrl);
-    await canvas.waitForCanvasTopbar();
-
+    await canvas.waitForEditorFrame();
     const languageButton = page.locator(
       '[data-testid="canvas-topbar"] [data-testid="language-select-trigger"]',
     );
@@ -331,40 +330,42 @@ test.describe('Templates - General', () => {
     });
 
     // Delete the French config translation via the three dots popover.
-    // Open the dropdown once first so the canvas layout API can respond and
-    // populate translation data into the Redux store; wait for the French tick
-    // mark as the signal that the response has arrived.
     await page.keyboard.press('Escape');
     await expect(
       page.locator('[data-state="open"][role="menu"]'),
     ).not.toBeAttached();
+
     const closedLanguageButton = page.locator(
       '[data-testid="canvas-topbar"] [data-testid="language-select-trigger"][data-state="closed"]',
     );
     await closedLanguageButton.click();
-    await expect(
-      page.locator(
-        '[data-testid="language-option-fr"] [data-canvas-has-translation="true"]',
-      ),
-    ).toBeVisible();
-    // Close and reopen: the data is now cached in the store so the UI is
-    // stable and the three dots button can be clicked without risk of detach.
-    await page.keyboard.press('Escape');
-    await expect(
-      page.locator('[data-state="open"][role="menu"]'),
-    ).not.toBeAttached();
-    await closedLanguageButton.click();
     await page
-      .locator('[aria-label="More options for French"]')
+      .locator(`[aria-label="More options for French"]`)
       .first()
       .click();
+
+    const frenchPopover = page
+      .locator('[data-testid="language-options-popover"]')
+      .first();
+    await expect(frenchPopover).toBeVisible();
     await expect(
-      page.locator('[data-testid="language-options-popover"]'),
+      page.locator('[data-testid="language-options-popover-title"]').first(),
+    ).toContainText('French');
+    await expect(
+      page.locator('[data-testid="language-options-delete"]').first(),
     ).toBeVisible();
+
+    // Deleting the French translation happens in-app: no new browser tab
+    // opens, and the dropdown updates without a page reload.
+    let popupOpened = false;
+    page.on('popup', () => {
+      popupOpened = true;
+    });
     await page
       .locator('[data-testid="language-options-delete"]')
       .first()
       .click();
+    expect(popupOpened).toBe(false);
 
     // Wait for the in-app delete to complete: three dots disappear for French.
     await expect(
