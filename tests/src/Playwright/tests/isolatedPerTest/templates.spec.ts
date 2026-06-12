@@ -128,7 +128,8 @@ test.describe('Templates - General', () => {
     await expect(languageButton).toBeVisible();
     await languageButton.click();
 
-    // Verify translation indicators are present for translated languages.
+    // Verify translation indicators: only English (the default language) gets a
+    // tick mark here because the content template has no config translations.
     await expect(
       page.locator(
         '[data-testid="language-option-en"] [data-canvas-has-translation="true"]',
@@ -138,7 +139,7 @@ test.describe('Templates - General', () => {
       page.locator(
         '[data-testid="language-option-es"] [data-canvas-has-translation="true"]',
       ),
-    ).toHaveAttribute('data-canvas-has-translation', 'true');
+    ).toHaveCount(0);
     await expect(
       page.locator(
         '[data-testid="language-option-fr"] [data-canvas-has-translation="true"]',
@@ -237,5 +238,167 @@ test.describe('Templates - General', () => {
     // Verify the Hero component renders with article title.
     await expect(page.locator('.my-hero__heading')).toBeVisible();
     await expect(page.locator('.my-hero__heading')).toHaveCount(1);
+  });
+
+  test('Config translations on content templates', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.loginAsAdmin();
+    await drupal.installModules(['config_translation']);
+    await canvas.openCanvasRoot();
+    await canvas.openTemplatesPanel();
+
+    await canvas.addTemplate('Article', 'Full content');
+    await page.getByTestId('template-list-item-article-Full content').click();
+
+    await canvas.openLibraryPanel();
+    await canvas.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
+
+    await canvas.publishAllChanges();
+    const editorUrl = page.url();
+
+    // Translate the content template into French via the config translation.
+    await page.goto(
+      '/admin/structure/content-template/node.article.full/translate/fr/add',
+    );
+    await page
+      .locator('summary', { hasText: 'Component at position 0' })
+      .click();
+    await page
+      .locator('input[name^="translation"][name*="[heading]"]')
+      .first()
+      .fill('Hero in french');
+    await page.getByRole('button', { name: 'Save translation' }).click();
+
+    await page.goto(editorUrl);
+    await canvas.waitForCanvasTopbar();
+
+    const languageButton = page.locator(
+      '[data-testid="canvas-topbar"] [data-testid="language-select-trigger"]',
+    );
+    await expect(languageButton).toBeVisible();
+    await languageButton.click();
+
+    // English (default) and French (config override) should both show a tick
+    // translation indicator.
+    await expect(
+      page.locator(
+        '[data-testid="language-option-en"] [data-canvas-has-translation="true"]',
+      ),
+    ).toHaveAttribute('data-canvas-has-translation', 'true');
+    await expect(
+      page.locator(
+        '[data-testid="language-option-fr"] [data-canvas-has-translation="true"]',
+      ),
+    ).toHaveAttribute('data-canvas-has-translation', 'true');
+    await expect(
+      page.locator(
+        '[data-testid="language-option-es"] [data-canvas-has-translation="true"]',
+      ),
+    ).toHaveCount(0);
+
+    // The three dots (options trigger) appear only for French – the only
+    // language with a config translation override.
+    await expect(
+      page.locator('[aria-label="More options for French"]'),
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-testid="language-options-popover-trigger"]'),
+    ).toHaveCount(1);
+
+    const frenchOption = page.locator('[data-testid="language-option-fr"]');
+    await expect(frenchOption).toBeVisible();
+    await frenchOption.click();
+    await page.waitForURL(
+      /\/preview\/template\/node\/article\/\d+\/full\/full\?language=fr/,
+      { timeout: 10000 },
+    );
+    await expect(
+      page
+        .locator('iframe[class^="_PagePreviewIframe"]')
+        .contentFrame()
+        .locator('[data-component-id="canvas_test_sdc:my-hero"] h1'),
+    ).toHaveText('Hero in french');
+
+    await languageButton.click();
+    const englishOption = page.locator('[data-testid="language-option-en"]');
+    await expect(englishOption).toBeVisible();
+    await englishOption.click();
+    await page.waitForURL(/\/canvas\/template\/node\/article\/full\/\d+/, {
+      timeout: 10000,
+    });
+
+    // Delete the French config translation via the three dots popover.
+    // Open the dropdown once first so the canvas layout API can respond and
+    // populate translation data into the Redux store; wait for the French tick
+    // mark as the signal that the response has arrived.
+    await page.keyboard.press('Escape');
+    await expect(
+      page.locator('[data-state="open"][role="menu"]'),
+    ).not.toBeAttached();
+    const closedLanguageButton = page.locator(
+      '[data-testid="canvas-topbar"] [data-testid="language-select-trigger"][data-state="closed"]',
+    );
+    await closedLanguageButton.click();
+    await expect(
+      page.locator(
+        '[data-testid="language-option-fr"] [data-canvas-has-translation="true"]',
+      ),
+    ).toBeVisible();
+    // Close and reopen: the data is now cached in the store so the UI is
+    // stable and the three dots button can be clicked without risk of detach.
+    await page.keyboard.press('Escape');
+    await expect(
+      page.locator('[data-state="open"][role="menu"]'),
+    ).not.toBeAttached();
+    await closedLanguageButton.click();
+    await page
+      .locator('[aria-label="More options for French"]')
+      .first()
+      .click();
+    await expect(
+      page.locator('[data-testid="language-options-popover"]'),
+    ).toBeVisible();
+    await page
+      .locator('[data-testid="language-options-delete"]')
+      .first()
+      .click();
+
+    // Wait for the in-app delete to complete: three dots disappear for French.
+    await expect(
+      page.locator('[aria-label="More options for French"]'),
+    ).toHaveCount(0);
+
+    // Reopen the dropdown: French should no longer have a tick mark or dots.
+    await page.keyboard.press('Escape');
+    await expect(
+      page.locator('[data-state="open"][role="menu"]'),
+    ).not.toBeAttached();
+    await languageButton.click();
+    await expect(
+      page.locator(
+        '[data-testid="language-option-fr"] [data-canvas-has-translation="true"]',
+      ),
+    ).toHaveCount(0);
+    await expect(
+      page.locator('[data-testid="language-options-popover-trigger"]'),
+    ).toHaveCount(0);
+
+    // Navigate to the French preview: without the config override the English
+    // component tree is used, so the heading falls back to the English default.
+    await expect(frenchOption).toBeVisible();
+    await frenchOption.click();
+    await page.waitForURL(
+      /\/preview\/template\/node\/article\/\d+\/full\/full\?language=fr/,
+      { timeout: 10000 },
+    );
+    await expect(
+      page
+        .locator('iframe[class^="_PagePreviewIframe"]')
+        .contentFrame()
+        .locator('[data-component-id="canvas_test_sdc:my-hero"] h1'),
+    ).toHaveText('There goes my hero');
   });
 });
