@@ -26,6 +26,23 @@ web_environment:
   # default.
   - DRUSH_OPTIONS_URI=https://${DDEV_HOSTNAME}
   - VITE_SERVER_ORIGIN=https://${DDEV_HOSTNAME}:5174
+
+# Inverted-mount scalar flags. These are non-default values, so a normal merge
+# applies them — no override_config needed (unlike the hook suppression in
+# config.zzz.canvas.yaml). They live in this tracked overlay rather than
+# config.yaml, which `ddev setup` marks skip-worktree so DDEV's per-start
+# rewrites don't dirty git; edits to config.yaml would not reach a fresh clone.
+#
+# - no_project_mount: stop DDEV emitting the default `../ -> /var/www/html` bind
+#   mount; docker-compose.inverted.yaml mounts the scaffold volume and binds the
+#   module instead.
+# - disable_settings_management: DDEV would write settings.php to the empty host
+#   docroot under no_project_mount; `ddev setup` writes settings into the volume.
+# - fail_on_hook_fail: keep `ddev start` succeeding even if the first-run
+#   `ddev setup` hook fails, so the container stays up to debug or re-run setup.
+no_project_mount: true
+disable_settings_management: true
+fail_on_hook_fail: false
 webimage_extra_packages:
   - libasound2
   - libgbm-dev
@@ -42,8 +59,3 @@ web_extra_exposed_ports:
     container_port: 5173
     http_port: 5173
     https_port: 5174
-
-hooks:
-  post-start:
-    - exec-host: |
-        ddev setup

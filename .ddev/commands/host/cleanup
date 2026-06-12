@@ -51,8 +51,14 @@ echo "Cleaning up environment-specific files..."
 if ddev exec true >/dev/null 2>&1; then
   ddev exec '
     set -e
+    # Drupal hardens sites/default to 0555 and settings*.php to 0444 after a
+    # site install. Those read-only bits stop rm from emptying the tree, so
+    # restore write permission first. Scoped to web/sites (entirely removed
+    # below) so it never recurses into the web/modules/contrib/canvas bind
+    # mount (the real host repo).
+    [ -d /var/www/html/web/sites ] && chmod -R u+w /var/www/html/web/sites
     find /var/www/html -mindepth 1 -maxdepth 1 ! -name web -exec rm -rf {} +
-    find /var/www/html/web -mindepth 1 -maxdepth 1 ! -name modules -exec rm -rf {} + 2>/dev/null || true
+    find /var/www/html/web -mindepth 1 -maxdepth 1 ! -name modules -exec rm -rf {} +
     find /var/www/html/web/modules -mindepth 1 -maxdepth 1 ! -name contrib -exec rm -rf {} + 2>/dev/null || true
     find /var/www/html/web/modules/contrib -mindepth 1 -maxdepth 1 ! -name canvas -exec rm -rf {} + 2>/dev/null || true
   '
