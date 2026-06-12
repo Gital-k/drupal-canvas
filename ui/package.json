@@ -62,7 +62,7 @@
     "cypress-axe": "^1.5.0",
     "cypress-real-events": "^1.13.0",
     "date-fns": "^4.1.0",
-    "deep-chat-react": "^2.1.1",
+    "deep-chat-react": "^2.4.2",
     "dompurify": "^3.2.5",
     "dotenv": "^16.4.5",
     "html-react-parser": "^5.2.3",
