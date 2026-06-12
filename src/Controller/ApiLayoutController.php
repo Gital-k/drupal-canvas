@@ -141,7 +141,7 @@ final class ApiLayoutController {
     $links = [];
     if ($entity instanceof ContentEntityInterface) {
       $available_translations = \array_keys($entity->getTranslationLanguages(FALSE));
-       if($this->moduleHandler->moduleExists('content_translation')) {
+      if ($this->moduleHandler->moduleExists('content_translation')) {
         foreach ($available_translations as $langcode) {
           $translation = $entity->getTranslation($langcode);
           // The delete route gates on update access, so emit the link to the
@@ -164,7 +164,7 @@ final class ApiLayoutController {
     if ($entity instanceof ContentTemplate && $this->languageManager instanceof ConfigurableLanguageManagerInterface) {
       $config_name = $entity->getConfigDependencyName();
       foreach ($this->languageManager->getLanguages() as $langcode => $language) {
-        if ($language->isDefault() || in_array($langcode, $available_translations, TRUE)) {
+        if ($language->isDefault() || \in_array($langcode, $available_translations, TRUE)) {
           continue;
         }
         $override = $this->languageManager->getLanguageConfigOverride($langcode, $config_name);
@@ -187,8 +187,8 @@ final class ApiLayoutController {
       }
     }
     // The client should also list the default language.
-    $default_langcode = $translation_entity instanceof ContentEntityInterface
-      ? $translation_entity->getUntranslated()->language()->getId()
+    $default_langcode = $entity instanceof ContentEntityInterface
+      ? $entity->getUntranslated()->language()->getId()
       : $entity->language()->getId();
     array_unshift($available_translations, $default_langcode);
     $data['translations'] = [
