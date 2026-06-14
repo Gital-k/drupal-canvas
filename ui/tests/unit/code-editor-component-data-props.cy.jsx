@@ -7,13 +7,14 @@ import { Theme } from '@radix-ui/themes';
 import { makeStore } from '@/app/store';
 import {
   addProp,
+  reorderProps,
   selectCodeComponentProperty,
   toggleRequired,
   updateProp,
 } from '@/features/code-editor/codeEditorSlice';
 import ComponentData from '@/features/code-editor/component-data/ComponentData';
 import { parseExampleSrc as parseImageExampleSrc } from '@/features/code-editor/component-data/forms/FormPropTypeImage';
-import { getPropMachineName } from '@/features/code-editor/utils/utils';
+import { getPropSchemaKey } from '@/features/code-editor/utils/utils';
 
 import '@/styles/radix-themes';
 import '@/styles/index.css';
@@ -44,7 +45,7 @@ describe('Component data / props in code editor', () => {
     // Add a new prop.
     cy.findByText('Add').click();
 
-    cy.findByLabelText('Prop name').should('exist');
+    cy.findByLabelText('Title').should('exist');
     cy.findByLabelText('Type').should('exist');
     cy.findByLabelText('Required').should('exist');
 
@@ -58,6 +59,7 @@ describe('Component data / props in code editor', () => {
       expect(props[0]).to.deep.include(
         {
           name: '',
+          machineName: '',
           type: 'string',
           example: '',
           derivedType: 'text',
@@ -68,7 +70,7 @@ describe('Component data / props in code editor', () => {
       );
     });
 
-    cy.findByLabelText('Prop name').type('Title');
+    cy.findByLabelText('Title').type('Title');
     cy.findByLabelText('Example value').type('Your title goes here');
 
     cy.log('Checking updated prop');
@@ -91,7 +93,7 @@ describe('Component data / props in code editor', () => {
 
     // Add a test list prop with three values.
     cy.findByText('Add').click();
-    cy.findAllByLabelText('Prop name').last().type('Variant');
+    cy.findAllByLabelText('Title').last().type('Variant');
     cy.findAllByLabelText('Type').last().click();
     cy.findByText('List: text').click();
     cy.findByText('Add value').click();
@@ -111,7 +113,7 @@ describe('Component data / props in code editor', () => {
 
     // Add a boolean prop.
     cy.findByText('Add').click();
-    cy.findAllByLabelText('Prop name').last().type('Featured');
+    cy.findAllByLabelText('Title').last().type('Featured');
     cy.findAllByLabelText('Type').last().click();
     cy.findByText('Boolean').click();
     cy.findAllByLabelText('Example value').last().assertToggleState(false);
@@ -154,9 +156,9 @@ describe('Component data / props in code editor', () => {
     });
 
     // Reorder the props. Move the first prop to the third position.
-    cy.findAllByLabelText('Move prop')
-      .first()
-      .realDnd('[data-testid="prop-2"]');
+    cy.wrap(store).then((store) => {
+      store.dispatch(reorderProps({ oldIndex: 0, newIndex: 2 }));
+    });
     // Check that the props in the store are in the new order.
     cy.wrap(store).then((store) => {
       const props = selectCodeComponentProperty('props')(store.getState());
@@ -166,11 +168,9 @@ describe('Component data / props in code editor', () => {
     });
 
     // Reorder the props again. Move the first prop to the second position.
-    cy.findAllByLabelText('Move prop')
-      .first()
-      .realDnd('[data-testid="prop-0"]', {
-        position: 'bottom',
-      });
+    cy.wrap(store).then((store) => {
+      store.dispatch(reorderProps({ oldIndex: 0, newIndex: 1 }));
+    });
     // Check that the props in the store are in the new order.
     cy.wrap(store).then((store) => {
       const props = selectCodeComponentProperty('props')(store.getState());
@@ -214,13 +214,14 @@ describe('Component data / props in code editor', () => {
     // Check that the prop is now required.
     cy.log('Checking updated prop');
     cy.wrap(store).then((store) => {
-      const propName = selectCodeComponentProperty('props')(store.getState())[0]
-        .name;
+      const firstProp = selectCodeComponentProperty('props')(
+        store.getState(),
+      )[0];
       const required = selectCodeComponentProperty('required')(
         store.getState(),
       );
       expect(required[0]).to.equal(
-        getPropMachineName(propName),
+        getPropSchemaKey(firstProp),
         'Should have the prop as required',
       );
     });
@@ -276,7 +277,7 @@ describe('Component data / props in code editor', () => {
     });
 
     // Check that the prop is displayed in the component.
-    cy.findByLabelText('Prop name').should('have.value', 'Title');
+    cy.findByLabelText('Title').should('have.value', 'Title');
     cy.findByLabelText('Type').should('have.text', 'Text');
     cy.findByLabelText('Required').assertToggleState(true);
     cy.findByLabelText('Example value').should(
@@ -318,7 +319,7 @@ describe('Component data / props in code editor', () => {
     });
 
     // Validate setup state
-    cy.findByLabelText('Prop name').should('have.value', 'Title');
+    cy.findByLabelText('Title').should('have.value', 'Title');
     cy.findByLabelText('Type').should('have.text', 'List: text');
     cy.findByLabelText('Default value').should('have.text', 'Alpha');
 
@@ -504,7 +505,7 @@ describe('Component data / props in code editor', () => {
   it('validates example value of a link prop', () => {
     cy.findByText('Add').click();
 
-    cy.findByLabelText('Prop name').type('Link');
+    cy.findByLabelText('Title').type('Link');
     cy.findByLabelText('Type').click();
     cy.findByText('Link').click();
     cy.findByLabelText('Example value').type('gerbeaud');

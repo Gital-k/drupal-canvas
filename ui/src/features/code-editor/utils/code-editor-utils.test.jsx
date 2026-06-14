@@ -12,8 +12,16 @@ import {
 import {
   deserializeProps,
   deserializeSlots,
+  filterRequiredAgainstSerializedProps,
   formatToValidImportName,
+  getDuplicatePropSchemaKeys,
+  getDuplicateSlotSchemaKeys,
+  getInvalidMachineNamePropIds,
+  getInvalidMachineNameSlotIds,
+  getPropSchemaKey,
   getPropValuesForPreview,
+  getSlotSchemaKey,
+  isValidMachineName,
   serializeProps,
   serializeSlots,
 } from '@/features/code-editor/utils/utils';
@@ -414,6 +422,296 @@ describe('Code editor utilities', () => {
         id: undefined,
       });
     });
+  });
+});
+
+describe('Prop/slot schema keys and round-trip (machine name)', () => {
+  it('getPropSchemaKey returns trimmed machineName when set', () => {
+    expect(
+      getPropSchemaKey({
+        id: '1',
+        name: 'ignored when machine name set',
+        type: 'string',
+        derivedType: 'text',
+        machineName: '  my_custom_key  ',
+        example: '',
+      }),
+    ).toBe('my_custom_key');
+  });
+
+  it('getPropSchemaKey falls back to camelCase title when machineName is empty or whitespace', () => {
+    expect(
+      getPropSchemaKey({
+        id: '1',
+        name: 'Button label',
+        type: 'string',
+        derivedType: 'text',
+        machineName: '',
+        example: '',
+      }),
+    ).toBe('buttonLabel');
+    expect(
+      getPropSchemaKey({
+        id: '1',
+        name: 'Button label',
+        type: 'string',
+        derivedType: 'text',
+        machineName: '   ',
+        example: '',
+      }),
+    ).toBe('buttonLabel');
+  });
+
+  it('getSlotSchemaKey returns trimmed machineName when set', () => {
+    expect(
+      getSlotSchemaKey({
+        id: '1',
+        name: 'Any title',
+        machineName: '  slotKey  ',
+      }),
+    ).toBe('slotKey');
+  });
+
+  it('getSlotSchemaKey falls back to camelCase title when machineName is empty', () => {
+    expect(
+      getSlotSchemaKey({
+        id: '1',
+        name: 'Main region',
+        machineName: '',
+        example: '',
+      }),
+    ).toBe('mainRegion');
+  });
+
+  it('serializeProps then deserializeProps preserves a key that differs from camelCase(title)', () => {
+    const prop = {
+      id: 'round-trip-id',
+      name: 'Button label',
+      machineName: 'button_label',
+      type: 'string',
+      example: 'Go',
+      derivedType: 'text',
+    };
+    const serialized = serializeProps([prop]);
+    expect(serialized).toHaveProperty('button_label');
+    expect(serialized.button_label).toMatchObject({ title: 'Button label' });
+
+    const [deserializedProp] = deserializeProps(serialized);
+    expect(deserializedProp.name).toBe('Button label');
+    expect(deserializedProp.machineName).toBe('button_label');
+    expect(deserializedProp.type).toBe('string');
+    expect(deserializedProp.derivedType).toBe('text');
+  });
+
+  it('getDuplicatePropSchemaKeys returns colliding keys only', () => {
+    expect(
+      getDuplicatePropSchemaKeys([
+        { id: '1', name: 'Alpha', type: 'string', derivedType: 'text' },
+        { id: '2', name: 'Bravo', type: 'string', derivedType: 'text' },
+      ]),
+    ).toEqual([]);
+    expect(
+      getDuplicatePropSchemaKeys([
+        { id: '1', name: 'X', type: 'string', derivedType: 'text' },
+        { id: '2', name: 'X', type: 'string', derivedType: 'text' },
+      ]),
+    ).toEqual(['x']);
+    expect(
+      getDuplicatePropSchemaKeys([
+        {
+          id: '1',
+          name: 'A',
+          machineName: 'same',
+          type: 'string',
+          derivedType: 'text',
+        },
+        {
+          id: '2',
+          name: 'B',
+          machineName: 'same',
+          type: 'string',
+          derivedType: 'text',
+        },
+      ]),
+    ).toEqual(['same']);
+  });
+
+  it('serializeProps keeps the first prop when two share a schema key', () => {
+    const first = {
+      id: 'a',
+      name: 'Background',
+      machineName: 'bg',
+      type: 'string',
+      example: 'base',
+      derivedType: 'text',
+    };
+    const second = {
+      id: 'b',
+      name: 'Other',
+      machineName: 'bg',
+      type: 'string',
+      example: 'Example text',
+      derivedType: 'text',
+    };
+    const out = serializeProps([first, second]);
+    expect(out.bg.title).toBe('Background');
+    expect(out.bg.examples).toEqual(['base']);
+  });
+
+  it('serializeSlots keeps the first slot when two share a schema key', () => {
+    const out = serializeSlots([
+      {
+        id: '1',
+        name: 'Main',
+        machineName: 'content',
+        example: '<p>first</p>',
+      },
+      {
+        id: '2',
+        name: 'Other',
+        machineName: 'content',
+        example: '<p>second</p>',
+      },
+    ]);
+    expect(out.content).toEqual({
+      title: 'Main',
+      examples: ['<p>first</p>'],
+    });
+  });
+
+  it('getDuplicateSlotSchemaKeys returns colliding keys only', () => {
+    expect(
+      getDuplicateSlotSchemaKeys([
+        { id: '1', name: 'Main', example: '' },
+        { id: '2', name: 'Body', example: '' },
+      ]),
+    ).toEqual([]);
+    expect(
+      getDuplicateSlotSchemaKeys([
+        { id: '1', name: 'Content', example: '<p></p>' },
+        { id: '2', name: 'Content', example: '<p></p>' },
+      ]),
+    ).toEqual(['content']);
+  });
+
+  it('serializeSlots then deserializeSlots preserves a key that differs from camelCase(title)', () => {
+    const slot = {
+      id: 's1',
+      name: 'Body copy',
+      machineName: 'body_copy',
+      example: '<p>x</p>',
+    };
+    const serialized = serializeSlots([slot]);
+    expect(serialized).toHaveProperty('body_copy');
+    expect(serialized.body_copy).toEqual({
+      title: 'Body copy',
+      examples: ['<p>x</p>'],
+    });
+
+    const [deser] = deserializeSlots(serialized);
+    expect(deser.name).toBe('Body copy');
+    expect(deser.machineName).toBe('body_copy');
+    expect(deser.example).toBe('<p>x</p>');
+  });
+});
+
+describe('Machine name validation', () => {
+  const baseProp = {
+    type: 'string',
+    derivedType: 'text',
+    example: '',
+    name: '',
+  };
+  const baseSlot = { name: '' };
+
+  describe('isValidMachineName', () => {
+    it('treats empty and whitespace-only as valid (means "derive from title")', () => {
+      expect(isValidMachineName('')).toBe(true);
+      expect(isValidMachineName('   ')).toBe(true);
+      expect(isValidMachineName(undefined)).toBe(true);
+      expect(isValidMachineName(null)).toBe(true);
+    });
+
+    it('accepts identifiers starting with a letter', () => {
+      expect(isValidMachineName('foo')).toBe(true);
+      expect(isValidMachineName('fooBar')).toBe(true);
+      expect(isValidMachineName('FOO_BAR_99')).toBe(true);
+    });
+
+    it('accepts identifiers starting with an underscore', () => {
+      expect(isValidMachineName('_foo')).toBe(true);
+      expect(isValidMachineName('__private')).toBe(true);
+    });
+
+    it('rejects identifiers starting with a digit', () => {
+      expect(isValidMachineName('1foo')).toBe(false);
+      expect(isValidMachineName('123')).toBe(false);
+    });
+
+    it('rejects identifiers containing disallowed characters', () => {
+      expect(isValidMachineName('foo-bar')).toBe(false);
+      expect(isValidMachineName('foo bar')).toBe(false);
+      expect(isValidMachineName('foo.bar')).toBe(false);
+      expect(isValidMachineName('foo@bar')).toBe(false);
+    });
+  });
+
+  describe('getInvalidMachineNamePropIds', () => {
+    it('returns the ids of only invalid props', () => {
+      const props = [
+        { id: 'a', machineName: 'goodOne', ...baseProp },
+        { id: 'b', machineName: '1bad', ...baseProp },
+        { id: 'c', machineName: '', ...baseProp },
+        { id: 'd', machineName: 'has space', ...baseProp },
+      ];
+      expect(getInvalidMachineNamePropIds(props)).toEqual(['b', 'd']);
+    });
+
+    it('returns an empty array when all are valid', () => {
+      const props = [
+        { id: 'a', machineName: 'foo', ...baseProp },
+        { id: 'b', machineName: '', ...baseProp },
+      ];
+      expect(getInvalidMachineNamePropIds(props)).toEqual([]);
+    });
+  });
+
+  describe('getInvalidMachineNameSlotIds', () => {
+    it('returns the ids of only invalid slots', () => {
+      const slots = [
+        { id: 'a', machineName: 'good', ...baseSlot },
+        { id: 'b', machineName: '9bad', ...baseSlot },
+      ];
+      expect(getInvalidMachineNameSlotIds(slots)).toEqual(['b']);
+    });
+  });
+});
+
+describe('filterRequiredAgainstSerializedProps', () => {
+  it('drops keys that are not in serialized props', () => {
+    const serialized = { foo: {}, bar: {} };
+    expect(
+      filterRequiredAgainstSerializedProps(['foo', 'missing'], serialized),
+    ).toEqual(['foo']);
+  });
+
+  it('returns input unchanged when all keys are present', () => {
+    const serialized = { foo: {}, bar: {} };
+    expect(
+      filterRequiredAgainstSerializedProps(['foo', 'bar'], serialized),
+    ).toEqual(['foo', 'bar']);
+  });
+
+  it('returns an empty array when none of the keys are present', () => {
+    expect(
+      filterRequiredAgainstSerializedProps(['foo'], {}),
+    ).toEqual([]);
+  });
+
+  it('returns an empty array when required is empty', () => {
+    expect(
+      filterRequiredAgainstSerializedProps([], { foo: {} }),
+    ).toEqual([]);
   });
 });
 

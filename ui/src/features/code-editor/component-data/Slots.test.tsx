@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -42,7 +43,7 @@ describe('Slots', () => {
   describe('slots form', () => {
     it('renders empty', () => {
       expect(
-        screen.queryByRole('textbox', { name: 'Slot name' }),
+        screen.queryByRole('textbox', { name: 'Title' }),
       ).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
     });
@@ -50,7 +51,7 @@ describe('Slots', () => {
     it('add new slot form', async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
       expect(
-        screen.getByRole('textbox', { name: 'Slot name' }),
+        screen.getByRole('textbox', { name: 'Title' }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole('textbox', { name: /Example/ }),
@@ -67,7 +68,7 @@ describe('Slots', () => {
         screen.getByRole('button', { name: /Remove slot/ }),
       );
       expect(
-        screen.queryByRole('textbox', { name: 'Slot name' }),
+        screen.queryByRole('textbox', { name: 'Title' }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole('textbox', { name: /Example/ }),
@@ -80,10 +81,10 @@ describe('Slots', () => {
     it('saves slot data', async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
       expect(
-        screen.getByRole('textbox', { name: 'Slot name' }),
+        screen.getByRole('textbox', { name: 'Title' }),
       ).toBeInTheDocument();
       await userEvent.type(
-        screen.getByRole('textbox', { name: 'Slot name' }),
+        screen.getByRole('textbox', { name: 'Title' }),
         'Alpha',
       );
       await userEvent.type(
@@ -93,7 +94,71 @@ describe('Slots', () => {
       const values = selectCodeComponentProperty('slots')(store.getState());
       expect(values[0]).toMatchObject({
         name: 'Alpha',
+        machineName: '',
         example: 'Alpha example',
+      });
+    });
+
+    it('shows machine name after Add and updates store', async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+      const machineNameInput = screen.getByRole('textbox', {
+        name: 'Machine name',
+      });
+      expect(machineNameInput).toBeInTheDocument();
+      await userEvent.type(machineNameInput, 'main_body');
+      expect(
+        selectCodeComponentProperty('slots')(store.getState())[0].machineName,
+      ).toBe('main_body');
+    });
+
+    describe('machine name format validation', () => {
+      const INVALID_MESSAGE =
+        'Use letters, numbers and underscores only. Must start with a letter or underscore.';
+
+      it('does not show the format error while typing (only on blur)', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+      });
+
+      it('shows the format error after blurring an invalid value', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        fireEvent.blur(machineNameInput);
+        expect(await screen.findByText(INVALID_MESSAGE)).toBeInTheDocument();
+      });
+
+      it('clears the format error once the value becomes valid', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        fireEvent.blur(machineNameInput);
+        expect(await screen.findByText(INVALID_MESSAGE)).toBeInTheDocument();
+
+        await userEvent.clear(machineNameInput);
+        await userEvent.type(machineNameInput, 'good_one');
+        await waitFor(() => {
+          expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+        });
+      });
+
+      it('shows the top-level callout when any slot has an invalid machine name', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, 'bad-name');
+        expect(
+          screen.getByText(/one or more slots have an invalid machine name/i),
+        ).toBeInTheDocument();
       });
     });
 
@@ -107,11 +172,11 @@ describe('Slots', () => {
       const slot2 = screen.getByTestId('slot-1');
 
       await userEvent.type(
-        within(slot1).getByRole('textbox', { name: 'Slot name' }),
+        within(slot1).getByRole('textbox', { name: 'Title' }),
         'Alpha',
       );
       await userEvent.type(
-        within(slot2).getByRole('textbox', { name: 'Slot name' }),
+        within(slot2).getByRole('textbox', { name: 'Title' }),
         'Beta',
       );
 
@@ -155,6 +220,7 @@ describe('Slots', () => {
               {
                 id: existingSlotId,
                 name: 'ExistingSlot',
+                machineName: '',
                 example: '<p>Example content</p>',
               },
             ],
@@ -168,11 +234,21 @@ describe('Slots', () => {
       const exposedStore = createExposedComponentStore();
       render(<Wrapper store={exposedStore} />);
 
-      const nameField = screen.getByRole('textbox', { name: 'Slot name' });
+      const nameField = screen.getByRole('textbox', { name: 'Title' });
       expect(nameField).toBeDisabled();
       expect(nameField).toHaveValue('ExistingSlot');
       const exampleField = screen.getByRole('textbox', { name: /Example/ });
       expect(exampleField).not.toBeDisabled();
+    });
+
+    it('disables machine name field for existing slots on exposed component', async () => {
+      const exposedStore = createExposedComponentStore();
+      render(<Wrapper store={exposedStore} />);
+
+      const machineNameField = screen.getByRole('textbox', {
+        name: 'Machine name',
+      });
+      expect(machineNameField).toBeDisabled();
     });
 
     it('allows editing name for newly added slot on exposed component', async () => {
@@ -183,14 +259,14 @@ describe('Slots', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
       await waitFor(() => {
-        expect(
-          screen.getAllByRole('textbox', { name: 'Slot name' }),
-        ).toHaveLength(2);
+        expect(screen.getAllByRole('textbox', { name: 'Title' })).toHaveLength(
+          2,
+        );
       });
 
       // The second slot name field (newly added) should not be disabled
       const slotNameFields = screen.getAllByRole('textbox', {
-        name: 'Slot name',
+        name: 'Title',
       });
       expect(slotNameFields).toHaveLength(2);
       expect(slotNameFields[0]).toBeDisabled(); // Existing slot
@@ -211,7 +287,7 @@ describe('Slots', () => {
         selectCodeComponentProperty('slots')(exposedStore.getState()),
       ).toHaveLength(0);
       expect(
-        screen.queryByRole('textbox', { name: 'Slot name' }),
+        screen.queryByRole('textbox', { name: 'Title' }),
       ).not.toBeInTheDocument();
     });
   });

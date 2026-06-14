@@ -21,7 +21,7 @@ import {
 } from '@/features/code-editor/codeEditorSlice';
 import { createDisplayArray } from '@/features/code-editor/utils/arrayPropUtils';
 import {
-  getPropMachineName,
+  getPropSchemaKey,
   serializeProps,
 } from '@/features/code-editor/utils/utils';
 import { type CodeComponentPropImageExample } from '@/types/CodeComponent';
@@ -55,12 +55,12 @@ const addProp = async (typeDisplayName: string, propName: string) => {
 
   await waitFor(() => {
     expect(
-      screen.getAllByRole('textbox', { name: 'Prop name' }).length,
+      screen.getAllByRole('textbox', { name: 'Title' }).length,
     ).toBeGreaterThan(0);
   });
 
   const allPropNameInputs = screen.getAllByRole('textbox', {
-    name: 'Prop name',
+    name: 'Title',
   });
   const allTypeSelects = screen.getAllByRole('combobox', { name: 'Type' });
   const lastIndex = allPropNameInputs.length - 1;
@@ -85,7 +85,7 @@ describe('props in code editor', () => {
   describe('props form', () => {
     it('renders empty', async () => {
       expect(
-        screen.queryByRole('textbox', { name: 'Prop name' }),
+        screen.queryByRole('textbox', { name: 'Title' }),
       ).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
     });
@@ -93,7 +93,7 @@ describe('props in code editor', () => {
     it('adds and removes props', async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
       expect(
-        screen.getByRole('textbox', { name: 'Prop name' }),
+        screen.getByRole('textbox', { name: 'Title' }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole('textbox', { name: 'Example value' }),
@@ -113,7 +113,7 @@ describe('props in code editor', () => {
         screen.getByRole('button', { name: /Remove prop/ }),
       );
       expect(
-        screen.queryByRole('textbox', { name: 'Prop name' }),
+        screen.queryByRole('textbox', { name: 'Title' }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole('textbox', { name: 'Example value' }),
@@ -133,10 +133,10 @@ describe('props in code editor', () => {
     it('saves prop data', async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
       expect(
-        screen.getByRole('textbox', { name: 'Prop name' }),
+        screen.getByRole('textbox', { name: 'Title' }),
       ).toBeInTheDocument();
       await userEvent.type(
-        screen.getByRole('textbox', { name: 'Prop name' }),
+        screen.getByRole('textbox', { name: 'Title' }),
         'Alpha',
       );
       expect(
@@ -155,23 +155,24 @@ describe('props in code editor', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
       await waitFor(() => {
         expect(
-          screen.getByRole('textbox', { name: 'Prop name' }),
+          screen.getByRole('textbox', { name: 'Title' }),
         ).toBeInTheDocument();
       });
-      const propName = selectCodeComponentProperty('props')(store.getState())[0]
-        .name;
+      const firstProp = selectCodeComponentProperty('props')(
+        store.getState(),
+      )[0];
       await userEvent.click(screen.getByRole('switch', { name: 'Required' }));
       expect(screen.getByRole('switch', { name: 'Required' })).toBeChecked();
       expect(
         selectCodeComponentProperty('required')(store.getState())[0],
-      ).toEqual(getPropMachineName(propName));
+      ).toEqual(getPropSchemaKey(firstProp));
     });
 
     it('changing type clears example data', async () => {
       await addProp('Integer', 'Alpha');
       await waitFor(() => {
         expect(
-          screen.getByRole('textbox', { name: 'Prop name' }),
+          screen.getByRole('textbox', { name: 'Title' }),
         ).toBeInTheDocument();
       });
 
@@ -1512,6 +1513,97 @@ describe('props in code editor', () => {
     );
   });
 
+  describe('prop machine name', () => {
+    it('shows machine name after Add and updates store', async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+      const machineNameInput = screen.getByRole('textbox', {
+        name: 'Machine name',
+      });
+      expect(machineNameInput).toBeInTheDocument();
+      await userEvent.type(machineNameInput, 'my_custom_key');
+      expect(
+        selectCodeComponentProperty('props')(store.getState())[0].machineName,
+      ).toBe('my_custom_key');
+    });
+
+    it('shows duplicate message when two props resolve to the same schema key', async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+      await userEvent.type(
+        screen.getByRole('textbox', { name: 'Title' }),
+        'Shared title',
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+      const titleInputs = screen.getAllByRole('textbox', { name: 'Title' });
+      await userEvent.type(titleInputs[1], 'Shared title');
+      const dupMessages = screen.getAllByText(
+        'Another prop uses this machine name.',
+      );
+      expect(dupMessages).toHaveLength(2);
+    });
+
+    describe('machine name format validation', () => {
+      const INVALID_MESSAGE =
+        'Use letters, numbers and underscores only. Must start with a letter or underscore.';
+
+      it('does not show the format error while typing (only on blur)', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+      });
+
+      it('shows the format error after blurring an invalid value', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        fireEvent.blur(machineNameInput);
+        expect(await screen.findByText(INVALID_MESSAGE)).toBeInTheDocument();
+      });
+
+      it('clears the format error once the value becomes valid', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, '1bad');
+        fireEvent.blur(machineNameInput);
+        expect(await screen.findByText(INVALID_MESSAGE)).toBeInTheDocument();
+
+        await userEvent.clear(machineNameInput);
+        await userEvent.type(machineNameInput, 'good_one');
+        await waitFor(() => {
+          expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+        });
+      });
+
+      it('does not show the format error when the field is empty (means derived from title)', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        fireEvent.blur(machineNameInput);
+        expect(screen.queryByText(INVALID_MESSAGE)).not.toBeInTheDocument();
+      });
+
+      it('shows the top-level callout when any prop has an invalid machine name', async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+        const machineNameInput = screen.getByRole('textbox', {
+          name: 'Machine name',
+        });
+        await userEvent.type(machineNameInput, 'bad-name');
+        // Callout uses the store state, not the touched UI state, so it
+        // surfaces as soon as the value becomes invalid.
+        expect(
+          screen.getByText(/one or more props have an invalid machine name/i),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('image data', () => {
     const aspectRatios = [
       ['1:1 (Square)', { width: 600, height: 600 }],
@@ -1594,7 +1686,7 @@ describe('props in code editor', () => {
       const exposedStore = createExposedComponentStore();
       render(<Wrapper store={exposedStore} />);
 
-      const nameField = screen.getByRole('textbox', { name: 'Prop name' });
+      const nameField = screen.getByRole('textbox', { name: 'Title' });
       expect(nameField).toBeDisabled();
       const typeSelect = screen.getByRole('combobox', { name: 'Type' });
       expect(typeSelect).toBeDisabled();
@@ -1602,6 +1694,16 @@ describe('props in code editor', () => {
         name: 'Example value',
       });
       expect(exampleField).not.toBeDisabled();
+    });
+
+    it('disables machine name field for existing props on exposed component', async () => {
+      const exposedStore = createExposedComponentStore();
+      render(<Wrapper store={exposedStore} />);
+
+      const machineNameField = screen.getByRole('textbox', {
+        name: 'Machine name',
+      });
+      expect(machineNameField).toBeDisabled();
     });
 
     it('allows editing name and type for newly added props on an exposed component', async () => {
@@ -1612,14 +1714,14 @@ describe('props in code editor', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
       await waitFor(() => {
-        expect(
-          screen.getAllByRole('textbox', { name: 'Prop name' }),
-        ).toHaveLength(2);
+        expect(screen.getAllByRole('textbox', { name: 'Title' })).toHaveLength(
+          2,
+        );
       });
 
       // The second prop name field (newly added) should not be disabled
       const propNameFields = screen.getAllByRole('textbox', {
-        name: 'Prop name',
+        name: 'Title',
       });
       expect(propNameFields[0]).toBeDisabled(); // Existing prop
       expect(propNameFields[1]).not.toBeDisabled(); // New prop
@@ -1648,7 +1750,7 @@ describe('props in code editor', () => {
         selectCodeComponentProperty('props')(exposedStore.getState()),
       ).toHaveLength(0);
       expect(
-        screen.queryByRole('textbox', { name: 'Prop name' }),
+        screen.queryByRole('textbox', { name: 'Title' }),
       ).not.toBeInTheDocument();
     });
 
@@ -1680,7 +1782,7 @@ describe('props in code editor', () => {
       render(<Wrapper store={exposedStore} />);
 
       // Name and Type should be disabled for existing props
-      const nameField = screen.getByRole('textbox', { name: 'Prop name' });
+      const nameField = screen.getByRole('textbox', { name: 'Title' });
       expect(nameField).toBeDisabled();
       const typeSelect = screen.getByRole('combobox', { name: 'Type' });
       expect(typeSelect).toBeDisabled();
@@ -1727,7 +1829,7 @@ describe('props in code editor', () => {
       render(<Wrapper store={exposedStore} />);
 
       // Name and Type should be disabled
-      const nameField = screen.getByRole('textbox', { name: 'Prop name' });
+      const nameField = screen.getByRole('textbox', { name: 'Title' });
       expect(nameField).toBeDisabled();
       const typeSelect = screen.getByRole('combobox', { name: 'Type' });
       expect(typeSelect).toBeDisabled();
@@ -1768,7 +1870,7 @@ describe('props in code editor', () => {
       render(<Wrapper store={exposedStore} />);
 
       // Name and Type should be disabled for existing props
-      const nameField = screen.getByRole('textbox', { name: 'Prop name' });
+      const nameField = screen.getByRole('textbox', { name: 'Title' });
       expect(nameField).toBeDisabled();
       const typeSelect = screen.getByRole('combobox', { name: 'Type' });
       expect(typeSelect).toBeDisabled();
@@ -1812,7 +1914,7 @@ describe('props in code editor', () => {
       render(<Wrapper store={exposedStore} />);
 
       // Name and Type should be disabled
-      const nameField = screen.getByRole('textbox', { name: 'Prop name' });
+      const nameField = screen.getByRole('textbox', { name: 'Title' });
       expect(nameField).toBeDisabled();
       const typeSelect = screen.getByRole('combobox', { name: 'Type' });
       expect(typeSelect).toBeDisabled();
@@ -4423,7 +4525,7 @@ describe('props in code editor', () => {
         });
 
         // Verify all three props are rendered
-        const propNames = screen.getAllByRole('textbox', { name: 'Prop name' });
+        const propNames = screen.getAllByRole('textbox', { name: 'Title' });
         expect(propNames).toHaveLength(3);
       });
     });
@@ -5695,12 +5797,12 @@ describe('props in code editor', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole('textbox', { name: 'Prop name' }),
+          screen.getByRole('textbox', { name: 'Title' }),
         ).toBeInTheDocument();
       });
 
       const allPropNameInputs = screen.getAllByRole('textbox', {
-        name: 'Prop name',
+        name: 'Title',
       });
       const allTypeSelects = screen.getAllByRole('combobox', { name: 'Type' });
       const lastIndex = allPropNameInputs.length - 1;
@@ -5751,13 +5853,13 @@ describe('props in code editor', () => {
 
       await waitFor(() => {
         const inputs = screen.getAllByRole('textbox', {
-          name: 'Prop name',
+          name: 'Title',
         });
         expect(inputs.length).toBeGreaterThan(1);
       });
 
       const allPropNameInputs = screen.getAllByRole('textbox', {
-        name: 'Prop name',
+        name: 'Title',
       });
       const allTypeSelects = screen.getAllByRole('combobox', { name: 'Type' });
       const lastIndex = allPropNameInputs.length - 1;
@@ -5857,12 +5959,12 @@ describe('props in code editor', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole('textbox', { name: 'Prop name' }),
+          screen.getByRole('textbox', { name: 'Title' }),
         ).toBeInTheDocument();
       });
 
       const allPropNameInputs = screen.getAllByRole('textbox', {
-        name: 'Prop name',
+        name: 'Title',
       });
       const allTypeSelects = screen.getAllByRole('combobox', { name: 'Type' });
       const lastIndex = allPropNameInputs.length - 1;

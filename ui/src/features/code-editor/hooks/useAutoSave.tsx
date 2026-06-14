@@ -14,6 +14,11 @@ import {
   setStatus,
 } from '@/features/code-editor/codeEditorSlice';
 import {
+  filterRequiredAgainstSerializedProps,
+  getDuplicatePropSchemaKeys,
+  getDuplicateSlotSchemaKeys,
+  getInvalidMachineNamePropIds,
+  getInvalidMachineNameSlotIds,
   serializeProps,
   serializeSlots,
 } from '@/features/code-editor/utils/utils';
@@ -129,6 +134,22 @@ const useAutoSave = (requestedComponentId: string): void => {
       clearTimeout(lastInvocationCodeComponentTimeoutRef.current);
     }
     lastInvocationCodeComponentTimeoutRef.current = setTimeout(() => {
+      if (
+        getDuplicatePropSchemaKeys(props).length > 0 ||
+        getDuplicateSlotSchemaKeys(slots).length > 0 ||
+        getInvalidMachineNamePropIds(props).length > 0 ||
+        getInvalidMachineNameSlotIds(slots).length > 0
+      ) {
+        return;
+      }
+      const serializedProps = serializeProps(props);
+      // Drop any `required` entries that don't appear in the serialized props
+      // (e.g. a prop with a machine name but no title is filtered out by
+      // `serializeProps` and would otherwise produce a 500 server-side).
+      const filteredRequired = filterRequiredAgainstSerializedProps(
+        required,
+        serializedProps,
+      );
       updateCodeComponent({
         id: componentId,
         data: {
@@ -139,9 +160,9 @@ const useAutoSave = (requestedComponentId: string): void => {
           sourceCodeCss,
           compiledJs,
           compiledCss,
-          props: serializeProps(props),
+          props: serializedProps,
           slots: serializeSlots(slots),
-          required,
+          required: filteredRequired,
           importedJsComponents: importedJsComponentsRef.current,
           dataDependencies,
         },

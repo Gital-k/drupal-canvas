@@ -1,5 +1,3 @@
-import { camelCase } from 'lodash-es';
-
 import { isComponentYmlFile } from '../utils/components.js';
 import {
   getYAMLMappingPair,
@@ -52,7 +50,7 @@ const rule: EslintRule.RuleModule = {
     type: 'problem',
     docs: {
       description:
-        'Validates that component prop IDs match the camelCase version of their titles',
+        'Validates that each component prop in YAML has a title (SDC `title` field)',
     },
   },
   create(context: EslintRule.RuleContext): EslintRule.RuleListener {
@@ -77,16 +75,6 @@ const rule: EslintRule.RuleModule = {
             context.report({
               node: prop.node,
               message: `Prop "${prop.id}" is missing a title.`,
-            });
-            continue;
-          }
-
-          const expectedId = camelCase(prop.title);
-
-          if (prop.id !== expectedId) {
-            context.report({
-              node: prop.node,
-              message: `Prop machine name "${prop.id}" should be the camelCase version of its title. Expected: "${expectedId}". https://drupal.org/i/3524675`,
             });
           }
         }

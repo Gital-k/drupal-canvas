@@ -35,6 +35,10 @@ import useCompileJavaScript from '@/features/code-editor/hooks/useCompileJavaScr
 import { upsertClassNameCandidatesInComment } from '@/features/code-editor/utils/classNameCandidates';
 import {
   detectValidPropOrSlotChange,
+  getDuplicatePropSchemaKeys,
+  getDuplicateSlotSchemaKeys,
+  getInvalidMachineNamePropIds,
+  getInvalidMachineNameSlotIds,
   getJsForSlotsPreview,
 } from '@/features/code-editor/utils/utils';
 
@@ -162,6 +166,22 @@ const useSourceCode = (requestedComponentId: string): void => {
     }
 
     const compile = async () => {
+      const hasCollidingSchemaKeys =
+        getDuplicatePropSchemaKeys(props).length > 0 ||
+        getDuplicateSlotSchemaKeys(slots).length > 0;
+      const hasInvalidMachineNames =
+        getInvalidMachineNamePropIds(props).length > 0 ||
+        getInvalidMachineNameSlotIds(slots).length > 0;
+      if (hasCollidingSchemaKeys || hasInvalidMachineNames) {
+        dispatch(
+          setStatus({
+            compilationError: true,
+            isCompiling: false,
+          }),
+        );
+        return;
+      }
+
       // Extract class name candidates from the component's JS code.
       const classNameCandidates = extractClassNameCandidates(sourceCodeJS);
       // Add it to our globally tracked index of class name candidates, which
@@ -274,6 +294,7 @@ const useSourceCode = (requestedComponentId: string): void => {
     extractClassNameCandidates,
     globalSourceCodeCSS,
     isJavaScriptCompilerReady,
+    props,
     globalAssetLibrary.assets,
     requestedComponentId,
     slots,

@@ -64,10 +64,8 @@ testRunner.run('component-prop-names rule', rule, {
       `,
       filename: '/components/button/button.yml',
     },
-  ],
-  invalid: [
     {
-      name: 'should validate named component metadata files',
+      name: 'allows prop machine name to differ from camelCase of title (Code Component / SDC flexibility)',
       code: `
         name: Button
         machineName: button
@@ -79,16 +77,9 @@ testRunner.run('component-prop-names rule', rule, {
               title: Button Title
       `,
       filename: '/components/button/button.component.yml',
-      errors: [
-        {
-          message:
-            'Prop machine name "title" should be the camelCase version of its title. Expected: "buttonTitle". https://drupal.org/i/3524675',
-          line: 7,
-        },
-      ],
     },
     {
-      name: 'should fail when prop id is not a camelCase version of Title',
+      name: 'allows prop id that is not camelCase of title in component.yml',
       code: `
         name: Button
         machineName: button
@@ -100,14 +91,9 @@ testRunner.run('component-prop-names rule', rule, {
               title: Button Title
         `,
       filename: '/components/card/component.yml',
-      errors: [
-        {
-          message:
-            'Prop machine name "title" should be the camelCase version of its title. Expected: "buttonTitle". https://drupal.org/i/3524675',
-          line: 7,
-        },
-      ],
     },
+  ],
+  invalid: [
     {
       name: 'should fail when prop is missing a title',
       code: `

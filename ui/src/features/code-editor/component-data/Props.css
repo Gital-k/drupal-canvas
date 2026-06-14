@@ -1,3 +1,19 @@
+/* Keep Title / Machine name label rows the same height so inputs line up */
+.props-form-label-row {
+  flex-shrink: 0;
+  min-height: 1.25rem;
+}
+
+/* Title + machine name fields: use full width of the grid cell */
+.props-field-full-width {
+  width: 100%;
+}
+
+/* Prop type select: stretch to the type column (second row) */
+.props-type-trigger.props-type-trigger {
+  width: 100%;
+}
+
 .props-select-trigger.props-select-trigger {
   width: 50%;
 }
