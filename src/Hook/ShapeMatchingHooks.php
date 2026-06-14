@@ -121,7 +121,7 @@ class ShapeMatchingHooks {
       'entity_reference' => EntityReferenceItemOverride::class,
     ];
     foreach ($overrides as $plugin_id => $class) {
-      if (\array_key_exists($plugin_id, $info)) {
+      if (\array_key_exists($plugin_id, $info) && \class_exists($class)) {
         $info[$plugin_id]['class'] = $class;
       }
     }
