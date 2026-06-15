@@ -15,7 +15,7 @@ use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
-final class JsonSchemaPropsComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
+class JsonSchemaPropsComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
 
   /**
    * {@inheritdoc}
@@ -72,38 +72,12 @@ final class JsonSchemaPropsComponentInstanceUpdater implements ComponentInstance
     $from_version = $component->getLoadedVersion();
     $to_version = $component->getActiveVersion();
 
+    [$from_props, $to_props] = self::getPropDefinitions($component, $from_version, $to_version);
     // Props that are still present, need to allow the same field data to be
     // stored in the active version of the Component. If not
     // (If only the field widget or expression changes, it's SAFE to update.)
-    $prop_field_definition_to_storable_prop_shape = static function (array $prop_field_definition): StorablePropShape {
-      $field_type_prop = StructuredDataPropExpression::fromString($prop_field_definition['expression']);
-      \assert($field_type_prop instanceof FieldTypeBasedPropExpressionInterface);
-
-      // Shape details are irrelevant for update safety checks, but the
-      // constructor validates that cardinality aligns with array/non-array.
-      $is_single_value = ($prop_field_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) === 1;
-      $irrelevant_prop_shape = $is_single_value
-        ? new PropShape(['type' => 'object'])
-        : new PropShape(['type' => 'array', 'items' => ['type' => 'object']]);
-
-      // Normalize to unlimited so cardinality changes don't block the update.
-      // - Increasing cardinality is allowed: the data fits in the new storage.
-      // - Decreasing cardinality is allowed: the data loss is accepted on
-      // update.
-      $comparison_cardinality = $is_single_value ? NULL : FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED;
-
-      return new StorablePropShape(
-        shape: $irrelevant_prop_shape,
-        fieldTypeProp: $field_type_prop,
-        fieldWidget: 'irrelevant',
-        cardinality: $comparison_cardinality,
-        fieldStorageSettings: $prop_field_definition['field_storage_settings'] ?? NULL,
-        fieldInstanceSettings: $prop_field_definition['field_instance_settings'] ?? NULL,
-      );
-    };
-    [$from_props, $to_props] = self::getPropDefinitions($component, $from_version, $to_version);
-    $from_props = \array_map($prop_field_definition_to_storable_prop_shape, $from_props);
-    $to_props = \array_map($prop_field_definition_to_storable_prop_shape, $to_props);
+    $from_props = self::toStorablePropShapes($from_props);
+    $to_props = self::toStorablePropShapes($to_props);
     $common_props_names = \array_keys(\array_intersect_key($to_props, $from_props));
     $common_props_names_with_changed_definition = \array_any(
       $common_props_names,
@@ -150,24 +124,9 @@ final class JsonSchemaPropsComponentInstanceUpdater implements ComponentInstance
     // Truncate array inputs exceeding the new finite cardinality. This handles
     // the case where maxItems was tightened after component instances were
     // already created.
-    foreach ($to_props as $prop_name => $def) {
-      // @see \Drupal\canvas\PropSource\StaticPropSource::getCardinality()
-      $new_cardinality = $def['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY;
-      // When the new cardinality is unlimited, no change is necessary because
-      // any number of stored values is valid.
-      if ($new_cardinality === FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
-        continue;
-      }
-      // Skip if prop is absent, not an array, or already within the new limit.
-      if (
-        !isset($inputs[$prop_name]) ||
-        !\is_array($inputs[$prop_name]) ||
-        \count($inputs[$prop_name]) <= $new_cardinality
-      ) {
-        continue;
-      }
-
-      $inputs[$prop_name] = \array_slice($inputs[$prop_name], 0, $new_cardinality);
+    $truncated = self::applyCardinalityTruncation($inputs, $to_props);
+    if ($truncated !== $inputs) {
+      $inputs = $truncated;
       $needs_input_update = TRUE;
     }
 
@@ -256,10 +215,115 @@ final class JsonSchemaPropsComponentInstanceUpdater implements ComponentInstance
    * @return array
    *   An array containing the prop field definitions.
    */
-  private static function getPropDefinitions(ComponentInterface $component, string $from_version, string $to_version): array {
+  protected static function getPropDefinitions(ComponentInterface $component, string $from_version, string $to_version): array {
     $from_settings = $component->getSettings($from_version);
     $to_settings = $component->getSettings($to_version);
     return [$from_settings['prop_field_definitions'], $to_settings['prop_field_definitions']];
+  }
+
+  /**
+   * Extracts top-level prop names with validation errors.
+   *
+   * @param iterable $violations
+   *   Constraint violations returned by validateComponentInput().
+   * @param string $component_instance_uuid
+   *   Component instance UUID.
+   *
+   * @return list<string>
+   *   Invalid top-level prop names.
+   */
+  protected static function getInvalidPropNames(iterable $violations, string $component_instance_uuid): array {
+    $invalid_prop_names = [];
+    $prefix = "inputs.$component_instance_uuid.";
+    foreach ($violations as $violation) {
+      $path = $violation->getPropertyPath();
+      if (!str_starts_with($path, $prefix)) {
+        continue;
+      }
+      $relative_path = substr($path, \strlen($prefix));
+      if ($relative_path === '') {
+        continue;
+      }
+      $segments = explode('.', $relative_path);
+      $invalid_prop_names[$segments[0]] = TRUE;
+    }
+    return \array_keys($invalid_prop_names);
+  }
+
+  /**
+   * Truncates array inputs that exceed the new finite cardinality.
+   *
+   * @param array $inputs
+   *   Current prop inputs.
+   * @param array $to_props
+   *   Prop field definitions for the target version.
+   *
+   * @return array
+   *   Inputs with oversized arrays sliced to the new cardinality limit.
+   */
+  protected static function applyCardinalityTruncation(array $inputs, array $to_props): array {
+    foreach ($to_props as $prop_name => $def) {
+      // @see \Drupal\canvas\PropSource\StaticPropSource::getCardinality()
+      $new_cardinality = $def['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY;
+      // When the new cardinality is unlimited, any number of stored values is
+      // valid.
+      if ($new_cardinality === FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
+        continue;
+      }
+      // Skip if prop is absent, not an array, or already within the new limit.
+      if (
+        !isset($inputs[$prop_name]) ||
+        !\is_array($inputs[$prop_name]) ||
+        \count($inputs[$prop_name]) <= $new_cardinality
+      ) {
+        continue;
+      }
+      $inputs[$prop_name] = \array_slice($inputs[$prop_name], 0, $new_cardinality);
+    }
+    return $inputs;
+  }
+
+  /**
+   * Determines if a prop definition stores multiple values.
+   */
+  protected static function isMultiValuePropDefinition(array $prop_definition): bool {
+    return ($prop_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) !== 1;
+  }
+
+  /**
+   * Converts prop field definitions to StorablePropShape objects.
+   *
+   * @param array $prop_field_definitions
+   *   The prop field definitions array from Component::getSettings().
+   *
+   * @return array<string, \Drupal\canvas\PropShape\StorablePropShape>
+   */
+  protected static function toStorablePropShapes(array $prop_field_definitions): array {
+    return \array_map(static function (array $prop_field_definition): StorablePropShape {
+      $field_type_prop = StructuredDataPropExpression::fromString($prop_field_definition['expression']);
+      \assert($field_type_prop instanceof FieldTypeBasedPropExpressionInterface);
+      // Shape details are irrelevant for update safety checks, but the
+      // constructor validates that cardinality aligns with array/non-array.
+      $is_single_value = ($prop_field_definition['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY) === 1;
+      $irrelevant_prop_shape = $is_single_value
+        ? new PropShape(['type' => 'object'])
+        : new PropShape(['type' => 'array', 'items' => ['type' => 'object']]);
+
+      // Normalize to unlimited so cardinality changes don't block the update.
+      // - Increasing cardinality is allowed: the data fits in the new storage.
+      // - Decreasing cardinality is allowed: the data loss is accepted on
+      // update.
+      $comparison_cardinality = $is_single_value ? NULL : FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED;
+
+      return new StorablePropShape(
+        shape: $irrelevant_prop_shape,
+        fieldTypeProp: $field_type_prop,
+        fieldWidget: 'irrelevant',
+        cardinality: $comparison_cardinality,
+        fieldStorageSettings: $prop_field_definition['field_storage_settings'] ?? NULL,
+        fieldInstanceSettings: $prop_field_definition['field_instance_settings'] ?? NULL,
+      );
+    }, $prop_field_definitions);
   }
 
 }

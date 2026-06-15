@@ -579,30 +579,14 @@ Each `component source` is able to specify an updater class (see `\Drupal\canvas
 This updater will be responsible for:
 
 * Checking if a `component instance` is using the active version.
-* Deciding if a `component instance` not using the active version can be updated automatically without any data loss.
+* Deciding if a `component instance` not using the active version can be updated automatically according to the rules defined by that source's updater: some might accept data loss.
 * Performing that update.
 
 This update of the `component tree`'s`component instance`s will happen automatically
 as soon as we attempt to edit a component tree (see `\Drupal\canvas\Controller\ApiLayoutController::buildRegion()` and
 `\Drupal\canvas\Controller\ApiConfigControllers::normalize()`).
 
-For those `component source`s not providing an input UX (see [`Canvas Components` doc](components.md)), the scenarios
-where such an update is possible without any risk are:
-
-- Adding optional props
-- Adding slots
-- Changing props from required to optional
-- Changing a prop matched prop shape field widget (but only the widget!)
-- Changing default values in prop_field_definitions
-- Changing slot examples
-- Removing props (required or optional)
-- Removing slots
-- Adding a new required prop.
-- Changing props from optional to required
-
-Unsafe changes (that prevent auto-update) include:
-
-- Changing prop shapes
 
 See
 - `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceUpdater::canUpdate`
+- `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentInstanceUpdater`

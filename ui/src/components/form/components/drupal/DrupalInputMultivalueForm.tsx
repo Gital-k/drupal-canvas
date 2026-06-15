@@ -76,6 +76,15 @@ const DrupalInputMultivalueForm = ({
     String(initialValue ?? ''),
   );
 
+  // Sync when the form re-fetches with new server-side values (e.g. after a
+  // prop type migration). useState only initialize on mount so it stays stale
+  // across re-renders with updated attributes unless explicitly synced.
+  useEffect(() => {
+    setDisplayValue(
+      (attributes.value || attributes.defaultValue || '') as string,
+    );
+  }, [attributes.value, attributes.defaultValue]);
+
   const hasError = () =>
     refs.current.popoverInput &&
     refs.current.popoverInput.dataset.invalidPropValue === 'true';

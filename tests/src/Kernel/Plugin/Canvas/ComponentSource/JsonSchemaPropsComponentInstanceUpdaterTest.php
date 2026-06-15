@@ -49,7 +49,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
     'field',
   ];
 
-  private JavaScriptComponent $jsComponent;
+  protected JavaScriptComponent $jsComponent;
 
   protected const string COMPONENT_INSTANCE_UUID = '2c6e91ae-23ac-433d-9bb8-687144464b34';
   protected const string ORIGINAL_VERSION_HASH = '542cc17c549ba2bc';
@@ -136,6 +136,16 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Creates the updater under test.
+   *
+   * Subclasses override this to exercise the same scenarios against a different
+   * updater, instead of duplicating the test methods.
+   */
+  protected static function createUpdater(): JsonSchemaPropsComponentInstanceUpdater {
+    return new JsonSchemaPropsComponentInstanceUpdater();
+  }
+
+  /**
    * @param string $new_latest_version
    *   The version hash after the update.
    * @param ?callable $setup_callback
@@ -154,7 +164,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
    */
   #[DataProvider('providerUpdate')]
   public function testUpdate(string $new_latest_version, ?callable $setup_callback, ComponentInstanceUpdateAttemptResult $update_result, ?callable $assertion_callback, array $bc_break_violations): void {
-    $sut = new JsonSchemaPropsComponentInstanceUpdater();
+    $sut = static::createUpdater();
     $component_tree_value = [
       // The test component to be updated.
       [
@@ -437,7 +447,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
     ?callable $assertion_callback,
     array $bc_break_violations,
   ): void {
-    $sut = new JsonSchemaPropsComponentInstanceUpdater();
+    $sut = static::createUpdater();
     // Match testUpdate() so shared setup callbacks can keep strict fixture assumptions.
     $component_tree_value = [
       [
@@ -474,7 +484,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
    */
   #[DataProvider('providerUpdateWithGarbageInput')]
   public function testUpdateWithGarbageInput(string $setup_method, callable $assertion_callback): void {
-    $sut = new JsonSchemaPropsComponentInstanceUpdater();
+    $sut = static::createUpdater();
 
     // Add a new required `voice` prop to create a new version. Depending on
     // the scenario, the garbage `voice` value already present on the
@@ -542,7 +552,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
   }
 
   public function testAddingOptionalArrayPropToInUseComponentCanUpdate(): void {
-    $sut = new JsonSchemaPropsComponentInstanceUpdater();
+    $sut = static::createUpdater();
     $component_tree_value = [
       [
         'uuid' => self::COMPONENT_INSTANCE_UUID,
@@ -608,7 +618,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
     self::assertSame(['cat', 'dog'], $inputs['favorite_animals']);
   }
 
-  private static function generateComponentTree(array $component_tree_value, array $expected_violations): ComponentTreeItemList {
+  protected static function generateComponentTree(array $component_tree_value, array $expected_violations): ComponentTreeItemList {
     $component_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
     $component_tree->setValue($component_tree_value);
     self::assertSame($expected_violations, self::violationsToArray($component_tree->validate()));
@@ -627,7 +637,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
    */
   #[DataProvider('providerUpdateNeeded')]
   public function testIsUpdateNeeded(array $component_instance_value, ?callable $setup_callback, bool $expected): void {
-    $sut = new JsonSchemaPropsComponentInstanceUpdater();
+    $sut = static::createUpdater();
     if ($setup_callback !== NULL) {
       call_user_func_array($setup_callback, []);
     }

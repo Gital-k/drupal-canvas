@@ -405,6 +405,7 @@ HTML,
       'expected_validation_errors' => [],
       'expected_exception' => NULL,
       'expected_output_selector' => \sprintf('[id*="block-%s"]:contains("Hello, Canvas!")', static::UUID_CRASH_TEST_DUMMY),
+      'component_version' => NULL,
     ];
 
     // @todo Add a "hydration exception" test case in https://www.drupal.org/i/3524399
@@ -420,6 +421,7 @@ HTML,
         'message' => "Intentional test exception.",
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
   }
 

@@ -1302,6 +1302,86 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     }
   }
 
+  public function testRenderComponentFailureWhenPropsValidForPriorVersionButInvalidForActiveVersion(): void {
+    $this->generateComponentConfig();
+    $this->expectedDefaultComponentInstallCount = \count($this->componentStorage->loadMultiple());
+
+    $component_id = JsComponent::componentIdFromJavascriptComponentId('canvas_test_code_components_with_props');
+    $prior_string_version = $this->createPriorStringVersionAndNewActiveIntegerVersion($component_id);
+
+    parent::testRenderComponentFailure(
+      component_id: $component_id,
+      inputs: [
+        'age' => 'thirty two',
+        'name' => 'Tilly',
+      ],
+      expected_validation_errors: [
+        '2.inputs.' . self::UUID_CRASH_TEST_DUMMY . '.age' => 'String value found, but an integer or an object is required. The provided value is: "thirty two".',
+      ],
+      expected_exception: [
+        'class' => InvalidComponentException::class,
+        'message' => 'String value found, but an integer or an object is required.',
+      ],
+      expected_output_selector: NULL,
+      component_version: $prior_string_version,
+    );
+  }
+
+  /**
+   * Creates a prior string-typed version and a new active integer-typed version.
+   *
+   * This creates the exact render-time scenario where stored inputs are valid
+   * for a previous version but invalid for the active implementation.
+   */
+  private function createPriorStringVersionAndNewActiveIntegerVersion(string $component_id): string {
+    $component = Component::load($component_id);
+    self::assertInstanceOf(Component::class, $component);
+    self::assertCount(1, $component->getVersions());
+
+    $active_settings = $component->getSettings();
+    self::assertSame('integer', $active_settings['prop_field_definitions']['age']['field_type']);
+
+    $string_settings = $active_settings;
+    $string_settings['prop_field_definitions']['age']['field_type'] = 'string';
+    $string_settings['prop_field_definitions']['age']['default_value'][0] = ['value' => 'Oh hi'];
+    $string_settings['prop_field_definitions']['age']['expression'] = 'ℹ︎string␟value';
+    $string_settings['prop_field_definitions']['age']['field_widget'] = 'string_textfield';
+
+    $source_manager = $this->container->get(ComponentSourceManager::class);
+    \assert($source_manager instanceof ComponentSourceManager);
+    $string_source = $source_manager->createInstance(JsComponent::SOURCE_PLUGIN_ID, [
+      'local_source_id' => JsComponentDiscovery::getSourceSpecificComponentId($component_id),
+      ...$string_settings,
+    ]);
+    \assert($string_source instanceof ComponentSourceBase);
+    $string_version = $string_source->generateVersionHash();
+    $component->createVersion($string_version)
+      ->setSettings($string_settings)
+      ->save();
+    self::assertCount(2, $component->getVersions());
+    self::assertSame($string_version, $component->getActiveVersion());
+
+    $new_integer_settings = $string_settings;
+    $new_integer_settings['prop_field_definitions']['age']['field_type'] = 'integer';
+    // Ensure this integer-typed version hash differs from the original one.
+    $new_integer_settings['prop_field_definitions']['age']['default_value'][0] = ['value' => 42];
+    $new_integer_settings['prop_field_definitions']['age']['expression'] = 'ℹ︎integer␟value';
+    $new_integer_settings['prop_field_definitions']['age']['field_widget'] = 'number';
+    $new_integer_source = $source_manager->createInstance(JsComponent::SOURCE_PLUGIN_ID, [
+      'local_source_id' => JsComponentDiscovery::getSourceSpecificComponentId($component_id),
+      ...$new_integer_settings,
+    ]);
+    \assert($new_integer_source instanceof ComponentSourceBase);
+    $new_integer_version = $new_integer_source->generateVersionHash();
+    $component->createVersion($new_integer_version)
+      ->setSettings($new_integer_settings)
+      ->save();
+    self::assertCount(3, $component->getVersions());
+    self::assertSame($new_integer_version, $component->getActiveVersion());
+
+    return $string_version;
+  }
+
   /**
    * {@inheritdoc}
    */
@@ -1316,6 +1396,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
       'expected_validation_errors' => [],
       'expected_exception' => NULL,
       'expected_output_selector' => \sprintf('canvas-island[uid="%s"][props*="Tilly"][props*="19"]', self::UUID_CRASH_TEST_DUMMY),
+      'component_version' => NULL,
     ];
 
     // Garbage (non-existent) prop should result in:
@@ -1344,6 +1425,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
         'message' => '\'hydration_should_fail_on_this_non_existent_value\' is not a prop on this version of the Component \'Code component: <em class="placeholder">With props</em>\'.',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
 
     yield "JS Component with valid props, JSON encoding exception" => [
@@ -1358,6 +1440,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
         'message' => 'Wilson is a ball, not a person',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
 
     yield "JS Component with invalid props (wrong shape: string instead of integer!), validation error" => [
@@ -1374,6 +1457,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
         'message' => 'String value found, but an integer or an object is required.',
       ],
       'expected_output_selector' => NULL,
+      'component_version' => NULL,
     ];
     // Missing required props from the active version will be assigned on
     // hydration so no exception occurs.
@@ -1385,6 +1469,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
       ],
       'expected_exception' => NULL,
       'expected_output_selector' => \sprintf('canvas-island[uid="%s"][props*="Canvas"]', self::UUID_CRASH_TEST_DUMMY),
+      'component_version' => NULL,
     ];
   }
 

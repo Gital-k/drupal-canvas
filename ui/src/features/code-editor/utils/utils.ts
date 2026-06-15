@@ -144,6 +144,34 @@ function serializeExample(
   return example!;
 }
 
+function hasCompatibleCardinalityExample(
+  isMultiValueProp: boolean,
+  example: CodeComponentProp['example'],
+): boolean {
+  if (isMultiValueProp) {
+    return Array.isArray(example);
+  }
+  return !Array.isArray(example);
+}
+
+function hasSerializableExampleValue(
+  example: CodeComponentProp['example'],
+  serializedExample:
+    | NonNullable<CodeComponentPropSerialized['examples']>[number]
+    | undefined,
+): boolean {
+  if (serializedExample === undefined) {
+    return false;
+  }
+  if (Array.isArray(example)) {
+    return Array.isArray(serializedExample) && serializedExample.length > 0;
+  }
+  if (typeof example === 'string') {
+    return example !== '';
+  }
+  return example !== undefined && example !== null;
+}
+
 /**
  * Serializes props for saving in the JS Component config entity.
  *
@@ -181,7 +209,8 @@ export function serializeProps(props: CodeComponentProp[]) {
         const isImage = derivedType === 'image';
 
         // Determine the actual type for serialization
-        const serializedType = allowMultiple && items ? 'array' : type;
+        const isMultiValueProp = allowMultiple && items;
+        const serializedType = isMultiValueProp ? 'array' : type;
 
         // For string-based array props (e.g. date, link), empty strings should
         // be treated as "no value" and excluded from the serialized output.
@@ -189,27 +218,34 @@ export function serializeProps(props: CodeComponentProp[]) {
         const isStringArrayProp =
           allowMultiple && items?.type === 'string' && !isNumberType;
 
+        // Drop schema-incompatible cardinality examples (array <-> scalar
+        // mismatch) instead of sending invalid payloads to the backend.
+        const matchesCardinality = hasCompatibleCardinalityExample(
+          !!isMultiValueProp,
+          example,
+        );
+        const serializedExample = matchesCardinality
+          ? serializeExample(example, {
+              isNumberType,
+              isStringArrayProp,
+              isVideo,
+              isImage,
+            })
+          : undefined;
+
         // Whether this prop has a non-empty example worth serializing.
-        // For arrays: check length > 0 (string arrays also require non-empty strings)
-        // For non-arrays: check truthy value or explicit false (for booleans)
-        const hasExample = Array.isArray(example)
-          ? isStringArrayProp
-            ? (example as string[]).some((v) => v !== '')
-            : example.length > 0
-          : example || example === false;
+        // Use the serialized example to avoid persisting values that become
+        // empty after normalization (for example [''] -> []).
+        const hasExample = hasSerializableExampleValue(
+          example,
+          serializedExample,
+        );
 
         const processed: CodeComponentPropSerialized = {
           title: name,
           type: serializedType,
           ...(hasExample && {
-            examples: [
-              serializeExample(example, {
-                isNumberType,
-                isStringArrayProp,
-                isVideo,
-                isImage,
-              }),
-            ],
+            examples: [serializedExample!],
           }),
           // Only add enum/meta:enum at root level if NOT an array
           ...(!allowMultiple &&

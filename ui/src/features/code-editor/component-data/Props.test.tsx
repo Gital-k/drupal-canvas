@@ -1510,6 +1510,53 @@ describe('props in code editor', () => {
         }
       },
     );
+
+    it('drops list metadata and multivalue shape when switching from list:text multivalue to integer', async () => {
+      await addProp('List: text', 'Field');
+
+      // Required prefill gives us a valid enum + example for list types.
+      await userEvent.click(screen.getByRole('switch', { name: 'Required' }));
+
+      const multiValueCheckbox = screen.getByRole('checkbox', {
+        name: 'Allow multiple values',
+      });
+      fireEvent.click(multiValueCheckbox);
+
+      await waitFor(() => {
+        const prop = selectCodeComponentProperty('props')(store.getState())[0];
+        expect(prop.allowMultiple).toBe(true);
+        expect(prop.type).toBe('array');
+        expect(prop.items).toEqual({
+          type: 'string',
+        });
+        expect(prop.example).toEqual(['option_1']);
+      });
+
+      // Switch from List: text to Integer.
+      await userEvent.click(screen.getByRole('combobox', { name: 'Type' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Integer' }));
+
+      await waitFor(() => {
+        const prop = selectCodeComponentProperty('props')(store.getState())[0];
+        expect(prop.derivedType).toBe('integer');
+        expect(prop.type).toBe('integer');
+        expect(prop.allowMultiple).toBe(false);
+        expect(prop.items).toBeUndefined();
+        expect(prop.enum).toBeUndefined();
+        expect(prop.example).toBe('0');
+      });
+
+      const serialized = serializeProps(
+        selectCodeComponentProperty('props')(store.getState()),
+      );
+      expect(serialized.field).toMatchObject({
+        type: 'integer',
+        examples: [0],
+      });
+      expect(serialized.field.enum).toBeUndefined();
+      expect(serialized.field['meta:enum']).toBeUndefined();
+      expect(serialized.field.items).toBeUndefined();
+    });
   });
 
   describe('image data', () => {
