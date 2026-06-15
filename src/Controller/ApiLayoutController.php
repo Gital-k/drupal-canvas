@@ -163,7 +163,9 @@ final class ApiLayoutController {
     }
     // Also collect languages that have config language overrides for the
     // ContentTemplate.
-    if ($entity instanceof ContentTemplate && $this->languageManager instanceof ConfigurableLanguageManagerInterface) {
+    if ($entity instanceof ContentTemplate
+      && $this->moduleHandler->moduleExists('config_translation')
+      && $this->languageManager instanceof ConfigurableLanguageManagerInterface) {
       $config_name = $entity->getConfigDependencyName();
       foreach ($this->languageManager->getLanguages() as $langcode => $language) {
         if ($language->isDefault() || \in_array($langcode, $available_translations, TRUE)) {

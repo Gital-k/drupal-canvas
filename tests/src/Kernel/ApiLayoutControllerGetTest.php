@@ -940,7 +940,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
    * Tests config translation handling for ContentTemplate in the layout API.
    *
    * Covers:
-   * - translations.available includes languages that have a config language
+   * - Available translations includes languages that have a config language
    *   override on the ContentTemplate.
    * - The generated delete-form link points to
    *   canvas.api.config.translation.delete (not the content-translation route).
@@ -948,6 +948,8 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
    *   those belong to the article node, not to the template.
    * - The delete link is gated on the 'translate configuration' permission
    *   that protects the delete route.
+   * - The entire block is skipped when config_translation is not installed,
+   *    so config-override languages disappear from available entirely.
    */
   public function testConfigTranslationAvailabilityLinksAndPermissions(): void {
     $this->container->get('module_installer')->install([
@@ -965,7 +967,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // language selector only reflects the template's own config overrides.
     $node = Node::load(1);
     \assert($node instanceof Node);
-    $node->addTranslation('es', ['title' => 'Título de prueba', 'status' => 1]);
+    $node->addTranslation('es', ['title' => 'Title in Spanish', 'status' => 1]);
     $node->save();
 
     // Add a French config language override to the ContentTemplate.
@@ -1001,6 +1003,16 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       'French is still available without translate configuration.');
     self::assertArrayNotHasKey('fr', $json['translations']['links'],
       'No delete link without translate configuration permission.');
+
+    // When config_translation is uninstalled the detection block is skipped
+    // entirely, so French must also disappear from available.
+    $this->container->get('module_installer')->uninstall(['config_translation']);
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION]);
+    $json = static::decodeResponse($this->request(Request::create($url->toString())));
+    self::assertNotContains('fr', $json['translations']['available'],
+      'French is absent from available when config_translation is uninstalled.');
+    self::assertArrayNotHasKey('fr', $json['translations']['links'],
+      'Delete link is absent when config_translation is not installed.');
   }
 
 }
