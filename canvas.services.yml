@@ -225,6 +225,7 @@ services:
   Drupal\canvas\Controller\ApiConfigControllers: ~
   Drupal\canvas\Controller\ApiConfigAutoSaveControllers: ~
   Drupal\canvas\Controller\ApiContentAutoSaveControllers: ~
+  Drupal\canvas\Controller\ApiContentExportController: ~
   Drupal\canvas\Controller\ApiExtensionControllers: ~
   Drupal\canvas\Controller\ApiLayoutController: {}
   Drupal\canvas\Controller\ApiLogController: {}
