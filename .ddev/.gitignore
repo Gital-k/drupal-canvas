@@ -3,6 +3,9 @@
 # Sentinel written by `ddev setup` to mark the scaffold as built.
 /.scaffold-built
 
+# Re-entrancy lock held by `ddev setup` while it runs.
+/.setup-running
+
 /**/*.example
 /.dbimageBuild
 /.ddev-docker-*.yaml
