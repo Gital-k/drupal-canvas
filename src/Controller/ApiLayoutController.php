@@ -27,6 +27,7 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Render\Markup;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
 use Drupal\language\ConfigurableLanguageManagerInterface;
@@ -62,6 +63,7 @@ final class ApiLayoutController {
     private readonly ComponentSourceManager $componentSourceManager,
     private readonly ModuleHandlerInterface $moduleHandler,
     private readonly LanguageManagerInterface $languageManager,
+    private readonly AccountProxyInterface $currentUser,
   ) {
     $theme = $this->themeManager->getActiveTheme()->getName();
     $theme_regions = system_region_list($theme);
@@ -170,7 +172,7 @@ final class ApiLayoutController {
         $override = $this->languageManager->getLanguageConfigOverride($langcode, $config_name);
         if (!$override->isNew()) {
           $available_translations[] = $langcode;
-          if (!isset($links[$langcode]) && $entity->access('update')) {
+          if (!isset($links[$langcode]) && $this->currentUser->hasPermission('translate configuration')) {
             $delete_url = Url::fromRoute(
               'canvas.api.config.translation.delete',
               [

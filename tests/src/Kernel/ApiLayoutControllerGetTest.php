@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -19,6 +20,8 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\ParamConverter\ParamNotConvertedException;
 use Drupal\Core\Url;
+use Drupal\language\ConfigurableLanguageManagerInterface;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\link\LinkItemInterface;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
@@ -931,6 +934,73 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $this->container->get(EntityTypeManagerInterface::class)->getAccessControlHandler('node')->resetCache();
     $response = $this->request(Request::create($url->toString()));
     $this->assertEquals(200, $response->getStatusCode(), 'Response status code is 200 OK');
+  }
+
+  /**
+   * Tests config translation handling for ContentTemplate in the layout API.
+   *
+   * Covers:
+   * - translations.available includes languages that have a config language
+   *   override on the ContentTemplate.
+   * - The generated delete-form link points to
+   *   canvas.api.config.translation.delete (not the content-translation route).
+   * - No delete link is emitted for preview-entity content translations;
+   *   those belong to the article node, not to the template.
+   * - The delete link is gated on the 'translate configuration' permission
+   *   that protects the delete route.
+   */
+  public function testConfigTranslationAvailabilityLinksAndPermissions(): void {
+    $this->container->get('module_installer')->install([
+      'language',
+      'canvas_dev_translation',
+      'config_translation',
+      'content_translation',
+    ]);
+
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    ConfigurableLanguage::createFromLangcode('es')->save();
+
+    // Add a Spanish content translation to the preview entity. This must
+    // NOT surface in translations.available for a ContentTemplate – the
+    // language selector only reflects the template's own config overrides.
+    $node = Node::load(1);
+    \assert($node instanceof Node);
+    $node->addTranslation('es', ['title' => 'Título de prueba', 'status' => 1]);
+    $node->save();
+
+    // Add a French config language override to the ContentTemplate.
+    $template = $this->getTestEntity(ContentTemplate::ENTITY_TYPE_ID);
+    \assert($template instanceof ContentTemplate);
+    $languageManager = $this->container->get('language_manager');
+    \assert($languageManager instanceof ConfigurableLanguageManagerInterface);
+    $override = $languageManager->getLanguageConfigOverride('fr', $template->getConfigDependencyName());
+    $override->setData(['component_tree' => []])->save();
+
+    $url = $this->getLayoutUrl($template);
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, 'translate configuration']);
+    $json = static::decodeResponse($this->request(Request::create($url->toString())));
+
+    self::assertContains('fr', $json['translations']['available'],
+      'French config override is listed as available.');
+
+    self::assertNotContains('es', $json['translations']['available'],
+      'Preview-entity content translation for Spanish is not listed for a ContentTemplate.');
+
+    self::assertArrayHasKey('fr', $json['translations']['links'],
+      'Delete link is emitted for the French config override.');
+    $deleteLink = $json['translations']['links']['fr'][CanvasUriDefinitions::LINK_REL_DELETE];
+    self::assertStringContainsString('canvas/api/v0/config/content_template', $deleteLink,
+      'Delete link points to canvas.api.config.translation.delete.');
+
+    self::assertArrayNotHasKey('es', $json['translations']['links'],
+      'No delete link is emitted for preview-entity content translations.');
+
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION]);
+    $json = static::decodeResponse($this->request(Request::create($url->toString())));
+    self::assertContains('fr', $json['translations']['available'],
+      'French is still available without translate configuration.');
+    self::assertArrayNotHasKey('fr', $json['translations']['links'],
+      'No delete link without translate configuration permission.');
   }
 
 }

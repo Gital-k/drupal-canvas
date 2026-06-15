@@ -390,7 +390,7 @@ test.describe('Templates - General', () => {
     ).toHaveCount(0);
 
     // Navigate to the French preview: without the config override the English
-    // component tree is used, so the heading falls back to the English default.\
+    // component tree is used, so the heading falls back to the English default.
     await page.keyboard.press('Escape');
     await expect(
       page.locator('[data-state="open"][role="menu"]'),
