@@ -997,12 +997,20 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     self::assertArrayNotHasKey('es', $json['translations']['links'],
       'No delete link is emitted for preview-entity content translations.');
 
+    // Without 'translate configuration', the language is still listed in
+    // available (so the selector shows it) but no delete link is emitted.
     $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION]);
     $json = static::decodeResponse($this->request(Request::create($url->toString())));
     self::assertContains('fr', $json['translations']['available'],
       'French is still available without translate configuration.');
     self::assertArrayNotHasKey('fr', $json['translations']['links'],
       'No delete link without translate configuration permission.');
+
+    // Granting the permission brings the delete link back.
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, 'translate configuration']);
+    $json = static::decodeResponse($this->request(Request::create($url->toString())));
+    self::assertArrayHasKey('fr', $json['translations']['links'],
+      'Delete link is present again once translate configuration is granted.');
 
     // When config_translation is uninstalled the detection block is skipped
     // entirely, so French must also disappear from available.
