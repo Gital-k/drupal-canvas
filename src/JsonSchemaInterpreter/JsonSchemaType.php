@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\JsonSchemaInterpreter;
 
-use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\canvas\Plugin\Validation\Constraint\StringSemanticsConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\canvas\ShapeMatcher\DataTypeShapeRequirement;
 use Drupal\canvas\ShapeMatcher\DataTypeShapeRequirements;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 /**
  * Interprets JSON schema types (with type-specific constraints) to Typed Data.
@@ -83,14 +83,6 @@ enum JsonSchemaType: string {
       // @see \Drupal\Core\TypedData\TraversableTypedDataInterface
       self::Array, self::Object => FALSE,
     };
-  }
-
-  public function isIterable(): bool {
-    return !$this->isScalar();
-  }
-
-  public function isTraversable(): bool {
-    return !$this->isScalar();
   }
 
   /**
@@ -245,12 +237,24 @@ enum JsonSchemaType: string {
       // configure a minimum number of values for a field. Plus, JSON schema
       // allows declaring that an array must be non-empty (`minItems: 1`) even
       // for an optional array (not listed in `required`). So, it is impossible
-      // to support `minItems`. And in fact, marking an SDC prop as required has
-      // the same effect as `minItems: 1`.
+      // to support arbitrary `minItems` values.
+      // However, `minItems: 1` is supported: it aligns exactly with Drupal's
+      // "required means >=1 value" Field API semantics, and unlike `required`
+      // alone (which in JSON Schema only means "the key must be present"), it
+      // correctly enforces that an array cannot be empty.
+      // Note: marking a prop as `required` does NOT have the same effect as
+      // `minItems: 1`. JSON Schema `required: [prop]` only means the key must
+      // be present — it does not prevent `value: []`.
       // @see https://www.drupal.org/project/unlimited_field_settings
       // @see https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-00#rfc.section.6.4.2
       // @see https://stackoverflow.com/a/49548055
-      if (!empty(array_diff(\array_keys($schema), ['type', 'items', 'maxItems']))) {
+      // @see https://www.drupal.org/project/canvas/issues/3516754
+      if (!empty(array_diff(\array_keys($schema), ['type', 'items', 'maxItems', 'minItems']))) {
+        return NULL;
+      }
+      // Only minItems: 1 is supported. Higher values cannot be enforced by
+      // Drupal's Field API, which has no concept of minimum cardinality > 1.
+      if (isset($schema['minItems']) && $schema['minItems'] !== 1) {
         return NULL;
       }
       \assert($schema['type'] === 'array');
@@ -383,13 +387,35 @@ enum JsonSchemaType: string {
       },
 
       JsonSchemaType::Object => match (TRUE) {
+        // Content entity reference: at minimum, `x-allowed-entity-type-id` is
+        // required (validated upstream). Optionally `x-allowed-bundle` narrows
+        // selection to a single bundle via the `default` selection handler.
+        // @see docs/shape-matching.md#3.2.3
+        // @see \Drupal\canvas\ComponentMetadataRequirementsChecker
+        JsonSchemaObjectRef::isContentEntityReference($schema)
+          && \array_key_exists('x-allowed-entity-type-id', $shape->schema) => new StorablePropShape(
+            shape: $shape,
+            fieldTypeProp: new FieldTypePropExpression('entity_reference', 'entity'),
+            fieldWidget: 'entity_reference_autocomplete',
+            fieldStorageSettings: [
+              'target_type' => $schema['x-allowed-entity-type-id'],
+            ],
+            fieldInstanceSettings: !\array_key_exists('x-allowed-bundle', $schema)
+              ? NULL
+              : [
+                'handler' => 'default',
+                'handler_settings' => [
+                  'target_bundles' => [$schema['x-allowed-bundle']],
+                ],
+              ],
+        ),
         // For object shapes, it's far simpler to match on the `$ref` than on
         // minutiae.
-        \array_key_exists('$ref', $schema) => match ($schema['$ref']) {
+        \array_key_exists('$ref', $schema) => match (JsonSchemaObjectRef::tryFrom($schema['$ref'])) {
           // @see \Drupal\image\Plugin\Field\FieldType\ImageItem
           // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
           // @todo Try decorating with adapter in https://www.drupal.org/project/canvas/issues/3536115.
-          'json-schema-definitions://canvas.module/image' => new StorablePropShape(shape: $shape, fieldWidget: 'image_image', fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
+          JsonSchemaObjectRef::Image => new StorablePropShape(shape: $shape, fieldWidget: 'image_image', fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
             // TRICKY: Additional computed property on image fields added by
             // Drupal Canvas.
             // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride
@@ -409,7 +435,7 @@ enum JsonSchemaType: string {
           ])),
           // @see \Drupal\file\Plugin\Field\FieldType\FileItem
           // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
-          'json-schema-definitions://canvas.module/video' => new StorablePropShape(
+          JsonSchemaObjectRef::Video => new StorablePropShape(
             shape: $shape,
             fieldWidget: 'file_generic',
             fieldTypeProp: new FieldTypeObjectPropsExpression('file', [

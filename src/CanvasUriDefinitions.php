@@ -7,6 +7,10 @@ namespace Drupal\canvas;
 /**
  * Provides link relations for the internal HTTP API.
  *
+ * @see https://jsonapi.org/format/#document-links
+ * @see https://tools.ietf.org/html/rfc8288
+ * @see https://www.iana.org/assignments/link-relations/link-relations.xhtml
+ *
  * @internal
  */
 class CanvasUriDefinitions {
@@ -25,6 +29,9 @@ class CanvasUriDefinitions {
   const string LINK_REL_UNPUBLISH = 'disable';
   const string LINK_REL_PUBLISH = 'enable';
   // @see \Drupal\canvas\Controller\ApiUsageControllers::componentDetails()
+  // @todo Add it in \Drupal\canvas\Entity\JavaScriptComponent::getEntityOperations()
+  // @phpstan-ignore-next-line shipmonk.deadConstant
   const string LINK_REL_USAGE_DETAILS = 'https://drupal.org/project/canvas#link-rel-usage-details';
+  const string LINK_REL_TYPED_DATA_BROWSER = 'https://drupal.org/project/canvas#link-rel-typed-data-browser';
 
 }

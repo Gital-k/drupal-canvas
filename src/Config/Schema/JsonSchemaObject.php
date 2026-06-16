@@ -30,7 +30,7 @@ final class JsonSchemaObject extends Mapping {
       parent::__construct($definition, $name, $parent);
       return;
     }
-    $schema = \json_decode(\file_get_contents($ref) ?: '{}', TRUE, \JSON_THROW_ON_ERROR);
+    $schema = \json_decode(\file_get_contents($ref) ?: '{}', TRUE, flags: \JSON_THROW_ON_ERROR);
     if ($schema['type'] !== 'object') {
       throw new \LogicException(\sprintf("The schema definition at `%s` is invalid: the parent '\$ref' property should resolve to an object definition.", $parent?->getPropertyPath() ?? $name));
     }
@@ -42,7 +42,7 @@ final class JsonSchemaObject extends Mapping {
     ];
     foreach ($schema['properties'] as $property_name => $detail) {
       if (\array_key_exists('$ref', $detail)) {
-        $prop_schema = \json_decode(\file_get_contents($detail['$ref']) ?: '{}', TRUE, \JSON_THROW_ON_ERROR);
+        $prop_schema = \json_decode(\file_get_contents($detail['$ref']) ?: '{}', TRUE, flags: \JSON_THROW_ON_ERROR);
         if (!\in_array($prop_schema['type'] ?? NULL, $supported_property_types, TRUE)) {
           throw new \LogicException(\sprintf("The schema definition at `%s` is invalid: the parent '\$ref' property contains a '%s' property that uses an unsupported config schema type '%s'. This is not supported.", $parent?->getPropertyPath() ?? $name, $property_name, $prop_schema['type'] ?? 'unknown'));
         }
@@ -99,7 +99,7 @@ final class JsonSchemaObject extends Mapping {
    * @return string|null
    *   The $ref URI, or NULL if not found.
    */
-  private function findContainingSingleCardinalityProperty(?TypedDataInterface $parent): ?string {
+  private static function findContainingSingleCardinalityProperty(?TypedDataInterface $parent): ?string {
     // Case 1: Regular object prop example - $ref is sibling of examples.
     // Structure: props.some_prop.$ref, props.some_prop.examples.0
     // Parent chain: example item -> examples sequence -> prop definition
@@ -112,7 +112,7 @@ final class JsonSchemaObject extends Mapping {
     // Structure: props.array_prop.items.$ref, props.array_prop.examples.0.0
     // Parent chain: item -> inner sequence (examples.0) -> outer sequence
     // (examples) -> prop definition.
-    $propDefinition = $parent->getParent()?->getParent()?->getValue();
+    $propDefinition = $parent->getParent()->getParent()?->getValue();
     if (\is_array($propDefinition) && ($propDefinition['type'] ?? NULL) === 'array') {
       return $propDefinition['items']['$ref'] ?? NULL;
     }

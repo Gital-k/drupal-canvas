@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
-use Drupal\Component\Utility\Random;
-use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
-use Drupal\Core\Entity\EntityStorageInterface;
-use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
-use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\canvas\EntityHandlers\ContentCreatorVisibleCanvasConfigEntityAccessControlHandler;
-use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\Component\Utility\Random;
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
+use Drupal\Core\Entity\Attribute\ConfigEntityType;
+use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
@@ -43,7 +43,6 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
   public const string ADMIN_PERMISSION = 'administer patterns';
 
   use ClientServerConversionTrait;
-  use ConfigUpdaterAwareEntityTrait;
 
   /**
    * Pattern entity ID.
@@ -170,22 +169,6 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
    */
   public static function refineListQuery(QueryInterface &$query, RefinableCacheableDependencyInterface $cacheability): void {
     // Nothing to do.
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function set($property_name, $value): self {
-    if ($property_name === 'component_tree') {
-      // Ensure predictable order of tree items.
-      $value = self::generateComponentTreeKeys($value);
-    }
-    return parent::set($property_name, $value);
-  }
-
-  public function preSave(EntityStorageInterface $storage): void {
-    parent::preSave($storage);
-    self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
   }
 
 }

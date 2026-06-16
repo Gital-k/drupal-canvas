@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Drupal\canvas\EventSubscriber;
 
 use Drupal\Core\EventSubscriber\MainContentViewSubscriber;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\Routing\LocalRedirectResponse;
 use Drupal\Core\Routing\RouteBuildEvent;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Routing\RoutingEvents;
@@ -22,7 +25,34 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
 
   public function __construct(
     private readonly RouteMatchInterface $routeMatch,
+    private readonly LanguageManagerInterface $languageManager,
   ) {}
+
+  public function redirectCanvasToDefaultLanguage(RequestEvent $event): void {
+    $request = $event->getRequest();
+    $path = $request->getPathInfo();
+    // Only act on /canvas paths, but not canvas API paths - those handle
+    // language negotiation themselves and must not be redirected.
+    if (!preg_match('#^/[^/]+/canvas(/|$)#', $path) || str_contains($path, '/canvas/api/')) {
+      return;
+    }
+
+    // If the current language differs from the default, the URL will contain a
+    // language prefix (e.g. /es/canvas/editor/canvas_page/1). Strip it with a
+    // 302 redirect so that Canvas always receives a prefix-free path
+    // (/canvas/editor/canvas_page/1).
+    // @todo Remove this redirect once Canvas natively supports
+    //   language-prefixed URLs in
+    //   https://git.drupalcode.org/project/canvas/-/work_items/3546597.
+    // @see \Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber::preventRouteNormalization()
+    $default_langcode = $this->languageManager->getDefaultLanguage()->getId();
+    $current_langcode = $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_URL)->getId();
+    if ($current_langcode !== $default_langcode) {
+      $base_path = $request->getBasePath();
+      $canvas_path = preg_replace('#^/' . preg_quote($current_langcode, '#') . '/#', '/', $path);
+      $event->setResponse(new LocalRedirectResponse($base_path . $canvas_path, 302));
+    }
+  }
 
   public function transformWrapperFormatRouteOption(RequestEvent $event): void {
     if (!str_starts_with($this->routeMatch->getRouteName() ?? '', 'canvas.api.')) {
@@ -40,7 +70,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
     }
   }
 
-  public function addCsrfToken(RouteBuildEvent $event): void {
+  public static function addCsrfToken(RouteBuildEvent $event): void {
     foreach ($event->getRouteCollection() as $name => $route) {
       if (str_starts_with($name, 'canvas.api.') &&
         // Drupal's AJAX submits to these URL and doesn't know that it needs to
@@ -54,7 +84,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
     }
   }
 
-  public function preventRouteNormalization(RouteBuildEvent $event): void {
+  public static function preventRouteNormalization(RouteBuildEvent $event): void {
     foreach ($event->getRouteCollection()->getIterator() as $route_name => $route) {
       \assert($route instanceof Route);
       // This ensures our react based routing works with redirect module
@@ -66,7 +96,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
     }
   }
 
-  public function enforceJsonFormatForApis(RouteBuildEvent $event): void {
+  public static function enforceJsonFormatForApis(RouteBuildEvent $event): void {
     foreach ($event->getRouteCollection() as $route_name => $route) {
       if (str_starts_with($route_name, 'canvas.api.')) {
         $route->setRequirement('_format', 'json');
@@ -78,6 +108,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
    * {@inheritdoc}
    */
   public static function getSubscribedEvents(): array {
+    $events[KernelEvents::REQUEST][] = ['redirectCanvasToDefaultLanguage', 100];
     $events[KernelEvents::REQUEST][] = ['transformWrapperFormatRouteOption'];
     $events[RoutingEvents::ALTER][] = ['addCsrfToken'];
     $events[RoutingEvents::ALTER][] = ['preventRouteNormalization'];

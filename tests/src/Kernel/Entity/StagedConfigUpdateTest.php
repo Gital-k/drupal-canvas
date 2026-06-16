@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\StagedConfigUpdate;
+use Drupal\canvas\EntityHandlers\StagedConfigUpdateStorage;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Access\AccessResultReasonInterface;
 use Drupal\Core\Cache\Cache;
@@ -13,14 +16,11 @@ use Drupal\Core\DependencyInjection\ServiceModifierInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Recipe\InvalidConfigException;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\StagedConfigUpdate;
-use Drupal\canvas\EntityHandlers\StagedConfigUpdateStorage;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 #[Group('canvas')]
@@ -116,11 +116,11 @@ final class StagedConfigUpdateTest extends CanvasKernelTestBase implements Servi
       ],
     ], $sut->getActions());
 
-    self::assertCount(0, $auto_save_manager->getAllAutoSaveList());
+    self::assertCount(0, $auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE));
     self::assertNull($storage->load($sut->id()));
 
     $sut->save();
-    self::assertCount(1, $auto_save_manager->getAllAutoSaveList());
+    self::assertCount(1, $auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE));
 
     $sut->set('label', 'Test Update Modified');
     $sut->save();
@@ -129,7 +129,7 @@ final class StagedConfigUpdateTest extends CanvasKernelTestBase implements Servi
     self::assertEquals($sut, $loaded);
 
     $sut->delete();
-    self::assertCount(0, $auto_save_manager->getAllAutoSaveList());
+    self::assertCount(0, $auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE));
   }
 
   public function testCreateFromClientSide(): void {

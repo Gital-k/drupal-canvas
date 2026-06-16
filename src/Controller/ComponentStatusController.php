@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\ComponentIncompatibilityReasonRepository;
+use Drupal\canvas\Entity\Component;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Url;
-use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
-use Drupal\canvas\ComponentIncompatibilityReasonRepository;
-use Drupal\canvas\Entity\Component;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
 /**
@@ -86,7 +86,7 @@ final class ComponentStatusController {
     $source_plugin_id = $source->getPluginId();
     if ($op === 'disable') {
       $component->disable()->save();
-      $this->reasonRepository->storeReasons($source_plugin_id, $component_id, ['Manually disabled']);
+      $this->reasonRepository->storeReasons($source_plugin_id, $component_id, [ComponentIncompatibilityReasonRepository::MANUALLY_DISABLED_REASON]);
     }
     elseif ($op === 'enable') {
       try {

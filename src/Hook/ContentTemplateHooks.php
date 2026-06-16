@@ -6,6 +6,9 @@ namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\ContentTemplateRoutes;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
@@ -17,9 +20,6 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Url;
 
 /**
@@ -69,7 +69,7 @@ final class ContentTemplateHooks {
    * Implements hook_entity_type_alter.
    */
   #[Hook('entity_type_alter')]
-  public function entityTypeAlter(array $definitions): void {
+  public static function entityTypeAlter(array $definitions): void {
     /** @var \Drupal\Core\Entity\EntityTypeInterface $entity_type */
     foreach ($definitions as $entity_type) {
       // Canvas pages don't have any structured data, and therefore don't

@@ -2,15 +2,10 @@
 
 declare(strict_types=1);
 
-// cspell:ignore Qqzr
-
 namespace Drupal\Tests\canvas\Kernel\PropSource;
 
-use Drupal\Component\Plugin\Exception\PluginNotFoundException;
-use Drupal\Component\Utility\UrlHelper;
-use Drupal\Core\Cache\CacheableMetadata;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+// cspell:ignore Qqzr
+
 use Drupal\canvas\Plugin\Adapter\UnixTimestampToDateAdapter;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
@@ -19,6 +14,11 @@ use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\Component\Plugin\Exception\PluginNotFoundException;
+use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\node\Entity\NodeType;
@@ -99,11 +99,38 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
       ],
       cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
     );
+
+    // For testing a simple FieldPropExpression pointing to a computed field
+    // property provided by Canvas.
+    // @see \Drupal\canvas\Plugin\DataType\ListStringItemLabel
+    FieldStorageConfig::create([
+      'field_name' => 'one_from_an_string_list',
+      'entity_type' => 'node',
+      'type' => 'list_string',
+      'cardinality' => 1,
+      'settings' => [
+        'allowed_values' => [
+          'first_key' => 'First Value',
+          'second_key' => 'Second Value',
+          // Make sure that the allowed value's label is properly sanitized.
+          'sanitization_required' => 'Some <script>dangerous</script> & unescaped <strong>markup</strong>',
+        ],
+      ],
+    ])->save();
+    FieldConfig::create([
+      'label' => 'A pre-defined string',
+      'field_name' => 'one_from_an_string_list',
+      'entity_type' => 'node',
+      'bundle' => 'page',
+      'field_type' => 'list_string',
+      'required' => TRUE,
+    ])->save();
     $node = $this->createNode([
       'type' => 'page',
       'uid' => $user->id(),
       'field_image' => ['target_id' => 1],
       'field_photos' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
+      'one_from_an_string_list' => ['value' => 'sanitization_required'],
     ]);
 
     $original = EntityFieldPropSource::parse(match ($adapter_plugin_id) {
@@ -244,6 +271,54 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
       'expected_node_access_denied_message' => NULL,
       'expected_dependencies_expression_only' => ['module' => ['user']],
       'expected_dependencies_with_host_entity' => ['module' => ['user']],
+    ];
+
+    yield "simple: FieldPropExpression, but for a `list_string` field type's Canvas-specific computed `label` property" => [
+      'permissions' => ['access content'],
+      'expression' => 'ℹ︎␜entity:node:page␝one_from_an_string_list␞␟label',
+      'adapter_plugin_id' => NULL,
+      'is_required' => TRUE,
+      'expected_array_representation' => [
+        'sourceType' => PropSource::EntityField->value,
+        'expression' => 'ℹ︎␜entity:node:page␝one_from_an_string_list␞␟label',
+      ],
+      'expected_expression_class' => FieldPropExpression::class,
+      'expected_evaluation_with_user_host_entity' => NULL,
+      'expected_user_access_denied_message' => NULL,
+      'expected_evaluation_with_node_host_entity' => new EvaluationResult(
+        'Some <script>dangerous</script> & unescaped <strong>markup</strong>',
+        (new CacheableMetadata())
+          ->setCacheTags([
+            // The host entity.
+            'node:1',
+            // The bundle field that is evaluated.
+            'config:field.storage.node.one_from_an_string_list',
+          ])
+          ->setCacheContexts([
+            // Cache context added during the computing of the `label` field
+            // property.
+            // @see \Drupal\canvas\Plugin\DataType\ListStringItemLabel::computeValue
+            'languages:language_content',
+            // Cache context added by host entity access checking.
+            // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
+            'user.permissions',
+          ]),
+      ),
+      'expected_node_access_denied_message' => ["Access denied to entity while evaluating expression, ℹ︎␜entity:node:page␝one_from_an_string_list␞␟label, reason: The 'access content' permission is required."],
+      'expected_dependencies_expression_only' => [
+        'module' => ['node'],
+        'config' => [
+          'node.type.page',
+          'field.field.node.page.one_from_an_string_list',
+        ],
+      ],
+      'expected_dependencies_with_host_entity' => [
+        'module' => ['node'],
+        'config' => [
+          'node.type.page',
+          'field.field.node.page.one_from_an_string_list',
+        ],
+      ],
     ];
 
     yield "simple, with adapter: FieldPropExpression" => [
@@ -951,12 +1026,73 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
    */
   #[IgnoreDeprecations]
   public function testDynamicPrefixIsTransformedOnLoad(): void {
-    $this->expectDeprecation('The "dynamic" prop source was renamed to "entity field" is deprecated in canvas:1.2.0 and will be removed from canvas:2.0.0. Re-save (and re-export) all Canvas content templates. See https://www.drupal.org/node/3566701');
+    $this->expectDeprecation('The "dynamic" prop source was renamed to "entity field" and is deprecated in canvas:1.2.0 and will be removed from canvas:2.0.0. Re-save (and re-export) all Canvas content templates. See https://www.drupal.org/node/3566701');
     $prop_source = PropSource::parse([
       'sourceType' => PropSource::Dynamic->value,
       'expression' => "ℹ︎␜entity:user␝name␞␟value",
     ]);
     self::assertInstanceOf(EntityFieldPropSource::class, $prop_source);
+  }
+
+  /**
+   * A broken reference (deleted target entity) contributes the target's tag.
+   *
+   * When a referenced entity is deleted, the field still stores its ID but
+   * EntityReference::getValue() returns NULL. The cached NULL result must
+   * carry the former target's cache tag so that a new entity written at the
+   * same ID correctly busts any cached output.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
+   */
+  public function testBrokenReferenceContributesCacheTag(): void {
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('user');
+    NodeType::create(['type' => 'page', 'name' => 'Page'])->save();
+    FieldStorageConfig::create([
+      'field_name' => 'field_ref',
+      'entity_type' => 'node',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'user'],
+      'cardinality' => 1,
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_ref',
+      'entity_type' => 'node',
+      'bundle' => 'page',
+      'label' => 'Ref',
+      'settings' => [
+        'handler' => 'default:user',
+        'handler_settings' => [],
+      ],
+    ])->save();
+
+    $target_user = User::create(['name' => 'Soon deleted', 'status' => 1]);
+    $target_user->save();
+    $target_uid = $target_user->id();
+
+    $node = $this->createNode([
+      'type' => 'page',
+      'field_ref' => $target_uid,
+    ]);
+
+    // Delete the target; the node still stores the ID.
+    $target_user->delete();
+
+    $this->setUpCurrentUser(permissions: ['access content', 'access user profiles']);
+
+    $prop_source = EntityFieldPropSource::parse([
+      'sourceType' => PropSource::EntityField->value,
+      'expression' => 'ℹ︎␜entity:node:page␝field_ref␞␟entity␜␜entity:user␝name␞␟value',
+    ]);
+
+    $result = $prop_source->evaluate($node, is_required: FALSE);
+
+    // The referenced entity is gone; the result is NULL.
+    self::assertNull($result->value);
+
+    // The deleted entity's cache tag must be present so that if the entity is
+    // recreated (or otherwise written at that ID), the cached NULL invalidates.
+    self::assertContains('user:' . $target_uid, $result->getCacheTags());
   }
 
 }

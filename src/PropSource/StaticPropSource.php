@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Drupal\canvas\PropSource;
 
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\Component\Utility\NestedArray;
@@ -24,8 +26,6 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
-use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 
 /**
  * Contains unstructured data for 1 explicit input of a component instance.
@@ -562,6 +562,17 @@ final class StaticPropSource extends PropSourceBase {
       }
     }
 
+    // Don't add the "Empty" field automatically.
+    if ($this->getCardinality() === FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
+      $parents = $form['#parents'] ?? [];
+      if (!$widget::getWidgetState($parents, $sdc_prop_name, $form_state)) {
+        $widget::setWidgetState($parents, $sdc_prop_name, $form_state, [
+          'items_count' => max(0, $field->count() - 1),
+          'array_parents' => [],
+        ]);
+      }
+    }
+
     $widget_form = $widget->form($field, $form, $form_state);
     if ($widget->getPluginId() === 'datetime_default' && !$this->fieldItemList->isEmpty()) {
       // The datetime widget needs a DrupalDateTime object as the value.
@@ -569,10 +580,24 @@ final class StaticPropSource extends PropSourceBase {
       // @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase::createDefaultValue()
       for ($i = 0; $i < $this->fieldItemList->count(); $i++) {
         \assert($this->fieldItemList[$i] !== NULL);
-        // @see \Drupal\Core\Field\FieldItemList::__get()
-        // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItem::propertyDefinitions()
-        // @phpstan-ignore property.notFound
-        $widget_form['widget'][$i]['value']['#default_value'] = new DrupalDateTime($this->fieldItemList[$i]->value);
+
+        // Only update existing widget items. In some cases such
+        // as a delete AJAX request, the widget item might not exist despite it
+        // still being present in the fieldItemList.
+        if (isset($widget_form['widget'][$i])) {
+          // @see \Drupal\Core\Field\FieldItemList::__get()
+          // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItem::propertyDefinitions()
+          // @phpstan-ignore property.notFound
+          $widget_form['widget'][$i]['value']['#default_value'] = new DrupalDateTime($this->fieldItemList[$i]->value);
+
+          // No timezone adjusting takes place when entering or storing date
+          // values. It assumes the date time selected is literally the date
+          // time stored. Because of that, the form render needs to assume UTC
+          // as well, otherwise the input values will be different upon
+          // reloading the form.
+          // @see https://drupal.org/i/3501281
+          $widget_form['widget'][$i]['value']['#date_timezone'] = 'UTC';
+        }
       }
     }
 

@@ -4,30 +4,27 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\TestWith;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\PropSource\PropSource;
-use Drupal\Core\Access\CsrfRequestHeaderAccessCheck;
-use Drupal\Core\Access\CsrfTokenGenerator;
-use Drupal\Core\Cache\CacheableJsonResponse;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Extension\ModuleInstallerInterface;
-use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
-use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\Session\SessionConfigurationInterface;
-use Drupal\Core\Url;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiAutoSaveController;
 use Drupal\canvas\Controller\ErrorCodesEnum;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\StagedConfigUpdate;
+use Drupal\canvas\PropSource\PropSource;
+use Drupal\Core\Access\CsrfRequestHeaderAccessCheck;
+use Drupal\Core\Access\CsrfTokenGenerator;
+use Drupal\Core\Cache\CacheableJsonResponse;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\RevisionableStorageInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Session\SessionConfigurationInterface;
+use Drupal\Core\Url;
 use Drupal\image\ImageStyleInterface;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
@@ -42,10 +39,15 @@ use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
+use Drupal\Tests\content_moderation\Traits\ContentModerationTestTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -63,6 +65,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
   use AutoSaveManagerTestTrait;
   use AutoSaveRequestTestTrait;
+  use ContentModerationTestTrait;
   use ConstraintViolationsTestTrait;
   use UserCreationTrait;
   use OpenApiSpecTrait;
@@ -215,7 +218,9 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertCount(0, \array_diff($account1->getCacheTags(), $response->getCacheableMetadata()->getCacheTags()));
     self::assertCount(0, \array_diff($account1->getCacheContexts(), $response->getCacheableMetadata()->getCacheContexts()));
     self::assertContains('config:user.settings', $response->getCacheableMetadata()->getCacheTags());
-    $content = \json_decode($response->getContent() ?: '{}', TRUE);
+    $response_body = \json_decode($response->getContent() ?: '{}', TRUE);
+    $this->assertArrayHasKey('data', $response_body);
+    $content = $response_body['data'];
     $anonContentIdentifier = \sprintf('node:%d:en', $anonAccountContent->id());
     self::assertEquals([
       'asset_library:global',
@@ -339,6 +344,263 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $this->assertDataCompliesWithApiSpecification($content, 'AutoSaveCollection');
   }
 
+  public function testApiAutoSaveControllerGetConflictDetection(): void {
+    $this->installConfig(['test_user_config']);
+    $permissions = [
+      Page::EDIT_PERMISSION,
+      // We need access to page regions even for seeing there are changes.
+      PageRegion::ADMIN_PERMISSION,
+    ];
+
+    $account = $this->createUser($permissions);
+    self::assertInstanceOf(AccountInterface::class, $account);
+    $this->setCurrentUser($account);
+
+    $page = Page::create([
+      'title' => self::NEW_PAGE_TITLE,
+      'status' => FALSE,
+      'owner' => $account->id(),
+    ]);
+    self::assertSame([], self::violationsToArray($page->validate()));
+    $page->save();
+    $page2 = Page::create([
+      'title' => self::NEW_PAGE_TITLE,
+      'status' => FALSE,
+      'owner' => $account->id(),
+    ]);
+    self::assertSame([], self::violationsToArray($page2->validate()));
+    $page2->save();
+
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $auto_save */
+    $auto_save = $this->container->get(AutoSaveManager::class);
+    $page->set('title', 'Test title, please ignore');
+    $auto_save->saveEntity($page);
+
+    // Validate that the endpoint response works as expected without conflict detected.
+    $request = Request::create(Url::fromRoute('canvas.api.auto-save.get')->toString());
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+    self::assertContains(AutoSaveManager::CACHE_TAG, $response->getCacheableMetadata()->getCacheTags());
+    self::assertCount(0, \array_diff($account->getCacheTags(), $response->getCacheableMetadata()->getCacheTags()));
+    self::assertCount(0, \array_diff($account->getCacheContexts(), $response->getCacheableMetadata()->getCacheContexts()));
+    self::assertContains('config:user.settings', $response->getCacheableMetadata()->getCacheTags());
+    $response_content = \json_decode($response->getContent() ?: '{}', TRUE);
+
+    $this->assertArrayHasKey('data', $response_content);
+    self::assertCount(1, $response_content['data']);
+    $this->assertDataCompliesWithApiSpecification($response_content['data'], 'AutoSaveCollection');
+    $pageContentIdentifier = \sprintf('canvas_page:%d:en', $page->id());
+
+    // Validate that conflict changes are not leaking into the endpoint response.
+    self::assertArrayHasKey($pageContentIdentifier, $response_content['data']);
+    self::assertArrayNotHasKey('errors', $response_content);
+    self::assertArrayNotHasKey('original_hash', $response_content['data'][$pageContentIdentifier], 'The property "original_hash" should be unset before returning response.');
+    self::assertArrayNotHasKey('conflict', $response_content['data'][$pageContentIdentifier], 'The "conflict" property should only be added for Page entities with detected resolvable conflicts.');
+
+    // Create a conflict - entity that has auto-save entry is updated outside of the Canvas UI.
+    $page->set('title', 'Conflicting title change, please ignore');
+    $page->setNewRevision();
+    $page->save();
+
+    // Make auto-save/pending call, conflict should be detected.
+    $request = Request::create(Url::fromRoute('canvas.api.auto-save.get')->toString());
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertEquals(Response::HTTP_CONFLICT, $response->getStatusCode());
+    self::assertContains(AutoSaveManager::CACHE_TAG, $response->getCacheableMetadata()->getCacheTags());
+    self::assertCount(0, \array_diff($account->getCacheTags(), $response->getCacheableMetadata()->getCacheTags()));
+    self::assertCount(0, \array_diff($account->getCacheContexts(), $response->getCacheableMetadata()->getCacheContexts()));
+    self::assertContains('config:user.settings', $response->getCacheableMetadata()->getCacheTags());
+    $response_content = \json_decode($response->getContent() ?: '{}', TRUE);
+
+    $this->assertArrayHasKey('data', $response_content);
+    self::assertCount(1, $response_content['data']);
+    $this->assertDataCompliesWithApiSpecification($response_content['data'], 'AutoSaveCollection');
+    $this->assertArrayHasKey('errors', $response_content);
+    self::assertCount(1, $response_content['errors']);
+    $this->assertDataCompliesWithApiSpecification($response_content['errors'][0], 'Error');
+
+    // Validate conflict property is added to the entity with conflict.
+    self::assertArrayHasKey($pageContentIdentifier, $response_content['data']);
+    self::assertArrayNotHasKey('original_hash', $response_content['data'][$pageContentIdentifier], 'The property "original_hash" should be unset before returning response.');
+    self::assertArrayNotHasKey('conflict', $response_content['data'][$pageContentIdentifier], 'The property "conflict" should be unset from the auto-save entry in the top-level "data" property of the response body.');
+    self::assertArrayHasKey('conflict_id', $response_content['errors'][0]['meta'], 'The "conflict_id" property should be added to all `errors` items that are a result of conflict detection.');
+    self::assertEquals($page->getLoadedRevisionId(), $response_content['errors'][0]['meta']['conflict_id']);
+    $page_first_conflict = $response_content['errors'][0]['meta']['conflict_id'];
+
+    // Repeated requests to auto-save/pending should result in HTTP 409 until
+    // all the conflicts in the response are resolved.
+    $request = Request::create(Url::fromRoute('canvas.api.auto-save.get')->toString());
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertEquals(Response::HTTP_CONFLICT, $response->getStatusCode());
+    $response_content = \json_decode($response->getContent() ?: '{}', TRUE);
+    $this->assertArrayHasKey('data', $response_content);
+    $this->assertArrayHasKey('errors', $response_content);
+    self::assertCount(1, $response_content['errors']);
+    $this->assertDataCompliesWithApiSpecification($response_content['errors'][0], 'Error');
+    self::assertArrayHasKey('conflict_id', $response_content['errors'][0]['meta']);
+    self::assertEquals($response_content['errors'][0]['meta']['conflict_id'], $page_first_conflict);
+
+    // Save the conflict property in auto-save storage.
+    $page->set('title', 'Test title, please ignore');
+    $auto_save->saveEntity($page);
+
+    // Create a second conflict for the same entity.
+    // This will result in a new conflict ID.
+    $page->set('title', 'Conflicting title change, please ignore even harder');
+    $page->setNewRevision();
+    $page->save();
+
+    // The response will still detect conflict and return HTTP 409 response.
+    $request = Request::create(Url::fromRoute('canvas.api.auto-save.get')->toString());
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertEquals(Response::HTTP_CONFLICT, $response->getStatusCode());
+    $response_content = \json_decode($response->getContent() ?: '{}', TRUE);
+
+    // Only the latest active conflict is detected, there cannot be 2 conflict
+    // errors per same auto-save entity entry.
+    $this->assertArrayHasKey('data', $response_content);
+    self::assertCount(1, $response_content['data']);
+    self::assertArrayHasKey($pageContentIdentifier, $response_content['data']);
+    $this->assertArrayHasKey('errors', $response_content);
+
+    // Validate conflict property is added to the relevant error.
+    self::assertArrayHasKey('conflict_id', $response_content['errors'][0]['meta']);
+    self::assertCount(1, $response_content['errors']);
+    $this->assertDataCompliesWithApiSpecification($response_content['errors'][0], 'Error');
+
+    // Validate it's a conflict based on latest $page revision.
+    self::assertEquals($page->getLoadedRevisionId(), $response_content['errors'][0]['meta']['conflict_id']);
+
+    // Validate it's a new conflict with a new conflict id.
+    self::assertNotEquals($response_content['errors'][0]['meta']['conflict_id'], $page_first_conflict);
+    $page_second_conflict = $response_content['errors'][0]['meta']['conflict_id'];
+
+    // Save the second page entity in the auto-save.
+    $page2->set('title', 'Page without a conflict in sight.');
+    $auto_save->saveEntity($page2);
+
+    // One auto-save entry with active conflict is enough to receive HTTP 409
+    // response.
+    $request = Request::create(Url::fromRoute('canvas.api.auto-save.get')->toString());
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertEquals(Response::HTTP_CONFLICT, $response->getStatusCode());
+    $response_content = \json_decode($response->getContent() ?: '{}', TRUE);
+
+    // Validate there are two auto-save entries and one error.
+    $this->assertArrayHasKey('data', $response_content);
+    self::assertCount(2, $response_content['data']);
+    $this->assertArrayHasKey('errors', $response_content);
+    self::assertCount(1, $response_content['errors']);
+    $page2ContentIdentifier = \sprintf('canvas_page:%d:en', $page2->id());
+
+    // New page 2 entry without conflict.
+    self::assertArrayHasKey($page2ContentIdentifier, $response_content['data']);
+    self::assertNotEquals($response_content['errors'][0]['meta']['api_auto_save_key'], $page2ContentIdentifier);
+
+    // Pre-existing page 1 entry with conflict.
+    self::assertArrayHasKey($pageContentIdentifier, $response_content['data']);
+    self::assertEquals($response_content['errors'][0]['meta']['api_auto_save_key'], $pageContentIdentifier);
+    self::assertArrayHasKey('conflict_id', $response_content['errors'][0]['meta']);
+    self::assertEquals($response_content['errors'][0]['meta']['conflict_id'], $page_second_conflict);
+
+    // Create a conflict for the second entry.
+    $page2->set('title', 'Secondary entry conflict detected, please ignore.');
+    $page2->setNewRevision();
+    $page2->save();
+
+    // Two entries with active conflicts - HTTP 409 response.
+    $request = Request::create(Url::fromRoute('canvas.api.auto-save.get')->toString());
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertEquals(Response::HTTP_CONFLICT, $response->getStatusCode());
+    $response_content = \json_decode($response->getContent() ?: '{}', TRUE);
+
+    // Validate there are two auto-save entries and two errors.
+    $this->assertArrayHasKey('data', $response_content);
+    self::assertCount(2, $response_content['data']);
+    $this->assertArrayHasKey('errors', $response_content);
+    self::assertCount(2, $response_content['errors']);
+
+    // Validate both errors match openapi spec.
+    $this->assertDataCompliesWithApiSpecification($response_content['errors'][0], 'Error');
+    $this->assertDataCompliesWithApiSpecification($response_content['errors'][1], 'Error');
+
+    // Validate page 1 has error due to conflict.
+    self::assertArrayHasKey($pageContentIdentifier, $response_content['data']);
+    self::assertEquals($response_content['errors'][0]['meta']['api_auto_save_key'], $pageContentIdentifier);
+    self::assertArrayHasKey('conflict_id', $response_content['errors'][0]['meta']);
+
+    // Validate page 2 has error due to conflict.
+    self::assertArrayHasKey($page2ContentIdentifier, $response_content['data']);
+    self::assertEquals($response_content['errors'][1]['meta']['api_auto_save_key'], $page2ContentIdentifier);
+    self::assertArrayHasKey('conflict_id', $response_content['errors'][1]['meta']);
+
+    // Simulate conflict resolution for the page 1.
+    $key = $auto_save::getAutoSaveKey($page);
+    $auto_save_store = $this->container->get('keyvalue')->get(AutoSaveManager::AUTO_SAVE_STORE);
+    $auto_save_data = $auto_save_store->get($key);
+    // Conflict id is stored in the auto-save if it is resolved.
+    // Update the first auto-save entry with conflict id to simulate a conflict
+    // resolution.
+    $auto_save_data['conflict_id'] = $page_second_conflict;
+    // Save changes directly into auto-save store.
+    $auto_save_store->set($key, $auto_save_data);
+
+    // One entry out of two with has active conflict - HTTP 409 response.
+    $request = Request::create(Url::fromRoute('canvas.api.auto-save.get')->toString());
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertEquals(Response::HTTP_CONFLICT, $response->getStatusCode());
+    $response_content = \json_decode($response->getContent() ?: '{}', TRUE);
+
+    // Validate there are two entries and one conflict.
+    $this->assertArrayHasKey('data', $response_content);
+    $this->assertArrayHasKey('errors', $response_content);
+    self::assertCount(2, $response_content['data']);
+    self::assertCount(1, $response_content['errors']);
+
+    // Validate that the page 1 entry has resolved conflict.
+    self::assertArrayHasKey($pageContentIdentifier, $response_content['data']);
+    self::assertArrayHasKey('conflict_id', $response_content['errors'][0]['meta']);
+    self::assertNotEquals($response_content['errors'][0]['meta']['api_auto_save_key'], $pageContentIdentifier);
+
+    // Validate that the page 2 entry still has active conflict.
+    self::assertEquals($response_content['errors'][0]['meta']['api_auto_save_key'], $page2ContentIdentifier);
+
+    // Simulate conflict resolution for the second entry.
+    $key = $auto_save::getAutoSaveKey($page2);
+    $auto_save_data = $auto_save_store->get($key);
+    // Update the second auto-save entry with conflict id to simulate a conflict
+    // resolution.
+    $auto_save_data['conflict_id'] = $response_content['errors'][0]['meta']['conflict_id'];
+    // Save changes directly into auto-save store.
+    $auto_save_store->set($key, $auto_save_data);
+
+    // Validate endpoint response returns 200 when all conflicts are resolved.
+    $request = Request::create(Url::fromRoute('canvas.api.auto-save.get')->toString());
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+    $response_content = \json_decode($response->getContent() ?: '{}', TRUE);
+
+    // Validate there are two auto-save entries.
+    $this->assertArrayHasKey('data', $response_content);
+    self::assertCount(2, $response_content['data']);
+    $this->assertDataCompliesWithApiSpecification($response_content['data'], 'AutoSaveCollection');
+
+    // Validate there are no errors.
+    $this->assertArrayNotHasKey('errors', $response_content);
+
+    // Validate that the both entries still have auto-save entries.
+    self::assertArrayHasKey($pageContentIdentifier, $response_content['data']);
+    self::assertArrayHasKey($page2ContentIdentifier, $response_content['data']);
+  }
+
   public function testGetOmitsNotAccessibleEntities(): void {
     $permissions = [
       'create article content',
@@ -446,7 +708,9 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertInstanceOf(CacheableJsonResponse::class, $response);
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
     self::assertSame([
+      'canvas_page:2',
       'config:canvas.js_component.test_code',
+      'node:4',
       'config:canvas.page_region.stark.highlighted',
       'config:system.site',
       'user:0',
@@ -455,7 +719,9 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       'http_response',
     ], $response->getCacheableMetadata()->getCacheTags());
     self::assertSame(['user.permissions'], $response->getCacheableMetadata()->getCacheContexts());
-    $content = \json_decode($response->getContent() ?: '{}', TRUE);
+    $response_body = \json_decode($response->getContent() ?: '{}', TRUE);
+    $this->assertArrayHasKey('data', $response_body);
+    $content = $response_body['data'];
     $anonContentIdentifier = \sprintf('node:%d:en', $article->id());
     // Assert we get the keys of auto-save data that we can view (even if maybe
     // we aren't allowed to update).
@@ -1040,6 +1306,12 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $this->assertSame('The updated title.', $page->label());
     $this->assertSame($page->getRevisionUserId(), $user->id());
 
+    // The `path` field is computed (aliases are persisted as `path_alias`
+    // entities), but the auto-saved alias must still be published.
+    $node2_reloaded = $entity_type_manager->getStorage('node')->loadUnchanged((string) $node2->id());
+    \assert($node2_reloaded instanceof Node);
+    $this->assertSame('/llama', $node2_reloaded->get('path')->first()?->getValue()['alias']);
+
     $this->assertNotNull($template->id());
     $template = $content_template_storage->loadUnchanged($template->id());
     \assert($template instanceof ContentTemplate);
@@ -1356,6 +1628,59 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         ],
       ], $json);
     }
+  }
+
+  /**
+   * Tests that publishing carries over the auto-saved moderation state.
+   */
+  public function testPublishModeratedEntity(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['content_moderation']);
+    $workflow = $this->createEditorialWorkflow();
+    $this->addEntityTypeAndBundleToWorkflow($workflow, 'node', 'article');
+
+    $this->setUpCurrentUser(permissions: [
+      'access content',
+      'view own unpublished content',
+      'edit any article content',
+      AutoSaveManager::PUBLISH_PERMISSION,
+      'use editorial transition create_new_draft',
+      'use editorial transition publish',
+    ]);
+
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Moderated node',
+      'moderation_state' => 'published',
+    ]);
+    self::assertSame(SAVED_NEW, $node->save());
+    self::assertTrue($node->isPublished());
+
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
+    $autoSave = \Drupal::service(AutoSaveManager::class);
+    $node->set('moderation_state', 'draft');
+    $autoSave->saveEntity($node);
+
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $auto_save_key = $autoSave->getAutoSaveKey($node);
+    $response = $this->makePublishAllRequest([$auto_save_key => $auto_save_data[$auto_save_key]]);
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    self::assertEquals(['message' => 'Successfully published 1 item.'], json_decode($response->getContent() ?: '', TRUE));
+
+    // The `moderation_state` field is computed (states are persisted as
+    // `content_moderation_state` entities), but the auto-saved state must
+    // still be published: the latest revision must be a draft, while the
+    // default revision remains published.
+    $node_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage('node');
+    \assert($node_storage instanceof RevisionableStorageInterface);
+    $latest_revision_id = $node_storage->getLatestRevisionId((int) $node->id());
+    self::assertNotNull($latest_revision_id);
+    $latest_revision = $node_storage->loadRevision($latest_revision_id);
+    \assert($latest_revision instanceof Node);
+    self::assertSame('draft', $latest_revision->get('moderation_state')->value);
+    self::assertFalse($latest_revision->isPublished());
+    $default_revision = $node_storage->loadUnchanged((string) $node->id());
+    \assert($default_revision instanceof Node);
+    self::assertTrue($default_revision->isPublished());
   }
 
   /**

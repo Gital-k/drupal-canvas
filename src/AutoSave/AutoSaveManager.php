@@ -4,7 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\AutoSave;
 
+use Drupal\canvas\AutoSaveEntity;
+use Drupal\canvas\Controller\ApiContentControllers;
+use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\StagedConfigUpdate;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\Component\Datetime\TimeInterface;
+use Drupal\content_moderation\Plugin\Field\ModerationStateFieldItemList;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
 use Drupal\Core\Config\ConfigCrudEvent;
@@ -19,6 +29,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Entity\TranslatableInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
@@ -26,14 +37,7 @@ use Drupal\Core\KeyValueStore\KeyValueStoreInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\TypedData\PrimitiveInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
-use Drupal\Component\Datetime\TimeInterface;
-use Drupal\canvas\AutoSaveEntity;
-use Drupal\canvas\Controller\ApiContentControllers;
-use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\Entity\BrandKit;
-use Drupal\canvas\Entity\StagedConfigUpdate;
-use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\path\Plugin\Field\FieldType\PathFieldItemList;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -59,6 +63,22 @@ class AutoSaveManager implements EventSubscriberInterface {
   public const string FORM_VIOLATIONS_STORE = 'canvas.form_violations';
   public const string COMPONENT_INSTANCE_FORM_VIOLATIONS_STORE = 'canvas.component_instance_form_violations';
 
+  /**
+   * Various internal auto-save properties that are not used client side.
+   *
+   * The 'client_id' is only used to determine if the client has the latest
+   * changes when editing an entity in Drupal Canvas and not needed for the
+   * publishing process.
+   *
+   * The 'conflict_id' is used to store conflict id when it is resolved.
+   */
+  public const array AUTO_SAVE_INTERNAL_PROPERTIES = [
+    'data',
+    'client_id',
+    'entity',
+    'original_hash',
+    'conflict_id',
+  ];
   const ENTITY_DUPLICATE_SUFFIX = ' (Copy)';
 
   private KeyValueStoreInterface $autoSaveStore;
@@ -90,8 +110,51 @@ class AutoSaveManager implements EventSubscriberInterface {
   }
 
   /**
+   * Checks whether a computed field is user-editable and persisted on save.
    *
+   * Some fields are marked as computed because their values are not stored in
+   * the host entity's tables, but they are user-editable and persisted by
+   * their own storage on entity save:
+   * - `path`: persisted as `path_alias` entities by PathItem::postSave().
+   * - `moderation_state`: persisted as `content_moderation_state` entities.
+   * These must be treated like regular stored fields by the auto-save system,
+   * or edits to them would be silently dropped.
+   *
+   * There is no reliable way to infer these: computed fields are read-only by
+   * default per DataDefinition::isReadOnly() and `moderation_state` declares
+   * setReadOnly(FALSE), but core's `path` field does not, so both are
+   * hardcoded.
+   *
+   * @todo Stop hardcoding these in https://drupal.org/i/3503446
    */
+  public static function isPersistedComputedField(FieldDefinitionInterface $field_definition): bool {
+    return \is_a($field_definition->getClass(), PathFieldItemList::class, TRUE)
+      || \is_a($field_definition->getClass(), ModerationStateFieldItemList::class, TRUE);
+  }
+
+  /**
+   * Converts an entity to array ready for storing in auto-save item.
+   *
+   * For content entities, exclude computed fields: only actually stored data
+   * matters here — except computed fields that are persisted on save.
+   *
+   * @see self::isPersistedComputedField()
+   */
+  private static function toStorableArray(EntityInterface $entity): array {
+    if ($entity instanceof FieldableEntityInterface) {
+      $values = [];
+      foreach ($entity->getFields(include_computed: TRUE) as $name => $field_item_list) {
+        \assert($field_item_list instanceof FieldItemListInterface);
+        if ($field_item_list->getFieldDefinition()->isComputed() && !self::isPersistedComputedField($field_item_list->getFieldDefinition())) {
+          continue;
+        }
+        $values[$name] = $field_item_list->getValue();
+      }
+      return $values;
+    }
+    return $entity->toArray();
+  }
+
   public function saveEntity(EntityInterface $entity, ?string $clientId = NULL): void {
     $key = $this->getAutoSaveKey($entity);
     $data = self::normalizeEntity($entity);
@@ -121,14 +184,25 @@ class AutoSaveManager implements EventSubscriberInterface {
     $auto_save_data = [
       'entity_type' => $entity->getEntityTypeId(),
       'entity_id' => $entity->id(),
-      'data' => $entity->toArray(),
+      'data' => self::toStorableArray($entity),
       'langcode' => $entity->language()->getId(),
-      'label' => $entity->label(),
+      'label' => (string) $entity->label(),
+      'original_hash' => $original_hash,
       'data_hash' => $data_hash,
       'client_id' => $clientId,
       'owner' => (int) $this->currentUser->id(),
       'updated' => $this->time->getRequestTime(),
     ];
+    \assert(!\is_null($auto_save_data['entity_id']));
+    // Check for conflicts.
+    if ($unresolved_conflict = $this->getUnresolvedConflict($auto_save_data)) {
+      $previous_auto_save_data = $this->autoSaveStore->get($key);
+      // If it's a conflict that has been resolved before, retain conflict_id.
+      if (isset($previous_auto_save_data['conflict_id']) && $previous_auto_save_data['conflict_id'] === $unresolved_conflict) {
+        $auto_save_data['conflict_id'] = $previous_auto_save_data['conflict_id'];
+      }
+    }
+
     $this->autoSaveStore->set($key, $auto_save_data);
     $this->cache->delete($key);
     $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
@@ -203,7 +277,7 @@ class AutoSaveManager implements EventSubscriberInterface {
         }
         $entity->setComponentTree($tree->getValue());
       }
-      return $entity->toArray();
+      return self::toStorableArray($entity);
     }
     $normalized = [];
     $fields = $entity->getFields();
@@ -219,8 +293,11 @@ class AutoSaveManager implements EventSubscriberInterface {
       // @todo We can probably remove this when we refactor the pageData slice
       //   in https://drupal.org/i/3535569.
       $fields = \array_filter($fields, static fn (FieldItemListInterface $field) => $field->getFieldDefinition()->getType() !== 'externalUpdates');
-
     }
+    // Exclude all computed properties except those that are user-editable and
+    // persisted elsewhere on save (path aliases, moderation states).
+    $fields = \array_filter($fields, static fn (FieldItemListInterface $field) => !$field->getFieldDefinition()->isComputed() || self::isPersistedComputedField($field->getFieldDefinition()));
+
     foreach (\array_keys($fields) as $name) {
       $items = $entity->get($name);
       // Exclude items that are empty.
@@ -335,14 +412,22 @@ class AutoSaveManager implements EventSubscriberInterface {
   /**
    * Gets all auto-save data.
    *
-   * @return array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, data_hash: string, client_id: ?string, langcode: ?string, entity: ?EntityInterface}>
+   * @param bool $with_entities
+   *   Whether the auto-save items should contain entity instances in 'entity'.
+   * @param bool $with_conflicts
+   *   Whether the auto-save items contain 'conflict_id' for items with detected
+   *   unresolved conflicts due to external updates to the entity on which the
+   *   auto-save item was based.
+   *
+   * @return array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, original_hash: string, data_hash: string, client_id: ?string, langcode: ?string, entity: ?EntityInterface, conflict_id?: string}>
    *   All auto-save data entries.
    */
-  public function getAllAutoSaveList(bool $with_entities = FALSE): array {
+  public function getAllAutoSaveList(bool $with_entities, bool $with_conflicts): array {
     $entries = $this->autoSaveStore->getAll();
+
     // Sort by key to ensure consistent ordering.
     \ksort($entries);
-    /** @var array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, data_hash: string, client_id: ?string, langcode: ?string, entity: ?EntityInterface}> $result */
+    /** @var array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, original_hash: string, data_hash: string, client_id: ?string, langcode: ?string, entity: ?EntityInterface, conflict_id?: string}> $result */
     $result = \array_map(fn (array $entry) => $entry +
     // Append the owner and updated data into each entry, and an entity object
     // upon request.
@@ -351,6 +436,31 @@ class AutoSaveManager implements EventSubscriberInterface {
       'owner' => \is_numeric($entry['owner']) ? (int) $entry['owner'] : 0,
       'entity' => $with_entities ? $this->createEntityFromAutoSave($entry) : NULL,
     ], $entries);
+
+    if ($with_conflicts) {
+      // Add conflict_id property only for Page entities with unresolved
+      // conflicts.
+      // @todo Expand to other entities in https://www.drupal.org/project/canvas/issues/3591544
+      $result = \array_map(
+        function (array $entry): array {
+          $unresolved_conflict = $this->getUnresolvedConflict($entry);
+          unset($entry['conflict_id']);
+          if ($entry['entity_type'] === Page::ENTITY_TYPE_ID && $unresolved_conflict) {
+            $entry['conflict_id'] = $unresolved_conflict;
+          }
+          return $entry;
+        },
+        $result,
+      );
+    }
+    else {
+      $result = \array_map(fn (array $entry) =>
+        \array_diff_key($entry, \array_flip(['conflict_id'])),
+        $result
+      );
+    }
+
+    /** @var array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, original_hash: string, data_hash: string, client_id: ?string, langcode: ?string, entity: ?EntityInterface, conflict_id?: string}> $result */
     return $result;
   }
 
@@ -366,6 +476,69 @@ class AutoSaveManager implements EventSubscriberInterface {
   protected function createEntityFromAutoSave(array $entry) {
     ['entity_type' => $entity_type, 'data' => $entity_values] = $entry;
     return $this->entityTypeManager->getStorage($entity_type)->create($entity_values);
+  }
+
+  /**
+   * Checks if there is an unresolved conflict and returns its id.
+   *
+   * This method only handles conflicts in scenarios where an entity on which
+   * the auto-save entry was based on is updated externally, e.g. using config
+   * syncing, entity saves performed by Drush scripts, or even just using an
+   * entity's canonical edit form.
+   *
+   * Such conflicts are detected by storing the 'original_hash' of the entity
+   * during the ::saveEntity() and comparing it to the current version of the
+   * entity in the entity storage.
+   *
+   * Auto-save entry saves 'conflict_id' only when the conflict is being marked
+   * as resolved. This method assumes that if there is a 'conflict_id' property
+   * in the $entry passed as an argument it's used for marking that conflict as
+   * resolved.
+   *
+   * @param array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, original_hash: ?string, data_hash: string, client_id: ?string, langcode: ?string, entity?: ?EntityInterface, conflict_id?: string} $entry
+   *
+   * @return string|null
+   */
+  private function getUnresolvedConflict(array $entry): string|null {
+    // For now, only Page entities supported.
+    // @todo Expand in https://www.drupal.org/project/canvas/issues/3591544
+    if ($entry['entity_type'] !== Page::ENTITY_TYPE_ID) {
+      return NULL;
+    }
+
+    if (!\array_key_exists('original_hash', $entry)) {
+      // If there is no original hash, we have no basis to determine if there is
+      // a conflict, so we assume there isn't one. This can only occur for auto-
+      // save entries created before https://git.drupalcode.org/project/canvas/-/commit/e31e9442e857c3a61d87a0eba8b626962a38208c
+      // @todo Remove this in Canvas 2.0.
+      return NULL;
+    }
+
+    $entity = $this->entityTypeManager->getStorage($entry['entity_type'])->loadUnchanged($entry['entity_id']);
+    \assert(!\is_null($entity));
+
+    // Compare the original_hash in auto-save entry vs latest entity hash.
+    if ($entry['original_hash'] === $this->getUnchangedHash($entity)) {
+      // Hashes are matching - no conflict
+      return NULL;
+    }
+
+    // Hashes are not matching - conflict detected.
+    $active_conflict = self::getConflictId($entity);
+
+    // This conflict is already stored in the entry and therefore is resolved.
+    if (isset($entry['conflict_id']) && $entry['conflict_id'] === $active_conflict) {
+      return NULL;
+    }
+
+    return $active_conflict;
+  }
+
+  /**
+   * @todo Refactor to support config entities in https://www.drupal.org/project/canvas/issues/3591544
+   */
+  public static function getConflictId(EntityInterface $entity): string {
+    return $entity instanceof Page ? (string) $entity->getLoadedRevisionId() : '';
   }
 
   /**
@@ -503,7 +676,7 @@ class AutoSaveManager implements EventSubscriberInterface {
    *
    */
   public function onCanvasConfigDelete(ConfigCrudEvent $event): void {
-    $autoSaveEntities = $this->getAllAutoSaveList(TRUE);
+    $autoSaveEntities = $this->getAllAutoSaveList(with_entities: TRUE, with_conflicts: FALSE);
     $autoSaveEntities = array_filter($autoSaveEntities, fn($entityData) => $entityData['entity'] instanceof StagedConfigUpdate);
     foreach ($autoSaveEntities as $autoSaveEntity) {
       $staged_config_update = $autoSaveEntity['entity'];

@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 
 import packageJson from '../package.json';
+import { agentsContextCommand } from './commands/agents-context';
 import { buildCommand } from './commands/build';
 import { buildDeprecatedCommand } from './commands/build-deprecated';
 import { downloadCommand } from './commands/download-deprecated';
@@ -13,7 +14,11 @@ import { reconcileMediaCommand } from './commands/reconcile-media';
 import { scaffoldCommand } from './commands/scaffold';
 import { uploadCommand } from './commands/upload-deprecated';
 import { validateCommand } from './commands/validate';
-import { handleLegacyComponentDirMigration } from './config';
+import {
+  emitCanvasConfigWarnings,
+  handleLegacyComponentDirMigration,
+  handleLegacySyncEnvMigration,
+} from './config';
 
 const version = (packageJson as { version?: string }).version;
 
@@ -28,6 +33,7 @@ loginCommand(program);
 logoutCommand(program);
 downloadCommand(program);
 pullCommand(program);
+agentsContextCommand(program);
 pushCommand(program);
 reconcileMediaCommand(program);
 scaffoldCommand(program);
@@ -43,11 +49,23 @@ program.hook('preAction', async (command, actionCommand) => {
     return;
   }
   const commandOptions = command.opts?.() as { yes?: boolean };
-  const actionOptions = actionCommand.opts?.() as { dir?: string };
+  const actionOptions = actionCommand.opts?.() as {
+    dir?: string;
+    yes?: boolean;
+  };
+  const migrationOptions = {
+    skipPrompt: Boolean(actionOptions?.yes ?? commandOptions?.yes),
+  };
+  let emittedPreActionOutput =
+    await handleLegacySyncEnvMigration(migrationOptions);
   if (!actionOptions?.dir) {
-    await handleLegacyComponentDirMigration({
-      skipPrompt: Boolean(commandOptions?.yes),
-    });
+    emittedPreActionOutput =
+      (await handleLegacyComponentDirMigration(migrationOptions)) ||
+      emittedPreActionOutput;
+  }
+  emittedPreActionOutput = emitCanvasConfigWarnings() || emittedPreActionOutput;
+  if (emittedPreActionOutput) {
+    console.log();
   }
 });
 

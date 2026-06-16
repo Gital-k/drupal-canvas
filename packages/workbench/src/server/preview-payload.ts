@@ -10,8 +10,9 @@ import {
   resolveCanvasConfig,
 } from '@drupal-canvas/discovery';
 import {
-  drupalCanvasCompat,
+  createCanvasViteBuildConfig,
   extractComponentPreviewMetadataFromComponentYaml,
+  validateCanvasImportRoots,
 } from '@drupal-canvas/vite-compat';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -416,6 +417,10 @@ export async function bundleInteractivePreview(options: {
     componentSources: options.componentSources,
     cssEntryPaths: options.cssEntryPaths,
   });
+  const canvasViteConfig = createCanvasViteBuildConfig({
+    hostRoot: options.projectRoot,
+    hostAliasBaseDir: options.aliasBaseDir,
+  });
 
   try {
     await fs.writeFile(entryPath, entrySource, 'utf-8');
@@ -423,6 +428,7 @@ export async function bundleInteractivePreview(options: {
     const buildResult = await viteBuild({
       configFile: false,
       root: options.projectRoot,
+      esbuild: canvasViteConfig.esbuild,
       logLevel: 'silent',
       define: {
         'process.env.NODE_ENV': JSON.stringify('production'),
@@ -432,10 +438,7 @@ export async function bundleInteractivePreview(options: {
       plugins: [
         react(),
         tailwindcss(),
-        ...drupalCanvasCompat({
-          hostRoot: options.projectRoot,
-          hostAliasBaseDir: options.aliasBaseDir,
-        }),
+        ...(canvasViteConfig.plugins ?? []),
       ] as any,
       resolve: {
         dedupe: [
@@ -755,7 +758,30 @@ export async function buildPreviewPayload(
   const bundle =
     dependencies.bundleInteractivePreview ?? bundleInteractivePreview;
 
-  const config = resolveConfig({ hostRoot: options.projectRoot });
+  const configWarnings: PreviewIssue[] = [];
+  const config = resolveConfig({
+    hostRoot: options.projectRoot,
+    onWarning: (warning) =>
+      configWarnings.push(toIssue(warning.code, warning.message, warning.path)),
+  });
+  try {
+    validateCanvasImportRoots({
+      hostRoot: options.projectRoot,
+      aliasBaseDir: config.aliasBaseDir,
+      componentDir: config.componentDir,
+    });
+  } catch (error) {
+    return toPayload(request, {
+      ok: false,
+      errors: [
+        toIssue(
+          'invalid_canvas_config',
+          error instanceof Error ? error.message : String(error),
+        ),
+      ],
+    });
+  }
+
   const componentRoot = path.resolve(options.projectRoot, config.componentDir);
   const pagesRoot = path.resolve(options.projectRoot, config.pagesDir);
 
@@ -778,9 +804,14 @@ export async function buildPreviewPayload(
     });
   }
 
-  const warnings: PreviewIssue[] = discoveryResult.warnings.map((warning) =>
-    toIssue(warning.code, warning.message, warning.path),
-  );
+  // Preview build returns config warnings in the JSON payload.
+  // This gives command output the same deprecation notices that live Workbench logs during startup.
+  const warnings: PreviewIssue[] = [
+    ...configWarnings,
+    ...discoveryResult.warnings.map((warning) =>
+      toIssue(warning.code, warning.message, warning.path),
+    ),
+  ];
 
   const globalCssResult = await maybeResolveGlobalCssPath(
     options.projectRoot,

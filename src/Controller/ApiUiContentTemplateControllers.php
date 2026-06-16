@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
@@ -12,9 +15,6 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
-use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -59,7 +59,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     $this->validateRequest($content_entity_type_id, $bundle, $component_config_entity_id);
     // @phpstan-ignore-next-line
     $source = Component::load($component_config_entity_id)->getComponentSource();
-    \assert($source instanceof GeneratedFieldExplicitInputUxComponentSourceBase);
+    \assert($source instanceof JsonSchemaPropsComponentSourceBase);
 
     $suggestions = $this->propSourceSuggester->suggest(
       $source->getSourceSpecificComponentId(),
@@ -84,7 +84,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     }
 
     $source = $component->getComponentSource();
-    if (!$source instanceof GeneratedFieldExplicitInputUxComponentSourceBase) {
+    if (!$source instanceof JsonSchemaPropsComponentSourceBase) {
       throw new BadRequestHttpException('Only components that define their inputs using JSON Schema and use fields to populate their inputs are currently supported.');
     }
 

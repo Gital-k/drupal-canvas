@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
-use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 use Drupal\canvas\PropShape\EphemeralPropShapeRepository;
+use Drupal\canvas\PropShape\StorablePropShape;
+use Drupal\canvas\Validation\JsonSchema\ContentEntityReferenceObjectConstraint;
 use Drupal\Core\Template\Attribute;
 use Drupal\Core\Theme\Component\ComponentMetadata;
-use Drupal\canvas\PropShape\StorablePropShape;
 use JsonSchema\Validator;
 
 /**
@@ -28,15 +30,11 @@ final class ComponentMetadataRequirementsChecker {
    *   Component metadata.
    * @param string[] $required_props
    *   Array of required prop names.
-   * @param array<string, string> $forbidden_key_characters
-   *   Array of forbidden key characters as keys and replacements as values.
-   *   For example, component metadata stored as Configuration entities does not
-   *   allow dots.
    *
    * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
    *   When the component does not meet requirements.
    */
-  public static function check(string $component_id, ComponentMetadata $metadata, array $required_props, array $forbidden_key_characters): void {
+  public static function check(string $component_id, ComponentMetadata $metadata, array $required_props): void {
     $messages = [];
 
     if ($metadata->group == 'Elements') {
@@ -64,13 +62,39 @@ final class ComponentMetadataRequirementsChecker {
       }
 
       // For array types, also check enum in items.
-      if (\in_array('array', $prop['type'], TRUE) && isset($prop['items']['enum']) && \in_array('', $prop['items']['enum'], TRUE)) {
+      $is_array_prop_type = \in_array('array', $prop['type'], TRUE);
+      if ($is_array_prop_type && isset($prop['items']['enum']) && \in_array('', $prop['items']['enum'], TRUE)) {
         $messages[] = \sprintf('Prop "%s" has an empty enum value in items.', $prop_name);
       }
 
-      // Required props must have examples.
-      if (\in_array($prop_name, $required_props, TRUE) && !isset($prop['examples'][0])) {
+      // Required props must have examples — except content-entity-reference
+      // props, for which `examples` are explicitly unsupported (see below).
+      $is_required_prop = \in_array($prop_name, $required_props, TRUE);
+      if ($is_required_prop && !isset($prop['examples'][0]) && !JsonSchemaObjectRef::isContentEntityReference($prop)) {
         $messages[] = \sprintf('Prop "%s" is required, but does not have example value', $prop_name);
+      }
+
+      // Content-entity-reference props must not carry `examples`: the
+      // referenced entity is resolved at runtime from
+      // `dataDependencies.entityFields`, so an example value is meaningless.
+      if (JsonSchemaObjectRef::isContentEntityReference($prop) && \array_key_exists('examples', $prop)) {
+        $messages[] = \sprintf('Prop "%s" is a content-entity-reference prop and must not have examples.', $prop_name);
+      }
+
+      // Required array ("multiple cardinality") props must have `minItems: 1`.
+      // JSON Schema's `required` keyword only means that the key must be
+      // present, but it does not enforce that an array cannot be empty (`[]`).
+      // That would make a required multiple-cardinality prop meaningless for a
+      // content author: no values would be required.
+      // To align with Content Author expectations, every required `type: array`
+      // prop must hence also have `minItems: 1`. This also happens to align
+      // exactly with Drupal's Field API semantics for a "required" field.
+      if ($is_array_prop_type && $is_required_prop && (!\array_key_exists('minItems', $prop) || $prop['minItems'] < 1)) {
+        $messages[] = \sprintf('Multiple-cardinality prop "%s" is required, but does not specify `minItems: 1`.', $prop_name);
+      }
+      // `minItems` only ever makes sense for required props.
+      if ($is_array_prop_type && !$is_required_prop && \array_key_exists('minItems', $prop)) {
+        $messages[] = \sprintf('Multiple-cardinality prop "%s" specifies `minItems`, but is not required. Only required multiple-cardinality props can specify `minItems`.', $prop_name);
       }
 
       // JSON Schema does not require that examples must be valid, but we do
@@ -105,13 +129,13 @@ final class ComponentMetadataRequirementsChecker {
       // that IF `maxItems` is specified, it is >1. Because a single-value array
       // would be a pointless (array) wrapper for a component prop. (And `0` for
       // an empty array would make even less sense, let alone negative numbers.)
-      if (\in_array('array', $prop['type'], TRUE) && \array_key_exists('maxItems', $prop) && $prop['maxItems'] < 2) {
+      if ($is_array_prop_type && \array_key_exists('maxItems', $prop) && $prop['maxItems'] < 2) {
         $messages[] = \sprintf('The "maxItems" restriction on arrays (if set) must be at least 2, but got %d on prop "%s". Use a non-array type for single-value props.', $prop['maxItems'], $prop_name);
       }
 
       // Validation for the additional functionality overlaid on top of the SDC
       // JSON Schema.
-      // @see docs/shape-matching-into-field-types.md#3.2
+      // @see docs/shape-matching-into-field-types.md#3.2.1
       if (\array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'text/html' && isset($prop['x-formatting-context'])) {
         if (!\in_array($prop['x-formatting-context'], ['inline', 'block'], TRUE)) {
           $messages[] = \sprintf('Invalid value "%s" for "x-formatting-context". Valid values are "inline" and "block".', $prop['x-formatting-context']);
@@ -119,36 +143,29 @@ final class ComponentMetadataRequirementsChecker {
         }
       }
 
+      // Validation for content-entity-reference props.
+      // ContentEntityReferenceObjectConstraint is registered as the JSON Schema
+      // "object" constraint, but it only fires when validating prop *values*
+      // (ComponentValidator::validateProps), not at metadata-derivation time —
+      // hence the explicit static call below.
+      // @see docs/shape-matching.md#3.2.3
+      // @see \Drupal\canvas\CanvasServiceProvider::alter()
+      // @see \Drupal\canvas\Validation\JsonSchema\ContentEntityReferenceObjectConstraint
+      if (JsonSchemaObjectRef::isContentEntityReference($prop)) {
+        if (\in_array($prop_name, $required_props, TRUE)) {
+          $messages[] = \sprintf('Prop "%s" is required, but content-entity-reference props must be optional.', $prop_name);
+          continue;
+        }
+        $schema_errors = ContentEntityReferenceObjectConstraint::validateMetadataSchema($prop, $prop_name);
+        if (!empty($schema_errors)) {
+          $messages = [...$messages, ...$schema_errors];
+          continue;
+        }
+      }
+
       // Every prop must have a title.
       if (!isset($prop['title'])) {
         $messages[] = \sprintf('Prop "%s" must have title', $prop_name);
-      }
-
-      $enum_container = \in_array('array', $prop['type'], TRUE) ?
-        $prop['items'] ?? [] :
-        $prop;
-      if (isset($enum_container['enum'], $enum_container['meta:enum']) && !empty($forbidden_key_characters)) {
-        foreach ($enum_container['meta:enum'] as $meta_key => $meta_value) {
-          $meta_key_with_replacements = str_replace(
-            \array_keys($forbidden_key_characters),
-            array_values($forbidden_key_characters),
-            (string) $meta_key,
-          );
-          if ((string) $meta_key !== $meta_key_with_replacements) {
-            $messages[] = \sprintf('The "meta:enum" keys for the "%s" prop enum cannot contain a dot. Offending key: "%s"', $prop_name, $meta_key);
-          }
-        }
-
-        // Ensure we replace dots with underscores when checking meta:enums.
-        $meta_enum_valid_keys = \array_map(fn($key) => str_replace(
-          \array_keys($forbidden_key_characters),
-          array_values($forbidden_key_characters),
-          (string) $key,
-        ), $enum_container['enum']);
-        $enum_keys_diff = \array_diff($meta_enum_valid_keys, \array_keys($enum_container['meta:enum']));
-        if (!empty($enum_keys_diff)) {
-          $messages[] = \sprintf('The values for the "%s" prop enum must be defined in "meta:enum". Missing keys: "%s"', $prop_name, \implode(', ', $enum_keys_diff));
-        }
       }
     }
 
@@ -158,17 +175,35 @@ final class ComponentMetadataRequirementsChecker {
       throw new ComponentDoesNotMeetRequirementsException($messages);
     }
 
-    // Every prop must have a StorablePropShape.
-    $props_for_metadata = GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($component_id, $metadata);
+    // Every prop must have a StorablePropShape. If an example is provided, it
+    // must be considered non-empty by the field type that will power it.
+    $props_for_metadata = JsonSchemaPropsComponentSourceBase::getComponentInputsForMetadata($component_id, $metadata);
     /** @var \Drupal\canvas\PropShape\PropShapeRepositoryInterface $prop_shape_repository */
     $prop_shape_repository = \Drupal::service(EphemeralPropShapeRepository::class);
     foreach ($props_for_metadata as $cpe => $prop_shape) {
+      $prop_name = ComponentPropExpression::fromString($cpe)->propName;
       $storable_prop_shape = $prop_shape_repository->getStorablePropShape($prop_shape);
-      if ($storable_prop_shape instanceof StorablePropShape) {
+      if (!$storable_prop_shape instanceof StorablePropShape) {
+        $messages[] = \sprintf('Drupal Canvas does not know of a field type/widget to allow populating the <code>%s</code> prop, with the shape <code>%s</code>.', $prop_name, json_encode($prop_shape->schema, JSON_UNESCAPED_SLASHES));
         continue;
       }
-      $messages[] = \sprintf('Drupal Canvas does not know of a field type/widget to allow populating the <code>%s</code> prop, with the shape <code>%s</code>.', ComponentPropExpression::fromString($cpe)->propName, json_encode($prop_shape->schema, JSON_UNESCAPED_SLASHES));
+      // Entity-referencing props skip the StaticPropSource pipeline at runtime,
+      // so don't trial them here either.
+      if (JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity($storable_prop_shape)) {
+        continue;
+      }
+      $example = $metadata->schema['properties'][$prop_name]['examples'][0] ?? NULL;
+      if ($example === NULL) {
+        continue;
+      }
+      try {
+        $storable_prop_shape->toStaticPropSource()->withValue($example);
+      }
+      catch (\LogicException) {
+        $messages[] = \sprintf('Prop "%s" example value `%s` cannot be used as a default.', $prop_name, \json_encode($example));
+      }
     }
+
     if (!empty($messages)) {
       throw new ComponentDoesNotMeetRequirementsException($messages);
     }

@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\AutoSavePublishAwareInterface;
+use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\EntityConstraintViolationList;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -23,15 +32,6 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\PluralTranslatableMarkup;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Utility\Error;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\AssetLibrary;
-use Drupal\canvas\Entity\BrandKit;
-use Drupal\canvas\Entity\AutoSavePublishAwareInterface;
-use Drupal\canvas\Entity\EntityConstraintViolationList;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\Exception\ConstraintViolationException;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\user\UserInterface;
 use Psr\Log\LoggerInterface;
@@ -50,6 +50,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
   use ConstraintPropertyPathTranslatorTrait;
 
   public const AUTO_SAVE_KEY = 'api_auto_save_key';
+  public const AUTO_SAVE_CONFLICT_KEY = 'conflict_id';
   public const AVATAR_IMAGE_STYLE = 'canvas_avatar';
 
   public function __construct(
@@ -144,7 +145,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
     $cache = new CacheableMetadata();
 
     // Filter those the user has access to.
-    $filtered = \array_filter($this->autoSaveManager->getAllAutoSaveList(TRUE), function (array $item) use ($cache) {
+    $filtered = \array_filter($this->autoSaveManager->getAllAutoSaveList(with_entities: TRUE, with_conflicts: TRUE), function (array $item) use ($cache) {
       \assert($item['entity'] instanceof EntityInterface);
       $access = $item['entity']->access('view label', return_as_object: TRUE);
       // @todo This will result in the cache tag for this entity being returned
@@ -170,15 +171,40 @@ final class ApiAutoSaveController extends ApiControllerBase {
     }
     // User display names depend on configuration.
     $cache->addCacheableDependency($this->configFactory->get('user.settings'));
+    $status = Response::HTTP_OK;
 
-    // Remove 'data', 'client_id', 'entity' keys because this will reduce the
-    // amount of data sent to the client and back to the server. Also,
-    // 'client_id' is only used to determine if the client has the latest
-    // changes when editing an entity in Drupal Canvas and not needed for the
-    // publishing process.
-    $filtered = \array_map(fn(array $item) => \array_diff_key($item, \array_flip(['data', 'client_id', 'entity'])), $filtered);
+    $body = [];
+    if (self::autoSaveListHasConflicts($filtered)) {
+      $status = Response::HTTP_CONFLICT;
+      foreach ($filtered as $key => $entry) {
+        if (isset($entry[self::AUTO_SAVE_CONFLICT_KEY])) {
+          $body['errors'][] = [
+            'detail' => ErrorCodesEnum::ItemEntityUpdatedExternally->getMessage(),
+            'source' => [
+              'pointer' => $key,
+            ],
+            'code' => ErrorCodesEnum::ItemEntityUpdatedExternally->value,
+            'meta' => [
+              'entity_type' => $entry['entity_type'],
+              'entity_id' => $entry['entity_id'],
+              'label' => $entry['label'],
+              self::AUTO_SAVE_CONFLICT_KEY => $entry[self::AUTO_SAVE_CONFLICT_KEY],
+              self::AUTO_SAVE_KEY => $key,
+            ],
+          ];
+        }
+      }
+    }
 
-    $withUserDetails = \array_map(fn(array $item) => [
+    // Remove internal auto-save properties that are not used client side (like
+    // 'data', 'client_id', 'entity', etc.). This will reduce the amount of data
+    // sent to the client and back to the server.
+    $filtered = \array_map(fn (array $item) =>
+      \array_diff_key($item, \array_flip(AutoSaveManager::AUTO_SAVE_INTERNAL_PROPERTIES)),
+      $filtered
+    );
+
+    $body['data'] = \array_map(fn(array $item) => [
       // @phpstan-ignore-next-line
       'owner' => \array_key_exists($item['owner'], $users) ? [
         'name' => $users[$item['owner']]->getDisplayName(),
@@ -192,7 +218,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
         'id' => $item['owner'],
       ],
     ] + $item, $filtered);
-    return (new CacheableJsonResponse($withUserDetails))->addCacheableDependency($cache->addCacheTags([AutoSaveManager::CACHE_TAG]));
+
+    return (new CacheableJsonResponse(data: $body, status: $status))->addCacheableDependency($cache->addCacheTags([AutoSaveManager::CACHE_TAG]));
   }
 
   /**
@@ -203,7 +230,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
   public function post(Request $request): JsonResponse {
     $client_auto_saves = \json_decode($request->getContent(), TRUE);
     \assert(\is_array($client_auto_saves));
-    $all_auto_saves = $this->autoSaveManager->getAllAutoSaveList(TRUE);
+    $all_auto_saves = $this->autoSaveManager->getAllAutoSaveList(with_entities: TRUE, with_conflicts: FALSE);
     if ($validation_response = self::validateExpectedAutoSaves($client_auto_saves, $all_auto_saves)) {
       return $validation_response;
     }
@@ -261,16 +288,41 @@ final class ApiAutoSaveController extends ApiControllerBase {
       }
       else {
         \assert($entity instanceof ContentEntityInterface);
+        $auto_save_entity = $entity;
 
-        $fields = $entity->getFieldDefinitions();
-        $entity_definition = $entity->getEntityType();
+        $fields = $auto_save_entity->getFieldDefinitions();
+        $entity_definition = $auto_save_entity->getEntityType();
         \assert($entity_definition instanceof ContentEntityTypeInterface);
-        \assert(!\is_null($entity->id()));
-        $original_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
-        \assert($original_entity instanceof ContentEntityInterface);
+        \assert(!\is_null($auto_save_entity->id()));
+
+        // Apply the auto-saved changes onto the stored entity, instead of
+        // saving the entity that was reconstructed from the auto-save snapshot.
+        // The snapshot only ever contains the translation that was edited, so
+        // saving it directly would drop every other translation. Loading the
+        // real entity preserves all translations — and keeps a valid loaded
+        // revision ID, which content_translation's field synchronizer relies on
+        // to pick the correct synchronization source when untranslatable
+        // ("symmetric") field columns are involved.
+        // @see \Drupal\content_translation\FieldTranslationSynchronizer::synchronizeFields()
+        $entity = $this->entityTypeManager->getStorage($auto_save_entity->getEntityTypeId())->loadUnchanged($auto_save_entity->id());
+        \assert($entity instanceof ContentEntityInterface);
+        // The unchanged copy is used both to detect which fields changed and to
+        // determine whether the entity is still considered a draft (which keys
+        // off the stored, pre-edit title).
+        $original_entity = clone $entity;
+        // The auto-save snapshot belongs to a specific translation. Apply the
+        // changes onto that same translation of the stored entity, so editing
+        // (and publishing) a non-default translation never clobbers the others.
+        // Setting a non-translatable field via a non-default translation writes
+        // to the shared (default) value, which is exactly what we want for
+        // symmetric columns.
+        // @see \Drupal\Core\Entity\ContentEntityBase::getTranslatedField()
+        $langcode = $auto_save_entity->language()->getId();
+        $target = $entity->hasTranslation($langcode) ? $entity->getTranslation($langcode) : $entity->addTranslation($langcode);
+        $original_target = $original_entity->hasTranslation($langcode) ? $original_entity->getTranslation($langcode) : $original_entity;
         foreach ($fields as $field_name => $field) {
-          $field_access = $entity->get($field_name)->access(operation: 'edit', return_as_object: TRUE);
-          $original_field = $original_entity->get($field_name);
+          $field_access = $auto_save_entity->get($field_name)->access(operation: 'edit', return_as_object: TRUE);
+          $original_field = $original_target->get($field_name);
 
           // We ignore those fields that didn't change. We also need to ignore
           // field access for computed fields, because there
@@ -278,7 +330,11 @@ final class ApiAutoSaveController extends ApiControllerBase {
           // We are protected because the entity validation will trigger errors
           // if those were changed in an unexpected way.
           // Status and published will be TRUE when publishing.
-          $ignore_field = $field->isComputed() || $original_field->equals($entity->get($field_name));
+          // TRICKY: some computed fields (`path`, `moderation_state`) are
+          // user-editable and persisted on save, so they must still be
+          // carried over.
+          // @see \Drupal\canvas\AutoSave\AutoSaveManager::isPersistedComputedField()
+          $ignore_field = ($field->isComputed() && !AutoSaveManager::isPersistedComputedField($field)) || $original_field->equals($auto_save_entity->get($field_name));
           $keys = ['id', 'revision_id', 'uuid', 'langcode', 'status', 'published'];
           $revision_keys = ['revision_created', 'revision_user'];
           foreach ($keys as $key) {
@@ -287,23 +343,39 @@ final class ApiAutoSaveController extends ApiControllerBase {
           foreach ($revision_keys as $revision_key) {
             $ignore_field |= $field_name === $entity_definition->getRevisionMetadataKey($revision_key);
           }
-          if (!$ignore_field && $field_access->isForbidden()) {
+          if ($ignore_field) {
+            continue;
+          }
+          if ($field_access->isForbidden()) {
             throw new CacheableAccessDeniedHttpException(
               (new CacheableMetadata())->addCacheableDependency($field_access),
-              \sprintf('Unable to update field %s for entity "%s".', $field_name, $entity->label()),
+              \sprintf('Unable to update field %s for entity "%s".', $field_name, $auto_save_entity->label()),
             );
           }
+          // Apply the changed value from the auto-save snapshot onto the edited
+          // translation of the stored entity.
+          $target->set($field_name, $auto_save_entity->get($field_name)->getValue());
         }
+
         $is_draft = AutoSaveManager::entityIsConsideredNew($original_entity);
 
+        // The published status is an entity key and therefore excluded from the
+        // field copy above, so carry it over explicitly onto the edited
+        // translation.
         // For draft entities automatically publish them when publishing
         // changes.
-        // For non-draft unpublished entities, preserve the published status
-        // from the autosaved entity to allow unpublishing to work correctly.
-        if ($is_draft && $entity instanceof EntityPublishedInterface) {
-          $entity->setPublished();
+        // For non-draft entities, preserve the published status from the
+        // auto-saved entity to allow unpublishing to work correctly.
+        if ($target instanceof EntityPublishedInterface) {
+          \assert($auto_save_entity instanceof EntityPublishedInterface);
+          if ($is_draft || $auto_save_entity->isPublished()) {
+            $target->setPublished();
+          }
+          else {
+            $target->setUnpublished();
+          }
         }
-        // If the entity is new, the autosaved data is considered to be part
+        // If the entity is new, the auto-saved data is considered to be part
         // of the first revision. Therefore, do not create a new revision
         // for new entities.
         if ($is_draft) {
@@ -499,6 +571,17 @@ final class ApiAutoSaveController extends ApiControllerBase {
       $map,
       ($violations instanceof EntityConstraintViolationListInterface) ? EntityConstraintViolationList::fromCoreConstraintViolationList($violations) : $violations,
     );
+  }
+
+  /**
+   * Checks if any entries in the list have the 'conflict_id' property.
+   *
+   * @param array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, data_hash: string, client_id: ?string, langcode: ?string, entity: ?EntityInterface, conflict_id?: string,}> $auto_save_entries
+   *
+   * @return bool
+   */
+  private static function autoSaveListHasConflicts(array $auto_save_entries): bool {
+    return !empty(\array_column($auto_save_entries, self::AUTO_SAVE_CONFLICT_KEY));
   }
 
 }

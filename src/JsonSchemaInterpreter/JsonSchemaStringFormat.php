@@ -6,9 +6,6 @@ namespace Drupal\canvas\JsonSchemaInterpreter;
 
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
-use Drupal\Core\TypedData\Type\DateTimeInterface;
-use Drupal\Core\TypedData\Type\UriInterface;
-use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTemplateWithVariablesConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
@@ -19,6 +16,9 @@ use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\canvas\ShapeMatcher\DataTypeShapeRequirement;
 use Drupal\canvas\ShapeMatcher\DataTypeShapeRequirements;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\Core\TypedData\Type\DateTimeInterface;
+use Drupal\Core\TypedData\Type\UriInterface;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\link\LinkItemInterface;
 use Symfony\Component\Validator\Constraints\Ip;
 
@@ -29,7 +29,7 @@ use Symfony\Component\Validator\Constraints\Ip;
  * @see https://json-schema.org/understanding-json-schema/reference/string#format
  * @see https://json-schema.org/understanding-json-schema/reference/string#built-in-formats
  *
- * @phpstan-type JsonSchema array<string, mixed>
+ * @phpstan-import-type JsonSchema from \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType
  * @internal
  */
 enum JsonSchemaStringFormat: string {

@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\block\Controller\BlockListController;
+use Drupal\canvas\Entity\PageRegion;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
+use Drupal\Core\Link;
+use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Routing\RouteBuildEvent;
 use Drupal\Core\Routing\RoutingEvents;
 use Drupal\Core\Url;
-use Drupal\Core\Link;
-use Drupal\Core\Messenger\MessengerInterface;
-use Drupal\canvas\Entity\PageRegion;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -100,7 +100,7 @@ final class CanvasBlockListController extends BlockListController implements Eve
     return $events;
   }
 
-  public function onAlterRoutes(RouteBuildEvent $event): void {
+  public static function onAlterRoutes(RouteBuildEvent $event): void {
     $collection = $event->getRouteCollection();
     if ($route = $collection->get('block.admin_display')) {
       $route->setDefault('_controller', static::class . '::listing');

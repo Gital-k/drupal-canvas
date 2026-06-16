@@ -6,19 +6,19 @@ import { Box, Button, Flex, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
-import { toPropName } from '@/components/form/formUtil';
+import {
+  DEBOUNCE_TIMEOUT,
+  toPropName,
+} from '@/components/form/react-hook-form/fields/componentFormData';
 import { removeFieldValue } from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
 import { useUpdateComponentMutation } from '@/services/preview';
-import { resolveEntityUri } from '@/utils/transforms';
 
 import {
   buildModelWithItemRemoved,
-  dispatchSyntheticChange,
   extractPositionFromFieldName,
-  isAutocompleteMenuOpen,
   isRemoveButtonEnabled,
   triggerDrupalRemoveButton,
 } from './multivalueFormUtils';
@@ -32,8 +32,7 @@ type MultivalueRefs = {
   popoverContainer: HTMLDivElement | null;
   triggerRow: HTMLDivElement | null;
   triggerButton: HTMLButtonElement | null;
-  valueAtOpen: string;
-  shouldRevertOnClose: boolean;
+  preventEnter: boolean;
 };
 /**
  * DrupalInputMultivalueForm component for inputs within multivalue widgets.
@@ -64,22 +63,27 @@ const DrupalInputMultivalueForm = ({
   const isAutocomplete =
     attributes?.class instanceof Array &&
     attributes?.class?.includes('form-autocomplete');
-  const initialValue = attributes.value || attributes.defaultValue || '';
+  const initialValue = attributes.value ?? attributes.defaultValue ?? '';
   const refs = useRef<MultivalueRefs>({
     triggerRow: null,
     triggerButton: null,
     popoverInput: null,
     popoverContainer: null,
-    valueAtOpen: initialValue as string,
-    shouldRevertOnClose: true,
+    preventEnter: false,
   });
 
   const [displayValue, setDisplayValue] = useState<string>(
-    initialValue as string,
+    String(initialValue ?? ''),
   );
+
+  const hasError = () =>
+    refs.current.popoverInput &&
+    refs.current.popoverInput.dataset.invalidPropValue === 'true';
+
   // Controlled popover state so we can close it programmatically on remove.
   const [popoverOpen, setPopoverOpen] = useState(false);
   const fieldLabel = attributes['data-field-label'] || '';
+  const displayText = displayValue === '' ? 'Empty' : String(displayValue);
 
   const setPopoverOpenAndRefocus = (open: boolean) => {
     setPopoverOpen(open);
@@ -88,136 +92,57 @@ const DrupalInputMultivalueForm = ({
     }
   };
 
-  const pausePreviewUpdates = () => {
-    refs.current?.popoverInput?.setAttribute(
-      'data-canvas-stage-changes',
-      'true',
-    );
-  };
-
-  const resumePreviewUpdates = () => {
-    refs.current?.popoverInput?.removeAttribute('data-canvas-stage-changes');
-  };
-
   useEffect(() => {
+    // Listen for the custom autocomplete-selected event dispatched by
+    // autocomplete.extend.js when the user picks a suggestion.
     setTimeout(() => {
       if (
         isAutocomplete &&
         refs.current.popoverInput &&
         popoverOpen &&
-        !refs.current.popoverInput.hasAttribute(
-          'data-canvas-popover-autocomplete',
-        )
+        !(refs.current.popoverInput as any).__listenersAdded
       ) {
-        refs.current.popoverInput.setAttribute(
-          'data-canvas-popover-autocomplete',
-          'true',
-        );
+        (refs.current.popoverInput as any).__listenersAdded = true;
         refs.current.popoverInput.addEventListener(
           'data-canvas-autocomplete-selected',
           (e: Event) => {
-            const customEvent = e as CustomEvent<{ value: string }>;
-            refs.current.popoverInput?.removeAttribute(
-              'data-canvas-stage-changes',
-            );
+            const customEvent = e as CustomEvent<{
+              value: string;
+            }>;
             setTimeout(() => {
-              const forDisplay = customEvent.detail.value;
-              setDisplayValue(forDisplay);
-              setTimeout(() => {
-                if (refs.current.popoverInput) {
-                  dispatchSyntheticChange(
-                    refs.current.popoverInput,
-                    resolveEntityUri(forDisplay),
-                    true,
-                  );
-                }
-                setPopoverOpen(false);
-              });
+              const selection = customEvent.detail.value;
+              setDisplayValue(selection);
+              setPopoverOpenAndRefocus(false);
             });
           },
         );
       }
     });
   }, [isAutocomplete, refs.current.popoverInput, popoverOpen]);
-  // Listen for the custom autocomplete-selected event dispatched by
-  // autocomplete.extend.js when the user picks a suggestion.
 
-  // Handle Enter and Escape key presses in popover input.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Handle Escape key to close popover without committing changes
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' || e.key === 'Enter') {
       handlePopoverOpenChange(false);
-      return;
-    }
-
-    if (e.key === 'Enter') {
-      // If a jQuery UI autocomplete dropdown is currently open, do NOT
-      // intercept Enter — let jQuery UI process the selection so that
-      // the autocomplete select event fires. The data-canvas-autocomplete-selected
-      // listener will then commit the correct suggestion value and close the popover.
-      const inputElement =
-        refs.current.popoverInput || (e.target as HTMLInputElement);
-
-      if (isAutocompleteMenuOpen(inputElement)) {
-        return;
-      }
-
       e.preventDefault();
-
-      setTimeout(() => {
-        if (refs.current.popoverInput) {
-          const hasError = !!refs.current.popoverInput.closest(
-            '[data-has-field-error="true"]',
-          );
-          if (!hasError) {
-            resumePreviewUpdates();
-            const committedValue = refs.current.popoverInput.value;
-            setPopoverOpen(false);
-            dispatchSyntheticChange(
-              refs.current.popoverInput,
-              committedValue,
-              isAutocomplete,
-            );
-            setDisplayValue(committedValue);
-            refs.current.shouldRevertOnClose = false;
-          }
-        }
-      });
+      return;
     }
   };
 
   const handlePopoverOpenChange = (open: boolean) => {
     if (open) {
-      pausePreviewUpdates();
-      refs.current.shouldRevertOnClose = true;
       setTimeout(() => {
         const input = refs.current.popoverContainer?.querySelector(
           'input',
         ) as HTMLInputElement | null;
         if (input) {
           refs.current.popoverInput = input;
-          refs.current.popoverInput.setAttribute(
-            'data-canvas-stage-changes',
-            'true',
-          );
-          refs.current.valueAtOpen = input.value;
           input.select();
         }
       }, 0);
     } else {
-      // If we explicitly close the popover, the changes made thus far should
-      // be undone, and the field reverted to its value prior to opening.
-      if (refs.current.shouldRevertOnClose && refs.current.popoverInput) {
-        dispatchSyntheticChange(
-          refs.current.popoverInput,
-          refs.current.valueAtOpen,
-          isAutocomplete,
-        );
+      if (!hasError()) {
+        setPopoverOpenAndRefocus(false);
       }
-
-      setPopoverOpenAndRefocus(false);
-      resumePreviewUpdates();
-      refs.current.shouldRevertOnClose = true;
       return;
     }
 
@@ -229,7 +154,6 @@ const DrupalInputMultivalueForm = ({
     const triggerElement = refs.current.triggerRow;
     if (!triggerElement) return;
     setPopoverOpenAndRefocus(false);
-    resumePreviewUpdates();
     setTimeout(() => {
       const formId = attributes['data-form-id'] as string | undefined;
       const { name } = attributes;
@@ -297,19 +221,20 @@ const DrupalInputMultivalueForm = ({
         {/* List Item View - Trigger */}
         <Popover.Trigger asChild>
           <button
+            data-multivalue-popover-trigger
             ref={(node) => {
               refs.current.triggerButton = node;
             }}
             className={styles.listItem}
             type="button"
-            aria-label={`Edit ${fieldLabel}: ${displayValue || 'Empty'}`}
+            aria-label={`Edit ${fieldLabel}: ${displayText}`}
           >
             <Text
               size="2"
               className={styles.itemText}
               data-canvas-multivalue-label
             >
-              {displayValue || 'Empty'}
+              {displayText}
             </Text>
             <ArrowRightIcon className={styles.arrowIcon} />
           </button>
@@ -352,7 +277,19 @@ const DrupalInputMultivalueForm = ({
         </Flex>
         <Box>
           <DrupalInput
-            attributes={{ ...attributes, onKeyDown: handleKeyDown }}
+            attributes={{
+              ...attributes,
+              onKeyDown: handleKeyDown,
+              onInput: (e: any) => {
+                setTimeout(() => {
+                  if (e.target.dataset.invalidPropValue !== 'true')
+                    setDisplayValue(e.target.value);
+                  // Delay onInput checks by twice the debounce
+                  // timeout. This ensures that current value has been run
+                  // through validation.
+                }, DEBOUNCE_TIMEOUT * 2);
+              },
+            }}
           />
         </Box>
         <Flex justify="center" className={styles.removeButtonContainer}>

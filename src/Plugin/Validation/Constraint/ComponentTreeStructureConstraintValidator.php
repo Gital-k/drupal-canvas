@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\Core\Config\Plugin\Validation\Constraint\ConfigExistsConstraint;
 use Drupal\Core\Config\Schema\Sequence;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
@@ -13,9 +16,6 @@ use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
 use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
 use Drupal\Core\Validation\Plugin\Validation\Constraint\LengthConstraint;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\Constraints\All;
@@ -66,10 +66,6 @@ final class ComponentTreeStructureConstraintValidator extends ConstraintValidato
       $base_property_path = $this->context->getPropertyPath();
     }
     $object = $this->context->getObject();
-    if ($object instanceof Sequence) {
-      // Remove keys from config-based component trees.
-      $value = \array_values($value);
-    }
     if (\is_array($value) && $object instanceof TypedDataInterface && !($object instanceof Sequence)) {
       $type = $object->getDataDefinition()->getDataType();
       if ($type === 'field.value.component_tree' && ($parent = $object->getParent()) !== NULL) {

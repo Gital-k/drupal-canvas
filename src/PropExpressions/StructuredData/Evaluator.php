@@ -157,6 +157,11 @@ final class Evaluator {
             return NULL;
           }
 
+          // Optional expression with no branch for this bundle: omit it.
+          if (self::shouldOmitUnmatchedBundle($expr, $referenced_entity, $is_required)) {
+            return NULL;
+          }
+
           $referenced_expression = $expr->getTargetExpression(
             $expr->targetsMultipleBundles() ? $referenced_entity : NULL
           );
@@ -221,6 +226,21 @@ final class Evaluator {
                 $result_cacheability->addCacheableDependency($prop);
               }
               $raw_result[$delta] = $prop->getValue();
+              // An entity reference field item whose target was deleted still
+              // stores the target ID, but getValue() returns NULL because the
+              // entity no longer loads. The cached NULL result must invalidate
+              // if that ID is ever written again (e.g. entity recreated with
+              // the same ID), so add the cache tag now while the ID is still
+              // reachable via getTargetIdentifier().
+              if ($prop instanceof EntityReference
+                && $raw_result[$delta] === NULL
+                && ($target_id = $prop->getTargetIdentifier()) !== NULL
+                && ($target_entity_type_id = $prop->getTargetDefinition()->getEntityTypeId()) !== NULL
+              ) {
+                // TRICKY: imperfect, but the default for most entity types.
+                // @see \Drupal\Core\Entity\EntityBase::getCacheTagsToInvalidate
+                $result_cacheability->addCacheTags([$target_entity_type_id . ':' . $target_id]);
+              }
               $result[$delta] = $prop instanceof PrimitiveInterface
                 ? $prop->getCastedValue()
                 : $raw_result[$delta];
@@ -311,6 +331,10 @@ final class Evaluator {
               \assert(!$is_required);
               return new EvaluationResult(NULL, $referencer_result);
             }
+            // Optional expression with no branch for this bundle: omit it.
+            if (self::shouldOmitUnmatchedBundle($expr, $referenced_entity, $is_required)) {
+              return new EvaluationResult(NULL, $referencer_result);
+            }
             $referenced_expression = $expr->getTargetExpression(
               $expr->targetsMultipleBundles() ? $referenced_entity : NULL
             );
@@ -326,6 +350,10 @@ final class Evaluator {
           \assert(\is_array($referenced_entities));
           foreach ($referenced_entities as $delta => $referenced_entity) {
             \assert($referenced_entity instanceof FieldableEntityInterface);
+            // Optional expression with no branch for this bundle: skip it.
+            if (self::shouldOmitUnmatchedBundle($expr, $referenced_entity, $is_required)) {
+              continue;
+            }
             $referenced_expression = $expr->getTargetExpression(
               $expr->targetsMultipleBundles() ? $referenced_entity : NULL
             );
@@ -345,6 +373,28 @@ final class Evaluator {
           ->addCacheableDependency($field_access)
       );
     }
+  }
+
+  /**
+   * Determines whether an unmatched multi-bundle reference must be omitted.
+   *
+   * A multi-bundle reference expression only carries branches for specific
+   * bundles. When the referenced entity's bundle has no branch, an optional
+   * result omits it (the caller returns NULL or skips the delta); a required
+   * result instead lets evaluation proceed so getBranch() surfaces an
+   * \OutOfRangeException.
+   *
+   * @todo Figure out a fuller solution for the required case in
+   *   https://www.drupal.org/project/canvas/issues/3563309
+   * @see \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::getBranch()
+   */
+  private static function shouldOmitUnmatchedBundle(ReferenceFieldTypePropExpression|ReferenceFieldPropExpression $expr, FieldableEntityInterface $entity, bool $is_required): bool {
+    if (!$expr->targetsMultipleBundles()) {
+      return FALSE;
+    }
+    \assert($expr->referenced instanceof ReferencedBundleSpecificBranches);
+    return !$is_required
+      && !$expr->referenced->hasBranch("entity:{$entity->getEntityTypeId()}:{$entity->bundle()}");
   }
 
   protected static function validateAccess(EntityInterface|FieldItemListInterface $entity_or_field, StructuredDataPropExpressionInterface $expr): AccessResultInterface {

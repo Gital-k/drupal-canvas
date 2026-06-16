@@ -4,13 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Audit;
 
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Drupal\Core\Config\Entity\ConfigEntityInterface;
-use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Entity\Entity\EntityViewMode;
-use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -18,8 +11,15 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Drupal\Core\Config\Entity\ConfigEntityInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\Entity\EntityViewMode;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\node\Entity\NodeType;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests Drupal\canvas\Audit\ComponentAudit.
@@ -83,7 +83,7 @@ class ComponentAuditTest extends ComponentAuditTestBase {
     self::assertEquals([$revisionId1], \array_map(static fn(ContentEntityInterface $page): int|null|string => $page->getRevisionId(), $content));
   }
 
-  protected function createTestPattern(array $tree): Pattern {
+  protected static function createTestPattern(array $tree): Pattern {
     $pattern = Pattern::create([
       'id' => 'test_pattern',
       'label' => 'Test Pattern',
@@ -93,7 +93,7 @@ class ComponentAuditTest extends ComponentAuditTestBase {
     return $pattern;
   }
 
-  protected function createTestPageRegion(array $tree): PageRegion {
+  protected static function createTestPageRegion(array $tree): PageRegion {
     $page_region = PageRegion::create([
       'theme' => 'stark',
       'region' => 'sidebar_first',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\ComponentSource;
 
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\Schema\Mapping;
 use Drupal\Core\Config\TypedConfigManagerInterface;
@@ -12,7 +13,9 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Plugin\ContextAwarePluginAssignmentTrait;
 use Drupal\Core\Plugin\ContextAwarePluginTrait;
 use Drupal\Core\Plugin\PluginBase;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\Core\TypedData\PrimitiveInterface;
+use Drupal\Core\TypedData\TraversableTypedDataInterface;
+use Drupal\Core\TypedData\TypedDataInterface;
 
 /**
  * @internal
@@ -48,7 +51,18 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
     );
     \assert($typed_source_specific_settings instanceof Mapping);
     $normalized_data = [
-      'settings' => $typed_source_specific_settings->toArray(),
+      // ⚠️ TRICKY: Use config-schema-*casted* values, NOT the raw
+      // `Mapping::toArray()`. A setting generated in PHP (e.g. an SDC
+      // `examples` default of int `2`) hashes differently from its
+      // config-schema-cast form (string `"2"`, since core types
+      // `field.value.list_float.value` as `string`). That cast only kicks in
+      // once config is read back through validation — config import, recipes,
+      // config sync — and NOT on a clean install, which skips config
+      // validation. That asymmetry is why config-export-driven setups (e.g.
+      // Drupal CMS recipes) hit this and few others did. Casting here makes
+      // generation and validation agree.
+      // @see \Drupal\canvas\Entity\Component::validateActiveVersion()
+      'settings' => self::castRawTypedConfigToPhpTypes($typed_source_specific_settings),
       'slot_definitions' => $this instanceof ComponentSourceWithSlotsInterface
         ? self::normalizeSlotDefinitions($this->getSlotDefinitions())
         : [],
@@ -78,6 +92,42 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
         self::recursiveKsort($value);
       }
     }
+  }
+
+  /**
+   * Recursively calls PrimitiveInterface::getCastedValue()
+   *
+   * Unlike `Mapping::toArray()` (raw, un-cast values, possibly strings), this
+   * casts every primitive leaf via `PrimitiveInterface::getCastedValue()`, to
+   * use the corresponding native PHP type.
+   *
+   * @param \Drupal\Core\TypedData\TypedDataInterface $element
+   *   The typed config element to extract from.
+   *
+   * @return mixed
+   *   Scalar/NULL for primitives; an array (keys preserved) for mappings and
+   *   sequences.
+   */
+  private static function castRawTypedConfigToPhpTypes(TypedDataInterface $element): mixed {
+    if ($element instanceof PrimitiveInterface) {
+      return $element->getCastedValue();
+    }
+    if ($element instanceof TraversableTypedDataInterface) {
+      // Preserve `toArray()`'s NULL-vs-array distinction: an optional, unset
+      // sequence/mapping stays NULL rather than becoming an empty array, which
+      // would needlessly change the hash of components that have such a key.
+      if ($element->getValue() === NULL) {
+        return NULL;
+      }
+      $casted = [];
+      foreach ($element as $name => $child) {
+        $casted[$name] = self::castRawTypedConfigToPhpTypes($child);
+      }
+      return $casted;
+    }
+    // Anything that is neither a primitive nor traversable (e.g. an `ignore`
+    // element) has no canonical config-schema type; use its value verbatim.
+    return $element->getValue();
   }
 
   private static function normalizeSlotDefinitions(array $slot_definitions): array {
@@ -124,50 +174,6 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
     $definition = parent::getPluginDefinition();
     \assert(\is_array($definition));
     return $definition;
-  }
-
-  /**
-   * Returns the plugin dependencies being removed.
-   *
-   * The function recursively computes the intersection between all plugin
-   * dependencies and all removed dependencies.
-   *
-   * Note: The two arguments do not have the same structure.
-   *
-   * @param array[] $plugin_dependencies
-   *   A list of dependencies having the same structure as the return value of
-   *   ConfigEntityInterface::calculateDependencies().
-   * @param array[] $removed_dependencies
-   *   A list of dependencies having the same structure as the input argument of
-   *   ConfigEntityInterface::onDependencyRemoval().
-   *
-   * @return array
-   *   A recursively computed intersection.
-   *
-   * @see \Drupal\Core\Config\Entity\ConfigEntityInterface::calculateDependencies()
-   * @see \Drupal\Core\Config\Entity\ConfigEntityInterface::onDependencyRemoval()
-   * @see \Drupal\Core\Entity\EntityDisplayBase::getPluginRemovedDependencies()
-   * @todo Remove this verbatim copy of \Drupal\Core\Entity\EntityDisplayBase::getPluginRemovedDependencies() and move it to a trait in Drupal core.
-   */
-  protected function getPluginRemovedDependencies(array $plugin_dependencies, array $removed_dependencies) {
-    $intersect = [];
-    foreach ($plugin_dependencies as $type => $dependencies) {
-      if (\array_key_exists($type, $removed_dependencies) && $removed_dependencies[$type]) {
-        // Config and content entities have the dependency names as keys while
-        // module and theme dependencies are indexed arrays of dependency names.
-        // @see \Drupal\Core\Config\ConfigManager::callOnDependencyRemoval()
-        if (\in_array($type, ['config', 'content'], TRUE)) {
-          $removed = array_intersect_key($removed_dependencies[$type], array_flip($dependencies));
-        }
-        else {
-          $removed = array_values(array_intersect($removed_dependencies[$type], $dependencies));
-        }
-        if ($removed) {
-          $intersect[$type] = $removed;
-        }
-      }
-    }
-    return $intersect;
   }
 
   /**

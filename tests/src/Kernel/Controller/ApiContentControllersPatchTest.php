@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Controller;
 
-use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Controller\ApiContentControllers;
@@ -20,8 +19,6 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * Tests the ApiContentControllers::patch() method.
@@ -250,45 +247,6 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
       [],
       0,
     ];
-  }
-
-  public function testConflictErrorIfPatchingEntityWithAutoSaveDataPresent(): void {
-    $this->expectException(ConflictHttpException::class);
-    $page = Page::create([
-      'title' => 'Initial title',
-      'status' => FALSE,
-      'path' => ['alias' => '/this-is-the-old-path'],
-      'components' => [],
-    ]);
-    self::assertEntityIsValid($page);
-    $page->save();
-
-    // Create some auto-save data. We don't know yet if should be discarded or
-    // not, so better have explicit coverage of it.
-    $autoSaveManager = \Drupal::service(AutoSaveManager::class);
-    \assert($autoSaveManager instanceof AutoSaveManager);
-    $page->set('title', 'autosaved title');
-    $page->set('path', '/autosaved/path');
-    $autoSaveManager->saveEntity($page);
-
-    $request = Request::create(\sprintf(self::URL, $page->id()),
-      'PATCH',
-      server: ['CONTENT_TYPE' => 'application/json'],
-      content: \json_encode([
-        'title' => 'My patched title',
-        'status' => TRUE,
-        'path' => '/patched',
-        'components' => [],
-      ], JSON_THROW_ON_ERROR),
-    );
-    $response = $this->request($request);
-    // The response of a patch shouldn't be cacheable.
-    \assert($response instanceof JsonResponse && !$response instanceof CacheableJsonResponse);
-
-    $this->assertSame(Response::HTTP_CONFLICT, $response->getStatusCode());
-    $this->assertSame([
-      'error' => 'Page with ID 1 has existing auto-saved data. Please use the UI to publish it or discard it.',
-    ], $this->decodeResponse($response));
   }
 
 }

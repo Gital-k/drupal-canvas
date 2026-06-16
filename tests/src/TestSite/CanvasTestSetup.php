@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\TestSite;
 
-use Drupal\canvas\Entity\Component as ComponentEntity;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
-use Drupal\Component\FileCache\FileCacheFactory;
-use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\Component as ComponentEntity;
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\PropSource\StaticPropSource;
-use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\Component\FileCache\FileCacheFactory;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
@@ -36,6 +36,7 @@ use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
 use Symfony\Component\Yaml\Yaml as SymfonyYaml;
 
+// @phpstan-ignore function.impossibleType
 if (!\class_exists(TestSetupInterface::class)) {
   // We're running test-discovery inside run-tests.sh which is before
   // autoloading for the \Drupal\TestSite namespace has been established.
@@ -607,6 +608,7 @@ class CanvasTestSetup implements TestSetupInterface {
    * TRICKY: to allow reusing MediaTypeCreationTrait, simulate `::assertSame()`.
    *
    * @see \Drupal\Tests\media\Traits\MediaTypeCreationTrait
+   * @phpstan-ignore-next-line shipmonk.deadMethod
    */
   public static function assertSame(mixed $expected, mixed $actual, string $message = ''): void {
     // Intentionally empty;

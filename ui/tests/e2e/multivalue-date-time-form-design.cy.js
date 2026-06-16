@@ -9,13 +9,9 @@
  * - Custom drag handles and remove buttons via DrupalDatetimeMultivalueForm component.
  */
 
-describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
+describe('Multivalue DateTime Form Design', () => {
   before(() => {
-    cy.drupalCanvasInstall([
-      'canvas_test_article_fields',
-      // @todo remove once https://drupal.org/i/3577946 is fixed.
-      'canvas_dev_mode',
-    ]);
+    cy.drupalCanvasInstall(['canvas_test_article_fields']);
   });
 
   beforeEach(() => {
@@ -51,7 +47,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       .as('datetimePopover');
   };
 
-  const commitPopoverWithEnter = (inputSelector) => {
+  const closePopoverWithEnter = (inputSelector) => {
     cy.get('@datetimePopover').find(inputSelector).first().trigger('keydown', {
       key: 'Enter',
       code: 'Enter',
@@ -88,14 +84,14 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
             cy.wrap($timeInput).clear({ force: true });
             cy.wrap($timeInput).type(time, { force: true });
             cy.wrap($timeInput).should('have.value', time);
-            commitPopoverWithEnter('input[type="time"]');
+            closePopoverWithEnter('input[type="time"]');
             return;
           }
 
-          commitPopoverWithEnter('input[type="date"]');
+          closePopoverWithEnter('input[type="date"]');
         });
     } else {
-      commitPopoverWithEnter('input[type="date"]');
+      closePopoverWithEnter('input[type="date"]');
     }
 
     // Wait for popover to close after Enter.
@@ -278,12 +274,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
 
     cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
 
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-
     findEditableEmptyRowIndex('@unlimited-datetime').then((emptyRowIndex) => {
       if (emptyRowIndex !== -1) {
         setDateTimeInRow(
@@ -303,7 +293,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     });
 
     // Wait for the preview to finish loading.
-    cy.wait('@updatePreview');
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     // Verify the value was set (formatted for display).
@@ -322,12 +311,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       .closest('.js-form-wrapper')
       .as('unlimited-date');
 
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-
     findEditableEmptyRowIndex('@unlimited-date').then((emptyRowIndex) => {
       if (emptyRowIndex !== -1) {
         setDateInRow('@unlimited-date', emptyRowIndex, '2024-06-20');
@@ -341,7 +324,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       setDateTimeInFirstEmptyRow('@unlimited-date', '2024-06-20', null);
     });
 
-    cy.wait('@updatePreview');
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     // Verify the date was set (date-only, no time).
@@ -368,22 +350,12 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       .then(($initialRows) => {
         const initialCount = $initialRows.length;
 
-        // Register intercept BEFORE the action that triggers the preview
-        // update.
-        cy.intercept({
-          url: '**/canvas/api/v0/layout/node/2',
-          times: 1,
-          method: 'POST',
-        }).as('updatePreview');
-
         // Set first datetime in the first editable empty row.
         setDateTimeInFirstEmptyRow(
           '@unlimited-datetime',
           '2024-01-10',
           '09:00',
         );
-        cy.wait('@updatePreview');
-        cy.waitForAjax();
 
         // Verify the new button text.
         cy.get('@unlimited-datetime')
@@ -416,8 +388,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
           '2024-02-15',
           '13:45',
         );
-        cy.wait('@updatePreview');
-        cy.waitForAjax();
 
         // Verify both values are set.
         cy.get('@unlimited-datetime')
@@ -448,8 +418,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       method: 'POST',
     }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-01-01', '10:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
 
     cy.get('@unlimited-datetime')
       .findByRole('button', { name: '+ Add new' })
@@ -463,8 +431,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       method: 'POST',
     }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-02-01', '11:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
 
     // Store original order.
     const date1 = formatDateForDisplay('2024-01-01');
@@ -474,6 +440,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
 
     // Ensure the drop target is in the viewport.
     cy.get('@unlimited-datetime').find('tbody tr').eq(0).scrollIntoView();
+    cy.reasonableWait();
 
     const dndDefaults = {
       position: 'topLeft',
@@ -523,7 +490,8 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       });
 
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-    cy.waitForAjax();
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(1000);
 
     // Verify date2 appears before date1 after drag and drop.
     cy.get('@unlimited-datetime')
@@ -575,14 +543,10 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       .should('exist');
 
     // Close the popover.
-    cy.get('[role="dialog"][data-state="open"]').find('[aria-label="Close"]');
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click();
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    cy.closeMultivaluePopover();
   });
 
-  it('popover discards uncommitted datetime changes when closed without Enter', () => {
+  it('popover propagates datetime changes live as user types', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
 
@@ -598,12 +562,9 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     }).as('updatePreview');
 
     setDateTimeInRow('@unlimited-datetime', 0, '2024-05-10', '15:30');
-    cy.wait('@updatePreview');
     cy.findByLabelText('Loading Preview').should('not.exist');
 
-    const originalDisplay = `${formatDateForDisplay('2024-05-10')}, ${formatTimeForDisplay('15:30')}`;
-
-    // Open popover and change values without committing.
+    // Reopen and change the date — row label should update immediately.
     openEditableRowPopover('@unlimited-datetime', 0);
 
     cy.get('[role="dialog"][data-state="open"]')
@@ -612,6 +573,11 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     cy.get('[role="dialog"][data-state="open"]')
       .find('input[type="date"]')
       .type('2024-12-25');
+
+    const expectedAfterDate = `${formatDateForDisplay('2024-12-25')}, ${formatTimeForDisplay('15:30')}`;
+    verifyRowDateTime('@unlimited-datetime', 0, expectedAfterDate);
+
+    // Now change the time — row label should update again.
     cy.get('[role="dialog"][data-state="open"]')
       .find('input[type="time"]')
       .clear();
@@ -619,16 +585,16 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       .find('input[type="time"]')
       .type('23:59');
 
-    // Close without pressing Enter.
-    cy.get('[role="dialog"][data-state="open"]').find('[aria-label="Close"]');
+    const expectedAfterTime = `${formatDateForDisplay('2024-12-25')}, ${formatTimeForDisplay('23:59')}`;
+    verifyRowDateTime('@unlimited-datetime', 0, expectedAfterTime);
+
+    // Close via the × button — value should not be reverted.
     cy.get('[role="dialog"][data-state="open"]')
       .find('[aria-label="Close"]')
       .click();
-
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
-    // Verify original value is retained.
-    verifyRowDateTime('@unlimited-datetime', 0, originalDisplay);
+    verifyRowDateTime('@unlimited-datetime', 0, expectedAfterTime);
   });
 
   it('maintains form state across datetime popover interactions', () => {
@@ -647,7 +613,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
 
     // Set first datetime value.
     setDateTimeInRow('@unlimited-datetime', 0, '2024-03-15', '09:30');
-    cy.wait('@updatePreview');
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     // Add and set second datetime value.
@@ -657,7 +622,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
     setDateTimeInRow('@unlimited-datetime', 1, '2024-04-20', '14:45');
-    cy.wait('@updatePreview');
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     // Verify both items maintain their values.
@@ -693,11 +657,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       .should('not.exist');
 
     // Close the popover.
-    cy.get('[role="dialog"][data-state="open"]').find('[aria-label="Close"]');
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click();
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    cy.closeMultivaluePopover();
   });
 
   // Skipping due to intermittent failures.
@@ -719,16 +679,8 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
-    // Set up two items. Register intercept BEFORE each action that triggers
-    // the preview update.
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
+    // Set up two items.
     setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-01-01', '10:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
 
     cy.get('@unlimited-datetime')
       .findByRole('button', { name: '+ Add new' })
@@ -736,14 +688,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-02-01', '11:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
 
     // Get initial row count and verify removal works.
     assertCommittedItemCount('@unlimited-datetime', 2);
@@ -764,7 +709,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-    cy.waitForAjax();
 
     // Verify row count decreased.
     assertCommittedItemCount('@unlimited-datetime', 1);
@@ -782,15 +726,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       .as('required-datetime');
 
     // Set one datetime value (required field must have at least one value).
-    // Register intercept BEFORE the action that triggers the preview update.
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@required-datetime', '2024-01-01', '10:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
 
     // Verify at least one committed value exists.
     getCommittedItemCount('@required-datetime').then((count) => {
@@ -836,16 +772,8 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
-    // Set first datetime value. Register intercept BEFORE the action that
-    // triggers the preview update.
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
+    // Set first datetime value.
     setDateTimeInFirstEmptyRow('@required-datetime', '2024-01-01', '10:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
 
     // Add second item.
     cy.get('@required-datetime')
@@ -855,14 +783,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
     // Set second datetime value.
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@required-datetime', '2024-02-01', '11:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
 
     // Verify multiple committed values exist.
     getCommittedItemCount('@required-datetime').then((countBeforeRemove) => {
@@ -894,7 +815,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-    cy.waitForAjax();
 
     // Verify one item was removed.
     cy.get('@countBeforeRemove').then((countBeforeRemove) => {

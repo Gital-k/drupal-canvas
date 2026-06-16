@@ -54,19 +54,43 @@ interface EntityFieldBasedPropExpressionInterface extends StructuredDataPropExpr
   public function getDelta(): ?int;
 
   /**
-   * Whether the starting point is the same as that of another expression.
+   * Returns a stable identity for the expression's starting point.
    *
    * When comparing entity field-based prop expressions, it is important to know
    * whether they start from the same point, meaning they evaluate the same set
    * of data.
    * In Drupal Typed data terminology: whether they target the same field data:
-   * the same field item list, or potentially even the same specific field item.
+   * the same field item list, or potentially even the same specific field
+   * (delta).
    *
-   * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $other
-   *   The other expression to compare with.
+   * @return string
+   *   The starting point key, for example:
+   *   - `entity:node:article|title|0` — first item of a node article's title
+   *      field
+   *   - `entity:node:article|field_tags|*` — all items of a node article's
+   *      field_tags field
+   *   NOTE: this representation may change without warning: it is considered
+   *   internal.
    *
-   * @return bool
+   * @internal
    */
-  public function hasSameStartingPointAs(EntityFieldBasedPropExpressionInterface $other): bool;
+  public function getStartingPointKey(): string;
+
+  /**
+   * Computes the canonical developer-facing key for this expression's field.
+   *
+   * The expression's field name, normalized to the entity key it implements
+   * when there is one: e.g. node's `title` field implements the `label`
+   * entity key, so the key is `label`; a configurable `field_image` field
+   * implements no entity key, so the key is `field_image`. This yields keys
+   * that are stable across entity types. For reference expressions, the
+   * referencer's field name is used.
+   *
+   * @return string
+   *   The developer-facing key, e.g. `label` or `field_image`.
+   *
+   * @internal
+   */
+  public function getDeveloperFacingKey(): string;
 
 }

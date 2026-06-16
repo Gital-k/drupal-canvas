@@ -11,16 +11,16 @@ declare(strict_types=1);
 
 use Drupal\Core\Entity\Entity\EntityFormDisplay;
 use Drupal\Core\Language\LanguageInterface;
-use Drupal\link\LinkItemInterface;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface;
 use Drupal\editor\Entity\Editor;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\filter\Entity\FilterFormat;
+use Drupal\link\LinkItemInterface;
 use Drupal\node\NodeInterface;
-use Drupal\Tests\content_moderation\Traits\ContentModerationTestTrait;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\Tests\content_moderation\Traits\ContentModerationTestTrait;
 use Drupal\user\Entity\Role;
 use Drupal\user\RoleInterface;
 
@@ -553,6 +553,96 @@ function canvas_test_article_fields_install(): void {
       ],
       'default_value' => [
         ['value' => 42],
+      ],
+    ],
+    'field_cvt_unlimited_list_string' => [
+      'type' => 'list_string',
+      'label' => 'Canvas Unlimited List (Text)',
+      'settings' => [
+        'allowed_values' => [
+          'one' => 'One',
+          'two' => 'Two',
+          'three' => 'Three',
+          'four' => 'Four',
+          'five' => 'Five',
+        ],
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'options_select',
+        'weight' => -989,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 'one'],
+      ],
+    ],
+    'field_cvt_limited_list_string' => [
+      'type' => 'list_string',
+      'label' => 'Canvas Limited List (Text)',
+      'settings' => [
+        'allowed_values' => [
+          'one' => 'One',
+          'two' => 'Two',
+          'three' => 'Three',
+          'four' => 'Four',
+          'five' => 'Five',
+        ],
+      ],
+      'cardinality' => 3,
+      'widget' => [
+        'type' => 'options_select',
+        'weight' => -988,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 'one'],
+        ['value' => 'two'],
+      ],
+    ],
+    'field_cvt_unlimited_list_integer' => [
+      'type' => 'list_integer',
+      'label' => 'Canvas Unlimited List (Integer)',
+      'settings' => [
+        'allowed_values' => [
+          1 => '1',
+          2 => '2',
+          3 => '3',
+          4 => '4',
+          5 => '5',
+        ],
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'options_select',
+        'weight' => -987,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 1],
+      ],
+    ],
+    'field_cvt_limited_list_integer' => [
+      'type' => 'list_integer',
+      'label' => 'Canvas Limited List (Integer)',
+      'settings' => [
+        'allowed_values' => [
+          1 => '1',
+          2 => '2',
+          3 => '3',
+          4 => '4',
+          5 => '5',
+        ],
+      ],
+      'cardinality' => 3,
+      'widget' => [
+        'type' => 'options_select',
+        'weight' => -986,
+        'settings' => [],
+      ],
+      'default_value' => [
+        ['value' => 1],
+        ['value' => 2],
       ],
     ],
     'field_cvt_boolean_checkbox' => [

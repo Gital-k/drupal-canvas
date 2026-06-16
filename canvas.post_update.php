@@ -7,6 +7,7 @@ use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\Core\Config\Entity\ConfigEntityUpdater;
@@ -175,7 +176,7 @@ function canvas_post_update_0007_respect_prop_ordering(array &$sandbox): void {
  * 2. using a dot in a `meta:enum` key is no longer forbidden for SDCs
  *
  * @see https://www.drupal.org/node/2960601
- * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getComponentInputsForMetadata()
  * @see \Drupal\canvas\PropShape\PropShape::standardize()
  * @see \Drupal\canvas\ComponentMetadataRequirementsChecker)
  */
@@ -221,7 +222,6 @@ function canvas_post_update_0010_migrate_auto_save(): void {
     $tempstore_storage = $storage_property->getValue($tempstore);
 
     foreach ($tempstore_storage->getAll() as $key => $value) {
-      // @phpstan-ignore property.notFound
       if (\is_object($value) && isset($value->data)) {
         $data = $value->data;
         \assert(\property_exists($value, 'owner'));
@@ -326,4 +326,100 @@ function canvas_post_update_0015_remove_wrong_image_style_dependency_in_field_co
       $dependencies = $field->getDependencies();
       return \in_array('image.style.canvas_parametrized_width', $dependencies['config'] ?? [], TRUE);
     });
+}
+
+/**
+ * Pattern config entities' component trees' inputs must be arrays.
+ */
+function canvas_post_update_0016_pattern_component_inputs_must_be_arrays(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, Pattern::ENTITY_TYPE_ID, static fn(Pattern $pattern): bool => $canvasConfigUpdater->needsConfigEntityWithComponentTreeInputsAsArrays($pattern));
+}
+
+/**
+ * Page Region config entities' component trees' inputs must be arrays.
+ */
+function canvas_post_update_0016_page_region_component_inputs_must_be_arrays(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, PageRegion::ENTITY_TYPE_ID, static fn(PageRegion $region): bool => $canvasConfigUpdater->needsConfigEntityWithComponentTreeInputsAsArrays($region));
+}
+
+/**
+ * Content Template config entities' component trees' inputs must be arrays.
+ */
+function canvas_post_update_0016_content_template_component_inputs_must_be_arrays(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, ContentTemplate::ENTITY_TYPE_ID, static fn(ContentTemplate $template): bool => $canvasConfigUpdater->needsConfigEntityWithComponentTreeInputsAsArrays($template));
+}
+
+/**
+ * Component tree fields' default values' inputs must be arrays.
+ */
+function canvas_post_update_0016_component_tree_field_default_value_inputs(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, 'field_config', static fn(FieldConfig $field): bool => $canvasConfigUpdater->needsConfigEntityWithComponentTreeInputsAsArrays($field));
+}
+
+/**
+ * Pattern component trees must use UUID sequence keys.
+ */
+function canvas_post_update_0017_pattern_component_tree_sequence_keys(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, Pattern::ENTITY_TYPE_ID, static fn(Pattern $pattern): bool => $canvasConfigUpdater->needsConfigEntityWithComponentTreeSequenceKeysUpdate($pattern));
+}
+
+/**
+ * Page region component trees must use UUID sequence keys.
+ */
+function canvas_post_update_0017_page_region_component_tree_sequence_keys(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, PageRegion::ENTITY_TYPE_ID, static fn(PageRegion $region): bool => $canvasConfigUpdater->needsConfigEntityWithComponentTreeSequenceKeysUpdate($region));
+}
+
+/**
+ * Content template component trees must use UUID sequence keys.
+ */
+function canvas_post_update_0017_content_template_component_tree_sequence_keys(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, ContentTemplate::ENTITY_TYPE_ID, static fn(ContentTemplate $template): bool => $canvasConfigUpdater->needsConfigEntityWithComponentTreeSequenceKeysUpdate($template));
+}
+
+/**
+ * Update Folder config entities to declare their items as config dependencies.
+ */
+function canvas_post_update_0018_folder_component_dependencies(array &$sandbox): void {
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, Folder::ENTITY_TYPE_ID, static fn(Folder $folder): bool => !empty($folder->get('items')));
+}
+
+/**
+ * Recompute version hashes of components with a `list_float` prop default.
+ */
+function canvas_post_update_0019_recompute_list_float_component_version_hashes(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, Component::ENTITY_TYPE_ID, static fn(Component $component): bool => $canvasConfigUpdater->updateListFloatComponentVersionHash($component));
 }

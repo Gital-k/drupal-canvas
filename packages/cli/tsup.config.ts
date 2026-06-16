@@ -8,9 +8,11 @@ export default defineConfig({
   splitting: false,
   treeshake: true,
   minify: false,
+  external: ['vite-plugin-svgr'],
   publicDir: 'assets',
   noExternal: [
     'tailwindcss-in-browser',
+    '@drupal-canvas/auth',
     '@drupal-canvas/discovery',
     '@drupal-canvas/vite-compat',
   ],

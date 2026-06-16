@@ -148,7 +148,7 @@ describe('Transforms - link', () => {
     ]);
   });
 
-  it('Should trim trailing and leading nulls', () => {
+  it('Should strip empty rows surrounding a filled row', () => {
     fieldData.sourceTypeSettings.instance.title = 0;
     expect(
       transforms.link(
@@ -163,8 +163,7 @@ describe('Transforms - link', () => {
     ).toEqual(['https://example.com']);
   });
 
-  it('Should trim leading nulls', () => {
-    // Rows 0 and 1 are empty, row 2 has a value.
+  it('Should strip leading empty rows', () => {
     fieldData.sourceTypeSettings.instance.title = 0;
     expect(
       transforms.link(
@@ -193,7 +192,7 @@ describe('Transforms - link', () => {
     ).toEqual([]);
   });
 
-  it('Should trim trailing empty rows when the first row is filled', () => {
+  it('Should strip trailing empty rows when the first row is filled', () => {
     fieldData.sourceTypeSettings.instance.title = 0;
     expect(
       transforms.link(
@@ -206,6 +205,21 @@ describe('Transforms - link', () => {
         fieldData,
       ),
     ).toEqual(['https://example.com/first']);
+  });
+
+  it('Should strip empty rows between filled rows', () => {
+    fieldData.sourceTypeSettings.instance.title = 0;
+    expect(
+      transforms.link(
+        {
+          0: { uri: 'https://example.com/first', _weight: '0' },
+          1: { uri: '', _weight: '1' },
+          2: { uri: 'https://example.com/third', _weight: '2' },
+        },
+        { multiple: true },
+        fieldData,
+      ),
+    ).toEqual(['https://example.com/first', 'https://example.com/third']);
   });
 });
 
@@ -443,6 +457,114 @@ describe('Transforms - firstRecord', () => {
   });
 });
 
+describe('Transforms - entityAutocompleteTargetId', () => {
+  it('Should return target ID from single autocomplete value', () => {
+    expect(transforms.entityAutocompleteTargetId('A node title (3)')).to.equal(
+      '3',
+    );
+  });
+
+  it('Should return target IDs from multiple autocomplete values', () => {
+    expect(
+      transforms.entityAutocompleteTargetId(
+        'A node title (3), Another node title (42)',
+      ),
+    ).to.deep.equal(['3', '42']);
+  });
+
+  it('Should parse emoji titles from autocomplete values', () => {
+    expect(
+      transforms.entityAutocompleteTargetId('😎 A node title (7)'),
+    ).to.equal('7');
+  });
+
+  it('Should handle a trailing comma in single-value tags input', () => {
+    expect(
+      transforms.entityAutocompleteTargetId('A node title (3), '),
+    ).to.equal('3');
+  });
+
+  it('Should map array values when given array input', () => {
+    expect(
+      transforms.entityAutocompleteTargetId([
+        'A node title (3)',
+        'Another node title (42)',
+      ]),
+    ).to.deep.equal(['3', '42']);
+  });
+
+  it('Should pass through an already-extracted target ID unchanged', () => {
+    // The transform is re-applied on every commit; the second pass receives
+    // the previously-extracted id (e.g. '3'), and must return it unchanged so
+    // the value is not destroyed. Mirrors the pass-through behavior of
+    // \Drupal\Core\Entity\Element\EntityAutocomplete::extractEntityIdFromAutocompleteInput.
+    expect(transforms.entityAutocompleteTargetId('3')).to.equal('3');
+    expect(transforms.entityAutocompleteTargetId('A node title')).to.equal(
+      'A node title',
+    );
+  });
+
+  it('Should be idempotent for single values', () => {
+    const first = transforms.entityAutocompleteTargetId('A node title (3)');
+    expect(first).to.equal('3');
+    expect(transforms.entityAutocompleteTargetId(first)).to.equal('3');
+  });
+
+  it('Should be idempotent for array values', () => {
+    const first = transforms.entityAutocompleteTargetId([
+      'A node title (3)',
+      'Another node title (42)',
+    ]);
+    expect(first).to.deep.equal(['3', '42']);
+    expect(transforms.entityAutocompleteTargetId(first)).to.deep.equal([
+      '3',
+      '42',
+    ]);
+  });
+
+  it('Should pass through bare ids in an array', () => {
+    expect(transforms.entityAutocompleteTargetId(['3', '42'])).to.deep.equal([
+      '3',
+      '42',
+    ]);
+  });
+
+  it('Should accept arrays mixing bare ids and "Label (id)" values', () => {
+    expect(
+      transforms.entityAutocompleteTargetId(['A node title (3)', '42']),
+    ).to.deep.equal(['3', '42']);
+  });
+
+  it('Should return null for null input', () => {
+    expect(transforms.entityAutocompleteTargetId(null)).to.equal(null);
+  });
+
+  it('Should return null for an empty string', () => {
+    expect(transforms.entityAutocompleteTargetId('')).to.equal(null);
+  });
+
+  it('Should keep an internal comma inside a quoted label', () => {
+    // Mirrors Drupal.autocomplete.splitValues quote handling.
+    expect(
+      transforms.entityAutocompleteTargetId('"Hello, world" (3)'),
+    ).to.equal('3');
+  });
+
+  it('Should split tags around quoted labels containing commas', () => {
+    expect(
+      transforms.entityAutocompleteTargetId('"Hello, world" (3), Another (5)'),
+    ).to.deep.equal(['3', '5']);
+  });
+
+  it('Should keep legitimate ids when a tags-mode entry is unparseable', () => {
+    // Unparseable entries are treated as bare ids (idempotent pass-through);
+    // server-side validation surfaces the actual error.
+    expect(
+      transforms.entityAutocompleteTargetId('A node title (3), invalid'),
+    ).to.deep.equal(['3', 'invalid']);
+  });
+});
+
 describe('Transforms - dateTime', () => {
   const datePropSource = {
     sourceType: 'static:field_item:datetime',
@@ -455,7 +577,7 @@ describe('Transforms - dateTime', () => {
     expect(transforms.dateTime({ date: '' }, {}, undefined)).to.equal(null);
   });
 
-  it('should trim trailing and leading', () => {
+  it('should strip empty rows surrounding a filled row', () => {
     expect(
       transforms.dateTime(
         [
@@ -469,8 +591,7 @@ describe('Transforms - dateTime', () => {
     ).toEqual(['2024-06-01']);
   });
 
-  it('should trim trailing and leading nulls but keep middle nulls', () => {
-    // Rows 0 and 1 are empty, row 2 has a value.
+  it('should strip all empty rows including leading ones', () => {
     expect(
       transforms.dateTime(
         [
@@ -497,7 +618,7 @@ describe('Transforms - dateTime', () => {
     ).toEqual([]);
   });
 
-  it('should trim trailing empty rows when the first row is filled', () => {
+  it('should strip trailing empty rows when the first row is filled', () => {
     expect(
       transforms.dateTime(
         [
@@ -509,6 +630,20 @@ describe('Transforms - dateTime', () => {
         datePropSource,
       ),
     ).toEqual(['2024-01-01']);
+  });
+
+  it('should strip empty rows between filled rows', () => {
+    expect(
+      transforms.dateTime(
+        [
+          { date: '2024-01-01', time: '' },
+          { date: '', time: '' },
+          { date: '2024-06-01', time: '' },
+        ],
+        { type: 'date', multiple: true },
+        datePropSource,
+      ),
+    ).toEqual(['2024-01-01', '2024-06-01']);
   });
 });
 

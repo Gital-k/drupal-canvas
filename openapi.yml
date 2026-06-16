@@ -152,7 +152,7 @@ paths:
             text/javascript:
               example: 'console.log("hey");'
   /canvas/api/v0/auto-saves/pending:
-    description: TODO
+    description: Current auto-save entries
     get:
       summary: All current auto-save entries
       responses:
@@ -163,57 +163,161 @@ paths:
               examples:
                 multipleEntries:
                   value:
-                    node:1:en:
-                      owner:
-                        name: Garrett Bobby Ferguson, Jr
-                        avatar: /sites/default/files/user-pictures/garrett.jpg
-                        uri: /user/12
-                        id: 12
-                      updated: 1732763679
-                      entity_type: node
-                      langcode: en
-                      data_hash: 4711efecf75d2d1a
-                      entity_id: 1
-                      label: Home page
-                    asset_library:global:
-                      owner:
-                        name: Gracie Dog
-                        avatar: /sites/default/files/user-pictures/good-dog.jpg
-                        uri: /user/13
-                        id: 13
-                      updated: 1732763680
-                      entity_type: asset_library
-                      langcode: NULL
-                      data_hash: 4711efecf75d2d1b
-                      entity_id: global
-                      label: Global asset library
-                    js_component:hero:
-                      owner:
-                        name: Mark Scout
-                        avatar: /sites/default/files/user-pictures/severed.jpg
-                        uri: /user/16
-                        id: 16
-                      updated: 1732763680
-                      entity_type: js_component
-                      langcode: NULL
-                      data_hash: 4711efecf75d2d1b
-                      entity_id: hero
-                      label: Hero component
-                    segment:test_segment:
-                      owner:
-                        name: Mark Scout
-                        avatar: /sites/default/files/user-pictures/severed.jpg
-                        uri: /user/16
-                        id: 16
-                      updated: 1732763680
-                      entity_type: test_segment
-                      langcode: NULL
-                      data_hash: a95cf01fd2e9c59e
-                      entity_id: test_segment
-                      label: Test segment
-
+                    data:
+                      node:1:en:
+                        owner:
+                          name: Garrett Bobby Ferguson, Jr
+                          avatar: /sites/default/files/user-pictures/garrett.jpg
+                          uri: /user/12
+                          id: 12
+                        updated: 1732763679
+                        entity_type: node
+                        langcode: en
+                        data_hash: 4711efecf75d2d1a
+                        entity_id: 1
+                        label: Home page
+                      asset_library:global:
+                        owner:
+                          name: Gracie Dog
+                          avatar: /sites/default/files/user-pictures/good-dog.jpg
+                          uri: /user/13
+                          id: 13
+                        updated: 1732763680
+                        entity_type: asset_library
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: global
+                        label: Global asset library
+                      js_component:hero:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: js_component
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: hero
+                        label: Hero component
+                      segment:test_segment:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: test_segment
+                        langcode: NULL
+                        data_hash: a95cf01fd2e9c59e
+                        entity_id: test_segment
+                        label: Test segment
               schema:
-                $ref: '#/components/schemas/AutoSaveCollection'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AutoSaveCollection'
+        '409':
+          description: 'Returned if at least one of the auto-save entries has the entity it is based on updated outside of Canvas. Response contains both "errors" and "data" top level properties.'
+          content:
+            application/json:
+              examples:
+                multipleEntries:
+                  value:
+                    errors:
+                      - detail: Conflict detected
+                        source:
+                          pointer: canvas_page:1:en
+                        code: 4
+                        meta:
+                          entity_type: canvas_page
+                          entity_id: "1"
+                          label: Demo Canvas Page
+                          api_auto_save_key : canvas_page:1:en
+                          conflict_id: "2"
+                      - detail: Conflict detected
+                        source:
+                          pointer: canvas_page:7:en
+                        code: 4
+                        meta:
+                          entity_type: canvas_page
+                          entity_id: "7"
+                          label: Demo Canvas Page
+                          api_auto_save_key: canvas_page:7:en
+                          conflict_id: '7'
+                    data:
+                      canvas_page:1:en:
+                        owner:
+                          name: Garrett Bobby Ferguson, Jr
+                          avatar: /sites/default/files/user-pictures/garrett.jpg
+                          uri: /user/12
+                          id: 12
+                        updated: 1732763679
+                        entity_type: canvas_page
+                        langcode: en
+                        data_hash: 4711efecf75d2d1a
+                        entity_id: 1
+                        label: First Canvas page
+                      canvas_page:7:en:
+                        owner:
+                          name: Garrett Bobby Ferguson, Jr
+                          avatar: /sites/default/files/user-pictures/garrett.jpg
+                          uri: /user/12
+                          id: 12
+                        updated: 1732764679
+                        entity_type: canvas_page
+                        langcode: en
+                        data_hash: 4711efecf75d2d1a
+                        entity_id: 7
+                        label: Second Canvas page
+                      asset_library:global:
+                        owner:
+                          name: Gracie Dog
+                          avatar: /sites/default/files/user-pictures/good-dog.jpg
+                          uri: /user/13
+                          id: 13
+                        updated: 1732763680
+                        entity_type: asset_library
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: global
+                        label: Global asset library
+                      js_component:hero:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: js_component
+                        langcode: NULL
+                        data_hash: 4711efecf75d2d1b
+                        entity_id: hero
+                        label: Hero component
+                      segment:test_segment:
+                        owner:
+                          name: Mark Scout
+                          avatar: /sites/default/files/user-pictures/severed.jpg
+                          uri: /user/16
+                          id: 16
+                        updated: 1732763680
+                        entity_type: test_segment
+                        langcode: NULL
+                        data_hash: a95cf01fd2e9c59e
+                        entity_id: test_segment
+                        label: Test segment
+              schema:
+                type: object
+                required:
+                  - errors
+                properties:
+                  errors:
+                    type: array
+                    description: Error items
+                    items:
+                      $ref: '#/components/schemas/Error'
+                  data:
+                    $ref: '#/components/schemas/AutoSaveCollection'
   /canvas/api/v0/auto-saves/publish:
     description: TODO
     post:
@@ -732,6 +836,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContentTemplate'
+    patch:
+      summary: Updates a specific Content Template.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      requestBody:
+        description: Properties to update on the Content Template.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateContentTemplate'
+      responses:
+        '200':
+          description: Updated Content Template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentTemplate'
     delete:
       summary: Deletes a ContentTemplate.
       parameters:
@@ -739,6 +861,17 @@ paths:
       responses:
         '204':
           description: Deleted individual ContentTemplate entity.
+  '/canvas/api/v0/config/content_template/{configEntityId}/translations':
+    description: Endpoint for deleting a specific translation of a Content Template. Note that the path can be prefixed with a langcode to negotiate deleting that particular translation.
+    delete:
+      summary: Deletes the language config override (translation) for a content_template config entity.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: No translation exists for the current language.
   /canvas/api/v0/config/folder:
     description: TODO
     get:
@@ -941,6 +1074,140 @@ paths:
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/config/page_region:
+    description: Endpoint for managing Page Regions.
+    get:
+      summary: Retrieves all available Page Regions for the site's default theme.
+      responses:
+        '200':
+          description: All available Page Regions
+          content:
+            application/json:
+              schema:
+                type: object
+                minProperties: 0
+                additionalProperties:
+                  $ref: '#/components/schemas/PageRegion'
+              examples:
+                page_regions:
+                  summary: Page regions for a theme
+                  value:
+                    olivero.sidebar:
+                      id: olivero.sidebar
+                      theme: olivero
+                      region: sidebar
+                      status: true
+                      component_tree: []
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
+        '403':
+          description: Access denied response.
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+    post:
+      summary: Creates a new Page Region.
+      requestBody:
+        description: Create a new Page Region.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPageRegion'
+            examples:
+              highlighted_with_empty_tree:
+                value:
+                  region: highlighted
+                  status: true
+                  component_tree: []
+      responses:
+        '201':
+          description: Created Page Region successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageRegion'
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
+        '403':
+          description: Access denied response.
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+        '409':
+          description: Page Region with same theme + region already exists.
+          $ref: '#/components/responses/ClientErrorResponse'
+        '422':
+          description: Validation errors exist
+          $ref: '#/components/responses/ClientErrorResponse'
+  '/canvas/api/v0/config/page_region/{configEntityId}':
+    description: Endpoint for managing a specific Page Region.
+    get:
+      summary: Retrieves details of a specific Page Region.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: Individual Page Region
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageRegion'
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
+        '403':
+          description: Access denied response.
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+    patch:
+      summary: Updates a specific Page Region.
+      requestBody:
+        description: Update specific Page Region.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PageRegion'
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: Individual Page Region
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageRegion'
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
+        '403':
+          description: Access denied response.
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+        '422':
+          description: Validation errors exist
+          $ref: '#/components/responses/ClientErrorResponse'
+    delete:
+      summary: Deletes a Page Region.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '204':
+          description: Deleted individual Page Region
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
+        '403':
+          description: Access denied response.
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  '/canvas/api/v0/config/page_region/{configEntityId}/translations':
+    description: Endpoint for deleting a specific translation of a Page Region. Note that the path can be prefixed with a langcode to negotiate deleting that particular translation.
+    delete:
+      summary: Deletes the language config override (translation) for a page_region config entity.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: No translation exists for the current language.
   /canvas/api/v0/config/pattern:
     description: TODO
     get:
@@ -1351,6 +1618,17 @@ paths:
       responses:
         '204':
           description: Content deleted successfully
+  '/canvas/api/v0/content/canvas_page/{entityId}/translations':
+    description: Endpoint for deleting a specific translation of a Page content entity. Note that the path can be prefixed with a langcode to negotiate deleting that particular translation.
+    delete:
+      summary: Deletes a single translation of a canvas_page entity.
+      parameters:
+        - $ref: '#/components/parameters/entityId'
+      responses:
+        '204':
+          description: Translation deleted successfully.
+        '400':
+          description: Cannot delete the default translation. Use the entity delete endpoint to remove the whole entity.
   '/canvas/api/v0/content/{entity_type}':
     get:
       summary: Provides api for page listing.
@@ -1689,6 +1967,63 @@ paths:
               schema:
                 type: object
                 description: A Drupal AJAX response.
+  '/canvas/api/v0/layout-content-template-draft/{entityTypeId}/{entityId}':
+    description: >
+      Resolves a content template draft (provided in the request body) against
+      a preview entity, returning evaluated input values, for use in consumers
+      that provide their own renderer.
+    parameters:
+      - $ref: '#/components/parameters/entityTypeId'
+      - $ref: '#/components/parameters/entityId'
+    post:
+      summary: Resolves a content template draft against a preview entity.
+      requestBody:
+        description: The content template draft to resolve.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - bundle
+                - viewMode
+              properties:
+                bundle:
+                  type: string
+                  description: The content entity bundle the template targets.
+                viewMode:
+                  type: string
+                  description: The view mode the template targets.
+                component_tree:
+                  $ref: '#/components/schemas/ComponentTree'
+                  description: The component tree to resolve. Defaults to empty.
+      responses:
+        '200':
+          description: The resolved draft model keyed by component instance UUID.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - model
+                properties:
+                  model:
+                    $ref: '#/components/schemas/Model'
+        '400':
+          description: Malformed request body or mismatched bundle.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
+        '403':
+          description: Access denied response.
+          $ref: '#/components/responses/AuthenticationErrorResponse'
   '/canvas/api/v0/layout-content-template/{configEntityId}/{entityId}':
     description: Layout content template endpoints for managing layout components with preview entity context
     parameters:
@@ -1955,6 +2290,8 @@ paths:
                       'uid[0][target_id]': Anonymous (0)
                       'langcode[0][value]': en
                       'revision_log[0][value]': ''
+                    translations:
+                      available: [en, fr]
                     isNew: false
                     isPublished: true
               schema:
@@ -1966,6 +2303,7 @@ paths:
                   - isNew
                   - isPublished
                   - html
+                  - translations
                 properties:
                   html:
                     type: string
@@ -1982,6 +2320,17 @@ paths:
                   entity_form_fields:
                     type: object
                     description: Entity field values that the user has edit access to.
+                  translations:
+                    type: object
+                    description: Translation metadata for the entity.
+                    required:
+                      - available
+                    properties:
+                      available:
+                        type: array
+                        description: Language codes with existing translations.
+                        items:
+                          type: string
                   isNew:
                     type: boolean
                     # @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew()
@@ -2335,6 +2684,78 @@ paths:
           description: Push start recorded.
         '403':
           $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/site-data:
+    description: Returns the site-level canvasData.v0 payload.
+    get:
+      summary: Returns the site-level canvasData.v0 payload.
+      responses:
+        '200':
+          description: The site-level canvasData.v0 payload
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - baseUrl
+                  - branding
+                  - jsonapiSettings
+                  - themeAssets
+                properties:
+                  baseUrl:
+                    type: string
+                    format: uri-reference
+                    description: The absolute base URL of the site.
+                  branding:
+                    type: object
+                    required:
+                      - homeUrl
+                      - siteName
+                      - siteSlogan
+                    properties:
+                      homeUrl:
+                        type: string
+                        format: uri-reference
+                      siteName:
+                        type: string
+                      siteSlogan:
+                        type: string
+                  jsonapiSettings:
+                    type: ['object', 'null']
+                    properties:
+                      apiPrefix:
+                        type: string
+                    required:
+                      - apiPrefix
+                  themeAssets:
+                    type: object
+                    required:
+                      - logo
+                      - favicon
+                    properties:
+                      logo:
+                        type: object
+                        required:
+                          - url
+                        properties:
+                          url:
+                            type: string
+                            format: uri-reference
+                      favicon:
+                        type: object
+                        required:
+                          - url
+                          - mimeType
+                        properties:
+                          url:
+                            type: string
+                            format: uri-reference
+                          mimeType:
+                            type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+
   /canvas/api/v0/staged-update/auto-save:
     description: Auto-save endpoints for staged config updates.
     post:
@@ -2383,6 +2804,279 @@ paths:
                     examples:
                       - Missing data
                       - Missing clientInstanceId
+  /canvas/api/v0/ui/content-entity-reference:
+    get:
+      summary: Lists fieldable content entity types and their bundles the current user can view.
+      responses:
+        '200':
+          description: Map of entity type IDs to labels and accessible bundles.
+          content:
+            application/json:
+              schema:
+                title: Content entity types and bundles
+                type: object
+                required:
+                  - data
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    minProperties: 0
+                    additionalProperties:
+                      type: object
+                      required:
+                        - label
+                        - bundles
+                      additionalProperties: false
+                      properties:
+                        label:
+                          type: string
+                          description: Human-readable label of the entity type.
+                        bundles:
+                          type: object
+                          minProperties: 1
+                          additionalProperties:
+                            type: object
+                            required:
+                              - label
+                              - links
+                            additionalProperties: false
+                            properties:
+                              label:
+                                type: string
+                                description: Human-readable label of the bundle.
+                              links:
+                                type: object
+                                required:
+                                  - https://drupal.org/project/canvas#link-rel-typed-data-browser
+                                additionalProperties: false
+                                properties:
+                                  https://drupal.org/project/canvas#link-rel-typed-data-browser:
+                                    type: object
+                                    required:
+                                      - href
+                                    additionalProperties: false
+                                    properties:
+                                      href:
+                                        type: string
+                                        description: URL to the fields endpoint for this entity type + bundle.
+              examples:
+                types-and-bundles:
+                  summary: Fieldable content entity types and accessible bundles
+                  value:
+                    data:
+                      node:
+                        label: Content
+                        bundles:
+                          article:
+                            label: Article
+                            links:
+                              https://drupal.org/project/canvas#link-rel-typed-data-browser:
+                                href: /canvas/api/v0/ui/content-entity-reference/node/article
+                          page:
+                            label: Basic page
+                            links:
+                              https://drupal.org/project/canvas#link-rel-typed-data-browser:
+                                href: /canvas/api/v0/ui/content-entity-reference/node/page
+                      user:
+                        label: User
+                        bundles:
+                          user:
+                            label: User
+                            links:
+                              https://drupal.org/project/canvas#link-rel-typed-data-browser:
+                                href: /canvas/api/v0/ui/content-entity-reference/user/user
+        '401':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/ui/content-entity-reference/{entityType}/{bundle}:
+    get:
+      summary: Lists fields with derivable prop expressions on an entity type + bundle.
+      parameters:
+        - in: path
+          name: entityType
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: bundle
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: parent
+          required: false
+          schema:
+            type: string
+          description: >
+            URL-encoded expression representing a reference chain up to the
+            current navigation point. When provided, the server builds complete
+            expression strings rooted at the original entity.
+      responses:
+        '200':
+          description: Array of field descriptors, each with its pickable properties. Internal and multi-valued fields are omitted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - name
+                        - label
+                        - hasChildren
+                        - properties
+                      additionalProperties: false
+                      properties:
+                        name:
+                          type: string
+                        label:
+                          type: string
+                        hasChildren:
+                          type: boolean
+                          description: True for reference fields with at least one resolved target bundle; false otherwise.
+                        targetEntityType:
+                          type: string
+                          description: Present only when hasChildren is true.
+                        targetBundles:
+                          type: object
+                          description: >
+                            Present only when hasChildren is true. Keyed by bundle ID;
+                            each value provides a label, reference expression and
+                            browse link for that bundle. Contains one entry for
+                            single-bundle targets, multiple for multi-bundle targets.
+                          additionalProperties:
+                            type: object
+                            required:
+                              - label
+                              - labelExpression
+                              - links
+                            additionalProperties: false
+                            properties:
+                              label:
+                                type: string
+                              labelExpression:
+                                type: string
+                                description: >
+                                  Expression that resolves to the referenced entity's
+                                  label for this bundle (the reference field followed to
+                                  the target bundle's label property). Use it to display
+                                  the picked entity's label. It also doubles as the
+                                  `?parent=` value when descending into this bundle.
+                              links:
+                                type: object
+                                properties:
+                                  https://drupal.org/project/canvas#link-rel-typed-data-browser:
+                                    type: object
+                                    required:
+                                      - href
+                                    additionalProperties: false
+                                    properties:
+                                      href:
+                                        type: string
+                                        description: URL to descend into the target entity type + bundle, with `?parent=` pre-filled.
+                        properties:
+                          type: array
+                          description: >
+                            Non-internal typed-data properties of the field, each with a
+                            pre-built FieldPropExpression string. For reference fields the
+                            `entity` typed-data property is omitted (it's the descend path,
+                            encoded by `hasChildren`/`targetEntityType`/`targetBundles`).
+                          items:
+                            type: object
+                            required:
+                              - name
+                              - label
+                              - expression
+                            additionalProperties: false
+                            properties:
+                              name:
+                                type: string
+                              label:
+                                type: string
+                              expression:
+                                type: string
+              examples:
+                node-article-fields:
+                  summary: Fields on node/article (root level, no parent)
+                  value:
+                    data:
+                      - name: title
+                        label: Title
+                        hasChildren: false
+                        properties:
+                          - name: value
+                            label: Text value
+                            expression: "ℹ︎␜entity:node:article␝title␞␟value"
+                      - name: uid
+                        label: Authored by
+                        hasChildren: true
+                        targetEntityType: user
+                        targetBundles:
+                          user:
+                            label: User
+                            labelExpression: "ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user:user␝name␞␟value"
+                            links:
+                              https://drupal.org/project/canvas#link-rel-typed-data-browser:
+                                # cspell:disable-next-line
+                                href: "/canvas/api/v0/ui/content-entity-reference/user/user?parent=%E2%84%B9%EF%B8%8E%E2%90%9Centity%3Anode%3Aarticle%E2%90%9Duid%E2%90%9E%E2%90%9Fentity%E2%90%9C%E2%90%9Centity%3Auser%3Auser%E2%90%9Dname%E2%90%9E%E2%90%9Fvalue"
+                        properties:
+                          - name: target_id
+                            label: User ID
+                            expression: "ℹ︎␜entity:node:article␝uid␞␟target_id"
+                      - name: field_image
+                        label: Image
+                        hasChildren: false
+                        properties:
+                          - name: target_id
+                            label: File ID
+                            expression: "ℹ︎␜entity:node:article␝field_image␞␟target_id"
+                          - name: alt
+                            label: Alternative text
+                            expression: "ℹ︎␜entity:node:article␝field_image␞␟alt"
+                          - name: title
+                            label: Title
+                            expression: "ℹ︎␜entity:node:article␝field_image␞␟title"
+                          - name: width
+                            label: Width
+                            expression: "ℹ︎␜entity:node:article␝field_image␞␟width"
+                          - name: height
+                            label: Height
+                            expression: "ℹ︎␜entity:node:article␝field_image␞␟height"
+                          - name: src_with_alternate_widths
+                            label: URL with alternate widths
+                            expression: "ℹ︎␜entity:node:article␝field_image␞␟src_with_alternate_widths"
+                user-fields-via-parent:
+                  summary: Fields on user (navigated via node.article.uid reference)
+                  value:
+                    data:
+                      - name: name
+                        label: Name
+                        hasChildren: false
+                        properties:
+                          - name: value
+                            label: Text value
+                            expression: "ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝name␞␟value"
+                      - name: mail
+                        label: Email
+                        hasChildren: false
+                        properties:
+                          - name: value
+                            label: Text value
+                            expression: "ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝mail␞␟value"
+        '401':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+        '403':
+          description: Current user cannot access the entity type/bundle, or any hop in the parent chain.
+          $ref: '#/components/responses/ClientErrorResponse'
+        '404':
+          description: Non-existent entity type or bundle, or invalid parent expression.
+          $ref: '#/components/responses/ClientErrorResponse'
   /canvas/api/v0/ui/content_template/suggestions/preview/{entityTypeId}/{bundle}:
     description: Provides content that can be used for previewing content template targeting the specified entity type and bundle.
     get:
@@ -2699,8 +3393,8 @@ components:
       type: object
       description: Component transforms keyed by prop name.
       # Names of Components' inputs, *if* they use field widgets.
-      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getExplicitInputDefinitions()
-      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getClientSideInfo()
+      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getExplicitInputDefinitions()
+      # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getClientSideInfo()
       additionalProperties:
         type: object
         # Client-side transforms for those inputs' field widgets.
@@ -3043,6 +3737,17 @@ components:
           description: Client instance ID for the layout preview
         entity_form_fields:
           type: object
+        translations:
+          type: object
+          description: Translation metadata for the entity.
+          required:
+            - available
+          properties:
+            available:
+              type: array
+              description: Language codes with existing translations.
+              items:
+                type: string
         isNew:
           type: boolean
         isPublished:
@@ -3339,6 +4044,75 @@ components:
         weight:
           type: integer
           description: The weight of the segment, used for ordering segments.
+    PageRegion:
+      title: Page Region
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Page Region ID, composed of theme and region (e.g. "olivero.sidebar")
+        theme:
+          type: string
+          description: The theme this page region belongs to
+        region:
+          type: string
+          description: The region name within the theme
+        status:
+          type: boolean
+          description: Whether the region is editable (active).
+        component_tree:
+          type: array
+          description: |
+            The component instances rendered inside this page region. Each entry
+            is a flat node with its `parent_uuid`/`slot` referencing another
+            entry to express tree structure. The HTTP API accepts an array
+            (deltas); the underlying config storage transforms it into a
+            UUID-keyed sequence on save.
+          items:
+            type: object
+            required:
+              - uuid
+              - component_id
+            additionalProperties: false
+            properties:
+              uuid:
+                type: string
+                format: uuid
+                description: Unique identifier of this component instance.
+              component_id:
+                type: string
+                description: The component config entity ID (e.g. "js.hero").
+              component_version:
+                type: string
+                description: The component version hash.
+              parent_uuid:
+                type:
+                  - string
+                  - 'null'
+                format: uuid
+                description: UUID of the parent component (null for root items).
+              slot:
+                type:
+                  - string
+                  - 'null'
+                description: The slot name in the parent component (null for root items).
+              inputs:
+                type:
+                  - object
+                  - 'null'
+                description: The component input values (prop sources).
+              label:
+                type:
+                  - string
+                  - 'null'
+                description: Optional label for the component instance.
+    NewPageRegion:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/PageRegion'
+      required:
+        - region
     SuggestedPropSources:
       title: A list of suggested prop sources (a level in the tree of hierarchical suggestions)
       type: array
@@ -3436,6 +4210,9 @@ components:
               examples:
                 - 'node:4:en'
               title: The corresponding key in the pending changes API
+            conflict_id:
+              type: string
+              description: Only available in HTTP 409 responses. Contains the id of the conflict detected due to external updates to the entity on which the auto-save item was based.
           additionalProperties: false
     Model:
       title: model
@@ -3696,6 +4473,23 @@ components:
         viewMode:
           type: string
           description: Drupal View Mode
+        status:
+          type: boolean
+          description: ContentTemplate entity status. Defaults to false (disabled) when omitted.
+        component_tree:
+          $ref: '#/components/schemas/ComponentTree'
+          description: Initial component tree. Defaults to an empty tree when omitted.
+    UpdateContentTemplate:
+      title: ContentTemplate fields the client may PATCH on the server side.
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: boolean
+          description: ContentTemplate entity status.
+        component_tree:
+          $ref: '#/components/schemas/ComponentTree'
+          description: Replacement component tree.
     Extension:
       title: Canvas Extension metadata
       description: Canvas Extension metadata
@@ -3977,6 +4771,7 @@ components:
         - suggestedPreviewEntityId
         - label
         - viewModeLabel
+        - component_tree
       properties:
         entityType:
           type: string
@@ -4002,6 +4797,44 @@ components:
         viewModeLabel:
           type: string
           description: Entity View Mode label.
+        component_tree:
+          $ref: '#/components/schemas/ComponentTree'
+          description: The persisted component tree.
+    ComponentTree:
+      title: A flat array of component tree items.
+      description: >
+        The stored component tree as a flat array of items.
+      type: array
+      items:
+        type: object
+        required:
+          - uuid
+          - component_id
+          - component_version
+        properties:
+          uuid:
+            type: string
+            format: uuid
+            description: Unique identifier of this component instance.
+          component_id:
+            type: string
+            description: The component config entity ID.
+          component_version:
+            type: string
+            description: The component version hash.
+          parent_uuid:
+            type: [ 'null', string ]
+            format: uuid
+            description: UUID of the parent component (null for root items).
+          slot:
+            type: [ 'null', string ]
+            description: The slot name in the parent component (null for root items).
+          inputs:
+            type: [ 'null', object ]
+            description: The component input values (prop sources).
+          label:
+            type: [ 'null', string ]
+            description: Optional label for the component instance.
   # @see https://spec.openapis.org/oas/v3.1.0.html#response-object
   responses:
     ContentEntityResponse:

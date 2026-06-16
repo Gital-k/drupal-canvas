@@ -4,19 +4,22 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
+use Drupal\canvas\Access\CanvasUiAccessCheck;
 use Drupal\canvas\Access\ViewModeAccessCheck;
 use Drupal\canvas\Config\ThemeSettingsDiscovery;
+use Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSynchronizer;
 use Drupal\canvas\CoreBugFix\ConfigEntityQueryFactory;
 use Drupal\canvas\CoreBugFix\TypedConfigManagerWithCachePollutionFix;
+use Drupal\canvas\EventSubscriber\DefaultContentSubscriber;
 use Drupal\canvas\Plugin\ComponentPluginManager;
+use Drupal\canvas\Validation\JsonSchema\ContentEntityReferenceObjectConstraint;
+use Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint;
 use Drupal\Core\DefaultContent\Exporter;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\DependencyInjection\ServiceProviderBase;
-use Drupal\canvas\Access\CanvasUiAccessCheck;
-use Drupal\canvas\EventSubscriber\DefaultContentSubscriber;
-use Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint;
 use Drupal\Core\Theme\Component\ComponentValidator;
 use JsonSchema\Constraints\Factory;
+use JsonSchema\DraftIdentifiers;
 use JsonSchema\Validator;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
@@ -58,7 +61,12 @@ class CanvasServiceProvider extends ServiceProviderBase {
   public function alter(ContainerBuilder $container): void {
     $validator = $container->getDefinition(ComponentValidator::class);
     $factory = $container->setDefinition(Factory::class, new Definition(Factory::class));
+    // Align the PHP validator with the Ajv default in the UI: both use JSON
+    // Schema draft-07.
+    // @see ui/src/utils/ajv.ts
+    $factory->addMethodCall('setDefaultDialect', [DraftIdentifiers::DRAFT_7]);
     $factory->addMethodCall('setConstraintClass', ['format', UriSchemeAwareFormatConstraint::class]);
+    $factory->addMethodCall('setConstraintClass', ['object', ContentEntityReferenceObjectConstraint::class]);
     $container->setDefinition(Validator::class, new Definition(Validator::class, [
       new Reference(Factory::class),
     ]));
@@ -83,6 +91,15 @@ class CanvasServiceProvider extends ServiceProviderBase {
         ->setAutowired(TRUE)
         ->setDecoratedService('access_check.field_ui.view_mode');
       $container->setDefinition('canvas.access_check.field_ui.view_mode', $definition);
+    }
+
+    // Decorate the content translation synchronizer to perform component tree
+    // field type-specific content translation synchronization.
+    if ($container->hasDefinition('content_translation.synchronizer')) {
+      $definition = (new Definition(ComponentTreeFieldSymmetricalTranslationSynchronizer::class))
+        ->setAutowired(TRUE)
+        ->setDecoratedService('content_translation.synchronizer');
+      $container->setDefinition('canvas.content_translation.synchronizer', $definition);
     }
 
     // Alter the config entity query factory to fix a bug with sorting by

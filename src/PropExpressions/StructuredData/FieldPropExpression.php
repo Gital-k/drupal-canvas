@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropExpressions\StructuredData;
 
+use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
@@ -16,7 +17,6 @@ use Drupal\Core\Field\FieldConfigInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 
 /**
  * For pointing to a prop in a concrete field.
@@ -243,7 +243,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
     return $dependencies;
   }
 
-  private function calculateDependenciesForFieldDefinition(FieldDefinitionInterface $field_definition, ?string $bundle): array {
+  private static function calculateDependenciesForFieldDefinition(FieldDefinitionInterface $field_definition, ?string $bundle): array {
     $dependencies = [];
 
     // If this is a base field definition, there are no other dependencies.
@@ -279,15 +279,6 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
       sort($values);
       return $values;
     }, $dependencies);
-  }
-
-  public function withDelta(int $delta): static {
-    return new static(
-      $this->entityType,
-      $this->fieldName,
-      $delta,
-      $this->propName,
-    );
   }
 
   public static function fromString(string $representation): static {

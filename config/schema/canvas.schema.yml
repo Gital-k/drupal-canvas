@@ -237,23 +237,35 @@ canvas.js_component.*:
           type: sequence
           orderby: key
           constraints:
-            # There must be >=1 entity reference prop; otherwise the key should be omitted.
+            # There must be >=1 content-entity-reference prop; otherwise the key should be omitted.
             NotBlank:
-              message: "There must be >=1 entity reference prop; otherwise the 'entityFields' key should be omitted."
-            # Each key must be a prop name from the component's props.
+              message: "There must be >=1 content-entity-reference prop; otherwise the 'entityFields' key should be omitted."
+            # Every `content-entity-reference`-shaped prop MUST have a corresponding
+            # `entityFields` entry (and vice versa) so `toSdcDefinition()` can
+            # derive `x-allowed-entity-type-id` / `x-allowed-bundle`.
             SequenceKeysMustMatch:
-              matchType: subset
-              # @todo allow filtering to the subset that are actually "entity reference" props, rather than all props.
               propertyPathToSequence: props
+              # @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef::ContentEntityReference
+              conditions:
+                type: object
+                "$ref": "json-schema-definitions://canvas.module/content-entity-reference"
           sequence:
             type: sequence
             orderby: value
             constraints:
               # There must be >=1 entity field expression.
               NotBlank:
-                message: 'There must be >=1 entity field expression; otherwise the entity reference prop should be deleted.'
+                message: 'There must be >=1 entity field expression; otherwise the content-entity-reference prop should be deleted.'
               # All expressions must target the same entity type and bundle.
               EntityFieldExpressionsSameTarget: ~
+              # All expressions targeting the same field must be coalesced into a single
+              # FieldObjectPropsExpression.
+              # @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::coalesce()
+              EntityFieldExpressionsSameFieldMustBeCoalesced: ~
+              # Every expression must survive the content selection UI's
+              # expand → edit → coalesce round trip without losing data.
+              # @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::expand()
+              EntityFieldExpressionsMustBeIdempotent: ~
             sequence:
               type: string
               label: 'Entity field prop expression'
@@ -269,6 +281,16 @@ canvas.js_component.*:
                   message: 'The expression is valid, but not one of the allowed types: %choices.'
                 # Validate that the expression targets an existing entity type and bundle.
                 ExpressionTargetEntityBundleExists: ~
+                # Reject references targeting multiple bundles: resolving them at
+                # render time is not yet supported.
+                # @todo https://git.drupalcode.org/project/canvas/-/work_items/3591656
+                MultiTargetBundleReferenceNotSupported: ~
+                # Reject expressions on multi-valued fields: resolving them at
+                # render time is not yet supported.
+                # @todo https://git.drupalcode.org/project/canvas/-/work_items/3589536
+                MultiValuedFieldNotSupported: ~
+                # Reject expressions targeting an internal field or field property.
+                EntityFieldExpressionMustNotTargetInternalProperty: ~
 
 canvas.page_region.*:
   type: config_entity
@@ -321,11 +343,15 @@ canvas.page_region.*:
 
 # The config equivalent of a ComponentTreeItemList, validated by the same constraints.
 # This is a list of component items in a tree, one item per component instance.
+# @see `ComponentTreeItemKeyedSequence` in ComponentTreeConfigEntityBase
 canvas.component_tree:
   type: sequence
   label: 'Config-Defined Component Tree'
-  # @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait::generateComponentTreeKeys()
-  orderby: key
+  # Sequence keys are component instance UUIDs. Necessary for reliable translations. Note these are transformed at
+  # export time to improve DX (and the reverse is done at import time).
+  # @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::asDeterministicallyAndTranslatableKeyedComponentTreeSequence
+  # @see \Drupal\canvas\EventSubscriber\ComponentTreeConfigEntityTransformer
+  orderby: ~
   constraints:
     ComponentTreeStructure: []
     ComponentTreeMeetRequirements:
@@ -349,6 +375,8 @@ canvas.component_tree:
   sequence:
     # @todo Ensure the component instances appear in a predictable order in the exported YAML in https://www.drupal.org/i/3526127
     type: canvas.component_tree_node
+  # Ensure a decent config translation UX: only 'inputs' is translatable, so simplify the form.
+  form_element_class: '\Drupal\canvas\ConfigTranslation\CanvasComponentTreeItemListFormElement'
 
 # The config equivalent of a ComponentTreeItem, validated by the same constraint.
 canvas.component_tree_node:
@@ -400,8 +428,11 @@ canvas.component_tree_node:
       constraints: { }
     # @see \Drupal\canvas\Plugin\DataType\ComponentInputs
     inputs:
-      type: ignore
+      type: mapping
+      class: '\Drupal\canvas\Config\Schema\ComponentInputsMapping'
       label: 'Input values for each component in the component tree'
+      # Omitted optional inputs must also be translatable. Config Translation's default UI prevents this.
+      form_element_class: '\Drupal\canvas\ConfigTranslation\CanvasComponentTreeItemInputsMappingFormElement'
     label:
       # This is entirely optional; provides more context for content authors.
       requiredKey: false
@@ -449,7 +480,7 @@ canvas.component_source_local_id.sdc:
 canvas.component_source_settings.sdc:
   constraints:
     FullyValidatable: ~
-  type: canvas.generated_field_explicit_input_ux
+  type: canvas.json_schema_props
   label: 'SDC component settings'
   mapping:
     prop_field_definitions:
@@ -482,15 +513,15 @@ canvas.component_source_settings.*:
   # No settings by default.
   mapping: {}
 
-# @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
-# Each ComponentSource that extends GeneratedFieldExplicitInputUxComponentSourceBase MUST provide an override that:
+# @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase
+# Each ComponentSource that extends JsonSchemaPropsComponentSourceBase MUST provide an override that:
 # - MUST override the top-level label
 # - MUST add appropriate validation constraints to `local_source_id`
 # - MAY add more key-value pairs to the mapping — and then add appropriate validation constraints for those
 # - MUST mark the entire subtype as being fully validatable
-canvas.generated_field_explicit_input_ux:
+canvas.json_schema_props:
   type: canvas.component_source_settings.*
-  label: 'Baseline component settings for ComponentSource plugins that extend GeneratedFieldExplicitInputUxComponentSourceBase'
+  label: 'Baseline component settings for ComponentSource plugins that extend JsonSchemaPropsComponentSourceBase'
   mapping:
     prop_field_definitions:
       type: sequence
@@ -499,7 +530,7 @@ canvas.generated_field_explicit_input_ux:
       # Note: simply reordering the props in the schema without other changes (such as changing the example value) will
       # result in an identical component version hash. That means all existing component instances are automatically
       # "upgraded" to the updated prop order.
-      # @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildConfigurationForm()
+      # @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsonSchemaPropsComponentSourceBase::buildConfigurationForm()
       orderby: ~
       sequence:
         type: mapping
@@ -590,7 +621,7 @@ canvas.component_source_local_id.js:
 canvas.component_source_settings.js:
   constraints:
     FullyValidatable: ~
-  type: canvas.generated_field_explicit_input_ux
+  type: canvas.json_schema_props
   label: 'Code component settings'
   mapping:
     prop_field_definitions:

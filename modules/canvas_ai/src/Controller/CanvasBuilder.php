@@ -3,22 +3,23 @@
 namespace Drupal\canvas_ai\Controller;
 
 use Drupal\ai\AiProviderPluginManager;
-use Drupal\ai_agents\Enum\AiAgentStatusItemTypes;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai\OperationType\GenericType\ImageFile;
+use Drupal\ai_agents\Enum\AiAgentStatusItemTypes;
+use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
 use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
+use Drupal\canvas_ai\CanvasAiChatHelper;
+use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\canvas_ai\CanvasAiTempStore;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface;
 use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Controller\ControllerBase;
-use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
-use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
-use Drupal\canvas_ai\CanvasAiTempStore;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -41,6 +42,7 @@ final class CanvasBuilder extends ControllerBase {
     protected CanvasAiTempStore $canvasAiTempStore,
     protected FileSystemInterface $fileSystem,
     protected AiAgentStatusPollerServiceInterface $poller,
+    protected CanvasAiChatHelper $canvasAiChatHelper,
   ) {}
 
   /**
@@ -55,6 +57,7 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('canvas_ai.tempstore'),
       $container->get('file_system'),
       $container->get('ai_agents.agent_status_poller'),
+      $container->get('canvas_ai.chat_helper'),
     );
   }
 
@@ -150,8 +153,15 @@ final class CanvasBuilder extends ControllerBase {
       ]);
     }
     $task_message = array_pop($prompt['messages']);
+
+    // Generate verbose context for orchestrator.
+    $context = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
+
+    // Append the necessary context to the user message.
+    $message_xml = $this->canvasAiPageBuilderHelper->formatMessageWithContext($context, $task_message['text']);
+
     $agent->setChatInput(new ChatInput([
-      new ChatMessage($task_message['role'], $task_message['text'], $image_files),
+      new ChatMessage($task_message['role'], $message_xml, $image_files),
     ]));
 
     // Store the current layout in the temp store. This will be later used by
@@ -162,33 +172,8 @@ final class CanvasBuilder extends ControllerBase {
       $this->canvasAiTempStore->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, Json::encode($current_layout));
     }
 
-    $task = $prompt['messages'];
-    $messages = [];
-    foreach ($task as $message) {
-      if (!empty($message['files'])) {
-        $images = [];
-        foreach ($message['files'] as $file_info) {
-          if (!empty($file_info['src']) && preg_match('/^data:(image\/(?:jpeg|png));base64,(.+)$/i', $file_info['src'], $matches)) {
-            $mime_type = $matches[1];
-            $binary = base64_decode($matches[2], TRUE);
-            if ($binary !== FALSE) {
-              $images[] = new ImageFile($binary, $mime_type, 'temp');
-            }
-          }
-        }
-        // The text is intentionally kept empty while setting it in comments
-        // so that the AI only takes the image as a context/history for the
-        // next prompt not any text related to it.
-        $messages[] = new ChatMessage($message['role'], '', $images);
-        break;
-      }
-      else {
-        if (!empty($message['text'])) {
-          $messages[] = new ChatMessage($message['role'] === 'user' ? 'user' : 'assistant', $message['text']);
-        }
-      }
-    }
-    $agent->setChatHistory($messages);
+    $chat_history = $this->canvasAiChatHelper->getFilteredChatHistory($prompt['messages']);
+    $agent->setChatHistory($chat_history);
     $agent->setProgressThreadId($prompt['request_id']);
     $agent->setDetailedProgressTracking([
       AiAgentStatusItemTypes::Started,
@@ -227,7 +212,6 @@ final class CanvasBuilder extends ControllerBase {
       'menu_fetch_source' => $this->getMenuFetchSource(),
       'json_api_module_status' => $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled',
       'available_regions' => Json::encode($this->canvasAiPageBuilderHelper->getAvailableRegions(Json::encode($prompt['current_layout']))) ?? NULL,
-      'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
       'custom_libraries' => $this->getSupportedLibraries(),
     ]);
     try {
@@ -438,7 +422,7 @@ final class CanvasBuilder extends ControllerBase {
         "name" => "formatted_text",
         "type" => "Built-in custom package",
         "description" => "A built-in component to render text with trusted HTML using [`dangerouslySetInnerHTML`](https://react.dev/reference/react-dom/components/common#dangerously-setting-the-inner-html). The content is safe when processed through Drupal's filter system that is [correctly configured](https://www.drupal.org/docs/administering-a-drupal-site/security-in-drupal/configuring-text-formats-aka-input-formats-for-security).",
-        "code" => "``jsx\nimport FormattedText from 'drupal-canvas';\n\nexport default function Example() {\n  return (\n    <FormattedText>\n      <em>Hello, world!</em>\n    </FormattedText>\n  );\n}\n```",
+        "code" => "```jsx\nimport { FormattedText } from 'drupal-canvas';\n\nexport default function Example() {\n  return (\n    <FormattedText>\n      <em>Hello, world!</em>\n    </FormattedText>\n  );\n}\n```",
       ],
       [
         "name" => "cn",
@@ -463,6 +447,24 @@ final class CanvasBuilder extends ControllerBase {
         "type" => "Bundled npm package",
         "description" => "CVA helps you define components with multiple visual variants (like size, color, state) in a clean, type-safe way. Instead of manually concatenating CSS classes or writing complex conditional logic, you define variants upfront and let CVA handle the class composition.",
         "code" => "```js\nimport { cva } from 'class-variance-authority';\n\nconst button = cva(\n  'font-semibold border rounded', // base classes\n  {\n    variants: {\n      intent: {\n        primary: 'bg-blue-500 text-white border-blue-500',\n        secondary: 'bg-gray-200 text-gray-900 border-gray-200',\n      },\n      size: {\n        small: 'text-sm py-1 px-2',\n        medium: 'text-base py-2 px-4',\n      },\n    },\n    defaultVariants: {\n      intent: 'primary',\n      size: 'medium',\n    },\n  },\n);\n\n// Usage\nbutton({ intent: 'secondary', size: 'small' });\n// Returns: \"font-semibold border rounded bg-gray-200 text-gray-900 border-gray-200 text-sm py-1 px-2\"\n```",
+      ],
+      [
+        "name" => "json_api_client",
+        "type" => "Bundled npm package",
+        "description" => "A JSON:API client for fetching Drupal content from code components. Use it with drupal-jsonapi-params to build query strings and swr to load and cache remote data.",
+        "code" => "```js\nimport { JsonApiClient } from '@drupal-api-client/json-api-client';\nimport { DrupalJsonApiParams } from 'drupal-jsonapi-params';\nimport useSWR from 'swr';\n```",
+      ],
+      [
+        "name" => "drupal_jsonapi_params",
+        "type" => "Bundled npm package",
+        "description" => "A helper package for generating JSON:API query strings, including includes, filters, fields, sorts, and pagination.",
+        "code" => "```js\nimport { DrupalJsonApiParams } from 'drupal-jsonapi-params';\n\nconst params = new DrupalJsonApiParams()\n  .addInclude(['field_media_image'])\n  .addFields('node--article', ['title', 'path', 'field_media_image']);\n```",
+      ],
+      [
+        "name" => "swr",
+        "type" => "Bundled npm package",
+        "description" => "A React data fetching hook for loading, caching, and revalidating content in code components.",
+        "code" => "```js\nimport useSWR from 'swr';\n\nconst { data, error, isLoading } = useSWR('/jsonapi/node/article', fetcher);\n```",
       ],
       [
         "name" => "tailwind_merge",

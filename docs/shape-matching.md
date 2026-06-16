@@ -293,13 +293,17 @@ There may be additional `prop source`s that may be offered as suggestions to Sit
 populate `component input`s:
 - For the various URI `prop shape`s (see also [3.2.2](#3.2.2)!), there is the `host entity URL prop source`, which is
   able to generate various URIs that point to the host entity (i.e. the containing `content entity`).
-- @todo <https://www.drupal.org/project/canvas/issues/3573831> will add a `HostEntityPropSource`
+- For the `content-entity-reference` `prop shape` (see [3.2.3](#3.2.3)!), there is the `host entity prop source`, which
+  populates the prop with the host `content entity` itself when the host's entity type and bundle satisfy the prop's
+  `x-allowed-entity-type-id` and `x-allowed-bundle`.
 - TBD: there may be more, such as a `remote prop source` that can retrieve data from remote sources ("external data")
 
 See:
 - `\Drupal\canvas\ShapeMatcher\PropSourceSuggester`
 - `\Drupal\canvas\PropSource\HostEntityUrlPropSource`
 - `\Drupal\canvas\ShapeMatcher\HostEntityUrlPropSourceMatcher`
+- `\Drupal\canvas\PropSource\HostEntityPropSource`
+- `\Drupal\canvas\ShapeMatcher\HostEntityPropSourceMatcher`
 
 
 #### 3.1.3 `prop expression`s: evaluating a `entity field prop source` or `static prop source`
@@ -474,3 +478,68 @@ Explanation:
 - `x-allowed-schemes` - Optional; indicates which URI schemes are allowed for URIs passed into this shape. Specifying
   `[http, https]` conveys the URI must be resolvable by web browsers. (As opposed to something like Drupal's `public` or
   `private`, or other proprietary URI schemes.)
+
+#### 3.2.3 (Content) Entity objects
+A prop that wishes to receive a (content) entity object can use the
+`json-schema-definitions://canvas.module/content-entity-reference` well-known prop shape.
+
+Note that such a prop is never allowed to be required, because the component must continue to render in all
+circumstances:
+- the referenced entity may have been deleted
+- on a content template the entity reference field may be optional
+- on a content template the entity reference field may be required but nodes were created before it was required.
+
+It is entirely up to the `Component Source Plugin` developer to determine what to do with the received entity object,
+but typically it would be used to then retrieve one or more `field prop`s from that entity object.
+
+> [!WARNING]
+> Today only code components actually support `content-entity-reference` props end-to-end. The YAML examples
+> below show the shape, but **an SDC that authors them directly will currently be flagged ineligible at discovery time**.
+
+Any User entity:
+```yaml
+contributor:
+  type: object
+  $ref: json-schema-definitions://canvas.module/content-entity-reference
+  x-allowed-entity-type-id: user
+```
+
+Any Node entity of the "article" content type:
+```yaml
+promoted_article:
+  type: object
+  $ref: json-schema-definitions://canvas.module/content-entity-reference
+  x-allowed-entity-type-id: node
+  x-allowed-bundle: article
+```
+
+##### Sources
+
+A `content-entity-reference` prop can be populated by any of these `prop source`s:
+
+- **Static pick** (`\Drupal\canvas\PropSource\StaticPropSource`): the Site Builder picks a specific entity at edit time,
+  stored as `unstructured data` via a `conjured field`.
+- **Host-entity reference field** (`\Drupal\canvas\PropSource\EntityFieldPropSource`): when the host entity has an
+  entity reference `base field` or `bundle field` whose target entity type and bundle match the prop's
+  `x-allowed-entity-type-id` and `x-allowed-bundle`, the referenced entity populates the prop. Suggested by
+  `\Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher`.
+- **Host entity itself** (`\Drupal\canvas\PropSource\HostEntityPropSource`): when the host entity rendering the
+  component is itself a valid target for the prop (its entity type and bundle satisfy the prop's
+  `x-allowed-entity-type-id` and `x-allowed-bundle`), the prop can be populated with the host entity directly. The
+  stored source is:
+  ```json
+  {"sourceType": "host-entity"}
+  ```
+  Suggested by `\Drupal\canvas\ShapeMatcher\HostEntityPropSourceMatcher` only when the host entity's type strictly
+  equals the prop's `x-allowed-entity-type-id`, and the host's bundle strictly equals the prop's `x-allowed-bundle`
+  (or the prop's target entity type has no bundles). At render time, the prop receives the host entity object, which
+  is then projected through the prop's `dataDependencies.entityFields` expressions to produce the
+  JS-component-facing value.
+
+##### Projection (code components only)
+
+For code components (`JsComponent`), the developer-facing `props` definition deliberately omits these keys. The concrete target
+entity type and bundle live in the JavaScriptComponent config entity's `dataDependencies.entityFields` (the single source of
+truth). At runtime, `JavaScriptComponent::toSdcDefinition()` **projects** these keys into the SDC definition so it matches the
+shape above. The persisted config entity is never mutated; the projection produces a local copy of the props for the SDC
+definition. See ADR 11.

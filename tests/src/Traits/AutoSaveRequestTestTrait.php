@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Traits;
 
-use Drupal\Core\Url;
 use Drupal\canvas\Controller\ApiAutoSaveController;
+use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,8 +19,9 @@ trait AutoSaveRequestTestTrait {
     \assert($response instanceof JsonResponse);
     $content = $response->getContent();
     \assert(\is_string($content));
-    $auto_saves = json_decode($content, TRUE);
-    return $auto_saves;
+    $response_body = json_decode($content, TRUE);
+    \assert(\array_key_exists('data', $response_body));
+    return $response_body['data'];
   }
 
   protected function assertNoAutoSaveData(): void {

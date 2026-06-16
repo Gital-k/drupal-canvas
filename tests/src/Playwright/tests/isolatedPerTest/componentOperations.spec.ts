@@ -36,6 +36,23 @@ test.describe('Perform CRUD operations on components', () => {
     ).toMatchAriaSnapshot({
       name: 'Perform-CRUD-operations-on-components-Layer-and-Components-Panel-1.aria.yml',
     });
+    await canvas.addComponent({ id: 'sdc.canvas_test_sdc.heading' });
+    await canvas.clickPreviewComponent('sdc.canvas_test_sdc.heading');
+    // Heading.
+    await canvas.testInPreviewFrame(
+      'h1[data-component-id="canvas_test_sdc:heading"].primary',
+      async (heading) => {
+        await expect(heading).toBeAttached();
+      },
+    );
+    await canvas.editComponentProp('style', 'secondary', 'select');
+    await canvas.editComponentProp('element', 'h3', 'select');
+    await canvas.testInPreviewFrame(
+      'h3[data-component-id="canvas_test_sdc:heading"].secondary',
+      async (heading) => {
+        await expect(heading).toBeAttached();
+      },
+    );
   });
 
   test('Component hovers and clicks', async ({ page, drupal, canvas }) => {
@@ -117,21 +134,18 @@ test.describe('Perform CRUD operations on components', () => {
     await canvas.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
 
     // Heading.
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText('There goes my hero');
+      },
+    );
+    await expect(page.getByText('The main heading of the hero')).toHaveCount(1);
     await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText('There goes my hero');
-    await expect(
-      await page.getByText('The main heading of the hero').count(),
-    ).toEqual(1);
-    await expect(
-      await page
-        .getByText('Start typing the title of a piece of content', {
-          exact: false,
-        })
-        .count(),
-    ).toEqual(0);
+      page.getByText('Start typing the title of a piece of content', {
+        exact: false,
+      }),
+    ).toHaveCount(0);
   });
 
   test('Renders markup in prop descriptions including links with quoted href', async ({
@@ -168,49 +182,105 @@ test.describe('Perform CRUD operations on components', () => {
     await canvas.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
 
     // Heading.
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText('There goes my hero');
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText('There goes my hero');
+      },
+    );
     await canvas.editComponentProp('heading', '');
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).not.toContainText('There goes my hero');
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).not.toContainText('There goes my hero');
+      },
+    );
 
     // Refresh the page.
     await page.reload();
-    await expect(
-      await page.getByLabel('Heading', { exact: true }),
-    ).not.toHaveValue('There goes my hero');
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).not.toContainText('There goes my hero');
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] .my-hero__subheading',
-      ),
-    ).toContainText('Watch him as he goes!');
+    await expect(page.getByLabel('Heading', { exact: true })).not.toHaveValue(
+      'There goes my hero',
+    );
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).not.toContainText('There goes my hero');
+      },
+    );
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] .my-hero__subheading',
+      async (subheading) => {
+        await expect(subheading).toContainText('Watch him as he goes!');
+      },
+    );
 
     // CTAs.
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] a[href="https://example.com"]',
-      ),
-    ).toBeVisible();
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] a[href="https://example.com"]',
+      async (cta) => {
+        await expect(cta).toBeVisible();
+      },
+    );
     await canvas.editComponentProp('cta1href', 'https://drupal.org');
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] a.my-hero__cta--primary',
-      ),
-    ).toHaveAttribute('href', /drupal\.org/);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] a.my-hero__cta--primary',
+      async (cta) => {
+        await expect(cta).toHaveAttribute('href', /drupal\.org/);
+      },
+    );
   });
 
-  test('Can delete component with delete key', async ({ drupal, canvas }) => {
+  test('Can handle empty required formatted body prop', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.login({ username: 'editor', password: 'editor' });
+    await canvas.openCanvas(await canvas.createCanvas());
+    await canvas.openLibraryPanel();
+    await canvas.addComponent({
+      id: 'sdc.canvas_test_sdc.required-formatted-body',
+    });
+
+    const contextualForm =
+      '[data-testid="canvas-contextual-panel"] [data-drupal-selector="component-instance-form"]';
+
+    await canvas.testInPreviewFrame('text=Example', async (el) => {
+      await expect(el).toBeVisible();
+    });
+
+    const bodyEditable = page.locator(
+      `${contextualForm} .field--name-body .ck-editor__editable`,
+    );
+    await expect(bodyEditable).toBeVisible();
+    await bodyEditable.click();
+    await bodyEditable.fill('');
+    await page
+      .locator(`${contextualForm} .field--name-body`)
+      .locator('label.js-form-required')
+      .click();
+
+    await canvas.testInPreviewFrame('text=Example', async (el) => {
+      await expect(el).toHaveCount(0);
+    });
+
+    await page.reload();
+
+    await expect(
+      page.locator(`${contextualForm} .field--name-body textarea`),
+    ).toHaveValue('');
+    await canvas.testInPreviewFrame('text=Example', async (el) => {
+      await expect(el).toHaveCount(0);
+    });
+  });
+
+  // Assertions are made in the helper functions.
+  // eslint-disable-next-line playwright/expect-expect
+  test('Can delete component with delete key', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.openCanvas(await canvas.createCanvas());
     await canvas.openLibraryPanel();
@@ -315,17 +385,19 @@ test.describe('Perform CRUD operations on components', () => {
       subType,
     );
     await page.getByLabel('CTA 1 text').click();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText(headType);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText(headType);
+      },
+    );
 
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] p',
-      ),
-    ).toContainText(subType);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] p',
+      async (p) => {
+        await expect(p).toContainText(subType);
+      },
+    );
 
     // Type in the autocomplete field, then blur by clicking another field
     await page.getByLabel('CTA 1 link', { exact: true }).fill('com');
@@ -333,24 +405,29 @@ test.describe('Perform CRUD operations on components', () => {
     // would revert the preview to earlier values.
     await page.getByLabel('CTA 2 text', { exact: true }).click();
 
-    // To make this a test that will fail without the fix present, but pass with
-    // the fix in place, we need a fixed value wait here so that there's enough time
-    // for the problem to appear in the preview. The correct contents will be asserted after this.
-    // Wait 1000ms
-    await page.waitForTimeout(1000);
+    // Wait for network idle before asserting. Typing in a Drupal entity-reference
+    // autocomplete triggers an AJAX request; blurring the field cancels or completes
+    // it. The bug (#3519734) caused the AJAX response (or its cancellation handler)
+    // to revert the component state. By waiting until there are no in-flight requests
+    // we give any such side-effects time to run, so the assertions below will catch
+    // a revert if the fix were absent, without relying on an arbitrary timeout.
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
 
     // Assert the preview still has the correct values
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText(headType);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText(headType);
+      },
+    );
 
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] p',
-      ),
-    ).toContainText(subType);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] p',
+      async (p) => {
+        await expect(p).toContainText(subType);
+      },
+    );
     await expect(page.getByLabel('Heading', { exact: true })).toHaveValue(
       headType,
     );

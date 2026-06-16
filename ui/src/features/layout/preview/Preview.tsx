@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
 import { useParams } from 'react-router';
 
-import { useAppSelector } from '@/app/hooks';
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   selectLayout,
   selectModel,
@@ -16,7 +16,9 @@ import {
   selectPreviewHtml,
 } from '@/features/pagePreview/previewSlice';
 import {
+  clearPreviewAfterUndoRedo,
   selectEditorFrameContext,
+  selectNeedsPreviewAfterUndoRedo,
   selectSelectedComponentUuid,
 } from '@/features/ui/uiSlice';
 import { useStableCallback } from '@/hooks/useStableCallback';
@@ -24,19 +26,23 @@ import useSyncTitle from '@/hooks/useSyncTitle';
 import { usePostTemplateLayoutMutation } from '@/services/componentAndLayout';
 import {
   selectUpdateComponentLoadingState,
-  usePostPreviewMutation,
+  useQueuedPostPreviewMutation,
 } from '@/services/preview';
 import { isAjaxing } from '@/utils/isAjaxing';
 
 import type React from 'react';
 
 const Preview: React.FC = () => {
+  const dispatch = useAppDispatch();
   const layout = useAppSelector(selectLayout);
   const updatePreview = useAppSelector(selectUpdatePreview);
   const model = useAppSelector(selectModel);
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const backgroundUpdate = useAppSelector(selectPreviewBackgroundUpdate);
   const entity_form_fields = useAppSelector(selectPageData);
+  const needsPreviewAfterUndoRedo = useAppSelector(
+    selectNeedsPreviewAfterUndoRedo,
+  );
   const { entityId, entityType } = useParams();
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const frameSrcDoc = useAppSelector(selectPreviewHtml);
@@ -48,9 +54,12 @@ const Preview: React.FC = () => {
   );
 
   // --- API Mutations ---
-  const [postPreview, { isLoading: isFetching }] = usePostPreviewMutation({
-    fixedCacheKey: 'editorFramePreview',
-  });
+  const [postPreview, { isLoading: isFetching }] = useQueuedPostPreviewMutation(
+    {
+      fixedCacheKey: 'editorFramePreview',
+    },
+  );
+
   const [postTemplatePreview, { isLoading: isTemplateFetching }] =
     usePostTemplateLayoutMutation({
       fixedCacheKey: 'editorFrameTemplatePreview',
@@ -70,7 +79,7 @@ const Preview: React.FC = () => {
             entity_form_fields,
             entityId,
             entityType,
-          }).unwrap();
+          });
         } else if (context === 'template') {
           await postTemplatePreview({
             layout,
@@ -127,7 +136,12 @@ const Preview: React.FC = () => {
   // Effect: Trigger POSTing of layout, model and entity_form_fields when they change
   // to generate a new preview and create a new autoSave.
   useEffect(() => {
-    if (updatePreview) {
+    if (updatePreview || needsPreviewAfterUndoRedo) {
+      // If we're triggering because of undo/redo flag, clear it immediately
+      if (needsPreviewAfterUndoRedo) {
+        dispatch(clearPreviewAfterUndoRedo());
+      }
+
       const context = editorFrameContext === 'template' ? 'template' : 'entity';
       stableScheduleRequest(context);
     }
@@ -136,8 +150,10 @@ const Preview: React.FC = () => {
     model,
     entity_form_fields,
     updatePreview,
+    needsPreviewAfterUndoRedo,
     editorFrameContext,
     stableScheduleRequest,
+    dispatch,
   ]);
 
   // Effect: Cleanup interval on unmount

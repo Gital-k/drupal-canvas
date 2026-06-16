@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Update;
 
+use Drupal\canvas\Entity\ContentTemplate;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
-use Drupal\canvas\Entity\ContentTemplate;
 
 /**
  * Tests Content Template Dynamic Prop Sources To Entity Field Prop Sources Update.
@@ -50,7 +50,8 @@ final class ContentTemplateDynamicPropSourcesToEntityFieldPropSourcesUpdateTest 
       ?->getComponentTree()
       // phpcs:ignore Drupal.WhiteSpace.ObjectOperatorIndent.Indent
       ->get(0)
-      ?->getValue()['inputs'];
+      ?->getInput();
+    self::assertIsString($raw_inputs_for_first_component_instance);
     self::assertStringNotContainsString('"sourceType":"dynamic"', $raw_inputs_for_first_component_instance);
     self::assertStringContainsString('"sourceType":"entity-field"', $raw_inputs_for_first_component_instance);
   }

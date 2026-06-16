@@ -22,11 +22,13 @@ export default defineConfig({
   /* Parallel test workers, leave undefined for automatic */
   workers: process.env.CI ? 1 : '50%',
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: [
-    ['list'],
-    ['junit', { outputFile: 'test-results/playwright.xml' }],
-    ['html', { host: '0.0.0.0', open: 'never' }],
-  ],
+  reporter: process.env.CI
+    ? [['blob'], ['list']]
+    : [
+        ['list'],
+        ['junit', { outputFile: 'test-results/playwright.xml' }],
+        ['html', { host: '0.0.0.0', open: 'never' }],
+      ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -43,6 +45,8 @@ export default defineConfig({
       fullPage: true,
     },
     video: 'retain-on-failure',
+    timezoneId: 'Australia/Sydney',
+    locale: 'en-US-u-hc-h23',
   },
 
   /* Configure projects for major browsers */
