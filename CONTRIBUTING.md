@@ -57,9 +57,7 @@ ddev composer run phpstan
 ddev composer run phpunit -- tests/src/Unit/CoalescerTest.php
 ```
 
-Passthrough arguments after `--` are forwarded to the script. The `ddev phpunit`,
-`ddev phpcs`, `ddev phpstan`, `ddev cypress`, `ddev playwright` and
-`ddev stylelint` commands also target the project.
+Passthrough arguments after `--` are forwarded to the script.
 
 ### Debugging with xdebug (PhpStorm / IDE)
 
@@ -89,7 +87,7 @@ The most common commands in the development process are:
 3. `ddev drupal-install`: This will reinstall the site. Very useful when you update Canvas and want a fresh installation.
 4. `ddev ui-build`: This will build a production ready canvas UI.
 5. `ddev ui-dev`: This will build a development environment for developing the canvas app itself.
-6. Tests and linting: The commands `ddev eslint`, `ddev phpcs`, `ddev phpstan` and `ddev phpunit` must be used before any commit to ensure code looks good and pass tests.
+6. Tests and linting: The commands `[ddev] composer run lint`, `[ddev] npm run lint`, `[ddev] composer run phpcs`, `[ddev] composer run phpstan` and `[ddev] composer run phpunit` must be used before any commit to ensure code looks good and pass tests.
 7. Cypress tests: `ddev cypress run`
 8. Playwright tests: `ddev playwright test`
    - Watch tests run in the browser via VNC: https://canvas.ddev.site:8444 (username: your local username, password: `secret`)

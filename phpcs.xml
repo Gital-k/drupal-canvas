@@ -15,6 +15,7 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
   <!-- YAML files that create PHP scripts can trigger phpcs -->
   <exclude-pattern>*.yaml$</exclude-pattern>
   <exclude-pattern>*.yml$</exclude-pattern>
+  <!-- Skip ddev generated files -->
   <exclude-pattern>.ddev</exclude-pattern>
 
   <!-- Use the Drupal coding standard, but … -->

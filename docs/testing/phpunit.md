@@ -12,7 +12,7 @@ composer run phpunit -- --help
 ```
 or with DDEV:
 ```shell
-ddev exec -d /var/www/html composer run phpunit -- --help
+ddev composer run phpunit -- --help
 ```
 
 ## Running tests from PhpStorm
