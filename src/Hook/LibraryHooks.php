@@ -8,12 +8,14 @@ use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Version;
+use Drupal\Core\Asset\AttachedAssetsInterface;
 use Drupal\Core\Asset\LibraryDiscoveryParser;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Plugin\Discovery\YamlDiscovery;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Theme\ThemeInitializationInterface;
@@ -90,6 +92,42 @@ final class LibraryHooks {
         $libraries['astro.client']['version'] = $this->version->getVersion();
         $libraries['astro.hydration']['version'] = $this->version->getVersion();
         $libraries['canvas-ui']['version'] = $this->version->getVersion();
+      }
+    }
+  }
+
+  /**
+   * Implements hook_js_alter().
+   *
+   * Canvas registers draft JavaScript assets for its auto-save API endpoints
+   * (e.g. /canvas/api/v0/auto-saves/js/asset_library/{id}) via
+   * hook_library_info_build(). These are Drupal routes that serve dynamically
+   * generated content — they are not static files on disk.
+   *
+   * Drupal's LibraryDiscoveryParser assigns type 'file' to root-relative paths
+   * (those starting with '/') and strips the leading slash, so the asset ends
+   * up as: type='file', data='canvas/api/v0/auto-saves/js/asset_library/global'.
+   * The locale module's js_alter then calls file_get_contents() on that path,
+   * which fails with a PHP warning because no such file exists.
+   *
+   * This hook corrects the type to 'external' for Canvas auto-save URL assets
+   * and restores the leading slash that the parser stripped, so they render
+   * identically (<script src="/canvas/api/v0/...">) while locale correctly
+   * skips them. This hook runs before locale's (module 'canvas' precedes
+   * 'locale' alphabetically, and both have default weight 0).
+   */
+  #[Hook('js_alter')]
+  public function jsAlter(array &$javascript, AttachedAssetsInterface $assets, LanguageInterface $language): void {
+    foreach ($javascript as &$item) {
+      if (
+        isset($item['type'], $item['data'])
+        && $item['type'] === 'file'
+        && str_starts_with($item['data'], 'canvas/api/v0/auto-saves/')
+      ) {
+        // Restore the leading '/' that LibraryDiscoveryParser stripped, and
+        // mark as 'external' so locale does not attempt file_get_contents().
+        $item['type'] = 'external';
+        $item['data'] = '/' . $item['data'];
       }
     }
   }
