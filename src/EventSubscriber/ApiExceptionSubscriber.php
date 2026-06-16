@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\EventSubscriber;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiAutoSaveController;
+use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\canvas\Utility\ExceptionHelper;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -12,9 +15,6 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\ParamConverter\ParamNotConvertedException;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Exception\ConstraintViolationException;
-use Drupal\canvas\Utility\ExceptionHelper;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -130,9 +130,11 @@ final class ApiExceptionSubscriber implements EventSubscriberInterface {
    * {@inheritdoc}
    */
   public static function getSubscribedEvents(): array {
-    // Lower than the priority of
-    // \Drupal\Core\EventSubscriber\ExceptionJsonSubscriber.
-    $events[KernelEvents::EXCEPTION][] = ['onException', 50];
+    // Run after \Drupal\Core\EventSubscriber\ExceptionLoggingSubscriber
+    // (priority 50) so exceptions on Canvas API routes are still logged, but
+    // before \Drupal\Core\EventSubscriber\ExceptionJsonSubscriber
+    // (priority -75) so Canvas API routes get this JSON response.
+    $events[KernelEvents::EXCEPTION][] = ['onException', -50];
     return $events;
   }
 

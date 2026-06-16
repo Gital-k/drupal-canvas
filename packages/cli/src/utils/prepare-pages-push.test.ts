@@ -18,6 +18,8 @@ const emptyDiscoveryResult: DiscoveryResult = {
   projectRoot: '',
   components: [],
   pages: [],
+  contentTemplates: [],
+  regions: [],
   warnings: [],
   stats: { scannedFiles: 0, ignoredFiles: 0 },
 };

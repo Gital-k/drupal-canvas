@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\Form\ComponentInstanceForm;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Form\ComponentInstanceForm;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
@@ -17,8 +17,6 @@ use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\Core\Form\FormState;
 use Drupal\Core\Url;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
@@ -26,16 +24,18 @@ use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use Drupal\Tests\system\Functional\Form\StubForm;
 use Drupal\user\Entity\User;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\DomCrawler\Crawler;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Tests Component Instance Form.
  *
- * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildComponentInstanceForm
+ * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::buildComponentInstanceForm
  * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetCompleteFormAlter
  */
 #[CoversClass(ComponentInstanceForm::class)]
@@ -524,7 +524,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
    * correct value for both a multi-cardinality prop (image-gallery, unlimited)
    * and a single-cardinality prop (image-gallery-nonsensical, maxItems=1).
    *
-   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildComponentInstanceForm()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::buildComponentInstanceForm()
    */
   public function testTransformsMultipleFlagReflectsCardinality(): void {
     $node = $this->createNode(['type' => 'article', 'title' => 'Test node']);
@@ -597,13 +597,13 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     self::assertStringNotContainsString('Component failed to render', $component_list_response, 'Component failed to render');
     self::assertStringNotContainsString('something went wrong', $component_list_response);
     // Fetch the client-side info.
-    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getClientSideInfo()
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getClientSideInfo()
     $client_side_info_prop_sources = json_decode($component_list_response, TRUE)[$component_id]['propSources'];
 
     // Perform the same transformation the Canvas UI does in JavaScript to construct
     // the `form_canvas_props` request parameter expected by ComponentInstanceForm.
     // @see \Drupal\canvas\Form\ComponentInstanceForm::buildForm()
-    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildConfigurationForm()
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::buildConfigurationForm()
     $form_canvas_props = [
       // Used by client to render previews.
       'resolved' => [],

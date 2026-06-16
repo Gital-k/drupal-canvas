@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-// cspell:ignore msword openxmlformats officedocument wordprocessingml
-
 namespace Drupal\Tests\canvas\Kernel\ShapeMatcher;
+
+// cspell:ignore msword openxmlformats officedocument wordprocessingml
 
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -21,7 +22,6 @@ use Drupal\link\LinkItemInterface;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
-use Drupal\canvas\PropSource\EntityFieldPropSource;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;

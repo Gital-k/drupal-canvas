@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\ClientSideRepresentation;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\Core\Entity\EntityAccessControlHandler;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\canvas\ClientSideRepresentation;
 
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
@@ -123,6 +123,44 @@ final class Folder extends ConfigEntityBase implements CanvasHttpApiEligibleConf
     $new_items = array_values(array_filter($items_in_folder, fn($item) => $item !== $remove_id));
     $this->set('items', $new_items);
     return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies(): static {
+    parent::calculateDependencies();
+    // Each item is the ID of a config entity of type $this->configEntityTypeId.
+    // Declare an explicit config dependency so that core's dependency removal
+    // machinery calls ::onDependencyRemoval() when any item is deleted.
+    $prefix = 'canvas.' . $this->configEntityTypeId;
+    foreach ($this->items as $item_id) {
+      $this->addDependency('config', $prefix . '.' . $item_id);
+    }
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Removes any items from this Folder whose config entities are being deleted.
+   * This covers all FolderItemInterface types (Component, JavaScriptComponent,
+   * Pattern, etc.) without each of them needing their own preDelete hook.
+   */
+  public function onDependencyRemoval(array $dependencies): bool {
+    $prefix = 'canvas.' . $this->configEntityTypeId . '.';
+    $removed_ids = [];
+    foreach (\array_keys($dependencies['config'] ?? []) as $config_name) {
+      if (\is_string($config_name) && str_starts_with($config_name, $prefix)) {
+        $removed_ids[] = substr($config_name, strlen($prefix));
+      }
+    }
+    if (empty($removed_ids)) {
+      return parent::onDependencyRemoval($dependencies);
+    }
+    $this->items = array_values(array_diff($this->items, $removed_ids));
+    parent::onDependencyRemoval($dependencies);
+    return TRUE;
   }
 
 }

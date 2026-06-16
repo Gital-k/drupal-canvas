@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\EventSubscriber;
 
 use Drupal\Core\EventSubscriber\MainContentViewSubscriber;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Routing\RouteBuildEvent;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Routing\RoutingEvents;
@@ -22,6 +23,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
 
   public function __construct(
     private readonly RouteMatchInterface $routeMatch,
+    private readonly LanguageManagerInterface $languageManager,
   ) {}
 
   public function transformWrapperFormatRouteOption(RequestEvent $event): void {

@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\Controller\CanvasController;
+use Drupal\canvas\Entity\Page;
 use Drupal\Core\Render\HtmlResponse;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
-use Drupal\canvas\Controller\CanvasController;
-use Drupal\canvas\Entity\Page;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -68,6 +68,7 @@ final class LibraryInfoAlterTest extends CanvasKernelTestBase {
       'canvas/canvas.transform.mediaSelection',
       'canvas/canvas.transform.cast',
       'canvas/canvas.transform.link',
+      'canvas/canvas.transform.entityAutocompleteTargetId',
       'canvas_test_page/canvas.transform.diaclone',
     ], array_values(array_filter(
       $attachments['library'],

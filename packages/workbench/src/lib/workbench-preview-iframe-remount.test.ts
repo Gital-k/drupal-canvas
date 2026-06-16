@@ -33,6 +33,8 @@ const baseDiscovery: DiscoveryResult = {
       relativePath: '',
     },
   ],
+  contentTemplates: [],
+  regions: [],
   warnings: [],
   stats: { scannedFiles: 0, ignoredFiles: 0 },
 };

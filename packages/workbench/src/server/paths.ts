@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadEnv } from 'vite';
 import { resolveCanvasConfig } from '@drupal-canvas/discovery';
 import { validateCanvasImportRoots } from '@drupal-canvas/vite-compat';
 
@@ -14,9 +15,14 @@ export interface WorkbenchPaths {
   allowedFsRoots: string[];
   clientRoot: string;
   componentDiscoveryRoot: string;
+  contentTemplatesDiscoveryRoot: string;
+  siteUrl: string | null;
   hostProjectRoot: string;
   packageRoot: string;
   pagesDiscoveryRoot: string;
+  regionsDiscoveryRoot: string;
+  /** Absolute path to the user's optional layout component, or null if absent. */
+  layoutPath: string;
   runningInsideWorkbenchPackage: boolean;
   watchRoots: string[];
   workbenchSourceRoot: string;
@@ -43,7 +49,14 @@ export function resolveWorkbenchPaths(
   const geistMonoPackageRoot = path.dirname(
     require.resolve('@fontsource-variable/geist-mono/package.json'),
   );
-  const canvasConfig = resolveCanvasConfig({ hostRoot: hostProjectRoot });
+  const canvasConfigWarnings: string[] = [];
+  const canvasConfig = resolveCanvasConfig({
+    hostRoot: hostProjectRoot,
+    onWarning: (warning) => canvasConfigWarnings.push(warning.message),
+  });
+  for (const warning of canvasConfigWarnings) {
+    console.warn(`[workbench] ${warning}`);
+  }
   validateCanvasImportRoots({
     hostRoot: hostProjectRoot,
     aliasBaseDir: canvasConfig.aliasBaseDir,
@@ -57,7 +70,23 @@ export function resolveWorkbenchPaths(
     hostProjectRoot,
     canvasConfig.pagesDir,
   );
-  const watchRoots = [...new Set([componentDiscoveryRoot, pagesDiscoveryRoot])];
+  const contentTemplatesDiscoveryRoot = path.resolve(
+    hostProjectRoot,
+    canvasConfig.contentTemplatesDir,
+  );
+  const regionsDiscoveryRoot = path.resolve(
+    hostProjectRoot,
+    canvasConfig.regionsDir,
+  );
+  const layoutPath = path.resolve(hostProjectRoot, canvasConfig.layoutPath);
+  const watchRoots = [
+    ...new Set([
+      componentDiscoveryRoot,
+      pagesDiscoveryRoot,
+      contentTemplatesDiscoveryRoot,
+      regionsDiscoveryRoot,
+    ]),
+  ];
 
   return {
     appHtmlPath: path.resolve(clientRoot, 'index.html'),
@@ -71,9 +100,18 @@ export function resolveWorkbenchPaths(
     ],
     clientRoot,
     componentDiscoveryRoot,
+    contentTemplatesDiscoveryRoot,
+    siteUrl:
+      loadEnv(
+        'development',
+        hostProjectRoot,
+        'CANVAS_',
+      ).CANVAS_SITE_URL?.trim() || null,
     hostProjectRoot,
     packageRoot,
     pagesDiscoveryRoot,
+    regionsDiscoveryRoot,
+    layoutPath,
     runningInsideWorkbenchPackage,
     watchRoots,
     workbenchSourceRoot,

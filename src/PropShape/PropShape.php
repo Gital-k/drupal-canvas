@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropShape;
 
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 
 /**
@@ -16,7 +16,7 @@ use Drupal\Core\Extension\ThemeHandlerInterface;
  * Pass a `Component` plugin instance to `PropShape::getComponentProps()` and
  * receive an array of PropShape objects.
  *
- * @phpstan-type JsonSchema array<string, mixed>
+ * @phpstan-import-type JsonSchema from \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType
  * @internal
  */
 final class PropShape {
@@ -166,10 +166,16 @@ final class PropShape {
       );
     }
 
-    // Omit the ID containing the resolved $ref URI.
+    // Omit the resolved $ref URI that schema resolution injects. Canvas uses
+    // the JSON-Schema Draft-07 dialect, whose id keyword is `$id` (not
+    // Draft-04's `id`). justinrainbow/json-schema only emits `$id` as of
+    // 6.9.0; earlier versions injected `id` regardless of dialect. Strip both
+    // so the URI never leaks into the prop shape on either version
+    // (drupal/core-recommended still pins ~6.8.2 until core adopts 6.9.0).
+    // @see https://github.com/jsonrainbow/json-schema/issues/911
     // @see \JsonSchema\SchemaStorage::resolveRefSchema()
     // @see \JsonSchema\Uri\UriRetriever::retrieve()
-    unset($normalized_prop_schema['id']);
+    unset($normalized_prop_schema['id'], $normalized_prop_schema['$id']);
 
     return $normalized_prop_schema;
   }

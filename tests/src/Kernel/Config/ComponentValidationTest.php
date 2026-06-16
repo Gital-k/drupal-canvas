@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
-use PHPUnit\Framework\Attributes\TestWith;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery;
-use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
@@ -19,6 +16,9 @@ use Drupal\canvas\Entity\VersionedConfigEntityInterface;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
+use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
@@ -27,6 +27,7 @@ use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -50,6 +51,9 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     'canvas',
     'sdc',
     'canvas_test_sdc',
+    // Provides the `heading` SDC with a `number` + `enum` (→ `list_float`) prop.
+    // @see ::testActiveVersionHashIsStableForListFloatProp()
+    'canvas_test_list_float',
     // Canvas's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
@@ -148,9 +152,8 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
           ],
         ],
         // Simulate the reality prior to `required` becoming a required key in
-        // `type: canvas.generated_field_explicit_input_ux`. This is considered
-        // valid thanks to `type: canvas.component.versioned.*.*` not validating
-        // `settings`.
+        // `type: canvas.json_schema_props`. This is considered valid thanks to
+        // `type: canvas.component.versioned.*.*` not validating `settings`.
         // Note: this is a subset of the active version, with a single SDC prop
         // and NO `required` key.
         'nonsensical' => [
@@ -200,7 +203,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   /**
    * Tests all ComponentSource plugin-specific settings.
    *
-   * - `canvas.generated_field_explicit_input_ux` extends the
+   * - `canvas.json_schema_props` extends the
    * fallback `canvas.component_source_settings.*`
    * - The "sdc" and "js" ones both extend
    *   `canvas.component_source_settings.*`
@@ -208,7 +211,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
    *
    * See the base type (`type: canvas.component_source_settings.*`) and all
    * source-specific subtypes:
-   * - `type: canvas.generated_field_explicit_input_ux`
+   * - `type: canvas.json_schema_props`
    * - `type: canvas.component_source_settings.sdc`
    * - `type: canvas.component_source_settings.js`
    * - `type: canvas.component_source_settings.block`
@@ -371,6 +374,92 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
+   * The active version hash must survive config-schema type casting.
+   *
+   * A `number` + `enum` prop maps to the `list_float` field type, whose
+   * `field.value.list_float.value` is typed `string` in core. Its default value
+   * is generated as a native int but cast to a string once round-tripped
+   * through config; the hash must be identical either way, else `active_version`
+   * validation fails when config is validated (e.g. applying a recipe).
+   *
+   * @see \Drupal\canvas\ComponentSource\ComponentSourceBase::generateVersionHash()
+   */
+  public function testActiveVersionHashIsStableForListFloatProp(): void {
+    // setUp() already generated (and saved) this component; under strict config
+    // schema, that save would itself have failed before the fix.
+    $name = 'canvas.component.sdc.canvas_test_list_float.heading';
+    $raw = $this->config($name)->getRawData();
+    $settings = $raw['versioned_properties'][VersionedConfigEntityInterface::ACTIVE_VERSION]['settings'];
+    self::assertSame('list_float', $settings['prop_field_definitions']['level']['field_type']);
+
+    // Validate the saved (config-cast) config the way RecipeConfigInstaller
+    // does: there must be no `active_version` mismatch.
+    $violations = $this->container->get('config.typed')->createFromNameAndData($name, $raw)->validate();
+    $version_violations = \array_filter(
+      \iterator_to_array($violations),
+      static fn ($violation): bool => \str_starts_with((string) $violation->getPropertyPath(), 'active_version'),
+    );
+    self::assertSame([], \array_map(
+      static fn ($violation): string => \strip_tags((string) $violation->getMessage()),
+      $version_violations,
+    ));
+
+    // The hash must match whether `level`'s default is the native int `2` or
+    // the config-cast string `"2"`.
+    $hash = function (mixed $value) use ($raw, $settings): string {
+      $settings['prop_field_definitions']['level']['default_value'] = [['value' => $value]];
+      $source = $this->container->get(ComponentSourceManager::class)->createInstance($raw['source'], [
+        'local_source_id' => $raw['source_local_id'],
+        ...$settings,
+      ]);
+      \assert($source instanceof ComponentSourceInterface);
+      return $source->generateVersionHash();
+    };
+    self::assertSame($hash(2), $hash('2'));
+  }
+
+  /**
+   * Tests that saving a Component self-heals a stale `list_float` version hash.
+   *
+   * Covers the save path (`Component::preSave()`), which the update-path test
+   * does not: there the hash is recomputed before the save.
+   *
+   * @see \Drupal\canvas\Entity\Component::preSave()
+   * @see \Drupal\canvas\CanvasConfigUpdater::updateListFloatComponentVersionHash()
+   */
+  public function testListFloatVersionHashRecomputedOnSave(): void {
+    $id = 'sdc.canvas_test_list_float.heading';
+    // setUp() already generated and saved this component with the correct hash.
+    $component = Component::load($id);
+    \assert($component instanceof Component);
+    self::assertSame('list_float', $component->getSettings()['prop_field_definitions']['level']['field_type']);
+    $correct_version = $component->getActiveVersion();
+    self::assertCount(1, $component->getVersions());
+
+    // Simulate a pre-fix install: point the active version at a stale hash,
+    // leaving the (correct) settings untouched.
+    // cspell:ignore deadbeefdeadbeef
+    $stale_version = 'deadbeefdeadbeef';
+    self::assertNotSame($correct_version, $stale_version);
+    $component->set('active_version', $stale_version);
+    $component->resetToActiveVersion();
+
+    // Saving must heal the hash, via Component::preSave().
+    $component->save();
+
+    $saved = Component::load($id);
+    \assert($saved instanceof Component);
+    self::assertSame($correct_version, $saved->getActiveVersion());
+    // The recomputed active version is added alongside the stale one (kept as a
+    // past version so existing component instances that reference it resolve).
+    self::assertCount(2, $saved->getVersions());
+    self::assertContains($stale_version, $saved->getVersions());
+
+    $this->entity = $saved;
+    $this->assertValidationErrors([]);
+  }
+
+  /**
    * Data provider for ::testInvalidMachineNameCharacters().
    *
    * @return array<string, array<int, bool|string>>
@@ -467,7 +556,10 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     // Manually create a Component config entity that this source's discovery
     // would not have created because it does not meet requirements. This is
     // considered valid as long as the Component is disabled (`status=FALSE`).
-    $discovery = new SingleDirectoryComponentDiscovery($this->container->get(ComponentPluginManager::class));
+    $discovery = new SingleDirectoryComponentDiscovery(
+      $this->container->get(PropShapeRepositoryInterface::class),
+      $this->container->get(ComponentPluginManager::class),
+    );
     try {
       $discovery->checkRequirements($source_specific_component_id);
       $this->fail("$source_specific_component_id should not meet requirements for the purposes of this test.");
@@ -773,8 +865,8 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   /**
    * Tests invalid prop field definition expression.
    *
-   * @see `type:canvas.generated_field_explicit_input_ux`
-   * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+   * @see `type:canvas.json_schema_props`
+   * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase
    */
   #[TestWith(["ℹ︎non_existing_field_type␟value", NULL])]
   #[TestWith(["ℹ︎string␟non_existing_field_property", NULL])]

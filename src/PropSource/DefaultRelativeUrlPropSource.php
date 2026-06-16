@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\ComponentSource\UrlRewriteInterface;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropShape\PropShape;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\canvas\ComponentSource\UrlRewriteInterface;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
-use Drupal\canvas\PropShape\PropShape;
 
 /**
  * Prop source that is used to reference default relative URLs.
@@ -23,7 +23,7 @@ use Drupal\canvas\PropShape\PropShape;
  * that can be used as a default value.
  *
  * @see \Drupal\canvas\ComponentSource\UrlRewriteInterface
- * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
  * @internal
  *
  * @phpstan-import-type DefaultRelativeUrlPropSourceArray from PropSourceBase

@@ -47,6 +47,7 @@ parameters:
     - identifier: missingType.generics
     # PHPStan finds many false positives for this, specifically when using the DIC or Typed Data.
     - identifier: varTag.type
+    # All of the ignores below are for missing parameter or return types that are imposed by upstream implementations.
     -
       message: '#^Method Drupal\\canvas\\Plugin\\Field\\FieldType\\ComponentTreeItemList\:\:get\(\) has parameter \$index with no type specified\.$#'
       identifier: missingType.parameter
@@ -75,6 +76,11 @@ parameters:
       identifier: missingType.return
       count: 1
       path: src/ConfigTranslation/CanvasComponentTreeItemInputsMappingFormElement.php
+    -
+      message: '#^Method Drupal\\canvas\\Tmgmt\\ComponentInputsConfigProcessor\:\:extractTranslatables\(\) has parameter \$config_data with no type specified\.$#'
+      identifier: missingType.parameter
+      count: 1
+      path: src/Tmgmt/ComponentInputsConfigProcessor.php
     # canvas_ai and canvas_personalization have their own dead code cleanup tasks.
     - { message: '#^(Unused |Property .+ is never (read|written))#', path: modules/canvas_ai/** }
     - { message: '#^(Unused |Property .+ is never (read|written))#', path: modules/canvas_personalization/** }
@@ -89,6 +95,8 @@ rules:
   - Canvas\PHPStan\Rules\NoOptionalParametersInDataProviderTestsRule
   - Canvas\PHPStan\Rules\NoJsonEncodedHttpExceptionMessageInApiControllersRule
   - Canvas\PHPStan\Rules\RequireStaticMethodsRule
+  - Canvas\PHPStan\Rules\ComponentPreSaveUpdateMethodsRule
+  - Canvas\PHPStan\Rules\ComponentConfigUpdaterMustDeclarePreSaveIntentRule
   - mglaman\PHPStanDrupal\Rules\Drupal\TodoCommentWithIssueUrlRule
 # Run `composer run phpstan-regenerate-ignores-for-11.3-and-higher` to update this list of ignores for Drupal >=11.3.
 includes:
@@ -140,6 +148,10 @@ services:
       - shipmonk.deadCode.memberUsageProvider
   -
     class: Canvas\PHPStan\UsageProvider\CanvasApiContractUsageProvider
+    tags:
+      - shipmonk.deadCode.memberUsageProvider
+  -
+    class: Canvas\PHPStan\UsageProvider\DrupalServiceDecoratorUsageProvider
     tags:
       - shipmonk.deadCode.memberUsageProvider
   -

@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\Tests\ApiRequestTrait;
 use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\user\UserInterface;
 use GuzzleHttp\RequestOptions;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -160,7 +160,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
       // The entity is deleted.
       $this->assertNull($entity);
       // No corresponding auto-save entries exists.
-      $auto_save_keys = \array_keys($this->container->get(AutoSaveManager::class)->getAllAutoSaveList());
+      $auto_save_keys = \array_keys($this->container->get(AutoSaveManager::class)->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE));
       // Auto save keys start with the entity type ID and ID, but could also
       // include a language ID if the entity supports translation.
       self::assertCount(0, \array_filter($auto_save_keys, static fn (string $key): bool => \str_starts_with($key, "$entity_type_id:$entity_id")));

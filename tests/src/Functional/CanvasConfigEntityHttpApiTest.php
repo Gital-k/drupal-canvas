@@ -4,8 +4,18 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\Audit\ComponentAudit;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Folder;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\Entity\Pattern;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\Random;
@@ -14,16 +24,6 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\Config\Entity\ConfigEntityType;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
-use Drupal\canvas\Audit\ComponentAudit;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\AssetLibrary;
-use Drupal\canvas\Entity\BrandKit;
-use Drupal\canvas\Entity\Folder;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\ComponentInterface;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Entity\Pattern;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\system\Entity\Menu;
@@ -34,6 +34,7 @@ use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 use Drupal\user\UserInterface;
 use GuzzleHttp\RequestOptions;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -257,6 +258,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       BrandKit::ADMIN_PERMISSION,
       JavaScriptComponent::ADMIN_PERMISSION,
       Pattern::ADMIN_PERMISSION,
+      PageRegion::ADMIN_PERMISSION,
       Folder::ADMIN_PERMISSION,
       ContentTemplate::ADMIN_PERMISSION,
     ]);
@@ -666,6 +668,215 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertDeletionAndEmptyList(Url::fromUri('base:/canvas/api/v0/config/pattern/testpatternpleaseignore'), $list_url, 'config:pattern_list');
 
     // This was now tested full circle! ✅
+  }
+
+  /**
+   * @see \Drupal\canvas\Entity\PageRegion
+   */
+  public function testPageRegion(): void {
+
+    $this->drupalLogin($this->limitedPermissionsUser);
+    // PageRegion::refineListQuery adds the `theme` cache context to the list
+    // response (it filters to the active theme).
+    $this->assertAuthenticationAndAuthorization('page_region', initial_cache_tags: ['http_response'], initial_cache_contexts: ['theme', 'user.permissions']);
+
+    $base = rtrim(base_path(), '/');
+    $list_url = Url::fromUri("base:/canvas/api/v0/config/page_region");
+
+    $request_options = [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+      ],
+    ];
+
+    // POST omitting `theme`: the server must fill it from the active default
+    // theme and compose the id accordingly. Then DELETE via HTTP to restore a
+    // clean slate for later assertions.
+    $request_options[RequestOptions::JSON] = [
+      'region' => 'highlighted',
+      'status' => TRUE,
+      'component_tree' => [],
+    ];
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    self::assertSame('stark.highlighted', $body['id']);
+    self::assertSame('stark', $body['theme']);
+    $this->assertExpectedResponse('DELETE', Url::fromUri('base:/canvas/api/v0/config/page_region/stark.highlighted'), [], 204, NULL, NULL, NULL, NULL);
+
+    // The `content` region is reserved for the main page content and may
+    // never have a PageRegion. Even with `theme` defaulted server-side, this
+    // must still 422 — proving validation runs against the filled-in theme.
+    $request_options[RequestOptions::JSON] = [
+      'region' => 'content',
+      'status' => TRUE,
+      'component_tree' => [],
+    ];
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 422, NULL, NULL, NULL, NULL);
+    self::assertSame([
+      'errors' => [
+        [
+          'detail' => 'The "content" region must always render the main content (returned by the controller of the matched route) and hence cannot contain a component tree.',
+          'source' => ['pointer' => 'region'],
+        ],
+      ],
+    ], $body);
+
+    // Load the block.page_title_block Component so we can compose a valid
+    // component_tree referencing it.
+    $component = Component::load('block.page_title_block');
+    self::assertInstanceOf(ComponentInterface::class, $component);
+    $component_version = $component->getActiveVersion();
+
+    $component_tree = [
+      [
+        'uuid' => '429f135f-aed3-43a4-ab04-148cf20b93d9',
+        'component_id' => 'block.page_title_block',
+        'component_version' => $component_version,
+        'inputs' => [
+          'label' => '',
+          'label_display' => '0',
+        ],
+      ],
+    ];
+
+    // POST creates a region.
+    $region_id = 'stark.sidebar_first';
+    $region_to_send = [
+      'theme' => 'stark',
+      'region' => 'sidebar_first',
+      'status' => TRUE,
+      'component_tree' => $component_tree,
+    ];
+    $request_options[RequestOptions::JSON] = $region_to_send;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL, [
+      'Location' => [
+        "$base/canvas/api/v0/config/page_region/$region_id",
+      ],
+    ]);
+    $expected_normalization = [
+      'id' => $region_id,
+      'theme' => 'stark',
+      'region' => 'sidebar_first',
+      'status' => TRUE,
+      'component_tree' => $component_tree,
+    ];
+    $this->assertSame($expected_normalization, $body);
+
+    $individual_url = Url::fromUri("base:/canvas/api/v0/config/page_region/$region_id");
+
+    // GET individual returns the same normalization.
+    $body = $this->assertExpectedResponse('GET', $individual_url, [], 200, ['user.permissions'], [
+      "config:canvas.page_region.$region_id",
+      'http_response',
+    ], 'UNCACHEABLE (request policy)', 'MISS');
+    $this->assertSame($expected_normalization, $body);
+
+    // GET list returns the stark region.
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
+      'config:page_region_list',
+      'http_response',
+    ], 'UNCACHEABLE (request policy)', 'MISS');
+    $this->assertSame([$region_id => $expected_normalization], $body);
+
+    // POST with empty component_tree: another stark region.
+    $second_region_id = 'stark.sidebar_second';
+    $second_region_to_send = [
+      'theme' => 'stark',
+      'region' => 'sidebar_second',
+      'status' => TRUE,
+      'component_tree' => [],
+    ];
+    $request_options[RequestOptions::JSON] = $second_region_to_send;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL, [
+      'Location' => [
+        "$base/canvas/api/v0/config/page_region/$second_region_id",
+      ],
+    ]);
+    self::assertIsArray($body);
+    self::assertSame([], $body['component_tree']);
+
+    // PATCH updates component_tree (empty -> full) and status (true -> false).
+    $patch_payload = [
+      'component_tree' => $component_tree,
+      'status' => FALSE,
+    ];
+    $request_options[RequestOptions::JSON] = $patch_payload;
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri("base:/canvas/api/v0/config/page_region/$second_region_id"), $request_options, 200, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    self::assertFalse($body['status']);
+    self::assertSame($component_tree, $body['component_tree']);
+
+    // PATCH with empty component_tree clears the tree.
+    $request_options[RequestOptions::JSON] = ['component_tree' => []];
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri("base:/canvas/api/v0/config/page_region/$second_region_id"), $request_options, 200, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    self::assertSame([], $body['component_tree']);
+
+    // POSTing the same theme+region again must 409 (id is composed from
+    // theme + region, so duplicates collide on the id constraint).
+    $request_options[RequestOptions::JSON] = $second_region_to_send;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 409, NULL, NULL, NULL, NULL);
+    self::assertSame([
+      'errors' => [
+        "'page_region' entity with ID '$second_region_id' already exists.",
+      ],
+    ], $body);
+
+    // PATCHing immutable fields (theme/region/id) is silently ignored —
+    // updateFromClientSide only applies `component_tree` and `status`. The
+    // request must still succeed and the stored values must be unchanged.
+    $request_options[RequestOptions::JSON] = [
+      'theme' => 'olivero',
+      'region' => 'header',
+      'id' => 'olivero.header',
+    ];
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri("base:/canvas/api/v0/config/page_region/$second_region_id"), $request_options, 200, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    self::assertSame($second_region_id, $body['id']);
+    self::assertSame('stark', $body['theme']);
+    self::assertSame('sidebar_second', $body['region']);
+
+    // refineListQuery filters to default theme. Install olivero and POST an
+    // olivero region; list should still return only stark regions.
+    \Drupal::service('theme_installer')->install(['olivero']);
+    $olivero_region_id = 'olivero.sidebar';
+    $olivero_region_to_send = [
+      'theme' => 'olivero',
+      'region' => 'sidebar',
+      'status' => TRUE,
+      'component_tree' => [],
+    ];
+    $request_options[RequestOptions::JSON] = $olivero_region_to_send;
+    $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL, [
+      'Location' => [
+        "$base/canvas/api/v0/config/page_region/$olivero_region_id",
+      ],
+    ]);
+
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
+      'config:page_region_list',
+      'http_response',
+    ], 'UNCACHEABLE (request policy)', 'MISS');
+    self::assertIsArray($body);
+    self::assertSame([$region_id, $second_region_id], \array_keys($body));
+
+    // Switch default theme to olivero; list should now only return olivero.
+    $this->config('system.theme')->set('default', 'olivero')->save();
+
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
+      'config:page_region_list',
+      'http_response',
+    ], 'UNCACHEABLE (request policy)', 'MISS');
+    self::assertIsArray($body);
+    self::assertSame([$olivero_region_id], \array_keys($body));
+
+    // Clean up via HTTP DELETE and verify the list reflects the change.
+    $this->assertExpectedResponse('DELETE', Url::fromUri("base:/canvas/api/v0/config/page_region/$olivero_region_id"), [], 204, NULL, NULL, NULL, NULL);
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['theme', 'user.permissions'], [
+      'config:page_region_list',
+      'http_response',
+    ], 'UNCACHEABLE (request policy)', 'MISS');
+    self::assertSame([], $body);
   }
 
   /**
@@ -1398,6 +1609,19 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     $page->delete();
 
+    // Deleting a Code Component removes it from any Folder that references it.
+    // Verify that a Folder referencing 'test' has the item removed when the
+    // component is deleted via the Canvas HTTP API, so the Folder does not
+    // retain a stale/invalid reference to a now-missing config entity.
+    $folder_for_delete_test = Folder::create([
+      'name' => 'Delete test folder',
+      'configEntityTypeId' => JavaScriptComponent::ENTITY_TYPE_ID,
+      'weight' => 0,
+      'items' => ['test'],
+    ]);
+    $folder_for_delete_test->save();
+    $this->assertSame(['test'], $folder_for_delete_test->get('items'));
+
     // We can delete the 'test' Code Component via the Canvas HTTP API. As it isn't
     // in use it will cascade delete the component as well.
     $component_storage = \Drupal::entityTypeManager()->getStorage(Component::ENTITY_TYPE_ID);
@@ -1408,6 +1632,11 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertNull($body);
     $component = $component_storage->loadUnchanged('js.test');
     self::assertNull($component);
+    // The Folder must no longer contain 'test' after the Code Component was deleted.
+    $folder_for_delete_test = Folder::load($folder_for_delete_test->id());
+    \assert($folder_for_delete_test instanceof Folder);
+    $this->assertSame([], $folder_for_delete_test->get('items'));
+    $folder_for_delete_test->delete();
 
     // Delete the 'another_component' Code Component via the Canvas HTTP API: 204.
     $body = $this->assertExpectedResponse('DELETE', Url::fromUri('base:/canvas/api/v0/config/js_component/another_component'), [], 204, NULL, NULL, NULL, NULL);
@@ -1733,7 +1962,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertExpectedResponse('DELETE', $canonical_url, [], 403, NULL, NULL, NULL, NULL);
   }
 
-  private function assertAuthenticationAndAuthorization(string $entity_type_id, bool $delete_allowed = TRUE, array $initial_items = [], array $initial_cache_tags = ['http_response']): void {
+  private function assertAuthenticationAndAuthorization(string $entity_type_id, bool $delete_allowed = TRUE, array $initial_items = [], array $initial_cache_tags = ['http_response'], array $initial_cache_contexts = ['user.permissions']): void {
     if (!\in_array("config:{$entity_type_id}_list", $initial_cache_tags, TRUE)) {
       $initial_cache_tags[] = "config:{$entity_type_id}_list";
     }
@@ -1749,7 +1978,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // Authenticated & authorized: 200, but empty list.
     $this->drupalLogin($this->httpApiUser);
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], $initial_cache_tags, 'UNCACHEABLE (request policy)', 'MISS');
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, $initial_cache_contexts, $initial_cache_tags, 'UNCACHEABLE (request policy)', 'MISS');
     if (empty($initial_items)) {
       $this->assertSame([], $body);
     }
@@ -1824,7 +2053,11 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     if (empty($examples)) {
       throw new \Exception('We require to define at least one example for POST "/canvas/api/v0/config/' . $entity_type_id . '" request in openapi.yml.');
     }
-    return (array) reset($examples);
+    $example = reset($examples);
+    if (\is_object($example) && \property_exists($example, 'value')) {
+      $example = $example->value;
+    }
+    return (array) $example;
   }
 
   private function assertExposedCodeComponents(array $expected, string $expected_dynamic_page_cache, array $request_options, array $additional_expected_cache_tags = []): void {
@@ -2289,6 +2522,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'status' => FALSE,
       'id' => 'node.bunny.full',
       'suggestedPreviewEntityId' => NULL,
+      'component_tree' => [],
     ];
 
     // The list response MUST contain unpublished ContentTemplates.
@@ -2302,11 +2536,9 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // Create a ContentTemplate via the Canvas HTTP API, but forget crucial data
     // that causes the required shape to be violated: 500, courtesy of OpenAPI.
-    // ⚠️ Unlike all other Canvas config entity types, this does NOT support:
-    // - POSTing the full representation of the config entity: only the initial
-    //   creation of an empty ContentTemplate is supported, all modifications
-    //   happen via the Canvas UI' editor frame, which talks to the "layout" API
-    // - PATCHing: similar
+    // ℹ️ POST and PATCH on this endpoint are intended for external consumers
+    // (Canvas CLI). The Canvas UI's editor frame edits content
+    // templates indirectly via the "layout" API and the auto-save flow.
     // @see \Drupal\canvas\Controller\ApiLayoutController::patch()
     $content_template_to_send = [
       'bundle' => 'llama',
@@ -2373,6 +2605,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'status' => FALSE,
       'id' => 'node.llama.full',
       'suggestedPreviewEntityId' => NULL,
+      'component_tree' => [],
     ];
     $this->assertSame($expected_full_llama_normalization, $body);
     // The same normalization should be present when GETting the `Location`.
@@ -2444,10 +2677,37 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:llama', 'user.node_grants:view'], 'UNCACHEABLE (request policy)', 'MISS');
     $this->assertSame($expected_list_normalization, $body);
 
-    // This was now tested as full circle as possible! ✅
-    // (POST with component tree and PATCH cannot be tested here, see comment
-    // at the top.)
-    // @see \Drupal\canvas\Controller\ApiLayoutController::patch()
+    // PATCH the existing llama template (CLI push path).
+    $patch_url = Url::fromUri('base:/canvas/api/v0/config/content_template/node.llama.full');
+    $request_options[RequestOptions::JSON] = [
+      'status' => TRUE,
+      'component_tree' => [],
+    ];
+    $body = $this->assertExpectedResponse('PATCH', $patch_url, $request_options, 200, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    self::assertTrue($body['status']);
+    self::assertSame([], $body['component_tree']);
+
+    // POST a brand-new template with explicit status — what `canvas push` does
+    // for a not-yet-existing template. The "cat" bundle was created above.
+    $request_options[RequestOptions::JSON] = [
+      'entityType' => 'node',
+      'bundle' => 'cat',
+      'viewMode' => 'full',
+      'status' => TRUE,
+      'component_tree' => [],
+    ];
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL, [
+      'Location' => [
+        "$base/canvas/api/v0/config/content_template/node.cat.full",
+      ],
+    ]);
+    self::assertIsArray($body);
+    self::assertTrue($body['status']);
+    self::assertSame([], $body['component_tree']);
+
+    // Clean up the templates we just created/mutated.
+    $this->assertExpectedResponse('DELETE', Url::fromUri('base:/canvas/api/v0/config/content_template/node.cat.full'), [], 204, NULL, NULL, NULL, NULL);
   }
 
 }

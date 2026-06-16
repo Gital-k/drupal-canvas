@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildElementsValidationContext,
   validateElements,
-  validatePages,
-} from './validate-page';
+} from './validate-elements';
+import { validatePages } from './validate-page';
 
 import type {
   ComponentMetadata,
@@ -105,6 +105,7 @@ describe('validatePages', () => {
       componentRoot: tmpDir,
       projectRoot: tmpDir,
       components: [],
+      contentTemplates: [],
       pages: [
         {
           name: 'home',
@@ -114,6 +115,7 @@ describe('validatePages', () => {
           relativePath: 'pages/home.json',
         },
       ],
+      regions: [],
       warnings: [],
       stats: { scannedFiles: 1, ignoredFiles: 0 },
     };
@@ -146,6 +148,7 @@ describe('validatePages', () => {
       componentRoot: tmpDir,
       projectRoot: tmpDir,
       components: [],
+      contentTemplates: [],
       pages: [
         {
           name: 'home',
@@ -155,6 +158,7 @@ describe('validatePages', () => {
           relativePath: 'pages/home.json',
         },
       ],
+      regions: [],
       warnings: [],
       stats: { scannedFiles: 1, ignoredFiles: 0 },
     };
@@ -203,6 +207,7 @@ describe('validatePages', () => {
       componentRoot: tmpDir,
       projectRoot: tmpDir,
       components: [],
+      contentTemplates: [],
       pages: [
         {
           name: 'new-page',
@@ -212,6 +217,7 @@ describe('validatePages', () => {
           relativePath: 'pages/new-page.json',
         },
       ],
+      regions: [],
       warnings: [],
       stats: { scannedFiles: 1, ignoredFiles: 0 },
     };

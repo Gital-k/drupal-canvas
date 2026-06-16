@@ -150,6 +150,8 @@ describe('buildCanvasProject', () => {
       projectRoot: tmpDir,
       components: [component],
       pages: [],
+      contentTemplates: [],
+      regions: [],
       warnings: [],
       stats: {
         scannedFiles: 2,
@@ -240,6 +242,8 @@ describe('buildCanvasProject', () => {
           projectRoot: tmpDir,
           components: [],
           pages: [],
+          contentTemplates: [],
+          regions: [],
           warnings: [],
           stats: {
             scannedFiles: 0,

@@ -4,19 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
-use Drupal\Component\Utility\NestedArray;
-use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityPublishedInterface;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\Core\Entity\RevisionableInterface;
-use Drupal\Core\Form\FormBuilderInterface;
-use Drupal\Core\Render\Markup;
-use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ClientDataToEntityConverter;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -25,7 +16,20 @@ use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\canvas\Storage\ComponentTreeLoader;
+use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityPublishedInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\RevisionableInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Render\Markup;
+use Drupal\Core\Theme\ThemeManagerInterface;
+use Drupal\Core\Url;
 use GuzzleHttp\Psr7\Query;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -54,6 +58,7 @@ final class ApiLayoutController {
     private readonly ClientDataToEntityConverter $converter,
     private readonly ComponentTreeLoader $componentTreeLoader,
     private readonly ComponentSourceManager $componentSourceManager,
+    private readonly ModuleHandlerInterface $moduleHandler,
   ) {
     $theme = $this->themeManager->getActiveTheme()->getName();
     $theme_regions = system_region_list($theme);
@@ -128,6 +133,40 @@ final class ApiLayoutController {
         [$entity],
         self::getEditableRegions($entity),
       )),
+    ];
+    $available_translations = [];
+    $links = [];
+    // ContentTemplate is a config entity with no translations of its own, so
+    // fall back to $preview_entity which holds the translatable content.
+    $translation_entity = $entity instanceof ContentEntityInterface ? $entity : $preview_entity;
+    if ($translation_entity instanceof ContentEntityInterface) {
+      $available_translations = \array_keys($translation_entity->getTranslationLanguages(FALSE));
+      if ($this->moduleHandler->moduleExists('content_translation')) {
+        foreach ($available_translations as $langcode) {
+          $translation = $translation_entity->getTranslation($langcode);
+          // The delete route gates on update access, so emit the link to the
+          // same users to avoid offering a link that would return 403.
+          // @see canvas.api.content.translation.delete in canvas.routing.yml
+          if ($translation->access('update')) {
+            $links[$langcode] = [
+              CanvasUriDefinitions::LINK_REL_DELETE => Url::fromRoute(
+                'canvas.api.content.translation.delete',
+                ['canvas_page' => $translation_entity->id()],
+                ['language' => $translation->language()],
+              )->toString(),
+            ];
+          }
+        }
+      }
+    }
+    // The client should also list the default language.
+    $default_langcode = $translation_entity instanceof ContentEntityInterface
+      ? $translation_entity->getUntranslated()->language()->getId()
+      : $entity->language()->getId();
+    array_unshift($available_translations, $default_langcode);
+    $data['translations'] = [
+      'available' => $available_translations,
+      'links' => $links,
     ];
     if ($entity instanceof ContentEntityInterface && $entity instanceof EntityPublishedInterface) {
       $data['isPublished'] = $entity->isPublished();
@@ -463,6 +502,40 @@ final class ApiLayoutController {
       return (string) $autoSaveData->entity->label();
     }
     return (string) $entity->label();
+  }
+
+  /**
+   * Renders a draft content template against a preview entity.
+   */
+  public function draftContentTemplate(Request $request, string $entity_type, ContentEntityInterface $preview_entity): JsonResponse {
+    $body = \json_decode($request->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
+    if (!\is_array($body)) {
+      throw new BadRequestHttpException('Request body must be a JSON object.');
+    }
+    foreach (['bundle', 'viewMode'] as $required) {
+      if (!\array_key_exists($required, $body) || !\is_string($body[$required]) || $body[$required] === '') {
+        throw new BadRequestHttpException(\sprintf('Missing or invalid "%s" in request body.', $required));
+      }
+    }
+    if ($preview_entity->bundle() !== $body['bundle']) {
+      throw new BadRequestHttpException(\sprintf('Preview entity bundle "%s" does not match draft bundle "%s".', $preview_entity->bundle(), $body['bundle']));
+    }
+
+    $draft = ContentTemplate::createFromClientSide([
+      'entityType' => $entity_type,
+      'bundle' => $body['bundle'],
+      'viewMode' => $body['viewMode'],
+      'component_tree' => $body['component_tree'] ?? [],
+      'status' => TRUE,
+    ]);
+
+    $tree = $this->componentTreeLoader->load($draft);
+    $this->componentSourceManager->updateComponentInstances($tree);
+    $built = $tree->getClientSideRepresentation($preview_entity);
+
+    return new JsonResponse([
+      'model' => empty($built['model']) ? new \stdClass() : $built['model'],
+    ]);
   }
 
   private static function extractModelForSubtree(array $initial_layout_node, array $full_model): array {

@@ -315,11 +315,52 @@ final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressi
   }
 
   /**
+   * Returns a copy of this expression with the final target replaced.
+   *
+   * Walks the reference chain to the leaf (the deepest non-reference) and
+   * substitutes the provided expression in its place, preserving every
+   * referencer along the way.
+   *
+   * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $new_leaf
+   *   The expression to use as the new leaf. May itself be a
+   *   ReferenceFieldPropExpression to extend the chain.
+   *
+   * @throws \LogicException
+   *   Thrown when this expression targets multiple bundles, because the branch
+   *   to replace is ambiguous.
+   */
+  public function withFinalTargetReplaced(EntityFieldBasedPropExpressionInterface $new_leaf): static {
+    if ($this->referenced instanceof ReferencedBundleSpecificBranches) {
+      throw new \LogicException('Cannot replace the final target of a multi-bundle reference expression; the branch to replace is ambiguous.');
+    }
+    $new_referenced = $this->referenced instanceof self
+      ? $this->referenced->withFinalTargetReplaced($new_leaf)
+      : $new_leaf;
+    return new static($this->referencer, $new_referenced);
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function targetsMultipleBundles(): bool {
     // @see ::withoutBranch()
     return $this->referenced instanceof ReferencedBundleSpecificBranches;
+  }
+
+  /**
+   * Finds the first reference in the chain that targets multiple bundles.
+   *
+   * Walks the whole reference chain, because a multi-target-bundle reference
+   * can be nested inside an otherwise single-bundle chain.
+   */
+  public function findMultiTargetBundleReference(): ?self {
+    if ($this->targetsMultipleBundles()) {
+      return $this;
+    }
+    if ($this->referenced instanceof self) {
+      return $this->referenced->findMultiTargetBundleReference();
+    }
+    return NULL;
   }
 
 }
