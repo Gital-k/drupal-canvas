@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+#ddev-generated
+## Command provided by https://github.com/ddev/ddev-drupal-contrib
+## Description: Symlink project files into the configured location (defaults to `web/modules/custom/[PROJECT_NAME]`)
+## Usage: symlink-project [flags] [args]
+## Example: "ddev symlink-project"
+## ExecRaw: true
+## MutagenSync: true
+
+# Canvas override of the stock ddev-drupal-contrib symlink-project. It is
+# identical to upstream except that node_modules is added to the ignore list
+# below, so it is NEVER symlinked into the module directory.
+#
+# Why: this is an npm-workspaces monorepo. If node_modules is symlinked into
+# web/modules/contrib/canvas and any `npm install` runs through that symlink,
+# npm deletes the symlink and creates a divergent real node_modules there
+# (`npm warn reify Removing non-directory`), so host and container diverge and a
+# singleton package can load from two realpaths. Reads through the other
+# symlinks (src/, ui/, packages/, …) are safe; only node_modules is the trigger.
+# node_modules itself stays where npm expects it — at the repo root, which is
+# the Composer root /var/www/html (this command's cwd) — and is bind-mounted out
+# of Mutagen via upload_dirs (see config.canvas.yaml).
+
+set -eu -o pipefail
+
+export _WEB_ROOT=$DDEV_DOCROOT
+cd "$DDEV_COMPOSER_ROOT" || exit
+curl -OL https://git.drupalcode.org/project/gitlab_templates/-/raw/default-ref/scripts/symlink_project.php
+
+if [ -z "${PROJECT_FILES-}" ]; then
+  # Suppress a warning. node_modules is Canvas' only addition to the upstream
+  # ignore list (see the @file note above).
+  PROJECT_FILES=$(ls -A --ignore="web" --ignore="vendor" --ignore="symlink_project.php" --ignore=".ddev" --ignore=".idea" --ignore="node_modules")
+  export PROJECT_FILES
+fi
+
+# Symlink name using underscores.
+# @see https://www.drupal.org/docs/develop/creating-modules/naming-and-placing-your-drupal-module
+# DRUPAL_PROJECT_FOLDER is used by the symlink-project script in gitlab_templates
+export DRUPAL_PROJECT_FOLDER=${DDEV_DOCROOT}/${DRUPAL_PROJECTS_PATH}/${DDEV_SITENAME//-/_}
+php symlink_project.php
+rm -f symlink_project.php

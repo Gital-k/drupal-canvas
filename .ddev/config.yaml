@@ -3,12 +3,12 @@ docroot: web
 php_version: "8.3"
 webserver_type: nginx-fpm
 xdebug_enabled: false
-no_project_mount: true
 fail_on_hook_fail: false
-# With no_project_mount the real docroot lives in the scaffold volume, not on
-# the host. DDEV's settings management writes settings.php to the host docroot
-# path (which is empty), so manage Drupal settings ourselves in the volume via
-# the setup command instead. @see .ddev/commands/host/setup
+# Canvas omits the db container and forces SQLite (see config.canvas.yaml and
+# .ddev/drupal-settings/settings.ddev.php). DDEV's settings management would
+# otherwise write a mariadb connection pointing at the absent db container, so
+# manage Drupal settings ourselves via the setup command instead.
+# @see .ddev/commands/host/setup
 disable_settings_management: true
 additional_hostnames: []
 additional_fqdns: []

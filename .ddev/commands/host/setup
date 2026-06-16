@@ -27,9 +27,8 @@ while :; do
 done
 
 # Exit early if already set up (unless --force).
-# The Drupal scaffold (vendor/, web/core) lives in a Docker volume, not on the
-# host, so we track completion with a host-side sentinel instead of checking for
-# vendor/autoload.php.
+# Completion is tracked with a host-side sentinel; a fresh checkout has no
+# sentinel and triggers the full build below.
 SENTINEL=.ddev/.scaffold-built
 if [[ -f "$SENTINEL" ]] && [[ "$FORCE" != true ]]; then
   echo "Development environment already set up."
@@ -69,52 +68,29 @@ if [[ ! -f .ddev/config.playwright.yml ]]; then
   ddev restart
 fi
 
-# The Drupal scaffold lives in a Docker volume at /var/www/html; this module is
-# bind-mounted at web/modules/contrib/canvas (see docker-compose.inverted.yaml).
-# Docker creates the intermediate mount-point directories (web, web/modules,
-# web/modules/contrib) in the volume owned by root. Hand them to the container
-# user so Composer can populate web/ during install. Do NOT recurse — that would
-# touch the bind-mounted module's files.
-ddev exec 'sudo chown "$(id -u):$(id -g)" /var/www/html /var/www/html/web /var/www/html/web/modules /var/www/html/web/modules/contrib 2>/dev/null || true'
-
-# Seed the scaffold's Composer root from the module so ddev-drupal-contrib's
-# expand step merges Canvas' own require/require-dev into the installed site.
-ddev exec 'cp web/modules/contrib/canvas/composer.json composer.json'
-
-# Allow all Composer plugins (operates on the scaffold's composer.json).
-ddev composer config \
-  --no-plugins \
-  allow-plugins.\* \
-  true
-
-# Build the Drupal scaffold (core + dependencies) into the volume.
+# Build Drupal core and dependencies. `ddev poser` reads the tracked repo-root
+# composer.json (drupal/canvas), writes a generated composer.contrib.json with
+# core + allow-plugins + installer-paths merged in, runs `composer install`, and
+# removes the generated file. The tracked composer.json is never mutated.
 ddev poser
 
-# Mark the scaffold root as a project so `composer run composer-root` resolves
-# to /var/www/html from anywhere beneath it (expand writes a drupal-module type).
-ddev composer config type project
-
-# `ddev composer run <script>` executes at the scaffold root (/var/www/html),
-# but Canvas' scripts (phpstan, phpcs, phpunit, …) were seeded from the module
-# and resolve their config relative to the module directory. Rewrite the
-# scaffold's copies into delegating shims that `cd` into the module first, so
-# `ddev composer run phpstan` works without an explicit --dir. The module's own
-# composer.json is untouched (see the helper's @file docblock).
-ddev exec 'php /mnt/ddev_config/scripts/shim-scaffold-composer-scripts.php'
+# Symlink the project into web/modules/contrib/canvas. This is Canvas' override
+# of the ddev-drupal-contrib command: identical to upstream except node_modules
+# is excluded from the symlink set (see .ddev/commands/web/symlink-project).
+ddev symlink-project
 
 # Create the simpletest directory that holds per-test Drupal site directories
 # for Playwright/PHPUnit installs. The per-test SQLite databases live on tmpfs
 # at /tmp/sqlite instead (see DRUPAL_TEST_DB_URL in config.canvas.yaml), so the
-# heavy write traffic stays off the journaled scaffold volume.
+# heavy write traffic stays off the Mutagen-synced project mount.
 ddev exec 'mkdir -p web/sites/simpletest && chmod 777 web/sites/simpletest'
 
-# Write Drupal settings directly into the scaffold volume. DDEV's own settings
-# management is disabled (disable_settings_management: true) because with
-# no_project_mount it would write settings.php to the empty host docroot instead
-# of the volume's real docroot. The settings files are kept under
-# .ddev/drupal-settings (mounted at /mnt/ddev_config) and copied in here.
-# settings.php includes settings.ddev.php, which holds test-module discovery and
-# a forced SQLite database.
+# Write Drupal settings into the docroot. DDEV's own settings management is
+# disabled (disable_settings_management: true): the db container is omitted and
+# SQLite is forced, so DDEV would otherwise write a mariadb connection to the
+# absent db container. The settings files are kept under .ddev/drupal-settings
+# (mounted at /mnt/ddev_config) and copied in here. settings.php includes
+# settings.ddev.php, which holds test-module discovery and a forced SQLite db.
 ddev exec 'cp /mnt/ddev_config/drupal-settings/settings.php /mnt/ddev_config/drupal-settings/settings.ddev.php web/sites/default/'
 
 # Install Drupal and enable the Drupal Canvas module.
@@ -123,12 +99,22 @@ ddev drupal-install
 # Node dependencies for Drupal core's JS tooling.
 ddev exec --dir /var/www/html/web/core npm install
 
-# Node dependencies for the Canvas monorepo. The npm workspaces root is the
-# module, so node_modules lives at the module path and is shared with the host.
-ddev exec --dir /var/www/html/web/modules/contrib/canvas npm install
+# Node dependencies for the Canvas monorepo. npm runs at the Composer root
+# (/var/www/html), which is the real repo root and npm-workspaces root, so
+# node_modules is created there — NOT through the module symlink, which would
+# fork a divergent node_modules. node_modules is bind-mounted out of Mutagen
+# (upload_dirs in config.canvas.yaml).
+ddev exec --dir /var/www/html npm install
 
-# Build the Canvas UI.
-ddev exec --dir /var/www/html/web/modules/contrib/canvas composer run ui-build
+# Build the Canvas UI. This (and `composer run phpunit`/`lint`/`fix`, plus
+# PhpStorm) invokes composer at the project root, which activates the Drupal
+# composer plugins (core-composer-scaffold, installers, patches, ...). The
+# tracked composer.json intentionally carries no `config.allow-plugins` (the
+# generated composer.contrib.json holds it only during `ddev poser`, then is
+# deleted), so those plugins are allow-listed via the container-global
+# .ddev/homeadditions/.composer/config.json, which DDEV copies into $HOME on
+# every start. Without it, composer aborts with a blocked-plugin error.
+ddev exec --dir /var/www/html composer run ui-build
 
 echo "Development environment ready!"
 

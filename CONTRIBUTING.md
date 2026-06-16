@@ -18,34 +18,38 @@ After `ddev start`, you will have a functional Drupal installation at https://ca
 
 ### How the environment is mounted
 
-DDEV runs with `no_project_mount: true`. The Drupal scaffold (core, `vendor/`,
-`index.php`, other contrib) lives in a named Docker volume at `/var/www/html`,
-and this repository is bind-mounted directly at
-`/var/www/html/web/modules/contrib/canvas` (see `.ddev/docker-compose.inverted.yaml`).
+DDEV uses the standard `ddev-drupal-contrib` layout. This repository is the
+project root and the Composer root, mounted at `/var/www/html` and synced
+bidirectionally with [Mutagen](https://ddev.readthedocs.io/en/stable/users/install/performance/#mutagen)
+(`performance_mode: "mutagen"`). `ddev poser` installs Drupal core and `vendor/`
+into the project root, and `ddev symlink-project` symlinks the repository into
+`web/modules/contrib/canvas` so Drupal can discover the module at its natural
+path. `web/`, `vendor/`, and `recipes/` are git-ignored, so `git status` stays
+clean.
 
-This replaces the older `ddev-drupal-contrib` `symlink-project` flow, which
-symlinked each project file into the docroot. Because the module now has a single
-container path, npm workspaces (`node_modules` at the module root) and xdebug path
-mapping both behave exactly as on the host. The trade-off: Drupal core and
-`vendor/` live in the volume, not on the host, so they are not indexable or
-steppable in your IDE — debugging targets the Canvas module itself.
+Because the whole project root is synced, Drupal core and `vendor/` are visible
+on the host — they index and step through in your IDE, and PHPUnit can run from
+the gutter (see [docs/testing/phpunit.md](docs/testing/phpunit.md)).
 
-`web/` and `vendor/` no longer appear in the repository working directory, so
-`git status` stays clean.
+`node_modules` is bind-mounted out of Mutagen (`upload_dirs` in
+`.ddev/config.canvas.yaml`) so the large workspace tree does not slow syncing.
+Canvas' `symlink-project` override excludes `node_modules` from the symlink set:
+this is an npm-workspaces monorepo, and symlinking `node_modules` into the module
+path would let an `npm install` through the symlink fork a divergent copy. Always
+run `npm install` at the project root (`/var/www/html`), never at the module
+symlink path.
 
 DDEV's settings management is disabled (`disable_settings_management: true`)
-because it writes `settings.php` to the host docroot path, which is empty under
-`no_project_mount`. The `ddev setup` command instead copies
-`.ddev/drupal-settings/settings.php` and `settings.ddev.php` into the volume's
-docroot; `settings.ddev.php` holds the SQLite database connection and enables
-test-module discovery.
+because the `db` container is omitted and SQLite is forced, so DDEV would
+otherwise write a mariadb connection pointing at the absent db container. The
+`ddev setup` command instead copies `.ddev/drupal-settings/settings.php` and
+`settings.ddev.php` into the docroot; `settings.ddev.php` holds the SQLite
+database connection and enables test-module discovery.
 
 ### Composer scripts (DDEV)
 
-`ddev composer ...` runs against the scaffold's `composer.json` at
-`/var/www/html`. During `ddev setup`, every Canvas composer script is also
-copied into that scaffold `composer.json` as a delegating shim that `cd`s into
-the module directory first, so you can run them directly:
+The project root is the Composer root, so `ddev composer run <script>` executes
+Canvas' own scripts directly:
 
 ```shell
 ddev composer run ui-build
@@ -53,22 +57,20 @@ ddev composer run phpstan
 ddev composer run phpunit -- tests/src/Unit/CoalescerTest.php
 ```
 
-Passthrough arguments after `--` are forwarded to the module's own script. The
-module's `composer.json` is never modified — only the scaffold copy is shimmed
-(see `.ddev/scripts/shim-scaffold-composer-scripts.php`), so CI, host, and manual
-setups, which already run from the module root, are unaffected.
-
-The `ddev phpunit`, `ddev phpcs`, `ddev phpstan`, `ddev cypress`, `ddev playwright`
-and `ddev stylelint` commands also target the module directory.
+Passthrough arguments after `--` are forwarded to the script. The `ddev phpunit`,
+`ddev phpcs`, `ddev phpstan`, `ddev cypress`, `ddev playwright` and
+`ddev stylelint` commands also target the project.
 
 ### Debugging with xdebug (PhpStorm / IDE)
 
 1. Enable xdebug: `ddev xdebug on` (disable with `ddev xdebug off`).
-2. In your IDE, map the project to the container module path:
-   - Host project root → `/var/www/html/web/modules/contrib/canvas`
+2. The project root maps 1:1 to `/var/www/html`, so the stock DDEV IDE
+   integration configures the interpreter and path mappings automatically.
 3. Set the server name to `canvas.ddev.site` (matches `PHP_IDE_CONFIG`).
 
-`.idea/` is not tracked, so this is a per-developer setup.
+For running individual PHPUnit tests from the IDE gutter, see
+[docs/testing/phpunit.md](docs/testing/phpunit.md). `.idea/` is not tracked, so
+this is a per-developer setup.
 
 ### First experience
 After this process, you will get the `drush uli` to login into the admin area. You will see an article created. If you edit the article, you will see a new link "Drupal Canvas: Test" to edit this entity with the new Canvas UI.
@@ -76,21 +78,14 @@ After this process, you will get the `drush uli` to login into the admin area. Y
 ### Usage
 The most common commands in the development process are:
 1. `ddev setup`: Set up the Canvas development environment (installs dependencies, builds UI, installs Drupal). Use `ddev setup --force` to completely reset an existing environment. (Note, this is executed automatically the first time you start ddev)
-2. `ddev cleanup`: Empty the Drupal scaffold volume and remove environment-specific folders and files ignored by `.gitignore` (node_modules, build artifacts, etc.). Use `ddev cleanup --force` to skip confirmation.
-   - The Drupal scaffold (core, `vendor/`, the installed site, its SQLite
-     database) lives in a Docker volume, not on the host (see [How the
-     environment is mounted](#how-the-environment-is-mounted)). `ddev cleanup`
-     empties that volume in place; it does not delete the volume itself. To
-     remove the ephemeral container and volume entirely, stop the project and
-     delete the named volume manually:
-     ```shell
-     ddev stop
-     docker volume rm ddev-canvas_drupal_scaffold
-     ```
-     The volume cannot be removed while the project is running (`docker` reports
-     `volume is in use`). The next `ddev start` recreates an empty volume and
-     re-runs `ddev setup` from scratch. Your bind-mounted module code (this
-     repository) is never in the volume, so it is unaffected.
+2. `ddev cleanup`: Remove environment-specific folders and files ignored by `.gitignore` (`web/`, `vendor/`, `recipes/`, `node_modules`, build artifacts, etc.). Use `ddev cleanup --force` to skip confirmation.
+   - The Drupal scaffold installs into the project root (see [How the
+     environment is mounted](#how-the-environment-is-mounted)), so `ddev cleanup`
+     simply removes those git-ignored directories on the host. The
+     `web/modules/contrib/canvas` symlink points back at the repository, so
+     removing `web/` removes the symlink, never your code. The next `ddev start`
+     re-runs `ddev setup` to rebuild from scratch. To tear the environment down
+     entirely, use `ddev delete`.
 3. `ddev drupal-install`: This will reinstall the site. Very useful when you update Canvas and want a fresh installation.
 4. `ddev ui-build`: This will build a production ready canvas UI.
 5. `ddev ui-dev`: This will build a development environment for developing the canvas app itself.
@@ -101,9 +96,9 @@ The most common commands in the development process are:
    - View test reports: Run `ddev playwright show-report` after tests complete, then open https://canvas.ddev.site:9324
    - Each test installs its own throwaway Drupal site. Its SQLite database lives
      on a tmpfs (RAM) mount at `/tmp/sqlite` so concurrent installs do not
-     contend on the scaffold volume's filesystem journal, so parallel workers
-     (the default) work without a `--workers` override. Test databases reset on
-     every `ddev restart`; the persistent dev-site database at
+     contend on the Mutagen-synced project mount, so parallel workers (the
+     default) work without a `--workers` override. Test databases reset on every
+     `ddev restart`; the persistent dev-site database at
      `web/sites/default/files/.ht.sqlite` is unaffected.
 
 Tip: Use `ddev help <command>` for additional information about the command and arguments available.

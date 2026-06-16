@@ -137,8 +137,16 @@ for arg in "$@"; do
 done
 
 if [ -n "$PHPUNIT_DIRECT_FILE" ]; then
-  echo php "$DRUPAL_PROJECT_ROOT/vendor/bin/phpunit" --configuration "$MODULE_ROOT" "$PHPUNIT_DIRECT_FILE" "${PASSTHROUGH_ARGS[@]}"
-  exec php "$DRUPAL_PROJECT_ROOT/vendor/bin/phpunit" --configuration "$MODULE_ROOT" "$PHPUNIT_DIRECT_FILE" "${PASSTHROUGH_ARGS[@]}"
+  # phpunit.xml.dist declares bootstrap="../../../core/tests/bootstrap.php",
+  # which is relative to the config file. That resolves correctly only when the
+  # config sits at web/modules/contrib/canvas (the 3rd-party Case 2 depth). In
+  # the included .ddev layout (Case 1) the composer/config root is /var/www/html,
+  # three levels too shallow, so the relative path escapes the project. Pass the
+  # absolute core bootstrap explicitly; $DRUPAL_WEB_ROOT/core is correct in both
+  # cases, and the CLI flag overrides the XML value.
+  BOOTSTRAP="$DRUPAL_WEB_ROOT/core/tests/bootstrap.php"
+  echo php "$DRUPAL_PROJECT_ROOT/vendor/bin/phpunit" --configuration "$MODULE_ROOT" --bootstrap "$BOOTSTRAP" "$PHPUNIT_DIRECT_FILE" "${PASSTHROUGH_ARGS[@]}"
+  exec php "$DRUPAL_PROJECT_ROOT/vendor/bin/phpunit" --configuration "$MODULE_ROOT" --bootstrap "$BOOTSTRAP" "$PHPUNIT_DIRECT_FILE" "${PASSTHROUGH_ARGS[@]}"
 fi
 
 DRUPAL_VERSION=$(sed -n "s/.*const VERSION = '\([^']*\)'.*/\1/p" "$DRUPAL_WEB_ROOT/core/lib/Drupal.php")

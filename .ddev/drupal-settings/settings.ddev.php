@@ -5,8 +5,8 @@
  * @file
  * Canvas DDEV environment-specific settings.
  *
- * Copied into the scaffold volume's docroot by .ddev/commands/host/setup and
- * included from settings.php.
+ * Copied into the docroot by .ddev/commands/host/setup and included from
+ * settings.php.
  */
 
 // Allow test modules and themes to be installed.

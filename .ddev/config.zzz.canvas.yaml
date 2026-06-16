@@ -1,8 +1,8 @@
-# Hook suppression for the inverted mount + Playwright add-on.
+# Hook suppression for the Playwright add-on.
 # Sorts last (zzz), after config.playwright.yml.
 #
 # config.playwright.yml is a #ddev-generated file we cannot edit. It injects
-# hooks that are wrong for Canvas's inverted-mount layout:
+# hooks that are wrong for Canvas's layout:
 #   - pre-start  `cp -r test/playwright .ddev/web-build/` (Canvas keeps
 #     package.json at the repo root; there is no test/playwright dir)
 #   - post-start `rm -rf .ddev/web-build/playwright` (cleanup of that copy)
@@ -17,8 +17,8 @@
 # The replacement lists below re-declare only the hooks Canvas actually needs:
 #   pre-start  1. refresh Dockerfile.playwright from the disabled template (add-on)
 #              2. stage package.json/package-lock.json for the Docker build (ours)
-#   post-start    run `ddev setup` (builds the scaffold + installs Drupal on the
-#                 inverted mount)
+#   post-start    run `ddev setup` (builds core/vendor, symlinks the project,
+#                 installs Drupal)
 override_config: true
 hooks:
   pre-start:

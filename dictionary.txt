@@ -75,6 +75,7 @@ greppable
 heredocs
 herobanner
 herobannersecond
+homeadditions
 hotfixes
 hyperscriptification
 hyperscriptified
@@ -121,6 +122,7 @@ myfont
 nourl
 opsz
 phpat
+phpstorm
 placehold
 Postel
 replayable
