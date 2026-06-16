@@ -36,21 +36,6 @@ if [[ -f "$SENTINEL" ]] && [[ "$FORCE" != true ]]; then
   exit 0
 fi
 
-# Re-entrancy guard. The first-run path below installs the ddev-playwright
-# add-on and runs `ddev restart`, which re-fires the post-start hook -> a nested
-# `ddev setup`. Without this guard, the nested run would race the outer one
-# (building the scaffold and installing Drupal twice); the inner install hardens
-# web/sites/default to 0555, so the outer run's later `cp settings.php` into that
-# directory fails with "Permission denied". The lock makes the nested invocation
-# a no-op so the outer run completes linearly exactly once. Removed on any exit.
-LOCK=.ddev/.setup-running
-if [[ -f "$LOCK" ]]; then
-  echo "Canvas setup is already running (triggered by the add-on restart); skipping nested run."
-  exit 0
-fi
-touch "$LOCK"
-trap 'rm -f "$LOCK"' EXIT
-
 echo "Setting up Canvas development environment..."
 
 # Mark config.yaml as skip-worktree so local changes don't show in git status.
@@ -66,6 +51,7 @@ if [[ ! -f .ddev/config.playwright.yml ]]; then
   ddev add-on get Lullabot/ddev-playwright
   cp .ddev/web-build/disabled.Dockerfile.playwright .ddev/web-build/Dockerfile.playwright
   ddev restart
+  exit 0
 fi
 
 # Build Drupal core and dependencies. `ddev poser` reads the tracked repo-root
