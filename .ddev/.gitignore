@@ -48,3 +48,6 @@
 /web-build/kasmvnc.yaml
 /web-build/xstartup
 /web-entrypoint.d/mkcert-nssdb.sh
+
+# Drupal Core ENV vars
+.env.web

@@ -12,7 +12,10 @@ set -eu -o pipefail
 
 export COMPOSER=composer.contrib.json
 .ddev/commands/web/expand-composer-json
+# ensure updated services can be deployed.
+sudo chmod 777 $DDEV_DOCROOT/sites/default
 composer install "$@"
 # The -f flag suppresses errors if lock file does not exist.
 rm -f composer.contrib.json composer.contrib.lock
 touch $DDEV_DOCROOT/core/.env
+echo "Switched to ${DRUPAL_CORE}. You can upgrade with 'ddev drush updb'. If downgrading from a newer version of drupal, you must run 'ddev drupal-install' to reinstall the site."
