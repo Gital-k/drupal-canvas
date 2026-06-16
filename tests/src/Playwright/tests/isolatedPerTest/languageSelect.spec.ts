@@ -444,6 +444,7 @@ test.describe('Language Select', () => {
       page.locator('[data-testid="language-options-delete"]').first(),
     ).toBeAttached();
 
+
     // Deleting the French translation happens in-app: no new browser tab
     // opens, and the dropdown updates without a page reload.
     let popupOpened = false;

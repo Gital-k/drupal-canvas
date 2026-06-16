@@ -88,6 +88,7 @@ interactable
 invariantly
 inwidget
 jangregor
+journaled
 Jsona
 JSONified
 jsxs
