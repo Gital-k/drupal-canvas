@@ -369,6 +369,22 @@ test.describe('Templates - General', () => {
       .click();
     expect(popupOpened).toBe(false);
 
+    // Clicking delete opens a confirmation dialog instead of deleting immediately.
+    const deleteDialog = page.getByRole('dialog');
+    await expect(deleteDialog).toBeVisible();
+    const confirmButton = deleteDialog.getByRole('button', {
+      name: 'Delete Translation',
+    });
+
+    await deleteDialog
+      .locator('[data-testid="delete-translation-confirm-input"]')
+      .fill('DELETE');
+    await expect(confirmButton).toBeEnabled();
+
+    // Confirming the dialog triggers the actual in-app deletion.
+    await confirmButton.click();
+    await expect(deleteDialog).not.toBeVisible();
+
     // Wait for the in-app delete to complete: three dots disappear for French.
     await expect(
       page.locator('[aria-label="More options for French"]'),
