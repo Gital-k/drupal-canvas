@@ -1,0 +1,37 @@
+<!-- Nuxt app container -->
+<div id="teleports"></div>
+<div id="__nuxt" style="display:none;"></div>
+
+<!-- Load Nuxt -->
+<script>window.__NUXT__ = {};
+  window.__NUXT__.config = {
+    public: {
+      componentPreview: true,
+    }, app: {baseURL: "/", buildId: "dev", buildAssetsDir: "/_nuxt/", cdnURL: ""}
+  }</script>
+<!-- !!! NOTE: Customize path to entry.js as needed !!! -->
+<script type="application/json" data-nuxt-data="nuxt-app" data-ssr="false" id="__NUXT_DATA__">[{"serverRendered":1},false]</script>
+<script type="importmap">{"imports":{"#entry":"http://172.19.0.1:3000/nuxt-component-preview/entry.js"}}</script>
+<script type="module" src="http://172.19.0.1:3000/nuxt-component-preview/entry.js"></script>
+
+<!-- Preview targets with unique ID. For now just use some random number. -->
+{% set unique_id = 'preview-target-' ~ random(99999) %}
+<div id="{{ unique_id }}" style="border: 2px dashed #ccc; min-height: 200px; padding: 20px; margin: 20px;">
+
+</div>
+
+<script>
+  window.addEventListener('nuxt-component-preview:ready', (event) => {
+    const { nuxtApp } = event.detail
+    console.log('NUXT: Rendering preview component {{ unque_id }}')
+
+    nuxtApp.$previewComponent(
+      '{{ component_name }}',
+      {
+        content: '{{  content|raw }}',
+      },
+      '#{{ unique_id }}'
+    )
+  })
+
+</script>
