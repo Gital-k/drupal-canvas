@@ -90,7 +90,7 @@ final class ApiContentExportController extends ApiControllerBase {
             $links[$langcode] = [
               CanvasUriDefinitions::LINK_REL_DELETE => Url::fromRoute(
                 'canvas.api.content.translation.delete',
-                ['canvas_page' => $canvas_page->id()],
+                [Page::ENTITY_TYPE_ID => $canvas_page->id()],
                 ['language' => $translation->language()],
               )->toString(),
             ];

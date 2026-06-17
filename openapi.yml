@@ -2266,9 +2266,9 @@ paths:
           schema:
             type: boolean
           examples:
-            "true":
+            "load the auto-save entry for this entity, if any":
               value: true
-            "false":
+            "load the actually stored entity":
               value: false
       responses:
         '200':
