@@ -90,7 +90,8 @@ The most common commands in the development process are:
 6. Tests and linting: The commands `[ddev] composer run lint`, `[ddev] npm run lint`, `[ddev] composer run phpcs`, `[ddev] composer run phpstan` and `[ddev] composer run phpunit` must be used before any commit to ensure code looks good and pass tests.
 7. Cypress tests: `ddev cypress run`
 8. Playwright tests: `ddev playwright test`
-   - Watch tests run in the browser via VNC: https://canvas.ddev.site:8444 (username: your local username, password: `secret`)
+   - When `--headed` is added to the command, you can watch tests run in the browser via VNC: https://canvas.ddev.site:8444 (username: your local username, password: `secret`)
+      - Important: This only works reliably when running a specific test. If you want to run all tests, it is better to run them in headless mode, as the browser will be opened and closed for each test, which is slow.
    - View test reports: Run `ddev playwright show-report` after tests complete, then open https://canvas.ddev.site:9324
    - Each test installs its own throwaway Drupal site. Its SQLite database lives
      on a tmpfs (RAM) mount at `/tmp/sqlite` so concurrent installs do not
