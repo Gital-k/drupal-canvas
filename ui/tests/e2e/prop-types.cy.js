@@ -573,6 +573,31 @@ describe('Prop types editing', () => {
     cy.get('[data-prop-message]')
       .should('have.length', 1)
       .should('have.text', '❌ data must match format "uri"');
+
+    // Confirm the fix in https://drupal.org/i/3589544
+    // Confirm a second field is showing its initial value in the iframe.
+    const stringPreviewSelector = '#test-string code';
+    const stringInitialValue = 'Hello, world!';
+    const stringUpdatedValue = 'Hello, url world!';
+    cy.waitForElementContentInIframe(stringPreviewSelector, stringInitialValue);
+
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/1',
+      times: 1,
+      method: 'PATCH',
+    }).as('patch');
+    // Make a valid change to the String — single line field and wait for preview.
+    cy.findByLabelText('String — single line').clear({ force: true });
+    cy.findByLabelText('String — single line').type(stringUpdatedValue);
+    // Wait for preview to complete to ensure the update is successful.
+    cy.wait('@patch');
+    cy.waitForElementContentNotInIframe(
+      '.layout-content',
+      'exception has been thrown',
+    );
+
+    cy.waitForElementContentInIframe(stringPreviewSelector, stringUpdatedValue);
+    cy.waitForElementContentInIframe(previewSelector, '');
   });
 
   it('idn-email', { retries: { openMode: 0, runMode: 3 } }, () => {
