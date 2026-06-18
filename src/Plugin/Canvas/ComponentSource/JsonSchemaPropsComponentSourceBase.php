@@ -1321,6 +1321,15 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
           }
         }
 
+        // Required array component props with minItems >= 1 that evaluate to []
+        // must be retained.
+        // ⚠️ The JS component receives [] for the prop and must handle it
+        // gracefully on the client side.
+        // Validation of the rendering is intentionally skipped for this case.
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+        // (No special-case code needed: the existing fall-through to
+        // $this->collapse() below already retains [] for required props.)
+
         // Required string component props that are completely free-form (so:
         // without a non-zero `minLength`, without a `format` or `pattern`) that
         // evaluate to '' must be retained: while the empty string is NOT
