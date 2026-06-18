@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\PropExpressions\StructuredData\Coalescer;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
@@ -16,6 +19,7 @@ use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -31,6 +35,7 @@ use Drupal\Core\Url;
 use Drupal\file\FileInterface;
 use Drupal\user\UserInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -234,6 +239,41 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
     $response = new CacheableJsonResponse(data: ['data' => $data]);
     $response->addCacheableDependency($cacheability);
     return $response;
+  }
+
+  /**
+   * Resolves entityFields expressions against a selected content entity.
+   */
+  public function preview(Request $request, string $entity_type, EntityInterface $entity): CacheableJsonResponse {
+    $body = self::decode($request);
+    /** @var array<string, list<string>> $entity_fields */
+    $entity_fields = $body['entityFields'];
+    if (!$entity instanceof ContentEntityInterface) {
+      throw new BadRequestHttpException(\sprintf("The entity type '%s' is not a content entity type.", $entity_type));
+    }
+    $resolved = [];
+    foreach ($entity_fields as $prop_name => $expression_strings) {
+      try {
+        $expressions = \array_map(
+          static function (string $expression_string): EntityFieldBasedPropExpressionInterface {
+            $expression = StructuredDataPropExpression::fromString($expression_string);
+            if (!$expression instanceof EntityFieldBasedPropExpressionInterface) {
+              throw new \InvalidArgumentException(\sprintf("'%s' is not a valid content-entity-reference prop expression.", $expression_string));
+            }
+            return $expression;
+          },
+          Coalescer::coalesce($expression_strings),
+        );
+      }
+      catch (\InvalidArgumentException $e) {
+        throw new BadRequestHttpException($e->getMessage(), $e);
+      }
+      $resolved[$prop_name] = JsComponent::buildReferencePayload(new EvaluationResult($entity), $expressions);
+    }
+    $resolved_result = new EvaluationResult($resolved);
+    return (new CacheableJsonResponse(data: ['data' => $resolved_result->value]))
+      ->addCacheableDependency($resolved_result)
+      ->addCacheableDependency($entity);
   }
 
   /**

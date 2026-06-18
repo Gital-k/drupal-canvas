@@ -18,6 +18,8 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\file\Entity\File;
+use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
@@ -28,6 +30,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -44,6 +47,7 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
 
   private const string URL_TYPES = '/canvas/api/v0/ui/content-entity-reference';
   private const string URL_FIELDS = '/canvas/api/v0/ui/content-entity-reference/%s/%s';
+  private const string URL_PREVIEW = '/canvas/api/v0/ui/content-entity-reference/preview/%s/%s';
 
   /**
    * {@inheritdoc}
@@ -315,6 +319,108 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
       (string) new FieldPropExpression($article, 'uid', NULL, 'target_id'),
       $uid_props_by_name['target_id']['expression'],
     );
+  }
+
+  /**
+   * Resolves entityFields expressions against a selected content entity.
+   */
+  public function testPreviewFieldsEndpoint(): void {
+    $account = $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'access user profiles']);
+    $file = File::create([
+      'uri' => 'public://example.jpg',
+      'filename' => 'example.jpg',
+    ]);
+    $file->save();
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Example article',
+      'uid' => $account->id(),
+      'status' => 1,
+      'field_image' => [
+        'target_id' => $file->id(),
+        'alt' => 'Example alt text',
+        'width' => 800,
+        'height' => 600,
+      ],
+    ]);
+    $node->save();
+
+    $article = BetterEntityDataDefinition::create('node', 'article');
+    $user = BetterEntityDataDefinition::create('user', 'user');
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'node', $node->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            (string) new FieldPropExpression($article, 'title', NULL, 'value'),
+            (string) new ReferenceFieldPropExpression(
+              new FieldPropExpression($article, 'uid', NULL, 'entity'),
+              new FieldPropExpression($user, 'name', NULL, 'value'),
+            ),
+            (string) new FieldPropExpression($article, 'field_image', NULL, 'alt'),
+            (string) new FieldPropExpression($article, 'field_image', NULL, 'width'),
+            (string) new FieldPropExpression($article, 'field_image', NULL, 'height'),
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $response = $this->request($request);
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    self::assertSame(
+      [
+        'data' => [
+          'article' => [
+            '__type' => 'article',
+            'label' => 'Example article',
+            'field_image' => [
+              'alt' => 'Example alt text',
+              'height' => 600,
+              'width' => 800,
+            ],
+            'owner' => [
+              '__type' => 'user',
+              'name' => $account->getAccountName(),
+            ],
+          ],
+        ],
+      ],
+      self::decodeResponse($response),
+    );
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertContains('node:' . $node->id(), $response->getCacheableMetadata()->getCacheTags());
+    self::assertContains('user:' . $account->id(), $response->getCacheableMetadata()->getCacheTags());
+  }
+
+  /**
+   * The preview endpoint requires view access to the selected entity.
+   */
+  public function testPreviewFieldsEndpointChecksSelectedEntityAccess(): void {
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Example article',
+      'status' => 1,
+    ]);
+    $node->save();
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION]);
+
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'node', $node->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            (string) new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'title', NULL, 'value'),
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $this->expectException(AccessDeniedHttpException::class);
+    $this->request($request);
   }
 
   /**
