@@ -707,6 +707,7 @@ canvas.api.ui.content_entity_reference.preview:
     _format: 'json'
   methods: [POST]
   options:
+    canvas_external_api: true
     parameters:
       entity:
         type: entity:{entity_type}
