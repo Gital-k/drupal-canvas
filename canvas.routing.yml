@@ -710,6 +710,7 @@ canvas.api.ui.content_entity_reference.preview:
     parameters:
       entity:
         type: entity:{entity_type}
+    _format: 'json'
 
 canvas.api.ui.content_template.suggestions.preview_content_entities:
   path: '/canvas/api/v0/ui/content_template/suggestions/preview/{entity_type_id}/{bundle}'
