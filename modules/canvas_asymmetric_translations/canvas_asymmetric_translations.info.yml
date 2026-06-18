@@ -1,0 +1,9 @@
+name: Canvas Asymmetric Translations
+type: module
+description: 'Provides asymmetric translation handling for canvas pages.'
+core_version_requirement: ^11
+package: Custom
+dependencies:
+  - drupal:content_translation
+  - drupal:language
+  - canvas:canvas
