@@ -669,7 +669,7 @@ export class ApiService {
   ): Promise<{ model: Record<string, unknown> }> {
     try {
       const response = await this.client.post(
-        `/canvas/api/v0/layout-content-template-draft/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(previewEntityId)}?_format=json`,
+        `/canvas/api/v0/layout-content-template-draft/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(previewEntityId)}`,
         {
           bundle,
           viewMode,
@@ -689,7 +689,7 @@ export class ApiService {
   ): Promise<Record<string, unknown>> {
     try {
       const response = await this.client.post(
-        `/canvas/api/v0/ui/content-entity-reference/preview/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(entityId)}?_format=json`,
+        `/canvas/api/v0/ui/content-entity-reference/preview/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(entityId)}`,
         { entityFields },
       );
       return response.data.data;
