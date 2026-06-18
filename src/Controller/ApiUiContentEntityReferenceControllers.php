@@ -244,7 +244,7 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
   /**
    * Resolves entityFields expressions against a selected content entity.
    */
-  public function preview(Request $request, string $entity_type, EntityInterface $entity): CacheableJsonResponse {
+  public static function preview(Request $request, string $entity_type, EntityInterface $entity): CacheableJsonResponse {
     $body = self::decode($request);
     /** @var array<string, list<string>> $entity_fields */
     $entity_fields = $body['entityFields'];
