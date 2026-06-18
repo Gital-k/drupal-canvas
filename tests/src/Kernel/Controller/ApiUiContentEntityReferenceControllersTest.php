@@ -31,6 +31,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -420,6 +421,30 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     );
 
     $this->expectException(AccessDeniedHttpException::class);
+    $this->request($request);
+  }
+
+  /**
+   * The selected entity must match the expressions' entity type and bundle.
+   */
+  public function testPreviewFieldsEndpointRejectsMismatchedSelectedEntity(): void {
+    $account = $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access user profiles']);
+
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'user', $account->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            (string) new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'title', NULL, 'value'),
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $this->expectException(BadRequestHttpException::class);
+    $this->expectExceptionMessage('is an expression for entity type `node`, but the provided entity is of type `user`.');
     $this->request($request);
   }
 
