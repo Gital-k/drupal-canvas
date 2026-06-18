@@ -268,7 +268,12 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       catch (\InvalidArgumentException $e) {
         throw new BadRequestHttpException($e->getMessage(), $e);
       }
-      $resolved[$prop_name] = JsComponent::buildReferencePayload(new EvaluationResult($entity), $expressions);
+      try {
+        $resolved[$prop_name] = JsComponent::buildReferencePayload(new EvaluationResult($entity), $expressions);
+      }
+      catch (\DomainException $e) {
+        throw new BadRequestHttpException($e->getMessage(), $e);
+      }
     }
     $resolved_result = new EvaluationResult($resolved);
     return (new CacheableJsonResponse(data: ['data' => $resolved_result->value]))
