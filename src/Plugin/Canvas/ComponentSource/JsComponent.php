@@ -251,6 +251,7 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
    *
    * @see ::getExplicitInput()
    * @see \Drupal\canvas\PropExpressions\StructuredData\EvaluationResult
+   * @internal
    */
   public static function buildReferencePayload(EvaluationResult $resolved_entity, array $expressions): EvaluationResult {
     if (!$resolved_entity->value instanceof FieldableEntityInterface) {
