@@ -349,6 +349,9 @@ interface PageListProps {
   // Pagination
   hasMore?: boolean;
   onLoadMore?: () => void;
+  paginationError?: unknown;
+  onRetryPagination?: () => void;
+  isLoadingMore?: boolean;
   // Event handlers
   onNewPage?: () => void;
   onDeletePage?: (item: ContentStub) => void;
@@ -369,6 +372,9 @@ const PageList = ({
   canCreatePages = false,
   hasMore = false,
   onLoadMore,
+  paginationError,
+  onRetryPagination,
+  isLoadingMore = false,
   onNewPage,
   onDeletePage,
   onDuplicatePage,
@@ -468,7 +474,31 @@ const PageList = ({
               error={pageItemsError}
             />
           )}
-          {hasMore && <InfiniteScrollObserver onLoadMore={onLoadMore} />}
+          {paginationError && (
+            <ErrorCard
+              title="Failed to load more pages"
+              error={
+                typeof paginationError === 'object' &&
+                paginationError !== null &&
+                'status' in paginationError &&
+                paginationError.status === 'FETCH_ERROR'
+                  ? 'Network error: Unable to connect to server. Please check your connection and try again.'
+                  : 'An error occurred while loading more pages.'
+              }
+              resetErrorBoundary={onRetryPagination}
+              resetButtonText="Retry"
+            />
+          )}
+          {hasMore && !paginationError && !isLoadingMore && (
+            <InfiniteScrollObserver onLoadMore={onLoadMore} />
+          )}
+          {isLoadingMore && (
+            <Box mt="3">
+              <Skeleton height="1.2rem" width="100%" my="2" />
+              <Skeleton height="1.2rem" width="100%" my="2" />
+              <Skeleton height="1.2rem" width="100%" my="2" />
+            </Box>
+          )}
         </Box>
       </Skeleton>
       <Skeleton

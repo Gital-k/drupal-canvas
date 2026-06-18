@@ -19,6 +19,7 @@ import {
   Heading,
   IconButton,
   ScrollArea,
+  Skeleton,
   Text,
   TextField,
   Tooltip,
@@ -26,6 +27,7 @@ import {
 
 import { useAppSelector } from '@/app/hooks';
 import EmptyStateCallout from '@/components/EmptyStateCallout';
+import ErrorCard from '@/components/error/ErrorCard';
 import InfiniteScrollObserver from '@/components/InfiniteScrollObserver';
 import { selectHomepagePath } from '@/features/configuration/configurationSlice';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
@@ -370,6 +372,9 @@ const Navigation = ({
   onDelete,
   hasMore = false,
   onLoadMore,
+  paginationError,
+  onRetryPagination,
+  isLoadingMore = false,
 }: {
   loading: boolean;
   showNew: boolean;
@@ -384,6 +389,9 @@ const Navigation = ({
   onDelete?: (page: ContentStub) => void;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  paginationError?: unknown;
+  onRetryPagination?: () => void;
+  isLoadingMore?: boolean;
 }) => {
   // Reset search when the component unmounts
   useEffect(() => {
@@ -463,7 +471,31 @@ const Navigation = ({
               onPublish={onPublish}
               onDelete={onDelete}
             />
-            {hasMore && <InfiniteScrollObserver onLoadMore={onLoadMore} />}
+            {paginationError && (
+              <ErrorCard
+                title="Failed to load more pages"
+                error={
+                  typeof paginationError === 'object' &&
+                  paginationError !== null &&
+                  'status' in paginationError &&
+                  paginationError.status === 'FETCH_ERROR'
+                    ? 'Network error: Unable to connect to server. Please check your connection and try again.'
+                    : 'An error occurred while loading more pages.'
+                }
+                resetErrorBoundary={onRetryPagination}
+                resetButtonText="Retry"
+              />
+            )}
+            {hasMore && !paginationError && !isLoadingMore && (
+              <InfiniteScrollObserver onLoadMore={onLoadMore} />
+            )}
+            {isLoadingMore && (
+              <Box mt="3">
+                <Skeleton height="1.2rem" width="100%" my="2" />
+                <Skeleton height="1.2rem" width="100%" my="2" />
+                <Skeleton height="1.2rem" width="100%" my="2" />
+              </Box>
+            )}
           </>
         )}
       </ScrollArea>
