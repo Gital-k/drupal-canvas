@@ -107,8 +107,8 @@ async function resolveContentEntityReferencePreview(
   props: Record<
     string,
     {
-      entityTypeId: string;
-      bundle: string;
+      entityTypeId?: string;
+      bundle?: string;
       entityId?: string;
       entityLabel?: string;
       entityFields: string[];
@@ -121,8 +121,8 @@ async function resolveContentEntityReferencePreview(
   const props: Record<
     string,
     {
-      entityTypeId: string;
-      bundle: string;
+      entityTypeId?: string;
+      bundle?: string;
       entityId?: string;
       entityLabel?: string;
       entityFields: string[];
@@ -143,6 +143,11 @@ async function resolveContentEntityReferencePreview(
       component.props?.[propName],
     );
     if (!target) {
+      props[propName] = {
+        entityFields: expressions,
+        error:
+          'Missing x-allowed-entity-type-id or x-allowed-bundle on the content-entity-reference prop metadata.',
+      };
       continue;
     }
     const suggestions = await apiService.fetchPreviewEntitySuggestions(

@@ -180,4 +180,65 @@ describe('pullAgentsContext', () => {
       },
     );
   });
+
+  it('reports CER props that are missing local projected target metadata', async () => {
+    const componentRoot = path.join(tmpDir, 'components');
+    const componentDir = path.join(componentRoot, 'article-card');
+    await fs.mkdir(componentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(componentDir, 'index.tsx'),
+      'export default {};',
+    );
+    await fs.writeFile(
+      path.join(componentDir, 'component.yml'),
+      [
+        'name: Article card',
+        'machineName: article-card',
+        'props:',
+        '  properties:',
+        '    article:',
+        '      title: Article',
+        '      type: object',
+        '      $ref: json-schema-definitions://canvas.module/content-entity-reference',
+        'dataDependencies:',
+        '  entityFields:',
+        '    article:',
+        '      - ℹ︎␜entity:node:article␝title␞␟value',
+        '',
+      ].join('\n'),
+    );
+    setConfig({ componentDir: componentRoot });
+
+    const apiService = {
+      fetchPreviewEntitySuggestions: vi.fn(),
+      previewContentEntityReferenceFields: vi.fn(),
+    } as unknown as ApiService;
+    const outputs: unknown[] = [];
+
+    await pullAgentsContext(
+      apiService,
+      tmpDir,
+      'cer-preview',
+      ['article-card'],
+      () => {},
+      (data) => outputs.push(data),
+    );
+
+    expect(outputs).toEqual([
+      {
+        component: 'article-card',
+        props: {
+          article: {
+            entityFields: ['ℹ︎␜entity:node:article␝title␞␟value'],
+            error:
+              'Missing x-allowed-entity-type-id or x-allowed-bundle on the content-entity-reference prop metadata.',
+          },
+        },
+      },
+    ]);
+    expect(apiService.fetchPreviewEntitySuggestions).not.toHaveBeenCalled();
+    expect(
+      apiService.previewContentEntityReferenceFields,
+    ).not.toHaveBeenCalled();
+  });
 });
