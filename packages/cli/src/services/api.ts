@@ -650,6 +650,22 @@ export class ApiService {
     }
   }
 
+  async previewContentEntityReferenceFields(
+    entityTypeId: string,
+    entityId: string,
+    entityFields: Record<string, string[]>,
+  ): Promise<Record<string, unknown>> {
+    try {
+      const response = await this.client.post(
+        `/canvas/api/v0/ui/content-entity-reference/preview/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(entityId)}?_format=json`,
+        { entityFields },
+      );
+      return response.data.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
   async listViewModes(): Promise<
     Record<
       string,

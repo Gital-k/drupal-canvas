@@ -3,7 +3,7 @@ import * as p from '@clack/prompts';
 import { discoverCanvasProject } from '@drupal-canvas/discovery';
 
 import { getConfig } from '../config.js';
-import { createApiService, ensureAuthConfig } from '../services/api.js';
+import { createApiService, isUserAuthenticated } from '../services/api.js';
 import {
   pluralize,
   pluralizeComponent,
@@ -28,6 +28,27 @@ interface ValidateOptions {
   yes?: boolean;
   fix?: boolean;
   deprecated?: boolean;
+}
+
+async function createOptionalValidationApiService(): Promise<
+  ApiService | undefined
+> {
+  const config = getConfig();
+  if (!config.siteUrl) {
+    return undefined;
+  }
+  const hasClientCredentials =
+    Boolean(config.clientId) &&
+    Boolean(config.clientSecret) &&
+    Boolean(config.scope);
+  if (!isUserAuthenticated(config.siteUrl) && !hasClientCredentials) {
+    return undefined;
+  }
+  try {
+    return await createApiService();
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -113,6 +134,7 @@ export function validateCommand(program: Command): void {
         );
 
         const results: Result[] = [];
+        const apiService = await createOptionalValidationApiService();
 
         const s = p.spinner();
         s.start(`Validating ${componentPluralized}`);
@@ -122,6 +144,7 @@ export function validateCommand(program: Command): void {
             componentDir,
             options.fix,
             options.deprecated,
+            apiService,
           );
           results.push({ ...result, itemType: 'Component' });
         }
@@ -156,14 +179,6 @@ export function validateCommand(program: Command): void {
           ctSpinner.start(
             `Validating ${ctCount} ${pluralize(ctCount, 'content template')}`,
           );
-
-          let apiService: ApiService | undefined;
-          try {
-            await ensureAuthConfig();
-            apiService = await createApiService();
-          } catch {
-            // Auth not configured — draft validation will be skipped.
-          }
 
           const { results: ctResults } = await validateContentTemplates(
             discoveryResult,

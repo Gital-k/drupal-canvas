@@ -6,12 +6,20 @@ import {
   requiredDeprecated as drupalCanvasRequiredDeprecated,
 } from '@drupal-canvas/eslint-config';
 
+import {
+  findMetadataPath,
+  readComponentMetadata,
+} from './process-component-files';
+import { validateContentEntityReferencePropExpressions } from './validate-content-entity-reference';
+
 import type { Result } from '../types/Result';
+import type { ContentEntityReferenceValidationApi } from './validate-content-entity-reference';
 
 export async function validateComponent(
   componentDir: string,
   fix: boolean = false,
   deprecated?: boolean,
+  apiService?: ContentEntityReferenceValidationApi,
 ): Promise<Result> {
   const eslint = new ESLint({
     overrideConfigFile: true,
@@ -24,7 +32,6 @@ export async function validateComponent(
   if (fix) {
     await ESLint.outputFixes(eslintResults);
   }
-  const success = eslintResults.every((result) => result.errorCount === 0);
   const details: { heading: string; content: string }[] = [];
   eslintResults
     .filter((result) => result.errorCount > 0)
@@ -41,6 +48,23 @@ export async function validateComponent(
         content: messages.join('\n\n'),
       });
     });
+
+  const metadataPath = findMetadataPath(componentDir);
+  if (metadataPath) {
+    const metadata = await readComponentMetadata(metadataPath);
+    if (metadata) {
+      details.push(
+        ...(await validateContentEntityReferencePropExpressions(
+          metadata,
+          apiService,
+        )),
+      );
+    }
+  }
+
+  const success =
+    eslintResults.every((result) => result.errorCount === 0) &&
+    details.length === 0;
 
   return {
     itemName: basename(componentDir),
