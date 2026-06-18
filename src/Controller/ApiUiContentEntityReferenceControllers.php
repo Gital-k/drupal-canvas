@@ -272,8 +272,7 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
     }
     $resolved_result = new EvaluationResult($resolved);
     return (new CacheableJsonResponse(data: ['data' => $resolved_result->value]))
-      ->addCacheableDependency($resolved_result)
-      ->addCacheableDependency($entity);
+      ->addCacheableDependency($resolved_result);
   }
 
   /**
