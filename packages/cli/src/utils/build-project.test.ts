@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getDataDependenciesFromAst } from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
 import {
   buildCanvasComponentEntry,
   buildCanvasLocalArtifacts,
@@ -228,6 +229,79 @@ describe('buildCanvasProject', () => {
     await expect(
       fs.access(path.join(outputDir, 'canvas-manifest.json')),
     ).resolves.toBeUndefined();
+  });
+
+  it('includes entity field data dependencies from component metadata in the component payload', async () => {
+    vi.mocked(getDataDependenciesFromAst).mockReturnValueOnce({
+      drupalSettings: ['v0.branding'],
+    });
+    await fs.writeFile(
+      path.join(componentDir, 'card/component.yml'),
+      [
+        'name: card',
+        'machineName: card',
+        'status: true',
+        'props:',
+        '  properties:',
+        '    article:',
+        '      type: object',
+        '      $ref: json-schema-definitions://canvas.module/content-entity-reference',
+        '      x-allowed-entity-type-id: node',
+        '      x-allowed-bundle: article',
+        'slots: {}',
+        'dataDependencies:',
+        '  entityFields:',
+        '    article:',
+        '      - entity:node:article.title.value',
+      ].join('\n'),
+    );
+    const component = {
+      id: 'card',
+      name: 'card',
+      kind: 'index',
+      directory: path.join(componentDir, 'card'),
+      relativeDirectory: 'src/components/card',
+      metadataPath: path.join(componentDir, 'card/component.yml'),
+      jsEntryPath: path.join(componentDir, 'card/index.tsx'),
+      cssEntryPath: null,
+    } as DiscoveredComponent;
+    const discoveryResult = {
+      componentRoot: componentDir,
+      projectRoot: tmpDir,
+      components: [component],
+      pages: [],
+      contentTemplates: [],
+      regions: [],
+      warnings: [],
+      stats: {
+        scannedFiles: 2,
+        ignoredFiles: 0,
+      },
+    } as DiscoveryResult;
+
+    const result = await buildCanvasProject({
+      projectRoot: tmpDir,
+      componentDir,
+      aliasBaseDir: 'src',
+      outputDir,
+      discoveryResult,
+      cleanOutputDir: true,
+      buildTailwind: true,
+      requireJsEntries: true,
+    });
+
+    expect(
+      result.builtComponents[0]?.componentPayload.dataDependencies,
+    ).toEqual({
+      drupalSettings: ['v0.branding'],
+      entityFields: {
+        article: ['entity:node:article.title.value'],
+      },
+    });
+    expect(result.builtComponents[0]?.componentPayload.props.article).toEqual({
+      type: 'object',
+      $ref: 'json-schema-definitions://canvas.module/content-entity-reference',
+    });
   });
 
   it('rejects componentDir outside aliasBaseDir', async () => {

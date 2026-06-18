@@ -9,6 +9,32 @@ import type { Component, DataDependencies } from '../types/Component';
 import type { Metadata } from '../types/Metadata';
 
 const NAMED_SUFFIX = '.component.yml';
+const PROJECTED_CONTENT_ENTITY_REFERENCE_PROP_KEYS = [
+  'x-allowed-entity-type-id',
+  'x-allowed-bundle',
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function stripProjectedContentEntityReferencePropKeys(
+  props: Component['props'],
+): Component['props'] {
+  const sanitizedProps: Component['props'] = {};
+  for (const [propName, prop] of Object.entries(props ?? {})) {
+    if (!isRecord(prop)) {
+      sanitizedProps[propName] = prop;
+      continue;
+    }
+    const sanitizedProp = { ...prop };
+    for (const key of PROJECTED_CONTENT_ENTITY_REFERENCE_PROP_KEYS) {
+      delete sanitizedProp[key];
+    }
+    sanitizedProps[propName] = sanitizedProp;
+  }
+  return sanitizedProps;
+}
 
 /**
  * Get files in a directory
@@ -239,12 +265,20 @@ export function createComponentPayload(params: {
   } = params;
 
   // Ensure props is correctly structured
-  const propsData = metadata.props.properties;
+  const propsData = stripProjectedContentEntityReferencePropKeys(
+    metadata.props.properties,
+  );
 
   // Ensure slots has correct format
   let slotsData = metadata.slots || {};
   if (typeof slotsData === 'string' || Array.isArray(slotsData)) {
     slotsData = {};
+  }
+
+  const payloadDataDependencies: DataDependencies = { ...dataDependencies };
+  if (metadata.dataDependencies?.entityFields) {
+    payloadDataDependencies.entityFields =
+      metadata.dataDependencies.entityFields;
   }
 
   return {
@@ -259,6 +293,6 @@ export function createComponentPayload(params: {
     sourceCodeCss: sourceCodeCss,
     compiledCss: compiledCss,
     importedJsComponents: importedJsComponents || [],
-    dataDependencies: dataDependencies || {},
+    dataDependencies: payloadDataDependencies,
   };
 }
