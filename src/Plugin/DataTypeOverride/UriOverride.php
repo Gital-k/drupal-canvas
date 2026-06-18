@@ -25,7 +25,7 @@ class UriOverride extends Uri {
 
     $uri = $components['scheme'] . '://'
       . $components['host']
-      . UrlHelper::encodePath($components['path'] ?? '');
+      . UrlHelper::encodePath(rawurldecode(rawurldecode($components['path'] ?? '')));
 
     if (\array_key_exists('query', $components) && strlen($components['query'])) {
       $uri .= '?' . $components['query'];
