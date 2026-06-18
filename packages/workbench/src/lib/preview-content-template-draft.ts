@@ -37,7 +37,7 @@ export async function fetchDraftContentTemplatePreview(
   const csrfToken = await fetchCsrfToken(signal);
   // The preview entity ID is the entity's primary identifier (e.g. nid for
   // nodes), as returned by the suggestions endpoint.
-  const url = `/canvas/api/v0/layout-content-template-draft/${encodeURIComponent(metadata.entityTypeId)}/${encodeURIComponent(previewEntityId)}?_format=json`;
+  const url = `/canvas/api/v0/layout-content-template-draft/${encodeURIComponent(metadata.entityTypeId)}/${encodeURIComponent(previewEntityId)}`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',

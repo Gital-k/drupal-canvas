@@ -246,7 +246,7 @@ export async function fetchResolvedContentEntityReferenceFields(
     headers['X-CSRF-Token'] = csrfToken;
   }
   const response = await fetch(
-    `/canvas/api/v0/ui/content-entity-reference/preview/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(entityId)}?_format=json`,
+    `/canvas/api/v0/ui/content-entity-reference/preview/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(entityId)}`,
     {
       method: 'POST',
       credentials: 'include',

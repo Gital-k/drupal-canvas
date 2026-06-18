@@ -47,7 +47,7 @@ describe('preview-content-entity-reference', () => {
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      '/canvas/api/v0/ui/content-entity-reference/preview/node/2?_format=json',
+      '/canvas/api/v0/ui/content-entity-reference/preview/node/2',
       {
         method: 'POST',
         credentials: 'include',
