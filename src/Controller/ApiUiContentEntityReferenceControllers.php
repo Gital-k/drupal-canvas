@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
-use Drupal\canvas\PropExpressions\StructuredData\Coalescer;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
@@ -245,29 +245,28 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
    * Resolves entityFields expressions against a selected content entity.
    */
   public static function preview(Request $request, string $entity_type, EntityInterface $entity): CacheableJsonResponse {
-    $body = self::decode($request);
-    /** @var array<string, list<string>> $entity_fields */
-    $entity_fields = $body['entityFields'];
     if (!$entity instanceof ContentEntityInterface) {
       throw new BadRequestHttpException(\sprintf("The entity type '%s' is not a content entity type.", $entity_type));
     }
+    $data = self::decode($request);
+    try {
+      $data = JavaScriptComponent::coalesceEntityFields($data);
+    }
+    catch (\Throwable $e) {
+      throw new BadRequestHttpException('The request contains invalid prop expressions.', $e);
+    }
     $resolved = [];
-    foreach ($entity_fields as $prop_name => $expression_strings) {
-      try {
-        $expressions = \array_map(
-          static function (string $expression_string): EntityFieldBasedPropExpressionInterface {
-            $expression = StructuredDataPropExpression::fromString($expression_string);
-            if (!$expression instanceof EntityFieldBasedPropExpressionInterface) {
-              throw new \InvalidArgumentException(\sprintf("'%s' is not a valid content-entity-reference prop expression.", $expression_string));
-            }
-            return $expression;
-          },
-          Coalescer::coalesce($expression_strings),
-        );
-      }
-      catch (\InvalidArgumentException $e) {
-        throw new BadRequestHttpException($e->getMessage(), $e);
-      }
+    foreach ($data['entityFields'] as $prop_name => $expression_strings) {
+      $expressions = \array_map(
+        static function (string $expression_string): EntityFieldBasedPropExpressionInterface {
+          $expression = StructuredDataPropExpression::fromString($expression_string);
+          if (!$expression instanceof EntityFieldBasedPropExpressionInterface) {
+            throw new BadRequestHttpException(\sprintf("'%s' is not a valid content-entity-reference prop expression.", $expression_string));
+          }
+          return $expression;
+        },
+        $expression_strings,
+      );
       try {
         $resolved[$prop_name] = JsComponent::buildReferencePayload(new EvaluationResult($entity), $expressions);
       }

@@ -9,6 +9,7 @@ use Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
@@ -445,6 +446,67 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
 
     $this->expectException(BadRequestHttpException::class);
     $this->expectExceptionMessage('is an expression for entity type `node`, but the provided entity is of type `user`.');
+    $this->request($request);
+  }
+
+  /**
+   * The preview endpoint rejects unparseable expression strings.
+   */
+  public function testPreviewFieldsEndpointRejectsInvalidExpressionString(): void {
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Example article',
+      'status' => 1,
+    ]);
+    $node->save();
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content']);
+
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'node', $node->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            'not-a-valid-expression',
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $this->expectException(BadRequestHttpException::class);
+    $this->expectExceptionMessage('The request contains invalid prop expressions.');
+    $this->request($request);
+  }
+
+  /**
+   * The preview endpoint accepts only entity-field-based expressions.
+   */
+  public function testPreviewFieldsEndpointRejectsFieldTypeExpression(): void {
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Example article',
+      'status' => 1,
+    ]);
+    $node->save();
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content']);
+
+    $expression = (string) new FieldTypePropExpression('string', 'value');
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'node', $node->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            $expression,
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $this->expectException(BadRequestHttpException::class);
+    $this->expectExceptionMessage(\sprintf("'%s' is not a valid content-entity-reference prop expression.", $expression));
     $this->request($request);
   }
 

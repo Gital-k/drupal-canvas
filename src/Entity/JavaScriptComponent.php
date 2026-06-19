@@ -426,8 +426,9 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    *
    * @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::coalesce()
    * @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsSameFieldMustBeCoalescedConstraint
+   * @internal
    */
-  private static function coalesceEntityFields(array $dataDependencies): array {
+  public static function coalesceEntityFields(array $dataDependencies): array {
     if (!isset($dataDependencies['entityFields']) || !\is_array($dataDependencies['entityFields'])) {
       return $dataDependencies;
     }
