@@ -38,6 +38,29 @@ composer run lint:phpstan
 
 Configuration is located in [`phpstan.neon`](../../phpstan.neon)
 
+### Chase upstream (Rector)
+Canvas uses [Drupal Rector](https://github.com/palantirnet/drupal-rector) to
+semi-automatically adopt upstream Drupal core changes (deprecations and safe
+breaking changes), while keeping backward-compatibility layers down to Canvas'
+minimum supported core version.
+
+Report what could be chased, without modifying files:
+```shell
+composer run lint:chase-upstream
+```
+
+Apply the changes (Rector + `phpcbf`), then review and commit the result:
+```shell
+composer run chase-upstream
+```
+
+The minimum supported core version is derived from Canvas'
+`core_version_requirement` by [`scripts/resolve-min-core.php`](../../scripts/resolve-min-core.php)
+and passed to Rector as `RECTOR_MIN_CORE`; configuration is located in
+[`rector.php`](../../rector.php). A nightly CI job (`chase-upstream`, allowed to
+fail) reports new upstream changes and attaches a `chase-upstream.patch`
+artifact you can apply locally.
+
 ## Node.js
 
 ### Setup

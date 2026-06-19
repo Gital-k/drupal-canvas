@@ -287,15 +287,27 @@ chase-upstream:
     - !reference [ .drupal-with-dev-dependencies ]
   script:
     - |
+      EXIT_CODE=0
       composer run lint:chase-upstream || EXIT_CODE=$?
-      if [ $EXIT_CODE -ne 0 ]; then
+      if [ "$EXIT_CODE" -ne 0 ]; then
         echo "🥳 New upstream changes that can be chased automatically."
-        echo "Run `composer run chase-upstream` locally, push the result as an MR."
+        echo "Capturing them as the chase-upstream.patch artifact you can apply locally."
+        # Apply (Rector + phpcbf) and capture the result as a reviewable patch.
+        composer run chase-upstream || true
+        git -C "$CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME" diff > "$CI_PROJECT_DIR/chase-upstream.patch" || true
+        echo "Or run 'composer run chase-upstream' locally and push the result as an MR."
         echo "Issue template: https://www.drupal.org/node/add/project-issue/canvas?title=Chase%20upstream%20core%20changes&categories=2&priorities=200&status=1&version=1.x-dev&assigned=0&tags=Drupal%2012%20compatibility"
       fi
       exit $EXIT_CODE
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
+  artifacts:
+    expose_as: 'Chase upstream patch'
+    when: on_failure
+    expire_in: 6 mos
+    name: artifacts-$CI_PIPELINE_ID-$CI_JOB_NAME_SLUG
+    paths:
+      - chase-upstream.patch
 
 lint (php):
   stage: validate
