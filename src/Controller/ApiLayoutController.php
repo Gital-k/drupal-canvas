@@ -141,7 +141,9 @@ final class ApiLayoutController {
     $available_translations = [];
     $links = [];
     if ($entity instanceof ContentEntityInterface) {
-      $available_translations = \array_keys($entity->getTranslationLanguages(FALSE));
+      // Use $original_entity (freshly loaded from the DB), NOT $entity (which
+      // may be the auto-saved entity created via EntityStorage::create()).
+      $available_translations = \array_keys($original_entity->getTranslationLanguages(FALSE));
       if ($this->moduleHandler->moduleExists('content_translation')) {
         foreach ($available_translations as $langcode) {
           $translation = $entity->getTranslation($langcode);
