@@ -17,7 +17,7 @@ export default defineConfig({
   maxFailures: 999,
   //maxFailures: process.env.CI ? 1 : 999,
   /* https://playwright.dev/docs/test-timeouts */
-  timeout: 120_000,
+  timeout: 60_000,
   expect: { timeout: 10_000 },
   /* Parallel test workers, leave undefined for automatic */
   workers: process.env.CI ? 1 : '50%',

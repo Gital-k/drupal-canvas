@@ -38,6 +38,19 @@ interface DeleteTranslationDialogProps {
   onClose: () => void;
 }
 
+type TranslationLinkKey = 'create' | 'edit-form' | 'delete-form';
+
+const isDefaultLinkHidden = (
+  linkKey: TranslationLinkKey,
+  hasTranslation: boolean,
+) => {
+  if (linkKey === 'create') {
+    return hasTranslation;
+  }
+
+  return !hasTranslation;
+};
+
 const DeleteTranslationDialog = ({
   languageId,
   url,
@@ -117,9 +130,7 @@ const LanguageSelect = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [deleteLanguageId, setDeleteLanguageId] = useState<string | null>(null);
-  // Languages whose translation was deleted in-session. Used to hide their
-  // check mark and options trigger without re-fetching the layout.
-  const [removedLanguages, setRemovedLanguages] = useState<string[]>([]);
+  const [deletedLanguages, setDeletedLanguages] = useState<string[]>([]);
   const popoverOffsetsRef = useRef<Record<string, number>>({});
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -144,6 +155,10 @@ const LanguageSelect = () => {
   const pageData = useAppSelector(selectPageData);
   const pageTitle =
     getEntityTitle(entityType, pageData) || pageData?.['title[0][value]'];
+
+  useEffect(() => {
+    setDeletedLanguages([]);
+  }, [translations]);
 
   // Derive the active language directly from the URL.
   const activeLanguageId = searchParams.get('language') ?? '';
@@ -183,8 +198,8 @@ const LanguageSelect = () => {
 
   const handleTranslate = (languageId: string) => {
     const url =
-      translations?.links?.[languageId]?.['edit-form'] ??
-      translations?.links?.[languageId]?.['create'];
+      getVisibleLink(languageId, 'edit-form') ??
+      getVisibleLink(languageId, 'create');
     if (url) {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
@@ -207,11 +222,34 @@ const LanguageSelect = () => {
 
   const currentLangObj = languages.find((lang) => lang.id === currentLanguage);
 
-  // A language counts as translated only if the layout reports it and it has
-  // not been deleted in this session.
-  const hasTranslation = (languageId: string) =>
+  const languageHasTranslation = (languageId: string) =>
     Boolean(translations?.available?.includes(languageId)) &&
-    !removedLanguages.includes(languageId);
+    !deletedLanguages.includes(languageId);
+
+  const getVisibleLink = (languageId: string, linkKey: TranslationLinkKey) => {
+    const url = translations?.links?.[languageId]?.[linkKey];
+    if (!url) {
+      return undefined;
+    }
+
+    const isHidden = isDefaultLinkHidden(
+      linkKey,
+      languageHasTranslation(languageId),
+    );
+
+    return isHidden ? undefined : url;
+  };
+
+  const hasVisibleLanguageActions = (languageId: string) =>
+    Boolean(
+      getVisibleLink(languageId, 'create') ||
+      getVisibleLink(languageId, 'edit-form') ||
+      getVisibleLink(languageId, 'delete-form'),
+    );
+
+  // Track translated status from layout data, with in-session overrides.
+  const hasTranslation = (languageId: string) =>
+    languageHasTranslation(languageId);
 
   if (languages.length <= 1) {
     return null;
@@ -264,91 +302,88 @@ const LanguageSelect = () => {
                   </Text>
                 </Flex>
               </DropdownMenu.Item>
-              {translations?.links?.[language.id] &&
-                !removedLanguages.includes(language.id) && (
-                  <Popover.Root
-                    open={openPopoverId === language.id}
-                    onOpenChange={(open) =>
-                      handlePopoverOpenChange(language.id, open)
-                    }
+              {hasVisibleLanguageActions(language.id) && (
+                <Popover.Root
+                  open={openPopoverId === language.id}
+                  onOpenChange={(open) =>
+                    handlePopoverOpenChange(language.id, open)
+                  }
+                >
+                  <DropdownMenu.Item
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      handlePopoverOpenChange(language.id, true);
+                    }}
                   >
-                    <DropdownMenu.Item
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        handlePopoverOpenChange(language.id, true);
-                      }}
-                    >
-                      <Popover.Trigger>
+                    <Popover.Trigger>
+                      <button
+                        data-testid="language-options-popover-trigger"
+                        className={styles.dotsButton}
+                        aria-label={`More options for ${language.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePopoverOpenChange(language.id, true);
+                        }}
+                      >
+                        <DotsVerticalIcon width="14" height="14" />
+                      </button>
+                    </Popover.Trigger>
+                  </DropdownMenu.Item>
+                  <Popover.Content
+                    side="left"
+                    sideOffset={popoverOffsetsRef.current[language.id] ?? 0}
+                    align="start"
+                    className={styles.popover}
+                    data-testid="language-options-popover"
+                    onPointerDownOutside={(e) => {
+                      e.preventDefault();
+                      setOpenPopoverId(null);
+                    }}
+                    onInteractOutside={(e) => {
+                      e.preventDefault();
+                    }}
+                  >
+                    <Flex direction="column" gap="1">
+                      <Text
+                        size="2"
+                        weight="medium"
+                        className={styles.popoverTitle}
+                        data-testid="language-options-popover-title"
+                      >
+                        {pageTitle || 'Untitled'} ({language.name})
+                      </Text>
+                      <Separator size="4" my="1" />
+                      {(getVisibleLink(language.id, 'edit-form') ||
+                        getVisibleLink(language.id, 'create')) && (
                         <button
-                          data-testid="language-options-popover-trigger"
-                          className={styles.dotsButton}
-                          aria-label={`More options for ${language.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePopoverOpenChange(language.id, true);
-                          }}
+                          className={styles.popoverItem}
+                          onClick={() => handleTranslate(language.id)}
                         >
-                          <DotsVerticalIcon width="14" height="14" />
+                          <ExternalLinkIcon width="14" height="14" />
+                          <Text size="2">
+                            {getVisibleLink(language.id, 'edit-form')
+                              ? 'Edit translation'
+                              : 'Add translation'}
+                          </Text>
                         </button>
-                      </Popover.Trigger>
-                    </DropdownMenu.Item>
-                    <Popover.Content
-                      side="left"
-                      sideOffset={popoverOffsetsRef.current[language.id] ?? 0}
-                      align="start"
-                      className={styles.popover}
-                      data-testid="language-options-popover"
-                      onPointerDownOutside={(e) => {
-                        e.preventDefault();
-                        setOpenPopoverId(null);
-                      }}
-                      onInteractOutside={(e) => {
-                        e.preventDefault();
-                      }}
-                    >
-                      <Flex direction="column" gap="1">
-                        <Text
-                          size="2"
-                          weight="medium"
-                          className={styles.popoverTitle}
-                          data-testid="language-options-popover-title"
+                      )}
+                      {getVisibleLink(language.id, 'delete-form') && (
+                        <button
+                          className={clsx(
+                            styles.popoverItem,
+                            styles.popoverItemRed,
+                          )}
+                          data-testid="language-options-delete"
+                          onClick={() => handleDeleteTranslation(language.id)}
                         >
-                          {pageTitle || 'Untitled'} ({language.name})
-                        </Text>
-                        <Separator size="4" my="1" />
-                        {(translations?.links?.[language.id]?.['edit-form'] ||
-                          translations?.links?.[language.id]?.['create']) && (
-                          <button
-                            className={styles.popoverItem}
-                            onClick={() => handleTranslate(language.id)}
-                          >
-                            <ExternalLinkIcon width="14" height="14" />
-                            <Text size="2">
-                              {translations?.links?.[language.id]?.['edit-form']
-                                ? 'Edit translation'
-                                : 'Add translation'}
-                            </Text>
-                          </button>
-                        )}
-                        {translations?.links?.[language.id]?.[
-                          'delete-form'
-                        ] && (
-                          <button
-                            className={clsx(
-                              styles.popoverItem,
-                              styles.popoverItemRed,
-                            )}
-                            data-testid="language-options-delete"
-                            onClick={() => handleDeleteTranslation(language.id)}
-                          >
-                            <TrashIcon width="14" height="14" />
-                            <Text size="2">Delete translation</Text>
-                          </button>
-                        )}
-                      </Flex>
-                    </Popover.Content>
-                  </Popover.Root>
-                )}
+                          <TrashIcon width="14" height="14" />
+                          <Text size="2">Delete translation</Text>
+                        </button>
+                      )}
+                    </Flex>
+                  </Popover.Content>
+                </Popover.Root>
+              )}
             </Flex>
           ))}
           <Separator size="4" my="2" />
@@ -375,7 +410,9 @@ const LanguageSelect = () => {
             : undefined
         }
         onSuccess={(languageId) => {
-          setRemovedLanguages((prev) => [...prev, languageId]);
+          setDeletedLanguages((prev) =>
+            prev.includes(languageId) ? prev : [...prev, languageId],
+          );
           setDeleteLanguageId(null);
         }}
         onClose={() => setDeleteLanguageId(null)}
