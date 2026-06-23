@@ -24,6 +24,7 @@ use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -323,8 +324,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       $revision_only_field_names = \array_filter(
         [
           $entity_type->getKey('revision'),
-          ...\array_values($entity_type->getRevisionMetadataKeys()),
-          // Standard Drupal base field, not returned by getRevisionMetadataKeys().
+          ...($entity_type instanceof ContentEntityTypeInterface ? \array_values($entity_type->getRevisionMetadataKeys()) : []),
           'revision_translation_affected',
         ],
         static fn (mixed $v): bool => $v !== FALSE && $v !== NULL && $v !== '',
