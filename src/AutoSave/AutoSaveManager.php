@@ -314,6 +314,24 @@ class AutoSaveManager implements EventSubscriberInterface {
     // persisted elsewhere on save (path aliases, moderation states).
     $fields = \array_filter($fields, static fn (FieldItemListInterface $field) => !$field->getFieldDefinition()->isComputed() || self::isPersistedComputedField($field->getFieldDefinition()));
 
+    // Exclude revision-only fields: these change on every new revision even
+    // when no canvas-editable content has been modified. The fields excluded
+    // here mirror those already skipped during auto-save publishing in
+    // \Drupal\canvas\Controller\ApiAutoSaveController::post()
+    if ($entity instanceof RevisionableInterface) {
+      $entity_type = $entity->getEntityType();
+      $revision_only_field_names = \array_filter(
+        [
+          $entity_type->getKey('revision'),
+          ...\array_values($entity_type->getRevisionMetadataKeys()),
+          // Standard Drupal base field, not returned by getRevisionMetadataKeys().
+          'revision_translation_affected',
+        ],
+        static fn (mixed $v): bool => $v !== FALSE && $v !== NULL && $v !== '',
+      );
+      $fields = \array_diff_key($fields, \array_flip($revision_only_field_names));
+    }
+
     foreach (\array_keys($fields) as $name) {
       $items = $entity->get($name);
       // Exclude items that are empty.
