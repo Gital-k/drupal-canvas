@@ -1,0 +1,22 @@
+canvas_test_translation_links.noop_translation:
+  path: '/canvas-test/translation/{entity_type}/{entity_id}/{target_language}'
+  defaults:
+    _controller: '\Drupal\canvas_test_translation_links\Controller\TranslationController::noop'
+  requirements:
+    _access: 'TRUE'
+
+canvas_test_translation_links.enable:
+  path: '/canvas-test/translation-links/enable'
+  defaults:
+    _controller: '\Drupal\canvas_test_translation_links\Controller\TranslationController::enable'
+  requirements:
+    _access: 'TRUE'
+
+canvas_test_translation_links.disable:
+  path: '/canvas-test/translation-links/disable'
+  defaults:
+    _controller: '\Drupal\canvas_test_translation_links\Controller\TranslationController::disable'
+  requirements:
+    _access: 'TRUE'
+
+

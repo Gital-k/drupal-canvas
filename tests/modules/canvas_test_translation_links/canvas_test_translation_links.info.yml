@@ -1,0 +1,4 @@
+name: Canvas test translation links
+type: module
+description: 'Adds create/edit translation links to Canvas layout API responses for UI tests.'
+package: Testing

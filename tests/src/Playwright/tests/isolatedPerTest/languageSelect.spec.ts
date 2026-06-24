@@ -8,7 +8,11 @@ import { isolatedPerTest as test } from '../../fixtures/test.js';
  */
 
 test.use({
-  modules: ['canvas_test_sdc', 'canvas_test_recipe'],
+  modules: [
+    'canvas_test_sdc',
+    'canvas_test_recipe',
+    'canvas_test_translation_links',
+  ],
   enableTestExtensions: true,
 });
 
@@ -455,5 +459,123 @@ test.describe('Language Select', () => {
     await expect(
       page.locator('[aria-label="More options for Spanish"]'),
     ).toHaveCount(0);
+  });
+
+  test('Language actions switch from edit to add after delete without refetch', async ({
+    page,
+    canvas,
+    drupal,
+  }) => {
+    await drupal.loginAsAdmin();
+    await drupal.page.goto('/canvas-test/translation-links/enable');
+    await drupal.addPermissions({
+      role: 'editor',
+      permissions: [
+        'edit canvas page',
+        'translate canvas page',
+        'delete canvas page',
+        'delete content translations',
+      ],
+    });
+    await logout(drupal);
+    await login({ username: 'editor', password: 'editor', drupal });
+    await page.goto('/canvas');
+
+    // Navigate to the pre-created translation test page via the content navigation.
+    await canvas.openContentNavigation();
+
+    const navigationResults = page.locator(
+      '[data-testid="canvas-navigation-results"]',
+    );
+    const translationPageLink = navigationResults.locator(
+      'text=Canvas Translation Test Page',
+    );
+    await expect(translationPageLink).toBeVisible();
+    await translationPageLink.click();
+
+    await canvas.waitForEditorUi();
+
+    const languageButton = page.locator(
+      '[data-testid="canvas-topbar"] [data-testid="language-select-trigger"][data-state="closed"]',
+    );
+
+    const openPopover = async (language = 'French') => {
+      const openMenu = page.locator('[role="menu"][data-state="open"]');
+      await expect(openMenu).toBeVisible();
+      const popoverTrigger = openMenu
+        .getByLabel(`More options for ${language}`)
+        .first();
+      await expect(popoverTrigger).toBeAttached();
+      await popoverTrigger.click();
+    };
+
+    await languageButton.click();
+
+    // With the decorator, both translated and untranslated languages expose
+    // options actions.
+    await expect(
+      page.locator('[aria-label="More options for French"]'),
+    ).toBeVisible();
+    await expect(
+      page.locator('[aria-label="More options for Spanish"]'),
+    ).toBeVisible();
+
+    await openPopover('French');
+    const frenchPopover = page
+      .locator('[data-testid="language-options-popover"]')
+      .first();
+    await expect(frenchPopover.getByText('Edit translation')).toBeVisible();
+    await expect(
+      frenchPopover.locator('[data-testid="language-options-delete"]'),
+    ).toBeVisible();
+
+    await frenchPopover
+      .locator('[data-testid="language-options-delete"]')
+      .click();
+    const deleteDialog = page
+      .locator('[role="dialog"][data-state="open"]')
+      .filter({
+        has: page.locator('h1', { hasText: 'Delete translation' }),
+      })
+      .first();
+    await expect(deleteDialog).toBeVisible();
+    await page
+      .locator('[data-testid="delete-translation-confirm-input"]')
+      .fill('DELETE');
+    await deleteDialog
+      .getByRole('button', { name: 'Delete Translation' })
+      .click();
+    await expect(deleteDialog).toBeHidden();
+
+    await expect(async () => {
+      await page.locator('[data-testid="scale-to-fit"]').click();
+      await expect(
+        page.locator(
+          '[data-state="open"][data-testid="language-select-trigger"]',
+        ),
+      ).not.toBeAttached();
+    }).toPass({ timeout: 10000 });
+    await languageButton.click();
+
+    await expect(
+      page.locator(
+        '[data-testid="language-option-fr"] [data-canvas-has-translation="true"]',
+      ),
+    ).toHaveCount(0);
+    await expect(
+      page.locator('[aria-label="More options for French"]'),
+    ).toBeVisible();
+
+    await languageButton.click();
+    await openPopover('French');
+    await expect(frenchPopover.getByText('Add translation')).toBeVisible();
+    await expect(
+      frenchPopover.locator('[data-testid="language-options-delete"]'),
+    ).toHaveCount(0);
+
+    await expect(
+      page.locator('[aria-label="More options for Spanish"]'),
+    ).toBeVisible();
+    await drupal.page.goto('/canvas-test/translation-links/enable');
   });
 });

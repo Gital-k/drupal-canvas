@@ -1,0 +1,7 @@
+services:
+  Drupal\canvas_test_translation_links\Controller\ApiLayoutControllerDecorator:
+    decorates: Drupal\canvas\Controller\ApiLayoutController
+    arguments:
+      - '@.inner'
+      - '@language_manager'
+      - '@state'
