@@ -5,14 +5,11 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\Entity\Page;
+use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\DefaultContent\Exporter;
-use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Serialization\Yaml;
-use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -26,9 +23,11 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class ApiContentExportController extends ApiControllerBase {
 
+  public const string AUTO_SAVED_QUERY_KEY = 'autoSaved';
+
   public function __construct(
     private readonly AutoSaveManager $autoSaveManager,
-    private readonly ModuleHandlerInterface $moduleHandler,
+    private readonly Exporter $exporter,
   ) {}
 
   /**
@@ -40,7 +39,7 @@ final class ApiContentExportController extends ApiControllerBase {
     $status = Response::HTTP_OK;
     // Determine if we are working with auto-save or published version of the
     // entity.
-    $auto_saved = $request->query->getBoolean('autoSaved', default: TRUE);
+    $auto_saved = $request->query->getBoolean(self::AUTO_SAVED_QUERY_KEY, default: TRUE);
     if ($auto_saved) {
       $cacheability->addCacheTags([AutoSaveManager::CACHE_TAG]);
       $auto_save_data = $this->autoSaveManager->getAutoSaveEntity($canvas_page);
@@ -56,7 +55,6 @@ final class ApiContentExportController extends ApiControllerBase {
           'source' => [
             'pointer' => AutoSaveManager::getAutoSaveKey($canvas_page),
           ],
-          'code' => 404,
         ];
       }
     }
@@ -67,43 +65,18 @@ final class ApiContentExportController extends ApiControllerBase {
     $cacheability->addCacheableDependency($canvas_page);
 
     if ($status === Response::HTTP_OK) {
-      $entity_export = \Drupal::service(Exporter::class)->export($canvas_page)->data;
-      $components = $entity_export['components'];
-      unset($entity_export['components']);
-      \array_push($entity_export, $components);
+      $entity_export = $this->exporter->export($canvas_page)->data;
+      if (isset($entity_export['components'])) {
+        $components = $entity_export['components'];
+        unset($entity_export['components']);
+        $entity_export[] = $components;
+      }
+
+      \assert(isset($body['data']));
       $body['data'] += [
         'language' => $canvas_page->language()->getId(),
         'entity' => Yaml::encode($entity_export),
       ];
-
-      if ($this->moduleHandler->moduleExists('content_translation')) {
-        $available_translations = \array_keys($canvas_page->getTranslationLanguages(FALSE));
-
-        $links = [];
-
-        foreach ($available_translations as $langcode) {
-          $translation = $canvas_page->getTranslation($langcode);
-          // The delete route gates on update access, so emit the link to the
-          // same users to avoid offering a link that would return 403.
-          // @see canvas.api.content.translation.delete in canvas.routing.yml
-          if ($translation->access('update')) {
-            $links[$langcode] = [
-              CanvasUriDefinitions::LINK_REL_DELETE => Url::fromRoute(
-                'canvas.api.content.translation.delete',
-                [Page::ENTITY_TYPE_ID => $canvas_page->id()],
-                ['language' => $translation->language()],
-              )->toString(),
-            ];
-          }
-          // The client should also list the default language.
-          $default_langcode = $canvas_page->getUntranslated()->language()->getId();
-          array_unshift($available_translations, $default_langcode);
-          $body['data']['translations'] = [
-            'available' => $available_translations,
-            'links' => $links,
-          ];
-        }
-      }
     }
 
     $json_response = new CacheableJsonResponse($body, status: $status);
