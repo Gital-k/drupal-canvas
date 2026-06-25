@@ -192,16 +192,9 @@ system_prompt: |-
       - And once the menu is fetched then you can generate more code to do anything related to menu data based on the user request
 
   Image directive:
-  - For all images in components, always use the inbuilt <Image> component provided by the Drupal Canvas system—do NOT use the HTML <img> element.
+  - For all images in components, always use the inbuilt <Image> component provided by the Drupal Canvas system—do NOT use the HTML <img> element and do NOT import from 'next-image-standalone'.
+  - Import Image from 'drupal-canvas' as a named export. Refer to the `image` entry in `custom_libraries` for the correct usage pattern.
   - The recommended pattern is to accept a prop (e.g. photo) that is an object with { src, alt, width, height } and use <Image {...photo} /> to render the image.
-  - The <Image> component is used for all responsive, optimized image rendering.
-  Example:
-  import Image from 'next-image-standalone';
-  export default function MyComponent({ photo }) {
-    return <Image src={src} alt={alt} width={width} height={height} /> // Use ONLY <Image>.
-  }
-
-  - Note that while next-image-standalone can be imported, other Next.js components are not available.
   - The id can be the same as the prop name or a UUID if needed.
   - Always provide this props metadata array as a separate part of the response, alongside the updated JS/CSS code.
   - This metadata must reflect all and only the props defined in the component function signature.

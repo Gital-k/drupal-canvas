@@ -419,6 +419,12 @@ final class CanvasBuilder extends ControllerBase {
         "code" => "```js\nimport { motion } from 'https://esm.sh/motion@12.23.26/react?external=react,react-dom'\n```",
       ],
       [
+        "name" => "image",
+        "type" => "Built-in custom package",
+        "description" => "A built-in Image component for automatic image optimization, responsive behavior, and modern loading techniques. Always use this instead of the HTML <img> element. Accept a prop (e.g. photo) that is an object with { src, alt, width, height } and spread it onto <Image>.",
+        "code" => "```jsx\nimport { Image } from 'drupal-canvas';\n\nexport default function MyComponent({ photo }) {\n  return <Image {...photo} />;\n}\n```",
+      ],
+      [
         "name" => "formatted_text",
         "type" => "Built-in custom package",
         "description" => "A built-in component to render text with trusted HTML using [`dangerouslySetInnerHTML`](https://react.dev/reference/react-dom/components/common#dangerously-setting-the-inner-html). The content is safe when processed through Drupal's filter system that is [correctly configured](https://www.drupal.org/docs/administering-a-drupal-site/security-in-drupal/configuring-text-formats-aka-input-formats-for-security).",
