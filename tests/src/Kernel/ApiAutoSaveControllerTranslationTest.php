@@ -448,8 +448,7 @@ final class ApiAutoSaveControllerTranslationTest extends CanvasKernelTestBase {
   /**
    * Tests TMGMT translation save on unpublished page triggers no 409 conflict.
    */
-  public function testTMGMTTranslationSaveOnUnpublishedPageDoesNotCauseConflict(): void
-  {
+  public function testTMGMTTranslationSaveOnUnpublishedPageDoesNotCauseConflict(): void {
     $this->setUpCurrentUser(permissions: [
       Page::EDIT_PERMISSION,
       AutoSaveManager::PUBLISH_PERMISSION,
