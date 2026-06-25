@@ -141,12 +141,10 @@ final class ApiLayoutController {
     $available_translations = [];
     $links = [];
     if ($entity instanceof ContentEntityInterface) {
-      // Use $original_entity (freshly loaded from the DB), NOT $entity (which
-      // may be the auto-saved entity created via EntityStorage::create()).
       $available_translations = \array_keys($original_entity->getTranslationLanguages(FALSE));
       if ($this->moduleHandler->moduleExists('content_translation')) {
         foreach ($available_translations as $langcode) {
-          $translation = $entity->getTranslation($langcode);
+          $translation = $original_entity->getTranslation($langcode);
           // The delete route gates on update access, so emit the link to the
           // same users to avoid offering a link that would return 403.
           // @see canvas.api.content.translation.delete in canvas.routing.yml
