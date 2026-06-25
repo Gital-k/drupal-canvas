@@ -140,7 +140,7 @@ final class ApiLayoutController {
     ];
     $available_translations = [];
     $links = [];
-    if ($entity instanceof ContentEntityInterface) {
+    if ($original_entity instanceof ContentEntityInterface) {
       $available_translations = \array_keys($original_entity->getTranslationLanguages(FALSE));
       if ($this->moduleHandler->moduleExists('content_translation')) {
         foreach ($available_translations as $langcode) {
