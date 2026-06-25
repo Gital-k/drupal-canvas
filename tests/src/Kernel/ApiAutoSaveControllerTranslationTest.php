@@ -445,4 +445,81 @@ final class ApiAutoSaveControllerTranslationTest extends CanvasKernelTestBase {
     self::getItem($page, $uuid)->setInput($inputs)->setLabel($label);
   }
 
+  /**
+   * Tests TMGMT translation save on unpublished page triggers no 409 conflict.
+   */
+  public function testTMGMTTranslationSaveOnUnpublishedPageDoesNotCauseConflict(): void {
+    $this->setUpCurrentUser(permissions: [
+      Page::EDIT_PERMISSION,
+      AutoSaveManager::PUBLISH_PERMISSION,
+    ]);
+
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    $page_storage = $this->container->get('entity_type.manager')->getStorage(Page::ENTITY_TYPE_ID);
+
+    // Create a page, change it's title and don't publish the changes.
+    $page = Page::create([
+      'title' => 'Test Page',
+      'status' => FALSE,
+    ]);
+    self::assertEntityIsValid($page);
+    self::assertSame(SAVED_NEW, $page->save());
+    $page_id = $page->id();
+    self::assertNotNull($page_id);
+
+    $page->set('title', 'Test Page (canvas edit in progress)');
+    $autoSave->saveEntity($page);
+
+    $en_key = AutoSaveManager::getAutoSaveKey($page);
+    self::assertFalse($autoSave->getAutoSaveEntity($page)->isEmpty(), 'Auto-save entry must exist before the TMGMT save.');
+
+    // Simulate TMGMT's "Save as complete": add a Spanish translation for the
+    // title and persist it in a *new revision*, exactly as TMGMT does when
+    // the translator finishes a translation job.
+    $page = $page_storage->loadUnchanged($page_id);
+    \assert($page instanceof Page);
+
+    $es = $page->addTranslation('es', [
+      'title' => 'Title in Spanish',
+      'status' => FALSE,
+    ]);
+    $this->container->get('content_translation.manager')
+      ->getTranslationMetadata($es)
+      ->setSource('en');
+
+    $page->setNewRevision(TRUE);
+    $page->save();
+
+    // The canvas-editor polls the auto-saves endpoint.  After the TMGMT
+    // save the English auto-save entry must still resolve to HTTP 200 - no
+    // false "Conflict detected" (HTTP 409) - because the English content
+    // fields (title, components, …) were not changed.
+    /** @var \Drupal\canvas\Controller\ApiAutoSaveController $controller */
+    $controller = $this->container->get(ApiAutoSaveController::class);
+    $response = $controller->get();
+    self::assertSame(
+      Response::HTTP_OK,
+      $response->getStatusCode(),
+      'A TMGMT translation save that only creates a new revision must NOT produce a 409 conflict for the English auto-save entry. Got: ' . $response->getContent(),
+    );
+
+    // The auto-save entry itself is still present.
+    self::assertFalse(
+      $autoSave->getAutoSaveEntity($page)->isEmpty(),
+      'The auto-save entry must survive the TMGMT save.',
+    );
+
+    // Publishing must still work after the TMGMT save.
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    self::assertArrayHasKey($en_key, $auto_save_data, 'The English auto-save key must appear in the pending list.');
+
+    $publish_response = $this->makePublishAllRequest([$en_key => $auto_save_data[$en_key]]);
+    self::assertSame(
+      Response::HTTP_OK,
+      $publish_response->getStatusCode(),
+      'Publishing the auto-save after a TMGMT translation save must succeed.',
+    );
+  }
+
 }

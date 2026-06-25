@@ -45,6 +45,11 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
     return () => {
       dispatch(setFirstLoadComplete(false));
       dispatch(unsetEditorFrameContext());
+      // Reset updatePreview on unmount so it does not bleed over to the
+      // standalone preview route (PagePreview). If it stayed true, PagePreview
+      // would immediately start POSTing — potentially with corrupted
+      // entity_form_fields — as soon as it mounts.
+      dispatch(setUpdatePreview(false));
     };
   }, [context, dispatch]);
 

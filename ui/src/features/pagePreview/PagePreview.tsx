@@ -16,6 +16,7 @@ import {
   selectPreviewHtml,
   setSnapshotHTML,
 } from '@/features/pagePreview/previewSlice';
+import { useStableCallback } from '@/hooks/useStableCallback';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
 import {
   useGetSnapshotPreviewQuery,
@@ -93,40 +94,50 @@ const PagePreview = () => {
     };
   }, [language, languagePreviewError, showBoundary, dispatch]);
 
+  const sendPreviewRequest = useCallback(async () => {
+    // Template previews are rendered by the snapshot query against the
+    // content-template route. This POST hits the generic /layout route, which
+    // only supports canvas_page entities; skip it for a content template's
+    // preview.
+    if (isContentTemplate || !entityType || !entityId) {
+      return;
+    }
+    try {
+      await postPreview({
+        layout,
+        model,
+        entity_form_fields,
+        entityId,
+        entityType,
+      });
+    } catch (err) {
+      showBoundary(err);
+    }
+  }, [
+    isContentTemplate,
+    entityType,
+    entityId,
+    postPreview,
+    layout,
+    model,
+    entity_form_fields,
+    showBoundary,
+  ]);
+
+  // Stable wrapper: never changes identity, always calls the latest
+  // sendPreviewRequest.
+  const stableSendPreviewRequest = useStableCallback(sendPreviewRequest);
+
   useEffect(() => {
-    const sendPreviewRequest = async () => {
-      // Template previews are rendered by the snapshot query against the
-      // content-template route. This POST hits the generic /layout route, which
-      // only supports canvas_page entities; skip it for a content template's
-      // preview.
-      if (isContentTemplate || !entityType || !entityId) {
-        return;
-      }
-      try {
-        await postPreview({
-          layout,
-          model,
-          entity_form_fields,
-          entityId,
-          entityType,
-        });
-      } catch (err) {
-        showBoundary(err);
-      }
-    };
     if (updatePreview) {
-      sendPreviewRequest().then(() => {});
+      stableSendPreviewRequest().then(() => {});
     }
   }, [
     layout,
     model,
-    postPreview,
     entity_form_fields,
-    entityId,
-    entityType,
-    isContentTemplate,
     updatePreview,
-    showBoundary,
+    stableSendPreviewRequest,
   ]);
 
   useEffect(() => {

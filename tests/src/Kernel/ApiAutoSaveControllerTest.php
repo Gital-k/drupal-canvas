@@ -109,7 +109,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $anonAccountContent->save();
     \assert($anonAccountContent instanceof NodeInterface);
     // Trigger a new hash.
-    $anonAccountContent->setRevisionUserId(2);
+    $anonAccountContent->setTitle('Anon, empty (edited)');
     /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
     $autoSave->saveEntity($anonAccountContent);
@@ -153,7 +153,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     // Empty data.
     $account2content = Node::load(2);
     \assert($account2content instanceof NodeInterface);
-    $account2content->setRevisionUser($account2);
+    $account2content->setTitle($this->getRandomGenerator()->sentences(10));
     $this->setCurrentUser($account2);
     $autoSave->saveEntity($account2content);
     $code_component = JavaScriptComponent::create(
@@ -613,7 +613,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $article->save();
     \assert($article instanceof NodeInterface);
     // Trigger a new hash.
-    $article->setRevisionUserId(2);
+    $article->setTitle('Anon, empty (edited)');
     /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
     $autoSave->saveEntity($article);
