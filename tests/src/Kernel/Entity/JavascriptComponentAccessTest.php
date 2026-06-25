@@ -109,7 +109,6 @@ final class JavascriptComponentAccessTest extends CanvasKernelTestBase {
       // @see \Drupal\canvas\AutoSave\AutoSaveManager::generateHash()
       'uuid' => '81a3d6c4-10e0-422f-ba71-92d76393c008',
       'created' => 0,
-      'revision_created' => 0,
     ]);
     self::assertEntityIsValid($page);
     $page->save();
@@ -159,7 +158,7 @@ final class JavascriptComponentAccessTest extends CanvasKernelTestBase {
       ],
     ]);
     $auto_save_manager->saveEntity($page);
-    self::assertSame([Page::ENTITY_TYPE_ID => ['auto-save-8f48528246bf1d24' => '1']], $audit->getAutoSavesUsingComponentIds([$component_id]));
+    self::assertSame([Page::ENTITY_TYPE_ID => ['auto-save-1a6d0e544d45fd27' => '1']], $audit->getAutoSavesUsingComponentIds([$component_id]));
     // And reset the access cache.
     $entity_type_manager->getAccessControlHandler(JavaScriptComponent::ENTITY_TYPE_ID)->resetCache();
     self::assertEquals(
