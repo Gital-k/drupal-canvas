@@ -72,6 +72,7 @@ interface EntityMetadata {
   bundle: string;
   entityTypeId: string;
   uuid: string;
+  translations: string[];
 }
 
 interface PageData {
@@ -99,7 +100,9 @@ export const getPageData = (): PageData => {
   const pageData = {
     pageTitle: globalThis?.drupalSettings?.canvasData?.v0?.pageTitle || '',
     breadcrumbs: globalThis?.drupalSettings?.canvasData?.v0?.breadcrumbs || [],
-    mainEntity: globalThis?.drupalSettings?.canvasData?.v0?.mainEntity || null,
+    mainEntity:
+      (globalThis?.drupalSettings?.canvasData?.v0
+        ?.mainEntity as EntityMetadata) || null,
   };
   globalThis?.window?.parent.postMessage({
     type: '_canvas_useswr_data_fetch',
