@@ -72,7 +72,13 @@ interface EntityMetadata {
   bundle: string;
   entityTypeId: string;
   uuid: string;
-  translations: string[];
+  translations: TranslationMetadata[];
+}
+
+interface TranslationMetadata {
+  id: string;
+  name: string;
+  url: string;
 }
 
 interface PageData {
