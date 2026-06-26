@@ -9,7 +9,9 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\TypedData\TranslatableInterface;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
@@ -170,7 +172,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'bundle' => 'canvas_page',
       'entityTypeId' => 'canvas_page',
       'uuid' => $page->uuid(),
-      'translations' => array_keys($page->getTranslationLanguages()),
+      'translations' => self::getExpectedEntityTranslations($page),
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
   }
 
@@ -233,7 +235,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'bundle' => 'article',
       'entityTypeId' => 'node',
       'uuid' => $node->uuid(),
-      'translations' => array_keys($node->getTranslationLanguages()),
+      'translations' => self::getExpectedEntityTranslations($node),
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
   }
 
@@ -277,6 +279,29 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       return $settings;
     }
     return [];
+  }
+
+  /**
+   * Builds expected translation metadata for a translatable entity.
+   */
+  private static function getExpectedEntityTranslations(EntityInterface $entity): array {
+    if (!$entity instanceof TranslatableInterface) {
+      return [];
+    }
+
+    $translations = [];
+    foreach ($entity->getTranslationLanguages() as $language) {
+      $translations[] = [
+        'id' => $language->getId(),
+        'name' => $language->getName(),
+        'url' => $entity
+          ->getTranslation($language->getId())
+          ->toUrl('canonical', ['language' => $language])
+          ->toString(),
+      ];
+    }
+
+    return $translations;
   }
 
 }

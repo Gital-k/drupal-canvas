@@ -189,7 +189,16 @@ readonly final class CodeComponentDataProvider {
       if ($entity instanceof EntityInterface) {
         $available_translations = [];
         if ($entity instanceof TranslatableInterface) {
-          $available_translations = \array_keys($entity->getTranslationLanguages());
+          foreach ($entity->getTranslationLanguages() as $language) {
+            $available_translations[] = [
+              'id' => $language->getId(),
+              'name' => $language->getName(),
+              'url' => $entity
+                ->getTranslation($language->getId())
+                ->toUrl('canonical', ['language' => $language])
+                ->toString(),
+            ];
+          }
         }
         return [
           self::V0 => [
