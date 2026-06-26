@@ -16,9 +16,11 @@ const TextArea = forwardRef(function TextArea(
   },
   ref: ForwardedRef<HTMLTextAreaElement>,
 ) {
+  const hasOnChange = typeof (attributes as { onChange?: unknown }).onChange === 'function';
+  const valueProps = hasOnChange ? { value } : { defaultValue: value };
   return (
     <TextAreaRadixThemes
-      value={value}
+      {...valueProps}
       className={styles.root}
       {...attributes}
       ref={ref}
