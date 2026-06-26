@@ -11,6 +11,7 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ThemeSettingsProvider;
 use Drupal\Core\Link;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\TypedData\TranslatableInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -186,12 +187,17 @@ readonly final class CodeComponentDataProvider {
       $entity = $this->routeMatch->getParameter($identifier);
 
       if ($entity instanceof EntityInterface) {
+        $available_translations = [];
+        if ($entity instanceof TranslatableInterface) {
+          $available_translations = \array_keys($entity->getTranslationLanguages());
+        }
         return [
           self::V0 => [
             'mainEntity' => [
               'bundle' => $entity->bundle(),
               'entityTypeId' => $entity->getEntityTypeId(),
               'uuid' => $entity->uuid(),
+              'translations' => $available_translations,
             ],
           ],
         ];
