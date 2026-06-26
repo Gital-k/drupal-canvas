@@ -170,6 +170,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'bundle' => 'canvas_page',
       'entityTypeId' => 'canvas_page',
       'uuid' => $page->uuid(),
+      'translations' => array_keys($page->getTranslationLanguages()),
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
   }
 
@@ -232,6 +233,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'bundle' => 'article',
       'entityTypeId' => 'node',
       'uuid' => $node->uuid(),
+      'translations' => array_keys($node->getTranslationLanguages()),
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
   }
 
