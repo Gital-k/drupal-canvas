@@ -892,3 +892,13 @@ entity.page_region.edit_form:
       page_region:
         type: entity:page_region
     _admin_route: TRUE
+
+canvas.settings:
+  path: '/admin/config/canvas/settings'
+  defaults:
+    _form: '\Drupal\canvas\Form\CanvasSettingsForm'
+    _title: 'Canvas settings'
+  requirements:
+    _permission: 'administer code components'
+  options:
+    _admin_route: TRUE

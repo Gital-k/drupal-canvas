@@ -105,3 +105,13 @@ function canvas_update_11200(): void {
     // @see \Drupal\system\Controller\DbUpdateController::triggerBatch()
   }
 }
+
+/**
+ * Install default `canvas.settings` config for code component sync mode.
+ */
+function canvas_update_11201(): void {
+  $config = \Drupal::configFactory()->getEditable('canvas.settings');
+  if ($config->get('code_components.sync_mode') === NULL) {
+    $config->set('code_components.sync_mode', 'preserve_production')->save();
+  }
+}
