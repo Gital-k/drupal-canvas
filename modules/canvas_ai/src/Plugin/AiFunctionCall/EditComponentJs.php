@@ -162,7 +162,7 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
         'status' => FALSE,
         'sourceCodeJs' => $js,
         'sourceCodeCss' => '',
-        'compiledJs' => '',
+        'compiledJs' => $this->compileSourceJs($js),
         'compiledCss' => '',
         'importedJsComponents' => [],
         'props' => $transformed_props,
@@ -209,6 +209,53 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
     }
     $this->setOutput($message);
     $this->logger->info($message);
+  }
+
+  /**
+   * Compiles JSX source to JavaScript with esbuild (matches the browser build).
+   *
+   * Code components are compiled in the browser editor; when created or edited
+   * programmatically (e.g. by the AI) compiledJs is left empty, which makes the
+   * rendered component show "[object Object]". Compile it server-side instead.
+   *
+   * @param string $source
+   *   The JSX source code.
+   *
+   * @return string
+   *   The compiled JavaScript, or an empty string if esbuild is unavailable.
+   */
+  protected function compileSourceJs(string $source): string {
+    if (\trim($source) === '') {
+      return '';
+    }
+    $candidates = [
+      '/../node_modules/.bin/esbuild',
+      '/node_modules/.bin/esbuild',
+      '/core/node_modules/.bin/esbuild',
+    ];
+    $bin = '';
+    foreach ($candidates as $rel) {
+      if (@\is_executable(DRUPAL_ROOT . $rel)) {
+        $bin = DRUPAL_ROOT . $rel;
+        break;
+      }
+    }
+    if ($bin === '') {
+      return '';
+    }
+    $descriptors = [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']];
+    $command = \escapeshellarg($bin) . ' --loader=jsx --jsx=automatic --format=esm';
+    $process = @\proc_open($command, $descriptors, $pipes);
+    if (!\is_resource($process)) {
+      return '';
+    }
+    \fwrite($pipes[0], $source);
+    \fclose($pipes[0]);
+    $compiled = \stream_get_contents($pipes[1]);
+    \fclose($pipes[1]);
+    \fclose($pipes[2]);
+    $code = \proc_close($process);
+    return ($code === 0 && \is_string($compiled)) ? $compiled : '';
   }
 
 }
