@@ -69,7 +69,10 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       $dependencies = NestedArray::mergeDeep($dependencies, $item->calculateFieldItemValueDependencies(
         $this->getParent()
           ? $this->getEntity()
-          // Hostless lists (e.g. for validation) have no parent entity.
+          // Virtually every *stored* component tree has a parent entity. The
+          // sole exception to that are the calculated dependencies of a
+          // FieldConfig config entity that describes a Canvas component tree
+          // field on a content entity type.
           : NULL
       ));
     }
@@ -570,7 +573,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
   }
 
   /**
-   * Creates a component tree list for validation and similar non-entity uses.
+   * Creates a hostless component tree for constraint validators or FieldConfig.
    */
   public static function createHostless(TypedDataManagerInterface $typed_data_manager): self {
     return self::instantiate($typed_data_manager);
@@ -604,10 +607,17 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
   /**
    * Reconciles the list to match $new_values, preserving item object identity.
    *
+   * $new_values must be the plain-array representation of a component tree: the
+   * format produced by getValue() on this class (equivalently, the
+   * ComponentTreeItemListArray format). Each entry is a ComponentTreeItemArray:
+   * the same flat associative array that ComponentTreeItem::getValue() returns.
+   *
    * For each entry in $new_values whose UUID already exists in this list, the
    * existing ComponentTreeItem object is reused and its value is updated in
    * place. New UUIDs get fresh items; removed UUIDs are dropped. Delta
    * positions are updated to match the new order.
+   *
+   * @param ComponentTreeItemListArray $new_values
    *
    * @internal Only called from ComponentTreeConfigEntityBase::set() to keep the
    *   owned list in sync with the raw array. Cannot be moved there: it needs

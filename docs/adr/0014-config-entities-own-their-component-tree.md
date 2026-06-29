@@ -63,6 +63,7 @@ Serialization excludes the cached list. The back-reference from the list to its 
 
 ### Cross-references
 
+- [ADR #6](0006-One-field-row-per-component-instance.md) — establishes the typed-data field-item list as the canonical representation of a component tree and the interface contract that all tree-owning entities implement; this decision builds on that foundation.
 - [ADR #10](0010-dynamic-config-schema-for-component-tree-translatability.md) — translatability classification; the deferred sync and its export boundary must preserve the UUID-keyed sequence format that config translations target.
 - [ADR #12](0012-symmetric-content-translation-store-all-inputs-validate-at-write-time.md) — symmetric translation invariant; the owned list must remain correct across write-time synchronization.
 - [ADR #13](0013-symmetric-translation-propagation-on-component-instance-update.md) — translation propagation; per-langcode merged trees are constructed as separate lists for the merge and do not interact with the owned instance.
