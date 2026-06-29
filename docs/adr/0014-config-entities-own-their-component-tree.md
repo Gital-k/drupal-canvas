@@ -14,7 +14,7 @@ Two storage paths exist. Content entities store the tree as a real typed-data fi
 
 Config entities store the tree as a plain PHP array that satisfies the config schema. To service the interface, the array must be wrapped in the list type. Without a deliberate design decision for how that wrapping is managed, the natural implementation wraps on every call — returning a fresh object each time.
 
-A fresh-object-per-call implementation has a critical footgun: any mutation made through one call's return value is invisible to a subsequent call's return value, because they are different objects. This forces every mutating caller to write its result back to the entity after modifying the tree. Forgetting this write-back silently discards edits, with no type system or runtime warning to catch the mistake. The pattern spreads an implicit write-back requirement across every callsite that touches a config entity's component tree, creating implicit coupling and a divergence from the content-entity developer experience.
+A fresh-object-per-call implementation has a critical hazard: any mutation made through one call's return value is invisible to a subsequent call's return value, because they are different objects. This forces every mutating caller to write its result back to the entity after modifying the tree. Forgetting this write-back silently discards edits, with no type system or runtime warning to catch the mistake. The pattern spreads an implicit write-back requirement across every call site that touches a config entity's component tree, creating implicit coupling and a divergence from the content-entity developer experience.
 
 The asymmetry between the two paths is a persistent source of bugs and developer confusion. Config entity callers must follow a different protocol (mutate → write back) than content entity callers (mutate directly), despite both paths presenting the same list type. The distinction is not visible in the return type or any documentation that travels with the value.
 
@@ -37,11 +37,11 @@ The owned instance is parented to the config entity. This is equivalent to what 
 
 The sync is **asymmetric in eagerness**.
 
-**Array → list (eager).** When the entity's raw array representation is updated via the standard property-set path, the raw write happens first. If the owned list has already been instantiated, the list is immediately reconciled to match the new array. This direction is eager because the set path is the only write path and is fully interceptable.
+**Array → list (eager).** When the entity's raw array representation is updated via the standard property-set path, the raw write happens first. If the owned list has already been instantiated, the list is immediately reconciled to match the new array. This direction is eager because the set path is the only write path and can be fully intercepted.
 
-**List → array (deferred).** PHP provides no mechanism to intercept mutations to a typed-data item list's internal state once an item object has been handed out. Callers can mutate item objects in place without triggering the set path. The list's internal state therefore cannot be kept in sync with the stored array in real time. Instead, synchronization is deferred to boundary chokepoints: config export and pre-save processing each derive the stored array from the owned list before they execute.
+**List → array (deferred).** PHP provides no mechanism to intercept mutations to a typed-data item list's internal state once an item object has been handed out. Callers can mutate item objects in place without triggering the set path. The list's internal state therefore cannot be kept in sync with the stored array in real time. Instead, synchronization is deferred to sync boundaries: config export and pre-save processing each derive the stored array from the owned list before they execute.
 
-The deferred sync means that the stored array may lag behind the owned list between a list mutation and the next chokepoint. Code within the config entity base class that needs the current array representation must read through the chokepoints or through the owned list directly.
+The deferred sync means that the stored array may lag behind the owned list between a list mutation and the next sync boundary. Code within the config entity base class that needs the current array representation must read through those sync boundaries or through the owned list directly.
 
 ### 3. Array → list sync preserves component instance object identity
 
@@ -63,7 +63,7 @@ Serialization excludes the cached list. The back-reference from the list to its 
 
 ### Cross-references
 
-- [ADR #10](0010-dynamic-config-schema-for-component-tree-translatability.md) — translatability classification; the deferred sync and export chokepoint must preserve the UUID-keyed sequence format that config translations target.
+- [ADR #10](0010-dynamic-config-schema-for-component-tree-translatability.md) — translatability classification; the deferred sync and its export boundary must preserve the UUID-keyed sequence format that config translations target.
 - [ADR #12](0012-symmetric-content-translation-store-all-inputs-validate-at-write-time.md) — symmetric translation invariant; the owned list must remain correct across write-time synchronization.
 - [ADR #13](0013-symmetric-translation-propagation-on-component-instance-update.md) — translation propagation; per-langcode merged trees are constructed as separate lists for the merge and do not interact with the owned instance.
 
@@ -73,7 +73,7 @@ In order of importance, with the following markers:
 - positives (`+`) vs negatives (`-`) vs status quo (`≃`)
 - impact types: technical (`T`) vs operational (`O`) vs business (`B`)
 
-1. `+TB` **The write-back footgun is eliminated.** Mutating callers no longer need to write the tree back to the entity after modifying it. The owned instance accumulates mutations directly. Code that forgot the write-back was silently discarding edits; after this decision, that class of bug cannot occur.
+1. `+TB` **The write-back hazard is eliminated.** Mutating callers no longer need to write the tree back to the entity after modifying it. The owned instance accumulates mutations directly. Code that forgot the write-back was silently discarding edits; after this decision, that class of bug cannot occur.
 
 2. `+T` **Config and content entity callers share one protocol.** The tree-access method on any entity returns a live, mutation-visible list. Callers need not know or care whether they are working with a content entity or a config entity.
 
@@ -83,7 +83,7 @@ In order of importance, with the following markers:
 
 5. `+T` **Instantiation logic consolidated.** The factory lives on the list class. The trait is deleted. Callers that needed the trait for instantiation are simpler.
 
-6. `-T` **List → array sync is deferred, not real-time.** Code that reads the stored array directly after mutating the owned list will see stale values until the next chokepoint. All internal code in the config entity base class and its subclasses must access the array representation only through the sync chokepoints or through the owned list.
+6. `-T` **List → array sync is deferred, not real-time.** Code that reads the stored array directly after mutating the owned list will see stale values until the next sync boundary. All internal code in the config entity base class and its subclasses must access the array representation only through those sync boundaries or through the owned list.
 
 7. `-T` **Clone and duplicate operations must reset the cached instance.** Forgetting this reset on a future subclass that overrides either operation would re-introduce the cross-entity aliasing hazard. The invariant is non-obvious.
 

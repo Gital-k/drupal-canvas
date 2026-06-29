@@ -642,9 +642,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
   }
 
   /**
-   * @todo Move to ContentTemplate as a private method: exposed-slot injection is
-   *   a ContentTemplate concern, not a general list behavior. Requires refactoring
-   *   ::injectSubTreeItemList()'s direct test coverage first.
+   * @todo Move to ContentTemplate as a private method: exposed-slot injection is a ContentTemplate concern, not a general list behavior. Requires refactoring ::injectSubTreeItemList()'s direct test coverage first.
    *
    * @param ExposedSlotDefinitions $exposed_slot_info
    * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList $subTreeItemList
