@@ -187,7 +187,7 @@ final class ComponentTreeInputs extends ProcessorPluginBase implements PluginFor
           // Intentionally accepted behavior: if linked content has no
           // translation for the indexed langcode, Drupal resolves a fallback,
           // which can inject source-language tokens into this item.
-          $tree = $template->getComponentTree($entity);
+          $tree = $template->assembleTemplatedComponentTreeFor($entity);
           $inputs = ComponentTreeInputExtractor::extractFromTree($tree, $ignored_prop_names);
         }
       }

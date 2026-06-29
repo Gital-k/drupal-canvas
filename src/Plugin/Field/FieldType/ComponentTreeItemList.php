@@ -22,10 +22,12 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
 use Drupal\Core\Field\FieldItemList;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Form\EnforcedResponseException;
 use Drupal\Core\Form\FormAjaxException;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RenderableInterface;
+use Drupal\Core\TypedData\TypedDataManagerInterface;
 
 /**
  * A component tree: a list item class for ComponentTreeItem.
@@ -67,8 +69,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       $dependencies = NestedArray::mergeDeep($dependencies, $item->calculateFieldItemValueDependencies(
         $this->getParent()
           ? $this->getEntity()
-          // Support dangling component trees.
-          // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait
+          // Hostless lists (e.g. for validation) have no parent entity.
           : NULL
       ));
     }
@@ -569,6 +570,82 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
   }
 
   /**
+   * Creates a component tree list for validation and similar non-entity uses.
+   */
+  public static function createHostless(TypedDataManagerInterface $typed_data_manager): self {
+    return self::instantiate($typed_data_manager);
+  }
+
+  /**
+   * Creates a component tree list parented to the given entity.
+   *
+   * The list's typed-data parent is set to $entity, enabling cacheability and
+   * entity resolution relative to it. This is orthogonal to field-storage
+   * ownership: "for entity" means typed-data-parented-to, not
+   * stored-in-a-field-of.
+   */
+  public static function createForEntity(TypedDataManagerInterface $typed_data_manager, FieldableEntityInterface|ComponentTreeEntityInterface $entity): self {
+    return self::instantiate($typed_data_manager, $entity);
+  }
+
+  private static function instantiate(TypedDataManagerInterface $typed_data_manager, FieldableEntityInterface|ComponentTreeEntityInterface|null $contextEntity = NULL): self {
+    $list_definition = $typed_data_manager->createListDataDefinition('field_item:component_tree');
+    \assert(\method_exists($list_definition, 'setCardinality'));
+    $list_definition->setCardinality(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED);
+    $item_list = $typed_data_manager->createInstance('list', [
+      'name' => NULL,
+      'parent' => $contextEntity?->getTypedData(),
+      'data_definition' => $list_definition,
+    ]);
+    \assert($item_list instanceof self);
+    return $item_list;
+  }
+
+  /**
+   * Reconciles the list to match $new_values, preserving item object identity.
+   *
+   * For each entry in $new_values whose UUID already exists in this list, the
+   * existing ComponentTreeItem object is reused and its value is updated in
+   * place. New UUIDs get fresh items; removed UUIDs are dropped. Delta
+   * positions are updated to match the new order.
+   *
+   * @internal Only called from ComponentTreeConfigEntityBase::set() to keep the
+   *   owned list in sync with the raw array. Cannot be moved there: it needs
+   *   access to $this->list, which is only reachable from within this class.
+   */
+  public function reconcileFromValues(array $new_values): void {
+    // Index existing items by UUID for O(1) lookup.
+    $existing_by_uuid = [];
+    foreach ($this->list as $item) {
+      \assert($item instanceof ComponentTreeItem);
+      $existing_by_uuid[$item->getUuid()] = $item;
+    }
+
+    $new_list = [];
+    foreach (\array_values($new_values) as $new_delta => $new_value) {
+      $uuid = $new_value['uuid'] ?? NULL;
+      if ($uuid !== NULL && isset($existing_by_uuid[$uuid])) {
+        $item = $existing_by_uuid[$uuid];
+        // Update value in place; FALSE = do not notify parent (we rebuild the
+        // list atomically and reset the graph below).
+        $item->setValue($new_value, FALSE);
+      }
+      else {
+        $item = $this->createItem($new_delta, $new_value);
+      }
+      $item->setContext((string) $new_delta, $this);
+      $new_list[$new_delta] = $item;
+    }
+
+    $this->list = $new_list;
+    $this->graph = NULL;
+  }
+
+  /**
+   * @todo Move to ContentTemplate as a private method: exposed-slot injection is
+   *   a ContentTemplate concern, not a general list behavior. Requires refactoring
+   *   ::injectSubTreeItemList()'s direct test coverage first.
+   *
    * @param ExposedSlotDefinitions $exposed_slot_info
    * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList $subTreeItemList
    * @return $this

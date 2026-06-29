@@ -16,7 +16,6 @@ use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Access\CsrfRequestHeaderAccessCheck;
 use Drupal\Core\Access\CsrfTokenGenerator;
@@ -44,7 +43,6 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
 
   use CiModulePathTrait;
   use CrawlerTrait;
-  use ComponentTreeItemListInstantiatorTrait;
   use ClientServerConversionTrait;
   use ConstraintViolationsTestTrait;
   use UserCreationTrait;
@@ -103,7 +101,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     self::assertTrue($prop_field_definitions['name']['required']);
 
     // Create an item for the component in its current form.
-    $items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $items = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $this->originalVersion = $component->getActiveVersion();
     self::assertSame([$this->originalVersion], $component->getVersions());
 
@@ -188,7 +186,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     self::assertCount(0, \array_diff([$new_version, $this->originalVersion], $component->getVersions()));
     self::assertEquals($expectedFieldTypes, \array_map(static fn(array $field) => $field['field_type'], $component->getSettings()['prop_field_definitions']));
 
-    $new_items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $new_items = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $values = [
       [
         'uuid' => self::COMPONENT_INSTANCE_UUID,
@@ -231,7 +229,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     // just like \Drupal\canvas\Controller\ApiLayoutController::buildRegion()
     // would do. This test must call it explicitly because it is a kernel test
     // that does not perform HTTP requests.
-    $original_items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $original_items = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $original_items->setValue($component_tree_item_list_values);
     $this->container->get(ComponentSourceManager::class)->updateComponentInstances($original_items);
     self::assertCount(0, $original_items->validate());
@@ -945,7 +943,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
 
     // Old instances keep their historical version and remain valid.
     $component_tree_item_list_values = self::convertClientToServer($this->originalClientModel['layout'], $this->originalClientModel['model']);
-    $original_items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $original_items = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $original_items->setValue($component_tree_item_list_values);
     self::assertCount(0, $original_items->validate(), 'Old component instances referencing historical versions with the slot should still validate');
 

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\canvas\Entity;
 
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
@@ -25,7 +24,6 @@ use Drupal\language\ConfigurableLanguageManagerInterface;
  */
 abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements ComponentTreeEntityInterface {
 
-  use ComponentTreeItemListInstantiatorTrait;
   use ConfigUpdaterAwareEntityTrait;
 
   /**
@@ -34,6 +32,18 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
    * @var ?array<string, ComponentTreeItemArray>
    */
   protected ?array $component_tree;
+
+  /**
+   * The lazily-instantiated, entity-owned component tree list.
+   *
+   * NULL until first access via getComponentTree(). Excluded from serialization
+   * via __sleep() to prevent circular reference through the typed-data parent
+   * pointer.
+   *
+   * @see ::getComponentTree()
+   * @see ::__sleep()
+   */
+  private ?ComponentTreeItemList $componentTree = NULL;
 
   /**
    * An array of entity translation metadata.
@@ -112,6 +122,17 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
   /**
    * {@inheritdoc}
    */
+  public function getComponentTree(): ComponentTreeItemList {
+    if ($this->componentTree === NULL) {
+      $this->componentTree = ComponentTreeItemList::createForEntity(\Drupal::typedDataManager(), $this);
+      $this->componentTree->setValue(\array_values($this->component_tree ?? []));
+    }
+    return $this->componentTree;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function set($property_name, $value) {
     // Reset statically cached config translations: when this config entity is
     // modified, its translations may have been modified in tandem.
@@ -119,7 +140,65 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
     if ($property_name === 'component_tree') {
       $value = self::componentTreeInstancesInputsMustBeArrays($value);
     }
-    return parent::set($property_name, $value);
+    $result = parent::set($property_name, $value);
+    // Keep the owned list in sync with the array: array → list is eager.
+    if ($property_name === 'component_tree' && $this->componentTree !== NULL) {
+      $this->componentTree->reconcileFromValues(\array_values($value));
+    }
+    return $result;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function toArray() {
+    // Flush list → array before exporting: list mutations are deferred, so
+    // derive the current array value from the list when it exists.
+    if ($this->componentTree !== NULL) {
+      // ComponentInputs::getValue() returns the JSON-encoded string (not the
+      // decoded array), so inputs must be normalized to arrays before export.
+      // NULL-valued optional keys (parent_uuid, slot, label) must be omitted —
+      // config schema uses requiredKey: false, meaning absent ≡ null; a present
+      // null fails schema type validation.
+      $this->component_tree = self::componentTreeInstancesInputsMustBeArrays(
+        self::asDeterministicallyAndTranslatableKeyedComponentTreeSequence(
+          self::filterNullsFromListValues($this->componentTree->getValue()),
+        )
+      );
+    }
+    return parent::toArray();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function __sleep(): array {
+    // Null out the cached list before serialization: the list holds a back-
+    // reference to this entity's typed-data adapter, creating a circular
+    // reference. getComponentTree() rebuilds it lazily on next access.
+    $this->componentTree = NULL;
+    return parent::__sleep();
+  }
+
+  /**
+   * Strips null values from ComponentTreeItemList::getValue() output.
+   *
+   * ComponentTreeItem::getValue() returns all properties including optional
+   * ones (parent_uuid, slot, label) as NULL when not set. Config schema uses
+   * requiredKey: false for those, meaning absent ≡ null; a present null fails
+   * type validation. Strip them before writing back to the raw array.
+   *
+   * @param array $list_values
+   *   Raw output of ComponentTreeItemList::getValue().
+   *
+   * @return array
+   *   Same items, null-valued keys removed per item.
+   */
+  private static function filterNullsFromListValues(array $list_values): array {
+    return \array_map(
+      static fn(array $item): array => \array_filter($item, static fn($v) => $v !== NULL),
+      $list_values,
+    );
   }
 
   /**
@@ -164,6 +243,10 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
   public function createDuplicate() {
     $duplicate = parent::createDuplicate();
     unset($duplicate->typedData);
+    // Reset the owned list: a shallow clone aliases the original's instance.
+    // The duplicate's $component_tree array is already correct and will seed
+    // a fresh list on the next getComponentTree() call.
+    $duplicate->componentTree = NULL;
     return $duplicate;
   }
 
@@ -172,6 +255,15 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
    */
   public function preSave(EntityStorageInterface $storage) {
     parent::preSave($storage);
+    // Flush list → array before the config-updater passes: list mutations are
+    // deferred (PHP cannot trap item-object mutations), so the raw array may
+    // lag behind the owned list. The updater passes read the raw array.
+    // Apply the same null-filter as toArray() so updater passes see clean data.
+    if ($this->componentTree !== NULL) {
+      $this->component_tree = self::asDeterministicallyAndTranslatableKeyedComponentTreeSequence(
+        self::filterNullsFromListValues($this->componentTree->getValue()),
+      );
+    }
     self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
     self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputsAsArrays($this);
     // TRICKY: do not use ::setComponentTree() here because it expects integer
@@ -196,14 +288,18 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
    * Builds the full translated component tree for the given language.
    *
    * Merges the base config's component_tree with the sparse
-   * LanguageConfigOverride for $langcode and returns a dangling
+   * LanguageConfigOverride for $langcode and returns a separate
    * ComponentTreeItemList containing the merged result. The entity's own
    * component_tree property is still the V1 (pre-update) base at call time, so
    * the returned tree is the V1 translated tree ready for the updater to run.
    *
+   * The returned list is separate from the owned instance returned by
+   * getComponentTree(): it represents the per-langcode merged view and is not
+   * cached on the entity.
+   *
    * @return \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList
-   *   A dangling ComponentTreeItemList containing the merged (base + override)
-   *   component tree, not yet updated.
+   *   A ComponentTreeItemList containing the merged (base + override) component
+   *   tree, not yet updated.
    *
    * @internal
    */
@@ -222,7 +318,7 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
     );
     $override = $this->getTranslation($langcode)->getData();
     $merged = NestedArray::mergeDeepArray([$base, $override], TRUE);
-    $tree = $this->createDanglingComponentTreeItemList($this);
+    $tree = ComponentTreeItemList::createForEntity(\Drupal::typedDataManager(), $this);
     $tree->setValue(\array_values($merged['component_tree'] ?? []));
     return $tree;
   }

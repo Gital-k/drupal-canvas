@@ -289,12 +289,10 @@ class AutoSaveManager implements EventSubscriberInterface {
   private static function normalizeEntity(EntityInterface $entity): array {
     if (!$entity instanceof FieldableEntityInterface) {
       if ($entity instanceof ComponentTreeEntityInterface && $entity instanceof ConfigEntityInterface) {
-        $tree = $entity->getComponentTree();
-        foreach ($tree as $component) {
+        foreach ($entity->getComponentTree() as $component) {
           \assert($component instanceof ComponentTreeItem);
           $component->optimizeInputs();
         }
-        $entity->setComponentTree($tree->getValue());
       }
       return self::toStorableArray($entity);
     }

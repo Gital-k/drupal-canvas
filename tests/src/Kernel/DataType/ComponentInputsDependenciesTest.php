@@ -7,7 +7,7 @@ namespace Drupal\Tests\canvas\Kernel\DataType;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\DataType\ResolvedComponentInputs;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Cache\Cache;
@@ -41,7 +41,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[CoversMethod(ResolvedComponentInputs::class, 'computeValue')]
 class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
 
-  use ComponentTreeItemListInstantiatorTrait;
   use ConstraintViolationsTestTrait;
   use GenerateComponentConfigTrait;
   use ImageFieldCreationTrait;
@@ -124,7 +123,7 @@ class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
     $this->generateComponentConfig();
 
     $uuid = \Drupal::service(UuidInterface::class);
-    $item_list = $this->createDanglingComponentTreeItemList();
+    $item_list = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
 
     // Create test data.
     $uuid_of_component_instance_with_invalid_static_prop_source = $uuid->generate();
@@ -177,7 +176,6 @@ class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
     // default validation constraints (only ContentTemplates allow these).
     // That doesn't matter for testing dependency calculation, so we can ignore
     // these validation errors.
-    // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait::staticallyCreateDanglingComponentTreeItemList()
     self::assertSame([
       "0.inputs.$uuid_of_component_instance_with_invalid_static_prop_source" => 'Using a static prop source that deviates from the configuration for Component <em class="placeholder">sdc.canvas_test_sdc.heading</em> at version <em class="placeholder">8c01a2bdb897a810</em>.',
       2 => "The 'entity-field' prop source type must be absent.",

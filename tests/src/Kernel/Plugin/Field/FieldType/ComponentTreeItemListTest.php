@@ -20,7 +20,6 @@ use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Exception\SubtreeInjectionException;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\Component\Utility\NestedArray;
@@ -63,7 +62,6 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
   use UserCreationTrait;
-  use ComponentTreeItemListInstantiatorTrait;
   use CacheBustingTrait;
   use DataProviderWithComponentTreeTrait;
 
@@ -1826,10 +1824,10 @@ HTML,
    */
   #[DataProvider('providerInjectSubTreeItemList')]
   public function testInjectSubTreeItemList(array $initial_value, array $exposed_slot_info, array $subtrees, array|string $expected_tree_or_exception): void {
-    $target_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $target_tree = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $target_tree->setValue($initial_value);
 
-    $sub_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $sub_tree = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $sub_tree->setValue($subtrees);
 
     try {
@@ -1908,7 +1906,7 @@ HTML,
     $this->assertInstanceOf(ComponentInterface::class, $component);
     $original_version = $component->getActiveVersion();
 
-    $item_list = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $item_list = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $parent_uuid = (new Php())->generate();
     $main_slot_child_uuid = (new Php())->generate();
     $removable_slot_child_uuid = (new Php())->generate();

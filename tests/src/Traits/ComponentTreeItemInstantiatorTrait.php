@@ -5,21 +5,21 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Traits;
 
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\Core\Entity\FieldableEntityInterface;
 
 /**
- * Builds a dangling Canvas component tree item carrying a single component.
+ * Builds a Canvas component tree item carrying a single component.
  */
 trait ComponentTreeItemInstantiatorTrait {
 
-  use ComponentTreeItemListInstantiatorTrait;
-
   /**
-   * Instantiates a (dangling) Canvas component tree item.
+   * Instantiates a Canvas component tree item.
    */
   private function buildComponentTreeItem(string $component_id, array $inputs, ?FieldableEntityInterface $root_entity = NULL): ComponentTreeItem {
-    $item_list = $this->createDanglingComponentTreeItemList($root_entity);
+    $item_list = $root_entity !== NULL
+      ? ComponentTreeItemList::createForEntity($this->container->get('typed_data_manager'), $root_entity)
+      : ComponentTreeItemList::createHostless($this->container->get('typed_data_manager'));
     $uuid = $this->container->get('uuid')->generate();
     $item_list->setValue([
       [

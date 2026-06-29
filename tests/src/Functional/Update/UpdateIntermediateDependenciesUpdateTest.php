@@ -7,7 +7,6 @@ namespace Drupal\Tests\canvas\Functional\Update;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -26,7 +25,6 @@ require_once \dirname(__DIR__, 3) . '/fixtures/update/intermediate_component_dep
 #[Group('canvas')]
 final class UpdateIntermediateDependenciesUpdateTest extends CanvasUpdatePathTestBase {
 
-  use ComponentTreeItemListInstantiatorTrait;
 
   protected $defaultTheme = 'stark';
 

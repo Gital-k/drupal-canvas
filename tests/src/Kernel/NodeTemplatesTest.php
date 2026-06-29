@@ -259,7 +259,7 @@ HTML;
     \assert($no_hosted_entity_component_tree instanceof ComponentTreeItem);
     self::assertNull($no_hosted_entity_component_tree->get('inputs_resolved')->getValue());
     // With a host entity, inputs_resolved returns the resolved values.
-    $hosted_entity_component_tree = $template->getComponentTree($node)->get(0);
+    $hosted_entity_component_tree = $template->assembleTemplatedComponentTreeFor($node)->get(0);
     \assert($hosted_entity_component_tree instanceof ComponentTreeItem);
     $resolved = $hosted_entity_component_tree->get('inputs_resolved')->getValue();
     self::assertIsArray($resolved);

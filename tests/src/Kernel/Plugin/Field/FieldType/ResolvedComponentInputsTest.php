@@ -8,7 +8,7 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\DataType\ResolvedComponentInputs;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\jsonapi\Normalizer\FieldItemNormalizer;
 use Drupal\jsonapi\Normalizer\Value\CacheableNormalization;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
@@ -27,7 +27,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[RunTestsInSeparateProcesses]
 class ResolvedComponentInputsTest extends CanvasKernelTestBase {
 
-  use ComponentTreeItemListInstantiatorTrait;
   use GenerateComponentConfigTrait;
 
   /**
@@ -53,7 +52,7 @@ class ResolvedComponentInputsTest extends CanvasKernelTestBase {
     parent::setUp();
     $this->generateComponentConfig();
 
-    $item_list = $this->createDanglingComponentTreeItemList();
+    $item_list = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
     $item_list->setValue([
       [
         'uuid' => '947c196f-f108-43fd-a446-03a08100d571',
@@ -103,7 +102,7 @@ class ResolvedComponentInputsTest extends CanvasKernelTestBase {
    * Tests the component instance's resolved inputs for a block.
    */
   public function testResolvedComponentInputsForBlock(): void {
-    $item_list = $this->createDanglingComponentTreeItemList();
+    $item_list = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
     $item_list->setValue([
       [
         'uuid' => '947c196f-f108-43fd-a446-03a08100d571',

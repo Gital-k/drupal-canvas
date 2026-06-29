@@ -7,7 +7,7 @@ namespace Drupal\Tests\canvas\Functional\Update;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\FieldConfigInterface;
 use PHPUnit\Framework\Attributes\Group;
@@ -25,7 +25,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class CollapseComponentInputsUpdateTest extends CanvasUpdatePathTestBase {
 
-  use ComponentTreeItemListInstantiatorTrait;
 
   protected $defaultTheme = 'stark';
 
@@ -73,7 +72,7 @@ final class CollapseComponentInputsUpdateTest extends CanvasUpdatePathTestBase {
 
     $field_before = FieldConfig::load('node.article.field_canvas_demo');
     \assert($field_before instanceof FieldConfigInterface);
-    $field_default_value_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $field_default_value_tree = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $field_default_value_tree->setValue($field_before->get('default_value'));
     self::assertSame($expected_before_input, $field_default_value_tree->getComponentTreeItemByUuid('c28c3443-174c-4a83-a07a-8a071b133371')?->getInputs());
 
@@ -95,7 +94,7 @@ final class CollapseComponentInputsUpdateTest extends CanvasUpdatePathTestBase {
 
     $field_after = FieldConfig::load('node.article.field_canvas_demo');
     \assert($field_after instanceof FieldConfigInterface);
-    $field_default_value_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $field_default_value_tree = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $field_default_value_tree->setValue($field_after->get('default_value'));
     self::assertEntityIsValid($field_after);
     self::assertSame($expected_after_input, $field_default_value_tree->getComponentTreeItemByUuid('c28c3443-174c-4a83-a07a-8a071b133371')?->getInputs());

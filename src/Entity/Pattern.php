@@ -7,7 +7,6 @@ namespace Drupal\canvas\Entity;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\EntityHandlers\ContentCreatorVisibleCanvasConfigEntityAccessControlHandler;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
@@ -53,15 +52,6 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
    * The human-readable label of the Drupal Canvas Pattern.
    */
   protected ?string $label;
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getComponentTree(): ComponentTreeItemList {
-    $component_tree = $this->createDanglingComponentTreeItemList($this);
-    $component_tree->setValue(\array_values($this->component_tree ?? []));
-    return $component_tree;
-  }
 
   /**
    * {@inheritdoc}

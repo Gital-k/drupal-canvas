@@ -13,7 +13,7 @@ use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputSchemaChangePoc;
 use Drupal\canvas_test_block_simulate_input_schema_change\Plugin\Block\SimulatedInputSchemaChangeBlock;
 use Drupal\Component\Utility\Html;
@@ -50,7 +50,6 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
   use CrawlerTrait;
-  use ComponentTreeItemListInstantiatorTrait;
   use ClientServerConversionTrait;
   use ConstraintViolationsTestTrait;
   use UserCreationTrait;
@@ -95,7 +94,7 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     $uuid = \Drupal::service(UuidInterface::class);
 
     // Create an item for the component in its current form.
-    $items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $items = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $first_uuid = $uuid->generate();
     $original_version = $component->getActiveVersion();
     self::assertSame([$original_version], $component->getVersions());
@@ -181,7 +180,7 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
       'target' => 'list_string',
     ], \array_map(static fn(array $field) => $field['field_type'], $component->getSettings()['prop_field_definitions']));
 
-    $new_items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $new_items = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $second_uuid = $uuid->generate();
     $new_items->setValue([
       [
@@ -238,7 +237,7 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     \assert(\array_key_exists('component_version', $component_tree_item_list_values[0]));
     self::assertSame($original_version, $component_tree_item_list_values[0]['component_version']);
     // Create a new item list from this.
-    $original_items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $original_items = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $original_items->setValue($component_tree_item_list_values);
     self::assertCount(0, $original_items->validate());
     // Should still equal the original model, even though the field type is now
@@ -262,7 +261,7 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
       'target' => 'list_string',
     ], \array_map(static fn (array $field) => $field['field_type'], $component->getSettings()['prop_field_definitions']));
 
-    $newest_items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $newest_items = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $newest_items->setValue([
       [
         'uuid' => $uuid->generate(),
@@ -442,7 +441,6 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     $build = $component_tree_entity->getComponentTree()->toRenderable($component_tree_entity);
     $rendered_block_components = $this->crawlerForRenderArray($build)->filter('[data-component-uuid], [id^=block-]');
     return array_combine(
-      // @phpstan-ignore argument.type
       $rendered_block_components->each(fn ($node, $i) => $node->attr('data-component-uuid') ?? substr($node->attr('id'), strlen('block-'))),
       $rendered_block_components->each(fn ($node, $i) => $node->text()),
     );
