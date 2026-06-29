@@ -11,11 +11,12 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\MissingHostEntityException;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
-use Drupal\Tests\canvas\Traits\ComponentTreeItemInstantiatorTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
@@ -39,7 +40,6 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
   use ConstraintViolationsTestTrait;
   use GenerateComponentConfigTrait;
   use ImageFieldCreationTrait;
-  use ComponentTreeItemInstantiatorTrait;
 
   /**
    * {@inheritdoc}
@@ -396,9 +396,16 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     self::assertEntityIsValid($host_node);
     $host_node->save();
 
-    $item = $this->buildComponentTreeItem($component_id, [
-      'host_node' => ['sourceType' => 'host-entity'],
+    $item_list = ComponentTreeItemList::createHostless($this->container->get('typed_data_manager'));
+    $item_list->setValue([
+      [
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $component_id,
+        'inputs' => ['host_node' => ['sourceType' => 'host-entity']],
+      ],
     ]);
+    $item = $item_list->get(0);
+    \assert($item instanceof ComponentTreeItem);
     $uuid = $this->container->get('uuid')->generate();
     $result = $source->getExplicitInput($uuid, $item, $host_node);
 
@@ -444,9 +451,16 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     $source = $component->getComponentSource();
     self::assertInstanceOf(JsComponent::class, $source);
 
-    $item = $this->buildComponentTreeItem($component_id, [
-      'host_node' => ['sourceType' => 'host-entity'],
+    $item_list = ComponentTreeItemList::createHostless($this->container->get('typed_data_manager'));
+    $item_list->setValue([
+      [
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $component_id,
+        'inputs' => ['host_node' => ['sourceType' => 'host-entity']],
+      ],
     ]);
+    $item = $item_list->get(0);
+    \assert($item instanceof ComponentTreeItem);
     $uuid = $this->container->get('uuid')->generate();
 
     $this->expectException(MissingHostEntityException::class);
