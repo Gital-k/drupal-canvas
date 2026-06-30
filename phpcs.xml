@@ -34,8 +34,9 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
   </rule>
   <rule ref="Drupal.Commenting.ClassComment.Missing">
     <!-- upstream: neither includes nor excludes ⇒ Canvas can specify them -->
-    <!-- Exclude code style enforcement, tests and experimental modules -->
+    <!-- Exclude code style enforcement, tests and experimental functionality -->
     <exclude-pattern>*/phpstan_rules/*</exclude-pattern>
+    <exclude-pattern>*/src/Extension/*</exclude-pattern>
     <exclude-pattern>*/tests/*</exclude-pattern>
     <exclude-pattern>*/modules/canvas_dev_mode/*</exclude-pattern>
     <exclude-pattern>*/modules/canvas_personalization/*</exclude-pattern>
