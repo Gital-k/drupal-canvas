@@ -72,13 +72,28 @@ interface EntityMetadata {
   bundle: string;
   entityTypeId: string;
   uuid: string;
+  /**
+   * Every enabled site language, to support building a language switcher.
+   *
+   * Includes the default translation and languages the entity is not yet
+   * translated into (`translated: false`); the latter still carry a URL that
+   * resolves to the fallback translation.
+   */
   translations: TranslationMetadata[];
 }
 
 interface TranslationMetadata {
   id: string;
+  // The language name in the current display language (e.g. "German").
   name: string;
+  // The language's own native name (e.g. "Deutsch").
+  nativeName: string;
   url: string;
+  // Whether the entity has a translation in this language.
+  translated: boolean;
+  // Whether this is the language currently being viewed (the URL/content
+  // language), even when its content falls back to the default translation.
+  active: boolean;
 }
 
 interface PageData {
@@ -106,9 +121,7 @@ export const getPageData = (): PageData => {
   const pageData = {
     pageTitle: globalThis?.drupalSettings?.canvasData?.v0?.pageTitle || '',
     breadcrumbs: globalThis?.drupalSettings?.canvasData?.v0?.breadcrumbs || [],
-    mainEntity:
-      (globalThis?.drupalSettings?.canvasData?.v0
-        ?.mainEntity as EntityMetadata) || null,
+    mainEntity: globalThis?.drupalSettings?.canvasData?.v0?.mainEntity || null,
   };
   globalThis?.window?.parent.postMessage({
     type: '_canvas_useswr_data_fetch',

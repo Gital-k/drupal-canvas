@@ -40,6 +40,7 @@ debucketed
 dedreux
 dedup
 Deepchat
+Deutsch
 delaville
 devizzent
 dhta
@@ -59,6 +60,7 @@ fieldtext
 fvar
 folderfy
 FrankenPHP
+Français
 gerbeaud
 gesturechange
 gestureend
