@@ -313,7 +313,9 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
     // A user who can only access published content must not see the unpublished
     // French translation: it is reported as `translated: false` (a fallback URL),
     // indistinguishable from an untranslated language.
-    $this->drupalLogin($this->drupalCreateUser(['access content']));
+    $unprivileged_user = $this->drupalCreateUser(['access content']);
+    $this->assertInstanceOf(AccountInterface::class, $unprivileged_user);
+    $this->drupalLogin($unprivileged_user);
     $this->drupalGet($page->toUrl());
     $drupalSettings = $this->getDrupalSettings();
     self::assertSame(
@@ -323,7 +325,9 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
 
     // A user who may edit pages can view the unpublished translation, so it is
     // reported as `translated: true`; the gate is per user, not a blanket hide.
-    $this->drupalLogin($this->drupalCreateUser([Page::EDIT_PERMISSION, 'access content']));
+    $editor_user = $this->drupalCreateUser([Page::EDIT_PERMISSION, 'access content']);
+    $this->assertInstanceOf(AccountInterface::class, $editor_user);
+    $this->drupalLogin($editor_user);
     $this->drupalGet($page->toUrl());
     $drupalSettings = $this->getDrupalSettings();
     self::assertSame(

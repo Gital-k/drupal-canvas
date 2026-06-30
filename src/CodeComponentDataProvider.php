@@ -206,13 +206,12 @@ readonly final class CodeComponentDataProvider {
           foreach ($this->languageManager->getLanguages() as $language) {
             $langcode = $language->getId();
             // A language is reported as translated only when the entity has a
-            // translation in it AND the current user may view that translation.
-            // Gating on view access folds in the translation's published state
-            // (node and Canvas Page access deny viewing an unpublished
-            // translation without the relevant permission), so an unpublished or
-            // otherwise inaccessible translation is reported exactly like an
-            // untranslated language (`translated: false` with a fallback URL)
-            // and is not disclosed.
+            // translation the current user may view. Gating on view access
+            // folds in the translation's published state: node and Canvas Page
+            // access deny viewing an unpublished translation without the
+            // relevant permission. So an unpublished or otherwise inaccessible
+            // translation is reported like an untranslated language
+            // (`translated: false` with a fallback URL), and is not disclosed.
             // @see \Drupal\content_translation\Hook\ContentTranslationHooks::pageAttachments()
             $is_translated = $entity->hasTranslation($langcode)
               && $entity->getTranslation($langcode)->access('view');
@@ -222,9 +221,9 @@ readonly final class CodeComponentDataProvider {
               // name (e.g. "Deutsch"), so a switcher can show either.
               'name' => $language->getName(),
               'nativeName' => $native_names[$langcode][1] ?? $language->getName(),
-              // Untranslated and inaccessible languages fall back to the default
-              // translation, in that language's URL form (path prefix, domain,
-              // etc.) per the site's language negotiation.
+              // Untranslated and inaccessible languages fall back to the
+              // default translation, in that language's URL form (path prefix,
+              // domain, etc.) per the site's language negotiation.
               'url' => ($is_translated ? $entity->getTranslation($langcode) : $entity)
                 ->toUrl('canonical', ['language' => $language])
                 ->toString(),
