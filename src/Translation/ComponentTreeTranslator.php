@@ -71,8 +71,9 @@ final class ComponentTreeTranslator {
   /**
    * Writes translations back into a component tree.
    *
-   * Tolerant by design: an $id whose component instance no longer exists is
-   * skipped; untranslated inputs of every instance are preserved.
+   * An $id whose component instance no longer exists is skipped (e.g. a
+   * component deleted after a draft was saved); untranslated inputs of every
+   * instance are preserved.
    *
    * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList $tree
    *   The target translation's component tree.
@@ -97,7 +98,7 @@ final class ComponentTreeTranslator {
         continue;
       }
       $mapping = $this->componentInputsTranslatablesExtractor->mappingForItem($item);
-      $item->setInput($this->componentInputsTranslatablesExtractor->applyToInstance(
+      $item->setInput(ComponentInputsTranslatablesExtractor::applyToInstance(
         $item->getInputs() ?? [],
         $instance_translations,
         $mapping,

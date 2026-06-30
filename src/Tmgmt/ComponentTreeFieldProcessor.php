@@ -70,7 +70,7 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
         continue;
       }
       $mapping = $this->extractor->mappingForItem($item);
-      $item->setInput($this->extractor->applyToInstance($item->getInputs() ?? [], $translations, $mapping));
+      $item->setInput(ComponentInputsTranslatablesExtractor::applyToInstance($item->getInputs() ?? [], $translations, $mapping));
     }
   }
 

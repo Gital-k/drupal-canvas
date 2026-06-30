@@ -71,7 +71,7 @@ final class ComponentInputsTranslatablesExtractor {
 
     $component = $this->entityTypeManager->getStorage(Component::ENTITY_TYPE_ID)->load($component_id);
     if (!$component instanceof ComponentInterface) {
-      // Non-existent Component. Robustness principle: walk the schema as-is.
+      // Non-existent Component: walk the schema as-is.
       return $this->walk($schema, $inputs, [], include_empty: FALSE);
     }
     $component_source = $component->loadVersion($component_version)->getComponentSource();
@@ -147,7 +147,7 @@ final class ComponentInputsTranslatablesExtractor {
    * @return array
    *   The updated `inputs`.
    */
-  public function applyToInstance(array $inputs, array $translations, ComponentInputsMapping $schema): array {
+  public static function applyToInstance(array $inputs, array $translations, ComponentInputsMapping $schema): array {
     foreach ($translations as $dotted_path => $text) {
       // Numeric path segments (sequence indices) are cast back to integers by
       // PHP when used as array keys, so an exploded dotted path addresses the
@@ -355,7 +355,6 @@ final class ComponentInputsTranslatablesExtractor {
       }
       $leaf = [
         'propPath' => $child_path,
-        // @phpstan-ignore-next-line offsetAccess.nonOffsetAccessible
         'label' => (string) $definition['label'],
         'sourceValue' => (string) $value,
         'format' => NULL,
@@ -375,8 +374,9 @@ final class ComponentInputsTranslatablesExtractor {
    *
    * Only direct props of a component instance's inputs surface when empty;
    * values nested deeper follow the source data's shape. This holds both for
-   * the concrete `type: mapping` generated from a JsonSchemaPropsComponentSource
-   * AND for the raw ComponentInputsMapping handled by the fallback paths in
+   * the concrete `type: mapping` generated from a
+   * JsonSchemaPropsComponentSource AND for the raw ComponentInputsMapping
+   * handled by the fallback paths in
    * ::extractTranslatables() (a Component that fails to load, or whose source
    * is not a JsonSchemaPropsComponentSourceBase, e.g. a block). In both cases
    * an empty but translatable input must still be offered for translation via

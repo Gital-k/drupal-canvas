@@ -123,19 +123,19 @@ final class ComponentTreeTranslatorTest extends ContentComponentTreeSymmetricalT
     self::assertNotNull($item);
     // The flat and nested leaves are translated; the untranslated `options`
     // sibling is preserved and no other keys appear.
-    self::assertSame([
+    self::assertSameInputs([
       'text' => 'Cliquez ici',
       'href' => ['uri' => 'https://fr.drupal.org', 'options' => []],
     ], $item->getInputs());
 
-    // Tolerant by design: an $id whose component instance no longer exists is
-    // skipped, leaving the existing inputs untouched.
+    // An $id whose component instance no longer exists is skipped, leaving the
+    // existing inputs untouched.
     $translator->applyTranslations($field, [
       'ffffffff-ffff-4fff-8fff-ffffffffffff.text' => 'x',
     ]);
     $item = $field->getComponentTreeItemByUuid(self::CTA_UUID);
     self::assertNotNull($item);
-    self::assertSame([
+    self::assertSameInputs([
       'text' => 'Cliquez ici',
       'href' => ['uri' => 'https://fr.drupal.org', 'options' => []],
     ], $item->getInputs());
