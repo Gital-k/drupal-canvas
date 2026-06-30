@@ -203,15 +203,19 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
     if (\trim($source) === '') {
       return '';
     }
-    $candidates = [
-      '/../node_modules/.bin/esbuild',
-      '/node_modules/.bin/esbuild',
-      '/core/node_modules/.bin/esbuild',
-    ];
+    // Prefer the standalone esbuild binary (an ELF executable that needs no
+    // Node) over the node_modules/.bin/esbuild wrapper, whose
+    // "#!/usr/bin/env node" shebang fails under php-fpm where Node is usually
+    // not on PATH.
+    $candidates = [];
+    foreach (['/../node_modules', '/node_modules', '/core/node_modules'] as $base) {
+      $candidates = \array_merge($candidates, \glob(DRUPAL_ROOT . $base . '/@esbuild/*/bin/esbuild') ?: []);
+      $candidates[] = DRUPAL_ROOT . $base . '/.bin/esbuild';
+    }
     $bin = '';
-    foreach ($candidates as $rel) {
-      if (@\is_executable(DRUPAL_ROOT . $rel)) {
-        $bin = DRUPAL_ROOT . $rel;
+    foreach ($candidates as $candidate) {
+      if (@\is_executable($candidate)) {
+        $bin = $candidate;
         break;
       }
     }
