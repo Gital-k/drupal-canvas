@@ -49,7 +49,6 @@ use Symfony\Component\Validator\Constraints\Hostname;
 use Symfony\Component\Validator\Constraints\Ip;
 
 /**
- * @file
  * Hook implementations that make shape matching work.
  *
  * @see https://www.drupal.org/project/issues/canvas?component=Shape+matching

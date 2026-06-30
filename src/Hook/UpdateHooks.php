@@ -9,6 +9,11 @@ use Drupal\Core\Config\ConfigInstallerInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\field\Entity\FieldConfig;
 
+/**
+ * Hook implementations necessary for certain Canvas config updates.
+ *
+ * @see \Drupal\canvas\CanvasConfigUpdater
+ */
 final class UpdateHooks {
 
   public function __construct(

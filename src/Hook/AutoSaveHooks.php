@@ -15,7 +15,6 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\node\Form\NodeRevisionRevertForm;
 
 /**
- * @file
  * Hook implementations for Canvas's auto-save functionality.
  *
  * @see \Drupal\canvas\AutoSave\AutoSaveManager

@@ -8,6 +8,11 @@ use Drupal\canvas\Entity\ParametrizedImageStyle;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\image\Entity\ImageStyle;
 
+/**
+ * Hook implementations that make Canvas' parametrized image style work.
+ *
+ * @see \Drupal\canvas\Entity\ParametrizedImageStyle
+ */
 final class ImageStyleHooks {
 
   /**
