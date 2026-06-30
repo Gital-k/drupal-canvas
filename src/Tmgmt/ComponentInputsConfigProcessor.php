@@ -2,6 +2,7 @@
 
 namespace Drupal\canvas\Tmgmt;
 
+use Drupal\canvas\Translation\ComponentInputsTranslatablesExtractor;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\tmgmt_config\DefaultConfigProcessor;
 use Symfony\Component\DependencyInjection\ContainerInterface;

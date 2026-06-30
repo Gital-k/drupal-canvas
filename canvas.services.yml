@@ -99,7 +99,8 @@ services:
   Drupal\canvas\CanvasConfigUpdater: ~
   Drupal\canvas\ComponentTreeInputExtractor: {}
   Drupal\canvas\GlobalImports: {}
-  Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor: ~
+  Drupal\canvas\Translation\ComponentInputsTranslatablesExtractor: ~
+  Drupal\canvas\Translation\ComponentTreeTranslator: ~
 
   # Health.
   # Note: the `canvas:doctor` command is discovered and registered automatically by core's ConsoleCompilerPass.

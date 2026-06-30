@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\canvas\Tmgmt;
+namespace Drupal\canvas\Translation;
 
 use Drupal\canvas\Config\Schema\ComponentInputsMapping;
 use Drupal\canvas\Entity\Component;
