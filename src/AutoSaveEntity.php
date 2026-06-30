@@ -9,6 +9,9 @@ use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableDependencyTrait;
 use Drupal\Core\Entity\EntityInterface;
 
+/**
+ * Value object to pass an auto-saved entity along with additional metadata.
+ */
 final class AutoSaveEntity implements CacheableDependencyInterface {
 
   use CacheableDependencyTrait;

@@ -7,6 +7,9 @@ namespace Drupal\canvas_stark;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Security\TrustedCallbackInterface;
 
+/**
+ * @internal
+ */
 class PreRender implements TrustedCallbackInterface {
 
   public static function verticalTabs(array $element): array {

@@ -24,6 +24,9 @@ use JsonSchema\Validator;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 
+/**
+ * Complements canvas.services.yml: alterations or conditionally registered.
+ */
 class CanvasServiceProvider extends ServiceProviderBase {
 
   /**

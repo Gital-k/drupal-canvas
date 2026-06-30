@@ -14,6 +14,9 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 
+/**
+ * For pointing to a prop in a field.
+ */
 final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressionInterface, ReferencePropExpressionInterface {
 
   use CompoundExpressionTrait;

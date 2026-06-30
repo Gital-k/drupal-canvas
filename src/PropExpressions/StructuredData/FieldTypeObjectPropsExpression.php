@@ -13,7 +13,7 @@ use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 
 /**
- * For pointing to a prop in a field type (not considering any delta).
+ * For pointing to multiple props in a field type (not considering any delta).
  */
 final class FieldTypeObjectPropsExpression implements FieldTypeBasedPropExpressionInterface, ObjectPropExpressionInterface {
 

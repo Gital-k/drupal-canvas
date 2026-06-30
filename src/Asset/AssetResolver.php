@@ -17,6 +17,9 @@ use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 
+/**
+ * @internal
+ */
 final class AssetResolver extends CoreAssetResolver {
 
   protected AssetResolverInterface $assetResolver;
