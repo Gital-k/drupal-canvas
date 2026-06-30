@@ -4,26 +4,33 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Tmgmt;
 
-use Drupal\canvas\Translation\ComponentTreeTranslator;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Translation\ComponentInputsTranslatablesExtractor;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Render\Element;
 use Drupal\tmgmt_content\DefaultFieldProcessor;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * TMGMT field processor for component_tree fields.
+ * Thin TMGMT content adapter for component_tree fields.
  *
- * Thin adapter: the extract/write-back logic is tmgmt-free and lives in
- * \Drupal\canvas\Translation\ComponentTreeTranslator. This class only adapts it
- * to the tmgmt_content DefaultFieldProcessor contract so it cannot be loaded
- * without tmgmt; the shared logic can.
+ * Translatable discovery and write-back are tmgmt-free and delegated to
+ * ComponentInputsTranslatablesExtractor. Shaping each component instance's
+ * leaves into (and back out of) TMGMT's nested data tree is delegated to
+ * TmgmtComponentTreeData. This class only bridges those to the tmgmt_content
+ * DefaultFieldProcessor contract so it cannot be loaded without tmgmt; the
+ * shared logic can.
  *
- * @see \Drupal\canvas\Translation\ComponentTreeTranslator
+ * @see \Drupal\canvas\Translation\ComponentInputsTranslatablesExtractor
+ * @see \Drupal\canvas\Tmgmt\TmgmtComponentTreeData
+ *
+ * @internal
  */
 final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements ContainerInjectionInterface {
 
   public function __construct(
-    private readonly ComponentTreeTranslator $componentTreeTranslator,
+    private readonly ComponentInputsTranslatablesExtractor $extractor,
   ) {}
 
   /**
@@ -31,7 +38,7 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
    */
   public static function create(ContainerInterface $container): static {
     return new static(
-      $container->get(ComponentTreeTranslator::class),
+      $container->get(ComponentInputsTranslatablesExtractor::class),
     );
   }
 
@@ -39,14 +46,32 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
    * {@inheritdoc}
    */
   public function extractTranslatableData(FieldItemListInterface $field): array {
-    return $this->componentTreeTranslator->extractTranslatableData($field);
+    $data = ['#label' => $field->getFieldDefinition()->getLabel()];
+    foreach ($field as $delta => $item) {
+      \assert($item instanceof ComponentTreeItem);
+      $mapping = $this->extractor->mappingForItem($item);
+      $data[$delta] = TmgmtComponentTreeData::encode($this->extractor->extractInstance($mapping, $item->getInputs() ?? []));
+    }
+    return $data;
   }
 
   /**
    * {@inheritdoc}
    */
   public function setTranslations($field_data, FieldItemListInterface $field): void {
-    $this->componentTreeTranslator->setTranslations($field_data, $field);
+    foreach (Element::children($field_data) as $delta) {
+      if (!$field->offsetExists($delta)) {
+        continue;
+      }
+      $item = $field->offsetGet($delta);
+      \assert($item instanceof ComponentTreeItem);
+      $translations = TmgmtComponentTreeData::decode($field_data[$delta]);
+      if (!$translations) {
+        continue;
+      }
+      $mapping = $this->extractor->mappingForItem($item);
+      $item->setInput($this->extractor->applyToInstance($item->getInputs() ?? [], $translations, $mapping));
+    }
   }
 
 }

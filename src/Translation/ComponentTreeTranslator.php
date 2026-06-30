@@ -4,192 +4,105 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Translation;
 
-use Drupal\canvas\Config\Schema\ComponentInputsMapping;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\Core\Config\TypedConfigManagerInterface;
-use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\Core\Render\Element;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 
 /**
- * Extracts and writes back translatable strings for component_tree fields.
+ * Translates a component tree: the Canvas-owned, translation-agnostic API.
  *
- * The shared, translation-system-agnostic home of the component-tree
- * extract/write-back logic: any translation feature can depend on this service
- * directly. The heavy lifting — converting a component instance's inputs to
- * typed config and reading its translatability metadata from config schema —
- * lives in ComponentInputsTranslatablesExtractor.
+ * The consumer-facing entry point for translating a `component_tree` (content
+ * field or config entity tree). A consumer does exactly two things and never
+ * sees Canvas storage internals or any translation system's data structures:
  *
+ * - ::extract() returns the translatable strings as TranslatableText value
+ *   objects, each with a stable, opaque $id.
+ * - ::applyTranslations() writes translations back, keyed by those same $ids.
+ *
+ * Identity is the component instance's UUID (not its position), so translations
+ * collected against one revision apply correctly to another even if components
+ * were reordered in between.
+ *
+ * The per-instance discovery and write-back is delegated to
+ * ComponentInputsTranslatablesExtractor; this class adds tree iteration and the
+ * stable, tree-wide identity.
+ *
+ * @see \Drupal\canvas\Translation\TranslatableText
  * @see \Drupal\canvas\Translation\ComponentInputsTranslatablesExtractor
- * @see \Drupal\canvas\Config\Schema\ComponentInputsMapping
+ *
+ * @internal
  */
 final class ComponentTreeTranslator {
 
   public function __construct(
-    private readonly TypedConfigManagerInterface $typedConfigManager,
     private readonly ComponentInputsTranslatablesExtractor $componentInputsTranslatablesExtractor,
   ) {}
 
   /**
-   * Extracts translatable data for a component_tree field.
+   * Extracts the translatable strings from a component tree.
    *
-   * @param \Drupal\Core\Field\FieldItemListInterface $field
-   *   A `component_tree` field.
+   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList $tree
+   *   A component tree (a content `component_tree` field, or a config entity's
+   *   tree obtained via ComponentTreeEntityInterface::getComponentTree()).
    *
-   * @return array
-   *   A structure keyed by field item delta; each delta holds a nested tree of
-   *   translatable leaves: ['#label' => …, '#text' => …, '#translate' => TRUE,
-   *   '#format' => …]. The top level also carries a '#label' for the field.
+   * @return array<string, \Drupal\canvas\Translation\TranslatableText>
+   *   Translatable strings keyed by their stable $id.
    */
-  public function extractTranslatableData(FieldItemListInterface $field): array {
-    $items = [];
-
-    foreach ($field as $delta => $item) {
+  public function extract(ComponentTreeItemList $tree): array {
+    $result = [];
+    foreach ($tree as $item) {
       \assert($item instanceof ComponentTreeItem);
-      $mapping = $this->asComponentInputsMapping($item);
-      $items[$delta] = $this->componentInputsTranslatablesExtractor->extractTranslatables($mapping, $item->getInputs() ?? []);
-    }
-
-    return ['#label' => $field->getFieldDefinition()->getLabel()] + $items;
-  }
-
-  /**
-   * Writes translations from a translation-data tree back into a field.
-   *
-   * Each translatable leaf in $field_data must carry a #translation['#text']
-   * value. Only the leaves present in $field_data are touched; every other
-   * input of every component instance is preserved.
-   *
-   * @param array $field_data
-   *   Translation data, keyed by field item delta; each delta holds a nested
-   *   tree of translatable leaves carrying #translation['#text'].
-   * @param \Drupal\Core\Field\FieldItemListInterface $field
-   *   The target translation's `component_tree` field.
-   */
-  public function setTranslations(array $field_data, FieldItemListInterface $field): void {
-    foreach (Element::children($field_data) as $delta) {
-      $item_data = $field_data[$delta];
-      if (!$field->offsetExists($delta)) {
-        continue;
-      }
-
-      $item = $field->offsetGet($delta);
-      \assert($item instanceof ComponentTreeItem);
-
-      $inputs = $item->getInputs() ?? [];
-
-      $changed = FALSE;
-      foreach (Element::children($item_data) as $prop_key) {
-        $found = FALSE;
-        $inputs[$prop_key] = self::writeNestedTranslationsToInputs($item_data[$prop_key], $inputs[$prop_key] ?? NULL, $found);
-        if ($found) {
-          $changed = TRUE;
-        }
-      }
-
-      if ($changed) {
-        // Respect `inputs` order dictated by the ComponentSource plugin's
-        // `inputs_config_schema_generator` handler.
-        // @see \Drupal\canvas\Attribute\ComponentSource::__construct(inputs_config_schema_generator)
-        // @see \Drupal\canvas\ComponentSource\ComponentInstanceInputsConfigSchemaGeneratorInterface
-        $config_schema_order = $this->asComponentInputsMapping($item)->getValidKeys();
-        $inputs_in_schema_order = \array_replace(
-          // Schema-ordered, all NULL.
-          \array_fill_keys($config_schema_order, NULL),
-          // $inputs filtered to schema keys only.
-          \array_intersect_key($inputs, \array_flip($config_schema_order)),
+      $uuid = $item->getUuid();
+      $mapping = $this->componentInputsTranslatablesExtractor->mappingForItem($item);
+      foreach ($this->componentInputsTranslatablesExtractor->extractInstance($mapping, $item->getInputs() ?? []) as $dotted_path => $leaf) {
+        $id = $uuid . '.' . $dotted_path;
+        $result[$id] = new TranslatableText(
+          id: $id,
+          componentInstanceUuid: $uuid,
+          propPath: $leaf['propPath'],
+          label: $leaf['label'],
+          sourceValue: $leaf['sourceValue'],
+          format: $leaf['format'],
         );
-        // Write only non-NULL (preserve FALSE, 0, '', []).
-        $item->setInput(\array_filter($inputs_in_schema_order, static fn($v) => $v !== NULL));
       }
-    }
-  }
-
-  /**
-   * Gets a ComponentTreeItem's `inputs` property as equivalent Typed Config.
-   *
-   * Note: This is the inverse of what happens during validation: then Typed
-   * Config is converted to ComponentTreeItem (content entity field) object
-   * representations. It happens to be that configuration schema has more
-   * translatability metadata, so for translation purposes, it's the other way
-   * around.
-   *
-   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem $item
-   *   A component instance.
-   *
-   * @return \Drupal\canvas\Config\Schema\ComponentInputsMapping
-   *   The Typed Config representation of the component instance's `inputs`.
-   *
-   * @see \Drupal\canvas\Plugin\Validation\Constraint\ConfigComponentTreeTrait::conjureFieldItemObject()
-   */
-  private function asComponentInputsMapping(ComponentTreeItem $item): ComponentInputsMapping {
-    $values = $item->getValue();
-    // Content fields store `inputs` as a JSON string; config-defined component
-    // trees provide it already decoded. Tolerate both.
-    if (\is_string($values['inputs'])) {
-      $values['inputs'] = \json_decode($values['inputs'], TRUE, flags: \JSON_THROW_ON_ERROR);
-    }
-    $parent_definition = [
-      'type' => 'canvas.component_tree_node',
-    ];
-    $name = (string) $item->getName();
-    $field_value = $this->typedConfigManager->create(
-      $this->typedConfigManager->buildDataDefinition($parent_definition, $values, $name),
-      $values,
-      $name,
-    );
-    $definition = [
-      'type' => 'mapping',
-      'class' => ComponentInputsMapping::class,
-      'label' => 'Input values for each component instance in the component tree',
-    ];
-    $inputs = $item->getInputs();
-    /** @var \Drupal\canvas\Config\Schema\ComponentInputsMapping */
-    return $this->typedConfigManager->create(
-      $this->typedConfigManager->buildDataDefinition($definition, $inputs, 'inputs', $field_value),
-      $inputs,
-      'inputs',
-      $field_value,
-    );
-  }
-
-  /**
-   * Writes translations back into a nested component input value.
-   *
-   * Unlike the SDC/JS path (where each prop maps 1:1 to a field item and the
-   * field item itself can be set directly), component sources not using
-   * PropSources can have translatables at arbitrary nesting depth within a
-   * single input key — e.g. `deeply_nested_translatable[0][bar]`. There is no
-   * field item to delegate to, so translations must be written back into the
-   * raw $inputs array at the exact nested position they were extracted from.
-   *
-   * Recursively walks the translation-data tree: at translatable leaves
-   * (#translate TRUE), returns the #translation['#text'] value; at intermediate
-   * nodes, merges translated children back into the existing input array,
-   * preserving non-translated sibling keys.
-   *
-   * @param array $translation_data
-   *   Translation-data node, e.g.
-   *   ['#text' => ..., '#translation' => [...], ...].
-   * @param mixed $existing
-   *   Existing input value to merge translated children into.
-   * @param bool $found
-   *   Set to TRUE if at least one #translation was applied.
-   *
-   * @return mixed
-   *   The updated value with translations written in at the correct depth.
-   */
-  private static function writeNestedTranslationsToInputs(array $translation_data, mixed $existing, bool &$found): mixed {
-    if (\array_key_exists('#translate', $translation_data) && $translation_data['#translate'] === TRUE) {
-      \assert(\array_key_exists('#translation', $translation_data));
-      \assert(\array_key_exists('#text', $translation_data['#translation']));
-      $found = TRUE;
-      return $translation_data['#translation']['#text'];
-    }
-    $result = \is_array($existing) ? $existing : [];
-    foreach (Element::children($translation_data) as $key) {
-      $result[$key] = self::writeNestedTranslationsToInputs($translation_data[$key], $result[$key] ?? NULL, $found);
     }
     return $result;
+  }
+
+  /**
+   * Writes translations back into a component tree.
+   *
+   * Tolerant by design: an $id whose component instance no longer exists is
+   * skipped; untranslated inputs of every instance are preserved.
+   *
+   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList $tree
+   *   The target translation's component tree.
+   * @param array<string, string> $translations
+   *   Translated strings keyed by the $id produced by ::extract().
+   */
+  public function applyTranslations(ComponentTreeItemList $tree, array $translations): void {
+    // Group by component instance UUID; an $id is "<uuid>.<dotted-prop-path>"
+    // and a UUID contains no '.'.
+    $by_uuid = [];
+    foreach ($translations as $id => $text) {
+      [$uuid, $dotted_path] = \explode('.', (string) $id, 2) + [1 => ''];
+      if ($dotted_path === '') {
+        continue;
+      }
+      $by_uuid[$uuid][$dotted_path] = $text;
+    }
+
+    foreach ($by_uuid as $uuid => $instance_translations) {
+      $item = $tree->getComponentTreeItemByUuid($uuid);
+      if ($item === NULL) {
+        continue;
+      }
+      $mapping = $this->componentInputsTranslatablesExtractor->mappingForItem($item);
+      $item->setInput($this->componentInputsTranslatablesExtractor->applyToInstance(
+        $item->getInputs() ?? [],
+        $instance_translations,
+        $mapping,
+      ));
+    }
   }
 
 }

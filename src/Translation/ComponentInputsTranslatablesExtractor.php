@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\Schema\Mapping;
 use Drupal\Core\Config\Schema\Sequence;
@@ -19,10 +20,21 @@ use Drupal\Core\Field\TypedData\FieldItemDataDefinitionInterface;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 
 /**
- * Extracts translatable data from component inputs for TMGMT.
+ * Discovers the translatable strings in a single component instance's inputs.
  *
- * Translates component inputs into typed config and leverages translation
- * meta-data from config schema to identify translatable data.
+ * The per-instance discovery + write-back engine: it converts a component
+ * instance's inputs to typed config, reads each prop's translatability metadata
+ * from config schema, and returns a flat list of translatable strings keyed by
+ * a dotted prop path. It is the single source of truth for "what is
+ * translatable in a component instance" — shared by every translation feature:
+ * the translation-system-agnostic ComponentTreeTranslator facade, and the TMGMT
+ * adapters under src/Tmgmt/. It is itself free of any translation system: it
+ * emits and consumes plain values, never TMGMT's data structure.
+ *
+ * @see \Drupal\canvas\Translation\ComponentTreeTranslator
+ * @see \Drupal\canvas\Config\Schema\ComponentInputsMapping
+ *
+ * @internal
  */
 final class ComponentInputsTranslatablesExtractor {
 
@@ -33,13 +45,19 @@ final class ComponentInputsTranslatablesExtractor {
   }
 
   /**
-   * {@inheritdoc}
+   * Extracts the translatable strings from one component instance's inputs.
+   *
+   * @param \Drupal\canvas\Config\Schema\ComponentInputsMapping $schema
+   *   The typed-config representation of the instance's `inputs`.
+   * @param array $inputs
+   *   The instance's `inputs` values.
+   *
+   * @return array<string, array{propPath: list<string|int>, label: string, sourceValue: string, format: string|null}>
+   *   Translatable strings keyed by dotted prop path (e.g. 'text', 'href.uri',
+   *   'deeply_nested_translatable.0.bar'). `sourceValue` is the empty string
+   *   for a translatable-but-unpopulated optional prop.
    */
-  public function extractTranslatables(TypedConfigInterface|Mapping|Sequence $schema, array $config_data, string $base_key = ''): array {
-    if (!$schema instanceof ComponentInputsMapping) {
-      return $this->extractTranslatablesOptionallyIncludingEmpty($schema, $config_data, $base_key, include_empty: FALSE);
-    }
-
+  public function extractInstance(ComponentInputsMapping $schema, array $inputs): array {
     // Per `type: canvas.component_tree_node`, some keys must definitely exist,
     // assert the ones that this class needs.
     $parent = $schema->getParent();
@@ -53,26 +71,12 @@ final class ComponentInputsTranslatablesExtractor {
 
     $component = $this->entityTypeManager->getStorage(Component::ENTITY_TYPE_ID)->load($component_id);
     if (!$component instanceof ComponentInterface) {
-      return $this->extractTranslatablesOptionallyIncludingEmpty($schema, $config_data, $base_key, include_empty: FALSE);
+      // Non-existent Component. Robustness principle: walk the schema as-is.
+      return $this->walk($schema, $inputs, [], include_empty: FALSE);
     }
     $component_source = $component->loadVersion($component_version)->getComponentSource();
     if (!$component_source instanceof JsonSchemaPropsComponentSourceBase) {
-      $translatables = $this->extractTranslatablesOptionallyIncludingEmpty($schema, $config_data, $base_key, include_empty: FALSE);
-      // The parent logic is brittle: it accepts anything translatable and
-      // assumes it contains a single string. That's not true for a translatable
-      // `type: ignore`, for example. This then crashes TMGMT later. Work around
-      // that naïve, brittle logic in TMGMT.
-      // @todo Remove after fixing upstream in https://www.drupal.org/project/tmgmt/issues/3601246
-      $translatables = NestedArray::filter($translatables, function ($needle) {
-        if (!\is_array($needle)) {
-          return TRUE;
-        }
-        if (!\array_key_exists('#text', $needle)) {
-          return TRUE;
-        }
-        return !\is_array($needle['#text']);
-      });
-      return $translatables;
+      return $this->walk($schema, $inputs, [], include_empty: FALSE);
     }
 
     // TRICKY: note that $schema is a ComponentInputsMapping, which this then
@@ -91,8 +95,8 @@ final class ComponentInputsTranslatablesExtractor {
       'type' => 'mapping',
     ];
     $prop_field_definitions = $component_source->getConfiguration()['prop_field_definitions'] ?? [];
-    foreach (\array_keys($prop_field_definitions + $config_data) as $prop_name) {
-      $value = $config_data[$prop_name] ?? NULL;
+    foreach (\array_keys($prop_field_definitions + $inputs) as $prop_name) {
+      $value = $inputs[$prop_name] ?? NULL;
       if (!JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator::isStaticPropSource($value)) {
         // No need to translate non-static prop sources.
         $concrete_schema['mapping'][$prop_name] = [
@@ -105,28 +109,114 @@ final class ComponentInputsTranslatablesExtractor {
     }
 
     // Ensure optional component inputs not populated in the default translation
-    // are still present with a NULL value in $config_data. This is necessary
-    // because TypedConfig's ArrayElement::getAllKeys() only returns keys
-    // present in the data, silently skipping schema-defined keys with no
-    // corresponding data.
+    // are still present with a NULL value in $inputs. This is necessary because
+    // TypedConfig's ArrayElement::getAllKeys() only returns keys present in the
+    // data, silently skipping schema-defined keys with no corresponding data.
     // @see \Drupal\canvas\ConfigTranslation\CanvasComponentTreeItemInputsMappingFormElement::ensureOmittedOptionalInputsAreTranslatable()
     // @see \Drupal\Core\Config\Schema\ArrayElement::getAllKeys()
     foreach ($concrete_schema['mapping'] ?? [] as $prop_name => $prop_schema) {
-      if (\array_key_exists($prop_name, $config_data)) {
+      if (\array_key_exists($prop_name, $inputs)) {
         continue;
       }
-      // Pretend this config property path is populated by NULL, to allow
-      // generating a TMGMT translatable.
-      $config_data[$prop_name] = NULL;
+      // Pretend this config property path is populated by NULL, so the optional
+      // prop is still surfaced as translatable.
+      $inputs[$prop_name] = NULL;
     }
 
     $name = $schema->getName();
     if (\is_int($name)) {
       $name = (string) $name;
     }
-    $concrete_element = $this->typedConfigManager->create($this->typedConfigManager->buildDataDefinition($concrete_schema, $config_data, $name, $parent), $config_data, $name, $parent);
+    $concrete_element = $this->typedConfigManager->create($this->typedConfigManager->buildDataDefinition($concrete_schema, $inputs, $name, $parent), $inputs, $name, $parent);
     \assert($concrete_element instanceof TypedConfigInterface);
-    return $this->extractTranslatablesOptionallyIncludingEmpty($concrete_element, $config_data, $base_key);
+    return $this->walk($concrete_element, $inputs, [], include_empty: TRUE);
+  }
+
+  /**
+   * Writes translations back into one component instance's inputs.
+   *
+   * @param array $inputs
+   *   The instance's current `inputs` values.
+   * @param array<string, string> $translations
+   *   Translated strings keyed by the dotted prop path produced by
+   *   ::extractInstance().
+   * @param \Drupal\canvas\Config\Schema\ComponentInputsMapping $schema
+   *   The typed-config representation of the instance's `inputs`, used to order
+   *   and prune the result to the props the component currently defines.
+   *
+   * @return array
+   *   The updated `inputs`.
+   */
+  public function applyToInstance(array $inputs, array $translations, ComponentInputsMapping $schema): array {
+    foreach ($translations as $dotted_path => $text) {
+      // Numeric path segments (sequence indices) are cast back to integers by
+      // PHP when used as array keys, so an exploded dotted path addresses the
+      // same slots as the originally stored value.
+      NestedArray::setValue($inputs, \explode('.', (string) $dotted_path), $text);
+    }
+
+    // Respect `inputs` order dictated by the ComponentSource plugin's
+    // `inputs_config_schema_generator` handler, and keep only props the
+    // component still defines.
+    // @see \Drupal\canvas\Attribute\ComponentSource::__construct(inputs_config_schema_generator)
+    // @see \Drupal\canvas\ComponentSource\ComponentInstanceInputsConfigSchemaGeneratorInterface
+    $config_schema_order = $schema->getValidKeys();
+    $inputs_in_schema_order = \array_replace(
+      // Schema-ordered, all NULL.
+      \array_fill_keys($config_schema_order, NULL),
+      // $inputs filtered to schema keys only.
+      \array_intersect_key($inputs, \array_flip($config_schema_order)),
+    );
+    // Write only non-NULL (preserve FALSE, 0, '', []).
+    return \array_filter($inputs_in_schema_order, static fn($v) => $v !== NULL);
+  }
+
+  /**
+   * Gets a ComponentTreeItem's `inputs` property as equivalent Typed Config.
+   *
+   * Note: This is the inverse of what happens during validation: then Typed
+   * Config is converted to ComponentTreeItem (content entity field) object
+   * representations. It happens to be that configuration schema has more
+   * translatability metadata, so for translation purposes, it's the other way
+   * around.
+   *
+   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem $item
+   *   A component instance.
+   *
+   * @return \Drupal\canvas\Config\Schema\ComponentInputsMapping
+   *   The Typed Config representation of the component instance's `inputs`.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\ConfigComponentTreeTrait::conjureFieldItemObject()
+   */
+  public function mappingForItem(ComponentTreeItem $item): ComponentInputsMapping {
+    $values = $item->getValue();
+    // Content fields store `inputs` as a JSON string; config-defined component
+    // trees provide it already decoded. Tolerate both.
+    if (\is_string($values['inputs'])) {
+      $values['inputs'] = \json_decode($values['inputs'], TRUE, flags: \JSON_THROW_ON_ERROR);
+    }
+    $parent_definition = [
+      'type' => 'canvas.component_tree_node',
+    ];
+    $name = (string) $item->getName();
+    $field_value = $this->typedConfigManager->create(
+      $this->typedConfigManager->buildDataDefinition($parent_definition, $values, $name),
+      $values,
+      $name,
+    );
+    $definition = [
+      'type' => 'mapping',
+      'class' => ComponentInputsMapping::class,
+      'label' => 'Input values for each component instance in the component tree',
+    ];
+    $inputs = $item->getInputs();
+    /** @var \Drupal\canvas\Config\Schema\ComponentInputsMapping */
+    return $this->typedConfigManager->create(
+      $this->typedConfigManager->buildDataDefinition($definition, $inputs, 'inputs', $field_value),
+      $inputs,
+      'inputs',
+      $field_value,
+    );
   }
 
   /**
@@ -160,8 +250,7 @@ final class ComponentInputsTranslatablesExtractor {
 
     // Use the raw definition whenever possible, this maximally preserves the
     // originally specified config schema type, such as `type: text_format`.
-    // That is necessary to set #format on a TMGMT translatable when appropriate
-    // to trigger the loading of CKEditor 5 in a TMGMT job item form.
+    // That is necessary to detect the text format of a rich-text prop.
     $prop_field_definition_raw = $this->typedConfigManager->getDefinitions()[$field_value_schema];
 
     // The number of non-computed stored properties on the field item — not the
@@ -216,103 +305,88 @@ final class ComponentInputsTranslatablesExtractor {
   }
 
   /**
-   * Extracts translatables, including unpopulated optional component inputs.
+   * Recursively collects translatable leaves, keyed by dotted prop path.
    *
-   * Unlike DefaultConfigProcessor::extractTranslatables(), this does NOT skip
-   * values where empty($config_data[$key]) is TRUE. This allows optional props
-   * that are not populated in the default translation to still be presented to
-   * the translator — because a translation may legitimately want to provide a
-   * value even when the source language leaves it empty.
-   *
-   * This ensures optional props that are not populated in the default
-   * translation (e.g. English) can still receive a translation (e.g. French).
+   * Surfaces translatable optional props that are unpopulated in the source (so
+   * a translation may provide a value even when the source leaves it empty):
+   * such a leaf is returned with an empty `sourceValue`. Empty values nested
+   * below a top-level prop are skipped, matching the source data's shape.
    *
    * @param \Drupal\Core\Config\Schema\TypedConfigInterface|\Drupal\Core\Config\Schema\Mapping|\Drupal\Core\Config\Schema\Sequence $schema
-   *   The schema element.
-   * @param array $config_data
-   *   The configuration data.
-   * @param string $base_key
-   *   The base key.
+   *   The schema element to walk.
+   * @param array $data
+   *   The values at this level.
+   * @param list<string|int> $path
+   *   The prop path accumulated so far.
+   * @param bool $include_empty
+   *   Whether to surface translatable-but-empty props at this level.
    *
-   * @return array
-   *   The extracted translatable data structure.
+   * @return array<string, array{propPath: list<string|int>, label: string, sourceValue: string, format: string|null}>
+   *   Translatable leaves keyed by dotted prop path.
    */
-  private function extractTranslatablesOptionallyIncludingEmpty(TypedConfigInterface|Mapping|Sequence $schema, array $config_data, string $base_key = '', bool $include_empty = TRUE): array {
-    $data = [];
+  private function walk(TypedConfigInterface|Mapping|Sequence $schema, array $data, array $path, bool $include_empty): array {
+    $leaves = [];
     foreach ($schema as $key => $element) {
-      // @phpstan-ignore-next-line isset.variable
-      $element_key = isset($base_key) ? "$base_key.$key" : $key;
+      $child_path = [...$path, $key];
       $definition = $element->getDataDefinition();
       if ($element instanceof Mapping || $element instanceof Sequence) {
-        $sub_data = $this->extractTranslatables($element, $config_data[$key] ?? [], $element_key);
-        if ($sub_data) {
-          $data[$key] = $sub_data;
-          $data[$key]['#label'] = $definition->getLabel();
-        }
+        // Nested values follow the source shape: do not surface empties below a
+        // top-level prop.
+        $leaves += $this->walk($element, $data[$key] ?? [], $child_path, include_empty: FALSE);
+        continue;
       }
-      else {
-        // TRICKY: Forcing TMGMT to allow translating an unpopulated optional
-        // Canvas component input in the default translation's component
-        // instance is a complex undertaking.
-        // 1. Falling back to the empty string for an unpopulated component
-        //    input does correctly generate a TMGMT translatable.
-        // 2. But then the TMGMT UI omits it anyway, due to how TMGMT's
-        //    flattening strips empty strings.
-        // Only viable solution: generate a TMGMT translatable that is NOT the
-        // empty string. This code opts for `∅`, which is the Unicode character
-        // for "empty set".
-        // @see \Drupal\tmgmt_config\DefaultConfigProcessor::extractTranslatables()
-        // @see \Drupal\tmgmt_config\Plugin\tmgmt\Source\ConfigSource::getData()
-        // @see \Drupal\tmgmt\Data::flatten()
-        // @see \Drupal\tmgmt_config\DefaultConfigProcessor::extractTranslatables()
-        // @phpstan-ignore-next-line offsetAccess.nonOffsetAccessible
-        if (!isset($definition['translatable']) || !isset($definition['type']) && !$include_empty && empty($config_data[$key])) {
+      // @phpstan-ignore-next-line offsetAccess.nonOffsetAccessible
+      if (!isset($definition['translatable']) || !isset($definition['type']) && !$include_empty && empty($data[$key])) {
+        continue;
+      }
+      $value = $data[$key] ?? NULL;
+      // A translatable value is always a single string. Anything else (e.g. an
+      // array left by a `type: ignore` prop) is not a translatable string.
+      if (\is_array($value)) {
+        continue;
+      }
+      if (empty($value)) {
+        if (!self::isDirectInputProp($schema)) {
           continue;
         }
-        if (empty($config_data[$key])) {
-          if (self::isComponentInstanceInputs($schema)) {
-            // Customized behavior, to allow translating optional component
-            // props not populated in the default translation.
-            $config_data[$key] = '∅';
-          }
-          else {
-            // Same behavior as the parent implementation.
-            continue;
-          }
-        }
-        $data[$key] = [
-          '#label' => $definition['label'],
-          '#text' => $config_data[$key],
-          '#translate' => TRUE,
-        ];
-        // TMGMT's DefaultConfigProcessor never sets `#format`, only TMGMT's
-        // DefaultFieldProcessor does. Hence TMGMT's config translation support
-        // never shows a CKEditor 5 instance when appropriate. This fixes that,
-        // by setting the `#format` that TMGMT's job item form looks for.
-        // @see \Drupal\tmgmt\Form\JobItemForm::buildTranslation()
-        // @see \Drupal\canvas\Hook\ConfigTranslationHooks::configSchemaInfoAlter()
-        // @todo Remove after fixing upstream in https://www.drupal.org/project/tmgmt/issues/3601476
-        if ($schema->getDataDefinition()->getDataType() === 'text_format') {
-          \assert(\array_key_exists('format', $config_data));
-          $data[$key]['#format'] = $config_data['format'];
-        }
+        // A translatable optional prop, unpopulated in the source: surface it
+        // with an empty source value so a translation can still be provided.
+        $value = '';
       }
+      $leaf = [
+        'propPath' => $child_path,
+        // @phpstan-ignore-next-line offsetAccess.nonOffsetAccessible
+        'label' => (string) $definition['label'],
+        'sourceValue' => (string) $value,
+        'format' => NULL,
+      ];
+      // A `type: text_format` value carries its text format alongside it;
+      // expose it so consumers can render the appropriate (rich-text) editor.
+      if ($schema->getDataDefinition()->getDataType() === 'text_format' && \array_key_exists('format', $data)) {
+        $leaf['format'] = $data['format'];
+      }
+      $leaves[\implode('.', $child_path)] = $leaf;
     }
-    return $data;
+    return $leaves;
   }
 
-  private static function isComponentInstanceInputs(TypedConfigInterface $data): bool {
-    // A component instance's inputs are translatable directly under a
-    // `canvas.component_tree_node`. This holds both for the concrete
-    // `type: mapping` generated from a JsonSchemaPropsComponentSource AND for
-    // the raw ComponentInputsMapping handled by the fallback paths in
-    // ::extractTranslatables() (a Component that fails to load, or whose source
-    // is not a JsonSchemaPropsComponentSourceBase, e.g. a block). In both cases
-    // an empty but translatable input must still be offered for translation via
-    // the `∅` placeholder: a value can legitimately be empty in the source
-    // language yet translated to a non-empty value in the target language.
-    // @see ::extractTranslatables()
-    return $data->getParent()?->getDataDefinition()->getDataType() === 'canvas.component_tree_node';
+  /**
+   * Whether the given schema is a component instance's inputs mapping.
+   *
+   * Only direct props of a component instance's inputs surface when empty;
+   * values nested deeper follow the source data's shape. This holds both for
+   * the concrete `type: mapping` generated from a JsonSchemaPropsComponentSource
+   * AND for the raw ComponentInputsMapping handled by the fallback paths in
+   * ::extractTranslatables() (a Component that fails to load, or whose source
+   * is not a JsonSchemaPropsComponentSourceBase, e.g. a block). In both cases
+   * an empty but translatable input must still be offered for translation via
+   * the `∅` placeholder: a value can legitimately be empty in the source
+   * language yet translated to a non-empty value in the target language.
+   *
+   * @see ::extractTranslatables()
+   */
+  private static function isDirectInputProp(TypedConfigInterface $schema): bool {
+    return $schema->getParent()?->getDataDefinition()->getDataType() === 'canvas.component_tree_node';
   }
 
 }
