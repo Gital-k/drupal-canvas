@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas;
 
 use Drupal\canvas\Access\CanvasUiAccessCheck;
+use Drupal\canvas\Attribute\IsCalledByDrupal;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\media_library\MediaLibraryFieldWidgetOpener;
@@ -28,6 +29,7 @@ final class MediaLibraryCanvasPropOpener extends MediaLibraryFieldWidgetOpener {
   /**
    * {@inheritdoc}
    */
+  #[IsCalledByDrupal('Overrides MediaLibraryFieldWidgetOpener::checkAccess(), which the media library opener system calls via $this->checkAccess() polymorphic dispatch.')]
   public function checkAccess(MediaLibraryState $state, AccountInterface $account) {
     // `field_widget_id` is necessary for the inherited, unaltered
     // `::getSelectionResponse()` method.

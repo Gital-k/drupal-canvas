@@ -133,7 +133,7 @@ services:
     tags:
       - shipmonk.deadCode.memberUsageProvider
   -
-    class: Canvas\PHPStan\UsageProvider\DrupalPolymorphicDispatchUsageProvider
+    class: Canvas\PHPStan\UsageProvider\IsCalledByDrupalUsageProvider
     tags:
       - shipmonk.deadCode.memberUsageProvider
   -
