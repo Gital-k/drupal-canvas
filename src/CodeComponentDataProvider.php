@@ -189,22 +189,25 @@ readonly final class CodeComponentDataProvider {
       $entity = $this->routeMatch->getParameter($identifier);
 
       if ($entity instanceof EntityInterface) {
-        $available_translations = [];
+        // The requested language is negotiated from the request (e.g. the URL
+        // prefix). The rendered language is the translation the entity actually
+        // loaded as; it falls back to the default when the requested language
+        // has no translation. They differ on `/de/page/1` when the page has no
+        // German translation: requested `de`, rendered `en`.
+        $requested_langcode = $this->languageManager
+          ->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)
+          ->getId();
+        $rendered_langcode = $entity->language()->getId();
+        $translations = [];
         if ($entity instanceof TranslatableInterface) {
-          // The active language is the one being viewed (the negotiated content
-          // language), not the translation the content may fall back to. On
-          // `/de/page/1` with no German translation, German is still active.
-          $active_langcode = $this->languageManager
-            ->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)
-            ->getId();
           // Native names (e.g. "Deutsch") come from the predefined language
           // list; `ConfigurableLanguage` only stores the localized name.
           $native_names = LanguageManager::getStandardLanguageList();
           foreach ($this->languageManager->getLanguages() as $language) {
             $langcode = $language->getId();
             $is_translated = $entity->hasTranslation($langcode);
-            $available_translations[] = [
-              'id' => $langcode,
+            $translations[] = [
+              'langcode' => $langcode,
               // Localized name (e.g. "German") and the language's own native
               // name (e.g. "Deutsch"), so a switcher can show either.
               'name' => $language->getName(),
@@ -215,7 +218,7 @@ readonly final class CodeComponentDataProvider {
                 ->toUrl('canonical', ['language' => $language])
                 ->toString(),
               'translated' => $is_translated,
-              'active' => $langcode === $active_langcode,
+              'current' => $langcode === $requested_langcode,
             ];
           }
         }
@@ -225,7 +228,9 @@ readonly final class CodeComponentDataProvider {
               'bundle' => $entity->bundle(),
               'entityTypeId' => $entity->getEntityTypeId(),
               'uuid' => $entity->uuid(),
-              'translations' => $available_translations,
+              'requestedLanguage' => $requested_langcode,
+              'renderedLanguage' => $rendered_langcode,
+              'translations' => $translations,
             ],
           ],
         ];

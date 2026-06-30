@@ -72,6 +72,12 @@ interface EntityMetadata {
   bundle: string;
   entityTypeId: string;
   uuid: string;
+  // The language requested via the URL (the negotiated content language).
+  requestedLanguage: string;
+  // The language the content actually rendered in. Falls back to the default
+  // translation when the requested language has no translation, so it can
+  // differ from `requestedLanguage`.
+  renderedLanguage: string;
   /**
    * Every enabled site language, to support building a language switcher.
    *
@@ -83,7 +89,7 @@ interface EntityMetadata {
 }
 
 interface TranslationMetadata {
-  id: string;
+  langcode: string;
   // The language name in the current display language (e.g. "German").
   name: string;
   // The language's own native name (e.g. "Deutsch").
@@ -91,9 +97,9 @@ interface TranslationMetadata {
   url: string;
   // Whether the entity has a translation in this language.
   translated: boolean;
-  // Whether this is the language currently being viewed (the URL/content
-  // language), even when its content falls back to the default translation.
-  active: boolean;
+  // Whether this is the requested language (the URL/content language), even
+  // when its content falls back to the default translation.
+  current: boolean;
 }
 
 interface PageData {
