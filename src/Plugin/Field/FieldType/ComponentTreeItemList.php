@@ -604,6 +604,8 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
     return $item_list;
   }
 
+  // @todo Un-disable this once https://www.drupal.org/project/coder/issues/3607093 is fixed
+  // phpcs:disable Drupal.Commenting.DataTypeNamespace.DataTypeNamespace
   /**
    * Reconciles the list to match $new_values, preserving item object identity.
    *
@@ -623,6 +625,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
    *   owned list in sync with the raw array. Cannot be moved there: it needs
    *   access to $this->list, which is only reachable from within this class.
    */
+  // phpcs:enable Drupal.Commenting.DataTypeNamespace.DataTypeNamespace
   public function reconcileFromValues(array $new_values): void {
     // Index existing items by UUID for O(1) lookup.
     $existing_by_uuid = [];
