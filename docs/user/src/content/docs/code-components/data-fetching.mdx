@@ -101,6 +101,56 @@ function RelatedArticlesWrapper() {
 export default RelatedArticlesWrapper;
 ```
 
+#### Translations and language switcher
+
+`mainEntity.translations` lists every enabled site language, so you can build a
+language switcher. Each entry has these fields:
+
+- `id` — the language code (e.g. `en`, `fr`).
+- `name` — the language name in the current display language (e.g. `German`).
+- `nativeName` — the language's own native name (e.g. `Deutsch`).
+- `url` — URL to view the entity in this language.
+- `translated` — whether the entity has a translation in this language.
+- `active` — whether this is the language currently being viewed (from the URL),
+  even when its content falls back to the default translation.
+
+ℹ️ Languages the entity is not translated into are still included, with
+`translated: false`. Their `url` resolves to the fallback (default) translation
+under the language prefix.
+
+**Example language switcher:**
+```js
+import { getPageData } from 'drupal-canvas';
+
+function LanguageSwitcher() {
+  const { mainEntity } = getPageData();
+  if (!mainEntity) {
+    return null;
+  }
+
+  return (
+    <ul>
+      {mainEntity.translations.map(
+        ({ id, nativeName, url, translated, active }) => (
+          <li key={id}>
+            {active ? (
+              <span aria-current="true">{nativeName}</span>
+            ) : (
+              <a href={url}>
+                {nativeName}
+                {!translated && ' (not translated)'}
+              </a>
+            )}
+          </li>
+        ),
+      )}
+    </ul>
+  );
+}
+
+export default LanguageSwitcher;
+```
+
 You can also access site information with the `getSiteData` utility
 
 ```js
