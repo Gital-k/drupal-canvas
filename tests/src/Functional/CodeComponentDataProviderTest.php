@@ -148,6 +148,9 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
     // language (French), an untranslated one (German), and the default and
     // currently active language (English).
     $this->container->get('module_installer')->install(['language']);
+    // Refresh the container so the language schema is known before saving
+    // language.negotiation below.
+    $this->rebuildContainer();
     ConfigurableLanguage::createFromLangcode('fr')->save();
     ConfigurableLanguage::createFromLangcode('de')->save();
     // Configure URL prefixes so translation links carry the language prefix.
@@ -268,6 +271,9 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
    */
   public function testGetCanvasDataMainEntityV0TranslationViewAccess(): void {
     $this->container->get('module_installer')->install(['language']);
+    // Refresh the container so the language schema is known before saving
+    // language.negotiation below.
+    $this->rebuildContainer();
     ConfigurableLanguage::createFromLangcode('fr')->save();
     $this->config('language.negotiation')
       ->set('url.prefixes', ['en' => '', 'fr' => 'fr'])
