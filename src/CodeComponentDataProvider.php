@@ -8,8 +8,12 @@ use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Language\LanguageManager;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Link;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\TypedData\TranslatableInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -33,6 +37,7 @@ readonly final class CodeComponentDataProvider {
     private RouteMatchInterface $routeMatch,
     private TitleResolverInterface $titleResolver,
     private ChainBreadcrumbBuilderInterface $breadcrumbManager,
+    private LanguageManagerInterface $languageManager,
     private ContainerInterface $container,
   ) {}
 
@@ -184,12 +189,48 @@ readonly final class CodeComponentDataProvider {
       $entity = $this->routeMatch->getParameter($identifier);
 
       if ($entity instanceof EntityInterface) {
+        // The requested language is negotiated from the request (e.g. the URL
+        // prefix). The rendered language is the translation the entity actually
+        // loaded as; it falls back to the default when the requested language
+        // has no translation. They differ on `/de/page/1` when the page has no
+        // German translation: requested `de`, rendered `en`.
+        $requested_langcode = $this->languageManager
+          ->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)
+          ->getId();
+        $rendered_langcode = $entity->language()->getId();
+        $translations = [];
+        if ($entity instanceof TranslatableInterface) {
+          // Native names (e.g. "Deutsch") come from the predefined language
+          // list; `ConfigurableLanguage` only stores the localized name.
+          $native_names = LanguageManager::getStandardLanguageList();
+          foreach ($this->languageManager->getLanguages() as $language) {
+            $langcode = $language->getId();
+            $is_translated = $entity->hasTranslation($langcode);
+            $translations[] = [
+              'langcode' => $langcode,
+              // Localized name (e.g. "German") and the language's own native
+              // name (e.g. "Deutsch"), so a switcher can show either.
+              'name' => $language->getName(),
+              'nativeName' => $native_names[$langcode][1] ?? $language->getName(),
+              // Untranslated languages still get a URL; it resolves to the
+              // fallback (default) translation under the language prefix.
+              'url' => ($is_translated ? $entity->getTranslation($langcode) : $entity)
+                ->toUrl('canonical', ['language' => $language])
+                ->toString(),
+              'translated' => $is_translated,
+              'current' => $langcode === $requested_langcode,
+            ];
+          }
+        }
         return [
           self::V0 => [
             'mainEntity' => [
               'bundle' => $entity->bundle(),
               'entityTypeId' => $entity->getEntityTypeId(),
               'uuid' => $entity->uuid(),
+              'requestedLanguage' => $requested_langcode,
+              'renderedLanguage' => $rendered_langcode,
+              'translations' => $translations,
             ],
           ],
         ];
