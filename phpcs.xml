@@ -36,13 +36,16 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
   </rule>
   <!-- … allow long-line array declarations where they are useful: in test expectations. -->
   <rule ref="Drupal.Arrays.Array.LongLineDeclaration">
+    <!-- upstream: neither includes nor excludes ⇒ Canvas can specify them -->
     <exclude-pattern>*/tests/*</exclude-pattern>
   </rule>
   <rule ref="Drupal.Files.EndFileNewline">
+    <!-- upstream: neither includes nor excludes ⇒ Canvas can specify them -->
     <exclude-pattern>*/config/install/*\.yml$</exclude-pattern>
   </rule>
   <!-- @todo eventually apply stricter rules to canvas_ai, too. -->
   <rule ref="Drupal.Files.LineLength.TooLong">
+    <!-- upstream: excludes ⇒ Canvas can add more excludes -->
     <exclude-pattern>*/canvas_ai/*</exclude-pattern>
   </rule>
 
