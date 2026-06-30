@@ -87,10 +87,12 @@ final class ComponentTreeTranslatorTest extends ContentComponentTreeSymmetricalT
 
     $item = $field->offsetGet(0);
     \assert($item instanceof ComponentTreeItem);
-    $inputs = $item->getInputs();
-    self::assertSame('Cliquez ici', $inputs['text']);
-    self::assertSame('https://fr.drupal.org', $inputs['href']['uri']);
-    self::assertSame([], $inputs['href']['options']);
+    // The flat (`text`) and nested (`href.uri`) leaves are translated; the
+    // untranslated `options` sibling is preserved and no other keys appear.
+    self::assertSame([
+      'text' => 'Cliquez ici',
+      'href' => ['uri' => 'https://fr.drupal.org', 'options' => []],
+    ], $item->getInputs());
   }
 
 }
