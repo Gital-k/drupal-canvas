@@ -8,6 +8,9 @@ use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Language\LanguageManager;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Link;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\TypedData\TranslatableInterface;
@@ -34,6 +37,7 @@ readonly final class CodeComponentDataProvider {
     private RouteMatchInterface $routeMatch,
     private TitleResolverInterface $titleResolver,
     private ChainBreadcrumbBuilderInterface $breadcrumbManager,
+    private LanguageManagerInterface $languageManager,
     private ContainerInterface $container,
   ) {}
 
@@ -187,14 +191,31 @@ readonly final class CodeComponentDataProvider {
       if ($entity instanceof EntityInterface) {
         $available_translations = [];
         if ($entity instanceof TranslatableInterface) {
-          foreach ($entity->getTranslationLanguages() as $language) {
+          // The active language is the one being viewed (the negotiated content
+          // language), not the translation the content may fall back to. On
+          // `/de/page/1` with no German translation, German is still active.
+          $active_langcode = $this->languageManager
+            ->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)
+            ->getId();
+          // Native names (e.g. "Deutsch") come from the predefined language
+          // list; `ConfigurableLanguage` only stores the localized name.
+          $native_names = LanguageManager::getStandardLanguageList();
+          foreach ($this->languageManager->getLanguages() as $language) {
+            $langcode = $language->getId();
+            $is_translated = $entity->hasTranslation($langcode);
             $available_translations[] = [
-              'id' => $language->getId(),
+              'id' => $langcode,
+              // Localized name (e.g. "German") and the language's own native
+              // name (e.g. "Deutsch"), so a switcher can show either.
               'name' => $language->getName(),
-              'url' => $entity
-                ->getTranslation($language->getId())
+              'nativeName' => $native_names[$langcode][1] ?? $language->getName(),
+              // Untranslated languages still get a URL; it resolves to the
+              // fallback (default) translation under the language prefix.
+              'url' => ($is_translated ? $entity->getTranslation($langcode) : $entity)
                 ->toUrl('canonical', ['language' => $language])
                 ->toString(),
+              'translated' => $is_translated,
+              'active' => $langcode === $active_langcode,
             ];
           }
         }
