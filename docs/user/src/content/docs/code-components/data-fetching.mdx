@@ -103,16 +103,20 @@ export default RelatedArticlesWrapper;
 
 #### Translations and language switcher
 
-`mainEntity.translations` lists every enabled site language, so you can build a
-language switcher. Each entry has these fields:
+`mainEntity` carries everything needed to build a language switcher:
 
-- `id` — the language code (e.g. `en`, `fr`).
-- `name` — the language name in the current display language (e.g. `German`).
-- `nativeName` — the language's own native name (e.g. `Deutsch`).
-- `url` — URL to view the entity in this language.
-- `translated` — whether the entity has a translation in this language.
-- `active` — whether this is the language currently being viewed (from the URL),
-  even when its content falls back to the default translation.
+- `requestedLanguage` — the language code requested via the URL (e.g. `fr`).
+- `renderedLanguage` — the language the content actually rendered in. It falls
+  back to the default translation when the requested language has no
+  translation, so it can differ from `requestedLanguage`.
+- `translations` — every enabled site language. Each entry has:
+  - `langcode` — the language code (e.g. `en`, `fr`).
+  - `name` — the language name in the current display language (e.g. `German`).
+  - `nativeName` — the language's own native name (e.g. `Deutsch`).
+  - `url` — URL to view the entity in this language.
+  - `translated` — whether the entity has a translation in this language.
+  - `current` — whether this is the requested language, even when its content
+    falls back to the default translation.
 
 ℹ️ Languages the entity is not translated into are still included, with
 `translated: false`. Their `url` resolves to the fallback (default) translation
@@ -127,24 +131,32 @@ function LanguageSwitcher() {
   if (!mainEntity) {
     return null;
   }
+  const { requestedLanguage, renderedLanguage, translations } = mainEntity;
 
   return (
-    <ul>
-      {mainEntity.translations.map(
-        ({ id, nativeName, url, translated, active }) => (
-          <li key={id}>
-            {active ? (
-              <span aria-current="true">{nativeName}</span>
-            ) : (
-              <a href={url}>
-                {nativeName}
-                {!translated && ' (not translated)'}
-              </a>
-            )}
-          </li>
-        ),
+    <nav>
+      {requestedLanguage !== renderedLanguage && (
+        <p>Not available in your language — showing {renderedLanguage}.</p>
       )}
-    </ul>
+      <ul>
+        {translations.map(
+          ({ langcode, nativeName, url, translated, current }) => (
+            <li key={langcode}>
+              {current ? (
+                <span lang={langcode} aria-current="true">
+                  {nativeName}
+                </span>
+              ) : (
+                <a href={url} lang={langcode} hrefLang={langcode}>
+                  {nativeName}
+                  {!translated && ' (not translated)'}
+                </a>
+              )}
+            </li>
+          ),
+        )}
+      </ul>
+    </nav>
   );
 }
 

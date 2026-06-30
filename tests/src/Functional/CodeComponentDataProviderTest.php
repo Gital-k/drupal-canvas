@@ -179,6 +179,11 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
     // Visit the English (default) canonical route.
     $this->drupalGet($page->toUrl());
 
+    // The translations data is rebuilt when the language list or URL prefixes
+    // change.
+    $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Tags', 'config:configurable_language_list');
+    $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Tags', 'config:language.negotiation');
+
     $drupalSettings = $this->getDrupalSettings();
     $this->assertArrayHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
 
@@ -186,65 +191,74 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'bundle' => 'canvas_page',
       'entityTypeId' => 'canvas_page',
       'uuid' => $page->uuid(),
+      'requestedLanguage' => 'en',
+      'renderedLanguage' => 'en',
       'translations' => [
         [
-          'id' => 'en',
+          'langcode' => 'en',
           'name' => 'English',
           'nativeName' => 'English',
           'url' => "/page/$id",
           'translated' => TRUE,
-          'active' => TRUE,
+          'current' => TRUE,
         ],
         [
-          'id' => 'fr',
+          'langcode' => 'fr',
           'name' => 'French',
           'nativeName' => 'Français',
           'url' => "/fr/page/$id",
           'translated' => TRUE,
-          'active' => FALSE,
+          'current' => FALSE,
         ],
         [
-          'id' => 'de',
+          'langcode' => 'de',
           'name' => 'German',
           'nativeName' => 'Deutsch',
           'url' => "/de/page/$id",
           'translated' => FALSE,
-          'active' => FALSE,
+          'current' => FALSE,
         ],
       ],
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
 
-    // Visiting the German URL makes German the active language, even though the
-    // page has no German translation and its content falls back to English.
+    // Visiting the German URL: German is requested and current, but the page has
+    // no German translation so the content renders in English (the fallback).
     $de = $this->container->get('language_manager')->getLanguage('de');
     $this->drupalGet($page->toUrl('canonical', ['language' => $de]));
     $drupalSettings = $this->getDrupalSettings();
     self::assertSame([
-      [
-        'id' => 'en',
-        'name' => 'English',
-        'nativeName' => 'English',
-        'url' => "/page/$id",
-        'translated' => TRUE,
-        'active' => FALSE,
+      'bundle' => 'canvas_page',
+      'entityTypeId' => 'canvas_page',
+      'uuid' => $page->uuid(),
+      'requestedLanguage' => 'de',
+      'renderedLanguage' => 'en',
+      'translations' => [
+        [
+          'langcode' => 'en',
+          'name' => 'English',
+          'nativeName' => 'English',
+          'url' => "/page/$id",
+          'translated' => TRUE,
+          'current' => FALSE,
+        ],
+        [
+          'langcode' => 'fr',
+          'name' => 'French',
+          'nativeName' => 'Français',
+          'url' => "/fr/page/$id",
+          'translated' => TRUE,
+          'current' => FALSE,
+        ],
+        [
+          'langcode' => 'de',
+          'name' => 'German',
+          'nativeName' => 'Deutsch',
+          'url' => "/de/page/$id",
+          'translated' => FALSE,
+          'current' => TRUE,
+        ],
       ],
-      [
-        'id' => 'fr',
-        'name' => 'French',
-        'nativeName' => 'Français',
-        'url' => "/fr/page/$id",
-        'translated' => TRUE,
-        'active' => FALSE,
-      ],
-      [
-        'id' => 'de',
-        'name' => 'German',
-        'nativeName' => 'Deutsch',
-        'url' => "/de/page/$id",
-        'translated' => FALSE,
-        'active' => TRUE,
-      ],
-    ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']['translations']);
+    ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
   }
 
   /**
@@ -306,14 +320,16 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'bundle' => 'article',
       'entityTypeId' => 'node',
       'uuid' => $node->uuid(),
+      'requestedLanguage' => 'en',
+      'renderedLanguage' => 'en',
       'translations' => [
         [
-          'id' => 'en',
+          'langcode' => 'en',
           'name' => 'English',
           'nativeName' => 'English',
           'url' => "/node/{$node->id()}",
           'translated' => TRUE,
-          'active' => TRUE,
+          'current' => TRUE,
         ],
       ],
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);

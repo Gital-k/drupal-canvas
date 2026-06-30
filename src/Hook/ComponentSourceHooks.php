@@ -128,6 +128,13 @@ readonly final class ComponentSourceHooks {
     // TRICKY: the `route` cache context varies also by route parameters, that
     // is unnecessary here, because this only varies by route definition.
     $page['#cache']['contexts'][] = 'route.name';
+    // The `canvasData.v0.mainEntity` code component data lists every enabled
+    // language (with names, order, and URLs), built from the language list and
+    // URL prefixes. Rebuild it when either changes. No language cache context
+    // is needed: the active language and per-language URLs follow the request
+    // URL, which already varies the page cache.
+    $page['#cache']['tags'][] = 'config:configurable_language_list';
+    $page['#cache']['tags'][] = 'config:language.negotiation';
     $asset_library = AssetLibrary::load(AssetLibrary::GLOBAL_ID);
     // The `global `asset library is guaranteed to exist, but protect even
     // against the most obscure edge cases. (Also: tests do simulate that!)
