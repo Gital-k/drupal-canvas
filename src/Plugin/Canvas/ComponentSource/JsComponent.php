@@ -417,10 +417,19 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     // @see \Drupal\canvas\Element\RenderSafeComponentContainer::handleComponentException()
     // @see https://www.drupal.org/project/canvas/issues/3583639
     \assert($this->componentValidator->validateProps($props, $this->getComponentPlugin()));
-    CacheableMetadata::createFromRenderArray($build)
+    $cacheability = CacheableMetadata::createFromRenderArray($build)
       ->addCacheableDependency($component)
-      ->addCacheableDependency($props_cacheability)
-      ->applyTo($build);
+      ->addCacheableDependency($props_cacheability);
+    // When this component reads `canvasData.v0.mainEntity`, its data embeds the
+    // per-language translation list, derived from the enabled-language list and
+    // the URL negotiation config. Rebuild it when either changes.
+    // Per-translation view access and published state need no extra
+    // cacheability here: the main entity is the rendered route entity, so its
+    // own access cacheability is already on the page.
+    if (\in_array('canvas/canvasData.v0.mainEntity', $component->getAssetLibraryDependencies(), TRUE)) {
+      $cacheability->addCacheTags(['config:configurable_language_list', 'config:language.negotiation']);
+    }
+    $cacheability->applyTo($build);
 
     return $build + [
       '#type' => 'astro_island',
