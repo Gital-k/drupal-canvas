@@ -281,6 +281,12 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
    */
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
     unset($this->typedData);
+    // Reset the owned list: after a save, any mutations have been persisted to
+    // the raw $component_tree array. A fresh list is rebuilt from that array on
+    // the next getComponentTree() call, ensuring stale in-memory component
+    // entity references (held by list items' component typed-data properties)
+    // never survive a save boundary.
+    $this->componentTree = NULL;
     parent::postSave($storage, $update);
   }
 
