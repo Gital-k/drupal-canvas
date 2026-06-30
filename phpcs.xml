@@ -41,7 +41,10 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
     <exclude-pattern>*/modules/canvas_personalization/*</exclude-pattern>
     <!-- Exclude plugins whose attributes already provide ample documentation. -->
     <exclude-pattern>*/src/Plugin/*</exclude-pattern>
+    <exclude-pattern>*/src/Element/*</exclude-pattern>
     <exclude-pattern>*/src/Entity/*</exclude-pattern>
+    <!-- Exclude entity handlers; the docs for the entity type should provide the necessary documentation. -->
+    <exclude-pattern>*/src/EntityHandlers/*</exclude-pattern>
     <!-- Exclude controllers whose route definition plus OpenAPI specs already provides ample documentation. -->
     <exclude-pattern>*/src/Controller/*</exclude-pattern>
   </rule>
