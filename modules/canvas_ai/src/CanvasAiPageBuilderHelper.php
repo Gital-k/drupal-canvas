@@ -138,7 +138,7 @@ class CanvasAiPageBuilderHelper {
    *
    * The output will be used as the context for the AI agent.
    */
-  public function getComponentContextForAi(): string {
+  public function getComponentContextForAi(): array {
     $component_context = [];
     $component_context_from_config = $this->getComponentContextFromConfig();
     $available_components = !empty($component_context_from_config) ? $component_context_from_config : $this->getAllComponentsKeyedBySource();
@@ -153,7 +153,7 @@ class CanvasAiPageBuilderHelper {
       }
 
     }
-    return Yaml::dump($component_context, 4, 2);
+    return $component_context;
   }
 
   /**
@@ -226,7 +226,7 @@ class CanvasAiPageBuilderHelper {
         // Recursively process any components in slots.
         if (!empty($component_data['slots'])) {
           foreach ($component_data['slots'] as $slot_components) {
-            if (\is_array($slot_components)) {
+            if (is_array($slot_components)) {
               $this->appendComponentsRecursive($slot_components, $predicted_layout, $target, $result_components);
             }
           }
@@ -250,7 +250,7 @@ class CanvasAiPageBuilderHelper {
   protected function processSlots(array $slots, array $parent_node_path, array &$result_components, $component_id): void {
 
     foreach ($slots as $slot_name => $slot_components) {
-      if (!\is_array($slot_components)) {
+      if (!is_array($slot_components)) {
         continue;
       }
 
@@ -521,8 +521,8 @@ class CanvasAiPageBuilderHelper {
       // Refresh component props.
       if (isset($component_data['props'])) {
         // Check if any new props have been added or existing props have been modified.
-        $previous_props = \is_array($component_data['props']) ? $component_data['props'] : [];
-        $current_props = \is_array($latest_components_under_source[$component_id]['props']) ? $latest_components_under_source[$component_id]['props'] : [];
+        $previous_props = is_array($component_data['props']) ? $component_data['props'] : [];
+        $current_props = is_array($latest_components_under_source[$component_id]['props']) ? $latest_components_under_source[$component_id]['props'] : [];
 
         if (\array_keys($previous_props) != \array_keys($current_props)) {
           // If the keys of the previous props and current props are different,
@@ -559,8 +559,8 @@ class CanvasAiPageBuilderHelper {
       // Refresh component slots.
       if (isset($component_data['slots'])) {
         // Check if any new slots have been added or existing slots have been modified.
-        $previous_slots = \is_array($component_data['slots']) ? $component_data['slots'] : [];
-        $current_slots = \is_array($latest_components_under_source[$component_id]['slots']) ? $latest_components_under_source[$component_id]['slots'] : [];
+        $previous_slots = is_array($component_data['slots']) ? $component_data['slots'] : [];
+        $current_slots = is_array($latest_components_under_source[$component_id]['slots']) ? $latest_components_under_source[$component_id]['slots'] : [];
 
         if (\array_keys($previous_slots) != \array_keys($current_slots)) {
           // If the keys of the previous slots and current slots are different,
@@ -654,7 +654,7 @@ class CanvasAiPageBuilderHelper {
         ];
 
         // Mark required props.
-        if (isset($sdc_definition['props']['required']) && \in_array($prop_name, $sdc_definition['props']['required'], TRUE)) {
+        if (isset($sdc_definition['props']['required']) && in_array($prop_name, $sdc_definition['props']['required'], TRUE)) {
           $output[$source_id]['components'][$component_id]['props'][$prop_name]['required'] = TRUE;
         }
         if (isset($prop_details['enum'])) {
@@ -684,7 +684,7 @@ class CanvasAiPageBuilderHelper {
     ];
 
     // Get the descriptions for props of the JS component.
-    if (isset($component_data['propSources']) && \is_array($component_data['propSources'])) {
+    if (isset($component_data['propSources']) && is_array($component_data['propSources'])) {
       $output[JsComponent::SOURCE_PLUGIN_ID]['components'][$component_id]['props'] = [];
       $metadata_properties = [];
       $component_source = $component->getComponentSource();
@@ -716,7 +716,7 @@ class CanvasAiPageBuilderHelper {
     }
 
     // Get the descriptions for slots of the JS component.
-    if (isset($component_data['metadata']['slots']) && \is_array($component_data['metadata']['slots'])) {
+    if (isset($component_data['metadata']['slots']) && is_array($component_data['metadata']['slots'])) {
       $output[JsComponent::SOURCE_PLUGIN_ID]['components'][$component_id]['slots'] = [];
       foreach ($component_data['metadata']['slots'] as $slot_name => $slot_details) {
         $output[JsComponent::SOURCE_PLUGIN_ID]['components'][$component_id]['slots'][$slot_name] = [
@@ -870,18 +870,18 @@ class CanvasAiPageBuilderHelper {
    *   parent-child relationships per slot.
    */
   public function convertCurrentLayoutToTree(array $data): array {
-    if (!isset($data['regions']) || !\is_array($data['regions'])) {
+    if (!isset($data['regions']) || !is_array($data['regions'])) {
       return [];
     }
 
     $result = [];
     foreach ($data['regions'] as $region => $region_data) {
-      if (!\is_array($region_data)) {
+      if (!is_array($region_data)) {
         continue;
       }
 
       $components = $region_data['components'] ?? [];
-      if (!\is_array($components)) {
+      if (!is_array($components)) {
         $components = [];
       }
 
@@ -906,22 +906,22 @@ class CanvasAiPageBuilderHelper {
     $tree = [];
 
     foreach ($components as $component) {
-      if (!\is_array($component) || !isset($component['uuid'])) {
+      if (!is_array($component) || !isset($component['uuid'])) {
         continue;
       }
 
       $uuid = $component['uuid'];
       $children_by_slot = [];
 
-      if (isset($component['slots']) && \is_array($component['slots'])) {
+      if (isset($component['slots']) && is_array($component['slots'])) {
         foreach ($component['slots'] as $slot_id => $slot_payload) {
           $slot_name = $this->extractSlotNameFromId($slot_id);
           $slot_components = [];
-          if (\is_array($slot_payload)) {
+          if (is_array($slot_payload)) {
             $slot_components = $slot_payload['components'] ?? [];
           }
           $children_by_slot[$slot_name] = $this->buildComponentUuidTree(
-            \is_array($slot_components) ? $slot_components : []
+            is_array($slot_components) ? $slot_components : []
           );
         }
       }
@@ -960,12 +960,12 @@ class CanvasAiPageBuilderHelper {
    *   The page builder output with UUIDs added to all components.
    */
   public function addUuidToAllComponents(array $page_builder_output): array {
-    if (!isset($page_builder_output['operations']) || !\is_array($page_builder_output['operations'])) {
+    if (!isset($page_builder_output['operations']) || !is_array($page_builder_output['operations'])) {
       return $page_builder_output;
     }
 
     foreach ($page_builder_output['operations'] as &$operation) {
-      if (!isset($operation['components']) || !\is_array($operation['components'])) {
+      if (!isset($operation['components']) || !is_array($operation['components'])) {
         continue;
       }
       $this->assignUuidsRecursively($operation['components']);
@@ -982,24 +982,24 @@ class CanvasAiPageBuilderHelper {
    */
   private function assignUuidsRecursively(array &$components): void {
     foreach ($components as &$component_wrapper) {
-      if (!\is_array($component_wrapper)) {
+      if (!is_array($component_wrapper)) {
         continue;
       }
 
       foreach ($component_wrapper as &$component_details) {
-        if (!\is_array($component_details)) {
+        if (!is_array($component_details)) {
           continue;
         }
 
         // Add UUID only if missing.
-        if (empty($component_details['uuid']) || !\is_string($component_details['uuid'])) {
+        if (empty($component_details['uuid']) || !is_string($component_details['uuid'])) {
           $component_details['uuid'] = $this->uuidService->generate();
         }
 
         // Recurse into slots if present.
-        if (isset($component_details['slots']) && \is_array($component_details['slots'])) {
+        if (isset($component_details['slots']) && is_array($component_details['slots'])) {
           foreach ($component_details['slots'] as &$slot_components) {
-            if (!\is_array($slot_components)) {
+            if (!is_array($slot_components)) {
               continue;
             }
 
@@ -1203,7 +1203,7 @@ class CanvasAiPageBuilderHelper {
       }
 
       // If value is an array, search recursively.
-      if (\is_array($value)) {
+      if (is_array($value)) {
         $result = $this->getPathFromUuid($value, $target_uuid, $new_path);
         if ($result !== NULL) {
           return $result;
@@ -1334,7 +1334,7 @@ class CanvasAiPageBuilderHelper {
           return $currentPath;
         }
 
-        if (\is_array($value) && !empty($value)) {
+        if (is_array($value) && !empty($value)) {
           $found = $findPath($value, $uuid, $currentPath);
           if (!empty($found)) {
             return $found;
@@ -1387,13 +1387,13 @@ class CanvasAiPageBuilderHelper {
   public function hasChildComponents(string $target): bool {
     $current_layout = $this->canvasAiTempstore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '';
     $current_layout = Json::decode($current_layout);
-    $current_layout = \is_array($current_layout) ? $current_layout : [];
+    $current_layout = is_array($current_layout) ? $current_layout : [];
 
     // Region case: no slash means region name.
     if (strpos($target, '/') === FALSE) {
       $region = $target;
       $components = $current_layout['regions'][$region]['components'] ?? [];
-      return \is_array($components) && !empty($components);
+      return is_array($components) && !empty($components);
     }
 
     // Slot case: formatted as "parent_uuid/slot_name".
@@ -1412,7 +1412,7 @@ class CanvasAiPageBuilderHelper {
     // Traverse to the parent component's slots array in the tree.
     $node = $layout_tree;
     foreach ($path as $key) {
-      if (!isset($node[$key]) || !\is_array($node[$key])) {
+      if (!isset($node[$key]) || !is_array($node[$key])) {
         return FALSE;
       }
       $node = $node[$key];
@@ -1420,7 +1420,7 @@ class CanvasAiPageBuilderHelper {
 
     // In the tree, slots are keyed by slot name and contain child components
     // keyed by their UUIDs. Non-empty means there are child components.
-    if (!isset($node[$slot_name]) || !\is_array($node[$slot_name])) {
+    if (!isset($node[$slot_name]) || !is_array($node[$slot_name])) {
       return FALSE;
     }
 
@@ -1440,7 +1440,7 @@ class CanvasAiPageBuilderHelper {
     $layout_array = Json::decode($current_layout);
     $regions = [];
 
-    if (isset($layout_array['regions']) && \is_array($layout_array['regions'])) {
+    if (isset($layout_array['regions']) && is_array($layout_array['regions'])) {
       foreach ($layout_array['regions'] as $region_name => $region_data) {
         if (isset($region_data['nodePathPrefix'])) {
           $regions[$region_name] = $region_data['nodePathPrefix'][0];
@@ -1498,7 +1498,7 @@ class CanvasAiPageBuilderHelper {
       ],
     ];
     foreach ($parsed_array as $region => $components) {
-      if (!\is_array($components)) {
+      if (!is_array($components)) {
         continue;
       }
 

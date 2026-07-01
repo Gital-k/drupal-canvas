@@ -60,6 +60,29 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state): array {
+    $form['description'] = [
+      '#markup' => $this->t('
+        <p>Use this form to customize the descriptions of available components, including their props and slots. These descriptions help the AI understand how components should be used when building pages.</p>
+
+        <p><strong>Description:</strong> Write a single clear sentence that explains what the component is and its primary purpose.</p>
+
+        <p><strong>Detailed description:</strong> Provide a concise explanation of when to use the component, how it should be used, and any important constraints.</p>
+
+        <p><strong>Example: Accordion component</strong></p>
+
+        <p><strong>Description:</strong> A collapsible accordion component that groups related content into expandable panels so users can reveal details when needed.</p>
+
+        <p><strong>Detailed description:</strong> Use this component to organize large or dense content into labeled sections that users can expand or collapse.</p>
+
+        <ul>
+          <li>Suitable for FAQs, help content, or overview and detail patterns where not all information needs to be visible at once.</li>
+          <li>Reduces vertical clutter while keeping all content accessible through user interaction.</li>
+          <li>Panels should have clear titles that describe the content inside.</li>
+          <li>Avoid using this component when users need to compare multiple sections at the same time or read content sequentially.</li>
+          <li>Works best with a limited number of panels, typically 3 to 7, and with well structured content inside each panel.</li>
+        </ul>
+      '),
+    ];
     // Create form elements to add description for each available components
     // and their props and slots.
     $form['component_context'] = $this->buildComponentContextForm();
@@ -101,6 +124,7 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
         if (isset($available_components[$source]['components'][$component_id])) {
           // Replace the component description.
           $available_components[$source]['components'][$component_id]['description'] = $component_data_from_form['description'];
+          $available_components[$source]['components'][$component_id]['detailed_description'] = $component_data_from_form['detailed_description'] ?? $component_data_from_form['description'];
 
           // Replace the props descriptions.
           if (isset($available_components[$source]['components'][$component_id]['props']) && \is_array($available_components[$source]['components'][$component_id]['props'])) {
@@ -140,9 +164,6 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
       '#type' => 'container',
       '#tree' => TRUE,
     ];
-    $form['description'] = [
-      '#markup' => $this->t('Use this form to customize the descriptions of available components, including their props and slots. These descriptions will help the AI better understand and utilize components when building pages.'),
-    ];
 
     foreach ($usable_components as $source => $source_data) {
       $form[$source] = [
@@ -164,10 +185,18 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
         ];
 
         // Component description element.
+        $default_description = $this->getDefaultValue($source, $component_id) ?? $component_data['description'];
         $form[$source]['components'][$component_id]['description'] = [
           '#type' => 'textarea',
           '#title' => $this->t('Description'),
-          '#default_value' => $this->getDefaultValue($source, $component_id) ?? $component_data['description'],
+          '#rows' => 2,
+          '#default_value' => $default_description,
+        ];
+
+        $form[$source]['components'][$component_id]['detailed_description'] = [
+          '#type' => 'textarea',
+          '#title' => $this->t('Detailed Description'),
+          '#default_value' => $this->getDefaultValue($source, $component_id, '', '', 'detailed_description') ?? $default_description,
         ];
 
         // Description elements for each prop.
@@ -244,25 +273,29 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
    *   The id of the prop or slot.
    * @param string $type
    *   The type: 'props' or 'slots'.
+   * @param string $value_key
+   *   The key to read from config. Defaults to 'description' and can be
+   *   overridden for keys like 'detailed_description'.
    *
    * @return string|null
    *   The default description value for the component, prop, or slot.
    */
-  private function getDefaultValue(string $source, string $component_id, string $identifier = '', string $type = ''): ?string {
+  private function getDefaultValue(string $source, string $component_id, string $identifier = '', string $type = '', string $value_key = 'description'): ?string {
     $component_context_decoded = $this->getComponentContextData($source);
     if ($component_context_decoded) {
       if ($type && $identifier) {
         // If type and identifier are provided, return the description for that
         // specific prop or slot.
-        if (isset($component_context_decoded[$component_id][$type][$identifier]['description'])) {
-          return $component_context_decoded[$component_id][$type][$identifier]['description'];
+        if (isset($component_context_decoded[$component_id][$type][$identifier][$value_key])) {
+          return $component_context_decoded[$component_id][$type][$identifier][$value_key];
         }
       }
       else {
+        // For component-level values, use the requested config key.
         // If type and identifier are not provided, return the description for
         // the component.
-        if (isset($component_context_decoded[$component_id]['description'])) {
-          return $component_context_decoded[$component_id]['description'];
+        if (isset($component_context_decoded[$component_id][$value_key])) {
+          return $component_context_decoded[$component_id][$value_key];
         }
       }
     }

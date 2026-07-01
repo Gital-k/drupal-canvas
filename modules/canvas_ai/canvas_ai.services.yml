@@ -18,6 +18,9 @@ services:
     arguments: ['canvas_ai_memory']
   canvas_ai.page_builder_helper:
     class: Drupal\canvas_ai\CanvasAiPageBuilderHelper
+    arguments:
+      $variationCache: '@cache.variation.canvas_ai'
+      $themeHandler: '@theme_handler'
   canvas_ai.tempstore:
     class: Drupal\canvas_ai\CanvasAiTempStore
   canvas_ai.response_validator:
@@ -30,3 +33,7 @@ services:
     arguments:
       - '@config.factory'
   Drupal\canvas_ai\CanvasAiTempStore: '@canvas_ai.tempstore'
+  canvas_ai.component_context_helper:
+    class: Drupal\canvas_ai\CanvasAiComponentContextHelper
+    arguments:
+      - '@canvas_ai.page_builder_helper'
