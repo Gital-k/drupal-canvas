@@ -31,12 +31,13 @@ final class ApiContentExportController extends ApiControllerBase {
   ) {}
 
   /**
-   * Returns a single Canvas page as yaml using default content exporter.
+   * Returns a JSON response containing a Canvas page exported as YAML text.
    */
   public function get(Request $request, Page $canvas_page): CacheableJsonResponse {
     $cacheability = new CacheableMetadata();
     $cacheability->addCacheContexts(['url.query_args:autoSaved']);
     $status = Response::HTTP_OK;
+    $body = [];
     // Determine if we are working with auto-save or published version of the
     // entity.
     $auto_saved = $request->query->getBoolean(self::AUTO_SAVED_QUERY_KEY, default: TRUE);
@@ -67,6 +68,8 @@ final class ApiContentExportController extends ApiControllerBase {
     if ($status === Response::HTTP_OK) {
       $entity_export = $this->exporter->export($canvas_page)->data;
       if (isset($entity_export['components'])) {
+        // Move `components` to a numeric key at the end so the response matches
+        // the expected text-based format for better UX.
         $components = $entity_export['components'];
         unset($entity_export['components']);
         $entity_export[] = $components;

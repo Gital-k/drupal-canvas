@@ -2254,9 +2254,9 @@ paths:
                     type: string
                     example: Cannot find entity to duplicate.
   '/canvas/api/v0/export/content/canvas_page/{entityId}':
-    description: Endpoint for retrieving text-based representation of a page entity using default content export.
     get:
-      summary: Returns a single page entity with client side metadata and default content export in Yaml format.
+      summary: Returns a page entity as a textual representation, with language and timestamp metadata.
+      description: When autoSaved is TRUE (default), the auto-save draft is returned. When FALSE, the published entity is returned.
       parameters:
         - $ref: '#/components/parameters/entityId'
         - in: query
@@ -2278,7 +2278,26 @@ paths:
               schema:
                 type: object
         '404':
-          description: Content entity not found.
+          description: No auto-save item found for the requested entity.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        detail:
+                          type: string
+                          example: No auto-save items for entity 1 found
+                        source:
+                          type: object
+                          properties:
+                            pointer:
+                              type: string
+                              example: canvas_page:1:en
   '/canvas/api/v0/extensions':
     description: Returns the available extensions metadata
     get:

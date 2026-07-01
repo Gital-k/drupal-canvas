@@ -345,7 +345,7 @@ canvas.api.export.content:
       canvas_page:
         type: entity:canvas_page
     _format: 'json'
-  methods: [ GET ]
+  methods: [GET]
 
 # @todo https://www.drupal.org/i/3498525 should generalize this to all eligible content entity types by using a route callback
 canvas.api.content.get:
