@@ -10,6 +10,7 @@ use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Translation\ComponentTreeTranslator;
 use Drupal\canvas\Translation\TranslatableText;
+use Drupal\canvas\Translation\TranslatedText;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 
@@ -18,9 +19,9 @@ use PHPUnit\Framework\Attributes\Group;
  *
  * ComponentTreeTranslator is the Canvas-owned, translation-system-agnostic
  * entry point for translating a component tree: ::extract() returns the
- * translatable strings as TranslatableText value objects keyed by a stable,
- * opaque $id, and ::applyTranslations() writes translations back keyed by those
- * same $ids. This test retrieves the service and exercises both paths —
+ * translatable strings as TranslatableText value objects, and
+ * ::applyTranslations() writes TranslatedText value objects back, matched by
+ * their explicit identity: component instance UUID + prop path. This test retrieves the service and exercises both paths —
  * crucially, with no tmgmt module installed — so that re-coupling it to tmgmt is
  * caught here rather than passing silently under the tmgmt-gated functional
  * tests (ContentWithComponentTreeTmgmtUiTest, ConfigWithComponentTreeTmgmtUiTest),
@@ -32,6 +33,7 @@ use PHPUnit\Framework\Attributes\Group;
  *
  * @see \Drupal\canvas\Translation\ComponentTreeTranslator
  * @see \Drupal\canvas\Translation\TranslatableText
+ * @see \Drupal\canvas\Translation\TranslatedText
  */
 #[CoversClass(ComponentTreeTranslator::class)]
 #[Group('canvas')]
@@ -77,19 +79,26 @@ final class ComponentTreeTranslatorTest extends ContentComponentTreeSymmetricalT
     \assert($translator instanceof ComponentTreeTranslator);
 
     // The translatable string is returned as a TranslatableText value object
-    // keyed by its stable "<uuid>.<dotted-prop-path>" $id.
+    // with explicit identity: component instance UUID + prop path.
     $texts = $translator->extract($field);
 
-    $id = self::STRING_UUID . '.title';
-    self::assertArrayHasKey($id, $texts);
-    $text = $texts[$id];
-    self::assertInstanceOf(TranslatableText::class, $text);
-    self::assertSame($id, $text->id);
+    $title_texts = \array_values(\array_filter(
+      $texts,
+      static fn (TranslatableText $text): bool => $text->propPath === ['title'],
+    ));
+    self::assertCount(1, $title_texts);
+    $text = $title_texts[0];
     self::assertSame(self::STRING_UUID, $text->componentInstanceUuid);
-    self::assertSame(['title'], $text->propPath);
     self::assertSame('Hello', $text->sourceValue);
     self::assertNotSame('', $text->label);
     self::assertNull($text->format);
+
+    // ::createTranslation() copies the identity, so a consumer holding the
+    // extracted object cannot mismatch it.
+    $translated = $text->createTranslation('Bonjour');
+    self::assertSame($text->componentInstanceUuid, $translated->componentInstanceUuid);
+    self::assertSame($text->propPath, $translated->propPath);
+    self::assertSame('Bonjour', $translated->value);
   }
 
   public function testApplyTranslationsWithoutTmgmt(): void {
@@ -113,10 +122,10 @@ final class ComponentTreeTranslatorTest extends ContentComponentTreeSymmetricalT
     \assert($translator instanceof ComponentTreeTranslator);
 
     // Write back translations for a flat leaf (`text`) and a nested leaf
-    // (`href.uri`), keyed by their stable $ids.
+    // (`href.uri`), each a TranslatedText addressing uuid + prop path.
     $translator->applyTranslations($field, [
-      self::CTA_UUID . '.text' => 'Cliquez ici',
-      self::CTA_UUID . '.href.uri' => 'https://fr.drupal.org',
+      new TranslatedText(self::CTA_UUID, ['text'], 'Cliquez ici'),
+      new TranslatedText(self::CTA_UUID, ['href', 'uri'], 'https://fr.drupal.org'),
     ]);
 
     $item = $field->getComponentTreeItemByUuid(self::CTA_UUID);
@@ -128,10 +137,10 @@ final class ComponentTreeTranslatorTest extends ContentComponentTreeSymmetricalT
       'href' => ['uri' => 'https://fr.drupal.org', 'options' => []],
     ], $item->getInputs());
 
-    // An $id whose component instance no longer exists is skipped, leaving the
-    // existing inputs untouched.
+    // A translation whose component instance no longer exists is skipped,
+    // leaving the existing inputs untouched.
     $translator->applyTranslations($field, [
-      'ffffffff-ffff-4fff-8fff-ffffffffffff.text' => 'x',
+      new TranslatedText('ffffffff-ffff-4fff-8fff-ffffffffffff', ['text'], 'x'),
     ]);
     $item = $field->getComponentTreeItemByUuid(self::CTA_UUID);
     self::assertNotNull($item);

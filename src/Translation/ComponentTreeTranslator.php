@@ -16,8 +16,9 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
  * sees Canvas storage internals or any translation system's data structures:
  *
  * - ::extract() returns the translatable strings as TranslatableText value
- *   objects, each with a stable, opaque $id.
- * - ::applyTranslations() writes translations back, keyed by those same $ids.
+ *   objects.
+ * - ::applyTranslations() writes TranslatedText value objects back, matched by
+ *   their explicit identity: component instance UUID + prop path.
  *
  * Identity is the component instance's UUID (not its position), so translations
  * collected against one revision apply correctly to another even if components
@@ -28,6 +29,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
  * stable, tree-wide identity.
  *
  * @see \Drupal\canvas\Translation\TranslatableText
+ * @see \Drupal\canvas\Translation\TranslatedText
  * @see \Drupal\canvas\Translation\ComponentInputsTranslatablesExtractor
  *
  * @internal
@@ -45,8 +47,8 @@ final class ComponentTreeTranslator {
    *   A component tree (a content `component_tree` field, or a config entity's
    *   tree obtained via ComponentTreeEntityInterface::getComponentTree()).
    *
-   * @return array<string, \Drupal\canvas\Translation\TranslatableText>
-   *   Translatable strings keyed by their stable $id.
+   * @return list<\Drupal\canvas\Translation\TranslatableText>
+   *   Translatable strings, in tree order.
    */
   public function extract(ComponentTreeItemList $tree): array {
     $result = [];
@@ -54,10 +56,8 @@ final class ComponentTreeTranslator {
       \assert($item instanceof ComponentTreeItem);
       $uuid = $item->getUuid();
       $mapping = ComponentInputsMapping::forItem($item);
-      foreach ($this->componentInputsTranslatablesExtractor->extractInstance($mapping, $item->getInputs() ?? []) as $dotted_path => $leaf) {
-        $id = $uuid . '.' . $dotted_path;
-        $result[$id] = new TranslatableText(
-          id: $id,
+      foreach ($this->componentInputsTranslatablesExtractor->extractInstance($mapping, $item->getInputs() ?? []) as $leaf) {
+        $result[] = new TranslatableText(
           componentInstanceUuid: $uuid,
           propPath: $leaf['propPath'],
           label: $leaf['label'],
@@ -72,25 +72,24 @@ final class ComponentTreeTranslator {
   /**
    * Writes translations back into a component tree.
    *
-   * An $id whose component instance no longer exists is skipped (e.g. a
+   * A translation whose component instance no longer exists is skipped (e.g. a
    * component deleted after a draft was saved); untranslated inputs of every
    * instance are preserved.
    *
    * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList $tree
    *   The target translation's component tree.
-   * @param array<string, string> $translations
-   *   Translated strings keyed by the $id produced by ::extract().
+   * @param list<\Drupal\canvas\Translation\TranslatedText> $translated_texts
+   *   The translations to write back.
    */
-  public function applyTranslations(ComponentTreeItemList $tree, array $translations): void {
-    // Group by component instance UUID; an $id is "<uuid>.<dotted-prop-path>"
-    // and a UUID contains no '.'.
+  public static function applyTranslations(ComponentTreeItemList $tree, array $translated_texts): void {
     $by_uuid = [];
-    foreach ($translations as $id => $text) {
-      [$uuid, $dotted_path] = \explode('.', (string) $id, 2) + [1 => ''];
-      if ($dotted_path === '') {
+    foreach ($translated_texts as $translated_text) {
+      if ($translated_text->propPath === []) {
         continue;
       }
-      $by_uuid[$uuid][$dotted_path] = $text;
+      // ComponentInputsTranslatablesExtractor::applyToInstance() addresses
+      // leaves by the same dotted prop path its ::extractInstance() emits.
+      $by_uuid[$translated_text->componentInstanceUuid][\implode('.', $translated_text->propPath)] = $translated_text->value;
     }
 
     foreach ($by_uuid as $uuid => $instance_translations) {

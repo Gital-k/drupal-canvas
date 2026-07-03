@@ -10,13 +10,17 @@ namespace Drupal\canvas\Translation;
  * The Canvas-owned, translation-system-agnostic unit of translation: a single
  * author-entered string of a component instance's input, with enough context to
  * translate it well. Consumers (e.g. an editor UI, a machine translator) read
- * the source value plus its metadata, and later submit a translation keyed by
- * $id — which they only ever round-trip, never construct.
+ * the source value plus its metadata, and submit a translation as a
+ * TranslatedText — most easily via ::createTranslation(), which copies the
+ * identity so it cannot be mismatched.
  *
- * $id is stable across structural edits (it is based on the component
- * instance's UUID, not its position), so a translation collected against one
- * revision still lands on the right component instance when applied to another.
+ * Identity is explicit: the component instance's UUID plus the prop path
+ * within its inputs. It is stable across structural edits (a UUID does not
+ * change when components are reordered), so a translation collected against
+ * one revision still lands on the right component instance when applied to
+ * another.
  *
+ * @see \Drupal\canvas\Translation\TranslatedText
  * @see \Drupal\canvas\Translation\ComponentTreeTranslator
  *
  * @internal
@@ -24,10 +28,6 @@ namespace Drupal\canvas\Translation;
 final readonly class TranslatableText {
 
   /**
-   * @param string $id
-   *   Stable, opaque identifier, of the form
-   *   "<component-instance-uuid>.<dotted-prop-path>". Round-trip it back via
-   *   ComponentTreeTranslator::applyTranslations().
    * @param string $componentInstanceUuid
    *   UUID of the component instance this string belongs to.
    * @param array $propPath
@@ -43,12 +43,21 @@ final readonly class TranslatableText {
    *   or NULL for plain text.
    */
   public function __construct(
-    public string $id,
     public string $componentInstanceUuid,
     public array $propPath,
     public string $label,
     public string $sourceValue,
     public ?string $format = NULL,
   ) {}
+
+  /**
+   * Creates the TranslatedText that translates this string.
+   *
+   * @param string $value
+   *   The translated text.
+   */
+  public function createTranslation(string $value): TranslatedText {
+    return new TranslatedText($this->componentInstanceUuid, $this->propPath, $value);
+  }
 
 }
