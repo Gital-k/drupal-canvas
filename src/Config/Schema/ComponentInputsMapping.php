@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Drupal\canvas\Config\Schema;
 
 use Drupal\canvas\Plugin\DataType\ComponentInputs;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Config\Schema\Mapping;
+use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\MapDataDefinition;
 use Drupal\Core\TypedData\TypedDataInterface;
@@ -54,6 +56,59 @@ final class ComponentInputsMapping extends Mapping {
     $definition['mapping'] = ComponentInputs::resolveConfigSchemaMapping($component_id, $component_version, $actual_inputs ?? []);
 
     parent::__construct($definition, $name, $parent);
+  }
+
+  /**
+   * Gets a ComponentTreeItem's `inputs` property as equivalent Typed Config.
+   *
+   * Note: This is the inverse of what happens during validation: then Typed
+   * Config is converted to ComponentTreeItem (content entity field) object
+   * representations. It happens to be that configuration schema has more
+   * translatability metadata, so for translation purposes, it's the other way
+   * around.
+   *
+   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem $item
+   *   A component instance.
+   *
+   * @return self
+   *   The Typed Config representation of the component instance's `inputs`.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\ConfigComponentTreeTrait::conjureFieldItemObject()
+   */
+  public static function forItem(ComponentTreeItem $item): self {
+    // TRICKY: this cannot use constructor injection because Typed Config
+    // objects are instantiated by the Typed Config manager.
+    $typed_config_manager = \Drupal::service('config.typed');
+    \assert($typed_config_manager instanceof TypedConfigManagerInterface);
+
+    $values = $item->getValue();
+    // Content fields store `inputs` as a JSON string; config-defined component
+    // trees provide it already decoded. Tolerate both.
+    if (\is_string($values['inputs'])) {
+      $values['inputs'] = \json_decode($values['inputs'], TRUE, flags: \JSON_THROW_ON_ERROR);
+    }
+    $parent_definition = [
+      'type' => 'canvas.component_tree_node',
+    ];
+    $name = (string) $item->getName();
+    $field_value = $typed_config_manager->create(
+      $typed_config_manager->buildDataDefinition($parent_definition, $values, $name),
+      $values,
+      $name,
+    );
+    $definition = [
+      'type' => 'mapping',
+      'class' => self::class,
+      'label' => 'Input values for each component instance in the component tree',
+    ];
+    $inputs = $item->getInputs();
+    /** @var self */
+    return $typed_config_manager->create(
+      $typed_config_manager->buildDataDefinition($definition, $inputs, 'inputs', $field_value),
+      $inputs,
+      'inputs',
+      $field_value,
+    );
   }
 
 }

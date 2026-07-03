@@ -9,7 +9,6 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\Schema\Mapping;
 use Drupal\Core\Config\Schema\Sequence;
@@ -169,54 +168,6 @@ final class ComponentInputsTranslatablesExtractor {
     );
     // Write only non-NULL (preserve FALSE, 0, '', []).
     return \array_filter($inputs_in_schema_order, static fn($v) => $v !== NULL);
-  }
-
-  /**
-   * Gets a ComponentTreeItem's `inputs` property as equivalent Typed Config.
-   *
-   * Note: This is the inverse of what happens during validation: then Typed
-   * Config is converted to ComponentTreeItem (content entity field) object
-   * representations. It happens to be that configuration schema has more
-   * translatability metadata, so for translation purposes, it's the other way
-   * around.
-   *
-   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem $item
-   *   A component instance.
-   *
-   * @return \Drupal\canvas\Config\Schema\ComponentInputsMapping
-   *   The Typed Config representation of the component instance's `inputs`.
-   *
-   * @see \Drupal\canvas\Plugin\Validation\Constraint\ConfigComponentTreeTrait::conjureFieldItemObject()
-   */
-  public function mappingForItem(ComponentTreeItem $item): ComponentInputsMapping {
-    $values = $item->getValue();
-    // Content fields store `inputs` as a JSON string; config-defined component
-    // trees provide it already decoded. Tolerate both.
-    if (\is_string($values['inputs'])) {
-      $values['inputs'] = \json_decode($values['inputs'], TRUE, flags: \JSON_THROW_ON_ERROR);
-    }
-    $parent_definition = [
-      'type' => 'canvas.component_tree_node',
-    ];
-    $name = (string) $item->getName();
-    $field_value = $this->typedConfigManager->create(
-      $this->typedConfigManager->buildDataDefinition($parent_definition, $values, $name),
-      $values,
-      $name,
-    );
-    $definition = [
-      'type' => 'mapping',
-      'class' => ComponentInputsMapping::class,
-      'label' => 'Input values for each component instance in the component tree',
-    ];
-    $inputs = $item->getInputs();
-    /** @var \Drupal\canvas\Config\Schema\ComponentInputsMapping */
-    return $this->typedConfigManager->create(
-      $this->typedConfigManager->buildDataDefinition($definition, $inputs, 'inputs', $field_value),
-      $inputs,
-      'inputs',
-      $field_value,
-    );
   }
 
   /**

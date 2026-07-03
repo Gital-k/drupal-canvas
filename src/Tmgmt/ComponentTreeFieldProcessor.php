@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Tmgmt;
 
+use Drupal\canvas\Config\Schema\ComponentInputsMapping;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Translation\ComponentInputsTranslatablesExtractor;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
@@ -49,7 +50,7 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
     $data = ['#label' => $field->getFieldDefinition()->getLabel()];
     foreach ($field as $delta => $item) {
       \assert($item instanceof ComponentTreeItem);
-      $mapping = $this->extractor->mappingForItem($item);
+      $mapping = ComponentInputsMapping::forItem($item);
       $data[$delta] = TmgmtComponentTreeData::encode($this->extractor->extractInstance($mapping, $item->getInputs() ?? []));
     }
     return $data;
@@ -69,7 +70,7 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
       if (!$translations) {
         continue;
       }
-      $mapping = $this->extractor->mappingForItem($item);
+      $mapping = ComponentInputsMapping::forItem($item);
       $item->setInput(ComponentInputsTranslatablesExtractor::applyToInstance($item->getInputs() ?? [], $translations, $mapping));
     }
   }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Translation;
 
+use Drupal\canvas\Config\Schema\ComponentInputsMapping;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 
@@ -52,7 +53,7 @@ final class ComponentTreeTranslator {
     foreach ($tree as $item) {
       \assert($item instanceof ComponentTreeItem);
       $uuid = $item->getUuid();
-      $mapping = $this->componentInputsTranslatablesExtractor->mappingForItem($item);
+      $mapping = ComponentInputsMapping::forItem($item);
       foreach ($this->componentInputsTranslatablesExtractor->extractInstance($mapping, $item->getInputs() ?? []) as $dotted_path => $leaf) {
         $id = $uuid . '.' . $dotted_path;
         $result[$id] = new TranslatableText(
@@ -97,7 +98,7 @@ final class ComponentTreeTranslator {
       if ($item === NULL) {
         continue;
       }
-      $mapping = $this->componentInputsTranslatablesExtractor->mappingForItem($item);
+      $mapping = ComponentInputsMapping::forItem($item);
       $item->setInput(ComponentInputsTranslatablesExtractor::applyToInstance(
         $item->getInputs() ?? [],
         $instance_translations,
