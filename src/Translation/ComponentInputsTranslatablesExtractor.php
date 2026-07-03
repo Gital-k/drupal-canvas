@@ -221,8 +221,8 @@ final class ComponentInputsTranslatablesExtractor {
       // A single stored property collapses to a scalar value. Decide whether it
       // is translatable with the SAME rule the config schema generator uses —
       // derived from this component *version's* stored prop field definitions,
-      // not the live implementation — so TMGMT never offers an input the
-      // generated config schema would reject on save (and vice versa). A
+      // not the live implementation — so no consumer is ever offered an input
+      // the generated config schema would reject on save (and vice versa). A
       // single-stored-property field reachable by a translatable shape is
       // always a plain string — rich text (value+format) and URI-esque strings
       // (link: uri+title+options) are multi-property field types — hence the
@@ -328,13 +328,13 @@ final class ComponentInputsTranslatablesExtractor {
    * the concrete `type: mapping` generated from a
    * JsonSchemaPropsComponentSource AND for the raw ComponentInputsMapping
    * handled by the fallback paths in
-   * ::extractTranslatables() (a Component that fails to load, or whose source
+   * ::extractInstance() (a Component that fails to load, or whose source
    * is not a JsonSchemaPropsComponentSourceBase, e.g. a block). In both cases
-   * an empty but translatable input must still be offered for translation via
-   * the `∅` placeholder: a value can legitimately be empty in the source
+   * an empty but translatable input must still be offered for translation with
+   * an empty source value: a value can legitimately be empty in the source
    * language yet translated to a non-empty value in the target language.
    *
-   * @see ::extractTranslatables()
+   * @see ::extractInstance()
    */
   private static function isDirectInputProp(TypedConfigInterface $schema): bool {
     return $schema->getParent()?->getDataDefinition()->getDataType() === 'canvas.component_tree_node';
