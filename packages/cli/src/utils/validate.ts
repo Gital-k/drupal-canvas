@@ -1,10 +1,7 @@
 import path from 'path';
 import { basename } from 'path/win32';
 import { ESLint } from 'eslint';
-import {
-  required as drupalCanvasRequired,
-  requiredDeprecated as drupalCanvasRequiredDeprecated,
-} from '@drupal-canvas/eslint-config';
+import { required as drupalCanvasRequired } from '@drupal-canvas/eslint-config';
 
 import {
   findMetadataPath,
@@ -12,20 +9,24 @@ import {
 } from './process-component-files';
 import { validateContentEntityReferencePropExpressions } from './validate-content-entity-reference';
 
+import type { DiscoveredComponent } from '@drupal-canvas/discovery';
 import type { Result } from '../types/Result';
 import type { ContentEntityReferenceValidationApi } from './validate-content-entity-reference';
+
+export function getComponentDirectoriesToValidate(
+  components: DiscoveredComponent[],
+): string[] {
+  return [...new Set(components.map((component) => component.directory))];
+}
 
 export async function validateComponent(
   componentDir: string,
   fix: boolean = false,
-  deprecated?: boolean,
   apiService?: ContentEntityReferenceValidationApi,
 ): Promise<Result> {
   const eslint = new ESLint({
     overrideConfigFile: true,
-    overrideConfig: deprecated
-      ? drupalCanvasRequiredDeprecated
-      : drupalCanvasRequired,
+    overrideConfig: drupalCanvasRequired,
     fix,
   });
   const eslintResults = await eslint.lintFiles(componentDir + '/**/*');

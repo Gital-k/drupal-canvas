@@ -9,6 +9,7 @@ use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ClientDataToEntityConverter;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentTreeConfigEntityBase;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\PageRegion;
@@ -22,12 +23,14 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Render\Markup;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
+use Drupal\language\ConfigurableLanguageManagerInterface;
 use GuzzleHttp\Psr7\Query;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -59,6 +62,8 @@ final class ApiLayoutController {
     private readonly ComponentTreeLoader $componentTreeLoader,
     private readonly ComponentSourceManager $componentSourceManager,
     private readonly ModuleHandlerInterface $moduleHandler,
+    private readonly LanguageManagerInterface $languageManager,
+    private readonly AccountProxyInterface $currentUser,
   ) {
     $theme = $this->themeManager->getActiveTheme()->getName();
     $theme_regions = system_region_list($theme);
@@ -90,7 +95,13 @@ final class ApiLayoutController {
 
     // Store the original entity for comparison purposes.
     $original_entity = $entity;
-    $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($entity);
+    // For content entities, reconstruct the draft with every pending
+    // translation overlaid: previewing one translation reconciles and re-saves
+    // all of them (symmetric component-tree columns must stay in sync), so a
+    // sibling translation's draft must be present or it would be clobbered.
+    $autoSaveData = $entity instanceof ContentEntityInterface
+      ? $this->autoSaveManager->getAutoSaveEntityForPreview($entity)
+      : $this->autoSaveManager->getAutoSaveEntity($entity);
     if (!$autoSaveData->isEmpty()) {
       $entity = $autoSaveData->entity;
       \assert($entity instanceof ContentEntityInterface || $entity instanceof ContentTemplate);
@@ -136,14 +147,11 @@ final class ApiLayoutController {
     ];
     $available_translations = [];
     $links = [];
-    // ContentTemplate is a config entity with no translations of its own, so
-    // fall back to $preview_entity which holds the translatable content.
-    $translation_entity = $entity instanceof ContentEntityInterface ? $entity : $preview_entity;
-    if ($translation_entity instanceof ContentEntityInterface) {
-      $available_translations = \array_keys($translation_entity->getTranslationLanguages(FALSE));
+    if ($entity instanceof ContentEntityInterface) {
+      $available_translations = \array_keys($entity->getTranslationLanguages(FALSE));
       if ($this->moduleHandler->moduleExists('content_translation')) {
         foreach ($available_translations as $langcode) {
-          $translation = $translation_entity->getTranslation($langcode);
+          $translation = $entity->getTranslation($langcode);
           // The delete route gates on update access, so emit the link to the
           // same users to avoid offering a link that would return 403.
           // @see canvas.api.content.translation.delete in canvas.routing.yml
@@ -151,7 +159,7 @@ final class ApiLayoutController {
             $links[$langcode] = [
               CanvasUriDefinitions::LINK_REL_DELETE => Url::fromRoute(
                 'canvas.api.content.translation.delete',
-                ['canvas_page' => $translation_entity->id()],
+                ['canvas_page' => $entity->id()],
                 ['language' => $translation->language()],
               )->toString(),
             ];
@@ -159,9 +167,38 @@ final class ApiLayoutController {
         }
       }
     }
+    // Also collect languages that have config language overrides for the
+    // ContentTemplate.
+    if ($entity instanceof ContentTemplate
+      && $this->moduleHandler->moduleExists('config_translation')
+      && $this->languageManager instanceof ConfigurableLanguageManagerInterface) {
+      $config_name = $entity->getConfigDependencyName();
+      foreach ($this->languageManager->getLanguages() as $langcode => $language) {
+        if ($language->isDefault() || \in_array($langcode, $available_translations, TRUE)) {
+          continue;
+        }
+        $override = $this->languageManager->getLanguageConfigOverride($langcode, $config_name);
+        if (!$override->isNew()) {
+          $available_translations[] = $langcode;
+          if (!isset($links[$langcode]) && $this->currentUser->hasPermission('translate configuration')) {
+            $delete_url = Url::fromRoute(
+              'canvas.api.config.translation.delete',
+              [
+                'canvas_config_entity_type_id' => 'content_template',
+                'config_entity' => $entity->id(),
+              ],
+              ['language' => $language],
+            );
+            $links[$langcode] = [
+              CanvasUriDefinitions::LINK_REL_DELETE => $delete_url->toString(),
+            ];
+          }
+        }
+      }
+    }
     // The client should also list the default language.
-    $default_langcode = $translation_entity instanceof ContentEntityInterface
-      ? $translation_entity->getUntranslated()->language()->getId()
+    $default_langcode = $entity instanceof ContentEntityInterface
+      ? $entity->getUntranslated()->language()->getId()
       : $entity->language()->getId();
     array_unshift($available_translations, $default_langcode);
     $data['translations'] = [
@@ -196,11 +233,39 @@ final class ApiLayoutController {
       if ($wasModified) {
         $entity = $items->getParent()?->getValue();
         \assert($entity instanceof ComponentTreeEntityInterface || $entity instanceof FieldableEntityInterface);
+        // Capture reconciled staged overrides BEFORE setComponentTree() calls
+        // set(), which clears the $stagedOverrides cache. If captured after,
+        // getTranslation() would re-create from the live LanguageConfigOverride
+        // (still containing removed props), discarding the reconciliation.
+        $configTranslationsToSave = $entity instanceof ComponentTreeConfigEntityBase
+          ? \array_values(\array_map(
+            fn($language) => $entity->getTranslation($language->getId()),
+            $entity->getTranslationLanguages(include_default: FALSE),
+          ))
+          : [];
         if ($entity instanceof ComponentTreeEntityInterface) {
           // @todo https://www.drupal.org/i/3498525 should generalize this to all eligible content entity types (aka FieldableEntityInterface)
           $entity->setComponentTree($items->getValue());
         }
-        $this->autoSaveManager->saveEntity($entity);
+        // This called ::updateComponentInstances(), that means all symmetrical
+        // translations (for content or config entities) have had their
+        // component instances updated, too. They must remain in sync, so also
+        // save the updated translations.
+        // @see ADR #13, decision 4: propagation is in-memory only.
+        $this->autoSaveManager->saveEntity($entity instanceof ContentEntityInterface
+          // For content entities $entity may be a non-default translation.
+          ? $entity->getUntranslated()
+          // For config entities, $entity is always the default translation.
+          : $entity
+        );
+        if ($entity instanceof ContentEntityInterface) {
+          foreach ($entity->getTranslationLanguages(include_default: FALSE) as $language) {
+            $this->autoSaveManager->saveEntity($entity->getTranslation($language->getId()));
+          }
+        }
+        foreach ($configTranslationsToSave as $stagedOverride) {
+          $this->autoSaveManager->saveEntity($stagedOverride);
+        }
       }
 
       $built = $items->getClientSideRepresentation($preview_entity);
@@ -620,20 +685,6 @@ final class ApiLayoutController {
       if (!$autoSaveData->isEmpty()) {
         \assert($autoSaveData->entity instanceof $stored_entity);
         $stored_entity = $autoSaveData->entity;
-        // AutoSaveManager::getAutoSaveEntity calls ::create which makes the
-        // entity appear new. There are some form widgets that check if the
-        // entity is new when constructing their form element. The auto-save
-        // entity is never new so we enforce that to avoid issues with form
-        // widgets.
-        // @see \Drupal\path\Plugin\Field\FieldWidget\PathWidget::formElement
-        $stored_entity->enforceIsNew(FALSE);
-        // We also need to record the loaded revision ID as the auto-save
-        // manager does not do this for us and some widgets make use of this
-        // information to load a particular revision.
-        // @see \Drupal\content_moderation\Plugin\Field\FieldWidget\ModerationStateWidget::formElement
-        if ($stored_entity instanceof RevisionableInterface) {
-          $stored_entity->updateLoadedRevisionId();
-        }
       }
       // If keys are specified, use those (e.g. client-side IDs), otherwise re-
       // key by entity ID.

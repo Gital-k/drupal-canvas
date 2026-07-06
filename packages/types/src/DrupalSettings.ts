@@ -49,6 +49,9 @@ export interface DrupalSettings {
     selectedComponent: string;
     devMode: boolean;
     devTranslationMode: boolean;
+    devEntityReferenceMode: boolean;
+    // @todo Remove the use of 'canvas_dev_cd' flag in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+    devConflictDetectionMode: boolean;
     contentTranslationEnabled: boolean;
     configTranslationEnabled: boolean;
     languages: Language[];

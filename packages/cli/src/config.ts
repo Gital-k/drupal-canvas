@@ -87,7 +87,6 @@ export interface Config {
   includeContentTemplates: boolean;
   includeRegions: boolean;
   includeBrandKit: boolean;
-  all?: boolean;
   // The following properties are loaded from canvas.config.json.
   aliasBaseDir: string;
   outputDir: string;
@@ -95,16 +94,15 @@ export interface Config {
   pagesDir: string;
   contentTemplatesDir: string;
   regionsDir: string;
-  deprecatedComponentDir: string;
   globalCssPath: string;
   layoutPath: string;
   fonts?: FontsConfig;
 }
 
-/** Filename for Brand Kit (font) configuration in the project root. */
+/** Filename for brand kit (font) configuration in the project root. */
 export const BRAND_KIT_CONFIG_FILENAME = 'canvas.brand-kit.json';
 
-/** Global Brand Kit id used by the CLI for font sync (single site-wide kit). */
+/** Global brand kit id used by the CLI for font sync (single site-wide kit). */
 export const BRAND_KIT_GLOBAL_ID = 'global';
 
 /** Top-level shape of canvas.brand-kit.json (fonts and future brand kit keys). */
@@ -145,7 +143,6 @@ const {
   pagesDir,
   contentTemplatesDir,
   regionsDir,
-  deprecatedComponentDir,
   globalCssPath,
   layoutPath,
   sync,
@@ -265,8 +262,6 @@ let config: Config = {
   pagesDir: pagesDir,
   contentTemplatesDir: contentTemplatesDir,
   regionsDir: regionsDir,
-  // We need this because the old commands use './components' as a default.
-  deprecatedComponentDir: deprecatedComponentDir,
   globalCssPath: globalCssPath,
   layoutPath: layoutPath,
   fonts: loadFontsFromBrandKitFile(process.cwd()),
@@ -520,7 +515,6 @@ export async function handleLegacyComponentDirMigration(
     // Preserve behavior for the current run.
     setConfig({
       componentDir: legacyComponentDir,
-      deprecatedComponentDir: legacyComponentDir,
     });
   }
 

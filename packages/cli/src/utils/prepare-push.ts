@@ -6,13 +6,12 @@ import * as p from '@clack/prompts';
 import { getImportsFromAst } from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
 
 import { getGlobalCss } from './build-tailwind.js';
-import { pluralizeComponent } from './command-helpers';
 import { sortByDependencies } from './dependency-sort';
 import { createProgressCallback, processInPool } from './request-pool';
 import { fileExists } from './utils';
 
 import type { ApiService } from '../services/api.js';
-import type { Component } from '../types/Component.js';
+import type { AssetLibrary, Component } from '../types/Component.js';
 import type { Result } from '../types/Result.js';
 
 type ComponentOperation = 'create' | 'update' | 'delete';
@@ -45,6 +44,12 @@ interface BuiltComponentForPush {
   componentName: string;
   componentPayload: Component;
   importedJsComponents: string[];
+}
+
+interface PushProgressSpinner {
+  start: (message?: string) => void;
+  stop: (message?: string) => void;
+  message: (message?: string) => void;
 }
 
 /**
@@ -100,7 +105,7 @@ async function buildComponentUploadTasks(
         });
         importedJsComponents = getImportsFromAst(ast, '@/components/');
       } catch (error) {
-        p.note(chalk.red(`Error: ${error}`));
+        p.log.error(chalk.red(`Error: ${String(error)}`));
       }
       tasks.push({
         machineName: name,
@@ -296,9 +301,11 @@ export async function pushBuiltComponents(
   builtComponents: BuiltComponentForPush[],
   apiService: ApiService,
   actionLabel: string = 'Uploading',
+  activeSpinner?: PushProgressSpinner,
 ): Promise<Result[]> {
   const results: Result[] = [];
-  const spinner = p.spinner();
+  const spinner = activeSpinner ?? p.spinner();
+  const spinnerStarted = activeSpinner !== undefined;
 
   if (builtComponents.length === 0) {
     return results;
@@ -322,12 +329,22 @@ export async function pushBuiltComponents(
     preparedByName.size,
   );
 
-  spinner.start('Checking component operations');
-  const uploadTasks = await buildComponentUploadTasks(
-    preparedByName,
-    apiService,
-    existenceProgress,
-  );
+  if (spinnerStarted) {
+    spinner.message('Checking component operations');
+  } else {
+    spinner.start('Checking component operations');
+  }
+  let uploadTasks: ComponentUploadTask[];
+  try {
+    uploadTasks = await buildComponentUploadTasks(
+      preparedByName,
+      apiService,
+      existenceProgress,
+    );
+  } catch (error) {
+    spinner.stop('Component operation check failed', 2);
+    throw error;
+  }
 
   const uploadProgress = createProgressCallback(
     spinner,
@@ -341,30 +358,6 @@ export async function pushBuiltComponents(
     apiService,
     uploadProgress,
   );
-
-  const failedUploads = uploadResults
-    .map((uploadResult) => {
-      if (uploadResult.success) {
-        return null;
-      }
-      const componentName =
-        builtComponents.find((component) => {
-          return component.machineName === uploadResult.machineName;
-        })?.componentName ||
-        uploadResult.machineName ||
-        'unknown';
-      const message =
-        uploadResult.error?.message?.trim() || 'Unknown upload error';
-      return `${componentName} (${message})`;
-    })
-    .filter((value): value is string => Boolean(value));
-
-  if (failedUploads.length > 0) {
-    spinner.stop(chalk.red('Component upload failed'));
-    throw new Error(
-      `Component upload failed for ${failedUploads.length} ${pluralizeComponent(failedUploads.length)}: ${failedUploads.join(', ')}`,
-    );
-  }
 
   const operationLabels: Record<ComponentOperation, string> = {
     create: 'Created',
@@ -388,21 +381,20 @@ export async function pushBuiltComponents(
     });
   }
 
-  spinner.stop(
-    chalk.green(
-      `Processed ${results.length} ${pluralizeComponent(results.length)}`,
-    ),
-  );
+  const hasFailures = results.some((result) => !result.success);
+  spinner.stop('Pushed components', hasFailures ? 2 : 0);
   return results;
 }
 
 /**
- * Upload the global asset library (CSS/JS) to Drupal.
+ * Prepare the global asset library (CSS/JS) update for Drupal.
  */
-export async function uploadGlobalAssetLibrary(
-  apiService: ApiService,
+export async function prepareGlobalAssetLibraryUpdate(
   outputDir: string,
-): Promise<Result> {
+): Promise<{
+  result: Result;
+  assetLibrary?: Partial<AssetLibrary>;
+}> {
   try {
     const globalCompiledCssPath = path.join(outputDir, 'index.css');
     const globalCompiledCssExists = await fileExists(globalCompiledCssPath);
@@ -416,24 +408,63 @@ export async function uploadGlobalAssetLibrary(
         'utf-8',
       );
       const originalCss = await getGlobalCss();
-      await apiService.updateGlobalAssetLibrary({
-        css: { original: originalCss, compiled: globalCompiledCss },
-        js: { original: classNameCandidateIndexFile, compiled: '' },
-      });
-      return { success: true, itemName: 'Global CSS' };
+      return {
+        result: {
+          success: true,
+          itemName: 'Global CSS (Tailwind CSS build)',
+          details: [{ content: 'Pushed' }],
+        },
+        assetLibrary: {
+          css: { original: originalCss, compiled: globalCompiledCss },
+          js: { original: classNameCandidateIndexFile, compiled: '' },
+        },
+      };
     }
     return {
-      success: false,
-      itemName: 'Global CSS',
-      details: [
-        { content: `Global CSS file not found at ${globalCompiledCssPath}.` },
-      ],
+      result: {
+        success: false,
+        itemName: 'Global CSS (Tailwind CSS build)',
+        details: [
+          {
+            content: `Compiled Tailwind CSS file not found at ${globalCompiledCssPath}.`,
+          },
+        ],
+      },
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return {
+      result: {
+        success: false,
+        itemName: 'Global CSS (Tailwind CSS build)',
+        details: [{ content: errorMessage }],
+      },
+    };
+  }
+}
+
+/**
+ * Upload the global asset library (CSS/JS) to Drupal.
+ */
+export async function uploadGlobalAssetLibrary(
+  apiService: ApiService,
+  outputDir: string,
+): Promise<Result> {
+  const { result, assetLibrary } =
+    await prepareGlobalAssetLibraryUpdate(outputDir);
+
+  if (!result.success || !assetLibrary) {
+    return result;
+  }
+
+  try {
+    await apiService.updateGlobalAssetLibrary(assetLibrary);
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
       success: false,
-      itemName: 'Global CSS',
+      itemName: 'Global CSS (Tailwind CSS build)',
       details: [{ content: errorMessage }],
     };
   }

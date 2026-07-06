@@ -216,6 +216,37 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Memoizes the reconstructed auto-save entity without serializing it.
+   *
+   * Repeated reads returning the same object instance proves no serialize /
+   * unserialize round-trip happens (which would recompute computed fields like
+   * metatag's and recurse).
+   *
+   * @see \Drupal\canvas\AutoSave\AutoSaveManager::getAutoSaveEntity()
+   */
+  public function testGetAutoSaveEntityCachesWithoutSerialization(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $page = Page::create([
+      'title' => 'Original title',
+      'components' => [],
+    ]);
+    self::assertSame(SAVED_NEW, $page->save());
+
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    \assert($autoSave instanceof AutoSaveManager);
+    $page->set('title', 'Changed title');
+    $autoSave->saveEntity($page);
+
+    $first = $autoSave->getAutoSaveEntity($page);
+    self::assertFalse($first->isEmpty());
+    $second = $autoSave->getAutoSaveEntity($page);
+    self::assertSame($first, $second);
+    self::assertSame($first->entity, $second->entity);
+  }
+
+  /**
    * Tests that auto-saves for different Page translations are stored independently.
    *
    * Verifies that:
@@ -306,6 +337,24 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     $auto_save_manager->delete($page_fr);
 
     // Verify all auto-saves are gone.
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+    self::assertEmpty($auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE));
+
+    // Recreate an auto-save for each translation, then delete the entity. The
+    // hook_entity_delete implementation must cascade and discard every
+    // translation's auto-save, not just the default translation's, so no
+    // orphaned sibling draft is left behind.
+    // @see \Drupal\canvas\Hook\AutoSaveHooks::entityDelete()
+    // @see \Drupal\Tests\canvas\Kernel\ComponentSource\ConfigEntitySymmetricalTranslationPropagationTestBase::testEntityDeleteDiscardsStagedOverrides()
+    $page_en->set('title', 'Modified English title again');
+    $auto_save_manager->saveEntity($page_en);
+    $page_fr->set('title', 'Titre français à nouveau');
+    $auto_save_manager->saveEntity($page_fr);
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+
+    $page_en->delete();
     self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
     self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
     self::assertEmpty($auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE));

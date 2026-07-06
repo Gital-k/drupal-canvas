@@ -21,6 +21,7 @@ canvascanvas
 canvasrc
 canvasstark
 Carden
+cardwithslot
 Cdiv
 cebe
 Clurichaun
@@ -57,6 +58,7 @@ extensionless
 fieldtext
 fvar
 folderfy
+FrankenPHP
 gerbeaud
 gesturechange
 gestureend
@@ -127,6 +129,7 @@ redoable
 redocly
 refetched
 reduxjs
+reimplementation
 renderify
 reparse
 reparsed
@@ -143,9 +146,11 @@ serp
 SERP
 shadcn
 shipmonk
+skypack
 slnt
 sonner
 sparkline
+STACKLIMIT
 Starshot
 subcontent
 subroute
@@ -178,6 +183,7 @@ unstub
 untampered
 unvalidatable
 unvalidated
+updb
 upserting
 upserts
 useswr

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Traits;
 
-// cspell:ignore Bienvenue savoir Identité visuelle Gitane Découvrez
+// cspell:ignore Bienvenue savoir Identité visuelle Gitane Découvrez Charte graphique
 
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputTranslatability;
 
@@ -25,6 +25,11 @@ use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputTranslatability;
  * - link field with uri + options (my-cta href)
  * - rich prose: value + format (banner text)
  * - non-translatable boolean props (branding block)
+ * - untranslatable prop shapes (untranslatable-prop-shapes): `date`,
+ *   `email`, `integer` and `boolean`. No prop shape is translatable, so none
+ *   is offered for translation — locking in that the TMGMT extractor and the
+ *   config schema generator agree (only plain/rich prose and URI-esque strings
+ *   are translatable).
  *
  * @see \Drupal\Tests\canvas\Functional\ConfigWithComponentTreeTranslationTestBase
  * @see \Drupal\Tests\canvas\Functional\ContentWithComponentTreeTmgmtUiTest
@@ -64,6 +69,27 @@ trait ComponentTreeWithAllSymmetricalTranslationEdgeCasesTrait {
   protected const UUID_BLOCK_DEEP_TRANSLATABLE = 'ffffffff-ffff-6fff-8fff-ffffffffffff';
 
   /**
+   * UUID: block component with an empty translatable input. Delta: 6.
+   *
+   * The branding block's only translatable input (`label`) is present but empty
+   * in the default translation. A translatable input that is empty in the
+   * source language must still be offered for translation (it may be given a
+   * value in the target language) rather than crash extraction.
+   *
+   * @see https://git.drupalcode.org/project/canvas/-/issues/3591734
+   */
+  protected const UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT = '0a0a0a0a-0a0a-40a0-80a0-0a0a0a0a0a0a';
+
+  /**
+   * UUID: untranslatable-prop-shapes component. Delta: 7.
+   *
+   * None of its prop shapes is translatable, so none is offered for
+   * translation: `date` (datetime field, date-only), `email`, `count`
+   * (integer) and `flag` (boolean).
+   */
+  protected const UUID_UNTRANSLATABLE_PROP_SHAPES = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+  /**
    * Delta of each component in the component tree, keyed by UUID constant name.
    *
    * Tmgmt_content uses delta-based field keys in its TMGMT review form
@@ -79,6 +105,8 @@ trait ComponentTreeWithAllSymmetricalTranslationEdgeCasesTrait {
     self::UUID_BANNER => 3,
     self::UUID_BRANDING => 4,
     self::UUID_BLOCK_DEEP_TRANSLATABLE => 5,
+    self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT => 6,
+    self::UUID_UNTRANSLATABLE_PROP_SHAPES => 7,
   ];
 
   /**
@@ -146,16 +174,33 @@ trait ComponentTreeWithAllSymmetricalTranslationEdgeCasesTrait {
       ],
       self::UUID_BRANDING => [
         'label' => 'Identité visuelle',
-        'label_display' => 'visible',
+        'label_display' => '0',
         'use_site_logo' => TRUE,
         'use_site_name' => TRUE,
         'use_site_slogan' => FALSE,
       ],
       self::UUID_BLOCK_DEEP_TRANSLATABLE => [
         'label' => 'fr: Canvas Test Block for testing input translatability',
-        'label_display' => 'visible',
+        'label_display' => '0',
         'top_level_translatable_regardless_of_type' => CanvasTestBlockInputTranslatability::DEFAULT_CONFIGURATION['top_level_translatable_regardless_of_type'],
         'deeply_nested_translatable' => [0 => ['foo' => 'Huh?', 'bar' => 'fr: Gitane']],
+      ],
+      // `name` is empty in the source but translated to a real value in French,
+      // proving an empty-source translatable input is offered and can receive a
+      // target-language value.
+      self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT => [
+        'label' => 'fr: Test block with settings',
+        'label_display' => '0',
+        'name' => 'Charte graphique',
+      ],
+      // The untranslatable-prop-shapes component: no prop shape is
+      // translatable. `date` (datetime field, date-only), `email`, `count`
+      // (integer) and `flag` (boolean) all keep their source values.
+      self::UUID_UNTRANSLATABLE_PROP_SHAPES => [
+        'date' => '2024-01-15',
+        'email' => 'person@example.com',
+        'count' => 42,
+        'flag' => TRUE,
       ],
     ];
     if ($expect_overrides_only) {
@@ -172,6 +217,11 @@ trait ComponentTreeWithAllSymmetricalTranslationEdgeCasesTrait {
       unset($result[self::UUID_BLOCK_DEEP_TRANSLATABLE]['label_display']);
       unset($result[self::UUID_BLOCK_DEEP_TRANSLATABLE]['top_level_translatable_regardless_of_type']);
       unset($result[self::UUID_BLOCK_DEEP_TRANSLATABLE]['deeply_nested_translatable'][0]['foo']);
+      // Keep only the translatable `label` and `name`.
+      unset($result[self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT]['label_display']);
+      // No prop shape is translatable, so the override holds nothing for this
+      // component instance.
+      unset($result[self::UUID_UNTRANSLATABLE_PROP_SHAPES]);
     }
     return $result;
   }
@@ -243,8 +293,12 @@ trait ComponentTreeWithAllSymmetricalTranslationEdgeCasesTrait {
         'component_id' => 'block.system_branding_block',
         'component_version' => '::ACTIVE_VERSION_IN_SUT::',
         'inputs' => [
-          'label' => 'Branding',
-          'label_display' => 'visible',
+          // ⚠️ `label`/`label_display` are not editable for blocks in Canvas, so
+          // they are empty/hidden. The empty `label` is still offered for
+          // translation (empty source → `∅` placeholder).
+          // @todo `label` should only be offered for translation when `label_display` is 'visible', once `label` becomes editable for blocks; refine in https://www.drupal.org/project/canvas/issues/3572850
+          'label' => '',
+          'label_display' => '0',
           'use_site_logo' => TRUE,
           'use_site_name' => TRUE,
           'use_site_slogan' => FALSE,
@@ -255,9 +309,35 @@ trait ComponentTreeWithAllSymmetricalTranslationEdgeCasesTrait {
         'component_id' => 'block.' . CanvasTestBlockInputTranslatability::PLUGIN_ID,
         'component_version' => '::ACTIVE_VERSION_IN_SUT::',
         'inputs' => [
-          'label' => 'Canvas Test Block for testing input translatability',
-          'label_display' => 'visible',
+          'label' => '',
+          'label_display' => '0',
           ...CanvasTestBlockInputTranslatability::DEFAULT_CONFIGURATION,
+        ],
+      ],
+      [
+        'uuid' => self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT,
+        'component_id' => 'block.canvas_test_block_input_validatable',
+        'component_version' => '::ACTIVE_VERSION_IN_SUT::',
+        'inputs' => [
+          'label' => '',
+          'label_display' => '0',
+          // ⚠️ `name` is a translatable content setting (`type: label`) that is
+          // present but empty in the default translation. It must still be
+          // offered for translation — empty in the source, translatable to a
+          // value in the target — rather than crash extraction.
+          // @see https://git.drupalcode.org/project/canvas/-/issues/3591734
+          'name' => '',
+        ],
+      ],
+      [
+        'uuid' => self::UUID_UNTRANSLATABLE_PROP_SHAPES,
+        'component_id' => 'sdc.canvas_test_translation.untranslatable-prop-shapes',
+        'component_version' => '::ACTIVE_VERSION_IN_SUT::',
+        'inputs' => [
+          'date' => '2024-01-15',
+          'email' => 'person@example.com',
+          'count' => 42,
+          'flag' => TRUE,
         ],
       ],
     ];

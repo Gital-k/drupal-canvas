@@ -58,7 +58,7 @@ describe('Pull Command', () => {
       const task = createComponentsPullTask(api, tmpDir, false);
 
       const { summaryLines } = await task.prepare();
-      expect(summaryLines).toEqual(['- 1 component (1 new)']);
+      expect(summaryLines).toEqual(['Components: 1 pull (1 new)']);
     });
 
     it('should show both new and existing counts in summary', async () => {
@@ -84,7 +84,7 @@ describe('Pull Command', () => {
       const task = createComponentsPullTask(api, tmpDir, false);
 
       const { summaryLines } = await task.prepare();
-      expect(summaryLines).toEqual(['- 3 components (2 new, 1 existing)']);
+      expect(summaryLines).toEqual(['Components: 3 pull (2 new, 1 existing)']);
     });
 
     it('should include local-only components in summary when remote is empty', async () => {
@@ -105,7 +105,7 @@ describe('Pull Command', () => {
       const task = createComponentsPullTask(api, tmpDir, false);
 
       const { summaryLines, localOnlyCount } = await task.prepare();
-      expect(summaryLines).toEqual(['- 1 component to delete (local-only)']);
+      expect(summaryLines).toEqual(['Components: 1 delete (local-only)']);
       expect(localOnlyCount).toBe(1);
     });
 
@@ -128,8 +128,8 @@ describe('Pull Command', () => {
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual([
-        '- 1 component (1 new)',
-        '- 1 component to delete (local-only)',
+        'Components: 1 pull (1 new)',
+        'Components: 1 delete (local-only)',
       ]);
     });
 
@@ -361,7 +361,7 @@ describe('Pull Command', () => {
       const task = createAssetsPullTask(api, globalCssPath, false);
 
       const { summaryLines } = await task.prepare();
-      expect(summaryLines).toEqual(['- global CSS']);
+      expect(summaryLines).toEqual(['Assets: global CSS pull']);
     });
 
     it('should return empty summary when no global CSS', async () => {
@@ -370,6 +370,19 @@ describe('Pull Command', () => {
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual([]);
+    });
+
+    it('should return no asset results when no global CSS is planned', async () => {
+      const api = mockApiService('');
+      const task = createAssetsPullTask(api, globalCssPath, false);
+
+      await task.prepare();
+      const results = await task.execute();
+
+      expect(results.title).toBe('Pulled assets');
+      expect(results.label).toBe('Asset');
+      expect(results.results).toEqual([]);
+      await expect(fs.access(globalCssPath)).rejects.toThrow();
     });
 
     it('should write global.css file', async () => {
@@ -516,7 +529,7 @@ describe('Pull Command', () => {
       const task = createPagesPullTask(api, tmpDir, false);
 
       const { summaryLines } = await task.prepare();
-      expect(summaryLines).toEqual(['- 1 page (1 new)']);
+      expect(summaryLines).toEqual(['Pages: 1 pull (1 new)']);
     });
 
     it('should show both new and existing counts in summary', async () => {
@@ -547,7 +560,7 @@ describe('Pull Command', () => {
       const task = createPagesPullTask(api, tmpDir, false);
 
       const { summaryLines } = await task.prepare();
-      expect(summaryLines).toEqual(['- 2 pages (1 new, 1 existing)']);
+      expect(summaryLines).toEqual(['Pages: 2 pull (1 new, 1 existing)']);
     });
 
     it('should write new page files on execute', async () => {
@@ -781,7 +794,7 @@ describe('Pull Command', () => {
       const task = createPagesPullTask(api, tmpDir, true);
 
       const { summaryLines } = await task.prepare();
-      expect(summaryLines).toEqual(['- 1 page (1 existing)']);
+      expect(summaryLines).toEqual(['Pages: 1 pull (1 existing)']);
 
       const results = await task.execute();
 
@@ -817,7 +830,7 @@ describe('Pull Command', () => {
       const task = createPagesPullTask(api, tmpDir, true);
 
       const { summaryLines } = await task.prepare();
-      expect(summaryLines).toEqual(['- 1 page (1 existing)']);
+      expect(summaryLines).toEqual(['Pages: 1 pull (1 existing)']);
 
       const results = await task.execute();
 
@@ -877,12 +890,10 @@ describe('Pull Command', () => {
       const task = createFontsPullTask(api, tmpDir);
 
       const { summaryLines } = await task.prepare();
-      expect(summaryLines).toHaveLength(1);
-      expect(summaryLines[0]).toContain('font variant');
-      expect(summaryLines[0]).toContain('1 new');
+      expect(summaryLines).toEqual(['brand kit: 1 font variant pull (1 new)']);
     });
 
-    it('should return empty summary when no fonts on Brand Kit', async () => {
+    it('should return empty summary when no fonts on brand kit', async () => {
       const api = mockApiService([]);
       const task = createFontsPullTask(api, tmpDir);
 
@@ -899,7 +910,7 @@ describe('Pull Command', () => {
       await task.prepare();
       const results = await task.execute();
 
-      expect(results.title).toBe('Pulled fonts');
+      expect(results.title).toBe('Pulled brand kit');
       expect(results.label).toBe('Font variant');
       expect(results.results.length).toBeGreaterThanOrEqual(1);
       expect(results.results[0].success).toBe(true);

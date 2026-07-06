@@ -3,6 +3,7 @@ parameters:
   level: 8
   strictRules:
     allRules: false
+    disallowedShortTernary: true
     strictFunctionCalls: true
   fileExtensions:
     - php
@@ -97,6 +98,7 @@ rules:
   - Canvas\PHPStan\Rules\DisallowHookSchemaRule
   - Canvas\PHPStan\Rules\NoDuplicateTraitUseRule
   - Canvas\PHPStan\Rules\KernelTestsMustUseAssertEntityIsValidRule
+  - Canvas\PHPStan\Rules\ComponentInputsComparisonMustIgnoreKeyOrderRule
   - Canvas\PHPStan\Rules\NoOptionalParametersInDataProviderTestsRule
   - Canvas\PHPStan\Rules\NoJsonEncodedHttpExceptionMessageInApiControllersRule
   - Canvas\PHPStan\Rules\RequireStaticMethodsRule

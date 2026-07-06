@@ -16,6 +16,7 @@ use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\VariationCacheInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
@@ -63,6 +64,8 @@ class CanvasAiPageBuilderHelper {
    *   The API config controllers service.
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $loggerFactory
    *   The logger channel factory.
+   * @param \Drupal\Core\Config\TypedConfigManagerInterface $typedConfigManager
+   *   The typed config manager.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
@@ -79,7 +82,55 @@ class CanvasAiPageBuilderHelper {
     private readonly ApiConfigControllers $apiConfigControllers,
     #[Autowire(service: 'logger.factory')]
     private readonly LoggerChannelFactoryInterface $loggerFactory,
+    private readonly TypedConfigManagerInterface $typedConfigManager,
   ) {
+  }
+
+  /**
+   * Combines all canvas page entity field updates under a single key.
+   *
+   * @param array $response
+   *   The current response array from the orchestrator.
+   *
+   * @return array
+   *   The modified response array.
+   *
+   * @see ui/src/components/aiExtension/AiWizard.tsx
+   * @see \Drupal\canvas_ai\Plugin\AiFunctionCall\CreateFieldContent
+   * @see \Drupal\canvas_ai\Plugin\AiFunctionCall\EditFieldContent
+   * @see \Drupal\canvas_ai\Plugin\AiFunctionCall\AddMetadata
+   */
+  public function processCanvasPageFields(array $response): array {
+    $canvasPageData = [];
+
+    // 'created_content' is set when the AI creates a new title; 'refined_text'
+    // when it edits an existing one. They come from separate tools, so only one
+    // is expected per response. If the AI returns both, prefer the created title
+    // and drop the refined one to keep the result deterministic.
+    if (!empty($response['created_content']) && !empty($response['refined_text'])) {
+      $this->loggerFactory->get('canvas_ai')->info('AI returned both created_content and refined_text; using created_content.');
+      unset($response['refined_text']);
+    }
+    if (!empty($response['created_content'])) {
+      $canvasPageData['title[0][value]'] = $response['created_content'];
+      unset($response['created_content']);
+    }
+    elseif (!empty($response['refined_text'])) {
+      $canvasPageData['title[0][value]'] = $response['refined_text'];
+      unset($response['refined_text']);
+    }
+    if (!empty($response['metadata']['metatag_description'])) {
+      $canvasPageData['description[0][value]'] = $response['metadata']['metatag_description'];
+      unset($response['metadata']['metatag_description']);
+      if (empty($response['metadata'])) {
+        unset($response['metadata']);
+      }
+    }
+
+    if (!empty($canvasPageData)) {
+      $response['canvas_page_data'] = $canvasPageData;
+    }
+    return $response;
   }
 
   /**
@@ -335,12 +386,7 @@ class CanvasAiPageBuilderHelper {
         $this->processCodeComponents($component, $output, $available_components[$component_id]);
       }
       else {
-        // Other sources: id, name, description (description = name)
-        $output[$source]['components'][$component_id] = [
-          'id' => $component_id,
-          'name' => $component->label(),
-          'description' => $component->label(),
-        ];
+        $this->processBlock($component, $output);
       }
     }
     $cacheability = CacheableMetadata::createFromObject($available_components_response->getCacheableMetadata());
@@ -349,6 +395,33 @@ class CanvasAiPageBuilderHelper {
     $this->memoryVariationCache->set($cache_keys, $output, $cacheability, $initial_cacheability);
 
     return $output;
+  }
+
+  /**
+   * Loads all block components from storage, keyed by component id.
+   *
+   * Helper for the 0007 post_update hook. That hook runs via `drush updb` as
+   * the anonymous user, for which getAllComponentsKeyedBySource() returns
+   * nothing because it access-checks the component listing. This loads block
+   * components straight from storage instead, so it is independent of the
+   * current user.
+   *
+   * @return array
+   *   Enabled block components keyed by component id, including their props.
+   *
+   * @see canvas_ai_post_update_0007_add_block_props_to_component_description_settings()
+   */
+  public function getEnabledBlockComponentsFromStorage(): array {
+    $output = [];
+    $components = $this->entityTypeManager
+      ->getStorage(Component::ENTITY_TYPE_ID)
+      ->loadByProperties(['status' => TRUE]);
+    foreach ($components as $component) {
+      if ($component->getComponentSource()->getPluginId() === BlockComponent::SOURCE_PLUGIN_ID) {
+        $this->processBlock($component, $output);
+      }
+    }
+    return $output[BlockComponent::SOURCE_PLUGIN_ID]['components'] ?? [];
   }
 
   /**
@@ -582,7 +655,7 @@ class CanvasAiPageBuilderHelper {
 
         // Mark required props.
         if (isset($sdc_definition['props']['required']) && \in_array($prop_name, $sdc_definition['props']['required'], TRUE)) {
-          $output[$source_id]['components'][$component_id]['props'][$prop_name]['required'] = TRUE;
+          $prop_metadata['required'] = TRUE;
         }
         if (isset($prop_details['enum'])) {
           $prop_metadata['enum'] = $prop_details['enum'];
@@ -614,9 +687,11 @@ class CanvasAiPageBuilderHelper {
     if (isset($component_data['propSources']) && \is_array($component_data['propSources'])) {
       $output[JsComponent::SOURCE_PLUGIN_ID]['components'][$component_id]['props'] = [];
       $metadata_properties = [];
+      $metadata_required = [];
       $component_source = $component->getComponentSource();
       if ($component_source instanceof JsComponent) {
         $metadata_properties = $component_source->getMetadata()->schema['properties'] ?? [];
+        $metadata_required = $component_source->getMetadata()->schema['required'] ?? [];
       }
       foreach ($component_data['propSources'] as $prop_name => $prop_details) {
         $prop_metadata = [
@@ -629,6 +704,9 @@ class CanvasAiPageBuilderHelper {
           'format' => $prop_details['jsonSchema']['format'] ?? '',
           'enum' => $prop_details['jsonSchema']['enum'] ?? '',
         ];
+        if (\in_array($prop_name, $metadata_required, TRUE)) {
+          $prop_metadata['required'] = TRUE;
+        }
         $prop_schema = $prop_details['jsonSchema'] ?? [];
         // The client-side prop schema strips meta:enum; pull labels from the
         // component metadata to keep option labels aligned with the UI.
@@ -654,6 +732,91 @@ class CanvasAiPageBuilderHelper {
         ];
       }
     }
+  }
+
+  /**
+   * Create the context data for Block components.
+   *
+   * @param \Drupal\canvas\Entity\Component $component
+   *   The component entity.
+   * @param array &$output
+   *   The output array to store the Block component data.
+   */
+  private function processBlock(Component $component, array &$output): void {
+    $component_id = $component->id();
+    $source_id = BlockComponent::SOURCE_PLUGIN_ID;
+    $output[$source_id]['components'][$component_id] = [
+      'id' => $component_id,
+      'name' => $component->label(),
+      'description' => $component->label(),
+    ];
+
+    $component_source = $component->getComponentSource();
+    if (!$component_source instanceof BlockComponent) {
+      return;
+    }
+
+    $raw_schema = $this->typedConfigManager->getDefinition('block.settings.' . $component->get('source_local_id'));
+    $mapping = $raw_schema['mapping'] ?? [];
+    if (!\is_array($mapping) || $mapping === []) {
+      return;
+    }
+
+    $settings = $component->getSettings();
+    $defaults = \is_array($settings['default_settings'] ?? NULL) ? $settings['default_settings'] : [];
+    $props = [];
+    foreach ($mapping as $prop_name => $prop_details) {
+      if (!\is_array($prop_details)) {
+        continue;
+      }
+      if (self::isBlockPropExcluded($prop_name)) {
+        continue;
+      }
+      $props[$prop_name] = [
+        'name' => $prop_details['label'] ?? $prop_name,
+        'description' => $prop_details['description'] ?? $prop_details['label'] ?? 'No description available',
+        'type' => $prop_details['type'] ?? 'string',
+        'default' => $defaults[$prop_name] ?? $prop_details['default'] ?? NULL,
+      ];
+      if (!\array_key_exists('requiredKey', $prop_details) || $prop_details['requiredKey'] !== FALSE) {
+        $props[$prop_name]['required'] = TRUE;
+      }
+      $enum = $this->getEnumFromSchemaConstraints($prop_details);
+      if (count($enum) > 0) {
+        $props[$prop_name]['enum'] = $enum;
+      }
+    }
+
+    if (!empty($props)) {
+      $output[$source_id]['components'][$component_id]['props'] = $props;
+    }
+  }
+
+  /**
+   * Returns TRUE if a block prop key should not be exposed to the agent.
+   *
+   * The context_mapping key is excluded because Canvas does not apply context
+   * mappings at render time, so any value written by the agent would have no
+   * effect.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentInstanceInputsConfigSchemaGenerator::getConfigSchemaMapping()
+   */
+  private static function isBlockPropExcluded(string $prop_name): bool {
+    return \in_array($prop_name, ['id', 'provider', 'admin_label', 'context_mapping'], TRUE);
+  }
+
+  /**
+   * Extracts enum values from config schema constraints.
+   *
+   * @param array $prop_details
+   *   The config schema definition for a prop.
+   *
+   * @return array
+   *   The enum values, if any.
+   */
+  private function getEnumFromSchemaConstraints(array $prop_details): array {
+    $choices = $prop_details['constraints']['Choice']['choices'] ?? [];
+    return \is_array($choices) ? $choices : [];
   }
 
   /**
@@ -1412,6 +1575,56 @@ class CanvasAiPageBuilderHelper {
 
     // For any other entity_type.
     return 'User has not created any entities';
+  }
+
+  /**
+   * Builds the state-specific prompt section for the component agent.
+   *
+   * Selects the prompt parts that match the current system state and returns
+   * them joined together, so the agent receives only the constraints that
+   * apply instead of evaluating the state itself.
+   *
+   * @param array $context
+   *   The current state, holding 'selected_component',
+   *   'selected_component_required_props', 'json_api_module_status' and
+   *   'menu_fetch_source'.
+   *
+   * @return string
+   *   The assembled prompt section.
+   *
+   * @see canvas_component_agent/dynamic_prompt_parts.yml
+   */
+  public function generateComponentAgentDynamicPromptSection(array $context): string {
+    $prompt_parts = Yaml::parseFile(__DIR__ . '/DynamicPrompts/canvas_component_agent/dynamic_prompt_parts.yml');
+
+    $selected_component = $context['selected_component'] ?? '';
+    $required_props = $context['selected_component_required_props'] ?? '';
+    $json_api_module_status = $context['json_api_module_status'] ?? '';
+    $menu_fetch_source = $context['menu_fetch_source'] ?? '';
+
+    $sections = [];
+
+    // Component editor state: which flow (create/edit) is available.
+    $sections[] = empty($selected_component)
+      ? $prompt_parts['selected_component']['empty']
+      : str_replace('{{selected_component}}', $selected_component, $prompt_parts['selected_component']['present']);
+
+    // Required props of the open component, when any are set.
+    if (!empty($selected_component) && !empty($required_props) && $required_props !== '[]') {
+      $sections[] = str_replace('{{required_props}}', $required_props, $prompt_parts['selected_component_required_props']);
+    }
+
+    // Content fetching constraints for the current JSON:API status.
+    if (isset($prompt_parts['json_api_module_status'][$json_api_module_status])) {
+      $sections[] = $prompt_parts['json_api_module_status'][$json_api_module_status];
+    }
+
+    // Menu fetching constraints for the current menu fetch source.
+    if (isset($prompt_parts['menu_fetch_source'][$menu_fetch_source])) {
+      $sections[] = $prompt_parts['menu_fetch_source'][$menu_fetch_source];
+    }
+
+    return implode("\n\n", \array_map('trim', $sections));
   }
 
   /**

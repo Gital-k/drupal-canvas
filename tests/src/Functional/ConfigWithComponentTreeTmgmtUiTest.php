@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-// cspell:ignore Bienvenue savoir Découvrez Identité visuelle
+// cspell:ignore Bienvenue savoir Découvrez Identité visuelle Charte graphique
 
 use Behat\Mink\Element\NodeElement;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -123,6 +123,17 @@ class ConfigWithComponentTreeTmgmtUiTest extends ConfigWithComponentTreeTranslat
         'component_tree|' . self::UUID_BLOCK_DEEP_TRANSLATABLE . '|inputs|label[translation]',
         'component_tree|' . self::UUID_BLOCK_DEEP_TRANSLATABLE . '|inputs|deeply_nested_translatable|0|bar[translation]',
       ],
+      // Block whose translatable `name` is empty in the source language: it is
+      // still offered for translation (shown via the `∅` placeholder),
+      // alongside the populated `label`.
+      self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT => [
+        'component_tree|' . self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT . '|inputs|label[translation]',
+        'component_tree|' . self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT . '|inputs|name[translation]',
+      ],
+      // untranslatable-prop-shapes component: no prop shape is translatable, so
+      // none is offered for translation. `date` (datetime field, date-only),
+      // `email`, `integer` and `boolean` are all excluded.
+      self::UUID_UNTRANSLATABLE_PROP_SHAPES => [],
     ], $this->getTmgmtFormElementsForComponentInstances());
     // The "format" input exists (to load CKEditor) but is hidden, so it cannot
     // be changed.
@@ -137,7 +148,13 @@ class ConfigWithComponentTreeTmgmtUiTest extends ConfigWithComponentTreeTranslat
       'component_tree|' . self::UUID_MY_HERO . '|inputs|heading[translation]' => 'Bienvenue à Canvas',
       'component_tree|' . self::UUID_MY_HERO . '|inputs|cta2[translation]' => 'En savoir plus',
       'component_tree|' . self::UUID_MY_CTA . '|inputs|href|uri[translation]' => 'https://fr.drupal.org',
+      // Each block's `label` is empty in the source language; translate it
+      // explicitly so the test translator does not map `∅` to `fr: ∅`.
       'component_tree|' . self::UUID_BRANDING . '|inputs|label[translation]' => 'Identité visuelle',
+      'component_tree|' . self::UUID_BLOCK_DEEP_TRANSLATABLE . '|inputs|label[translation]' => 'fr: Canvas Test Block for testing input translatability',
+      'component_tree|' . self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT . '|inputs|label[translation]' => 'fr: Test block with settings',
+      // The block's `name` is also empty in the source language.
+      'component_tree|' . self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT . '|inputs|name[translation]' => 'Charte graphique',
     ], 'Save as completed');
     $assert->pageTextContains('has been accepted');
 

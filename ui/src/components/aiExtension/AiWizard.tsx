@@ -19,7 +19,12 @@ import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
-import { deserializeProps } from '@/features/code-editor/utils/utils';
+import {
+  deserializeProps,
+  deserializeSlots,
+} from '@/features/code-editor/utils/utils';
+import { FORM_TYPES } from '@/features/form/constants';
+import { setFieldValue } from '@/features/form/formStateSlice';
 import {
   selectModel,
   setUpdatePreview,
@@ -32,6 +37,7 @@ import {
   useCreateCodeComponentMutation,
   useGetComponentsQuery,
 } from '@/services/componentAndLayout';
+import { isPropSourceComponent } from '@/types/Component';
 import { getBaseUrl, getDrupalSettings } from '@/utils/drupal-globals';
 
 import fixtureProps from '../../../../modules/canvas_ai/src/PropsSchema.json';
@@ -157,6 +163,16 @@ const propsMetadataHandler = {
   },
 };
 
+const slotsMetadataHandler = {
+  canHandle: (msg: any) => 'slots_metadata' in msg && msg.slots_metadata,
+  handle: async ({ message, dispatch }: { message: any; dispatch: any }) => {
+    const parsedSlots = JSON.parse(message.slots_metadata);
+    // Deserialize from Record format to Array format.
+    const deserializedSlots = deserializeSlots(parsedSlots);
+    dispatch(setCodeComponentProperty(['slots', deserializedSlots]));
+  },
+};
+
 const requiredPropsHandler = {
   canHandle: (msg: any) =>
     'required_props' in msg && Array.isArray(msg.required_props),
@@ -165,41 +181,49 @@ const requiredPropsHandler = {
   },
 };
 
-const createdContentHandler = {
-  canHandle: (msg: any) => 'created_content' in msg && msg.created_content,
+const canvasPageDataHandler = {
+  canHandle: (msg: any) => 'canvas_page_data' in msg && msg.canvas_page_data,
   handle: async ({ message, dispatch }: { message: any; dispatch: any }) => {
-    const value = message.created_content;
-    dispatch(setUpdatePreview(true));
-    dispatch(updatePageDataExternally({ 'title[0][value]': value }));
-  },
-};
-
-const editContentHandler = {
-  canHandle: (msg: any) => 'refined_text' in msg && msg.refined_text,
-  handle: async ({ message, dispatch }: { message: any; dispatch: any }) => {
-    const value = message.refined_text;
-    dispatch(setUpdatePreview(true));
-    dispatch(updatePageDataExternally({ 'title[0][value]': value }));
-  },
-};
-const metadataHandler = {
-  canHandle: (msg: any) => 'metadata' in msg && msg.metadata,
-  handle: async ({ message, dispatch }: { message: any; dispatch: any }) => {
-    const value = message.metadata;
-    dispatch(setUpdatePreview(true));
-    dispatch(
-      updatePageDataExternally({
-        'description[0][value]': value.metatag_description,
-      }),
-    );
+    const updates = message.canvas_page_data;
+    if (Object.keys(updates).length > 0) {
+      // Keep the formState slice in sync, mirroring what enhancedOnChange does
+      // for a real keystroke (see docs/component-and-entity-forms.md). Without
+      // this the formState slice retains the stale value, and the next field
+      // change or AJAX event rebuilds pageData from it
+      // (createPageDataFormStateHandler / PageDataForm's AJAX listener),
+      // clobbering the AI value before it is auto-saved or published.
+      // @todo Multi-value fields are written as raw arrays here, bypassing the
+      //   multi-select normalization in createPageDataFormStateHandler. Only
+      //   single-value fields (title, description) are set today. Normalize
+      //   when extending to multi-value fields, see
+      //   https://www.drupal.org/i/3587609.
+      Object.entries(updates).forEach(([fieldName, value]) => {
+        dispatch(
+          setFieldValue({
+            formId: FORM_TYPES.ENTITY_FORM,
+            fieldName,
+            value,
+          }),
+        );
+      });
+      // Flag the preview/auto-save POST and mirror the value into the RHF form
+      // display via useRespondToPageDataStoreUpdates.
+      dispatch(setUpdatePreview(true));
+      dispatch(updatePageDataExternally(updates));
+    }
   },
 };
 
 // Filters out 'media' fields from a js component instance's fieldValues based on the
 // component definition's propSources, forcing the component to use the example
 // image from its definition.
+// Block components do not have propSources, so we cannot set field values while
+// placing them - return unchanged in that case.
 // @todo Refactor this after https://www.drupal.org/i/3552000 is fixed.
 function removeMediaFields(componentDef: CanvasComponent, componentInst: any) {
+  if (!isPropSourceComponent(componentDef)) {
+    return componentInst;
+  }
   const newFieldValues = {} as any;
   const fieldValues = componentInst.fieldValues || {};
   for (const [key, value] of Object.entries(fieldValues)) {
@@ -278,14 +302,13 @@ const operationsHandler = {
 };
 
 const messageHandlers = [
-  createdContentHandler,
-  editContentHandler,
+  canvasPageDataHandler,
   cssStructureHandler,
   jsStructureHandler,
   componentStructureHandler,
   propsMetadataHandler,
+  slotsMetadataHandler,
   requiredPropsHandler,
-  metadataHandler,
   operationsHandler,
 ];
 
@@ -834,7 +857,12 @@ const AiWizard = () => {
                   );
                   requestBody.append(
                     'selected_component',
-                    currentValuesRef.current.codeComponentName,
+                    // Prefer the code-editor route param: it identifies the open
+                    // component immediately after navigation (e.g. right after
+                    // creating one), whereas the Redux machineName is only set
+                    // once the editor finishes its async data load.
+                    currentValuesRef.current.params.codeComponentId ||
+                      currentValuesRef.current.codeComponentName,
                   );
                   requestBody.append(
                     'selected_component_required_props',
@@ -856,6 +884,7 @@ const AiWizard = () => {
                     entity_type: currentValuesRef.current.params.entityType,
                     entity_id: currentValuesRef.current.params.entityId,
                     selected_component:
+                      currentValuesRef.current.params.codeComponentId ||
                       currentValuesRef.current.codeComponentName,
                     selected_component_required_props:
                       currentValuesRef.current.codeComponentRequiredProps || [],

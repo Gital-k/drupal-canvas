@@ -405,7 +405,7 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     // above. So we need to hardcode these per version.
     $active_version = match(TRUE) {
       // The 11.3.x version.
-      version_compare(\Drupal::VERSION, "11.3", '>=') => "ecbfb3dfb7ce5717",
+      version_compare(\Drupal::VERSION, "11.3", '>=') => "0b5af0d270d99618",
       // The 11.2.10 version, for the original implementation + schema of the
       // block being tested, because:
       // - no new version should be generated thanks to the Block
@@ -637,7 +637,14 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     // 2. contains exactly the expected values
     // 3. renders the expected markup.
     self::assertEntityIsValid($pattern);
-    self::assertSame($expected_post_update_config_defined_component_tree ?: $expected_post_update_content_defined_component_tree, \array_map(
+    // In most cases, the config-defined component tree expectations are
+    // identical to the content-defined ones, but not always. Allow omitting a
+    // config-specific one (by allowing `FALSE`).
+    $expected = $expected_post_update_config_defined_component_tree !== FALSE
+      ? $expected_post_update_config_defined_component_tree
+      : $expected_post_update_content_defined_component_tree;
+    self::assertSame($expected,
+      \array_map(
       function (ComponentTreeItem $item): array {
         $array = array_filter($item->toArray());
         $array['inputs'] = json_decode($array['inputs'], TRUE);

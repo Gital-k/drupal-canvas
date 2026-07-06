@@ -24,6 +24,7 @@ import { useAppSelector } from '@/app/hooks';
 import Dialog from '@/components/Dialog';
 import { selectTranslations } from '@/features/layout/layoutModelSlice';
 import { selectPageData } from '@/features/pageData/pageDataSlice';
+import { useTemplateCaption } from '@/hooks/useTemplateCaption';
 import { useTemplateRef } from '@/hooks/useTemplateRef';
 import { useDeletePageTranslationMutation } from '@/services/componentAndLayout';
 import { getCanvasPermissions, getLanguages } from '@/utils/drupal-globals';
@@ -141,9 +142,12 @@ const LanguageSelect = () => {
   const { isTemplateContext, isTemplatePreviewRoute } = useTemplateRef();
   const translations = useAppSelector(selectTranslations);
   const isTemplateRoute = isTemplateContext || isTemplatePreviewRoute;
+  const templateCaption = useTemplateCaption();
   const pageData = useAppSelector(selectPageData);
   const pageTitle =
-    getEntityTitle(entityType, pageData) || pageData?.['title[0][value]'];
+    templateCaption ||
+    getEntityTitle(entityType, pageData) ||
+    pageData?.['title[0][value]'];
 
   // Derive the active language directly from the URL.
   const activeLanguageId = searchParams.get('language') ?? '';
@@ -283,7 +287,10 @@ const LanguageSelect = () => {
                           data-testid="language-options-popover-trigger"
                           className={styles.dotsButton}
                           aria-label={`More options for ${language.name}`}
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePopoverOpenChange(language.id, true);
+                          }}
                         >
                           <DotsVerticalIcon width="14" height="14" />
                         </button>

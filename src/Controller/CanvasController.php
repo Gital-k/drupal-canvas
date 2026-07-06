@@ -125,6 +125,9 @@ HTML;
     $canvas_module_path = $this->moduleHandler->getModule('canvas')->getPath();
     $dev_mode = $this->moduleHandler->moduleExists('canvas_dev_mode');
     $dev_translation_mode = $this->moduleHandler->moduleExists('canvas_dev_translation');
+    $dev_entity_reference = $this->moduleHandler->moduleExists('canvas_dev_er');
+    // @todo Remove the use of 'canvas_dev_cd' flag in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+    $dev_conflict_detection = $this->moduleHandler->moduleExists('canvas_dev_cd');
     $content_translation_enabled = $this->moduleHandler->moduleExists('content_translation');
     $config_translation_enabled = $this->moduleHandler->moduleExists('config_translation');
     // ⚠️ This is highly experimental and *will* be refactored.
@@ -232,6 +235,9 @@ HTML;
             'entityTypeLabels' => $entity_type_labels,
             'devMode' => $dev_mode,
             'devTranslationMode' => $dev_translation_mode,
+            'devEntityReferenceMode' => $dev_entity_reference,
+            // @todo Remove the use of 'canvas_dev_cd' flag in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+            'devConflictDetectionMode' => $dev_conflict_detection,
             'contentTranslationEnabled' => $content_translation_enabled,
             'configTranslationEnabled' => $config_translation_enabled,
             'languages' => $languages_data,
@@ -313,7 +319,8 @@ HTML;
    */
   private function buildHtml(): string {
     $theme_config = $this->configFactory->get('system.theme');
-    $admin_theme_name = $theme_config->get('admin') ?: $theme_config->get('default');
+    $admin = (string) $theme_config->get('admin');
+    $admin_theme_name = $admin !== '' ? $admin : $theme_config->get('default');
     $active_admin_theme = $this->themeInitialization->getActiveThemeByName($admin_theme_name);
     $actual_active_theme = $this->themeManager->getActiveTheme();
     $this->themeManager->setActiveTheme($active_admin_theme);
