@@ -1,6 +1,13 @@
-import { useCallback, useLayoutEffect, useMemo } from 'react';
-import clsx from 'clsx';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import ScaleToFitIcon from '@assets/icons/justify-stretch.svg?react';
+import { Link2Icon } from '@radix-ui/react-icons';
 import { Button, DropdownMenu, Flex, Tooltip } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -52,66 +59,128 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
   const currentWidth = useAppSelector(selectViewportWidth);
   // Get viewport sizes (supports theme-level customization).
   const viewportSizes = useMemo(() => getViewportSizes(), []);
-  const handleWidthClick = (viewportSize: viewportSize) => {
-    dispatch(setViewportWidth(viewportSize.width));
-    dispatch(setViewportMinHeight(viewportSize.height));
-    // Remember user's last chosen viewport size so it can persist across page reloads/navigation etc.
-    localStorage.setItem('Canvas.editorFrame.viewportSize', viewportSize.id);
-  };
+
+  // Auto scale-to-fit preference from localStorage (defaults to true)
+  const [autoScaleToFit, setAutoScaleToFit] = useState(() => {
+    const stored = localStorage.getItem('Canvas.editorFrame.autoScaleToFit');
+    // Default to true if not set
+    return stored === null ? true : stored === 'true';
+  });
+
+  // Track if initial auto-scale has been performed
+  const hasAutoScaledOnMount = useRef(false);
 
   const getViewportByWidth = useCallback(
     (width: number): viewportSize => {
-      const viewportSize = viewportSizes.find((vw) => vw.width === width);
-      if (!viewportSize) {
+      const viewport = viewportSizes.find((vw) => vw.width === width);
+      if (!viewport) {
         throw new Error(`No viewport found with width: ${width}`);
       }
-      return viewportSize;
+      return viewport;
     },
     [viewportSizes],
   );
 
   const getViewportById = useCallback(
     (id: string): viewportSize => {
-      const viewportSize = viewportSizes.find((vw) => vw.id === id);
-      if (!viewportSize) {
+      const viewport = viewportSizes.find((vw) => vw.id === id);
+      if (!viewport) {
         throw new Error(`No viewport found with id: ${id}`);
       }
-      return viewportSize;
+      return viewport;
     },
     [viewportSizes],
   );
 
-  const handleScaleToFit = () => {
-    if (editorPaneRef.current) {
+  // Calculate the optimal scale for a given viewport width
+  const calculateOptimalScale = useCallback(
+    (targetWidth: number): number => {
+      if (!editorPaneRef.current) return 1;
       const editorFrameContainerWidth =
         editorPaneRef.current.getBoundingClientRect().width;
-      const scaleToFit = editorFrameContainerWidth / currentWidth;
+      const scaleToFit = editorFrameContainerWidth / targetWidth;
       const closestScale = findClosestScaleValue(scaleToFit);
-      dispatch(
-        setEditorFrameViewPort({
-          scale: closestScale.scale < 1 ? closestScale.scale : 1,
-        }),
-      );
+      return closestScale.scale < 1 ? closestScale.scale : 1;
+    },
+    [editorPaneRef],
+  );
 
-      requestAnimationFrame(() => {
-        if (editorPaneRef.current && scalingContainerRef.current) {
-          // Calculate the height of the preview (getBoundingClientRect takes into account scaling).
-          const previewHeight =
-            scalingContainerRef.current.getBoundingClientRect().height;
+  // Scale-to-fit function that updates both scale and position.
+  // When scrollToTop is true, positions at the top of the preview (for initial page load).
+  // When false, centers the preview vertically (for manual scale-to-fit clicks).
+  const performScaleToFit = useCallback(
+    (targetWidth: number, { scrollToTop = false } = {}) => {
+      if (editorPaneRef.current && scalingContainerRef.current) {
+        const newScale = calculateOptimalScale(targetWidth);
+        const x = getHalfwayScrollPosition(editorPaneRef.current);
 
-          // Calculate the center offset inside the editor frame.
+        let y: number;
+        if (scrollToTop) {
+          y = 0;
+        } else {
+          // Calculate position based on the NEW scale (without waiting for DOM update)
+          const unscaledPreviewHeight =
+            scalingContainerRef.current.scrollHeight;
+          const newScaledPreviewHeight = unscaledPreviewHeight * newScale;
+
+          // Calculate the center offset inside the editor frame
           const editorFrameHeight = editorPaneRef.current.scrollHeight;
-          const centerOffset = (editorFrameHeight - previewHeight) / 2;
-
-          const y = centerOffset - 50;
-          dispatch(
-            setEditorFrameViewPort({
-              x: getHalfwayScrollPosition(editorPaneRef.current),
-              y,
-            }),
-          );
+          const centerOffset = (editorFrameHeight - newScaledPreviewHeight) / 2;
+          y = centerOffset - 50;
         }
+
+        dispatch(
+          setEditorFrameViewPort({
+            scale: newScale,
+            x,
+            y,
+          }),
+        );
+      }
+    },
+    [calculateOptimalScale, dispatch, editorPaneRef, scalingContainerRef],
+  );
+
+  // Scale and center horizontally - for smooth resize animations
+  // Preview stays anchored at top due to transform-origin: top center
+  const performScaleOnly = useCallback(
+    (targetWidth: number) => {
+      if (editorPaneRef.current) {
+        const newScale = calculateOptimalScale(targetWidth);
+        const x = getHalfwayScrollPosition(editorPaneRef.current);
+        dispatch(setEditorFrameViewPort({ scale: newScale, x }));
+      }
+    },
+    [calculateOptimalScale, dispatch, editorPaneRef],
+  );
+
+  const handleScaleToFit = () => {
+    performScaleToFit(currentWidth);
+  };
+
+  const handleWidthClick = (viewportSize: viewportSize) => {
+    dispatch(setViewportWidth(viewportSize.width));
+    dispatch(setViewportMinHeight(viewportSize.height));
+    // Remember user's last chosen viewport size so it can persist across page reloads/navigation etc.
+    localStorage.setItem('Canvas.editorFrame.viewportSize', viewportSize.id);
+
+    // Auto-scale to fit when enabled
+    if (autoScaleToFit) {
+      // Use requestAnimationFrame to ensure the viewport width change has been applied
+      requestAnimationFrame(() => {
+        performScaleToFit(viewportSize.width);
       });
+    }
+  };
+
+  // Toggle auto scale-to-fit preference
+  const handleAutoScaleToggle = () => {
+    const newValue = !autoScaleToFit;
+    setAutoScaleToFit(newValue);
+    localStorage.setItem('Canvas.editorFrame.autoScaleToFit', String(newValue));
+    // Immediately scale to fit when enabling
+    if (newValue) {
+      handleScaleToFit();
     }
   };
 
@@ -130,6 +199,53 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
     dispatch(setViewportMinHeight(vs.height));
   }, [currentWidth, dispatch, getViewportByWidth, getViewportById]);
 
+  // Auto-scale to fit on initial load when enabled, scrolling to top of the page
+  useEffect(() => {
+    if (autoScaleToFit && currentWidth > 0 && !hasAutoScaledOnMount.current) {
+      hasAutoScaledOnMount.current = true;
+      // Double requestAnimationFrame to ensure DOM has fully rendered
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          performScaleToFit(currentWidth, { scrollToTop: true });
+        });
+      });
+    }
+  }, [autoScaleToFit, currentWidth, performScaleToFit]);
+
+  // Watch for editor pane size changes (e.g., when layer column opens/closes)
+  // and auto-scale if enabled. Debounced to wait for resize animations to complete.
+  useEffect(() => {
+    if (!autoScaleToFit || !editorPaneRef.current) {
+      return;
+    }
+
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+    const currentEditorPane = editorPaneRef.current;
+
+    const resizeObserver = new ResizeObserver(() => {
+      // Only rescale if we've already done the initial scale
+      if (hasAutoScaledOnMount.current && currentWidth > 0) {
+        // Debounce to wait for resize animation to complete
+        if (resizeTimeout) {
+          clearTimeout(resizeTimeout);
+        }
+        resizeTimeout = setTimeout(() => {
+          // Only update scale, not position - so preview scales in place smoothly
+          performScaleOnly(currentWidth);
+        }, 150);
+      }
+    });
+
+    resizeObserver.observe(currentEditorPane);
+
+    return () => {
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+      resizeObserver.disconnect();
+    };
+  }, [autoScaleToFit, currentWidth, editorPaneRef, performScaleOnly]);
+
   return (
     <Flex
       className={styles.toolbar}
@@ -142,7 +258,7 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
             variant="surface"
             size="1"
             color="gray"
-            className={clsx(styles.toolbarButton, styles.viewportSelect)}
+            className={`${styles.toolbarButton} ${styles.viewportSelect}`}
           >
             <BreakpointIcon width={currentWidth} />
             {currentWidth
@@ -164,19 +280,41 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
           ))}
         </DropdownMenu.Content>
       </DropdownMenu.Root>
-      <Tooltip side="bottom" content={'Scale to fit'}>
-        <Button
-          size="1"
-          onClick={handleScaleToFit}
-          color="gray"
-          variant="surface"
-          highContrast
-          className={styles.toolbarButton}
-          data-testid="scale-to-fit"
+      <DropdownMenu.Root>
+        <Tooltip
+          side="bottom"
+          content={autoScaleToFit ? 'Scale to fit (auto)' : 'Scale to fit'}
         >
-          <ScaleToFitIcon />
-        </Button>
-      </Tooltip>
+          <Flex className={styles.scaleToFitButton}>
+            <Button
+              size="1"
+              onClick={handleScaleToFit}
+              color={autoScaleToFit ? 'blue' : 'gray'}
+              variant="surface"
+              highContrast={!autoScaleToFit}
+              className={styles.toolbarButton}
+              data-testid="scale-to-fit"
+            >
+              {autoScaleToFit ? <Link2Icon /> : <ScaleToFitIcon />}
+            </Button>
+            <DropdownMenu.Trigger>
+              <Button
+                size="1"
+                color={autoScaleToFit ? 'blue' : 'gray'}
+                variant="surface"
+                className={styles.dropdownTrigger}
+              >
+                <DropdownMenu.TriggerIcon />
+              </Button>
+            </DropdownMenu.Trigger>
+          </Flex>
+        </Tooltip>
+        <DropdownMenu.Content size="1">
+          <DropdownMenu.Item onClick={handleAutoScaleToggle}>
+            {autoScaleToFit ? 'Disable auto-scale' : 'Enable auto-scale'}
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Root>
       <ZoomControl buttonClass={styles.toolbarButton} />
     </Flex>
   );
