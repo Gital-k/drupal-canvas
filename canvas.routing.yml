@@ -333,7 +333,7 @@ canvas.api.content.delete:
     canvas_external_api: true
   methods: ['DELETE']
 
-canvas.api.export.content:
+canvas.api.content.export:
   path: '/canvas/api/v0/export/content/canvas_page/{canvas_page}'
   defaults:
     _controller: 'Drupal\canvas\Controller\ApiContentExportController::get'
