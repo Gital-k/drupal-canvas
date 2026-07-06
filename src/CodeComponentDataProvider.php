@@ -8,8 +8,12 @@ use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Language\LanguageManager;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Link;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\TypedData\TranslatableInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -33,6 +37,7 @@ readonly final class CodeComponentDataProvider {
     private RouteMatchInterface $routeMatch,
     private TitleResolverInterface $titleResolver,
     private ChainBreadcrumbBuilderInterface $breadcrumbManager,
+    private LanguageManagerInterface $languageManager,
     private ContainerInterface $container,
   ) {}
 
@@ -184,12 +189,58 @@ readonly final class CodeComponentDataProvider {
       $entity = $this->routeMatch->getParameter($identifier);
 
       if ($entity instanceof EntityInterface) {
+        // The requested language is negotiated from the request (e.g. the URL
+        // prefix). The rendered language is the translation the entity actually
+        // loaded as; it falls back to the default when the requested language
+        // has no translation. They differ on `/de/page/1` when the page has no
+        // German translation: requested `de`, rendered `en`.
+        $requested_langcode = $this->languageManager
+          ->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)
+          ->getId();
+        $rendered_langcode = $entity->language()->getId();
+        $translations = [];
+        if ($entity instanceof TranslatableInterface) {
+          // Native names (e.g. "Deutsch") come from the predefined language
+          // list; `ConfigurableLanguage` only stores the localized name.
+          $native_names = LanguageManager::getStandardLanguageList();
+          foreach ($this->languageManager->getLanguages() as $language) {
+            $langcode = $language->getId();
+            // A language is reported as translated only when the entity has a
+            // translation the current user may view. Gating on view access
+            // folds in the translation's published state: node and Canvas Page
+            // access deny viewing an unpublished translation without the
+            // relevant permission. So an unpublished or otherwise inaccessible
+            // translation is reported like an untranslated language
+            // (`translated: false` with a fallback URL), and is not disclosed.
+            // @see \Drupal\content_translation\Hook\ContentTranslationHooks::pageAttachments()
+            $is_translated = $entity->hasTranslation($langcode)
+              && $entity->getTranslation($langcode)->access('view');
+            $translations[] = [
+              'langcode' => $langcode,
+              // Localized name (e.g. "German") and the language's own native
+              // name (e.g. "Deutsch"), so a switcher can show either.
+              'name' => $language->getName(),
+              'nativeName' => $native_names[$langcode][1] ?? $language->getName(),
+              // Untranslated and inaccessible languages fall back to the
+              // default translation, in that language's URL form (path prefix,
+              // domain, etc.) per the site's language negotiation.
+              'url' => ($is_translated ? $entity->getTranslation($langcode) : $entity)
+                ->toUrl('canonical', ['language' => $language])
+                ->toString(),
+              'translated' => $is_translated,
+              'current' => $langcode === $requested_langcode,
+            ];
+          }
+        }
         return [
           self::V0 => [
             'mainEntity' => [
               'bundle' => $entity->bundle(),
               'entityTypeId' => $entity->getEntityTypeId(),
               'uuid' => $entity->uuid(),
+              'requestedLanguage' => $requested_langcode,
+              'renderedLanguage' => $rendered_langcode,
+              'translations' => $translations,
             ],
           ],
         ];
