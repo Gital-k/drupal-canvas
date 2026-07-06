@@ -37,6 +37,11 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
   ) {}
 
   public function redirectCanvasToUnprefixedPath(RequestEvent $event): void {
+    // canvas_multilingual supports language-prefixed editor URLs, so stripping
+    // the prefix would make non-default-language editors unreachable.
+    if ($this->moduleHandler->moduleExists('canvas_multilingual')) {
+      return;
+    }
     $request = $event->getRequest();
     $path = $request->getPathInfo();
     // Only act on /canvas paths, but not canvas API paths - those handle
