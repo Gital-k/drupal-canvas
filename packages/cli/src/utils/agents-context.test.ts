@@ -70,13 +70,10 @@ describe('pullAgentsContext', () => {
     } as unknown as ApiService;
     const messages: string[] = [];
 
-    await pullAgentsContext(
-      apiService,
-      tmpDir,
-      'content-templates',
-      [],
-      (message) => messages.push(message),
-    );
+    await pullAgentsContext(apiService, tmpDir, {
+      provider: 'content-templates',
+      writeMessage: (message) => messages.push(message),
+    });
 
     expect(messages).toEqual([
       'Saved prop source suggestions for content template component props to .agents/drupal-canvas/prop-sources.json.',
@@ -136,14 +133,12 @@ describe('pullAgentsContext', () => {
     const messages: string[] = [];
     const outputs: unknown[] = [];
 
-    await pullAgentsContext(
-      apiService,
-      tmpDir,
-      'cer-preview',
-      ['js.article-card'],
-      (message) => messages.push(message),
-      (data) => outputs.push(data),
-    );
+    await pullAgentsContext(apiService, tmpDir, {
+      provider: 'cer-preview',
+      providerArgs: ['js.article-card'],
+      writeMessage: (message) => messages.push(message),
+      writeOutput: (data) => outputs.push(data),
+    });
 
     expect(messages).toEqual([]);
     expect(outputs).toEqual([
@@ -215,14 +210,12 @@ describe('pullAgentsContext', () => {
     } as unknown as ApiService;
     const outputs: unknown[] = [];
 
-    await pullAgentsContext(
-      apiService,
-      tmpDir,
-      'cer-preview',
-      ['article-card'],
-      () => {},
-      (data) => outputs.push(data),
-    );
+    await pullAgentsContext(apiService, tmpDir, {
+      provider: 'cer-preview',
+      providerArgs: ['article-card'],
+      writeMessage: () => {},
+      writeOutput: (data) => outputs.push(data),
+    });
 
     expect(outputs).toEqual([
       {

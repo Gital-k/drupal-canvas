@@ -49,9 +49,6 @@ export function agentsContextCommand(program: Command): void {
         providerArgs: string[],
         options: AgentsContextOptions,
       ) => {
-        printCommandIntro('agents-context');
-        const s = p.spinner();
-        let pullStarted = false;
         try {
           if (!provider && !options.all) {
             command.outputHelp();
@@ -72,22 +69,13 @@ export function agentsContextCommand(program: Command): void {
           const apiService = await createApiService();
           const projectRoot = process.cwd();
 
-          s.start('Pulling agents context');
-          pullStarted = true;
-
-          await pullAgentsContext(
-            apiService,
-            projectRoot,
+          await pullAgentsContext(apiService, projectRoot, {
             provider,
             providerArgs,
-            (message) => process.stdout.write(`${message}\n`),
-            undefined,
-            options.all === true,
-          );
+            runAll: options.all === true,
+          });
         } catch (error) {
-          if (pullStarted) {
-            s.stop('Agents context pull failed', 2);
-          }
+          printCommandIntro('agents-context');
           reportResults(
             [
               {

@@ -24,19 +24,30 @@ export interface AgentsContextProvider {
 
 export const AGENTS_CONTEXT_DIR = path.join('.agents', 'drupal-canvas');
 
+export interface PullAgentsContextOptions {
+  provider?: string;
+  providerArgs?: string[];
+  writeMessage?: (message: string) => void;
+  writeOutput?: (data: unknown) => void;
+  runAll?: boolean;
+}
+
 export async function pullAgentsContext(
   apiService: ApiService,
   projectRoot: string,
-  providerName?: string,
-  providerArguments: string[] = [],
-  writeMessage: (message: string) => void = (message) => {
-    process.stdout.write(`${message}\n`);
-  },
-  writeOutput: (data: unknown) => void = (data) => {
-    process.stdout.write(`${JSON.stringify(data)}\n`);
-  },
-  runAll = false,
+  options: PullAgentsContextOptions = {},
 ): Promise<void> {
+  const {
+    provider,
+    providerArgs = [],
+    writeMessage = (message: string) => {
+      process.stdout.write(`${message}\n`);
+    },
+    writeOutput = (data: unknown) => {
+      process.stdout.write(`${JSON.stringify(data)}\n`);
+    },
+    runAll = false,
+  } = options;
   const outDir = path.join(projectRoot, AGENTS_CONTEXT_DIR);
   const writeContextFile = async (
     filename: string,
@@ -48,13 +59,13 @@ export async function pullAgentsContext(
     return path.relative(projectRoot, filePath);
   };
 
-  const providers = selectAgentsContextProviders(providerName, runAll);
+  const providers = selectAgentsContextProviders(provider, runAll);
   const providerInput = {
     apiService,
     writeContextFile,
     writeMessage,
     writeOutput,
-    arguments: providerArguments,
+    arguments: providerArgs,
   };
 
   await Promise.all([
@@ -119,26 +130,25 @@ function formatProviderDescription(
 }
 
 function selectAgentsContextProviders(
-  providerName?: string,
+  provider?: string,
   runAll = false,
 ): AgentsContextProvider[] {
   if (runAll) {
     return agentsContextProviders.filter((provider) => provider.default);
   }
-  if (!providerName) {
+  if (!provider) {
     throw new Error(
       `Specify an agents context provider or use --all.\n\n${formatAgentsContextProviders()}`,
     );
   }
-  const provider = agentsContextProviders.find(
+  const selectedProvider = agentsContextProviders.find(
     (candidate) =>
-      candidate.name === providerName ||
-      candidate.aliases?.includes(providerName),
+      candidate.name === provider || candidate.aliases?.includes(provider),
   );
-  if (!provider) {
+  if (!selectedProvider) {
     throw new Error(
-      `Unknown agents context provider '${providerName}'. Available providers: ${agentsContextProviders.map((candidate) => candidate.name).join(', ')}.`,
+      `Unknown agents context provider '${provider}'. Available providers: ${agentsContextProviders.map((candidate) => candidate.name).join(', ')}.`,
     );
   }
-  return [provider];
+  return [selectedProvider];
 }
