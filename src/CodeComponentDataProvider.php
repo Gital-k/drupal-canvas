@@ -8,6 +8,7 @@ use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Extension\ThemeSettingsProvider;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManager;
 use Drupal\Core\Language\LanguageManagerInterface;
@@ -39,6 +40,7 @@ readonly final class CodeComponentDataProvider {
     private ChainBreadcrumbBuilderInterface $breadcrumbManager,
     private LanguageManagerInterface $languageManager,
     private ContainerInterface $container,
+    private ThemeSettingsProvider $themeSettingsProvider,
   ) {}
 
   /**
@@ -153,16 +155,16 @@ readonly final class CodeComponentDataProvider {
    *
    * @return array[]
    */
-  public static function getCanvasDataThemeAssetsV0(): array {
+  public function getCanvasDataThemeAssetsV0(): array {
     return [
       self::V0 => [
         'themeAssets' => [
           'logo' => [
-            'url' => theme_get_setting('logo.url') ?? '',
+            'url' => $this->themeSettingsProvider->getSetting('logo.url') ?? '',
           ],
           'favicon' => [
-            'url' => theme_get_setting('favicon.url') ?? '',
-            'mimeType' => theme_get_setting('favicon.mimetype') ?? '',
+            'url' => $this->themeSettingsProvider->getSetting('favicon.url') ?? '',
+            'mimeType' => $this->themeSettingsProvider->getSetting('favicon.mimetype') ?? '',
           ],
         ],
       ],
