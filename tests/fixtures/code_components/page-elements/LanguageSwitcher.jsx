@@ -16,7 +16,7 @@ const LanguageSwitcher = () => {
       )}
       <ul>
         {translations.map(
-          ({ langcode, nativeName, url, translated, current }) => (
+          ({ langcode, nativeName, url, translationAvailable, current }) => (
             <li key={langcode}>
               {current ? (
                 <span lang={langcode} aria-current="true">
@@ -25,7 +25,7 @@ const LanguageSwitcher = () => {
               ) : (
                 <a href={url} lang={langcode} hrefLang={langcode}>
                   {nativeName}
-                  {!translated && ' (not translated)'}
+                  {!translationAvailable && ' (not translated)'}
                 </a>
               )}
             </li>

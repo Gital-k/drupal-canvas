@@ -201,21 +201,45 @@ readonly final class CodeComponentDataProvider {
           ->getId();
         $rendered_langcode = $entity->language()->getId();
         $translations = [];
-        if ($entity instanceof TranslatableInterface) {
+        // `instanceof` alone is not enough: the translation APIs used below
+        // must only be relied upon when the entity type supports translation
+        // and the site has more than one language. `translations` stays empty
+        // otherwise.
+        // TRICKY: `ContentEntityBase::isTranslatable()` cannot be used here:
+        // it requires the *bundle* to be marked translatable, and only the
+        // `content_translation` module sets that flag. Canvas Page
+        // translations work without `content_translation` (the entity type is
+        // `translatable`), so that check would wrongly report no translation
+        // data on such sites.
+        if ($entity instanceof TranslatableInterface
+          && $entity->getEntityType()->isTranslatable()
+          && $this->languageManager->isMultilingual()) {
           // Native names (e.g. "Deutsch") come from the predefined language
           // list; `ConfigurableLanguage` only stores the localized name.
           $native_names = LanguageManager::getStandardLanguageList();
           foreach ($this->languageManager->getLanguages() as $language) {
             $langcode = $language->getId();
-            // A language is reported as translated only when the entity has a
-            // translation the current user may view. Gating on view access
+            // A translation is reported as available only when the entity has
+            // a translation the current user may view. Gating on view access
             // folds in the translation's published state: node and Canvas Page
             // access deny viewing an unpublished translation without the
             // relevant permission. So an unpublished or otherwise inaccessible
             // translation is reported like an untranslated language
-            // (`translated: false` with a fallback URL), and is not disclosed.
+            // (`translationAvailable: false` with a fallback URL), and is not
+            // disclosed.
+            // TRICKY: the boolean `access()` call discards the cacheability of
+            // the access result (e.g. the `user.permissions` cache context and
+            // access result cache tags). That is acceptable for now only
+            // because this data is attached via `hook_js_settings_alter()`:
+            // the per-entity cache tags are already on the response because
+            // the main entity is rendered on this page (so creating, updating
+            // or deleting a translation invalidates it), and the language
+            // config cache tags are attached in
+            // \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments().
+            // Access policy changes are however NOT reflected in cached Page
+            // Cache/Dynamic Page Cache entries.
             // @see \Drupal\content_translation\Hook\ContentTranslationHooks::pageAttachments()
-            $is_translated = $entity->hasTranslation($langcode)
+            $translation_available = $entity->hasTranslation($langcode)
               && $entity->getTranslation($langcode)->access('view');
             $translations[] = [
               'langcode' => $langcode,
@@ -223,13 +247,13 @@ readonly final class CodeComponentDataProvider {
               // name (e.g. "Deutsch"), so a switcher can show either.
               'name' => $language->getName(),
               'nativeName' => $native_names[$langcode][1] ?? $language->getName(),
-              // Untranslated and inaccessible languages fall back to the
-              // default translation, in that language's URL form (path prefix,
-              // domain, etc.) per the site's language negotiation.
-              'url' => ($is_translated ? $entity->getTranslation($langcode) : $entity)
+              // Unavailable translations fall back to the default translation,
+              // in that language's URL form (path prefix, domain, etc.) per
+              // the site's language negotiation.
+              'url' => ($translation_available ? $entity->getTranslation($langcode) : $entity)
                 ->toUrl('canonical', ['language' => $language])
                 ->toString(),
-              'translated' => $is_translated,
+              'translationAvailable' => $translation_available,
               'current' => $langcode === $requested_langcode,
             ];
           }

@@ -109,27 +109,33 @@ export default RelatedArticlesWrapper;
 - `renderedLanguage`: the language the content actually rendered in. It falls
   back to the default translation when the requested language has no
   translation, so it can differ from `requestedLanguage`.
-- `translations`: every enabled site language. Each entry has:
+- `translations`: every enabled site language. Empty when the entity type does
+  not support translation or the site is monolingual. Each entry has:
   - `langcode`: the language code (e.g. `en`, `fr`).
   - `name`: the language name in the current display language (e.g. `German`).
   - `nativeName`: the language's own native name (e.g. `Deutsch`).
   - `url`: URL to view the entity in this language, resolved according to the
-    site's configured language negotiation (path prefix, domain, etc.).
-  - `translated`: whether the entity has a translation in this language **that
-    the current user may view**. Unpublished or otherwise inaccessible
-    translations are reported as `translated: false` (see note below), so this
-    reflects viewable translations, not raw translation existence.
+    site's configured language negotiation (path prefix, domain, etc.). When
+    the translation is unavailable to the current user, this is the *default*
+    translation's URL in that language, so it never discloses anything about
+    the translation itself (such as a translated path alias).
+  - `translationAvailable`: whether the entity has a translation in this
+    language **that the current user may view**. Unpublished or otherwise
+    inaccessible translations are reported as `translationAvailable: false`
+    (see note below), so this reflects viewable translations, not raw
+    translation existence.
   - `current`: whether this is the requested language, even when its content
     falls back to the default translation.
 
 ℹ️ Languages the entity is not translated into (and translations the current
 user cannot view, such as an unpublished draft) are still included, with
-`translated: false`. Their `url` still points to that language's URL (for
-example a `/fr/` path prefix or an `fr.example.com` domain, depending on the
-site's language negotiation), but the content falls back to the default
-translation. The list therefore never reveals the existence of a translation
-the current user may not see, and it can vary per user (an editor may see
-`translated: true` where an anonymous visitor sees `translated: false`).
+`translationAvailable: false`. Their `url` still points to that language's URL
+(for example a `/fr/` path prefix or an `fr.example.com` domain, depending on
+the site's language negotiation), but the content falls back to the default
+translation. Neither the list nor the URLs reveal the existence of a
+translation the current user may not see, and both can vary per user (an
+editor may see `translationAvailable: true` where an anonymous visitor sees
+`translationAvailable: false`).
 
 **Example language switcher:**
 ```js
@@ -149,7 +155,7 @@ function LanguageSwitcher() {
       )}
       <ul>
         {translations.map(
-          ({ langcode, nativeName, url, translated, current }) => (
+          ({ langcode, nativeName, url, translationAvailable, current }) => (
             <li key={langcode}>
               {current ? (
                 <span lang={langcode} aria-current="true">
@@ -158,7 +164,7 @@ function LanguageSwitcher() {
               ) : (
                 <a href={url} lang={langcode} hrefLang={langcode}>
                   {nativeName}
-                  {!translated && ' (not translated)'}
+                  {!translationAvailable && ' (not translated)'}
                 </a>
               )}
             </li>

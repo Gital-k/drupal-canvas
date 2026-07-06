@@ -202,7 +202,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
           'name' => 'English',
           'nativeName' => 'English',
           'url' => "/page/$id",
-          'translated' => TRUE,
+          'translationAvailable' => TRUE,
           'current' => TRUE,
         ],
         [
@@ -210,7 +210,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
           'name' => 'French',
           'nativeName' => 'Français',
           'url' => "/fr/page/$id",
-          'translated' => TRUE,
+          'translationAvailable' => TRUE,
           'current' => FALSE,
         ],
         [
@@ -218,7 +218,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
           'name' => 'German',
           'nativeName' => 'Deutsch',
           'url' => "/de/page/$id",
-          'translated' => FALSE,
+          'translationAvailable' => FALSE,
           'current' => FALSE,
         ],
       ],
@@ -241,7 +241,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
           'name' => 'English',
           'nativeName' => 'English',
           'url' => "/page/$id",
-          'translated' => TRUE,
+          'translationAvailable' => TRUE,
           'current' => FALSE,
         ],
         [
@@ -249,7 +249,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
           'name' => 'French',
           'nativeName' => 'Français',
           'url' => "/fr/page/$id",
-          'translated' => TRUE,
+          'translationAvailable' => TRUE,
           'current' => FALSE,
         ],
         [
@@ -257,7 +257,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
           'name' => 'German',
           'nativeName' => 'Deutsch',
           'url' => "/de/page/$id",
-          'translated' => FALSE,
+          'translationAvailable' => FALSE,
           'current' => TRUE,
         ],
       ],
@@ -297,13 +297,13 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
     $page->getTranslation('fr')->setUnpublished()->save();
     $id = $page->id();
 
-    $expected = static fn (bool $fr_translated): array => [
+    $expected = static fn (bool $fr_translation_available): array => [
       [
         'langcode' => 'en',
         'name' => 'English',
         'nativeName' => 'English',
         'url' => "/page/$id",
-        'translated' => TRUE,
+        'translationAvailable' => TRUE,
         'current' => TRUE,
       ],
       [
@@ -311,14 +311,14 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
         'name' => 'French',
         'nativeName' => 'Français',
         'url' => "/fr/page/$id",
-        'translated' => $fr_translated,
+        'translationAvailable' => $fr_translation_available,
         'current' => FALSE,
       ],
     ];
 
     // A user who can only access published content must not see the unpublished
-    // French translation: it is reported as `translated: false` (a fallback URL),
-    // indistinguishable from an untranslated language.
+    // French translation: it is reported as `translationAvailable: false` (a
+    // fallback URL), indistinguishable from an untranslated language.
     $unprivileged_user = $this->drupalCreateUser(['access content']);
     $this->assertInstanceOf(AccountInterface::class, $unprivileged_user);
     $this->drupalLogin($unprivileged_user);
@@ -330,7 +330,8 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
     );
 
     // A user who may edit pages can view the unpublished translation, so it is
-    // reported as `translated: true`; the gate is per user, not a blanket hide.
+    // reported as `translationAvailable: true`; the gate is per user, not a
+    // blanket hide.
     $editor_user = $this->drupalCreateUser([Page::EDIT_PERMISSION, 'access content']);
     $this->assertInstanceOf(AccountInterface::class, $editor_user);
     $this->drupalLogin($editor_user);
@@ -403,16 +404,8 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'uuid' => $node->uuid(),
       'requestedLanguage' => 'en',
       'renderedLanguage' => 'en',
-      'translations' => [
-        [
-          'langcode' => 'en',
-          'name' => 'English',
-          'nativeName' => 'English',
-          'url' => "/node/{$node->id()}",
-          'translated' => TRUE,
-          'current' => TRUE,
-        ],
-      ],
+      // The site is monolingual, so no translation data is provided.
+      'translations' => [],
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
   }
 

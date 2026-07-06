@@ -80,9 +80,10 @@ interface EntityMetadata {
   /**
    * All enabled site languages for building a language switcher.
    *
-   * Includes default and untranslated languages (`translated: false`).
-   * Untranslated entries still include a URL that resolves to the fallback
-   * translation.
+   * Includes default and untranslated languages
+   * (`translationAvailable: false`). Untranslated entries still include a URL
+   * that resolves to the fallback translation. Empty when the entity type does
+   * not support translation or the site is monolingual.
    */
   translations: TranslationMetadata[];
 }
@@ -94,8 +95,9 @@ interface TranslationMetadata {
   // The language's own native name (e.g. "Deutsch").
   nativeName: string;
   url: string;
-  // Whether the entity has a translation in this language.
-  translated: boolean;
+  // Whether the entity has a translation in this language that the current
+  // user may view.
+  translationAvailable: boolean;
   // Whether this is the requested language (the URL/content language), even
   // when its content falls back to the default translation.
   current: boolean;
