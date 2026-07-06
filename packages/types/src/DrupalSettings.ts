@@ -92,8 +92,9 @@ export interface DrupalSettings {
         renderedLanguage: string;
         // Every enabled site language, to support building a language switcher.
         // Includes the default translation and languages the entity is not yet
-        // translated into (`translated: false`); the latter still carry a URL
-        // that resolves to the fallback translation.
+        // translated into (`translationAvailable: false`); the latter still
+        // carry a URL that resolves to the fallback translation. Empty when the
+        // entity type does not support translation or the site is monolingual.
         translations: Array<{
           langcode: string;
           // The language name in the current display language (e.g. "German").
@@ -101,8 +102,9 @@ export interface DrupalSettings {
           // The language's own native name (e.g. "Deutsch").
           nativeName: string;
           url: string;
-          // Whether the entity has a translation in this language.
-          translated: boolean;
+          // Whether the entity has a translation in this language that the
+          // current user may view.
+          translationAvailable: boolean;
           // Whether this is the requested language (the URL/content language),
           // even when its content falls back to the default.
           current: boolean;
