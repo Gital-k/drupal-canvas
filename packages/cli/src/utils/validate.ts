@@ -1,26 +1,33 @@
 import path from 'path';
-import { basename } from 'path/win32';
 import { ESLint } from 'eslint';
 import { required as drupalCanvasRequired } from '@drupal-canvas/eslint-config';
 
-import {
-  findMetadataPath,
-  readComponentMetadata,
-} from './process-component-files';
+import { readComponentMetadata } from './process-component-files';
 import { validateContentEntityReferencePropExpressions } from './validate-content-entity-reference';
 
-import type { DiscoveredComponent } from '@drupal-canvas/discovery';
+import type {
+  DiscoveredComponent,
+  DiscoveryResult,
+} from '@drupal-canvas/discovery';
 import type { Result } from '../types/Result';
 import type { ContentEntityReferenceValidationApi } from './validate-content-entity-reference';
 
-export function getComponentDirectoriesToValidate(
+function getComponentsToValidate(
   components: DiscoveredComponent[],
-): string[] {
-  return [...new Set(components.map((component) => component.directory))];
+): DiscoveredComponent[] {
+  const componentsByDirectory = new Map<string, DiscoveredComponent>();
+
+  for (const component of components) {
+    if (!componentsByDirectory.has(component.directory)) {
+      componentsByDirectory.set(component.directory, component);
+    }
+  }
+
+  return [...componentsByDirectory.values()];
 }
 
-export async function validateComponent(
-  componentDir: string,
+async function validateComponent(
+  component: DiscoveredComponent,
   fix: boolean = false,
   apiService?: ContentEntityReferenceValidationApi,
 ): Promise<Result> {
@@ -29,7 +36,7 @@ export async function validateComponent(
     overrideConfig: drupalCanvasRequired,
     fix,
   });
-  const eslintResults = await eslint.lintFiles(componentDir + '/**/*');
+  const eslintResults = await eslint.lintFiles(component.directory + '/**/*');
   if (fix) {
     await ESLint.outputFixes(eslintResults);
   }
@@ -50,17 +57,14 @@ export async function validateComponent(
       });
     });
 
-  const metadataPath = findMetadataPath(componentDir);
-  if (metadataPath) {
-    const metadata = await readComponentMetadata(metadataPath);
-    if (metadata) {
-      details.push(
-        ...(await validateContentEntityReferencePropExpressions(
-          metadata,
-          apiService,
-        )),
-      );
-    }
+  const metadata = await readComponentMetadata(component.metadataPath);
+  if (metadata) {
+    details.push(
+      ...(await validateContentEntityReferencePropExpressions(
+        metadata,
+        apiService,
+      )),
+    );
   }
 
   const success =
@@ -68,8 +72,26 @@ export async function validateComponent(
     details.length === 0;
 
   return {
-    itemName: basename(componentDir),
+    itemName: component.name,
     success,
     details,
   };
+}
+
+export async function validateComponents(
+  discoveryResult: DiscoveryResult,
+  options: {
+    fix?: boolean;
+    apiService?: ContentEntityReferenceValidationApi;
+  } = {},
+): Promise<{ results: Result[] }> {
+  const results: Result[] = [];
+
+  for (const component of getComponentsToValidate(discoveryResult.components)) {
+    results.push(
+      await validateComponent(component, options.fix, options.apiService),
+    );
+  }
+
+  return { results };
 }

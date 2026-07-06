@@ -11,7 +11,7 @@ import {
 
 import { buildCanvasProject } from './build-project';
 import { buildTailwindForComponents } from './build-tailwind';
-import { validateComponent } from './validate';
+import { validateComponents } from './validate';
 
 import type {
   DiscoveredComponent,
@@ -29,17 +29,13 @@ vi.mock('@drupal-canvas/ui/features/code-editor/utils/ast-utils', () => ({
 }));
 
 vi.mock('./validate', async () => {
-  const path = await import('node:path');
   return {
-    getComponentDirectoriesToValidate: vi.fn(
-      (components: DiscoveredComponent[]) => [
-        ...new Set(components.map((component) => component.directory)),
-      ],
-    ),
-    validateComponent: vi.fn(async (componentDir: string) => ({
-      itemName: path.basename(componentDir),
-      success: true,
-      details: [],
+    validateComponents: vi.fn(async (discoveryResult: DiscoveryResult) => ({
+      results: discoveryResult.components.map((component) => ({
+        itemName: component.name,
+        success: true,
+        details: [],
+      })),
     })),
   };
 });
@@ -349,10 +345,14 @@ describe('buildCanvasProject', () => {
     await fs.mkdir(outputDir, { recursive: true });
     await fs.writeFile(staleManifestPath, '{"stale":true}', 'utf-8');
 
-    vi.mocked(validateComponent).mockResolvedValueOnce({
-      itemName: 'card',
-      success: false,
-      details: [{ heading: 'index.tsx', content: 'Invalid component' }],
+    vi.mocked(validateComponents).mockResolvedValueOnce({
+      results: [
+        {
+          itemName: 'card',
+          success: false,
+          details: [{ heading: 'index.tsx', content: 'Invalid component' }],
+        },
+      ],
     });
 
     const result = await buildCanvasProject({

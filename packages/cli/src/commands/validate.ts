@@ -14,10 +14,7 @@ import {
 import { validateContentTemplates } from '../utils/validate-content-template.js';
 import { validatePages } from '../utils/validate-page.js';
 import { validateRegions } from '../utils/validate-region.js';
-import {
-  getComponentDirectoriesToValidate,
-  validateComponent,
-} from '../utils/validate.js';
+import { validateComponents } from '../utils/validate.js';
 
 import type { Command } from 'commander';
 import type { ApiService } from '../services/api.js';
@@ -72,7 +69,6 @@ export function validateCommand(program: Command): void {
         // Update config with CLI options
         updateConfigFromOptions(options);
 
-        let componentDirectoriesToValidate: string[] = [];
         const config = getConfig();
         const discoveryResult = await discoverCanvasProject({
           componentRoot: config.componentDir,
@@ -81,18 +77,20 @@ export function validateCommand(program: Command): void {
           regionsRoot: config.regionsDir,
           projectRoot: process.cwd(),
         });
-        componentDirectoriesToValidate = getComponentDirectoriesToValidate(
-          discoveryResult.components,
-        );
-
         const results: Result[] = [];
         const apiService = await createOptionalValidationApiService();
 
         const s = p.spinner();
         s.start('Validating components');
 
-        for (const componentDir of componentDirectoriesToValidate) {
-          const result = await validateComponent(componentDir, options.fix);
+        const { results: componentResults } = await validateComponents(
+          discoveryResult,
+          {
+            fix: options.fix,
+            apiService,
+          },
+        );
+        for (const result of componentResults) {
           results.push({ ...result, itemType: 'Component' });
         }
 
