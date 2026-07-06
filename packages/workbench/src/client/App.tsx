@@ -602,6 +602,8 @@ export function App() {
     selectedMockIndex,
   ]);
 
+  const isDefaultComponentPreview =
+    Boolean(selectedComponent) && selectedComponentMock === null;
   const selectedComponentEntityFields =
     selectedComponent?.dataDependencies.entityFields;
   const selectedComponentReferencePropPreviews = useMemo(
@@ -731,11 +733,14 @@ export function App() {
         ]);
         let specToRender = selectedComponentMock?.spec ?? defaultSpec;
         const entityFields = selectedComponent.dataDependencies.entityFields;
-        const entityFieldGroups = groupEntityFieldsByProp(
-          entityFields,
-          selectedComponent.props,
-          selectedComponentEntityIds,
-        );
+        const entityFieldGroups =
+          selectedComponentMock === null
+            ? groupEntityFieldsByProp(
+                entityFields,
+                selectedComponent.props,
+                selectedComponentEntityIds,
+              )
+            : [];
         if (workbenchConfig?.siteUrl && entityFieldGroups.length > 0) {
           try {
             const resolvedGroups = await Promise.all(
@@ -803,7 +808,7 @@ export function App() {
           }
         }
         const selectedMockRenderId = selectedComponentMock
-          ? `${selectedComponent.id}:${selectedComponentMock.id}:${JSON.stringify(selectedComponentEntityIds)}`
+          ? `${selectedComponent.id}:${selectedComponentMock.id}`
           : `${selectedComponent.id}:${JSON.stringify(selectedComponentEntityIds)}`;
         const registrySources = selectedComponentMock
           ? (discoveryResult?.components
@@ -1508,6 +1513,7 @@ export function App() {
           ) : null}
 
           {selectedComponent &&
+          isDefaultComponentPreview &&
           selectedComponentReferencePropPreviews.length > 0 ? (
             <div className="flex flex-wrap gap-x-4 gap-y-3 border p-2">
               {selectedComponentReferencePropPreviews.map((preview) => (
