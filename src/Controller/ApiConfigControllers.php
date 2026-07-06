@@ -12,7 +12,6 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Exception\ConstraintViolationException;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\Core\Access\AccessManagerInterface;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Cache\Cache;
@@ -44,8 +43,6 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
  * @see \Drupal\canvas\ClientSideRepresentation
  */
 final class ApiConfigControllers extends ApiControllerBase {
-
-  use ComponentTreeItemListInstantiatorTrait;
 
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
@@ -368,9 +365,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     // Pattern to the component tree being edited.
     // @todo Refine in https://www.drupal.org/project/canvas/issues/3571366
     if ($entity instanceof Pattern) {
-      $tree = $entity->getComponentTree();
-      $this->componentSourceManager->updateComponentInstances($tree);
-      $entity->setComponentTree($tree->getValue());
+      $this->componentSourceManager->updateComponentInstances($entity->getComponentTree());
     }
 
     // TRICKY: some components may (erroneously!) bubble cacheability even

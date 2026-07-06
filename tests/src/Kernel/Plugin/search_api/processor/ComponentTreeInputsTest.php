@@ -125,7 +125,7 @@ final class ComponentTreeInputsTest extends CanvasKernelTestBase {
     self::assertInstanceOf(ContentTemplate::class, $template);
     self::assertTrue($template->status());
 
-    $tree = $template->getComponentTree($node);
+    $tree = $template->assembleTemplatedComponentTreeFor($node);
     $raw_inputs = $this->container->get(ComponentTreeInputExtractor::class)->extractFromTree($tree, ['id', 'class', 'cssClasses', 'extraClasses']);
     $raw_values = [];
     foreach ($raw_inputs as $component_values) {

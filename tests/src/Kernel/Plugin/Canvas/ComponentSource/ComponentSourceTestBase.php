@@ -19,7 +19,6 @@ use Drupal\canvas\Form\ComponentInstanceForm;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\Component\Render\MarkupInterface;
@@ -120,7 +119,6 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
 
   use CiModulePathTrait;
   use CrawlerTrait;
-  use ComponentTreeItemListInstantiatorTrait;
   use ConstraintViolationsTestTrait;
   use GenerateComponentConfigTrait;
 
@@ -375,7 +373,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
     }
     $this->alterEnvironmentForCrashTestDummyComponentTree($component_id, $inputs);
 
-    $field_item = $this->createDanglingComponentTreeItemList();
+    $field_item = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
     $field_item->setValue([
       [
         'uuid' => '38b79bf8-53d0-4307-b9ef-221c6a63023a',
@@ -874,7 +872,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   #[DataProvider('providerResolvedComponentInputs')]
   public function testResolvedComponentInputs(string $component_id, array $inputs, ?array $expectedResolvedInputs): void {
     $this->generateComponentConfig();
-    $item_list = $this->createDanglingComponentTreeItemList();
+    $item_list = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
     $item_list->setValue([
       [
         'uuid' => '947c196f-f108-43fd-a446-03a08100d571',

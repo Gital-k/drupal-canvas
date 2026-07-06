@@ -10,7 +10,6 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\VersionedConfigEntityBase;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Field\BaseFieldDefinition;
@@ -35,7 +34,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 class ComponentTreeItemTest extends CanvasKernelTestBase {
 
   use SingleDirectoryComponentTreeTestTrait;
-  use ComponentTreeItemListInstantiatorTrait;
   use ConstraintViolationsTestTrait;
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
@@ -115,7 +113,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
 
     // Create a component tree item list using the oldest version; then try
     // editing it. The component version should not change.
-    $component_tree = $this->createDanglingComponentTreeItemList();
+    $component_tree = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
 
     // Iteration 1: populate the empty component tree item list.
     self::assertTrue($component_tree->isEmpty());
@@ -134,7 +132,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
    */
   public function testInvalidParentUuid(string $parent_uuid, array $expected_violations): void {
     $this->generateComponentConfig();
-    $item_list = $this->createDanglingComponentTreeItemList();
+    $item_list = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
     $item_list->setValue([
       [
         'parent_uuid' => $parent_uuid,
@@ -168,7 +166,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
     $child_uuid = '8b6b47ec-1167-433b-975d-e2d97739f5a6';
 
     $this->generateComponentConfig();
-    $item_list = $this->createDanglingComponentTreeItemList();
+    $item_list = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
     $item_list->setValue([
       [
         'uuid' => $root_uuid,
@@ -200,7 +198,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
     $child_uuid = '8b6b47ec-1167-433b-975d-e2d97739f5a6';
 
     $this->generateComponentConfig();
-    $item_list = $this->createDanglingComponentTreeItemList();
+    $item_list = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
     $item_list->setValue([
       [
         'uuid' => $root_uuid,
@@ -245,7 +243,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
     $this->generateComponentConfig();
     $this->installConfig('canvas_test_code_components');
 
-    $item_list = $this->createDanglingComponentTreeItemList();
+    $item_list = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
     $js_component_id = 'js.canvas_test_code_components_with_props';
 
     $js_component = Component::load($js_component_id);

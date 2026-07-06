@@ -4,9 +4,10 @@ namespace Drupal\canvas_ai;
 
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Exception\ConstraintViolationException;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\Component\Uuid\UuidInterface;
+use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
 
 /**
@@ -14,7 +15,6 @@ use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
  */
 class AiResponseValidator {
 
-  use ComponentTreeItemListInstantiatorTrait;
   use ConstraintPropertyPathTranslatorTrait;
 
   /**
@@ -24,10 +24,13 @@ class AiResponseValidator {
    *   The validator factory.
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
    *   The UUID service.
+   * @param \Drupal\Core\TypedData\TypedDataManagerInterface $typedDataManager
+   *   The typed data manager.
    */
   public function __construct(
     protected readonly BasicRecursiveValidatorFactory $validatorFactory,
     protected readonly UuidInterface $uuidService,
+    protected readonly TypedDataManagerInterface $typedDataManager,
   ) {
   }
 
@@ -47,7 +50,7 @@ class AiResponseValidator {
     // Convert YAML structure to Canvas ComponentTreeItem format.
     $componentTreeData = $this->convertToComponentTreeData($componentGroups, NULL, NULL, 'components', $pathMapping);
 
-    $componentTreeItemList = $this->createDanglingComponentTreeItemList();
+    $componentTreeItemList = ComponentTreeItemList::createHostless($this->typedDataManager);
     $componentTreeItemList->setValue($componentTreeData);
     $violations = $componentTreeItemList->validate();
 

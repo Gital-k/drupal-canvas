@@ -67,6 +67,7 @@ greppable
 heredocs
 herobanner
 herobannersecond
+hostless
 hotfixes
 hyperscriptification
 hyperscriptified

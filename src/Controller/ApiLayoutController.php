@@ -233,20 +233,12 @@ final class ApiLayoutController {
       if ($wasModified) {
         $entity = $items->getParent()?->getValue();
         \assert($entity instanceof ComponentTreeEntityInterface || $entity instanceof FieldableEntityInterface);
-        // Capture reconciled staged overrides BEFORE setComponentTree() calls
-        // set(), which clears the $stagedOverrides cache. If captured after,
-        // getTranslation() would re-create from the live LanguageConfigOverride
-        // (still containing removed props), discarding the reconciliation.
         $configTranslationsToSave = $entity instanceof ComponentTreeConfigEntityBase
           ? \array_values(\array_map(
             fn($language) => $entity->getTranslation($language->getId()),
             $entity->getTranslationLanguages(include_default: FALSE),
           ))
           : [];
-        if ($entity instanceof ComponentTreeEntityInterface) {
-          // @todo https://www.drupal.org/i/3498525 should generalize this to all eligible content entity types (aka FieldableEntityInterface)
-          $entity->setComponentTree($items->getValue());
-        }
         // This called ::updateComponentInstances(), that means all symmetrical
         // translations (for content or config entities) have had their
         // component instances updated, too. They must remain in sync, so also
@@ -732,10 +724,6 @@ final class ApiLayoutController {
           $host_entity
         )
       );
-      if ($entity instanceof ComponentTreeEntityInterface) {
-        // This might be dangling item list so we should update explicitly.
-        $entity->setComponentTree($tree->getValue());
-      }
     }
   }
 

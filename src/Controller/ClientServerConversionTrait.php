@@ -13,7 +13,6 @@ use Drupal\canvas\Entity\EntityConstraintViolationList;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Fallback;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraint;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -32,7 +31,6 @@ use Symfony\Component\Validator\ConstraintViolationList;
 trait ClientServerConversionTrait {
 
   use ConstraintPropertyPathTranslatorTrait;
-  use ComponentTreeItemListInstantiatorTrait;
 
   /**
    * @todo Refactor/remove in https://www.drupal.org/i/3521002

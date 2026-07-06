@@ -7,9 +7,9 @@ namespace Drupal\canvas\Plugin\Validation\Constraint;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\Core\Config\Schema\Sequence;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
@@ -17,12 +17,9 @@ use Symfony\Component\Validator\ConstraintValidator;
 
 final class ComponentTreeMeetsRequirementsConstraintValidator extends ConstraintValidator implements ContainerInjectionInterface {
 
-  use ComponentTreeItemListInstantiatorTrait;
-
   public function __construct(
-    TypedDataManagerInterface $typedDataManager,
+    private readonly TypedDataManagerInterface $typedDataManager,
   ) {
-    $this->setTypedDataManager($typedDataManager);
   }
 
   /**
@@ -51,13 +48,15 @@ final class ComponentTreeMeetsRequirementsConstraintValidator extends Constraint
       // A single content-defined component tree item.
       $value instanceof ComponentTreeItem => function ($value): ComponentTreeItemList {
         $host_entity = $value->getParent()?->getParent()?->getEntity();
-        $list = $this->createDanglingComponentTreeItemList($host_entity);
+        $list = $host_entity instanceof FieldableEntityInterface
+          ? ComponentTreeItemList::createForEntity($this->typedDataManager, $host_entity)
+          : ComponentTreeItemList::createHostless($this->typedDataManager);
         $list->setValue([$value->toArray()]);
         return $list;
       },
       // A multi-value config-defined component tree.
       \is_array($value) && $this->context->getObject() instanceof Sequence => function ($value): ComponentTreeItemList {
-        $list = $this->createDanglingComponentTreeItemList();
+        $list = ComponentTreeItemList::createHostless($this->typedDataManager);
         // Config-defined component trees have sequence keys; drop them in favor
         // of integers prior to converting to a ComponentTreeItemList.
         // @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::asDeterministicallyAndTranslatableKeyedComponentTreeSequence()
@@ -66,7 +65,7 @@ final class ComponentTreeMeetsRequirementsConstraintValidator extends Constraint
       },
       // A single config-defined component tree.
       \is_array($value) => function ($value): ComponentTreeItemList {
-        $list = $this->createDanglingComponentTreeItemList();
+        $list = ComponentTreeItemList::createHostless($this->typedDataManager);
         $list->setValue([$value]);
         return $list;
       },

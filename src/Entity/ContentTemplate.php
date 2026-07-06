@@ -223,10 +223,14 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   }
 
   /**
-   * {@inheritdoc}
+   * Assembles a component tree for the given templated entity.
+   *
+   * Creates a separate list — NOT the entity-owned instance returned by
+   * ::getComponentTree() — parented to $entity so that field data (exposed
+   * slots, prop sources) can be resolved relative to that content entity.
    */
-  public function getComponentTree(?FieldableEntityInterface $parent = NULL): ComponentTreeItemList {
-    $item = $this->createDanglingComponentTreeItemList($parent ?? $this);
+  public function assembleTemplatedComponentTreeFor(FieldableEntityInterface $entity): ComponentTreeItemList {
+    $item = ComponentTreeItemList::createForEntity(\Drupal::typedDataManager(), $entity);
     $item->setValue(\array_values($this->component_tree ?? []));
     return $item;
   }
@@ -356,7 +360,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     // When no exposed slots exist, no Canvas field is required.
     // @todo Consider always requiring a Canvas field again after 1.0, once exposed slot support is added to the UI.
     if (empty($this->getExposedSlots())) {
-      return $this->getComponentTree($entity)->toRenderable($this, $isPreview);
+      return $this->assembleTemplatedComponentTreeFor($entity)->toRenderable($this, $isPreview);
     }
 
     // @todo Prior to supporting multiple exposed slots, https://www.drupal.org/i/3526189
@@ -366,7 +370,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       ->getCanvasFieldName($entity);
     $sub_tree_item_list = $entity->get($canvas_field_name);
     \assert($sub_tree_item_list instanceof ComponentTreeItemList);
-    return $this->getComponentTree($entity)
+    return $this->assembleTemplatedComponentTreeFor($entity)
       ->injectSubTreeItemList($this->getExposedSlots(), $sub_tree_item_list)
       ->toRenderable($this, $isPreview);
   }
@@ -405,10 +409,6 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
         }
       }
     }
-    if ($changed) {
-      $this->setComponentTree($tree->getValue());
-    }
-
     $changed |= parent::onDependencyRemoval($dependencies);
     return (bool) $changed;
   }

@@ -123,7 +123,6 @@ class ComponentTreeItem extends FieldItemBase {
   // @todo Decide what the best location is for this constant.
   public const string VIOLATION_CODE_GARBAGE_INPUT = 'garbage';
 
-  use ComponentTreeItemListInstantiatorTrait;
 
   // phpcs:disable Drupal.Commenting.DataTypeNamespace.DataTypeNamespace
   /**
@@ -199,7 +198,7 @@ class ComponentTreeItem extends FieldItemBase {
     }
 
     $default_value = $field_definition->getDefaultValueLiteral();
-    $list = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $list = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $list->setValue($default_value);
 
     $dependencies = NestedArray::mergeDeep($dependencies, $list->calculateDependencies());

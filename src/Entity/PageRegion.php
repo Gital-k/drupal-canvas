@@ -10,7 +10,6 @@ use Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\Core\Entity\EntityStorageInterface;
@@ -131,18 +130,6 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
       throw new ConstraintViolationException($violations);
     }
     return $auto_saved_page_region;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getComponentTree(): ComponentTreeItemList {
-    \assert(\is_array($this->component_tree));
-
-    $field_items = $this->createDanglingComponentTreeItemList($this);
-    $field_items->setValue(\array_values($this->component_tree ?? []));
-
-    return $field_items;
   }
 
   /**

@@ -7,7 +7,6 @@ namespace Drupal\Tests\canvas\Functional\Update;
 // cspell:ignore hasnot Requiredness
 
 use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -20,7 +19,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class ComponentTrackingRequiredPropsUpdateTest extends CanvasUpdatePathTestBase {
 
-  use ComponentTreeItemListInstantiatorTrait;
 
   protected $defaultTheme = 'stark';
 

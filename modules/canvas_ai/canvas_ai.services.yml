@@ -25,6 +25,7 @@ services:
     arguments:
       - '@Drupal\Core\Validation\BasicRecursiveValidatorFactory'
       - '@uuid'
+      - '@typed_data_manager'
   canvas_ai.chat_helper:
     class: Drupal\canvas_ai\CanvasAiChatHelper
     arguments:

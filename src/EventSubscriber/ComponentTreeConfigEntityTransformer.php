@@ -88,7 +88,7 @@ final readonly class ComponentTreeConfigEntityTransformer implements EventSubscr
       // In other words: simulate `orderby: key` for this `type: sequence`, but
       // that cannot be specified in config schema, since to ensure
       // translatability, the sequence keys must be stable.
-      // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait::generateComponentTreeKeys()
+      // @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::asDeterministicallyAndTranslatableKeyedComponentTreeSequence()
       // @see \Drupal\Core\Config\StorableConfigBase::castValue()
       \ksort($raw['component_tree']);
       // Second, strip the position encoding, because the position has been

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Validation;
 
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
@@ -26,7 +26,6 @@ final class ComponentTreeStructureConstraintValidatorTest extends CanvasKernelTe
 
   use ConstraintViolationsTestTrait;
   use GenerateComponentConfigTrait;
-  use ComponentTreeItemListInstantiatorTrait;
 
   /**
  * Tests validation.
@@ -45,7 +44,7 @@ final class ComponentTreeStructureConstraintValidatorTest extends CanvasKernelTe
   #[DataProvider('providerValidationItemList')]
   public function testValidationItemList(array $items, array $expected_violations): void {
     $this->generateComponentConfig();
-    $item_list = $this->createDanglingComponentTreeItemList();
+    $item_list = ComponentTreeItemList::createHostless($this->container->get("typed_data_manager"));
     $item_list->setValue($items);
     $validator = \Drupal::service(BasicRecursiveValidatorFactory::class)->createValidator();
     $violations = $validator->validate($item_list, new ComponentTreeStructureConstraint(['basePropertyPath' => 'layout']));

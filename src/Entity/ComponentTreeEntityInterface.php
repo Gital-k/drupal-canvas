@@ -20,7 +20,7 @@ interface ComponentTreeEntityInterface extends EntityInterface {
    * Gets the component tree stored by this entity.
    *
    * @return \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList
-   *   One (dangling) component tree.
+   *   The component tree.
    */
   public function getComponentTree(): ComponentTreeItemList;
 

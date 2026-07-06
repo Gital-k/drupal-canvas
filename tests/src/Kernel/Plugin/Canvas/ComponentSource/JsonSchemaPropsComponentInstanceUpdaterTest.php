@@ -14,7 +14,6 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceUpdater;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\PropShape\PersistentPropShapeRepository;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\canvas\PropSource\PropSource;
@@ -39,7 +38,6 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
 
   use ConstraintViolationsTestTrait;
   use GenerateComponentConfigTrait;
-  use ComponentTreeItemListInstantiatorTrait;
   use MediaTypeCreationTrait;
   use UserCreationTrait;
 
@@ -500,7 +498,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
       ],
     ];
     // Skip validation: garbage inputs are intentionally invalid.
-    $component_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $component_tree = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $component_tree->setValue($component_tree_value);
     $component_instance = $component_tree->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
     self::assertNotNull($component_instance);
@@ -594,7 +592,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
    * Both are associative arrays (never lists), so neither can use
    * providerUpdate(), whose testUpdate() validates the tree (a dynamic source
    * is rejected outside a content template). This exercises update() directly
-   * on a dangling tree instead.
+   * on a hostless tree instead.
    */
   #[DataProvider('providerUpdatePreservesSingleValueInput')]
   public function testUpdatePreservesSingleValueInput(array $inputs, string $prop_name): void {
@@ -613,9 +611,9 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
     $this->addOptionalProp();
 
     // Skip tree validation: a dynamic source is only valid on a content
-    // template, and the multi-property value models a field this dangling tree
+    // template, and the multi-property value models a field this hostless tree
     // is not bound to. The updater's slicing logic is field-agnostic.
-    $component_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $component_tree = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $component_tree->setValue($component_tree_value);
     $component_instance = $component_tree->getComponentTreeItemByUuid(self::COMPONENT_INSTANCE_UUID);
     self::assertNotNull($component_instance);
@@ -695,7 +693,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
   }
 
   private static function generateComponentTree(array $component_tree_value, array $expected_violations): ComponentTreeItemList {
-    $component_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $component_tree = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $component_tree->setValue($component_tree_value);
     self::assertSame($expected_violations, self::violationsToArray($component_tree->validate()));
     return $component_tree;
@@ -718,7 +716,7 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
       call_user_func_array($setup_callback, []);
     }
 
-    $component_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $component_tree = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $component_tree->setValue($component_instance_value);
     // We explicitly don't validate the tree when the missing component exists,
     // as we want to allow that for properly testing we are handling it.

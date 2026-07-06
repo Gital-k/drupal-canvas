@@ -16,7 +16,6 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBa
 use Drupal\canvas\Plugin\DataType\ComponentInputs;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
@@ -29,8 +28,6 @@ use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\field\Entity\FieldConfig;
 
 class CanvasConfigUpdater {
-
-  use ComponentTreeItemListInstantiatorTrait;
 
   public function __construct(
     private readonly ComponentSourceManager $componentSourceManager,
@@ -124,7 +121,6 @@ class CanvasConfigUpdater {
     $tree = self::getComponentTreeForEntity($entity);
     self::optimizeTreeInputs($tree);
     if ($entity instanceof ComponentTreeEntityInterface) {
-      $entity->setComponentTree($tree->getValue());
       return TRUE;
     }
     $entity->set('default_value', $tree->getValue());
@@ -157,7 +153,7 @@ class CanvasConfigUpdater {
     }
     // @phpstan-ignore-next-line PHPStan correctly
     \assert($entity instanceof FieldConfig);
-    $field_default_value_tree = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $field_default_value_tree = ComponentTreeItemList::createHostless(\Drupal::typedDataManager());
     $field_default_value_tree->setValue($entity->get('default_value') ?? []);
     return $field_default_value_tree;
   }

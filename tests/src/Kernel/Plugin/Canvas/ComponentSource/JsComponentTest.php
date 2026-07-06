@@ -18,6 +18,8 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\PropSource\StaticPropSource;
@@ -52,7 +54,6 @@ use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
-use Drupal\Tests\canvas\Traits\ComponentTreeItemInstantiatorTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Depends;
@@ -74,7 +75,6 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
 
   use CacheBustingTrait;
   use CreateTestJsComponentTrait;
-  use ComponentTreeItemInstantiatorTrait;
 
   protected readonly AssetResolverInterface $assetResolver;
   /**
@@ -2798,7 +2798,16 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
       $inputs[$prop_name]['value'] = $value_entity->id();
     }
 
-    $item = $this->buildComponentTreeItem($fixtures['component_id'], $inputs);
+    $item_list = ComponentTreeItemList::createHostless($this->container->get('typed_data_manager'));
+    $item_list->setValue([
+      [
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $fixtures['component_id'],
+        'inputs' => $inputs,
+      ],
+    ]);
+    $item = $item_list->get(0);
+    \assert($item instanceof ComponentTreeItem);
     $uuid = $this->container->get('uuid')->generate();
     $result = $fixtures['source']->getExplicitInput($uuid, $item, $pass_host ? $fixtures['host_news'] : NULL);
 
@@ -2984,7 +2993,16 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     ]);
     self::assertEntityIsValid($empty_host);
     $empty_host->save();
-    $unrooted_item = $this->buildComponentTreeItem($fixtures['component_id'], $entity_field_inputs);
+    $unrooted_list = ComponentTreeItemList::createHostless($this->container->get('typed_data_manager'));
+    $unrooted_list->setValue([
+      [
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $fixtures['component_id'],
+        'inputs' => $entity_field_inputs,
+      ],
+    ]);
+    $unrooted_item = $unrooted_list->get(0);
+    \assert($unrooted_item instanceof ComponentTreeItem);
     $empty_host_result = $fixtures['source']->getExplicitInput(
       $this->container->get('uuid')->generate(),
       $unrooted_item,
@@ -3014,11 +3032,16 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     // Tree rooted in a fieldable host (host_news), $host_entity argument
     // omitted — exactly what ComponentTreeItemList::getHydratedValue() and
     // ComponentTreeInputExtractor::extract() do in production.
-    $rooted_item = $this->buildComponentTreeItem(
-      $fixtures['component_id'],
-      $entity_field_inputs,
-      $fixtures['host_news'],
-    );
+    $rooted_list = ComponentTreeItemList::createForEntity($this->container->get('typed_data_manager'), $fixtures['host_news']);
+    $rooted_list->setValue([
+      [
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $fixtures['component_id'],
+        'inputs' => $entity_field_inputs,
+      ],
+    ]);
+    $rooted_item = $rooted_list->get(0);
+    \assert($rooted_item instanceof ComponentTreeItem);
     $result = $fixtures['source']->getExplicitInput(
       $this->container->get('uuid')->generate(),
       $rooted_item,
@@ -3094,16 +3117,21 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     self::assertEntityIsValid($js_component);
     $js_component->save();
 
-    $rooted_item = $this->buildComponentTreeItem(
-      $fixtures['component_id'],
+    $rooted_list = ComponentTreeItemList::createForEntity($this->container->get('typed_data_manager'), $fixtures['host_news']);
+    $rooted_list->setValue([
       [
-        'news_item_reference' => [
-          'sourceType' => PropSource::EntityField->value,
-          'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $fixtures['component_id'],
+        'inputs' => [
+          'news_item_reference' => [
+            'sourceType' => PropSource::EntityField->value,
+            'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+          ],
         ],
       ],
-      $fixtures['host_news'],
-    );
+    ]);
+    $rooted_item = $rooted_list->get(0);
+    \assert($rooted_item instanceof ComponentTreeItem);
     $result = $fixtures['source']->getExplicitInput(
       $this->container->get('uuid')->generate(),
       $rooted_item,
@@ -3167,16 +3195,21 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     self::assertEntityIsValid($js_component);
     $js_component->save();
 
-    $rooted_item = $this->buildComponentTreeItem(
-      $fixtures['component_id'],
+    $rooted_list = ComponentTreeItemList::createForEntity($this->container->get('typed_data_manager'), $fixtures['host_news']);
+    $rooted_list->setValue([
       [
-        'news_item_reference' => [
-          'sourceType' => PropSource::EntityField->value,
-          'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $fixtures['component_id'],
+        'inputs' => [
+          'news_item_reference' => [
+            'sourceType' => PropSource::EntityField->value,
+            'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+          ],
         ],
       ],
-      $fixtures['host_news'],
-    );
+    ]);
+    $rooted_item = $rooted_list->get(0);
+    \assert($rooted_item instanceof ComponentTreeItem);
     $result = $fixtures['source']->getExplicitInput(
       $this->container->get('uuid')->generate(),
       $rooted_item,
@@ -3253,16 +3286,21 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     self::assertEntityIsValid($js_component);
     $js_component->save();
 
-    $rooted_item = $this->buildComponentTreeItem(
-      $fixtures['component_id'],
+    $rooted_list = ComponentTreeItemList::createForEntity($this->container->get('typed_data_manager'), $fixtures['host_news']);
+    $rooted_list->setValue([
       [
-        'news_item_reference' => [
-          'sourceType' => PropSource::EntityField->value,
-          'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $fixtures['component_id'],
+        'inputs' => [
+          'news_item_reference' => [
+            'sourceType' => PropSource::EntityField->value,
+            'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+          ],
         ],
       ],
-      $fixtures['host_news'],
-    );
+    ]);
+    $rooted_item = $rooted_list->get(0);
+    \assert($rooted_item instanceof ComponentTreeItem);
     $result = $fixtures['source']->getExplicitInput(
       $this->container->get('uuid')->generate(),
       $rooted_item,
@@ -3328,16 +3366,21 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
 
     // The host references a (single-bundle) news_item, so the prop resolves to a
     // real entity and evaluation reaches the branch expression.
-    $rooted_item = $this->buildComponentTreeItem(
-      $fixtures['component_id'],
+    $rooted_list = ComponentTreeItemList::createForEntity($this->container->get('typed_data_manager'), $fixtures['host_news']);
+    $rooted_list->setValue([
       [
-        'news_item_reference' => [
-          'sourceType' => PropSource::EntityField->value,
-          'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $fixtures['component_id'],
+        'inputs' => [
+          'news_item_reference' => [
+            'sourceType' => PropSource::EntityField->value,
+            'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
+          ],
         ],
       ],
-      $fixtures['host_news'],
-    );
+    ]);
+    $rooted_item = $rooted_list->get(0);
+    \assert($rooted_item instanceof ComponentTreeItem);
 
     $this->expectException(\LogicException::class);
     $this->expectExceptionMessage('Multi-target-bundle content entity references are not yet supported');
