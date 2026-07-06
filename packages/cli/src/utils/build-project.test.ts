@@ -286,7 +286,6 @@ describe('buildCanvasProject', () => {
       outputDir,
       discoveryResult,
       cleanOutputDir: true,
-      buildTailwind: true,
       requireJsEntries: true,
     });
 
