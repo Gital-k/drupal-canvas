@@ -53,6 +53,7 @@ drupalsettings
 druplicon
 endapply
 entityviewdisplay
+Español
 esque
 extralight
 extensionless
