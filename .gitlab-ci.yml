@@ -715,6 +715,43 @@ playwright-reports:
         - test-results/playwright.xml
       annotations: test-results/links.json
 
+playwright-status:
+  stage: report
+  image: *image-node
+  rules: !reference [playwright, rules]
+  needs:
+    - playwright
+  variables:
+    GIT_STRATEGY: none
+  cache: []
+  script:
+    - |
+      # Fail this job if any upstream Playwright shard jobs failed.
+      UPSTREAM_JOB_COUNTS=$(node -e '
+        (async () => {
+          const url = `${process.env.CI_API_V4_URL}/projects/${process.env.CI_PROJECT_ID}/pipelines/${process.env.CI_PIPELINE_ID}/jobs?per_page=100`;
+          const resp = await fetch(url, { headers: { "JOB-TOKEN": process.env.CI_JOB_TOKEN } });
+          if (!resp.ok) {
+            process.stderr.write(`GitLab API error: ${resp.status} ${resp.statusText}\n`);
+            process.exit(1);
+          }
+          const jobs = await resp.json();
+          const playwrightJobs = jobs.filter(j =>
+            j.name.startsWith("playwright") && !j.name.startsWith("playwright-")
+          );
+          const failureCount = playwrightJobs.filter(j => j.status === "failed").length;
+          process.stdout.write(`${failureCount} ${playwrightJobs.length}`);
+        })().catch(e => { process.stderr.write(e.message + "\n"); process.exit(1); });
+      ')
+      read -r UPSTREAM_FAILURES PLAYWRIGHT_JOBS <<EOF
+      ${UPSTREAM_JOB_COUNTS}
+      EOF
+      if [ "${UPSTREAM_FAILURES}" -gt 0 ]; then
+        echo "❌ ${UPSTREAM_FAILURES} / ${PLAYWRIGHT_JOBS} Playwright job(s) failed. See the Playwright report for details."
+        exit 1
+      fi
+      echo "✅ All ${PLAYWRIGHT_JOBS} Playwright job(s) passed."
+
 CLI Test:
   stage: test
   rules:
