@@ -23,7 +23,8 @@ test.describe('Block form', () => {
     const inputsForm = page.locator(
       '[data-testid="canvas-contextual-panel"] [data-drupal-selector="component-instance-form"]',
     );
-    await expect(inputsForm).toContainText('Menu levels');
+    // Temporary: force a fail
+    await expect(inputsForm).toContainText('Menu levelssss');
     await expect(inputsForm.locator('select')).toHaveCount(2);
     await expect(inputsForm.locator('input[type="checkbox"]')).toBeVisible();
   });
