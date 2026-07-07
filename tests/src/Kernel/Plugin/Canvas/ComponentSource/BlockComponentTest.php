@@ -246,6 +246,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
       'languages:language_interface',
       'theme',
       'user.permissions',
+      'workspace',
     ];
     $default_cacheability = (new CacheableMetadata())
       ->setCacheContexts($default_render_cache_contexts);
@@ -267,6 +268,7 @@ HTML,
             'theme',
             'user',
             'user.permissions',
+            'workspace',
           ]),
         'attachments' => [],
       ],
