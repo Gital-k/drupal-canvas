@@ -705,7 +705,7 @@ playwright-reports:
     - |
       # Fail this job if any upstream Playwright jobs failed. Checking via the
       # GitLab API (rather than the merged JUnit XML) catches infrastructure
-      # failures where no blob report was produced and tests="0" in the XML.
+      # failures where no blob report was produced and tests='0' in the XML.
       UPSTREAM_FAILURES=$(node -e '
         (async () => {
           const url = `${process.env.CI_API_V4_URL}/projects/${process.env.CI_PROJECT_ID}/pipelines/${process.env.CI_PIPELINE_ID}/jobs?per_page=100`;
