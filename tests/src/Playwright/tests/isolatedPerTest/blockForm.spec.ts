@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 
 import { isolatedPerTest as test } from '../../fixtures/test.js';
 
-// cspell:ignore cset levelssss
+// cspell:ignore cset
 
 test.describe('Block form', () => {
   test('Block settings form with details element', async ({
