@@ -740,6 +740,9 @@ playwright-status:
             j.name.startsWith("playwright") && !j.name.startsWith("playwright-")
           );
           const failureCount = playwrightJobs.filter(j => j.status === "failed").length;
+          if (failureCount > 0) {
+            process.stderr.write(`Matched Playwright jobs:\n${JSON.stringify(playwrightJobs, null, 2)}\n`);
+          }
           process.stdout.write(`${failureCount} ${playwrightJobs.length}`);
         })().catch(e => { process.stderr.write(e.message + "\n"); process.exit(1); });
       ')
