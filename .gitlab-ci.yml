@@ -717,7 +717,8 @@ playwright-reports:
           const jobs = await resp.json();
           const n = jobs.filter(j =>
             j.name.startsWith("playwright") && !j.name.startsWith("playwright-") &&
-            j.status === "failed"
+            j.status === "failed" &&
+            !j.retried
           ).length;
           process.stdout.write(String(n));
         })().catch(e => { process.stderr.write(e.message + "\n"); process.exit(1); });
