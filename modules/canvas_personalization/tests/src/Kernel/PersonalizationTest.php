@@ -110,6 +110,7 @@ final class PersonalizationTest extends KernelTestBase {
       'url.site',
       'user.permissions',
       'user.roles:authenticated',
+      'workspace',
     ], $cache_contexts);
   }
 
