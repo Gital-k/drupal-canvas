@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSave\Workspace\LegacyAutoSaveMigrator;
 use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSynchronizer;
 use Drupal\canvas\Entity\BrandKit;
@@ -14,6 +15,7 @@ use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Entity\StagedLanguageConfigOverride;
 use Drupal\Core\Config\Entity\ConfigEntityUpdater;
 use Drupal\Core\Entity\EntityDefinitionUpdateManagerInterface;
+use Drupal\Core\Entity\TranslatableInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\image\Entity\ImageStyle;
 
@@ -470,4 +472,47 @@ function canvas_post_update_0022_enforce_symmetrical_canvas_page_components_tran
   // it created.
   // @see \Drupal\Tests\canvas\Functional\Update\SymmetricalCanvasPageComponentsTranslationUpdateTest::testMissingOverride
   ComponentTreeFieldSymmetricalTranslationSynchronizer::ensureSymmetricalCanvasPageComponents();
+}
+
+/**
+ * Seeds workspace auto-save staging from legacy key-value auto-save entries.
+ *
+ * Workspace switching during migration needs no access relaxation: core
+ * exempts CLI (drush updb), and for web update.php the Canvas workspace
+ * provider grants view access during maintenance-mode update runs.
+ *
+ * @see \Drupal\canvas\AutoSave\Workspace\CanvasWorkspaceProvider::checkAccess()
+ */
+function canvas_post_update_0023_migrate_auto_save_to_workspace(array &$sandbox): void {
+  $kv = \Drupal::keyValue('canvas.auto_save');
+  if (!isset($sandbox['keys'])) {
+    $sandbox['keys'] = \array_keys($kv->getAll());
+    $sandbox['total'] = \count($sandbox['keys']);
+  }
+  if ($sandbox['total'] === 0) {
+    $sandbox['#finished'] = 1;
+    return;
+  }
+
+  /** @var \Drupal\canvas\AutoSave\Workspace\LegacyAutoSaveMigrator $migrator */
+  $migrator = \Drupal::service(LegacyAutoSaveMigrator::class);
+  foreach (\array_splice($sandbox['keys'], 0, 25) as $key) {
+    $entry = $kv->get($key);
+    if (!\is_array($entry) || !isset($entry['entity_type'], $entry['entity_id'])) {
+      continue;
+    }
+    $entity = \Drupal::entityTypeManager()->getStorage($entry['entity_type'])->load($entry['entity_id']);
+    if ($entity === NULL) {
+      continue;
+    }
+    // Legacy entries are per translation; the migrator derives the key from
+    // the entity object, so it must receive the matching translation.
+    if (isset($entry['langcode'])
+      && $entity instanceof TranslatableInterface
+      && $entity->hasTranslation($entry['langcode'])) {
+      $entity = $entity->getTranslation($entry['langcode']);
+    }
+    $migrator->migrateIfNeeded($entity);
+  }
+  $sandbox['#finished'] = \count($sandbox['keys']) === 0 ? 1 : 1 - (\count($sandbox['keys']) / $sandbox['total']);
 }
