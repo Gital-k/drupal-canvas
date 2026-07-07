@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSave\Workspace\WorkspaceAutoSave;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\AutoSavePublishAwareInterface;
@@ -74,6 +75,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
     private readonly ComponentSourceManager $componentSourceManager,
     private readonly ComponentTreeLoader $componentTreeLoader,
     private readonly ModuleHandlerInterface $moduleHandler,
+    private readonly WorkspaceAutoSave $workspaceAutoSave,
     /**
      * @var \Drupal\workspaces\WorkspaceManagerInterface|null
      */
@@ -502,6 +504,12 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // revision.
         if ($this->workspaceManager !== NULL) {
           $this->workspaceManager->executeOutsideWorkspace(static fn () => $entity->save());
+          if ($entity instanceof ContentEntityInterface) {
+            // Entities implicitly staged alongside the host (e.g. its path
+            // alias) were created with an unpublished Live revision; a
+            // selective per-item publish must publish them with their host.
+            $this->workspaceAutoSave->publishDependentStagedEntities($entity);
+          }
         }
         else {
           $entity->save();
