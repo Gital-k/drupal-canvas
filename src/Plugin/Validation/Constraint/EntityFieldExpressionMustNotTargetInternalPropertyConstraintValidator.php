@@ -10,6 +10,7 @@ use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ScalarPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -78,14 +79,18 @@ final class EntityFieldExpressionMustNotTargetInternalPropertyConstraintValidato
    * Finds the first internal (non-computed) field property in an expression.
    *
    * Walks reference chains and object-prop expressions, matching the picker's
-   * rule: a field property is excluded when it is internal but not computed.
-   * (Computed properties are internal-by-default in core yet remain pickable.)
+   * rule: a field property is excluded when it is internal but not computed,
+   * or when it explicitly opts back in to being internal despite being
+   * computed (e.g. `DateTimeItemOverride` marking `date` internal).
+   * (Computed properties are internal-by-default in core yet remain pickable
+   * otherwise.)
    *
    * @return array{0: string, 1: string}|null
    *   A [field, property] pair (e.g. ['entity:node:article.uid', 'pass']) for
    *   the offending property, or NULL when none is internal.
    *
    * @see \Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers::buildFieldEntry()
+   * @see \Drupal\canvas\Utility\TypedDataHelper::isEffectivelyInternal()
    */
   private function findInternalProperty(EntityFieldBasedPropExpressionInterface $expression): ?array {
     // Object-prop expression: every sub-property is on this same field.
@@ -116,21 +121,22 @@ final class EntityFieldExpressionMustNotTargetInternalPropertyConstraintValidato
     }
 
     // Scalar leaf: apply the picker's rule. A field property is excluded when
-    // it is internal but not computed — at the field level (e.g. a base field
-    // marked internal) or the field property level.
+    // it is internal but not computed, or explicitly internal despite being
+    // computed — at the field level (e.g. a base field marked internal) or
+    // the field property level.
     if ($expression instanceof ScalarPropExpressionInterface) {
       $field_definition = $this->resolveFieldDefinition($expression);
       if ($field_definition === NULL) {
         return NULL;
       }
       $field_id = \sprintf('%s.%s', $expression->getHostEntityDataDefinition()->getDataType(), $expression->getFieldName());
-      if ($field_definition->isInternal() && !$field_definition->isComputed()) {
+      if (TypedDataHelper::isEffectivelyInternal($field_definition)) {
         return [$field_id, $expression->getFieldPropertyName()];
       }
       $item_definition = $field_definition->getItemDefinition();
       if ($item_definition instanceof ComplexDataDefinitionInterface) {
         $property_definition = $item_definition->getPropertyDefinition($expression->getFieldPropertyName());
-        if ($property_definition !== NULL && $property_definition->isInternal() && !$property_definition->isComputed()) {
+        if ($property_definition !== NULL && TypedDataHelper::isEffectivelyInternal($property_definition)) {
           return [$field_id, $expression->getFieldPropertyName()];
         }
       }
