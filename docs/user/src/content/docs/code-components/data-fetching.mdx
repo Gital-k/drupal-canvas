@@ -109,8 +109,9 @@ export default RelatedArticlesWrapper;
 - `renderedLanguage`: the language the content actually rendered in. It falls
   back to the default translation when the requested language has no
   translation, so it can differ from `requestedLanguage`.
-- `translations`: every enabled site language. Empty when the entity type does
-  not support translation or the site is monolingual. Each entry has:
+- `translations`: every enabled site language, even when the entity itself is
+  not translatable, so a language switcher is always complete. Empty when the
+  site is monolingual. Each entry has:
   - `langcode`: the language code (e.g. `en`, `fr`).
   - `name`: the language name in the current display language (e.g. `German`).
   - `nativeName`: the language's own native name (e.g. `Deutsch`).

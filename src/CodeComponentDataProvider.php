@@ -206,18 +206,16 @@ readonly final class CodeComponentDataProvider {
           ->getId();
         $rendered_langcode = $entity->language()->getId();
         $translations = [];
-        // `instanceof` alone is not enough: the translation APIs used below
-        // must only be relied upon when the entity type supports translation
-        // and the site has more than one language. `translations` stays empty
-        // otherwise.
-        // TRICKY: `ContentEntityBase::isTranslatable()` cannot be used here:
-        // it requires the *bundle* to be marked translatable, and only the
-        // `content_translation` module sets that flag. Canvas Page
-        // translations work without `content_translation` (the entity type is
-        // `translatable`), so that check would wrongly report no translation
-        // data on such sites.
+        // The translations list powers language switchers, so it is provided
+        // for every content entity on a multilingual site, regardless of
+        // whether the entity (its type or bundle) is translatable: every
+        // enabled language must be listed for the switcher to be complete.
+        // Whether a translation actually exists in a language is conveyed
+        // per language by `translationAvailable`; for an untranslatable
+        // entity every other language simply reports
+        // `translationAvailable: false` with a fallback URL. On a monolingual
+        // site `translations` stays empty: there is nothing to switch to.
         if ($entity instanceof TranslatableInterface
-          && $entity->getEntityType()->isTranslatable()
           && $this->languageManager->isMultilingual()) {
           // Native names (e.g. "Deutsch") come from the predefined language
           // list; `ConfigurableLanguage` only stores the localized name.
