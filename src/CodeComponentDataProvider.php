@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas;
 
 use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\Entity\EntityInterface;
@@ -174,9 +175,13 @@ readonly final class CodeComponentDataProvider {
   /**
    * Returns main entity data for V0 of drupalSettings.canvasData.
    *
+   * @param \Drupal\Core\Cache\RefinableCacheableDependencyInterface|null $cacheability
+   *   (optional) When given, the cacheability of the per-translation `view`
+   *   access results embedded in the returned data is added to it.
+   *
    * @return array
    */
-  public function getCanvasDataMainEntityV0(): array {
+  public function getCanvasDataMainEntityV0(?RefinableCacheableDependencyInterface $cacheability = NULL): array {
     // List of likely route parameters to check for the entity.
     $likelyEntityIdentifiers = ['preview_entity', 'node', 'entity', 'canvas_page'];
     $currentRouteParams = $this->routeMatch->getParameters()->keys();
@@ -227,20 +232,24 @@ readonly final class CodeComponentDataProvider {
             // translation is reported like an untranslated language
             // (`translationAvailable: false` with a fallback URL), and is not
             // disclosed.
-            // TRICKY: the boolean `access()` call discards the cacheability of
-            // the access result (e.g. the `user.permissions` cache context and
-            // access result cache tags). That is acceptable for now only
-            // because this data is attached via `hook_js_settings_alter()`:
-            // the per-entity cache tags are already on the response because
-            // the main entity is rendered on this page (so creating, updating
-            // or deleting a translation invalidates it), and the language
-            // config cache tags are attached in
-            // \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments().
-            // Access policy changes are however NOT reflected in cached Page
-            // Cache/Dynamic Page Cache entries.
-            // @see \Drupal\content_translation\Hook\ContentTranslationHooks::pageAttachments()
-            $translation_available = $entity->hasTranslation($langcode)
-              && $entity->getTranslation($langcode)->access('view');
+            // TRICKY: `hook_js_settings_alter()`, where this data is attached,
+            // runs during asset rendering and cannot bubble cacheability. The
+            // access result cacheability (e.g. the `user.permissions` cache
+            // context) is therefore bubbled into the page via the
+            // $cacheability parameter by JsComponent::renderComponent(), for
+            // every code component depending on this data. The other
+            // dependencies need no bubbling here: the per-entity cache tags
+            // are already on the response because the main entity is rendered
+            // on this page (so creating, updating or deleting a translation
+            // invalidates it), and the language config cache tags are added in
+            // JsComponent::renderComponent() too.
+            // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+            $translation_available = FALSE;
+            if ($entity->hasTranslation($langcode)) {
+              $access_result = $entity->getTranslation($langcode)->access('view', NULL, TRUE);
+              $cacheability?->addCacheableDependency($access_result);
+              $translation_available = $access_result->isAllowed();
+            }
             $translations[] = [
               'langcode' => $langcode,
               // Localized name (e.g. "German") and the language's own native

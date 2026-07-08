@@ -7,6 +7,7 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\AutoSaveEntity;
+use Drupal\canvas\CodeComponentDataProvider;
 use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\BrandKit;
@@ -62,6 +63,7 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
   protected ?JavaScriptComponent $jsComponent = NULL;
   protected GlobalImports $globalImports;
   protected EntityTypeManagerInterface $entityTypeManager;
+  protected CodeComponentDataProvider $codeComponentDataProvider;
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
@@ -70,6 +72,7 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     $instance->fileUrlGenerator = $container->get(FileUrlGeneratorInterface::class);
     $instance->globalImports = $container->get(GlobalImports::class);
     $instance->entityTypeManager = $container->get(EntityTypeManagerInterface::class);
+    $instance->codeComponentDataProvider = $container->get(CodeComponentDataProvider::class);
     return $instance;
   }
 
@@ -423,11 +426,15 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     // When this component reads `canvasData.v0.mainEntity`, its data embeds the
     // per-language translation list, derived from the enabled-language list and
     // the URL negotiation config. Rebuild it when either changes.
-    // Per-translation view access and published state need no extra
-    // cacheability here: the main entity is the rendered route entity, so its
-    // own access cacheability is already on the page.
     if (\in_array('canvas/canvasData.v0.mainEntity', $component->getAssetLibraryDependencies(), TRUE)) {
       $cacheability->addCacheTags(['config:configurable_language_list', 'config:language.negotiation']);
+      // The data also embeds per-translation view access results. Their
+      // cacheability (e.g. the `user.permissions` cache context) must be
+      // bubbled here: the data itself is attached in hook_js_settings_alter(),
+      // which runs during asset rendering, outside the render pipeline. The
+      // returned data is discarded; it is recomputed there.
+      // @see \Drupal\canvas\Hook\ComponentSourceHooks::jsSettingsAlter()
+      $this->codeComponentDataProvider->getCanvasDataMainEntityV0($cacheability);
     }
     $cacheability->applyTo($build);
 
