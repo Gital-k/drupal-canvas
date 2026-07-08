@@ -333,14 +333,15 @@ test.describe('Conflict UX enabled', () => {
 
     await page.getByRole('tab', { name: 'Text' }).click();
     await expect(
-      page
-        .getByTestId('conflict-published-version-card')
-        .getByText('Externally updated side by side conflict page'),
+      page.getByTestId('conflict-text-diff-published').locator('del').filter({
+        hasText: "value: 'Externally updated side by side conflict page'",
+      }),
     ).toBeVisible();
     await expect(
       page
-        .getByTestId('conflict-new-version-card')
-        .getByText('Side by side conflict page'),
+        .getByTestId('conflict-text-diff-new')
+        .locator('ins')
+        .filter({ hasText: "value: 'Side by side conflict page'" }),
     ).toBeVisible();
 
     // The UI state cannot prove the exact conflict revision was sent, so this
