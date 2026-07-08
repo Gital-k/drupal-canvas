@@ -249,28 +249,13 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       throw new BadRequestHttpException(\sprintf("The entity type '%s' is not a content entity type.", $entity_type));
     }
     $data = self::decode($request);
-    try {
-      $data = JavaScriptComponent::coalesceEntityFields($data);
-    }
-    catch (\Throwable $e) {
-      throw new BadRequestHttpException('The request contains invalid prop expressions.', $e);
-    }
     $resolved = [];
     foreach ($data['entityFields'] as $prop_name => $expression_strings) {
-      $expressions = \array_map(
-        static function (string $expression_string): EntityFieldBasedPropExpressionInterface {
-          $expression = StructuredDataPropExpression::fromString($expression_string);
-          if (!$expression instanceof EntityFieldBasedPropExpressionInterface) {
-            throw new BadRequestHttpException(\sprintf("'%s' is not a valid content-entity-reference prop expression.", $expression_string));
-          }
-          return $expression;
-        },
-        $expression_strings,
-      );
       try {
+        $expressions = JavaScriptComponent::parseAndCoalesceEntityFieldExpressions($expression_strings);
         $resolved[$prop_name] = JsComponent::buildReferencePayload(new EvaluationResult($entity), $expressions);
       }
-      catch (\DomainException $e) {
+      catch (\DomainException | \InvalidArgumentException | \UnhandledMatchError $e) {
         throw new BadRequestHttpException($e->getMessage(), $e);
       }
     }

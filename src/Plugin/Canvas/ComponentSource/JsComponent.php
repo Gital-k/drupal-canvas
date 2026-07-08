@@ -17,6 +17,7 @@ use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionI
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
@@ -242,8 +243,8 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
    *   The resolved entity to evaluate the expressions against, wrapped in an
    *   EvaluationResult to carry the cacheability describing how this entity was
    *   loaded.
-   * @param array<\Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface> $expressions
-   *   The entity field expressions, relative to $entity.
+   * @param array<\Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface> $expressions
+   *   The expressions, relative to $entity.
    *
    * @return \Drupal\canvas\PropExpressions\StructuredData\EvaluationResult
    *   The payload object (always containing a `__type` key), wrapped in an
@@ -283,7 +284,8 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
       $reference_entries = match (TRUE) {
         $expression instanceof ReferenceFieldPropExpression => [$expression],
         $expression instanceof FieldObjectPropsExpression && $expression->isReferenceOnly() => \array_values($expression->objectPropsToFieldProps),
-        default => NULL,
+        $expression instanceof FieldPropExpression || $expression instanceof FieldObjectPropsExpression => NULL,
+        default => throw new \UnhandledMatchError(\sprintf("'%s' is not a valid content-entity-reference prop expression.", (string) $expression)),
       };
       if ($reference_entries !== NULL) {
         foreach ($reference_entries as $reference) {

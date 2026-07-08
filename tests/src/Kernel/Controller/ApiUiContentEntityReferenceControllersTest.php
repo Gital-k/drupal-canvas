@@ -469,7 +469,7 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     );
 
     $this->expectException(BadRequestHttpException::class);
-    $this->expectExceptionMessage('The request contains invalid prop expressions.');
+    $this->expectExceptionMessage("'not-a-valid-expression' is not a valid prop expression.");
     $this->request($request);
   }
 
@@ -500,7 +500,7 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     );
 
     $this->expectException(BadRequestHttpException::class);
-    $this->expectExceptionMessage('The request contains invalid prop expressions.');
+    $this->expectExceptionMessage(\sprintf("'%s' is not a valid content-entity-reference prop expression.", $expression));
     $this->request($request);
   }
 
