@@ -43,9 +43,12 @@ adopting a different translation provider, since the Drupal user translation
 capabilities are very basic.
 
 1. Enable TMGMT's "Drupal user" (tmgmt_local) module.
-2. Request translations manually at `/admin/tmgmt/sources`.
-3. Configure the provider at `/admin/tmgmt/translators`.
-4. Optionally, set up continuous translation at `/admin/tmgmt/jobs` so that a
+2. Configure the user's translation skills at the bottom of the user edit
+   form (for example, `/user/1/edit`). This is required for TMGMT to allow
+   using Drupal user translation.
+3. Request translations manually at `/admin/tmgmt/sources`.
+4. Configure the provider at `/admin/tmgmt/translators`.
+5. Optionally, set up continuous translation at `/admin/tmgmt/jobs` so that a
    new translation is requested every time changes are made.
 
 ### Translating a content template
