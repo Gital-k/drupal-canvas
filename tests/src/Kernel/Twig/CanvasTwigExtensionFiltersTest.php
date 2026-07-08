@@ -4,26 +4,28 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Twig;
 
+// cspell:ignore itok MIOT
+
+use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
+use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
-use Drupal\Core\Template\TwigEnvironment;
 use Drupal\Core\StreamWrapper\PublicStream;
-use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
-use Drupal\canvas\Twig\CanvasTwigExtension;
+use Drupal\Core\Template\TwigEnvironment;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PredictableImageStyleItokTestTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversMethod;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 
-// cspell:ignore itok MIOT
 /**
  * Tests Twig filter functionality.
  */
