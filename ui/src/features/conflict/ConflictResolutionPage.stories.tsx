@@ -68,8 +68,70 @@ const newPageHtml = `
   </html>
 `;
 
+const publishedPageYaml = `default:
+  revision_user:
+    -
+      target_id: 1
+  status:
+    -
+      value: true
+  owner:
+    -
+      target_id: 1
+  title:
+    -
+      value: Homepage
+  description:
+    -
+      value: Published homepage description
+  components:
+    -
+      uuid: published-hero
+      component_id: example:hero
+      inputs:
+        heading: 'Welcome to our site'
+        body: 'This is the currently published page content.'
+  path:
+    -
+      alias: /homepage
+      langcode: en
+`;
+
+const newPageYaml = `default:
+  revision_user:
+    -
+      target_id: 1
+  status:
+    -
+      value: true
+  owner:
+    -
+      target_id: 1
+  title:
+    -
+      value: Homepage
+  description:
+    -
+      value: Updated homepage description
+  components:
+    -
+      uuid: new-hero
+      component_id: example:hero
+      inputs:
+        heading: 'Welcome to our new site'
+        body: 'This is the conflicting auto-saved version.'
+        cta:
+          title: 'Start building'
+          url: /get-started
+  path:
+    -
+      alias: /homepage
+      langcode: en
+`;
+
 const publishedVersion = {
   html: publishedPageHtml,
+  text: publishedPageYaml,
   updated: 'Updated 8/19/26 at 12:01 PM',
   props: {
     entity_form_fields: {
@@ -87,6 +149,7 @@ const publishedVersion = {
 
 const newVersion = {
   html: newPageHtml,
+  text: newPageYaml,
   updated: 'Updated 8/20/26 at 8:10 PM',
   props: {
     entity_form_fields: {

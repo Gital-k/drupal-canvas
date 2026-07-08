@@ -10,7 +10,10 @@ import type { PendingChanges } from '@/services/pendingChangesApi';
 
 const mocks = vi.hoisted(() => ({
   dispatch: vi.fn(),
-  devMode: true,
+  devConflictDetectionMode: true,
+  exportError: false,
+  exportLoading: false,
+  exportRequests: vi.fn(),
   invalidateContent: vi.fn(),
   invalidateLayout: vi.fn(),
   layoutRequests: vi.fn(),
@@ -21,6 +24,12 @@ const mocks = vi.hoisted(() => ({
   ),
   draftLayoutUpdated: Math.floor(
     new Date(2026, 7, 20, 20, 10).getTime() / 1000,
+  ),
+  publishedExportUpdated: Math.floor(
+    new Date(2026, 7, 19, 12, 5).getTime() / 1000,
+  ),
+  draftExportUpdated: Math.floor(
+    new Date(2026, 7, 20, 20, 15).getTime() / 1000,
   ),
   refetch: vi.fn(),
   discardChange: vi.fn(),
@@ -43,7 +52,9 @@ vi.mock('@/app/hooks', () => ({
 }));
 
 vi.mock('@/utils/drupal-globals', () => ({
-  getCanvasSettings: () => ({ devConflictDetectionMode: mocks.devMode }),
+  getCanvasSettings: () => ({
+    devConflictDetectionMode: mocks.devConflictDetectionMode,
+  }),
 }));
 
 vi.mock('@/services/componentAndLayout', () => ({
@@ -80,6 +91,30 @@ vi.mock('@/services/content', () => ({
     util: {
       invalidateTags: mocks.invalidateContent,
     },
+  },
+  useGetContentExportQuery: (arg: {
+    entityId: string;
+    entityType: string;
+    autoSaved?: boolean;
+  }) => {
+    mocks.exportRequests(arg);
+    const isPublished = arg.autoSaved === false;
+    return {
+      data:
+        mocks.exportLoading || mocks.exportError
+          ? undefined
+          : {
+              entity: isPublished
+                ? `published yaml ${arg.entityId}`
+                : `new yaml ${arg.entityId}`,
+              updated: isPublished
+                ? mocks.publishedExportUpdated
+                : mocks.draftExportUpdated,
+              language: 'en',
+            },
+      isFetching: mocks.exportLoading,
+      isError: mocks.exportError,
+    };
   },
   useUpdateContentMutation: () => [
     (change: unknown) => ({
@@ -192,8 +227,20 @@ vi.mock('./ConflictResolutionView', () => ({
     selectedVersion,
     onSelectVersion,
   }: {
-    publishedVersion: { html: string; updated?: string };
-    newVersion: { html: string; updated?: string };
+    publishedVersion: {
+      html: string;
+      text?: string;
+      textLoading?: boolean;
+      textError?: boolean;
+      updated?: string;
+    };
+    newVersion: {
+      html: string;
+      text?: string;
+      textLoading?: boolean;
+      textError?: boolean;
+      updated?: string;
+    };
     selectedVersion?: 'published' | 'new';
     onSelectVersion?: (version: 'published' | 'new') => void;
   }) => (
@@ -214,8 +261,14 @@ vi.mock('./ConflictResolutionView', () => ({
       </button>
       <span>{publishedVersion.html}</span>
       <span>{publishedVersion.updated}</span>
+      <span>{publishedVersion.text}</span>
+      <span>{String(!!publishedVersion.textLoading)}</span>
+      <span>{String(!!publishedVersion.textError)}</span>
       <span>{newVersion.html}</span>
       <span>{newVersion.updated}</span>
+      <span>{newVersion.text}</span>
+      <span>{String(!!newVersion.textLoading)}</span>
+      <span>{String(!!newVersion.textError)}</span>
     </div>
   ),
 }));
@@ -241,7 +294,21 @@ const renderPage = () => render(getPage());
 describe('ConflictResolutionPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.devMode = true;
+    mocks.devConflictDetectionMode = true;
+    mocks.exportError = false;
+    mocks.exportLoading = false;
+    mocks.publishedLayoutUpdated = Math.floor(
+      new Date(2026, 7, 19, 12, 1).getTime() / 1000,
+    );
+    mocks.draftLayoutUpdated = Math.floor(
+      new Date(2026, 7, 20, 20, 10).getTime() / 1000,
+    );
+    mocks.publishedExportUpdated = Math.floor(
+      new Date(2026, 7, 19, 12, 5).getTime() / 1000,
+    );
+    mocks.draftExportUpdated = Math.floor(
+      new Date(2026, 7, 20, 20, 15).getTime() / 1000,
+    );
     mocks.pendingChanges = pendingChanges;
     mocks.pendingChangesFetching = false;
     mocks.discardChange.mockResolvedValue(undefined);
@@ -279,7 +346,9 @@ describe('ConflictResolutionPage', () => {
     expect(screen.getByText(/New version 1 content/)).toBeInTheDocument();
   });
 
-  it('passes formatted updated timestamps to the comparison view', () => {
+  it('uses layout updated timestamps while text exports are loading', () => {
+    mocks.exportLoading = true;
+
     renderPage();
 
     expect(
@@ -290,6 +359,44 @@ describe('ConflictResolutionPage', () => {
     expect(
       screen.getByText(formatExpectedVersionUpdated(mocks.draftLayoutUpdated)),
     ).toBeInTheDocument();
+  });
+
+  it('requests both YAML exports for the text comparison', () => {
+    renderPage();
+
+    expect(mocks.exportRequests).toHaveBeenCalledWith({
+      entityId: '1',
+      entityType: 'canvas_page',
+    });
+    expect(mocks.exportRequests).toHaveBeenCalledWith({
+      entityId: '1',
+      entityType: 'canvas_page',
+      autoSaved: false,
+    });
+    expect(screen.getByText('published yaml 1')).toBeInTheDocument();
+    expect(screen.getByText('new yaml 1')).toBeInTheDocument();
+  });
+
+  it('passes formatted export updated timestamps to the comparison view', () => {
+    renderPage();
+
+    expect(
+      screen.getByText(
+        formatExpectedVersionUpdated(mocks.publishedExportUpdated),
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(formatExpectedVersionUpdated(mocks.draftExportUpdated)),
+    ).toBeInTheDocument();
+  });
+
+  it('passes text export loading and error states to the comparison view', () => {
+    mocks.exportLoading = true;
+    mocks.exportError = true;
+
+    renderPage();
+
+    expect(screen.getAllByText('true')).toHaveLength(4);
   });
 
   it('starts with no selected version and disables resolution', () => {
@@ -365,7 +472,7 @@ describe('ConflictResolutionPage', () => {
   it('keeps the opened conflict snapshot when pending changes refresh', async () => {
     const user = userEvent.setup();
     const originalDraftUpdated = formatExpectedVersionUpdated(
-      mocks.draftLayoutUpdated,
+      mocks.draftExportUpdated,
     );
     const { rerender } = renderPage();
 
@@ -389,6 +496,9 @@ describe('ConflictResolutionPage', () => {
     mocks.draftLayoutUpdated = Math.floor(
       new Date(2026, 7, 21, 10, 30).getTime() / 1000,
     );
+    mocks.draftExportUpdated = Math.floor(
+      new Date(2026, 7, 21, 10, 35).getTime() / 1000,
+    );
 
     rerender(getPage());
 
@@ -396,6 +506,11 @@ describe('ConflictResolutionPage', () => {
     expect(
       screen.queryByText(
         formatExpectedVersionUpdated(mocks.draftLayoutUpdated),
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        formatExpectedVersionUpdated(mocks.draftExportUpdated),
       ),
     ).not.toBeInTheDocument();
 
@@ -525,12 +640,13 @@ describe('ConflictResolutionPage', () => {
   });
 
   it('does not expose the comparison route outside dev mode', async () => {
-    mocks.devMode = false;
+    mocks.devConflictDetectionMode = false;
 
     renderPage();
 
     expect(await screen.findByText('Editor')).toBeVisible();
     expect(mocks.layoutRequests).not.toHaveBeenCalled();
+    expect(mocks.exportRequests).not.toHaveBeenCalled();
   });
 
   it('renders the resolved state with a review changes action', async () => {

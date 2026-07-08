@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
 import ScaleToFitIcon from '@assets/icons/justify-stretch.svg?react';
 import {
   ArrowLeftIcon,
@@ -34,18 +35,100 @@ import {
 } from '@/features/ui/uiSlice';
 
 import type React from 'react';
+import type { ReactDiffViewerStylesOverride } from 'react-diff-viewer-continued';
 
 import styles from './ConflictResolutionPage.module.css';
 
 const EMPTY_HTML = '<main></main>';
 const PREVIEW_FIT_PADDING = 96;
 const PREVIEW_DRAG_THRESHOLD = 3;
+const YAML_DIFF_VIEWER_STYLES: ReactDiffViewerStylesOverride = {
+  variables: {
+    dark: {
+      diffViewerBackground: '#0f172a',
+      diffViewerColor: '#d8e1ec',
+      addedBackground: 'rgba(20, 184, 126, 0.2)',
+      addedColor: '#d8f7e8',
+      removedBackground: 'rgba(239, 68, 92, 0.22)',
+      removedColor: '#fee2e2',
+      changedBackground: 'rgba(59, 130, 246, 0.16)',
+      wordAddedBackground: 'rgba(20, 184, 126, 0.38)',
+      wordRemovedBackground: 'rgba(239, 68, 92, 0.38)',
+      addedGutterBackground: 'rgba(20, 184, 126, 0.18)',
+      removedGutterBackground: 'rgba(239, 68, 92, 0.2)',
+      gutterBackground: '#0b1220',
+      gutterBackgroundDark: '#111827',
+      gutterColor: '#64748b',
+      addedGutterColor: '#9ee6c5',
+      removedGutterColor: '#f8b4b4',
+      codeFoldBackground: '#111827',
+      codeFoldGutterBackground: '#0b1220',
+      codeFoldContentColor: '#93a4b8',
+      emptyLineBackground: '#0f172a',
+    },
+  },
+  diffContainer: {
+    minWidth: 520,
+    width: '100%',
+    height: '100%',
+    borderCollapse: 'separate',
+    borderSpacing: 0,
+    tableLayout: 'fixed',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+  },
+  line: {
+    verticalAlign: 'top',
+  },
+  gutter: {
+    minWidth: 44,
+    padding: '0 12px',
+    borderRight: '1px solid rgba(148, 163, 184, 0.14)',
+    lineHeight: '21px',
+  },
+  marker: {
+    width: 26,
+    paddingLeft: 8,
+    paddingRight: 8,
+    lineHeight: '21px',
+  },
+  contentText: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+    lineHeight: '21px',
+    whiteSpace: 'pre',
+  },
+  lineContent: {
+    paddingLeft: 12,
+    paddingRight: 16,
+  },
+  content: {
+    width: '50%',
+  },
+  wordDiff: {
+    borderRadius: 2,
+    padding: '0 1px',
+  },
+  codeFold: {
+    fontSize: 12,
+  },
+};
 
 type ConflictVersion = 'published' | 'new';
 
 export type ConflictVersionSelection = ConflictVersion | undefined;
 
-type VisualScrollAreas = Record<ConflictVersion, HTMLDivElement | null>;
+type ConflictScrollElement = HTMLElement;
+
+type ConflictScrollAreas = Record<
+  ConflictVersion,
+  ConflictScrollElement | null
+>;
+
+type ScrollPosition = {
+  scrollLeft: number;
+  scrollTop: number;
+};
 
 export interface ConflictResolutionViewProps {
   label: string;
@@ -138,6 +221,8 @@ export interface PageConflictVersion {
   html: string;
   props?: unknown;
   text?: string;
+  textLoading?: boolean;
+  textError?: boolean;
   updated?: string;
   loading?: boolean;
   changed?: boolean;
@@ -167,6 +252,65 @@ const buildConflictPreviewUrl = (
   const basePath = window.location.pathname.split('/conflict/')[0];
   const versionParam = published ? '?version=published' : '';
   return `${window.location.origin}${basePath}/conflict-preview/${entityType}/${entityId}/full${versionParam}`;
+};
+
+const syncComparisonScroll = (
+  sourceVersion: ConflictVersion,
+  sourceScrollArea: ConflictScrollElement,
+  scrollAreas: ConflictScrollAreas,
+  ignoredScrollPositions: Map<ConflictScrollElement, ScrollPosition>,
+) => {
+  const ignoredScrollPosition = ignoredScrollPositions.get(sourceScrollArea);
+  if (ignoredScrollPosition) {
+    ignoredScrollPositions.delete(sourceScrollArea);
+    if (
+      Math.abs(sourceScrollArea.scrollLeft - ignoredScrollPosition.scrollLeft) <
+        0.5 &&
+      Math.abs(sourceScrollArea.scrollTop - ignoredScrollPosition.scrollTop) <
+        0.5
+    ) {
+      return;
+    }
+  }
+
+  const targetVersion: ConflictVersion =
+    sourceVersion === 'published' ? 'new' : 'published';
+  const targetScrollArea = scrollAreas[targetVersion];
+  if (!targetScrollArea) {
+    return;
+  }
+
+  const sourceMaxLeft =
+    sourceScrollArea.scrollWidth - sourceScrollArea.clientWidth;
+  const sourceMaxTop =
+    sourceScrollArea.scrollHeight - sourceScrollArea.clientHeight;
+  const targetMaxLeft =
+    targetScrollArea.scrollWidth - targetScrollArea.clientWidth;
+  const targetMaxTop =
+    targetScrollArea.scrollHeight - targetScrollArea.clientHeight;
+
+  const nextLeft =
+    sourceMaxLeft > 0 && targetMaxLeft > 0
+      ? (sourceScrollArea.scrollLeft / sourceMaxLeft) * targetMaxLeft
+      : sourceScrollArea.scrollLeft;
+  const nextTop =
+    sourceMaxTop > 0 && targetMaxTop > 0
+      ? (sourceScrollArea.scrollTop / sourceMaxTop) * targetMaxTop
+      : sourceScrollArea.scrollTop;
+
+  if (
+    Math.abs(targetScrollArea.scrollLeft - nextLeft) < 0.5 &&
+    Math.abs(targetScrollArea.scrollTop - nextTop) < 0.5
+  ) {
+    return;
+  }
+
+  ignoredScrollPositions.set(targetScrollArea, {
+    scrollLeft: nextLeft,
+    scrollTop: nextTop,
+  });
+  targetScrollArea.scrollLeft = nextLeft;
+  targetScrollArea.scrollTop = nextTop;
 };
 
 export const PageConflictComparisonView = ({
@@ -218,77 +362,87 @@ export const PageConflictComparisonView = ({
     () => stringifyComparisonProps(newVersion.props),
     [newVersion.props],
   );
-  const visualScrollAreasRef = useRef<VisualScrollAreas>({
+  const isTextLoading =
+    !!publishedVersion.textLoading || !!newVersion.textLoading;
+  const isTextError = !!publishedVersion.textError || !!newVersion.textError;
+  const visualScrollAreasRef = useRef<ConflictScrollAreas>({
+    published: null,
+    new: null,
+  });
+  const textScrollAreasRef = useRef<ConflictScrollAreas>({
+    published: null,
+    new: null,
+  });
+  const propsScrollAreasRef = useRef<ConflictScrollAreas>({
     published: null,
     new: null,
   });
   const ignoredScrollPositionsRef = useRef(
-    new Map<HTMLDivElement, { scrollLeft: number; scrollTop: number }>(),
+    new Map<ConflictScrollElement, ScrollPosition>(),
   );
 
   const handleVisualScrollAreaMount = useCallback(
-    (version: ConflictVersion, node: HTMLDivElement | null) => {
+    (version: ConflictVersion, node: ConflictScrollElement | null) => {
       visualScrollAreasRef.current[version] = node;
     },
     [],
   );
 
   const handleVisualScroll = useCallback(
-    (sourceVersion: ConflictVersion, sourceScrollArea: HTMLDivElement) => {
-      const ignoredScrollPosition =
-        ignoredScrollPositionsRef.current.get(sourceScrollArea);
-      if (ignoredScrollPosition) {
-        ignoredScrollPositionsRef.current.delete(sourceScrollArea);
-        if (
-          Math.abs(
-            sourceScrollArea.scrollLeft - ignoredScrollPosition.scrollLeft,
-          ) < 0.5 &&
-          Math.abs(
-            sourceScrollArea.scrollTop - ignoredScrollPosition.scrollTop,
-          ) < 0.5
-        ) {
-          return;
-        }
-      }
+    (
+      sourceVersion: ConflictVersion,
+      sourceScrollArea: ConflictScrollElement,
+    ) => {
+      syncComparisonScroll(
+        sourceVersion,
+        sourceScrollArea,
+        visualScrollAreasRef.current,
+        ignoredScrollPositionsRef.current,
+      );
+    },
+    [],
+  );
 
-      const targetVersion: ConflictVersion =
-        sourceVersion === 'published' ? 'new' : 'published';
-      const targetScrollArea = visualScrollAreasRef.current[targetVersion];
-      if (!targetScrollArea) {
-        return;
-      }
+  const handleTextScrollAreaMount = useCallback(
+    (version: ConflictVersion, node: ConflictScrollElement | null) => {
+      textScrollAreasRef.current[version] = node;
+    },
+    [],
+  );
 
-      const sourceMaxLeft =
-        sourceScrollArea.scrollWidth - sourceScrollArea.clientWidth;
-      const sourceMaxTop =
-        sourceScrollArea.scrollHeight - sourceScrollArea.clientHeight;
-      const targetMaxLeft =
-        targetScrollArea.scrollWidth - targetScrollArea.clientWidth;
-      const targetMaxTop =
-        targetScrollArea.scrollHeight - targetScrollArea.clientHeight;
+  const handleTextScroll = useCallback(
+    (
+      sourceVersion: ConflictVersion,
+      sourceScrollArea: ConflictScrollElement,
+    ) => {
+      syncComparisonScroll(
+        sourceVersion,
+        sourceScrollArea,
+        textScrollAreasRef.current,
+        ignoredScrollPositionsRef.current,
+      );
+    },
+    [],
+  );
 
-      const nextLeft =
-        sourceMaxLeft > 0 && targetMaxLeft > 0
-          ? (sourceScrollArea.scrollLeft / sourceMaxLeft) * targetMaxLeft
-          : sourceScrollArea.scrollLeft;
-      const nextTop =
-        sourceMaxTop > 0 && targetMaxTop > 0
-          ? (sourceScrollArea.scrollTop / sourceMaxTop) * targetMaxTop
-          : sourceScrollArea.scrollTop;
+  const handlePropsScrollAreaMount = useCallback(
+    (version: ConflictVersion, node: ConflictScrollElement | null) => {
+      propsScrollAreasRef.current[version] = node;
+    },
+    [],
+  );
 
-      if (
-        Math.abs(targetScrollArea.scrollLeft - nextLeft) < 0.5 &&
-        Math.abs(targetScrollArea.scrollTop - nextTop) < 0.5
-      ) {
-        return;
-      }
-
-      ignoredScrollPositionsRef.current.set(targetScrollArea, {
-        scrollLeft: nextLeft,
-        scrollTop: nextTop,
-      });
-      targetScrollArea.scrollLeft = nextLeft;
-      targetScrollArea.scrollTop = nextTop;
+  const handlePropsScroll = useCallback(
+    (
+      sourceVersion: ConflictVersion,
+      sourceScrollArea: ConflictScrollElement,
+    ) => {
+      syncComparisonScroll(
+        sourceVersion,
+        sourceScrollArea,
+        propsScrollAreasRef.current,
+        ignoredScrollPositionsRef.current,
+      );
     },
     [],
   );
@@ -347,29 +501,21 @@ export const PageConflictComparisonView = ({
         </ComparisonGrid>
       </Tabs.Content>
       <Tabs.Content value="text" className={styles.tabContent}>
-        <ComparisonGrid>
-          <PreviewCard
-            title="Published version"
-            updated={publishedVersion.updated}
-            version="published"
-            selected={selectedVersion === 'published'}
-            onSelect={onSelectVersion}
-            onPreviewClick={handlePublishedPreview}
-          >
-            <TextPanel value={publishedText} />
-          </PreviewCard>
-          <PreviewCard
-            title="New version"
-            updated={newVersion.updated}
-            changed={!!newVersion.changed}
-            version="new"
-            selected={selectedVersion === 'new'}
-            onSelect={onSelectVersion}
-            onPreviewClick={handleNewPreview}
-          >
-            <TextPanel value={newText} />
-          </PreviewCard>
-        </ComparisonGrid>
+        <TextDiffComparison
+          publishedText={publishedText}
+          newText={newText}
+          publishedUpdated={publishedVersion.updated}
+          newUpdated={newVersion.updated}
+          newChanged={!!newVersion.changed}
+          selectedVersion={selectedVersion}
+          isLoading={isTextLoading}
+          isError={isTextError}
+          onSelectVersion={onSelectVersion}
+          onPublishedPreviewClick={handlePublishedPreview}
+          onNewPreviewClick={handleNewPreview}
+          onScrollAreaMount={handleTextScrollAreaMount}
+          onScrollAreaScroll={handleTextScroll}
+        />
       </Tabs.Content>
       <Tabs.Content value="props" className={styles.tabContent}>
         <ComparisonGrid>
@@ -381,7 +527,12 @@ export const PageConflictComparisonView = ({
             onSelect={onSelectVersion}
             onPreviewClick={handlePublishedPreview}
           >
-            <JsonPanel value={publishedProps} />
+            <JsonPanel
+              value={publishedProps}
+              version="published"
+              onScrollAreaMount={handlePropsScrollAreaMount}
+              onScrollAreaScroll={handlePropsScroll}
+            />
           </PreviewCard>
           <PreviewCard
             title="New version"
@@ -392,7 +543,12 @@ export const PageConflictComparisonView = ({
             onSelect={onSelectVersion}
             onPreviewClick={handleNewPreview}
           >
-            <JsonPanel value={newProps} />
+            <JsonPanel
+              value={newProps}
+              version="new"
+              onScrollAreaMount={handlePropsScrollAreaMount}
+              onScrollAreaScroll={handlePropsScroll}
+            />
           </PreviewCard>
         </ComparisonGrid>
       </Tabs.Content>
@@ -534,11 +690,11 @@ const VisualFrame = ({
   version: ConflictVersion;
   onScrollAreaMount?: (
     version: ConflictVersion,
-    node: HTMLDivElement | null,
+    node: ConflictScrollElement | null,
   ) => void;
   onScrollAreaScroll?: (
     version: ConflictVersion,
-    scrollArea: HTMLDivElement,
+    scrollArea: ConflictScrollElement,
   ) => void;
 }) => {
   const previewScale = useAppSelector(selectEditorViewPortScale);
@@ -691,13 +847,230 @@ const VisualFrame = ({
   );
 };
 
-const TextPanel = ({ value }: { value: string }) => (
-  <pre className={styles.textPanel}>{value || 'No text content.'}</pre>
+const TextDiffComparison = ({
+  publishedText,
+  newText,
+  publishedUpdated,
+  newUpdated,
+  newChanged,
+  selectedVersion,
+  isLoading,
+  isError,
+  onSelectVersion,
+  onPublishedPreviewClick,
+  onNewPreviewClick,
+  onScrollAreaMount,
+  onScrollAreaScroll,
+}: {
+  publishedText: string;
+  newText: string;
+  publishedUpdated?: string;
+  newUpdated?: string;
+  newChanged: boolean;
+  selectedVersion?: ConflictVersionSelection;
+  isLoading: boolean;
+  isError: boolean;
+  onSelectVersion?: (version: ConflictVersion) => void;
+  onPublishedPreviewClick: () => void;
+  onNewPreviewClick: () => void;
+  onScrollAreaMount?: (
+    version: ConflictVersion,
+    node: ConflictScrollElement | null,
+  ) => void;
+  onScrollAreaScroll?: (
+    version: ConflictVersion,
+    scrollArea: ConflictScrollElement,
+  ) => void;
+}) => {
+  const hasTextContent = publishedText.trim() || newText.trim();
+
+  return (
+    <div className={styles.textDiffComparison} data-testid="conflict-text-diff">
+      <ComparisonGrid>
+        <PreviewCard
+          title="Published version"
+          updated={publishedUpdated}
+          version="published"
+          selected={selectedVersion === 'published'}
+          onSelect={onSelectVersion}
+          onPreviewClick={onPublishedPreviewClick}
+        >
+          <TextDiffPanel
+            side="published"
+            publishedText={publishedText}
+            newText={newText}
+            isLoading={isLoading}
+            isError={isError}
+            hasTextContent={!!hasTextContent}
+            onScrollAreaMount={onScrollAreaMount}
+            onScrollAreaScroll={onScrollAreaScroll}
+          />
+        </PreviewCard>
+        <PreviewCard
+          title="New version"
+          updated={newUpdated}
+          changed={newChanged}
+          version="new"
+          selected={selectedVersion === 'new'}
+          onSelect={onSelectVersion}
+          onPreviewClick={onNewPreviewClick}
+        >
+          <TextDiffPanel
+            side="new"
+            publishedText={publishedText}
+            newText={newText}
+            isLoading={isLoading}
+            isError={isError}
+            hasTextContent={!!hasTextContent}
+            onScrollAreaMount={onScrollAreaMount}
+            onScrollAreaScroll={onScrollAreaScroll}
+          />
+        </PreviewCard>
+      </ComparisonGrid>
+    </div>
+  );
+};
+
+const TextDiffPanel = ({
+  side,
+  publishedText,
+  newText,
+  isLoading,
+  isError,
+  hasTextContent,
+  onScrollAreaMount,
+  onScrollAreaScroll,
+}: {
+  side: ConflictVersion;
+  publishedText: string;
+  newText: string;
+  isLoading: boolean;
+  isError: boolean;
+  hasTextContent: boolean;
+  onScrollAreaMount?: (
+    version: ConflictVersion,
+    node: HTMLDivElement | null,
+  ) => void;
+  onScrollAreaScroll?: (
+    version: ConflictVersion,
+    scrollArea: HTMLDivElement,
+  ) => void;
+}) => {
+  const panelClassName = [
+    styles.textDiffViewerSurface,
+    side === 'published'
+      ? styles.textDiffViewerPublished
+      : styles.textDiffViewerNew,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const handleScrollAreaRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      onScrollAreaMount?.(side, node);
+    },
+    [onScrollAreaMount, side],
+  );
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      onScrollAreaScroll?.(side, event.currentTarget);
+    },
+    [onScrollAreaScroll, side],
+  );
+
+  return (
+    <div
+      ref={handleScrollAreaRef}
+      className={panelClassName}
+      data-testid={`conflict-text-diff-${side}`}
+      onScroll={handleScroll}
+    >
+      {isLoading ? (
+        <TextDiffStatus message="Loading text comparison..." />
+      ) : isError ? (
+        <TextDiffStatus
+          message="Unable to load the text comparison for this page."
+          color="red"
+        />
+      ) : hasTextContent ? (
+        <ReactDiffViewer
+          oldValue={publishedText}
+          newValue={newText}
+          splitView
+          compareMethod={DiffMethod.YAML}
+          showDiffOnly={false}
+          useDarkTheme
+          styles={YAML_DIFF_VIEWER_STYLES}
+          hideSummary
+          disableWordDiff
+          disableWorker
+        />
+      ) : (
+        <TextDiffStatus message="No text content." />
+      )}
+    </div>
+  );
+};
+
+const TextDiffStatus = ({
+  message,
+  color = 'gray',
+}: {
+  message: string;
+  color?: React.ComponentProps<typeof Text>['color'];
+}) => (
+  <Flex
+    align="center"
+    justify="center"
+    className={styles.textDiffStatus}
+    data-testid="conflict-text-diff-status"
+  >
+    <Text size="2" color={color}>
+      {message}
+    </Text>
+  </Flex>
 );
 
-const JsonPanel = ({ value }: { value: string }) => (
-  <pre className={styles.textPanel}>{value}</pre>
-);
+const JsonPanel = ({
+  value,
+  version,
+  onScrollAreaMount,
+  onScrollAreaScroll,
+}: {
+  value: string;
+  version: ConflictVersion;
+  onScrollAreaMount?: (
+    version: ConflictVersion,
+    node: ConflictScrollElement | null,
+  ) => void;
+  onScrollAreaScroll?: (
+    version: ConflictVersion,
+    scrollArea: ConflictScrollElement,
+  ) => void;
+}) => {
+  const handlePanelRef = useCallback(
+    (node: HTMLPreElement | null) => {
+      onScrollAreaMount?.(version, node);
+    },
+    [onScrollAreaMount, version],
+  );
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLPreElement>) => {
+      onScrollAreaScroll?.(version, event.currentTarget);
+    },
+    [onScrollAreaScroll, version],
+  );
+
+  return (
+    <pre
+      ref={handlePanelRef}
+      className={styles.textPanel}
+      data-testid={`conflict-props-panel-${version}`}
+      onScroll={handleScroll}
+    >
+      {value}
+    </pre>
+  );
+};
 
 interface ConflictPreviewControlsProps {
   previewScrollAreaRef: React.RefObject<HTMLDivElement | null>;

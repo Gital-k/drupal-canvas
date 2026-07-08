@@ -19,9 +19,25 @@ vi.mock('@assets/icons/justify-stretch.svg?react', () => ({
   default: () => <svg aria-hidden="true" />,
 }));
 
+vi.mock('react-diff-viewer-continued', () => ({
+  default: ({ oldValue, newValue }: { oldValue: string; newValue: string }) => (
+    <div data-testid="yaml-diff-viewer">
+      <pre>{oldValue}</pre>
+      <pre>{newValue}</pre>
+    </div>
+  ),
+  DiffMethod: {
+    YAML: 'diffYaml',
+  },
+}));
+
 const publishedVersion = {
   html: '<main><h1>Published headline</h1></main>',
-  text: 'Published headline',
+  text: `default:
+  title:
+    -
+      value: Published headline
+`,
   updated: 'Updated 8/19/26 at 12:01 PM',
   props: {
     title: 'Published headline',
@@ -30,7 +46,11 @@ const publishedVersion = {
 
 const newVersion = {
   html: '<main><h1>New headline</h1></main>',
-  text: 'New headline',
+  text: `default:
+  title:
+    -
+      value: New headline
+`,
   updated: 'Updated 8/20/26 at 8:10 PM',
   props: {
     title: 'New headline',
@@ -109,6 +129,27 @@ const ComparisonHarness = () => {
   );
 };
 
+const renderComparison = (
+  props: Partial<React.ComponentProps<typeof PageConflictComparisonView>> = {},
+) => {
+  const store = createStore();
+  return render(
+    <Theme accentColor="blue" hasBackground={false}>
+      <TooltipProvider>
+        <Provider store={store}>
+          <PageConflictComparisonView
+            entityId="1"
+            entityType="canvas_page"
+            publishedVersion={publishedVersion}
+            newVersion={newVersion}
+            {...props}
+          />
+        </Provider>
+      </TooltipProvider>
+    </Theme>,
+  );
+};
+
 describe('PageConflictComparisonView', () => {
   it('renders updated timestamps in the version headers', () => {
     render(<ComparisonHarness />);
@@ -153,9 +194,9 @@ describe('PageConflictComparisonView', () => {
 
     await user.click(screen.getByRole('tab', { name: /Text/ }));
 
-    expect(screen.getByTestId('conflict-new-version-card')).toHaveClass(
-      styles.cardSelected,
-    );
+    expect(
+      screen.getByRole('button', { name: 'Select New version' }),
+    ).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(screen.getByRole('tab', { name: /Props/ }));
 
@@ -185,6 +226,56 @@ describe('PageConflictComparisonView', () => {
     expect(
       screen.getByRole('button', { name: viewportButtonName }),
     ).toBeInTheDocument();
+  });
+
+  it('renders the Text tab from YAML export content', async () => {
+    const user = userEvent.setup();
+    renderComparison();
+
+    await user.click(screen.getByRole('tab', { name: /Text/ }));
+
+    expect(
+      screen.getByTestId('conflict-text-diff-published'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('conflict-text-diff-new')).toBeInTheDocument();
+    expect(screen.getAllByTestId('yaml-diff-viewer')).toHaveLength(2);
+    expect(screen.getAllByText(/value: Published headline/)).toHaveLength(2);
+    expect(screen.getAllByText(/value: New headline/)).toHaveLength(2);
+    expect(screen.queryByText('Published headline')).not.toBeInTheDocument();
+  });
+
+  it('shows a Text tab loading state without blocking Visual tab content', async () => {
+    const user = userEvent.setup();
+    renderComparison({
+      publishedVersion: {
+        ...publishedVersion,
+        textLoading: true,
+      },
+    });
+
+    expect(screen.getAllByTitle('Conflict preview')).toHaveLength(2);
+
+    await user.click(screen.getByRole('tab', { name: /Text/ }));
+
+    expect(screen.getAllByText('Loading text comparison...')).toHaveLength(2);
+  });
+
+  it('shows a Text tab error without replacing Visual tab content', async () => {
+    const user = userEvent.setup();
+    renderComparison({
+      newVersion: {
+        ...newVersion,
+        textError: true,
+      },
+    });
+
+    expect(screen.getAllByTitle('Conflict preview')).toHaveLength(2);
+
+    await user.click(screen.getByRole('tab', { name: /Text/ }));
+
+    expect(
+      screen.getAllByText('Unable to load the text comparison for this page.'),
+    ).toHaveLength(2);
   });
 
   it('supports dragging the visual preview to scroll it', () => {
@@ -248,5 +339,67 @@ describe('PageConflictComparisonView', () => {
 
     expect(newScrollArea.scrollLeft).toBe(150);
     expect(newScrollArea.scrollTop).toBe(200);
+  });
+
+  it('keeps the text diff scroll positions synchronized', async () => {
+    const user = userEvent.setup();
+    render(<ComparisonHarness />);
+
+    await user.click(screen.getByRole('tab', { name: /Text/ }));
+
+    const publishedScrollArea = screen.getByTestId(
+      'conflict-text-diff-published',
+    );
+    const newScrollArea = screen.getByTestId('conflict-text-diff-new');
+    setScrollMetrics(publishedScrollArea, {
+      clientHeight: 200,
+      clientWidth: 200,
+      scrollHeight: 1200,
+      scrollWidth: 1000,
+    });
+    setScrollMetrics(newScrollArea, {
+      clientHeight: 200,
+      clientWidth: 200,
+      scrollHeight: 700,
+      scrollWidth: 600,
+    });
+
+    publishedScrollArea.scrollLeft = 200;
+    publishedScrollArea.scrollTop = 300;
+    fireEvent.scroll(publishedScrollArea);
+
+    expect(newScrollArea.scrollLeft).toBe(100);
+    expect(newScrollArea.scrollTop).toBe(150);
+  });
+
+  it('keeps the props panel scroll positions synchronized', async () => {
+    const user = userEvent.setup();
+    render(<ComparisonHarness />);
+
+    await user.click(screen.getByRole('tab', { name: /Props/ }));
+
+    const publishedScrollArea = screen.getByTestId(
+      'conflict-props-panel-published',
+    );
+    const newScrollArea = screen.getByTestId('conflict-props-panel-new');
+    setScrollMetrics(publishedScrollArea, {
+      clientHeight: 200,
+      clientWidth: 200,
+      scrollHeight: 600,
+      scrollWidth: 1100,
+    });
+    setScrollMetrics(newScrollArea, {
+      clientHeight: 200,
+      clientWidth: 200,
+      scrollHeight: 1000,
+      scrollWidth: 700,
+    });
+
+    newScrollArea.scrollLeft = 250;
+    newScrollArea.scrollTop = 400;
+    fireEvent.scroll(newScrollArea);
+
+    expect(publishedScrollArea.scrollLeft).toBe(450);
+    expect(publishedScrollArea.scrollTop).toBe(200);
   });
 });
