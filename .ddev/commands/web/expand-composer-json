@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-#ddev-generated
 ## Command provided by https://github.com/ddev/ddev-drupal-contrib
 ## Description: Add Drupal core and other needed dependencies.
 ## Usage: expand-composer-json [flags] [PROJECT_NAME]
@@ -10,11 +9,15 @@
 
 set -eu -o pipefail
 
-# Set the default core version.
-export DRUPAL_CORE=${DRUPAL_CORE:-^11.3}
-
 export _WEB_ROOT=$DDEV_DOCROOT
 cd "$DDEV_COMPOSER_ROOT" || exit
+
+# Default the core version to the module's declared drupal/core constraint so the DDEV default tracks composer.json.
+# An explicit DRUPAL_CORE (e.g. from `ddev core-version`) still takes precedence.
+if [ -z "${DRUPAL_CORE:-}" ] && [ -f composer.json ]; then
+  DRUPAL_CORE=$(php -r '$j=json_decode(file_get_contents("composer.json"),true)?:[]; echo $j["require"]["drupal/core"] ?? $j["require-dev"]["drupal/core"] ?? "";')
+fi
+export DRUPAL_CORE=${DRUPAL_CORE:-^11}
 curl -OL https://git.drupalcode.org/project/gitlab_templates/-/raw/default-ref/scripts/expand_composer_json.php
 _ddev_drupal_contrib_empty_composer=false
 if [[ ! -f composer.json ]]; then

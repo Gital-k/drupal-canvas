@@ -1,6 +1,5 @@
 #!/bin/bash
 
-## #ddev-generated
 ## Description: (Re)install Drupal and the Drupal Canvas module.
 ## Example: ddev drupal-install
 ## Aliases: drupal-install,si
