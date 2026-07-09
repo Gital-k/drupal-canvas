@@ -7,7 +7,7 @@ use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
-use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\canvas_ai\CanvasAiComponentContextHelper;
 use Drupal\canvas_ai\CanvasAiPermissions;
 use Drupal\Core\Session\AccountProxyInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -15,9 +15,10 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Function call plugin to get component context.
  *
- * This plugin retrieves information about all available components in the site
- * using the CanvasPageBuilderHelper service. The information can be used by AI
- * agents to understand available components and their capabilities.
+ * This plugin retrieves a lightweight catalog (id, name, and description) of
+ * all available components using the CanvasAiComponentContextHelper service.
+ * Agents scan it to shortlist candidates, then call get_metadata_of_components
+ * for the props and slots of the ones they intend to use.
  *
  * @internal
  */
@@ -25,18 +26,18 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   id: 'canvas_ai:get_component_context',
   function_name: 'get_component_context',
   name: 'Get Component Context',
-  description: 'This method gets information about all available components in the site.',
+  description: 'Lists all available components in the site with only their id, name, and description. Call get_metadata_of_components to get the props and slots of specific components.',
   group: 'information_tools',
   module_dependencies: ['canvas_ai'],
 )]
 final class GetComponentContext extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface {
 
   /**
-   * The Canvas page builder helper service.
+   * The Canvas AI component context helper service.
    *
-   * @var \Drupal\canvas_ai\CanvasAiPageBuilderHelper
+   * @var \Drupal\canvas_ai\CanvasAiComponentContextHelper
    */
-  protected CanvasAiPageBuilderHelper $pageBuilderHelper;
+  protected CanvasAiComponentContextHelper $componentContextHelper;
 
   /**
    * The current user.
@@ -55,7 +56,7 @@ final class GetComponentContext extends FunctionCallBase implements ExecutableFu
       $plugin_definition,
       $container->get('ai.context_definition_normalizer'),
     );
-    $instance->pageBuilderHelper = $container->get('canvas_ai.page_builder_helper');
+    $instance->componentContextHelper = $container->get('canvas_ai.component_context_helper');
     $instance->currentUser = $container->get('current_user');
     return $instance;
   }
@@ -68,7 +69,7 @@ final class GetComponentContext extends FunctionCallBase implements ExecutableFu
     if (!$this->currentUser->hasPermission(CanvasAiPermissions::USE_CANVAS_AI)) {
       throw new \Exception('The current user does not have the right permissions to run this tool.');
     }
-    $this->setOutput($this->pageBuilderHelper->getComponentContextForAi());
+    $this->setOutput($this->componentContextHelper->getComponentCatalog());
   }
 
 }

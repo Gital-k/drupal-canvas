@@ -2,6 +2,10 @@ canvas_ai.settings:
   type: config_object
   label: 'Drupal Canvas AI Settings'
   mapping:
+    main_agent:
+      type: string
+      label: 'Main agent'
+      description: 'The ai_agent config entity the user chats with.'
     http_client_options:
       type: mapping
       label: 'HTTP Client Options'

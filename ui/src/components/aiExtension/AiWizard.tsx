@@ -533,28 +533,21 @@ const messageHandlers = [
 
 // Renders agent/tool progress for a turn into a single HTML chat message. The
 // progress items come from each `/ai` hop response (no separate poll channel),
-// so the hop loop is the only writer of this message. The orchestrator entry is
-// shown last: sub-agent narration reads above the orchestrator's running
-// commentary.
+// so the hop loop is the only writer of this message.
 const buildProgressHtml = (items: any[]): string => {
   if (!items?.length) return '';
 
-  const rest = items.filter((i) => i.id !== 'canvas_ai_orchestrator');
-  const orchestrator = items.filter((i) => i.id === 'canvas_ai_orchestrator');
-  const ordered = [...rest, ...orchestrator];
-
   let html = '<div style="margin-top: 10px;">';
-  ordered.forEach((item) => {
+  items.forEach((item) => {
     const icon =
       item.status === 'completed'
         ? '<span class="aiCompletedIcon"></span>'
         : '<span class="aiLoader"></span>';
 
-    // Narration first, then the icon + label row beneath it. This keeps the
-    // active spinner as the last line of each agent's block — and, since the
-    // orchestrator ("Thinking") is ordered last, the last line of the whole
-    // block. As narration grows, the "still running" cue stays pinned at the
-    // bottom instead of being pushed out of view at the top.
+    // Narration first, then the icon + label row beneath it, so the active
+    // spinner stays as the last line of the block. As narration grows, the
+    // "still running" cue stays pinned at the bottom instead of being pushed
+    // out of view at the top.
     if (item.type === 'agent' && item.generated_text?.trim()) {
       html += `<div style="padding: 8px; background-color: white; font-size: 14px; line-height: 1.26;">
           ${item.generated_text.replace(/\n/g, '<br>')}

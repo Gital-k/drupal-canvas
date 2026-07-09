@@ -139,9 +139,16 @@ class CanvasAiPageBuilderHelper {
   /**
    * Gets the data of all the usable component entities.
    *
-   * The output will be used as the context for the AI agent.
+   * Returns a flat map keyed by component id, each value carrying the
+   * component's id, name, description, props, and slots. Callers that need a
+   * lighter or id-filtered view build it from this map.
+   *
+   * @return array
+   *   The component data, keyed by component id.
+   *
+   * @see \Drupal\canvas_ai\CanvasAiComponentContextHelper
    */
-  public function getComponentContextForAi(): string {
+  public function getComponentContextForAi(): array {
     $component_context = [];
     $component_context_from_config = $this->getComponentContextFromConfig();
     $available_components = !empty($component_context_from_config) ? $component_context_from_config : $this->getAllComponentsKeyedBySource();
@@ -156,7 +163,7 @@ class CanvasAiPageBuilderHelper {
       }
 
     }
-    return Yaml::dump($component_context, 4, 2);
+    return $component_context;
   }
 
   /**
