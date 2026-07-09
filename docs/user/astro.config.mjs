@@ -2,9 +2,54 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+/**
+ * Rehype plugin: prefix root-relative content links with the configured base.
+ *
+ * The site is deployed under a base path (`/canvas/` in production,
+ * `/canvas/mr-<iid>/` for merge request previews — see `ASTRO_BASE` in
+ * `.gitlab-ci.yml`). Starlight resolves sidebar `slug` links against that base,
+ * but hardcoded root-relative Markdown links in the content — for example
+ * `[Translations](/guides/translations)` — are emitted verbatim and would 404
+ * on the deployed site. This prepends the base so those links resolve correctly
+ * regardless of the deploy target.
+ */
+function rehypeBaseRelativeLinks() {
+  // ASTRO_BASE is normalized with a trailing slash; drop it so `base + href`
+  // never produces a double slash. Empty when unset (local dev at the domain
+  // root), which makes the rewrite a no-op.
+  const base = (process.env.ASTRO_BASE || '').replace(/\/+$/, '');
+  return (/** @type {any} */ tree) => {
+    if (!base) return;
+    const visit = (/** @type {any} */ node) => {
+      if (
+        node.type === 'element' &&
+        node.tagName === 'a' &&
+        typeof node.properties?.href === 'string'
+      ) {
+        const href = node.properties.href;
+        // Only rewrite in-site absolute paths. Leave external (`//`, `https://`),
+        // anchor (`#…`), and already-prefixed links untouched.
+        if (
+          href.startsWith('/') &&
+          !href.startsWith('//') &&
+          href !== base &&
+          !href.startsWith(`${base}/`)
+        ) {
+          node.properties.href = `${base}${href}`;
+        }
+      }
+      if (Array.isArray(node.children)) node.children.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
 // https://astro.build/config
 export default defineConfig({
   trailingSlash: 'never',
+  markdown: {
+    rehypePlugins: [rehypeBaseRelativeLinks],
+  },
   integrations: [
     starlight({
       title: 'Drupal Canvas',
