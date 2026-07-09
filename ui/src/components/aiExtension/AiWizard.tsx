@@ -1,15 +1,7 @@
 /**
  * ⚠️ This is highly experimental and *will* be refactored.
  */
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DeepChat } from 'deep-chat-react';
 import { useParams } from 'react-router';
 import { useNavigate } from 'react-router-dom';
@@ -107,7 +99,7 @@ const createHistoryStore = () => {
       db.clear();
       subscribers.forEach((callback) => callback());
     },
-    // @todo No subscribers remain since the history prop is frozen at mount; remove subscribe and the subscribers Set in https://git.drupalcode.org/project/canvas/-/work_items/3591731.
+    // @todo No subscribers remain since the history prop is captured once at mount; remove subscribe and the subscribers Set in https://git.drupalcode.org/project/canvas/-/work_items/3591731.
     subscribe(callback: () => void) {
       subscribers.add(callback);
       return () => subscribers.delete(callback);
@@ -118,205 +110,6 @@ const createHistoryStore = () => {
   };
 };
 const historyStore = createHistoryStore();
-
-// DeepChat is rendered through `memo` so that re-renders of AiWizard (e.g. when
-// the layout model changes as components are placed) do not re-seed DeepChat
-// from its `history` prop, which would wipe imperatively-added progress
-// messages. For the memo to hold, every object prop must be a stable reference,
-// so the static configuration objects live at module scope.
-const MemoDeepChat = memo(DeepChat);
-
-const DEEP_CHAT_IMAGES = {
-  files: {
-    acceptedFormats: '.jpg, .png, .jpeg',
-    // For now we just support uploading 1 image at a time
-    // if the user tries to upload another image the already
-    // added image is replaced.
-    maxNumberOfFiles: 1,
-  },
-  button: {
-    position: 'inside-start' as const,
-    styles: {
-      container: {
-        default: {
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginLeft: '8px',
-          marginBottom: '12px',
-          backgroundColor: '#F0F0F3',
-        },
-      },
-      svg: {
-        content: `
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="16" height="16" fill="white" fill-opacity="0.01"/>
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M8.53324 2.93324C8.53324 2.63869 8.29445 2.3999 7.9999 2.3999C7.70535 2.3999 7.46657 2.63869 7.46657 2.93324V7.46657H2.93324C2.63869 7.46657 2.3999 7.70535 2.3999 7.9999C2.3999 8.29445 2.63869 8.53324 2.93324 8.53324H7.46657V13.0666C7.46657 13.3611 7.70535 13.5999 7.9999 13.5999C8.29445 13.5999 8.53324 13.3611 8.53324 13.0666V8.53324H13.0666C13.3611 8.53324 13.5999 8.29445 13.5999 7.9999C13.5999 7.70535 13.3611 7.46657 13.0666 7.46657H8.53324V2.93324Z" fill="#60646C"/>
-        </svg>
-      `,
-      },
-    },
-  },
-};
-
-// Setting to -1 to allow sending the entire conversation history.
-// @see https://deepchat.dev/docs/connect/#requestBodyLimits
-const DEEP_CHAT_REQUEST_BODY_LIMITS = {
-  maxMessages: -1,
-};
-
-const DEEP_CHAT_TEXT_INPUT = {
-  placeholder: { text: 'Build me a ...' },
-  styles: {
-    text: {
-      padding: '16px',
-    },
-    container: {
-      height: '167px',
-      width: '100%',
-      padding: '0 0 40px 0',
-    },
-  },
-};
-
-const DEEP_CHAT_STYLE = {
-  width: '283px',
-  height: '100%',
-};
-
-const DEEP_CHAT_MESSAGE_STYLES = {
-  default: {
-    shared: {
-      bubble: {
-        width: '100%',
-        maxWidth: '100%',
-        color: 'var(--black-12)',
-        fontSize: '14px',
-        fontWeight: '400',
-        lineHeight: '1.26',
-        padding: '8px',
-        textAlign: 'left',
-      },
-    },
-    user: {
-      bubble: {
-        backgroundColor: '#F0F0F3',
-      },
-    },
-    ai: {
-      bubble: {
-        backgroundColor: 'white',
-      },
-    },
-    error: {
-      bubble: {
-        color: '#FF3333',
-      },
-    },
-  },
-};
-
-const DEEP_CHAT_SUBMIT_BUTTON_STYLES = {
-  disabled: {
-    container: {
-      default: {
-        display: 'none',
-      },
-    },
-  },
-  submit: {
-    container: {
-      default: {
-        display: 'inherit',
-        marginRight: '8px',
-        marginBottom: '12px',
-      },
-    },
-    svg: {
-      content: `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M0 3C0 1.34315 1.34315 0 3 0H21C22.6569 0 24 1.34315 24 3V21C24 22.6569 22.6569 24 21 24H3C1.34315 24 0 22.6569 0 21V3Z" fill="#0090FF"/>
-        <rect width="16" height="16" transform="translate(4 4)" fill="white" fill-opacity="0.01"/>
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M11.6228 6.28952C11.8311 6.08123 12.1688 6.08123 12.3771 6.28952L16.6438 10.5562C16.852 10.7645 16.852 11.1021 16.6438 11.3104C16.4355 11.5187 16.0978 11.5187 15.8894 11.3104L12.5333 7.95422V17.3333C12.5333 17.6278 12.2945 17.8666 12 17.8666C11.7054 17.8666 11.4666 17.6278 11.4666 17.3333V7.95422L8.11041 11.3104C7.90213 11.5187 7.56444 11.5187 7.35617 11.3104C7.14788 11.1021 7.14788 10.7645 7.35617 10.5562L11.6228 6.28952Z" fill="white"/>
-      </svg>
-    `,
-    },
-  },
-  stop: {
-    svg: {
-      content: `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M0 3C0 1.34315 1.34315 0 3 0H21C22.6569 0 24 1.34315 24 3V21C24 22.6569 22.6569 24 21 24H3C1.34315 24 0 22.6569 0 21V3Z" fill="#0090FF"/>
-        <rect width="16" height="16" transform="translate(4 4)" fill="white" fill-opacity="0.01"/>
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M6.1333 7.19997C6.1333 6.61087 6.61087 6.1333 7.19997 6.1333H16.8C17.3891 6.1333 17.8666 6.61087 17.8666 7.19997V16.8C17.8666 17.3891 17.3891 17.8666 16.8 17.8666H7.19997C6.61087 17.8666 6.1333 17.3891 6.1333 16.8V7.19997ZM16.8 7.19997H7.19997V16.8H16.8V7.19997Z" fill="white"/>
-      </svg>
-    `,
-    },
-  },
-};
-
-const DEEP_CHAT_AUXILIARY_STYLE = `
-:host {
-  border: none !important;
-}
-.aiLoader, .aiCompletedIcon {
-  display: inline-block;
-  box-sizing: border-box;
-  vertical-align: middle;
-  margin-right: 8px;
-}
-.aiLoader {
-  width: 12px;
-  height: 12px;
-  border: 2px solid #8B8D98;
-  border-bottom-color: transparent;
-  border-radius: 50%;
-  animation: ai-wizard-rotation 0.8s linear infinite;
-}
-@keyframes ai-wizard-rotation {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-.aiCompletedIcon {
-  position: relative;
-  width: 12px;
-  height: 12px;
-  border: 1.5px solid #30A46C;
-  border-radius: 50%;
-}
-.aiCompletedIcon::after {
-  content: '';
-  position: absolute;
-  top: 0px;
-  left: 3px;
-  width: 3px;
-  height: 6px;
-  border: solid #30A46C;
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
-}
-#chat-view:has(#messages:empty) {
-  display: block;
-}
-#chat-view:has(#messages:empty) #input:has(#file-attachment-container[style*='display: block']) {
-  margin-top: 40px;
-}
-.text-message h1 {
-  font-size: var(--font-size-5);
-}
-.text-message h2 {
-  font-size: var(--font-size-4);
-}
-.text-message h3 {
-  font-size: var(--font-size-3);
-}
-.text-message h4 {
-  font-size: var(--font-size-2);
-}
-.text-message h5 {
-  font-size: var(--font-size-1);
-}
-`;
 
 const simplePropertyHandler = (
   property: string,
@@ -475,8 +268,8 @@ const operationsHandler = {
             // No selection callback is passed: auto-selecting a placed
             // component navigates the URL to …/component/<uuid>, which remounts
             // AiWizard (each route mounts its own UiShell) and wipes the live
-            // progress and answer messages. AI batch placement leaves the
-            // selection untouched.
+            // progress and answer messages. The UUID is assigned server-side and
+            // echoed back so the next hop can chain reference_uuid.
             dispatch(
               layoutUtils.addNewComponentToLayout({
                 component: componentToUse,
@@ -498,12 +291,12 @@ const editComponentsHandler = {
   canHandle: (msg: any) => 'component_updates' in msg && msg.component_updates,
   handle: async ({
     message,
-    dispatch,
     layoutUtils,
+    dispatch,
   }: {
     message: any;
-    dispatch: any;
     layoutUtils: any;
+    dispatch: any;
   }) => {
     // Updates the props of components already on the page, keyed by UUID.
     for (const [uuid, values] of Object.entries(message.component_updates)) {
@@ -590,7 +383,8 @@ function withStickyScroll(chatEl: any, mutate: () => void) {
 
 // Recursively flattens a region's component tree into the wire shape the
 // backend expects (name + uuid + resolved props + nested slots). Pure — kept
-// at module scope so it carries no render-cycle identity.
+// at module scope so it carries no render-cycle identity. nodePath is computed
+// server-side in the hop pipeline, so it is not sent from here.
 function processComponents(
   components: ComponentNode[] | undefined,
   model: ComponentModels,
@@ -614,9 +408,211 @@ function processComponents(
   });
 }
 
+// Stable references for static DeepChat props. These are defined at module
+// scope so they keep the same identity across renders, preventing DeepChat from
+// resetting (and clearing the typed prompt) when the component re-renders.
+const DEEP_CHAT_IMAGES = {
+  files: {
+    acceptedFormats: '.jpg, .png, .jpeg',
+    // For now we just support uploading 1 image at a time
+    // if the user tries to upload another image the already
+    // added image is replaced.
+    maxNumberOfFiles: 1,
+  },
+  button: {
+    position: 'inside-start',
+    styles: {
+      container: {
+        default: {
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginLeft: '8px',
+          marginBottom: '12px',
+          backgroundColor: '#F0F0F3',
+        },
+      },
+      svg: {
+        content: `
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="16" height="16" fill="white" fill-opacity="0.01"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M8.53324 2.93324C8.53324 2.63869 8.29445 2.3999 7.9999 2.3999C7.70535 2.3999 7.46657 2.63869 7.46657 2.93324V7.46657H2.93324C2.63869 7.46657 2.3999 7.70535 2.3999 7.9999C2.3999 8.29445 2.63869 8.53324 2.93324 8.53324H7.46657V13.0666C7.46657 13.3611 7.70535 13.5999 7.9999 13.5999C8.29445 13.5999 8.53324 13.3611 8.53324 13.0666V8.53324H13.0666C13.3611 8.53324 13.5999 8.29445 13.5999 7.9999C13.5999 7.70535 13.3611 7.46657 13.0666 7.46657H8.53324V2.93324Z" fill="#60646C"/>
+        </svg>
+      `,
+      },
+    },
+  },
+} as const;
+
+// Setting to -1 to allow sending the entire conversation history.
+// @see https://deepchat.dev/docs/connect/#requestBodyLimits
+const DEEP_CHAT_REQUEST_BODY_LIMITS = {
+  maxMessages: -1,
+} as const;
+
+const DEEP_CHAT_TEXT_INPUT = {
+  placeholder: { text: 'Build me a ...' },
+  styles: {
+    text: {
+      padding: '16px',
+    },
+    container: {
+      height: '167px',
+      width: '100%',
+      padding: '0 0 40px 0',
+    },
+  },
+} as const;
+
+const DEEP_CHAT_STYLE = {
+  width: '283px',
+  height: '100%',
+} as const;
+
+const DEEP_CHAT_MESSAGE_STYLES = {
+  default: {
+    shared: {
+      bubble: {
+        width: '100%',
+        maxWidth: '100%',
+        color: 'var(--black-12)',
+        fontSize: '14px',
+        fontWeight: '400',
+        lineHeight: '1.26',
+        padding: '8px',
+        textAlign: 'left',
+      },
+    },
+    user: {
+      bubble: {
+        backgroundColor: '#F0F0F3',
+      },
+    },
+    ai: {
+      bubble: {
+        backgroundColor: 'white',
+      },
+    },
+    error: {
+      bubble: {
+        color: '#FF3333',
+      },
+    },
+  },
+} as const;
+
+const DEEP_CHAT_SUBMIT_BUTTON_STYLES = {
+  disabled: {
+    container: {
+      default: {
+        display: 'none',
+      },
+    },
+  },
+  submit: {
+    container: {
+      default: {
+        display: 'inherit',
+        marginRight: '8px',
+        marginBottom: '12px',
+      },
+    },
+    svg: {
+      content: `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 3C0 1.34315 1.34315 0 3 0H21C22.6569 0 24 1.34315 24 3V21C24 22.6569 22.6569 24 21 24H3C1.34315 24 0 22.6569 0 21V3Z" fill="#0090FF"/>
+        <rect width="16" height="16" transform="translate(4 4)" fill="white" fill-opacity="0.01"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M11.6228 6.28952C11.8311 6.08123 12.1688 6.08123 12.3771 6.28952L16.6438 10.5562C16.852 10.7645 16.852 11.1021 16.6438 11.3104C16.4355 11.5187 16.0978 11.5187 15.8894 11.3104L12.5333 7.95422V17.3333C12.5333 17.6278 12.2945 17.8666 12 17.8666C11.7054 17.8666 11.4666 17.6278 11.4666 17.3333V7.95422L8.11041 11.3104C7.90213 11.5187 7.56444 11.5187 7.35617 11.3104C7.14788 11.1021 7.14788 10.7645 7.35617 10.5562L11.6228 6.28952Z" fill="white"/>
+      </svg>
+    `,
+    },
+  },
+  stop: {
+    svg: {
+      content: `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 3C0 1.34315 1.34315 0 3 0H21C22.6569 0 24 1.34315 24 3V21C24 22.6569 22.6569 24 21 24H3C1.34315 24 0 22.6569 0 21V3Z" fill="#0090FF"/>
+        <rect width="16" height="16" transform="translate(4 4)" fill="white" fill-opacity="0.01"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M6.1333 7.19997C6.1333 6.61087 6.61087 6.1333 7.19997 6.1333H16.8C17.3891 6.1333 17.8666 6.61087 17.8666 7.19997V16.8C17.8666 17.3891 17.3891 17.8666 16.8 17.8666H7.19997C6.61087 17.8666 6.1333 17.3891 6.1333 16.8V7.19997ZM16.8 7.19997H7.19997V16.8H16.8V7.19997Z" fill="white"/>
+      </svg>
+    `,
+    },
+  },
+} as const;
+
+const DEEP_CHAT_AUXILIARY_STYLE = `
+:host {
+  border: none !important;
+}
+.aiLoader, .aiCompletedIcon {
+  display: inline-block;
+  box-sizing: border-box;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.aiLoader {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #8B8D98;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  animation: ai-wizard-rotation 0.8s linear infinite;
+}
+@keyframes ai-wizard-rotation {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.aiCompletedIcon {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #30A46C;
+  border-radius: 50%;
+}
+.aiCompletedIcon::after {
+  content: '';
+  position: absolute;
+  top: 0px;
+  left: 3px;
+  width: 3px;
+  height: 6px;
+  border: solid #30A46C;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+#chat-view:has(#messages:empty) {
+  display: block;
+}
+#chat-view:has(#messages:empty) #input:has(#file-attachment-container[style*='display: block']) {
+  margin-top: 40px;
+}
+.text-message h1 {
+  font-size: var(--font-size-5);
+}
+.text-message h2 {
+  font-size: var(--font-size-4);
+}
+.text-message h3 {
+  font-size: var(--font-size-3);
+}
+.text-message h4 {
+  font-size: var(--font-size-2);
+}
+.text-message h5 {
+  font-size: var(--font-size-1);
+}
+`;
+
+// DeepChat is rendered through `memo` so that re-renders of AiWizard (e.g. when
+// the layout model changes as components are placed) do not re-seed DeepChat
+// from its `history` prop, which would wipe imperatively-added progress
+// messages. For the memo to hold, every object prop must be a stable reference,
+// so the static configuration objects live at module scope and the `connect`
+// handler is kept referentially stable (see connectHandler).
+const MemoDeepChat = memo(DeepChat);
+
 const AiWizard = () => {
   const dispatch = useAppDispatch();
-  const drupalSettings = getDrupalSettings();
   const chatElementRef = useRef<any>(null);
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const [createCodeComponent] = useCreateCodeComponentMutation();
@@ -628,35 +624,30 @@ const AiWizard = () => {
   const codeComponentRequiredProps = useAppSelector(
     selectCodeComponentProperty('required'),
   );
+  // The Redux store is read directly (store.getState()) at request time. During
+  // the hop loop a handler dispatches a placement and the loop rebuilds the next
+  // request body immediately after; a render-synced ref would still hold the
+  // pre-placement layout because React has not re-committed yet. useAppStore()
+  // returns a stable store reference, so closing over it does not churn identity.
   const store = useAppStore();
-  const chatHistory = useSyncExternalStore(
-    historyStore.subscribe,
-    historyStore.getSnapshot,
-  );
   // `history` only seeds DeepChat (initial mount + reload restore). During a
   // live turn the progress message is added to DeepChat's own list imperatively
   // and addressed by index — it is not in historyStore until the final hop. If
-  // the `history` prop reference changes mid-turn DeepChat re-seeds and wipes
-  // that message, invalidating the cached index ("Message index not found").
-  // `historyStore.addMessage` swaps the snapshot array without notifying, so a
-  // mid-turn re-render (a parent re-rendering as components are placed) surfaces
-  // a new `chatHistory` reference. Freeze the reference for the whole turn so
-  // DeepChat never re-seeds while progress is live.
-  const turnActiveRef = useRef(false);
-  const frozenHistoryRef = useRef(chatHistory);
-  if (!turnActiveRef.current) {
-    frozenHistoryRef.current = chatHistory;
-  }
-  const hasRenderedRef = useRef(false);
+  // the `history` prop reference changed mid-turn DeepChat would re-seed and
+  // wipe that message, invalidating the cached index ("Message index not
+  // found"). Capture the snapshot once at mount so the prop never changes;
+  // messages are still written to IndexedDB for reload restore.
+  // @todo Decide whether IndexedDB chat persistence is still needed now that uploads are size-limited; restore or remove it in https://git.drupalcode.org/project/canvas/-/work_items/3591731.
+  const initialHistoryRef = useRef(historyStore.getSnapshot());
+  const isComponentRenderedRef = useRef(false);
   const welcomeTextRef = useRef<HTMLSpanElement>(null);
-  // AbortController to cancel ongoing requests when component unmounts
+  // AbortController to cancel ongoing requests when component unmounts.
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Create a ref to store current values for Deep Chat's connect prop.
-  // Accessing these ensures we're working with fresh values even after the Deep
-  // Chat component has been mounted. Layout, page data, and selection are read
-  // straight from the Redux store at request time instead — a ref lags the
-  // store by a render cycle, which is too late between hops.
+  // Ref for values that do not change during a turn (route params, the open
+  // code component). Layout, page data, and selection are read straight from
+  // the Redux store at request time instead — a ref lags the store by a render
+  // cycle, which is too late between hops.
   const currentValuesRef = useRef({
     codeComponentName,
     params,
@@ -671,8 +662,8 @@ const AiWizard = () => {
       codeComponentRequiredProps,
     };
   }, [codeComponentName, params, codeComponentRequiredProps]);
-  // Access layoutUtils from drupalSettings.canvas
-  const layoutUtils = drupalSettings.canvas?.layoutUtils as any;
+  // Access layoutUtils from drupalSettings.canvas.
+  const layoutUtils = getDrupalSettings().canvas?.layoutUtils as any;
 
   const { data: availableComponents } = useGetComponentsQuery();
   const componentsRef = useRef<any>(null);
@@ -764,6 +755,276 @@ const AiWizard = () => {
     [dispatch, layoutUtils, navigate, createCodeComponent],
   );
 
+  // Keep the latest receiveMessage and csrfToken in refs so connectHandler can
+  // stay referentially stable. A changing connect prop re-renders MemoDeepChat,
+  // which resets DeepChat and clears the typed prompt when page metadata
+  // changes.
+  const receiveMessageRef = useRef(receiveMessage);
+  const csrfTokenRef = useRef(csrfToken);
+  useEffect(() => {
+    receiveMessageRef.current = receiveMessage;
+    csrfTokenRef.current = csrfToken;
+  }, [receiveMessage, csrfToken]);
+
+  // Stable handler for DeepChat's connect prop. It reads up-to-date data via
+  // refs (currentValuesRef, receiveMessageRef, csrfTokenRef, chatElementRef,
+  // abortControllerRef) and the Redux store, so it never needs to be recreated
+  // and the connect prop keeps a stable identity. Both `store` and
+  // `transformLayout` are stable, so the handler identity never changes.
+  const connectHandler = useCallback(
+    async (body: any, signals: any) => {
+      const csrfToken = csrfTokenRef.current;
+      // MemoDeepChat only renders once csrfToken is set, but this handler is
+      // defined before that render guard, so narrow the nullable type here.
+      if (!csrfToken) {
+        return;
+      }
+      const drupalSettings = getDrupalSettings();
+      try {
+        const hasFiles = body instanceof FormData;
+        let requestBody: FormData | string = '';
+        const headers: Record<string, string> = {
+          'X-CSRF-Token': csrfToken,
+        };
+        // Generate a unique request ID. It stays constant across hops:
+        // the backend resolves the serialized agent state by it.
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+        if (hasFiles) {
+          const files = body.getAll('files');
+          const MAX_FILE_SIZE = drupalSettings?.canvas?.canvasAiMaxFileSize;
+
+          for (const file of files) {
+            if (file instanceof File && file.size > MAX_FILE_SIZE) {
+              signals.onResponse({
+                text: `File is too large. Maximum allowed size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`,
+                role: 'error',
+              });
+              return;
+            }
+          }
+          requestBody = body as FormData;
+          requestBody.append(
+            'entity_type',
+            currentValuesRef.current.params.entityType || '',
+          );
+          requestBody.append(
+            'entity_id',
+            currentValuesRef.current.params.entityId || '',
+          );
+          requestBody.append(
+            'selected_component',
+            // Prefer the code-editor route param: it identifies the open
+            // component immediately after navigation (e.g. right after
+            // creating one), whereas the Redux machineName is only set once
+            // the editor finishes its async data load.
+            currentValuesRef.current.params.codeComponentId ||
+              currentValuesRef.current.codeComponentName,
+          );
+          requestBody.append(
+            'selected_component_required_props',
+            JSON.stringify(
+              currentValuesRef.current.codeComponentRequiredProps || [],
+            ),
+          );
+          requestBody.append(
+            'layout',
+            JSON.stringify(
+              Object.fromEntries(
+                Object.entries(selectModel(store.getState())).map(
+                  ([uuid, comp]) => [uuid, comp.resolved],
+                ),
+              ),
+            ),
+          );
+          requestBody.append('derived_proptypes', JSON.stringify(fixtureProps));
+          requestBody.append('request_id', requestId);
+        } else {
+          headers['Content-Type'] = 'application/json';
+        }
+
+        // Create a new AbortController for this request.
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+
+        // Live progress is rendered into a single chat message that the hop
+        // loop updates in place. Each hop's response carries the cumulative
+        // narration (`data.progress`), so this is the only writer of the
+        // message — no concurrent poller, hence no stale-index races.
+        let progressIndex = -1;
+        const renderProgress = (items: any[]) => {
+          const chatEl = chatElementRef.current;
+          const html = buildProgressHtml(items);
+          if (!chatEl || !html) return;
+          withStickyScroll(chatEl, () => {
+            if (progressIndex < 0) {
+              chatEl.addMessage({ html, role: 'ai' });
+              progressIndex = chatEl.getMessages().length - 1;
+            } else {
+              try {
+                chatEl.updateMessage({ html }, progressIndex);
+              } catch (error) {
+                console.warn('UpdateMessage failed:', error);
+                chatEl.addMessage({ html, role: 'ai' });
+                progressIndex = chatEl.getMessages().length - 1;
+              }
+            }
+          });
+        };
+        const removeProgress = () => {
+          const chatEl = chatElementRef.current;
+          if (chatEl && progressIndex >= 0) {
+            try {
+              chatEl.updateMessage({ html: '' }, progressIndex);
+              progressIndex = -1;
+            } catch (error) {
+              console.warn('Failed to remove progress message:', error);
+            }
+          }
+        };
+
+        // The agent pauses after each tool decision and returns
+        // `should_continue: true`. We re-POST the same conversation
+        // (identified by request_id) to resume it, applying each hop's
+        // result, until the agent is finished.
+        const runHops = async () => {
+          let data: any;
+          do {
+            if (!hasFiles) {
+              // Rebuild the body every hop: the previous hop's handlers may
+              // have placed components or set page data, and the backend
+              // needs the resulting state. Read from the Redux store — refs
+              // and render-time values lag by a render cycle.
+              const state = store.getState();
+              const freshPageData = selectPageData(state);
+              const freshModel = selectModel(state);
+              requestBody = JSON.stringify({
+                ...body,
+                entity_type: currentValuesRef.current.params.entityType,
+                entity_id: currentValuesRef.current.params.entityId,
+                selected_component:
+                  currentValuesRef.current.params.codeComponentId ||
+                  currentValuesRef.current.codeComponentName,
+                selected_component_required_props:
+                  currentValuesRef.current.codeComponentRequiredProps || [],
+                layout: JSON.stringify(
+                  Object.fromEntries(
+                    Object.entries(freshModel).map(([uuid, comp]) => [
+                      uuid,
+                      comp.resolved,
+                    ]),
+                  ),
+                ),
+                active_component_uuid:
+                  (state as any)?.ui?.selection?.items[0] ?? '',
+                current_layout: transformLayout(),
+                derived_proptypes: fixtureProps,
+                page_title: freshPageData['title[0][value]'],
+                page_description: freshPageData['description[0][value]'],
+                request_id: requestId,
+              });
+            }
+            const response = await fetch('/admin/api/canvas/ai', {
+              method: 'POST',
+              headers,
+              body: requestBody,
+              signal: abortController.signal,
+            });
+            if (!response.ok) {
+              throw new Error(`HTTP error. Status: ${response.status}`);
+            }
+            data = await response.json();
+            if (data.status === false) {
+              throw new Error(
+                data.message ||
+                  'An error occurred while processing your request. Please try again.',
+              );
+            }
+            // Update the live progress message with this hop's narration.
+            if (data.progress?.length) {
+              renderProgress(data.progress);
+            }
+            // Apply this hop's side effects (component placement, page
+            // data, etc.).
+            const processedMessage = await receiveMessageRef.current(data);
+            if (!data.should_continue) {
+              // Final hop: persist the progress block to history (before the
+              // answer, so a reload shows user → progress → answer), then
+              // show the agent's answer.
+              if (data.progress?.length) {
+                const html = buildProgressHtml(data.progress);
+                if (html) {
+                  historyStore.addMessage({ html, role: 'ai' });
+                }
+              }
+              await signals.onResponse(processedMessage);
+              chatElementRef.current?.disableSubmitButton();
+            }
+          } while (data.should_continue);
+        };
+
+        runHops().catch((error) => {
+          removeProgress();
+          // Don't show error if request was aborted intentionally.
+          if (error.name === 'AbortError') {
+            console.log('AI request was aborted');
+            return;
+          }
+          console.error('AI request failed:', error);
+          signals.onResponse({
+            text: error.message
+              ? error.message
+              : 'An error occurred while processing your request. Please try again.',
+            role: 'error',
+          });
+          setTimeout(() => {
+            chatElementRef.current?.disableSubmitButton();
+          }, 0);
+        });
+      } catch (error: any) {
+        // Don't show error if request was aborted intentionally.
+        if (error.name === 'AbortError') {
+          console.log('AI request was aborted');
+          return;
+        }
+        console.error('AI request failed:', error);
+        await signals.onResponse({
+          text: 'An error occurred while processing your request. Please try again.',
+          role: 'error',
+        });
+        setTimeout(() => {
+          chatElementRef.current?.disableSubmitButton();
+        }, 0);
+      }
+      setTimeout(() => {
+        chatElementRef.current?.disableSubmitButton();
+      }, 0);
+    },
+    [store, transformLayout],
+  );
+
+  const connectConfig = useMemo(
+    () => ({
+      // Defining a handler instead of an object to ensure we can work with
+      // up-to-date data; everything mutable is read from refs or the Redux
+      // store at request time.
+      // @see https://deepchat.dev/docs/connect/#Handler
+      handler: connectHandler,
+    }),
+    [connectHandler],
+  );
+
+  // Reset chat state the first time DeepChat renders. Ref-guarded so this only
+  // runs once and the callback identity stays stable for `memo`.
+  const handleComponentRender = useCallback(() => {
+    if (!isComponentRenderedRef.current) {
+      chatElementRef.current.clearMessages();
+      historyStore.clearHistory();
+      chatElementRef.current.disableSubmitButton();
+      isComponentRenderedRef.current = true;
+    }
+  }, []);
+
   useEffect(() => {
     const chatEl = chatElementRef.current;
     if (!chatEl) return;
@@ -804,260 +1065,6 @@ const AiWizard = () => {
     }
   }, []);
 
-  // Reset chat state the first time DeepChat renders. Ref-guarded so this only
-  // runs once and the callback identity stays stable for `memo`.
-  const handleComponentRender = useCallback(() => {
-    if (!hasRenderedRef.current) {
-      chatElementRef.current.clearMessages();
-      historyStore.clearHistory();
-      chatElementRef.current.disableSubmitButton();
-      hasRenderedRef.current = true;
-    }
-  }, []);
-
-  // DeepChat's connect handler. Defining a handler instead of an object keeps us
-  // working with up-to-date data; everything mutable is read from refs or the
-  // Redux store at request time. Wrapped in useMemo so the `connect` object is a
-  // stable reference for `MemoDeepChat`.
-  // @see https://deepchat.dev/docs/connect/#Handler
-  const connect = useMemo(
-    () => ({
-      handler: async (body: any, signals: any) => {
-        try {
-          const hasFiles = body instanceof FormData;
-          let requestBody: FormData | string = '';
-          const headers: Record<string, string> = {
-            'X-CSRF-Token': csrfToken as string,
-          };
-          // Generate a unique request ID. It stays constant across hops:
-          // the backend resolves the serialized orchestrator state by it.
-          const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-          if (hasFiles) {
-            const files = body.getAll('files');
-            const MAX_FILE_SIZE = drupalSettings?.canvas?.canvasAiMaxFileSize;
-
-            for (const file of files) {
-              if (file instanceof File && file.size > MAX_FILE_SIZE) {
-                signals.onResponse({
-                  text: `File is too large. Maximum allowed size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`,
-                  role: 'error',
-                });
-                return;
-              }
-            }
-            requestBody = body as FormData;
-            requestBody.append(
-              'entity_type',
-              currentValuesRef.current.params.entityType || '',
-            );
-            requestBody.append(
-              'entity_id',
-              currentValuesRef.current.params.entityId || '',
-            );
-            requestBody.append(
-              'selected_component',
-              // Prefer the code-editor route param: it identifies the open
-              // component immediately after navigation (e.g. right after
-              // creating one), whereas the Redux machineName is only set once
-              // the editor finishes its async data load.
-              currentValuesRef.current.params.codeComponentId ||
-                currentValuesRef.current.codeComponentName,
-            );
-            requestBody.append(
-              'selected_component_required_props',
-              JSON.stringify(
-                currentValuesRef.current.codeComponentRequiredProps || [],
-              ),
-            );
-            requestBody.append(
-              'layout',
-              JSON.stringify(
-                Object.fromEntries(
-                  Object.entries(selectModel(store.getState())).map(
-                    ([uuid, comp]) => [uuid, comp.resolved],
-                  ),
-                ),
-              ),
-            );
-            requestBody.append(
-              'derived_proptypes',
-              JSON.stringify(fixtureProps),
-            );
-            requestBody.append('request_id', requestId);
-          } else {
-            headers['Content-Type'] = 'application/json';
-          }
-
-          // Create a new AbortController for this request.
-          const abortController = new AbortController();
-          abortControllerRef.current = abortController;
-
-          // Live progress is rendered into a single chat message that the hop
-          // loop updates in place. Each hop's response carries the cumulative
-          // narration (`data.progress`), so this is the only writer of the
-          // message — no concurrent poller, hence no stale-index races.
-          let progressIndex = -1;
-          const renderProgress = (items: any[]) => {
-            const chatEl = chatElementRef.current;
-            const html = buildProgressHtml(items);
-            if (!chatEl || !html) return;
-            withStickyScroll(chatEl, () => {
-              if (progressIndex < 0) {
-                chatEl.addMessage({ html, role: 'ai' });
-                progressIndex = chatEl.getMessages().length - 1;
-              } else {
-                try {
-                  chatEl.updateMessage({ html }, progressIndex);
-                } catch (error) {
-                  console.warn('UpdateMessage failed:', error);
-                  chatEl.addMessage({ html, role: 'ai' });
-                  progressIndex = chatEl.getMessages().length - 1;
-                }
-              }
-            });
-          };
-          const removeProgress = () => {
-            const chatEl = chatElementRef.current;
-            if (chatEl && progressIndex >= 0) {
-              try {
-                chatEl.updateMessage({ html: '' }, progressIndex);
-                progressIndex = -1;
-              } catch (error) {
-                console.warn('Failed to remove progress message:', error);
-              }
-            }
-          };
-
-          // The orchestrator pauses after each tool decision and returns
-          // `should_continue: true`. We re-POST the same conversation
-          // (identified by request_id) to resume it, applying each hop's
-          // result, until the orchestrator is finished.
-          const runHops = async () => {
-            let data: any;
-            do {
-              if (!hasFiles) {
-                // Rebuild the body every hop: the previous hop's handlers may
-                // have placed components or set page data, and the backend
-                // needs the resulting state. Read from the Redux store — refs
-                // and render-time values lag by a render cycle.
-                const state = store.getState();
-                const freshPageData = selectPageData(state);
-                const freshModel = selectModel(state);
-                requestBody = JSON.stringify({
-                  ...body,
-                  entity_type: currentValuesRef.current.params.entityType,
-                  entity_id: currentValuesRef.current.params.entityId,
-                  selected_component:
-                    currentValuesRef.current.params.codeComponentId ||
-                    currentValuesRef.current.codeComponentName,
-                  selected_component_required_props:
-                    currentValuesRef.current.codeComponentRequiredProps || [],
-                  layout: JSON.stringify(
-                    Object.fromEntries(
-                      Object.entries(freshModel).map(([uuid, comp]) => [
-                        uuid,
-                        comp.resolved,
-                      ]),
-                    ),
-                  ),
-                  active_component_uuid:
-                    (state as any)?.ui?.selection?.items[0] ?? '',
-                  current_layout: transformLayout(),
-                  derived_proptypes: fixtureProps,
-                  page_title: freshPageData['title[0][value]'],
-                  page_description: freshPageData['description[0][value]'],
-                  request_id: requestId,
-                });
-              }
-              const response = await fetch('/admin/api/canvas/ai', {
-                method: 'POST',
-                headers,
-                body: requestBody,
-                signal: abortController.signal,
-              });
-              if (!response.ok) {
-                throw new Error(`HTTP error. Status: ${response.status}`);
-              }
-              data = await response.json();
-              if (data.status === false) {
-                throw new Error(
-                  data.message ||
-                    'An error occurred while processing your request. Please try again.',
-                );
-              }
-              // Update the live progress message with this hop's narration.
-              if (data.progress?.length) {
-                renderProgress(data.progress);
-              }
-              // Apply this hop's side effects (component placement, page
-              // data, etc.).
-              const processedMessage = await receiveMessage(data);
-              if (!data.should_continue) {
-                // Final hop: persist the progress block to history (before the
-                // answer, so a reload shows user → progress → answer), then
-                // show the orchestrator's answer.
-                if (data.progress?.length) {
-                  const html = buildProgressHtml(data.progress);
-                  if (html) {
-                    historyStore.addMessage({ html, role: 'ai' });
-                  }
-                }
-                await signals.onResponse(processedMessage);
-                chatElementRef.current?.disableSubmitButton();
-              }
-            } while (data.should_continue);
-          };
-
-          // Freeze the history prop for the duration of the turn so mid-turn
-          // re-renders cannot re-seed DeepChat and wipe the live progress
-          // message. Released in `finally` once the hop loop settles.
-          turnActiveRef.current = true;
-          runHops()
-            .catch((error) => {
-              removeProgress();
-              // Don't show error if request was aborted intentionally
-              if (error.name === 'AbortError') {
-                console.log('AI request was aborted');
-                return;
-              }
-              console.error('AI request failed:', error);
-              signals.onResponse({
-                text: error.message
-                  ? error.message
-                  : 'An error occurred while processing your request. Please try again.',
-                role: 'error',
-              });
-              setTimeout(() => {
-                chatElementRef.current?.disableSubmitButton();
-              }, 0);
-            })
-            .finally(() => {
-              turnActiveRef.current = false;
-            });
-        } catch (error: any) {
-          // Don't show error if request was aborted intentionally
-          if (error.name === 'AbortError') {
-            console.log('AI request was aborted');
-            return;
-          }
-          console.error('AI request failed:', error);
-          await signals.onResponse({
-            text: 'An error occurred while processing your request. Please try again.',
-            role: 'error',
-          });
-          setTimeout(() => {
-            chatElementRef.current?.disableSubmitButton();
-          }, 0);
-        }
-        setTimeout(() => {
-          chatElementRef.current?.disableSubmitButton();
-        }, 0);
-      },
-    }),
-    [csrfToken, drupalSettings, store, transformLayout, receiveMessage],
-  );
-
   return (
     csrfToken && (
       <Flex
@@ -1085,10 +1092,14 @@ const AiWizard = () => {
         </Flex>
         <MemoDeepChat
           ref={chatElementRef}
-          history={frozenHistoryRef.current}
+          history={
+            initialHistoryRef.current.length > 0
+              ? initialHistoryRef.current
+              : undefined
+          }
           images={DEEP_CHAT_IMAGES}
           requestBodyLimits={DEEP_CHAT_REQUEST_BODY_LIMITS}
-          connect={connect}
+          connect={connectConfig}
           onInput={handleTextInput}
           onComponentRender={handleComponentRender}
           textInput={DEEP_CHAT_TEXT_INPUT}
