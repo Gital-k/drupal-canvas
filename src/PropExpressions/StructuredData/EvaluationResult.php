@@ -8,6 +8,7 @@ use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableDependencyTrait;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Render\BubbleableMetadata;
 
 /**
  * A value object wrapping the result of evaluating a prop expression.
@@ -30,6 +31,18 @@ final class EvaluationResult implements CacheableDependencyInterface {
   use CacheableDependencyTrait;
 
   /**
+   * Attachments (#attached assets) carried by this evaluation result.
+   *
+   * Populated when a BubbleableMetadata is passed as $cacheability, e.g.
+   * when the Evaluator captures attachments from a TextProcessed property.
+   * CacheableDependencyTrait::setCacheability() drops attachments, so they
+   * are stored here and exposed via getAttachments().
+   *
+   * @var array
+   */
+  private array $attachments = [];
+
+  /**
    * @var ActualEvaluationResult
    */
   public readonly mixed $value;
@@ -44,6 +57,13 @@ final class EvaluationResult implements CacheableDependencyInterface {
     mixed $value,
     CacheableDependencyInterface $cacheability = new CacheableMetadata(),
   ) {
+    // CacheableDependencyTrait::setCacheability() only retains cache
+    // tags/contexts/max-age; it drops any attachments. Capture them before
+    // the branches below call setCacheability().
+    if ($cacheability instanceof BubbleableMetadata) {
+      $this->attachments = $cacheability->getAttachments();
+    }
+
     if (!$value instanceof self && !self::hasNestedInstances($value)) {
       \assert((\is_array($value) && !static::hasNestedInstances($value)) || $value instanceof EntityInterface || \is_string($value) || $value instanceof \Stringable || \is_int($value) || \is_float($value) || \is_bool($value) || \is_null($value));
       // @phpstan-ignore-next-line assign.propertyType
@@ -61,6 +81,11 @@ final class EvaluationResult implements CacheableDependencyInterface {
     // @endcode
     if ($value instanceof self) {
       $this->value = $value->value;
+      // Merge attachments from the inner EvaluationResult.
+      $this->attachments = BubbleableMetadata::mergeAttachments(
+        $value->getAttachments(),
+        $this->attachments,
+      );
       $this->setCacheability(
         CacheableMetadata::createFromObject($value)
           ->addCacheableDependency($cacheability)
@@ -79,6 +104,11 @@ final class EvaluationResult implements CacheableDependencyInterface {
     $hoisted = self::hoistFromArray($value);
     \assert(\is_array($hoisted->value) && !static::hasNestedInstances($hoisted->value));
     $this->value = $hoisted->value;
+    // Merge attachments from all nested EvaluationResults that were hoisted.
+    $this->attachments = BubbleableMetadata::mergeAttachments(
+      $hoisted->getAttachments(),
+      $this->attachments,
+    );
     $this->setCacheability(
       CacheableMetadata::createFromObject($hoisted)
         ->addCacheableDependency($cacheability)
@@ -116,7 +146,9 @@ final class EvaluationResult implements CacheableDependencyInterface {
    */
   private static function hoistFromArray(array $value) : static {
     \assert(self::hasNestedInstances($value));
-    $combined_cacheability = new CacheableMetadata();
+    // Use BubbleableMetadata so that attachments from nested EvaluationResult
+    // objects survive the round-trip through the EvaluationResult constructor.
+    $combined_cacheability = new BubbleableMetadata();
     $hoisted_values = [];
     foreach ($value as $k => $v) {
       // An evaluation result may contain an arbitrarily complex nested array,
@@ -130,8 +162,23 @@ final class EvaluationResult implements CacheableDependencyInterface {
       }
       $hoisted_values[$k] = $v->value;
       $combined_cacheability->addCacheableDependency($v);
+      // Carry attachments from each nested result into the combined metadata.
+      $combined_cacheability->addAttachments($v->getAttachments());
     }
     return new EvaluationResult($hoisted_values, $combined_cacheability);
+  }
+
+  /**
+   * Returns the #attached assets carried by this evaluation result.
+   *
+   * These originate from typed data properties that expose filter or other
+   * render-pipeline assets (e.g. TextProcessed::getAttachments()).
+   *
+   * @return array
+   *   An attachments array compatible with BubbleableMetadata::addAttachments().
+   */
+  public function getAttachments(): array {
+    return $this->attachments;
   }
 
 }

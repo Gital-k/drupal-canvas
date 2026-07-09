@@ -35,6 +35,7 @@ use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
@@ -547,14 +548,18 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
   /**
    * @param array<string, EvaluationResult> $props_evaluation_results
    *
-   * @return array{0: array<string, mixed>, 1: \Drupal\Core\Cache\CacheableMetadata}
+   * @return array{0: array<string, mixed>, 1: \Drupal\Core\Render\BubbleableMetadata}
    */
   protected static function getResolvedPropsAndCacheability(array $props_evaluation_results): array {
     \assert(Inspector::assertAllObjects($props_evaluation_results, EvaluationResult::class));
-    $props_cacheability = new CacheableMetadata();
+    // BubbleableMetadata extends CacheableMetadata and additionally carries
+    // #attached assets. Its applyTo() merges both #cache and #attached into
+    // the render array, so filter libraries bubble up to the page response.
+    $props_cacheability = new BubbleableMetadata();
     $props = [];
     foreach ($props_evaluation_results as $prop_name => $evaluation_result) {
       $props_cacheability->addCacheableDependency($evaluation_result);
+      $props_cacheability->addAttachments($evaluation_result->getAttachments());
       $props[$prop_name] = $evaluation_result->value;
     }
     return [$props, $props_cacheability];

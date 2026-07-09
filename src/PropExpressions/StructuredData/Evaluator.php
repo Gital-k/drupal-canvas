@@ -9,6 +9,7 @@ use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Access\AccessResultReasonInterface;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -272,12 +273,21 @@ final class Evaluator {
         FieldPropExpression::class => (function () use ($expr, $field_item_list, $is_required, $cardinality) {
           $result = [];
           $raw_result = [];
-          $result_cacheability = new CacheableMetadata();
+          // Use BubbleableMetadata so that filter attachments (from typed data
+          // properties such as TextProcessed) can be carried through to the
+          // EvaluationResult and ultimately into the component render array.
+          $result_cacheability = new BubbleableMetadata();
           foreach ($field_item_list as $delta => $field_item) {
             if ($expr->delta === NULL || $expr->delta === $delta) {
               $prop = $field_item->get($expr->getFieldPropertyName());
               if ($prop instanceof CacheableDependencyInterface) {
                 $result_cacheability->addCacheableDependency($prop);
+              }
+              // Some computed typed data properties (e.g. TextProcessed) hold
+              // filter-generated #attached assets not reachable via
+              // CacheableDependencyInterface. Capture them when available.
+              if (method_exists($prop, 'getAttachments')) {
+                $result_cacheability->addAttachments($prop->getAttachments());
               }
               $raw_result[$delta] = $prop->getValue();
               if ($raw_result[$delta] === NULL && $prop instanceof EntityReference) {
