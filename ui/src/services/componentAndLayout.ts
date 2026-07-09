@@ -180,11 +180,15 @@ export const componentAndLayoutApi = createApi({
       { entityId: string; entityType: string; language?: string }
     >({
       query: ({ entityId, entityType, language }) => {
-        // When a language code is provided, prefix the URL so Drupal serves
-        // the translated content for that language.
+        // When a language code is provided, request that translation via the
+        // `canvas_preview_langcode` query parameter. The backend routes the
+        // request through the site's configured language negotiation —
+        // redirecting when needed — so the right translation is served
+        // regardless of the negotiation method.
+        const path = `canvas/api/v0/layout/${entityType}/${entityId}`;
         return language
-          ? `${language}/canvas/api/v0/layout/${entityType}/${entityId}`
-          : `canvas/api/v0/layout/${entityType}/${entityId}`;
+          ? `${path}?canvas_preview_langcode=${encodeURIComponent(language)}`
+          : path;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
@@ -238,6 +242,11 @@ export const componentAndLayoutApi = createApi({
             meta,
           } = await queryFulfilled;
           dispatch(setInitialPageData(entity_form_fields));
+          // Clear any stale snapshot (e.g. from a prior language/template
+          // preview) so selectPreviewHtml returns this fresh editor html.
+          // Mirrors getPageLayout; without it a leftover preview snapshot masks
+          // the template editor frame.
+          dispatch(setSnapshotHTML(''));
           dispatch(setHtml(html));
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         } catch (err) {

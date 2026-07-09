@@ -87,11 +87,24 @@ final class ApiAutoSaveControllerTranslationTest extends CanvasKernelTestBase {
     'canvas_test_sdc',
     'language',
     'content_translation',
-    'canvas_dev_translation',
     'config_translation',
     'field',
     'locale',
     'node',
+  ];
+
+  /**
+   * {@inheritdoc}
+   *
+   * The `asymmetric` test case marks the `tree` column group translatable,
+   * which the config schema forbids: only symmetrical translations are
+   * supported for now. This test intentionally exercises the (data model
+   * level) asymmetric behavior anyway, to guarantee it keeps working.
+   *
+   * @todo Remove in https://git.drupalcode.org/project/canvas/-/work_items/3571130
+   */
+  protected static $configSchemaCheckerExclusions = [
+    'core.base_field_override.canvas_page.canvas_page.components',
   ];
 
   /**
@@ -121,7 +134,7 @@ final class ApiAutoSaveControllerTranslationTest extends CanvasKernelTestBase {
       // Symmetric: the `tree` group is synced (non-translatable), `inputs` are
       // translatable. A structural edit on the default translation must
       // propagate to the non-default translation.
-      'symmetric' => [['inputs' => 'inputs', 'tree' => 0], TRUE],
+      'symmetric' => [['inputs' => 'inputs', 'tree' => '0'], TRUE],
       // Asymmetric: both groups translatable. Each translation keeps its own
       // tree, so a structural edit on the default translation must NOT leak in.
       'asymmetric' => [['inputs' => 'inputs', 'tree' => 'tree'], FALSE],

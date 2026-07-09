@@ -45,10 +45,6 @@ abstract class TranslationPropagationTestBase extends CanvasKernelTestBase {
   protected static $modules = [
     'field',
     'language',
-    // - Content-defined component trees: validates symmetrically translations
-    // - Config-defined component trees: makes PageRegion and ContentTemplate
-    //   config entities translatable
-    'canvas_dev_translation',
   ];
 
   /**
@@ -199,6 +195,23 @@ abstract class TranslationPropagationTestBase extends CanvasKernelTestBase {
     self::assertEntityIsValid($this->entity);
 
     $this->{$setup_method}();
+
+    // Reload content entities: the validity assertion above ran the
+    // ComponentTreeSymmetricalTranslation constraint (activated by the
+    // `translation_sync` setting of the base field override), which
+    // cached the `component` entity reference targets in the field items —
+    // now stale, because the setup method just created a new Component
+    // version. A production update pass always operates on freshly loaded
+    // entities.
+    if ($this->entity instanceof ContentEntityInterface) {
+      $entity_id = $this->entity->id();
+      \assert($entity_id !== NULL);
+      $entity = $this->container->get('entity_type.manager')
+        ->getStorage($this->entity->getEntityTypeId())
+        ->loadUnchanged($entity_id);
+      \assert($entity instanceof ContentEntityInterface);
+      $this->entity = $entity;
+    }
 
     $loader = $this->container->get(ComponentTreeLoader::class);
     \assert($loader instanceof ComponentTreeLoader);

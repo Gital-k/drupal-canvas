@@ -40,6 +40,7 @@ debucketed
 dedreux
 dedup
 Deepchat
+Deutsch
 delaville
 devizzent
 dhta
@@ -52,13 +53,16 @@ drupalsettings
 druplicon
 endapply
 entityviewdisplay
+Español
 esque
 extralight
 extensionless
 fieldtext
 fvar
 folderfy
+francais
 FrankenPHP
+Français
 gerbeaud
 gesturechange
 gestureend

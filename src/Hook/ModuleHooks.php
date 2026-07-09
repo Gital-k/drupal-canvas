@@ -126,25 +126,108 @@ class ModuleHooks {
         static::class,
         'afterBuildCanvasPageLanguageSettings',
       ];
+      $form['#validate'][] = [
+        static::class,
+        'validateCanvasPageLanguageSettings',
+      ];
     }
   }
 
   /**
-   * After-build callback that disables the language_alterable checkbox.
+   * After-build callback that adjusts the Canvas language settings form.
    *
    * Runs after the language_configuration element's #process callbacks have
-   * built the checkbox for Canvas pages, so the element is guaranteed
+   * built the settings for Canvas pages, so the element is guaranteed
    * to exist.
    */
   public static function afterBuildCanvasPageLanguageSettings(array $element, FormStateInterface $form_state): array {
     $bundle = Page::ENTITY_TYPE_ID;
-    if (isset($element[$bundle]['settings']['language']['language_alterable'])) {
-      $element[$bundle]['settings']['language']['language_alterable']['#description'] = t(
-        "Disabled for Canvas pages. Canvas pages must be created in the site's default language only. Translations are managed through the translation interface against the source-language page, not by creating pages in non-default languages."
-      );
-      $element[$bundle]['settings']['language']['language_alterable']['#attributes']['disabled'] = TRUE;
+    $translation_tip = '';
+
+    if (isset($element[$bundle]['settings']['language']['langcode'])) {
+      // Force default language of Canvas entities to the site's default
+      // language, and disable changing that. Keep this visible to help explain
+      // to the user what workflow they can expect. If content translation is
+      // also enabled, also add a tip about installing TMGMT or
+      // canvas_translate to enable translation as this workflow is different
+      // from other entities.
+      if (\Drupal::moduleHandler()->moduleExists('content_translation')) {
+        $translation_tip .= ' ' . t("Page translations may be created by translating component input values.");
+        if (!\Drupal::moduleHandler()->moduleExists('tmgmt') && !\Drupal::moduleHandler()->moduleExists('canvas_translate')) {
+          $translation_tip .= ' ' . t('To translate Canvas pages, install either the <a href=":canvas_translate_url">Canvas Translate Extension</a> for a simpler solution or <a href=":tmgmt_url">Translation Management Tool</a> for more advanced use cases.', [
+            ':tmgmt_url' => 'https://www.drupal.org/project/tmgmt',
+            ':canvas_translate_url' => 'https://www.drupal.org/project/canvas_translate',
+          ]);
+        }
+      }
+      $element[$bundle]['settings']['language']['langcode']['#value'] = 'site_default';
+      $element[$bundle]['settings']['language']['langcode']['#attributes']['disabled'] = TRUE;
+      $element[$bundle]['settings']['language']['langcode']['#description'] = t(
+        "All Canvas pages must be created in the site's default language. Creating pages in other languages is not supported."
+      ) . $translation_tip;
     }
+    // Hide the option and force the value to make sure the UI to change
+    // entity language is not available for Canvas pages.
+    if (isset($element[$bundle]['settings']['language']['language_alterable'])) {
+      $element[$bundle]['settings']['language']['language_alterable']['#value'] = 0;
+      $element[$bundle]['settings']['language']['language_alterable']['#access'] = FALSE;
+    }
+    // Unlike other content entities, Canvas is not integrated with core
+    // content translation, so remove configuration for that.
+    if (isset($element[$bundle]['settings']['content_translation']['untranslatable_fields_hide'])) {
+      $element[$bundle]['settings']['content_translation']['untranslatable_fields_hide']['#value'] = 0;
+      $element[$bundle]['settings']['content_translation']['untranslatable_fields_hide']['#access'] = FALSE;
+    }
+
+    // Change the label of the Components field to make it clear that the input
+    // values of the component instances are what is translatable, not the set
+    // of component instances nor their relative position themselves. Remove
+    // the Components field from the columns section to simplify the form.
+    if (isset($element[$bundle]['fields']['components'])) {
+      $element[$bundle]['fields']['components']['#label'] = t('Component input values');
+    }
+    if (isset($element[$bundle]['columns']['components'])) {
+      unset($element[$bundle]['columns']['components']);
+    }
+
     return $element;
+  }
+
+  /**
+   * Forces Canvas Pages to use symmetrical translations for `components` field.
+   *
+   * Ensures that the Canvas Page entity type's `components` base field always
+   * sets `third_party_settings.content_translation.translation_sync` to be
+   * symmetrically translated.
+   *
+   * @see \Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSynchronizer::ensureSymmetricalCanvasPageComponents()
+   */
+  public static function validateCanvasPageLanguageSettings(array &$form, FormStateInterface $form_state): void {
+    $bundle = Page::ENTITY_TYPE_ID;
+    $components_columns = $form_state->getValue([
+      'settings',
+      $bundle,
+      $bundle,
+      'columns',
+      'components',
+    ]);
+    // Normally absent: afterBuildCanvasPageLanguageSettings() removes the
+    // `components` column checkboxes from the form, so this handler forces the
+    // symmetrical combination rather than reading user input.
+    if (!\is_array($components_columns)) {
+      $components_columns = [];
+    }
+    // Note: `'0'`, not `0`, to comply with the config schema: core's
+    // `translation_sync` third party setting is a sequence of strings.
+    $components_columns['inputs'] = 'inputs';
+    $components_columns['tree'] = '0';
+    $form_state->setValue([
+      'settings',
+      $bundle,
+      $bundle,
+      'columns',
+      'components',
+    ], $components_columns);
   }
 
   /**
