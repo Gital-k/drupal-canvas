@@ -21,6 +21,9 @@ export interface ContentEntityReferenceFieldProperty {
   name: string;
   label: string;
   expression: string;
+  // The typed-data data type of the property's value (e.g. 'string',
+  // 'integer', 'uri'), for the entity-prop shape preview skeleton.
+  type: string;
 }
 
 interface ContentEntityReferenceFieldTargetBundle {
@@ -33,6 +36,12 @@ export interface ContentEntityReferenceField {
   name: string;
   label: string;
   hasChildren: boolean;
+  // The payload key this field actually resolves to (usually `name`, but
+  // entity keys like a node's `title` field normalize to their generic name,
+  // e.g. `label`). Use this, not `name`, wherever code must match the shape
+  // the component actually receives (e.g. the shape-preview skeleton).
+  // @see JsComponent::buildReferencePayload()
+  developerFacingKey: string;
   targetEntityType?: string;
   targetBundles?: Record<string, ContentEntityReferenceFieldTargetBundle>;
   properties: ContentEntityReferenceFieldProperty[];
@@ -42,6 +51,12 @@ export function getFieldsHref(
   source: { links?: Links } | undefined,
 ): string | undefined {
   return source?.links?.[TYPED_DATA_BROWSER_LINK_REL]?.href;
+}
+
+export interface ContentEntityReferencePreviewRequest {
+  entityTypeId: string;
+  entityId: string;
+  entityFields: Record<string, string[]>;
 }
 
 export const contentEntityReferenceApi = createApi({
@@ -61,8 +76,23 @@ export const contentEntityReferenceApi = createApi({
       transformResponse: (response: { data: ContentEntityReferenceField[] }) =>
         response.data,
     }),
+    previewContentEntityReference: builder.mutation<
+      Record<string, unknown>,
+      ContentEntityReferencePreviewRequest
+    >({
+      query: ({ entityTypeId, entityId, entityFields }) => ({
+        url: `/canvas/api/v0/ui/content-entity-reference/preview/${entityTypeId}/${entityId}`,
+        method: 'POST',
+        body: { entityFields },
+      }),
+      transformResponse: (response: { data: Record<string, unknown> }) =>
+        response.data,
+    }),
   }),
 });
 
-export const { useListEntityTypesQuery, useListFieldsQuery } =
-  contentEntityReferenceApi;
+export const {
+  useListEntityTypesQuery,
+  useListFieldsQuery,
+  usePreviewContentEntityReferenceMutation,
+} = contentEntityReferenceApi;
