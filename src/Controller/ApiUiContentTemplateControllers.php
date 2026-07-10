@@ -12,10 +12,12 @@ use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -36,6 +38,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     private readonly PropSourceSuggester $propSourceSuggester,
     private readonly EntityTypeBundleInfoInterface $bundleInfo,
     private readonly EntityDisplayRepositoryInterface $entityDisplayRepository,
+    private readonly EntityRepositoryInterface $entityRepository,
   ) {}
 
   /**
@@ -97,11 +100,17 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     }
   }
 
-  public function suggestPreviewContentEntities(string $entity_type_id, string $bundle): CacheableJsonResponse {
+  public function suggestPreviewContentEntities(string $entity_type_id, string $bundle, Request $request): CacheableJsonResponse {
+    $search = $request->query->get('search');
+    // A whitespace-only search means "no search", not "match nothing".
+    $search = \is_string($search) ? \trim($search) : '';
+    $entity_query_cacheability = new CacheableMetadata();
     $entity_query = ContentTemplate::getPreviewSuggestionQuery(
       $entity_type_id,
       $bundle,
       10,
+      $entity_query_cacheability,
+      $search === '' ? NULL : $search,
     );
 
     $entity_definition = $this->entityTypeManager->getDefinition($entity_type_id);
@@ -109,9 +118,10 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
 
     $entity_ids = $entity_query->execute();
     \assert(\is_array($entity_ids));
-    $entity_query_cacheability = (new CacheableMetadata())
+    $entity_query_cacheability
       ->addCacheTags($entity_definition->getBundleListCacheTags($bundle))
-      ->addCacheContexts($entity_storage->getEntityType()->getListCacheContexts());
+      ->addCacheContexts($entity_storage->getEntityType()->getListCacheContexts())
+      ->addCacheContexts(['url.query_args:search']);
 
     $entities = $entity_storage->loadMultiple($entity_ids);
 
@@ -126,7 +136,11 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
 
     $entities_data = \array_map(fn (EntityInterface $entity) => [
       'id' => $entity->id(),
-      'label' => $entity->label(),
+      // The label of the translation matching the current content language,
+      // not the default translation's, same as core's entity reference
+      // selection.
+      // @see \Drupal\Core\Entity\Plugin\EntityReferenceSelection\DefaultSelection::getReferenceableEntities()
+      'label' => $this->entityRepository->getTranslationFromContext($entity)->label(),
     ], $entities);
     $response = new CacheableJsonResponse($entities_data);
     $response->addCacheableDependency($entity_query_cacheability);
