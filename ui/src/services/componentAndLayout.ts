@@ -742,10 +742,12 @@ export const componentAndLayoutApi = createApi({
     }),
     getPreviewContentEntities: builder.query<
       PreviewContentEntitiesResponse,
-      { entityTypeId: string; bundle: string }
+      { entityTypeId: string; bundle: string; search?: string }
     >({
-      query: ({ entityTypeId, bundle }) =>
-        `canvas/api/v0/ui/content_template/suggestions/preview/${entityTypeId}/${bundle}`,
+      query: ({ entityTypeId, bundle, search }) => ({
+        url: `canvas/api/v0/ui/content_template/suggestions/preview/${entityTypeId}/${bundle}`,
+        params: search ? { search } : undefined,
+      }),
       providesTags: (result, error, { entityTypeId, bundle }) => [
         { type: 'PreviewContentEntities', id: `${entityTypeId}-${bundle}` },
       ],
