@@ -6,11 +6,17 @@ import type { Locator } from '@playwright/test';
 
 test.use({
   modules: ['canvas_test_code_components_content_entity_ref'],
+  // The preview panel's "Copy snippet" button and click-to-copy keys write to
+  // the clipboard, which the shared steps below read back.
+  permissions: ['clipboard-read', 'clipboard-write'],
 });
 
+// The payload nests picked fields by their developer-facing keys (uid becomes
+// owner), so the referenced author's name lives at author.owner.name.
+// @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
 const COMPONENT_CODE = [
   'const Component = ({ author }) => (',
-  '  <div>Author: {author?.name}</div>',
+  '  <div>Author: {author?.owner?.name}</div>',
   ');',
   'export default Component;',
 ].join('\n');
@@ -121,17 +127,23 @@ function bundleSection(
 
 test.describe('Content entity reference props', () => {
   // The dialog only lists entity types the user can view, so grant the editor
-  // the permissions needed to see User and Content.
+  // the permissions needed to see User and Content, plus node creation so the
+  // test can create a News Item to preview against.
   test.beforeEach(async ({ drupal }) => {
     await drupal.loginAsAdmin();
     await drupal.addPermissions({
       role: 'editor',
-      permissions: ['access content', 'access user profiles'],
+      permissions: [
+        'access content',
+        'access user profiles',
+        'create news_item content',
+      ],
     });
     await drupal.logout();
   });
 
   test('Adds and edits a content entity reference prop in the code editor', async ({
+    page,
     drupal,
     canvas,
   }) => {
@@ -282,6 +294,157 @@ test.describe('Content entity reference props', () => {
       await expect(
         fieldCheckbox(reopened, 'Authored by → Picture → Width'),
       ).toHaveAttribute('data-state', 'unchecked');
+    });
+
+    await test.step('Also pick Authored by → Name, then save', async () => {
+      // The previous step left the dialog open with Authored by → User
+      // expanded, so Name is already visible. Picking it lets the component
+      // code render author?.owner?.name from the resolved preview payload.
+      const dialog = propForm
+        .page()
+        .getByRole('dialog', { name: 'Content Relationship' });
+      const name = fieldCheckbox(dialog, 'Name');
+      await expect(name).toBeVisible();
+      await name.click();
+      await expect(name).toHaveAttribute('data-state', 'checked');
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(dialog).toBeHidden();
+    });
+
+    const shapePreview = propForm.getByTestId('cer-shape-preview');
+
+    await test.step('Shape skeleton reflects the payload keys', async () => {
+      await expect(
+        propForm.getByRole('combobox', { name: 'Preview entity' }),
+      ).toBeVisible();
+      await expect(shapePreview).toBeVisible();
+      // The Type row names the target bundle.
+      await expect(
+        shapePreview.getByText('Type', { exact: true }),
+      ).toBeVisible();
+      await expect(
+        shapePreview.getByText('news_item', { exact: true }),
+      ).toBeVisible();
+      // Keys are the developer-facing payload keys, not raw field names: uid
+      // renders as owner, whose picked leaf fields nest below its __type row.
+      await expect(shapePreview.locator('code')).toHaveText([
+        'body',
+        'owner',
+        '__type',
+        'user_picture',
+        'name',
+      ]);
+      // Each row carries a type badge (the bundle badge comes first).
+      await expect(shapePreview.locator('.rt-Badge')).toHaveText([
+        'news_item',
+        'string',
+        'object',
+        'string',
+        'string',
+        'string',
+      ]);
+      // Rows nested under owner are indented one level.
+      await expect(
+        shapePreview
+          .getByText('__type', { exact: true })
+          .first()
+          .locator('xpath=ancestor::div[contains(@class, "rt-Flex")][1]'),
+      ).toHaveCSS('padding-left', '16px');
+      await expect(
+        propForm.getByText(
+          /^Approximate: select an entity above for real values/,
+        ),
+      ).toBeVisible();
+    });
+
+    await test.step('Copy snippet copies a destructuring snippet', async () => {
+      await propForm
+        .getByRole('button', { name: 'Copy snippet', exact: true })
+        .click();
+      // The button label flips to Copied briefly as feedback.
+      await expect(
+        propForm.getByRole('button', { name: 'Copied', exact: true }),
+      ).toBeVisible();
+      const clipboard = await page.evaluate(() =>
+        navigator.clipboard.readText(),
+      );
+      expect(clipboard).toBe(
+        'const { body, owner: { user_picture, name } } = author;',
+      );
+    });
+
+    await test.step('Selecting a preview entity shows real values', async () => {
+      // Create a News Item in a second tab so the code editor keeps its state.
+      const nodePage = await page.context().newPage();
+      await nodePage.goto('/node/add/news_item');
+      await nodePage.getByLabel('Title').fill('CER Preview News');
+      await nodePage
+        .getByLabel('Body')
+        .fill('Preview body text for the news item.');
+      await nodePage.getByRole('button', { name: 'Save' }).click();
+      await expect(
+        nodePage.getByRole('contentinfo', { name: 'Status message' }),
+      ).toContainText('News Item CER Preview News has been created.');
+      await nodePage.close();
+
+      const picker = propForm.getByRole('combobox', {
+        name: 'Preview entity',
+      });
+      await picker.click();
+      await picker.fill('CER Preview');
+      await propForm
+        .getByRole('option', { name: 'CER Preview News', exact: true })
+        .click();
+
+      // The skeleton is replaced by the entity's real resolved payload.
+      await expect(shapePreview.locator('span[title="__type"]')).toHaveText(
+        '__type:',
+      );
+      await expect(shapePreview).toContainText('news_item');
+      await expect(shapePreview).toContainText(
+        'Preview body text for the news item.',
+      );
+      await expect(shapePreview.locator('span[title="owner"]')).toBeVisible();
+
+      // Keys are click-to-copy: the hover title flips to Copied briefly.
+      const bodyKey = shapePreview.locator('span[title]', {
+        hasText: 'body:',
+      });
+      await expect(bodyKey).toHaveAttribute('title', 'body');
+      await bodyKey.click();
+      await expect(bodyKey).toHaveAttribute('title', 'Copied');
+
+      // The resolved payload also feeds the code editor preview iframe as the
+      // prop value: the component renders the author's name from it.
+      await expect(
+        canvas
+          .getCodePreviewFrame()
+          .getByText('Author: editor', { exact: true }),
+      ).toBeVisible();
+    });
+
+    await test.step('Clearing the preview entity returns to the skeleton', async () => {
+      // react-select's clear (x) control is its first indicator container.
+      await propForm.locator('[class$="-indicatorContainer"]').first().click();
+      await expect(
+        shapePreview.getByText('Type', { exact: true }),
+      ).toBeVisible();
+      await expect(shapePreview.locator('code')).toHaveText([
+        'body',
+        'owner',
+        '__type',
+        'user_picture',
+        'name',
+      ]);
+      await expect(
+        propForm.getByText(
+          /^Approximate: select an entity above for real values/,
+        ),
+      ).toBeVisible();
+      // Without a referenced entity the prop resolves to null in the iframe.
+      await expect(
+        canvas.getCodePreviewFrame().getByText('Author:', { exact: true }),
+      ).toBeVisible();
     });
   });
 
