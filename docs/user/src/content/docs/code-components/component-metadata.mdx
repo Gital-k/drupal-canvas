@@ -217,6 +217,16 @@ expression names alone. After the component metadata exists locally, run
 shape that component code should consume. Reference expressions can create
 nested objects and include metadata keys such as `__type`.
 
+The code editor's props panel shows the same information without leaving the
+browser. Once a content entity reference prop has a target and at least one
+selected field, a collapsible "Delivered shape" panel appears: before an entity
+is selected it shows a skeleton of the keys and value types the prop will
+receive; a "Preview with" field lets you search for and select a real entity
+matching the prop's target type and bundle, after which the panel shows the
+actual resolved payload. The selected preview entity also drives the code
+editor's live component preview. It is an editing aid only: it is not saved
+with the component and has no effect on placed instances.
+
 ## Slot metadata
 
 Slots are defined under the `slots` key. Each slot key becomes the slot name
