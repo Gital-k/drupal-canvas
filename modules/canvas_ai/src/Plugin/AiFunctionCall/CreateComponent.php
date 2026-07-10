@@ -210,7 +210,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
     $candidates = [];
     foreach (['/../node_modules', '/node_modules', '/core/node_modules'] as $base) {
       $esbuild_matches = \glob(DRUPAL_ROOT . $base . '/@esbuild/*/bin/esbuild');
-      $candidates = \array_merge($candidates, $esbuild_matches ? $esbuild_matches : []);
+      $candidates = \array_merge($candidates, \is_array($esbuild_matches) ? $esbuild_matches : []);
       $candidates[] = DRUPAL_ROOT . $base . '/.bin/esbuild';
     }
     $bin = '';
