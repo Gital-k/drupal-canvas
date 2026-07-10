@@ -740,6 +740,10 @@ function PreviewPanel({
                     theme={jsonTreeThemeProp}
                     invertTheme={false}
                     hideRoot
+                    // The payload only contains the fields the developer
+                    // explicitly picked, so show every nested level upfront
+                    // instead of hiding picked values behind collapsed nodes.
+                    shouldExpandNodeInitially={() => true}
                     labelRenderer={([key]) => (
                       <CopyableText text={String(key)}>{key}:</CopyableText>
                     )}
