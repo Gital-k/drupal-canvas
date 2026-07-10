@@ -404,9 +404,11 @@ test.describe('Content entity reference props', () => {
         .getByRole('option', { name: 'CER Preview News', exact: true })
         .click();
 
-      // The skeleton is replaced by the entity's real resolved payload.
-      await expect(shapePreview.locator('span[title="__type"]')).toHaveText(
-        '__type:',
+      // The skeleton is replaced by the entity's real resolved payload. The
+      // tree expands fully, so both entity levels render their __type key:
+      // the news item itself and the nested owner object.
+      await expect(shapePreview.locator('span[title="__type"]')).toHaveCount(
+        2,
       );
       await expect(shapePreview).toContainText('news_item');
       await expect(shapePreview.locator('span[title="owner"]')).toBeVisible();
