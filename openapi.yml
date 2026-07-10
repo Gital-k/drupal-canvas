@@ -3396,6 +3396,7 @@ paths:
                         - name
                         - label
                         - hasChildren
+                        - developerFacingKey
                         - properties
                       additionalProperties: false
                       properties:
@@ -3406,6 +3407,14 @@ paths:
                         hasChildren:
                           type: boolean
                           description: True for reference fields with at least one resolved target bundle; false otherwise.
+                        developerFacingKey:
+                          type: string
+                          description: >
+                            The payload key this field actually resolves to in the
+                            rendered component's props: usually the field's own
+                            machine name, but entity keys (e.g. a node's `title`
+                            field) are normalized to their generic name (e.g.
+                            `label`), so components stay entity-agnostic.
                         targetEntityType:
                           type: string
                           description: Present only when hasChildren is true.
@@ -3459,6 +3468,7 @@ paths:
                               - name
                               - label
                               - expression
+                              - type
                             additionalProperties: false
                             properties:
                               name:
@@ -3467,6 +3477,9 @@ paths:
                                 type: string
                               expression:
                                 type: string
+                              type:
+                                type: string
+                                description: The typed-data data type of the property's value (e.g. `string`, `integer`, `uri`).
               examples:
                 node-article-fields:
                   summary: Fields on node/article (root level, no parent)
@@ -3475,13 +3488,16 @@ paths:
                       - name: title
                         label: Title
                         hasChildren: false
+                        developerFacingKey: label
                         properties:
                           - name: value
                             label: Text value
                             expression: "ℹ︎␜entity:node:article␝title␞␟value"
+                            type: string
                       - name: uid
                         label: Authored by
                         hasChildren: true
+                        developerFacingKey: owner
                         targetEntityType: user
                         targetBundles:
                           user:
@@ -3495,28 +3511,36 @@ paths:
                           - name: target_id
                             label: User ID
                             expression: "ℹ︎␜entity:node:article␝uid␞␟target_id"
+                            type: integer
                       - name: field_image
                         label: Image
                         hasChildren: false
+                        developerFacingKey: field_image
                         properties:
                           - name: target_id
                             label: File ID
                             expression: "ℹ︎␜entity:node:article␝field_image␞␟target_id"
+                            type: integer
                           - name: alt
                             label: Alternative text
                             expression: "ℹ︎␜entity:node:article␝field_image␞␟alt"
+                            type: string
                           - name: title
                             label: Title
                             expression: "ℹ︎␜entity:node:article␝field_image␞␟title"
+                            type: string
                           - name: width
                             label: Width
                             expression: "ℹ︎␜entity:node:article␝field_image␞␟width"
+                            type: integer
                           - name: height
                             label: Height
                             expression: "ℹ︎␜entity:node:article␝field_image␞␟height"
+                            type: integer
                           - name: src_with_alternate_widths
                             label: URL with alternate widths
                             expression: "ℹ︎␜entity:node:article␝field_image␞␟src_with_alternate_widths"
+                            type: uri
                 user-fields-via-parent:
                   summary: Fields on user (navigated via node.article.uid reference)
                   value:
@@ -3524,17 +3548,21 @@ paths:
                       - name: name
                         label: Name
                         hasChildren: false
+                        developerFacingKey: name
                         properties:
                           - name: value
                             label: Text value
                             expression: "ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝name␞␟value"
+                            type: string
                       - name: mail
                         label: Email
                         hasChildren: false
+                        developerFacingKey: mail
                         properties:
                           - name: value
                             label: Text value
                             expression: "ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝mail␞␟value"
+                            type: email
         '401':
           $ref: '#/components/responses/AuthenticationErrorResponse'
         '403':
@@ -3550,6 +3578,16 @@ paths:
       parameters:
         - $ref: '#/components/parameters/entityTypeId'
         - $ref: '#/components/parameters/bundle'
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+          description: >
+            Narrows results to entities whose label contains this substring
+            (matched literally, surrounding whitespace ignored; a blank value
+            means no narrowing). Access filtering (per-entity `view` access)
+            runs after the search query narrows the candidates.
       responses:
         '200':
           description: Provides content that can be used for previewing content template targeting the specified entity type and bundle.
