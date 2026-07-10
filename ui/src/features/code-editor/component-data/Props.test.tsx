@@ -1,6 +1,6 @@
 // @todo: Port tests from code-editor-component-data-props.cy.jsx to this file since we want to move away from
 //    Cypress unit tests toward vitest. https://www.drupal.org/i/3523490.
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { arrayMove } from '@dnd-kit/sortable';
 import {
   act,
@@ -18,6 +18,9 @@ import { makeStore } from '@/app/store';
 import {
   initialState,
   selectCodeComponentProperty,
+  setEntityFieldExpressions,
+  setPreviewEntity,
+  setPreviewResolvedValue,
   updateProp,
 } from '@/features/code-editor/codeEditorSlice';
 import { createDisplayArray } from '@/features/code-editor/utils/arrayPropUtils';
@@ -25,6 +28,7 @@ import {
   getPropMachineName,
   serializeProps,
 } from '@/features/code-editor/utils/utils';
+import { initialState as configurationInitialState } from '@/features/configuration/configurationSlice';
 import { type CodeComponentPropImageExample } from '@/types/CodeComponent';
 
 import Props, { REQUIRED_EXAMPLE_ERROR_MESSAGE } from './Props';
@@ -303,6 +307,576 @@ describe('props in code editor', () => {
       expect(
         selectCodeComponentProperty('props')(store.getState())[1].name,
       ).toEqual('Alpha');
+    });
+  });
+
+  describe('content entity reference preview', () => {
+    // RTK Query's `fetchBaseQuery` constructs a `Request` object, which
+    // (unlike `fetch()` in a browser) requires an absolute URL under
+    // Node/jsdom's fetch implementation. Every test in this block needs an
+    // absolute base URL so mocked fetches actually get exercised.
+    let previewStore: AppStore;
+
+    const NODE_ARTICLE_ENTITY_TYPES_RESPONSE = {
+      data: {
+        node: {
+          label: 'Content',
+          bundles: {
+            article: {
+              label: 'Article',
+              links: {
+                'https://drupal.org/project/canvas#link-rel-typed-data-browser':
+                  {
+                    href: '/canvas/api/v0/ui/content-entity-reference/node/article',
+                  },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const TYPED_DATA_BROWSER_LINK_REL =
+      'https://drupal.org/project/canvas#link-rel-typed-data-browser';
+    const EXPRESSION_TITLE = 'ℹ︎␜entity:node:article␝title␞␟value';
+    const EXPRESSION_IMAGE_ALT = 'ℹ︎␜entity:node:article␝field_image␞␟alt';
+    const EXPRESSION_IMAGE_TITLE = 'ℹ︎␜entity:node:article␝field_image␞␟title';
+    const EXPRESSION_OWNER_NAME =
+      'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user:user␝name␞␟value';
+    const EXPRESSION_DEPARTMENT_NAME =
+      'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user:user␝field_department␞␟entity␜␜entity:taxonomy_term:department␝name␞␟value';
+
+    // `title` resolves to `developerFacingKey: 'label'`, and `uid` to
+    // `owner`: entity keys normalize to their generic name in the real
+    // payload, so the mocked rows expose the same normalized keys.
+    const NODE_ARTICLE_FIELDS_RESPONSE = {
+      data: [
+        {
+          name: 'title',
+          label: 'Title',
+          hasChildren: false,
+          developerFacingKey: 'label',
+          properties: [
+            {
+              name: 'value',
+              label: 'Text value',
+              expression: EXPRESSION_TITLE,
+              type: 'string',
+            },
+          ],
+        },
+        {
+          name: 'field_image',
+          label: 'Image',
+          hasChildren: false,
+          developerFacingKey: 'field_image',
+          properties: [
+            {
+              name: 'alt',
+              label: 'Alternative text',
+              expression: EXPRESSION_IMAGE_ALT,
+              type: 'string',
+            },
+            {
+              name: 'title',
+              label: 'Title',
+              expression: EXPRESSION_IMAGE_TITLE,
+              type: 'string',
+            },
+          ],
+        },
+        {
+          name: 'uid',
+          label: 'Authored by',
+          hasChildren: true,
+          developerFacingKey: 'owner',
+          targetEntityType: 'user',
+          targetBundles: {
+            user: {
+              label: 'User',
+              labelExpression: 'ℹ︎␜entity:user:user␝name␞␟value',
+              links: {
+                [TYPED_DATA_BROWSER_LINK_REL]: {
+                  href: '/canvas/api/v0/ui/content-entity-reference/user/user',
+                },
+              },
+            },
+          },
+          properties: [],
+        },
+      ],
+    };
+
+    const USER_FIELDS_RESPONSE = {
+      data: [
+        {
+          name: 'name',
+          label: 'Name',
+          hasChildren: false,
+          developerFacingKey: 'name',
+          properties: [
+            {
+              name: 'value',
+              label: 'Text value',
+              expression: EXPRESSION_OWNER_NAME,
+              type: 'string',
+            },
+          ],
+        },
+        {
+          name: 'field_department',
+          label: 'Department',
+          hasChildren: true,
+          developerFacingKey: 'field_department',
+          targetEntityType: 'taxonomy_term',
+          targetBundles: {
+            department: {
+              label: 'Department',
+              labelExpression: 'ℹ︎␜entity:taxonomy_term:department␝name␞␟value',
+              links: {
+                [TYPED_DATA_BROWSER_LINK_REL]: {
+                  href: '/canvas/api/v0/ui/content-entity-reference/taxonomy_term/department',
+                },
+              },
+            },
+          },
+          properties: [],
+        },
+      ],
+    };
+
+    const DEPARTMENT_FIELDS_RESPONSE = {
+      data: [
+        {
+          name: 'name',
+          label: 'Name',
+          hasChildren: false,
+          developerFacingKey: 'name',
+          properties: [
+            {
+              name: 'value',
+              label: 'Text value',
+              expression: EXPRESSION_DEPARTMENT_NAME,
+              type: 'string',
+            },
+          ],
+        },
+      ],
+    };
+
+    const mockCerFetch = ({
+      suggestions,
+      preview,
+    }: { suggestions?: unknown; preview?: unknown } = {}) => {
+      const json = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      return vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
+        const url = typeof input === 'string' ? input : (input as Request).url;
+        if (url.includes('/content-entity-reference/preview/')) {
+          return json(preview ?? { data: { value: null } });
+        }
+        if (url.includes('/content_template/suggestions/preview/')) {
+          return json(suggestions ?? {});
+        }
+        if (url.includes('/content-entity-reference/node/article')) {
+          return json(NODE_ARTICLE_FIELDS_RESPONSE);
+        }
+        if (url.includes('/content-entity-reference/user/user')) {
+          return json(USER_FIELDS_RESPONSE);
+        }
+        if (
+          url.includes('/content-entity-reference/taxonomy_term/department')
+        ) {
+          return json(DEPARTMENT_FIELDS_RESPONSE);
+        }
+        if (url.endsWith('/content-entity-reference')) {
+          return json(NODE_ARTICLE_ENTITY_TYPES_RESPONSE);
+        }
+        return json({}, 404);
+      });
+    };
+
+    beforeEach(() => {
+      cleanup();
+      previewStore = makeStore({
+        configuration: {
+          ...configurationInitialState,
+          baseUrl: 'http://localhost/',
+        },
+      });
+      render(<Wrapper store={previewStore} />);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    const configureCerProp = (expressions: string[] = [EXPRESSION_TITLE]) => {
+      const propId = selectCodeComponentProperty('props')(
+        previewStore.getState(),
+      )[0].id;
+      previewStore.dispatch(
+        updateProp({
+          id: propId,
+          updates: {
+            'x-allowed-entity-type-id': 'node',
+            'x-allowed-bundle': 'article',
+            entityFieldExpressions: expressions,
+          },
+        }),
+      );
+      return propId;
+    };
+
+    it('shows a resolved skeleton once a target and fields are configured, and the entity picker', async () => {
+      mockCerFetch();
+      await addProp('Content entity reference', 'Author');
+      configureCerProp();
+
+      // The entity picker appears once the prop has a target and at least
+      // one selected field. The preview panel is expanded by default.
+      expect(
+        await screen.findByLabelText('Preview entity'),
+      ).toBeInTheDocument();
+
+      // The preview panel shows a client-derived skeleton before any preview
+      // entity is selected: the bundle type badge and one badge per field,
+      // resolved to the field's real developer-facing key and type, not
+      // the raw field name, and not a raw expression string.
+      const skeleton = await screen.findByTestId('cer-shape-preview');
+      expect(within(skeleton).getByText('article')).toBeInTheDocument();
+      expect(within(skeleton).getByText('label')).toBeInTheDocument();
+      expect(within(skeleton).getByText('string')).toBeInTheDocument();
+    });
+
+    it('copies just the clicked key, not a path, when clicking a skeleton row', async () => {
+      mockCerFetch();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp();
+      const skeleton = await screen.findByTestId('cer-shape-preview');
+
+      await userEvent.click(within(skeleton).getByText('label'));
+
+      expect(writeText).toHaveBeenCalledWith('label');
+    });
+
+    it('shows a loading state while the shape is still resolving, not the raw expression fallback', async () => {
+      // Fetches that never settle: the widget must show a loading state
+      // (with the copy snippet disabled), not unresolved raw expressions
+      // passed off as final.
+      vi.spyOn(global, 'fetch').mockImplementation(
+        () => new Promise<Response>(() => {}),
+      );
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp();
+      await screen.findByLabelText('Preview entity');
+
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+      expect(screen.queryByTestId('cer-shape-preview')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Copy snippet/ }),
+      ).toBeDisabled();
+    });
+
+    it('shows a terminal error with a retry action when resolution fails, and recovers on retry', async () => {
+      const failingFetch = vi
+        .spyOn(global, 'fetch')
+        .mockRejectedValue(new Error('network error'));
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp();
+
+      // A failed listFields() fetch is terminal: an error with a Retry
+      // action, not an eternal spinner, and the copy snippet stays
+      // disabled.
+      expect(
+        await screen.findByText('Could not load the shape.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('cer-shape-preview')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Copy snippet/ }),
+      ).toBeDisabled();
+
+      // Once the backend responds again, Retry resolves the shape.
+      failingFetch.mockRestore();
+      mockCerFetch();
+      await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+      const skeleton = await screen.findByTestId('cer-shape-preview');
+      expect(within(skeleton).getByText('label')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Copy snippet/ }),
+      ).not.toBeDisabled();
+    });
+
+    it('copies a destructuring snippet for the prop', async () => {
+      mockCerFetch();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp();
+      await screen.findByTestId('cer-shape-preview');
+
+      await userEvent.click(
+        screen.getByRole('button', { name: /Copy snippet/ }),
+      );
+
+      expect(writeText).toHaveBeenCalledTimes(1);
+      // "Author" -> propName "author", matching the machine name used in the
+      // component's function signature. "title" resolves to "label" (see
+      // NODE_ARTICLE_FIELDS_RESPONSE).
+      expect(writeText.mock.calls[0][0]).toEqual('const { label } = author;');
+      expect(
+        await screen.findByRole('button', { name: 'Copied' }),
+      ).toBeInTheDocument();
+    });
+
+    it('renders the resolved payload once a preview entity is selected, and null after clearing', async () => {
+      mockCerFetch({
+        preview: {
+          data: { value: { __type: 'article', label: 'Hello world' } },
+        },
+      });
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      await addProp('Content entity reference', 'Author');
+      const propId = configureCerProp();
+      await screen.findByLabelText('Preview entity');
+
+      act(() => {
+        previewStore.dispatch(
+          setPreviewEntity({
+            propId,
+            previewEntity: { entityTypeId: 'node', entityId: '1' },
+          }),
+        );
+      });
+
+      await waitFor(() => {
+        const shape = screen.getByTestId('cer-shape-preview');
+        expect(within(shape).getByText(/Hello world/)).toBeInTheDocument();
+      });
+
+      // Individual values in the resolved payload can be copied directly:
+      // just the value, not the surrounding JSON.
+      await userEvent.click(screen.getByText(/Hello world/));
+      expect(writeText).toHaveBeenCalledWith('Hello world');
+
+      // Clearing the preview entity reverts to `null`.
+      act(() => {
+        previewStore.dispatch(
+          setPreviewEntity({ propId, previewEntity: null }),
+        );
+      });
+      await waitFor(() => {
+        expect(
+          selectCodeComponentProperty('props')(previewStore.getState())[0]
+            .previewResolvedValue,
+        ).toBeUndefined();
+      });
+    });
+
+    it('displays the selected entity label after picking it, not leftover search text', async () => {
+      mockCerFetch({
+        suggestions: {
+          1: { id: '1', label: 'CER Preview Verification Article' },
+        },
+      });
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp();
+      const picker = await screen.findByLabelText('Preview entity');
+
+      await userEvent.type(picker, 'CER Preview');
+      const option = await screen.findByText(
+        'CER Preview Verification Article',
+      );
+      await userEvent.click(option);
+
+      // The selected label is shown, not the leftover typed search text.
+      await waitFor(() => {
+        expect(
+          screen.getByText('CER Preview Verification Article'),
+        ).toBeInTheDocument();
+      });
+      expect(screen.queryByDisplayValue('CER Preview')).not.toBeInTheDocument();
+    });
+
+    it('clears leftover search text when the picker loses focus without a pick', async () => {
+      mockCerFetch({
+        suggestions: {
+          1: { id: '1', label: 'CER Preview Verification Article' },
+        },
+      });
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp();
+      const picker = await screen.findByLabelText('Preview entity');
+
+      await userEvent.type(picker, 'CER Preview');
+      await userEvent.click(
+        await screen.findByText('CER Preview Verification Article'),
+      );
+
+      // Type over the selection, then move focus away without picking
+      // anything: the leftover text must not shadow the selected option's
+      // label indefinitely.
+      await userEvent.type(picker, 'foo');
+      fireEvent.blur(picker);
+
+      await waitFor(() => {
+        expect(screen.queryByDisplayValue('foo')).not.toBeInTheDocument();
+      });
+      expect(
+        screen.getByText('CER Preview Verification Article'),
+      ).toBeInTheDocument();
+    });
+
+    it('keys a nested pick by the referencer developer-facing key, nesting a __type row', async () => {
+      mockCerFetch();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp([EXPRESSION_OWNER_NAME]);
+
+      // The top-level key is the referencer's developer-facing key
+      // (`owner`, not the raw field name `uid`); the nested entity object
+      // always carries `__type` alongside the picked leaf field's own
+      // developer-facing key.
+      const skeleton = await screen.findByTestId('cer-shape-preview');
+      expect(within(skeleton).getByText('owner')).toBeInTheDocument();
+      expect(within(skeleton).queryByText('uid')).not.toBeInTheDocument();
+      expect(within(skeleton).getByText('__type')).toBeInTheDocument();
+      expect(within(skeleton).getByText('name')).toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByRole('button', { name: /Copy snippet/ }),
+      );
+      // `__type` is part of the payload but not of the user's selection, so
+      // the snippet only includes what was picked.
+      expect(writeText).toHaveBeenCalledWith(
+        'const { owner: { name } } = author;',
+      );
+    });
+
+    it('renders a field with two picked properties as an object keyed by property names', async () => {
+      mockCerFetch();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp([EXPRESSION_IMAGE_ALT, EXPRESSION_IMAGE_TITLE]);
+
+      // Two properties picked on one field coalesce into an object keyed by
+      // property names, even though both are plain strings.
+      const skeleton = await screen.findByTestId('cer-shape-preview');
+      expect(within(skeleton).getByText('field_image')).toBeInTheDocument();
+      expect(within(skeleton).getByText('object')).toBeInTheDocument();
+      expect(within(skeleton).getByText('alt')).toBeInTheDocument();
+      expect(within(skeleton).getByText('title')).toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByRole('button', { name: /Copy snippet/ }),
+      );
+      expect(writeText).toHaveBeenCalledWith(
+        'const { field_image: { alt, title } } = author;',
+      );
+    });
+
+    it('nests one object per hop for a two-hop reference chain', async () => {
+      mockCerFetch();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp([EXPRESSION_DEPARTMENT_NAME]);
+
+      const skeleton = await screen.findByTestId('cer-shape-preview');
+      expect(within(skeleton).getByText('owner')).toBeInTheDocument();
+      expect(
+        within(skeleton).getByText('field_department'),
+      ).toBeInTheDocument();
+      expect(within(skeleton).getByText('name')).toBeInTheDocument();
+      // Both nested entity objects carry a `__type` row.
+      expect(within(skeleton).getAllByText('__type')).toHaveLength(2);
+
+      await userEvent.click(
+        screen.getByRole('button', { name: /Copy snippet/ }),
+      );
+      expect(writeText).toHaveBeenCalledWith(
+        'const { owner: { field_department: { name } } } = author;',
+      );
+    });
+
+    it('resets the preview entity on changed expressions and preserves it on identical ones', () => {
+      // A pure reducer pin: no rendered component involved.
+      const cerProp = {
+        id: 'cer-prop',
+        name: 'Author',
+        type: 'object' as const,
+        example: '',
+        derivedType: 'contentEntityReference' as const,
+        entityFieldExpressions: [EXPRESSION_TITLE],
+      };
+      const seededStore = makeStore({
+        codeEditor: {
+          ...initialState,
+          codeComponent: {
+            ...initialState.codeComponent,
+            props: [cerProp],
+          },
+        },
+      });
+      seededStore.dispatch(
+        setPreviewEntity({
+          propId: 'cer-prop',
+          previewEntity: { entityTypeId: 'node', entityId: '1' },
+        }),
+      );
+      seededStore.dispatch(
+        setPreviewResolvedValue({
+          propId: 'cer-prop',
+          value: { __type: 'article' },
+        }),
+      );
+
+      // Re-saving an identical selection keeps the picked preview entity.
+      seededStore.dispatch(
+        setEntityFieldExpressions({
+          propId: 'cer-prop',
+          expressions: [EXPRESSION_TITLE],
+        }),
+      );
+      let prop = selectCodeComponentProperty('props')(
+        seededStore.getState(),
+      )[0];
+      expect(prop.previewEntity).toEqual({
+        entityTypeId: 'node',
+        entityId: '1',
+      });
+      expect(prop.previewResolvedValue).toEqual({ __type: 'article' });
+
+      // A changed selection resets it.
+      seededStore.dispatch(
+        setEntityFieldExpressions({
+          propId: 'cer-prop',
+          expressions: [EXPRESSION_IMAGE_ALT],
+        }),
+      );
+      prop = selectCodeComponentProperty('props')(seededStore.getState())[0];
+      expect(prop.previewEntity).toBeUndefined();
+      expect(prop.previewResolvedValue).toBeUndefined();
     });
   });
 
