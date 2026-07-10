@@ -377,10 +377,10 @@ test.describe('Content entity reference props', () => {
       // Create a News Item in a second tab so the code editor keeps its state.
       const nodePage = await page.context().newPage();
       await nodePage.goto('/node/add/news_item');
+      // The fixture module ships no form display for news_item, so Body is
+      // not on the node form: create with Title only. The resolved values
+      // asserted below come from the owner (the logged-in creator) instead.
       await nodePage.getByLabel('Title').fill('CER Preview News');
-      await nodePage
-        .getByLabel('Body')
-        .fill('Preview body text for the news item.');
       await nodePage.getByRole('button', { name: 'Save' }).click();
       await expect(
         nodePage.getByRole('contentinfo', { name: 'Status message' }),
@@ -401,10 +401,9 @@ test.describe('Content entity reference props', () => {
         '__type:',
       );
       await expect(shapePreview).toContainText('news_item');
-      await expect(shapePreview).toContainText(
-        'Preview body text for the news item.',
-      );
       await expect(shapePreview.locator('span[title="owner"]')).toBeVisible();
+      // The nested owner object resolves to the creating user's real values.
+      await expect(shapePreview).toContainText('editor');
 
       // Keys are click-to-copy: the hover title flips to Copied briefly.
       const bodyKey = shapePreview.locator('span[title]', {
