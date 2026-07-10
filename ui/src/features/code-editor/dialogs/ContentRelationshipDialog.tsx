@@ -44,6 +44,23 @@ export interface ContentEntityReferencePropState {
     label: string;
     expressions: string[];
     referenceChain: string[];
+    // The developer-facing payload key of each reference hop this property
+    // sits behind, ending with the leaf field's own developer-facing key
+    // (e.g. `['owner', 'name']` for a node's uid -> Name pick, or
+    // `['field_image']` for a root-level pick). Mirrors the key nesting of
+    // the real payload; the shape-preview skeleton inserts along this
+    // chain. Undefined for fallback (unresolved) field entries.
+    // @see JsComponent::buildReferencePayload()
+    keyChain?: string[];
+    // The typed-data data type of the property's value (e.g. `string`,
+    // `integer`), for the shape-preview skeleton. Undefined for fallback
+    // (unresolved) field entries.
+    type?: string;
+    // The property's own machine name (e.g. `alt`, `value`): when two or
+    // more properties of one field are picked, the payload coalesces them
+    // into an object keyed by property names. Undefined for fallback
+    // (unresolved) field entries.
+    propertyName?: string;
   }[];
 }
 
@@ -63,6 +80,7 @@ type ToggleProperties = (
   nextChecked: boolean,
   label: string,
   referenceChain: string[],
+  keyChain: string[],
 ) => void;
 
 function fieldsByExpression(
@@ -238,6 +256,7 @@ function useSelectedRelationshipFields(
     nextChecked,
     label,
     referenceChain,
+    keyChain,
   ) => {
     setSelectedFields((prev) => {
       const next = new Map(prev);
@@ -247,6 +266,9 @@ function useSelectedRelationshipFields(
             label: joinLabelChain([label, property.label]),
             expressions: [property.expression],
             referenceChain,
+            keyChain,
+            type: property.type,
+            propertyName: property.name,
           });
         } else {
           next.delete(property.expression);
@@ -269,6 +291,9 @@ interface FieldsTreeProps {
   href: string;
   ancestorLabels: string[];
   ancestorKeys: string[];
+  // Developer-facing key of each reference hop leading to this level, in
+  // payload nesting order; the source of every selected field's `keyChain`.
+  ancestorDeveloperKeys: string[];
   selected: Set<string>;
   nestedCounts: Map<string, number>;
   expanded: Set<string>;
@@ -281,6 +306,7 @@ function FieldsTree({
   href,
   ancestorLabels,
   ancestorKeys,
+  ancestorDeveloperKeys,
   selected,
   nestedCounts,
   expanded,
@@ -329,6 +355,7 @@ function FieldsTree({
           field={field}
           ancestorLabels={ancestorLabels}
           ancestorKeys={ancestorKeys}
+          ancestorDeveloperKeys={ancestorDeveloperKeys}
           selected={selected}
           nestedCounts={nestedCounts}
           expanded={expanded}
@@ -345,6 +372,7 @@ interface FieldRowProps {
   field: ContentEntityReferenceField;
   ancestorLabels: string[];
   ancestorKeys: string[];
+  ancestorDeveloperKeys: string[];
   selected: Set<string>;
   nestedCounts: Map<string, number>;
   expanded: Set<string>;
@@ -357,6 +385,7 @@ function FieldRow({
   field,
   ancestorLabels,
   ancestorKeys,
+  ancestorDeveloperKeys,
   selected,
   nestedCounts,
   expanded,
@@ -408,6 +437,9 @@ function FieldRow({
     : 0;
 
   const fullLabel = joinLabelChain([...ancestorLabels, field.label]);
+  // The payload key chain of a property picked on this field: every
+  // reference hop above, then this field's own developer-facing key.
+  const keyChain = [...ancestorDeveloperKeys, field.developerFacingKey];
 
   return (
     <Box>
@@ -463,6 +495,7 @@ function FieldRow({
               checked === true,
               fullLabel,
               ancestorKeys,
+              keyChain,
             )
           }
         />
@@ -476,6 +509,7 @@ function FieldRow({
               labelPrefix={fullLabel}
               selected={selected}
               referenceChain={ancestorKeys}
+              keyChain={keyChain}
               onToggleProperties={onToggleProperties}
             />
           )}
@@ -498,6 +532,7 @@ function FieldRow({
                   href={href}
                   ancestorLabels={[...ancestorLabels, field.label]}
                   ancestorKeys={nestedAncestorKeys}
+                  ancestorDeveloperKeys={keyChain}
                   selected={selected}
                   nestedCounts={nestedCounts}
                   expanded={expanded}
@@ -521,6 +556,7 @@ interface FieldPropertiesTreeProps {
   labelPrefix: string;
   selected: Set<string>;
   referenceChain: string[];
+  keyChain: string[];
   onToggleProperties: ToggleProperties;
 }
 
@@ -529,6 +565,7 @@ function FieldPropertiesTree({
   labelPrefix,
   selected,
   referenceChain,
+  keyChain,
   onToggleProperties,
 }: FieldPropertiesTreeProps) {
   return (
@@ -540,6 +577,7 @@ function FieldPropertiesTree({
           labelPrefix={labelPrefix}
           selected={selected}
           referenceChain={referenceChain}
+          keyChain={keyChain}
           onToggleProperties={onToggleProperties}
         />
       ))}
@@ -552,6 +590,7 @@ interface BundleFieldsSectionProps {
   href: string;
   ancestorLabels: string[];
   ancestorKeys: string[];
+  ancestorDeveloperKeys: string[];
   selected: Set<string>;
   nestedCounts: Map<string, number>;
   expanded: Set<string>;
@@ -568,6 +607,7 @@ function BundleFieldsSection({
   href,
   ancestorLabels,
   ancestorKeys,
+  ancestorDeveloperKeys,
   selected,
   nestedCounts,
   expanded,
@@ -597,6 +637,7 @@ function BundleFieldsSection({
             href={href}
             ancestorLabels={ancestorLabels}
             ancestorKeys={ancestorKeys}
+            ancestorDeveloperKeys={ancestorDeveloperKeys}
             selected={selected}
             nestedCounts={nestedCounts}
             expanded={expanded}
@@ -615,6 +656,7 @@ interface FieldPropertyRowProps {
   labelPrefix: string;
   selected: Set<string>;
   referenceChain: string[];
+  keyChain: string[];
   onToggleProperties: ToggleProperties;
 }
 
@@ -623,6 +665,7 @@ function FieldPropertyRow({
   labelPrefix,
   selected,
   referenceChain,
+  keyChain,
   onToggleProperties,
 }: FieldPropertyRowProps) {
   const checkboxId = useId();
@@ -654,6 +697,7 @@ function FieldPropertyRow({
             checked === true,
             labelPrefix,
             referenceChain,
+            keyChain,
           )
         }
       />
@@ -930,6 +974,7 @@ export default function ContentRelationshipDialog({
                     href={rootHref}
                     ancestorLabels={[]}
                     ancestorKeys={[]}
+                    ancestorDeveloperKeys={[]}
                     selected={selected}
                     nestedCounts={nestedCounts}
                     expanded={expanded}

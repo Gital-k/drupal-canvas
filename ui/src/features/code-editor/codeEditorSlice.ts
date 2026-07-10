@@ -287,12 +287,69 @@ export const codeEditorSlice = createSlice({
       if (!prop) {
         return;
       }
+      const previousExpressions = prop.entityFieldExpressions ?? [];
+      const isUnchanged =
+        previousExpressions.length === expressions.length &&
+        previousExpressions.every(
+          (expression, index) => expression === expressions[index],
+        );
       if (expressions.length === 0) {
         delete prop.entityFieldExpressions;
       } else {
         prop.entityFieldExpressions = expressions;
       }
+      // The target entity type/bundle and the field selection are saved
+      // together from the same dialog, so any change to either arrives here.
+      // A previously selected preview entity may no longer match a changed
+      // selection, so reset it; an identical re-save keeps it.
+      if (!isUnchanged) {
+        delete prop.previewEntity;
+        delete prop.previewResolvedValue;
+      }
       state.status.needsAutoSave = true;
+    },
+
+    /**
+     * Sets or clears the ephemeral preview entity driving the in-editor
+     * preview for a `content-entity-reference` prop. Never auto-saved: this
+     * is editor-only state, excluded from serializeProps().
+     */
+    setPreviewEntity: (
+      state,
+      action: PayloadAction<{
+        propId: string;
+        previewEntity: { entityTypeId: string; entityId: string } | null;
+      }>,
+    ) => {
+      const { propId, previewEntity } = action.payload;
+      const prop = state.codeComponent.props.find((p) => p.id === propId);
+      if (!prop) {
+        return;
+      }
+      prop.previewEntity = previewEntity;
+      // The resolved value belongs to whichever entity was previously
+      // selected; clear it so a stale payload never briefly renders for a
+      // newly (or no longer) selected entity while the new one resolves.
+      delete prop.previewResolvedValue;
+    },
+
+    /**
+     * Stores the resolved payload for the currently selected preview entity,
+     * for the in-editor preview iframe to consume. Never auto-saved.
+     */
+    setPreviewResolvedValue: (
+      state,
+      action: PayloadAction<{
+        propId: string;
+        value: Record<string, unknown> | null;
+      }>,
+    ) => {
+      const { propId, value } = action.payload;
+      const prop = state.codeComponent.props.find((p) => p.id === propId);
+      if (!prop) {
+        return;
+      }
+      prop.previewResolvedValue = value;
     },
 
     addSlot: (state) => {
@@ -552,6 +609,8 @@ export const {
   reorderProps,
   toggleRequired,
   setEntityFieldExpressions,
+  setPreviewEntity,
+  setPreviewResolvedValue,
   addSlot,
   updateSlot,
   removeSlot,
