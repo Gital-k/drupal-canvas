@@ -37,7 +37,7 @@ function canvas_ai_post_update_0002_chat_history_max_messages(): void {
   // preserve current behavior. New installations get the newer default of
   // 10 from config/install/canvas_ai.settings.yml.
   if (!$config->isNew()) {
-    $config->set('chat_history_max_messages', 3)->save(TRUE);
+    $config->set('chat_history_max_messages', 3)->save();
   }
 }
 
@@ -54,7 +54,7 @@ function canvas_ai_post_update_0003_reimport_orchestrator_agent(): void {
   if ($data && !$config->isNew()) {
     // Only the system prompt changed. Set just that key so the per-site uuid,
     // _core hash, and any other fields stay intact.
-    $config->set('system_prompt', $data['system_prompt'])->save(TRUE);
+    $config->set('system_prompt', $data['system_prompt'])->save();
 
     $message = 'The Canvas AI orchestrator agent system prompt has been updated. If you had customized it directly, those changes have been overwritten. The recommended way to extend or alter agent behavior is through the Context Control Center or custom event subscribers.';
     \Drupal::logger('canvas_ai')->warning($message);
@@ -73,7 +73,7 @@ function canvas_ai_post_update_0004_agent_hostname_filter(): void {
   $config = \Drupal::configFactory()
     ->getEditable('ai_agents.ai_agent.canvas_component_agent');
   if (!$config->isNew() && $config->get('hostname_filter_disabled') !== TRUE) {
-    $config->set('hostname_filter_disabled', TRUE)->save(TRUE);
+    $config->set('hostname_filter_disabled', TRUE)->save();
   }
 }
 
@@ -122,7 +122,7 @@ function canvas_ai_post_update_0005_normalize_component_description_settings(): 
   }
 
   ksort($migrated);
-  $config->set('component_context', $migrated)->save(TRUE);
+  $config->set('component_context', $migrated)->save();
 }
 
 /**
@@ -155,7 +155,7 @@ function canvas_ai_post_update_0006_restore_orchestrator_agent_uuid(): void {
     $changed = TRUE;
   }
   if ($changed) {
-    $config->save(TRUE);
+    $config->save();
   }
 }
 
@@ -200,7 +200,7 @@ function canvas_ai_post_update_0007_add_block_props_to_component_description_set
   }
 
   // Replace only the block data; the enabled flag is left untouched.
-  $config->set("component_context.$source.data", Yaml::encode($rebuilt_blocks))->save(TRUE);
+  $config->set("component_context.$source.data", Yaml::encode($rebuilt_blocks))->save();
 }
 
 /**
@@ -221,8 +221,7 @@ function canvas_ai_post_update_0008_reimport_component_agent(): void {
     // Only the system prompt and tool usage limits changed.
     $config
       ->set('system_prompt', $data['system_prompt'])
-      ->set('tool_usage_limits', $data['tool_usage_limits'])
-      ->save(TRUE);
+      ->set('tool_usage_limits', $data['tool_usage_limits'])->save();
 
     $message = 'The Canvas component agent system prompt has been updated. If you had customized it directly, those changes have been overwritten. The recommended way to extend or alter agent behavior is through the Context Control Center or custom event subscribers.';
     \Drupal::logger('canvas_ai')->warning($message);

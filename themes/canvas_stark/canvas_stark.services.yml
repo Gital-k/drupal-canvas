@@ -1,0 +1,5 @@
+
+services:
+  Drupal\canvas_stark\Hook\CanvasStarkHooks:
+    class: Drupal\canvas_stark\Hook\CanvasStarkHooks
+    autowire: true

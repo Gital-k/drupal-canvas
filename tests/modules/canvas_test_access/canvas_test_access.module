@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-use Drupal\Core\Access\AccessResult;
+use Drupal\canvas_test_access\Hook\CanvasTestAccessHooks;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Hook\Attribute\LegacyHook;
 use Drupal\Core\Session\AccountInterface;
 
 /**
@@ -12,16 +13,7 @@ use Drupal\Core\Session\AccountInterface;
  *
  * Denies view access to canvas_page entity with id 1.
  */
+#[LegacyHook]
 function canvas_test_access_canvas_page_access(EntityInterface $entity, string $operation, AccountInterface $account): AccessResultInterface {
-  $cacheContexts = \Drupal::keyValue('canvas_test_access')->get('cache_contexts', []);
-  $cacheTags = \Drupal::keyValue('canvas_test_access')->get('cache_tags', []);
-
-  if ((int) $entity->id() === 1 && $operation === 'view') {
-    return AccessResult::forbidden();
-  }
-  if ((int) $entity->id() === 1 && $operation === 'update' && !empty($cacheTags) && !empty($cacheContexts)) {
-    return AccessResult::allowed()->addCacheContexts($cacheContexts)->addCacheTags($cacheTags);
-  }
-
-  return AccessResult::neutral();
+  return \Drupal::service(CanvasTestAccessHooks::class)->canvasPageAccess($entity, $operation, $account);
 }

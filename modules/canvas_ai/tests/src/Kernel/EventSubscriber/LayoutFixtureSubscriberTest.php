@@ -15,6 +15,7 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
@@ -26,6 +27,7 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
  */
 #[CoversClass(LayoutFixtureSubscriber::class)]
 #[Group('canvas_ai')]
+#[RunTestsInSeparateProcesses]
 final class LayoutFixtureSubscriberTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;

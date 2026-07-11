@@ -9,6 +9,7 @@ use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Database\DatabaseException;
 use Drupal\Core\Database\Query\SelectInterface;
+use Drupal\Core\Database\Statement\FetchAs;
 use Drupal\Core\Database\StatementInterface;
 
 /**
@@ -162,7 +163,7 @@ final class CanvasNotificationHandler {
       $notifications = [];
       $result = $build_query('=', 'processing')->execute();
       if ($result !== NULL) {
-        foreach ($result->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+        foreach ($result->fetchAll(FetchAs::Associative) as $row) {
           $notifications[] = $row_mapper($row);
         }
       }
@@ -170,7 +171,7 @@ final class CanvasNotificationHandler {
       $non_processing_query->range(0, $limit);
       $result = $non_processing_query->execute();
       if ($result !== NULL) {
-        foreach ($result->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+        foreach ($result->fetchAll(FetchAs::Associative) as $row) {
           $notifications[] = $row_mapper($row);
         }
       }
@@ -251,7 +252,7 @@ final class CanvasNotificationHandler {
         ->condition('timestamp', $threshold, '<')
         ->execute();
       \assert($statement instanceof StatementInterface);
-      $stale = $statement->fetchAll(\PDO::FETCH_ASSOC);
+      $stale = $statement->fetchAll(FetchAs::Associative);
 
       // Create replacement error notifications.
       foreach ($stale as $row) {

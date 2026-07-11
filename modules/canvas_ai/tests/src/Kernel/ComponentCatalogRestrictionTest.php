@@ -9,6 +9,7 @@ use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -17,6 +18,7 @@ use Symfony\Component\Yaml\Yaml;
  * @see \Drupal\canvas_ai_agents_Test\Hook\CanvasAiAgentsTestHooks::canvasAiAgentsTestComponentAccess()
  */
 #[Group('canvas_ai')]
+#[RunTestsInSeparateProcesses]
 final class ComponentCatalogRestrictionTest extends CanvasKernelTestBase {
 
   use GenerateComponentConfigTrait;

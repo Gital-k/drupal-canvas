@@ -18,10 +18,7 @@ final class SdcTestExtension extends AbstractExtension {
    */
   public function getFunctions(): array {
     return [
-      new TwigFunction('throw_exception', [
-        $this,
-        'throwException',
-      ]),
+      new TwigFunction('throw_exception', $this->throwException(...)),
     ];
   }
 

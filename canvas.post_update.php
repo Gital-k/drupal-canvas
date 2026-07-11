@@ -220,7 +220,6 @@ function canvas_post_update_0010_migrate_auto_save(): void {
     // part of the SharedTempStore public API.
     $reflection = new \ReflectionObject($tempstore);
     $storage_property = $reflection->getProperty('storage');
-    $storage_property->setAccessible(TRUE);
     $tempstore_storage = $storage_property->getValue($tempstore);
 
     foreach ($tempstore_storage->getAll() as $key => $value) {

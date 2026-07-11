@@ -1,0 +1,5 @@
+
+services:
+  Drupal\canvas_force_publish_error\Hook\CanvasForcePublishErrorHooks:
+    class: Drupal\canvas_force_publish_error\Hook\CanvasForcePublishErrorHooks
+    autowire: true
