@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Functional\Update;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\Component\Utility\DeprecationHelper;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests Content Template Dynamic Prop Sources To Entity Field Prop Sources Update.
@@ -19,6 +21,7 @@ use PHPUnit\Framework\Attributes\IgnoreDeprecations;
  */
 #[Group('canvas')]
 #[IgnoreDeprecations]
+#[RunTestsInSeparateProcesses]
 final class ContentTemplateDynamicPropSourcesToEntityFieldPropSourcesUpdateTest extends CanvasUpdatePathTestBase {
 
   protected $defaultTheme = 'stark';
@@ -34,7 +37,7 @@ final class ContentTemplateDynamicPropSourcesToEntityFieldPropSourcesUpdateTest 
   }
 
   public function test(): void {
-    $this->expectDeprecation(self::EXPECT_DEPRECATION_3566701);
+    DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => $this->expectUserDeprecationMessage(self::EXPECT_DEPRECATION_3566701), fn() => $this->expectDeprecation(self::EXPECT_DEPRECATION_3566701));
 
     $raw_inputs_for_first_component_instance = ContentTemplate::load('node.page.full')
       ?->getComponentTree()

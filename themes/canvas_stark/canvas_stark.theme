@@ -5,9 +5,11 @@
  * Functions to support theming in the Canvas Stark theme.
  */
 
+use Drupal\canvas_stark\Hook\CanvasStarkHooks;
 use Drupal\canvas_stark\PreRender;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Hook\Attribute\LegacyHook;
 use Drupal\Core\Render\Element;
 
 /**
@@ -15,12 +17,9 @@ use Drupal\Core\Render\Element;
  *
  * Forces rendering with Twig for media library forms.
  */
+#[LegacyHook]
 function canvas_stark_form_alter(array &$form, FormStateInterface $form_state, string $form_id): void {
-  $ml_widget = isset($form['#id']) && \str_contains($form['#id'], 'views-exposed-form-media-library-widget');
-  $ml_form = \str_contains($form_id, 'media');
-  if ($ml_widget || $ml_form) {
-    _canvas_stark_mark_media_library($form, 'media_library');
-  }
+  \Drupal::service(CanvasStarkHooks::class)->formAlter($form, $form_state, $form_id);
 }
 
 /**
@@ -43,98 +42,57 @@ function _canvas_stark_mark_media_library(array &$form, string $form_id): void {
 /**
  * Implements hook_theme_suggestions_form_element_label_alter().
  */
+#[LegacyHook]
 function canvas_stark_theme_suggestions_form_element_label_alter(array &$suggestions, array $variables): void {
-  if (isset($variables['element']['#form_id']) && \str_contains($variables['element']['#form_id'], 'media_library')) {
-    $suggestions[] = 'form_element_label__media_library';
-  }
+  \Drupal::service(CanvasStarkHooks::class)->themeSuggestionsFormElementLabelAlter($suggestions, $variables);
 }
 
 /**
  * Implements hook_theme_suggestions_form_element_alter().
  */
+#[LegacyHook]
 function canvas_stark_theme_suggestions_form_element_alter(array &$suggestions, array $variables): void {
-  if (isset($variables['element']['#form_id']) && str_contains($variables['element']['#form_id'], 'media_library')) {
-    $suggestions[] = 'form_element__media_library';
-  }
+  \Drupal::service(CanvasStarkHooks::class)->themeSuggestionsFormElementAlter($suggestions, $variables);
 }
 
 /**
  * Implements hook_theme_suggestions_form_alter().
  */
+#[LegacyHook]
 function canvas_stark_theme_suggestions_form_alter(array &$suggestions, array $variables): void {
-  $ml_view = isset($variables['element']['#id']) && str_contains($variables['element']['#id'], 'views-exposed-form-media-library-widget');
-  $ml_form = !empty($variables['element']['#form_id']) && str_contains($variables['element']['#form_id'], 'media_library');
-  if ($ml_view || $ml_form) {
-    $suggestions[] = 'form__media_library';
-  }
+  \Drupal::service(CanvasStarkHooks::class)->themeSuggestionsFormAlter($suggestions, $variables);
 }
 
 /**
  * Implements hook_theme_suggestions_select_alter().
  */
+#[LegacyHook]
 function canvas_stark_theme_suggestions_select_alter(array &$suggestions, array $variables): void {
-  $ml_view = isset($variables['element']['#id']) && str_contains($variables['element']['#id'], 'views-exposed-form-media-library-widget');
-  $ml_form = !empty($variables['element']['#form_id']) && str_contains($variables['element']['#form_id'], 'media_library');
-  if ($ml_view || $ml_form) {
-    $suggestions[] = 'select__media_library';
-  }
-  if (isset($variables['element']['#is_multivalue_form']) &&
-    $variables['element']['#is_multivalue_form']) {
-    $suggestions[] = 'select__multivalue_form';
-  }
+  \Drupal::service(CanvasStarkHooks::class)->themeSuggestionsSelectAlter($suggestions, $variables);
 }
 
 /**
  * Implements hook_theme_suggestions_input_alter().
  */
+#[LegacyHook]
 function canvas_stark_theme_suggestions_input_alter(array &$suggestions, array $variables): void {
-  $ml_ajax = isset($variables['element']['#ajax']['wrapper']) && $variables['element']['#ajax']['wrapper'] === 'media-library-wrapper';
-  $ml_form = isset($variables['element']['#form_id']) && str_contains($variables['element']['#form_id'], 'media_library');
-  if ($ml_ajax || $ml_form) {
-    $suggestions[] = 'input__media_library';
-  }
-  if (isset($variables['element']['#is_multivalue_form']) &&
-    $variables['element']['#is_multivalue_form']) {
-    $type = $variables['element']['#type'] ?? '';
-    if ($type === 'submit') {
-      $suggestions[] = 'input__submit__multivalue_form';
-    }
-    else {
-      $suggestions[] = 'input__multivalue_form';
-    }
-  }
+  \Drupal::service(CanvasStarkHooks::class)->themeSuggestionsInputAlter($suggestions, $variables);
 }
 
 /**
  * Implements hook_theme_suggestions_datetime_wrapper_alter().
  */
+#[LegacyHook]
 function canvas_stark_theme_suggestions_datetime_wrapper_alter(array &$suggestions, array $variables): void {
-  if (isset($variables['element']['#multivalue_field_label']) &&
-    !empty($variables['element']['#multivalue_field_label'])) {
-    $suggestions[] = 'datetime_wrapper__multivalue_form';
-  }
+  \Drupal::service(CanvasStarkHooks::class)->themeSuggestionsDatetimeWrapperAlter($suggestions, $variables);
 }
 
 /**
  * Implements hook_theme_suggestions_alter().
  */
+#[LegacyHook]
 function canvas_stark_theme_suggestions_alter(array &$suggestions, array $variables): void {
-  // Add widget type to theme suggestions.
-  if (\in_array($variables["theme_hook_original"], [
-    'container',
-    'field_multiple_value_form',
-    'fieldset',
-  ], TRUE) && !empty($variables["element"]["#widget-type"])) {
-    if ($variables["theme_hook_original"] === 'fieldset') {
-      $suggestions[] = $variables["theme_hook_original"] . '__widget_' . \str_replace('-', '_', $variables["element"]["#widget-type"]);
-    }
-    else {
-      $suggestions[] = $variables["theme_hook_original"] . '__' . \str_replace('-', '_', $variables["element"]["#widget-type"]);
-    }
-  }
-  elseif (!empty($variables["element"]["#widget-type"])) {
-    $suggestions[] = $variables["theme_hook_original"] . '__inwidget_' . \str_replace('-', '_', $variables["element"]["#widget-type"]);
-  }
+  \Drupal::service(CanvasStarkHooks::class)->themeSuggestionsAlter($suggestions, $variables);
 }
 
 function canvas_stark_library_info_alter(array &$libraries, string $extension): void {
@@ -299,16 +257,9 @@ function canvas_stark_preprocess_form_element(array &$variables): void {
  * @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetCompleteFormAlter()
  * @see ui/src/components/form/components/DefaultImagePreview.tsx
  */
+#[LegacyHook]
 function canvas_stark_preprocess_fieldset__media_library_widget(array &$variables): void {
-  // Prop link data is passed to the media library widget differently, as the
-  // label is the fieldset legend, not a label element.
-  if (isset($variables['element']['#prop_link_data'])) {
-    $variables['prop_link_data'] = Json::encode($variables['element']['#prop_link_data']);
-  }
-  if (isset($variables['element']['#component_prop_name'])) {
-    $variables['component_prop_name'] = $variables['element']['#component_prop_name'];
-  }
-  unset($variables['prefix']['weight_toggle']);
+  \Drupal::service(CanvasStarkHooks::class)->preprocessFieldsetMediaLibraryWidget($variables);
 }
 
 function canvas_stark_preprocess_fieldset(array &$variables): void {

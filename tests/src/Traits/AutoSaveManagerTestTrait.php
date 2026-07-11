@@ -27,7 +27,6 @@ trait AutoSaveManagerTestTrait {
     // Use reflection access private \Drupal\canvas\AutoSave\AutoSaveManager::generateHash
     $autoSaveManager = new \ReflectionClass('Drupal\canvas\AutoSave\AutoSaveManager');
     $generateHash = $autoSaveManager->getMethod('generateHash');
-    $generateHash->setAccessible(TRUE);
     $hash = $generateHash->invokeArgs(NULL, [$data]);
     self::assertIsString($hash);
     return $hash;

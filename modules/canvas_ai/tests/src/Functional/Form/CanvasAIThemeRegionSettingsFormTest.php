@@ -8,11 +8,13 @@ use Drupal\canvas_ai\CanvasAiPermissions;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Tests\BrowserTestBase;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests the Canvas AI Theme Region Settings form.
  */
 #[Group('canvas_ai')]
+#[RunTestsInSeparateProcesses]
 final class CanvasAIThemeRegionSettingsFormTest extends BrowserTestBase {
 
   /**

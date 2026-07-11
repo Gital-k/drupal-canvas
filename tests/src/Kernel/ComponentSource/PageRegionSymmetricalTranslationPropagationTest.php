@@ -14,6 +14,7 @@ use Drupal\canvas\EntityHandlers\StagedLanguageConfigOverrideStorage;
 use Drupal\Core\Url;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -27,6 +28,7 @@ use Symfony\Component\HttpFoundation\Response;
 #[Group('canvas_data_model')]
 #[Group('canvas_translation')]
 #[Group('slow')]
+#[RunTestsInSeparateProcesses]
 final class PageRegionSymmetricalTranslationPropagationTest extends ConfigEntitySymmetricalTranslationPropagationTestBase {
 
   /**

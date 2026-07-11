@@ -329,7 +329,6 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
       \assert($component instanceof Component);
       $source = $component->getComponentSource();
       $private_method = new \ReflectionMethod($source, 'getDefaultStaticPropSource');
-      $private_method->setAccessible(TRUE);
       foreach (\array_keys($settings[$component_id]['prop_field_definitions']) as $prop) {
         $static_prop_source = $private_method->invoke($source, $prop, TRUE);
         $this->assertInstanceOf(StaticPropSource::class, $static_prop_source);

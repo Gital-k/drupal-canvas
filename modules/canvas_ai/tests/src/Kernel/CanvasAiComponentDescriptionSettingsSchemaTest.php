@@ -10,6 +10,7 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
@@ -17,6 +18,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * Tests config schema validation for supported component source keys.
  */
 #[Group('canvas_ai')]
+#[RunTestsInSeparateProcesses]
 final class CanvasAiComponentDescriptionSettingsSchemaTest extends CanvasKernelTestBase {
 
   /**

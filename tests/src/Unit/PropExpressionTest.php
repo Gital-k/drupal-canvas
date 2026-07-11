@@ -15,6 +15,7 @@ use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Drupal\Tests\UnitTestCase;
@@ -1440,7 +1441,7 @@ class PropExpressionTest extends UnitTestCase {
    */
   #[IgnoreDeprecations]
   public function testInvalidFieldPropExpressionDueToMultipleFieldPropNamesWithoutMultipleFieldNames(): void {
-    $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451);
+    DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => $this->expectUserDeprecationMessage(self::EXPECT_DEPRECATION_3563451), fn() => $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451));
     $this->expectException(\InvalidArgumentException::class);
     $this->expectExceptionMessage('A field property name must be specified for every field name, and in the same order.');
     new FieldPropExpression(
@@ -1465,7 +1466,7 @@ class PropExpressionTest extends UnitTestCase {
    */
   #[IgnoreDeprecations]
   public function testInvalidFieldPropExpressionDueToOnlyNullFieldPropNames(): void {
-    $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451);
+    DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => $this->expectUserDeprecationMessage(self::EXPECT_DEPRECATION_3563451), fn() => $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451));
     $this->expectException(\InvalidArgumentException::class);
     $this->expectExceptionMessage('At least one of the field names must have a field property specified; otherwise it should be omitted (␀ can only be used when a subset of the bundles does not provide a certain value).');
     new FieldPropExpression(
@@ -1489,7 +1490,7 @@ class PropExpressionTest extends UnitTestCase {
    */
   #[IgnoreDeprecations]
   public function testInvalidFieldPropExpressionDueToDuplicateBundles(): void {
-    $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451);
+    DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => $this->expectUserDeprecationMessage(self::EXPECT_DEPRECATION_3563451), fn() => $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451));
     $this->expectException(\InvalidArgumentException::class);
     $this->expectExceptionMessage('Duplicate bundles are nonsensical.');
     new FieldPropExpression(
@@ -1511,7 +1512,7 @@ class PropExpressionTest extends UnitTestCase {
    */
   #[IgnoreDeprecations]
   public function testInvalidFieldPropExpressionDueToFieldNameMismatch(array $field_name): void {
-    $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451);
+    DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => $this->expectUserDeprecationMessage(self::EXPECT_DEPRECATION_3563451), fn() => $this->expectDeprecation(self::EXPECT_DEPRECATION_3563451));
     $this->expectException(\InvalidArgumentException::class);
     $this->expectExceptionMessage('A field name must be specified for every bundle, and in the same order.');
     new FieldPropExpression(

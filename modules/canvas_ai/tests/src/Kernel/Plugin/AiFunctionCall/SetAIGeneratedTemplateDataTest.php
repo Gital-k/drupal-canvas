@@ -18,6 +18,7 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\Yaml\Yaml;
 
@@ -26,6 +27,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 #[CoversClass(SetAIGeneratedTemplateData::class)]
 #[Group('canvas_ai')]
+#[RunTestsInSeparateProcesses]
 final class SetAIGeneratedTemplateDataTest extends CanvasKernelTestBase {
 
   use CreateTestJsComponentTrait;

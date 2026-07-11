@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Update;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\Core\Recipe\Recipe;
 use Drupal\Core\Recipe\RecipeRunner;
 use Drupal\FunctionalTests\Core\Recipe\RecipeTestTrait;
@@ -12,6 +13,7 @@ use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\canvas\Functional\Update\ContentTemplateDynamicPropSourcesToEntityFieldPropSourcesUpdateTest;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Proves that no update path is necessary for exported content templates.
@@ -23,6 +25,7 @@ use PHPUnit\Framework\Attributes\IgnoreDeprecations;
  * @legacy-covers \canvas_post_update_0013_update_dynamic_prop_sources_to_entity_field_prop_sources
  */
 #[Group('canvas')]
+#[RunTestsInSeparateProcesses]
 final class RecipeWithContentTemplateDynamicPropSourcesToEntityFieldPropSourcesUpdateTest extends KernelTestBase {
 
   use RecipeTestTrait;
@@ -45,7 +48,7 @@ final class RecipeWithContentTemplateDynamicPropSourcesToEntityFieldPropSourcesU
  */
   #[IgnoreDeprecations]
   public function test(): void {
-    $this->expectDeprecation(ContentTemplateDynamicPropSourcesToEntityFieldPropSourcesUpdateTest::EXPECT_DEPRECATION_3566701);
+    DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => $this->expectUserDeprecationMessage(ContentTemplateDynamicPropSourcesToEntityFieldPropSourcesUpdateTest::EXPECT_DEPRECATION_3566701), fn() => $this->expectDeprecation(ContentTemplateDynamicPropSourcesToEntityFieldPropSourcesUpdateTest::EXPECT_DEPRECATION_3566701));
 
     // The recipe should apply without errors, because the components used by
     // the content should be available by the time the content is imported.

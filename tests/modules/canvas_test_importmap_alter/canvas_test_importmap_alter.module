@@ -2,16 +2,13 @@
 
 declare(strict_types=1);
 
+use Drupal\canvas_test_importmap_alter\Hook\CanvasTestImportmapAlterHooks;
+use Drupal\Core\Hook\Attribute\LegacyHook;
+
 /**
  * Implements hook_canvas_importmap_alter().
  */
+#[LegacyHook]
 function canvas_test_importmap_alter_canvas_importmap_alter(array &$import_map): void {
-  // Add a new global import.
-  $import_map['imports']['test-added-package'] = '/modules/test/js/test-added-package.js';
-  // Override an existing global import.
-  $import_map['imports']['clsx'] = '/modules/test/js/custom-clsx.js';
-  // Add scoped imports.
-  $import_map['scopes']['/modules/test/js/'] = [
-    'preact' => '/modules/test/js/custom-preact.js',
-  ];
+  \Drupal::service(CanvasTestImportmapAlterHooks::class)->canvasImportmapAlter($import_map);
 }

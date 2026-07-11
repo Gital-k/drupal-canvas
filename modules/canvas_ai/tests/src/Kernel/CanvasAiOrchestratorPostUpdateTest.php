@@ -6,11 +6,13 @@ namespace Drupal\Tests\canvas_ai\Kernel;
 
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests the orchestrator agent post-update hooks keep system-managed keys.
  */
 #[Group('canvas_ai')]
+#[RunTestsInSeparateProcesses]
 final class CanvasAiOrchestratorPostUpdateTest extends CanvasKernelTestBase {
 
   private const ORCHESTRATOR = 'ai_agents.ai_agent.canvas_ai_orchestrator';
@@ -45,7 +47,7 @@ final class CanvasAiOrchestratorPostUpdateTest extends CanvasKernelTestBase {
     self::assertNotEmpty($core);
 
     // Change the active prompt so the update has something to overwrite.
-    $this->config(self::ORCHESTRATOR)->set('system_prompt', 'stale prompt')->save(TRUE);
+    $this->config(self::ORCHESTRATOR)->set('system_prompt', 'stale prompt')->save();
 
     canvas_ai_post_update_0003_reimport_orchestrator_agent();
     $this->container->get('config.factory')->reset(self::ORCHESTRATOR);

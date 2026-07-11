@@ -6,6 +6,7 @@ namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -40,7 +41,7 @@ class PageRegionHooks {
       '#title' => new TranslatableMarkup('Use Drupal Canvas for page templates in this theme.'),
       '#default_value' => $enabled,
     ];
-    $possible_page_region_ids = \array_combine(\array_map(fn(string $region_name): string => "{$theme}.{$region_name}", \array_keys(\system_region_list($theme))), \system_region_list($theme));
+    $possible_page_region_ids = \array_combine(\array_map(fn(string $region_name): string => "{$theme}.{$region_name}", \array_keys(DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => \Drupal::service('theme_handler')->getTheme($theme)->listAllRegions(), fn() => \system_region_list($theme)))), DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => \Drupal::service('theme_handler')->getTheme($theme)->listAllRegions(), fn() => \system_region_list($theme)));
     $form['canvas']['editable'] = [
       '#type' => 'checkboxes',
       '#title' => new TranslatableMarkup('Exposed regions'),

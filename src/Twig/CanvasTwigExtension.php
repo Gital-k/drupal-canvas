@@ -64,19 +64,19 @@ final class CanvasTwigExtension extends AbstractExtension {
     return [
       new TwigFilter(
         'toSrcSet',
-        [$this, 'toSrcSet'],
+        $this->toSrcSet(...),
       ),
       new TwigFilter(
         'getWidth',
-        [$this, 'getWidth'],
+        $this->getWidth(...),
       ),
       new TwigFilter(
         'getHeight',
-        [$this, 'getHeight'],
+        $this->getHeight(...),
       ),
       new TwigFilter(
         'jsx_attributes',
-        [$this, 'jsxAttributes'],
+        $this->jsxAttributes(...),
       ),
     ];
   }
@@ -88,7 +88,7 @@ final class CanvasTwigExtension extends AbstractExtension {
     return [
       new TwigFunction(
         'slot',
-        [$this, 'slot'],
+        $this->slot(...),
         ['is_safe' => ['html']],
       ),
     ];

@@ -18,6 +18,7 @@ use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\canvas\Storage\ComponentTreeLoader;
+use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
@@ -68,7 +69,7 @@ final class ApiLayoutController {
     private readonly AccountProxyInterface $currentUser,
   ) {
     $theme = $this->themeManager->getActiveTheme()->getName();
-    $theme_regions = system_region_list($theme);
+    $theme_regions = DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.4.0', fn() => \Drupal::service('theme_handler')->getTheme($theme)->listAllRegions(), fn() => system_region_list($theme));
 
     // The PageRegion config entities get a corresponding `nodeType: region` in
     // the client-side representation. Their IDs match that of the server-side

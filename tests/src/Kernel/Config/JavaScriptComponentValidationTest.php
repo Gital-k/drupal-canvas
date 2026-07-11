@@ -20,6 +20,7 @@ use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\TestWith;
 
 /**
  * Tests validation of JavaScriptComponent entities.
@@ -157,6 +158,10 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
    *           [false, true, []]
    *           [false, false, []]
    */
+  #[TestWith([TRUE, TRUE, []])]
+  #[TestWith([TRUE, FALSE, ['' => 'Prop "silly" is required, but does not have example value']])]
+  #[TestWith([FALSE, TRUE, []])]
+  #[TestWith([FALSE, FALSE, []])]
   public function testPropExample(bool $required, bool $has_example, array $expected_validation_errors): void {
     $test_prop_definition = [
       'type' => 'boolean',
@@ -239,6 +244,11 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
    *           ["componente_extraño", "The 'importedJsComponents' contains an invalid component name."]
    *           [";", "The 'importedJsComponents' contains an invalid component name."]
    */
+  #[TestWith(['missing', 'The JavaScript component with the machine name \'missing\' does not exist.'])]
+  #[TestWith(['', 'The \'importedJsComponents\' contains an invalid component name.'])]
+  #[TestWith(['🚀', 'The \'importedJsComponents\' contains an invalid component name.'])]
+  #[TestWith(['componente_extraño', 'The \'importedJsComponents\' contains an invalid component name.'])]
+  #[TestWith([';', 'The \'importedJsComponents\' contains an invalid component name.'])]
   public function testNonExistingJsDependencies(string $component_id, string $expected_exception_message): void {
     \assert($this->entity instanceof JavaScriptComponent);
     $this->expectException(ConstraintViolationException::class);
@@ -352,6 +362,14 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
    *
    * @todo Expand this test coverage in https://www.drupal.org/project/canvas/issues/3542890 — this shows what is allowed by the two choices offered by the UI.
    */
+  #[TestWith([['format' => 'uri-reference'], 'https://example.com', NULL])]
+  #[TestWith([['format' => 'uri-reference'], 'ftp://example.com', NULL])]
+  #[TestWith([['format' => 'uri-reference'], '/node/1', NULL])]
+  #[TestWith([['format' => 'uri-reference'], 'bunny.jpg', NULL])]
+  #[TestWith([['format' => 'uri'], 'https://example.com', NULL])]
+  #[TestWith([['format' => 'uri'], 'ftp://example.com', NULL])]
+  #[TestWith([['format' => 'uri'], '/node/1', 'Invalid URL format'])]
+  #[TestWith([['format' => 'uri'], 'bunny.jpg', 'Invalid URL format'])]
   public function testStringFormatPropDefinition(array $string_definition, string $example, ?string $validation_error): void {
     $this->entity->set('props', [
       'beep' => [
@@ -1410,6 +1428,16 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
    *           [{"drupalSettings": ["foo"], "entityFields": {"nonexistent_prop": ["ℹ︎␜entity:user␝name␞␟value"]}}, {"dataDependencies.drupalSettings.0": "The value you selected is not a valid choice.", "dataDependencies.entityFields.nonexistent_prop": "'nonexistent_prop' is not a supported key."}]
    *           [{"entityFields": {"text": ["ℹ︎␜entity:user␝name␞␟value"]}}, {"dataDependencies.entityFields.text": "'text' is not a supported key."}]
    */
+  #[TestWith([[], []])]
+  #[TestWith([['something' => []], ['dataDependencies.something' => '\'something\' is not a supported key.']])]
+  #[TestWith([['drupalSettings' => []], ['dataDependencies.drupalSettings' => 'This value should not be blank.']])]
+  #[TestWith([['drupalSettings' => ['v0.pageTitle', 'foo']], ['dataDependencies.drupalSettings.1' => 'The value you selected is not a valid choice.']])]
+  #[TestWith([['drupalSettings' => ['v0.pageTitle', 'v0.branding']], []])]
+  #[TestWith([['urls' => []], ['dataDependencies.urls' => 'This value should not be blank.']])]
+  #[TestWith([['urls' => ['https://www.drupal.org/jsonapi']], []])]
+  #[TestWith([['drupalSettings' => ['v0.pageTitle', 'v0.branding'], 'urls' => ['https://www.drupal.org/jsonapi'], 'entityFields' => ['my_reference' => ['ℹ︎␜entity:user␝name␞␟value']]], []])]
+  #[TestWith([['drupalSettings' => ['foo'], 'entityFields' => ['nonexistent_prop' => ['ℹ︎␜entity:user␝name␞␟value']]], ['dataDependencies.drupalSettings.0' => 'The value you selected is not a valid choice.', 'dataDependencies.entityFields.nonexistent_prop' => '\'nonexistent_prop\' is not a supported key.']])]
+  #[TestWith([['entityFields' => ['text' => ['ℹ︎␜entity:user␝name␞␟value']]], ['dataDependencies.entityFields.text' => '\'text\' is not a supported key.']])]
   public function testDataDependencies(array $test, array $expected_errors): void {
     // Auto-inject a synthetic `my_reference` content-entity-reference prop
     // whenever the test data targets it via `entityFields.my_reference`. This

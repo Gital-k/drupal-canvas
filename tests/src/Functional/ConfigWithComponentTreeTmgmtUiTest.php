@@ -16,6 +16,7 @@ use Drupal\tmgmt\Entity\Job;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @see \Drupal\Tests\canvas\Functional\ContentWithComponentTreeTmgmtUiTest
@@ -24,6 +25,7 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('canvas_translation')]
 #[CoversClass(ComponentInputsConfigProcessor::class)]
 #[CoversMethod(TmgmtHooks::class, 'configSchemaInfoAlter')]
+#[RunTestsInSeparateProcesses]
 class ConfigWithComponentTreeTmgmtUiTest extends ConfigWithComponentTreeTranslationTestBase {
 
   use TmgmtTestTrait;

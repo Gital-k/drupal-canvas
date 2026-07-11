@@ -10,6 +10,7 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\Yaml\Yaml;
 
@@ -17,6 +18,7 @@ use Symfony\Component\Yaml\Yaml;
  * Tests for the GetJsComponent function call plugin.
  */
 #[Group('canvas_ai')]
+#[RunTestsInSeparateProcesses]
 final class GetJsComponentTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;

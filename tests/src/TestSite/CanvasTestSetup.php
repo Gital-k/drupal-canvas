@@ -156,7 +156,7 @@ class CanvasTestSetup implements TestSetupInterface {
     $config_factory = \Drupal::configFactory();
     $config = $config_factory->getEditable('system.logging');
     $config->set('error_level', ERROR_REPORTING_DISPLAY_VERBOSE);
-    $config->save(TRUE);
+    $config->save();
 
     if (getenv('CANVAS_DISABLE_AGGREGATION') !== 'true') {
       $config = \Drupal::service('config.factory')->getEditable('system.performance');
