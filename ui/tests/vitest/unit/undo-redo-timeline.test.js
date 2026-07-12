@@ -634,8 +634,9 @@ describe('Undo/redo timeline works across slices', () => {
     // And a subsequent update.
     store.dispatch(deleteNode('static-static-card1ab'));
     layoutState = selectLayoutHistory(store.getState());
-    // updatePreview should be true as the preview would have been updated.
-    expect(layoutState.present.updatePreview).to.eq(true);
+    // updatePreview should be false: the patch layout middleware sends the
+    // operation to the backend and updates the preview from its response.
+    expect(layoutState.present.updatePreview).to.eq(false);
 
     // And the setLayoutModel in the past entry should also be true, even though
     // we passed 'false' when dispatching setLayoutModel.

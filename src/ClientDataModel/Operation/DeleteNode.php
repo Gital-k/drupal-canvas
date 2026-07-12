@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ClientDataModel\Operation;
 
-use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\canvas\ClientDataModel\ClientDataModel;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 

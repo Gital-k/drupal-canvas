@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\EventSubscriber;
 
-use Drupal\Core\Routing\RouteSubscriberBase;
-use Drupal\canvas\ClientDataModel\Operation\DeleteNode;
-use Drupal\canvas\ClientDataModel\Operation\DuplicateNode;
-use Drupal\canvas\ClientDataModel\Operation\InsertNodes;
-use Drupal\canvas\ClientDataModel\Operation\MoveNode;
-use Drupal\canvas\ClientDataModel\Operation\ShiftNode;
-use Drupal\canvas\ClientDataModel\Operation\UpdateModel;
+use Drupal\canvas\ClientDataModel\Operation\ArgumentResolver;
+use Drupal\canvas\ClientDataModel\SupportedClientDataModelOperations;
 use Drupal\canvas\Controller\ApiLayoutController;
+use Drupal\Core\Routing\RouteSubscriberBase;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 use function Symfony\Component\String\s;
@@ -23,22 +19,19 @@ final class ClientDataModelOperationRouteSubscriber extends RouteSubscriberBase 
 
   protected function alterRoutes(RouteCollection $collection): void {
     $controller = \ltrim(ApiLayoutController::class, '\\');
-    $map = [
-      'move-node' => MoveNode::class,
-      'insert-nodes' => InsertNodes::class,
-      'shift-node' => ShiftNode::class,
-      'delete-node' => DeleteNode::class,
-      'duplicate-node' => DuplicateNode::class,
-      'update-model' => UpdateModel::class,
-    ];
-    foreach ($map as $slug => $operation_class) {
+    foreach (SupportedClientDataModelOperations::cases() as $operation) {
+      $operation_class = $operation->getOperationClass();
+      if ($operation_class === NULL) {
+        // The operation is not implemented yet: no route.
+        continue;
+      }
       $route = new Route(
-        \sprintf("/canvas/api/v0/layout/%s/{entity_type}/{entity}", $slug),
+        \sprintf("/canvas/api/v0/layout/%s/{entity_type}/{entity}", $operation->value),
         [
           '_controller' => \sprintf('%s::mutateModel', $controller),
           '_title_callback' => \sprintf('%s::getLabel', $controller),
-          // @see \Drupal\canvas\Controller\ApiLayoutController::mutateModel
-          'operation_class' => $operation_class,
+          // @see \Drupal\canvas\ClientDataModel\Operation\ArgumentResolver
+          ArgumentResolver::OPERATION_CLASS => $operation_class,
         ],
         [
           '_canvas_component_tree_edit_access' => 'TRUE',
@@ -55,7 +48,7 @@ final class ClientDataModelOperationRouteSubscriber extends RouteSubscriberBase 
         ],
         methods: ['PATCH']
       );
-      $collection->add(\sprintf('canvas.api.layout.patch.%s', s($slug)->snake()), $route);
+      $collection->add(\sprintf('canvas.api.layout.patch.%s', s($operation->value)->snake()), $route);
     }
 
   }

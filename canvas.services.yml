@@ -85,6 +85,11 @@ services:
     tags:
       - { name: cache.bin.memory }
   Drupal\canvas\AutoSave\AutoSaveValidationManager: {}
+  # Resolves ClientDataModelOperationInterface controller arguments. Added to
+  # core's controller argument resolver list by the service provider, because
+  # core hardcodes that list (there is no tag to collect).
+  # @see \Drupal\canvas\CanvasServiceProvider::alter
+  Drupal\canvas\ClientDataModel\Operation\ArgumentResolver: {}
   Drupal\canvas\Storage\ComponentTreeLoader: {}
   Drupal\canvas\CodeComponentDataProvider: {}
   Drupal\canvas\Version: {}

@@ -6,19 +6,23 @@ namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ClientDataModel\ClientDataModel;
+use Drupal\canvas\ClientDataModel\Operation\MoveNode;
+use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-/**
- * @group canvas
- * @group ApiLayoutController
- * @covers \Drupal\canvas\ClientDataModel\Operation\MoveNode
- * @covers \Drupal\canvas\Controller\ApiLayoutController
- */
+#[RunTestsInSeparateProcesses]
+#[CoversClass(MoveNode::class)]
+#[CoversClass(ApiLayoutController::class)]
+#[Group('canvas')]
+#[Group('ApiLayoutController')]
 final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateModelTestBase {
 
   protected static function getValidRequestBody(string $componentUuid): array {
@@ -120,7 +124,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
   }
 
   #[DataProvider('providerValid')]
-  public function testOperation(bool $withAutoSave = FALSE, bool $withGlobal = FALSE): void {
+  public function testOperation(bool $withAutoSave, bool $withGlobal): void {
     $this->setUpCurrentUser([], [
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
@@ -146,7 +150,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
       'slot' => 'column_two',
       'fractal' => 1.5,
     ] + $this->getPatchContentsDefaults([$this->node]), JSON_THROW_ON_ERROR)));
-    $data = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
+    $data = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
@@ -156,6 +160,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
       CanvasTestSetup::UUID_STATIC_CARD2,
       CanvasTestSetup::UUID_ALL_SLOTS_EMPTY,
       CanvasTestSetup::UUID_STATIC_CARD3,
+      CanvasTestSetup::UUID_STATIC_IMAGE2,
     ], \array_column($contentRegion['components'][0]['slots'][1]['components'], 'uuid'));
 
     // Move to the content region.
@@ -165,7 +170,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
       'slot' => NULL,
       'fractal' => 1.5,
     ] + $this->getPatchContentsDefaults([$this->node]), JSON_THROW_ON_ERROR)));
-    $data = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
+    $data = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
@@ -174,6 +179,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
     self::assertEquals([
       CanvasTestSetup::UUID_STATIC_CARD2,
       CanvasTestSetup::UUID_STATIC_CARD3,
+      CanvasTestSetup::UUID_STATIC_IMAGE2,
     ], \array_column($contentRegion['components'][0]['slots'][1]['components'], 'uuid'));
     self::assertEquals([
       CanvasTestSetup::UUID_TWO_COLUMN_UUID,
@@ -195,7 +201,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
       'fractal' => 0.5,
     ] + $this->getPatchContentsDefaults([$this->node]);
     $response = $this->request(Request::create(\sprintf('/canvas/api/v0/layout/%s/node/1', static::getOperationPathSlug()), method: 'PATCH', content: \json_encode($move_global_component_body, JSON_THROW_ON_ERROR)));
-    $data = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
+    $data = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
@@ -208,8 +214,11 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
     self::assertEquals([
       $region_component_uuid,
     ], \array_column($contentRegion['components'][1]['slots'][0]['components'], 'uuid'));
+    // The region is still rendered (its wrapper markers remain so the UI can
+    // target it), but it no longer contains any component instance.
     $highlighted = $this->getRegion('highlighted');
-    self::assertNull($highlighted);
+    self::assertNotNull($highlighted);
+    self::assertStringNotContainsString('canvas-start-', $highlighted);
 
     // Move a component to a global region.
     $move_global_component_body = [
@@ -219,7 +228,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
       'fractal' => 0.5,
     ] + $this->getPatchContentsDefaults([$this->node]);
     $response = $this->request(Request::create(\sprintf('/canvas/api/v0/layout/%s/node/1', static::getOperationPathSlug()), method: 'PATCH', content: \json_encode($move_global_component_body, JSON_THROW_ON_ERROR)));
-    $data = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
+    $data = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);

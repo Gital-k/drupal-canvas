@@ -1,10 +1,8 @@
 import { makeStore } from '@/app/store';
 import {
   deleteNode,
-  duplicateNode,
   initialState,
   layoutModelSlice,
-  moveNode,
   selectLayoutHistory,
   setLayoutModel,
   shiftNode,
@@ -104,11 +102,16 @@ describe('Move node', () => {
     expect(
       layout.layout[0].components[0].slots[0].components[0].uuid,
     ).to.deep.equal('static-static-card1ab');
+    // Use the internal slice action: the exported moveNode thunk derives the
+    // parent position fields consumed by the patch layout middleware.
     const state = layoutModelSlice.reducer(
       layout,
-      moveNode({
+      layoutModelSlice.actions.moveNode({
         uuid: 'static-static-card1ab',
         to: [0, 4, 0, 1],
+        parentRegionOrUuid: 'content',
+        slot: null,
+        fractal: 1.5,
       }),
     );
     expect(state.layout[0].components[0].slots[0].components.length).to.eq(1);
@@ -341,9 +344,15 @@ describe('Duplicate node', () => {
     );
 
     const nodeToDuplicateUUID = 'original-node';
+    // Use the internal slice action: the exported duplicateNode thunk builds
+    // the uuidMap consumed by the patch layout middleware. An empty map makes
+    // the reducer generate new UUIDs itself.
     const stateAfterDuplication = layoutModelSlice.reducer(
       initialStateWithLayout,
-      duplicateNode({ uuid: nodeToDuplicateUUID }),
+      layoutModelSlice.actions.duplicateNode({
+        uuid: nodeToDuplicateUUID,
+        uuidMap: {},
+      }),
     );
 
     const originalNode = initialStateWithLayout.layout[0].components.find(

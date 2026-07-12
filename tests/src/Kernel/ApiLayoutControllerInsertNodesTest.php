@@ -6,19 +6,23 @@ namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ClientDataModel\ClientDataModel;
+use Drupal\canvas\ClientDataModel\Operation\InsertNodes;
+use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-/**
- * @group canvas
- * @group ApiLayoutController
- * @covers \Drupal\canvas\ClientDataModel\Operation\InsertNodes
- * @covers \Drupal\canvas\Controller\ApiLayoutController
- */
+#[RunTestsInSeparateProcesses]
+#[CoversClass(InsertNodes::class)]
+#[CoversClass(ApiLayoutController::class)]
+#[Group('canvas')]
+#[Group('ApiLayoutController')]
 final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutateModelTestBase {
 
   private const string INSERTED_COMPONENT_UUID = 'afef79ad-4537-4a66-9af2-ed0e9b5fc5b9';
@@ -34,8 +38,14 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
         'expression' => 'ℹ︎string␟value',
       ],
       'href' => [
-        'sourceType' => 'static:field_item:uri',
-        'expression' => 'ℹ︎uri␟value',
+        'sourceType' => 'static:field_item:link',
+        'expression' => 'ℹ︎link␟url',
+        'sourceTypeSettings' => [
+          'instance' => [
+            'title' => 0,
+            'link_type' => 16,
+          ],
+        ],
       ],
     ],
   ];
@@ -43,7 +53,7 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
   private const array INSERTED_COMPONENT = [
     'nodeType' => 'component',
     'uuid' => self::INSERTED_COMPONENT_UUID,
-    'type' => 'sdc.canvas_test_sdc.my-cta@9454c3bca9bbbf4b',
+    'type' => 'sdc.canvas_test_sdc.my-cta@89881c04a0fde367',
     'slots' => [],
   ];
 
@@ -220,7 +230,7 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
   }
 
   #[DataProvider('providerValid')]
-  public function testOperation(bool $withAutoSave = FALSE, bool $withGlobal = FALSE): void {
+  public function testOperation(bool $withAutoSave, bool $withGlobal): void {
     $this->setUpCurrentUser([], [
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
@@ -253,7 +263,7 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
         ],
       ],
     ] + $this->getPatchContentsDefaults([$this->node]), JSON_THROW_ON_ERROR)));
-    $data = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
+    $data = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
@@ -263,6 +273,7 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
       CanvasTestSetup::UUID_STATIC_CARD2,
       self::INSERTED_COMPONENT_UUID,
       CanvasTestSetup::UUID_STATIC_CARD3,
+      CanvasTestSetup::UUID_STATIC_IMAGE2,
     ], \array_column($contentRegion['components'][0]['slots'][1]['components'], 'uuid'));
     self::assertEquals(self::INSERTED_MODEL, $data['model'][self::INSERTED_COMPONENT_UUID]);
 
@@ -276,7 +287,7 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
     $component = [
       'nodeType' => 'component',
       'uuid' => $uuid,
-      'type' => 'sdc.canvas_test_sdc.my-cta@9454c3bca9bbbf4b',
+      'type' => 'sdc.canvas_test_sdc.my-cta@89881c04a0fde367',
       'slots' => [],
     ];
 
@@ -291,8 +302,14 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
           'expression' => 'ℹ︎string␟value',
         ],
         'href' => [
-          'sourceType' => 'static:field_item:uri',
-          'expression' => 'ℹ︎uri␟value',
+          'sourceType' => 'static:field_item:link',
+          'expression' => 'ℹ︎link␟url',
+          'sourceTypeSettings' => [
+            'instance' => [
+              'title' => 0,
+              'link_type' => 16,
+            ],
+          ],
         ],
       ],
     ];
@@ -314,7 +331,7 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
       ],
     ] + $this->getPatchContentsDefaults([$this->node]);
     $response = $this->request(Request::create(\sprintf('/canvas/api/v0/layout/%s/node/1', static::getOperationPathSlug()), method: 'PATCH', content: \json_encode($insert_global_component, JSON_THROW_ON_ERROR)));
-    $data = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
+    $data = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
 
     $highlighted = $this->getRegion('highlighted');
     self::assertNotNull($highlighted);

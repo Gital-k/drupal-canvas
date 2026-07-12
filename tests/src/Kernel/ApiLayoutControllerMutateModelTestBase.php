@@ -4,38 +4,21 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
-use Drupal\Tests\block\Traits\BlockCreationTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
-use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
-use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
-use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
-use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
-/**
- * @group canvas
- * @group ApiLayoutController
- * @covers \Drupal\canvas\Controller\ApiLayoutController
- */
 abstract class ApiLayoutControllerMutateModelTestBase extends ApiLayoutControllerTestBase {
 
-  use AutoSaveManagerTestTrait;
   use CanvasFieldTrait;
-  use GenerateComponentConfigTrait;
-  use ContentTypeCreationTrait;
-  use MediaTypeCreationTrait;
-  use BlockCreationTrait;
   use AutoSaveRequestTestTrait;
 
   protected NodeInterface $node;
@@ -47,122 +30,18 @@ abstract class ApiLayoutControllerMutateModelTestBase extends ApiLayoutControlle
   abstract public static function providerInvalid(): iterable;
 
   #[DataProvider('providerValid')]
-  abstract public function testOperation(bool $withAutoSave = FALSE, bool $withGlobal = FALSE): void;
-
-  protected static $modules = [
-    'canvas_test_sdc',
-    'system',
-    'canvas',
-    'file',
-    'image',
-    'link',
-    'path',
-    'path_alias',
-    'media',
-    'user',
-    'text',
-    'options',
-    'node',
-    'filter',
-    'field',
-    'editor',
-    'block',
-    'ckeditor5',
-    'canvas_dev_standard',
-  ];
+  abstract public function testOperation(bool $withAutoSave, bool $withGlobal): void;
 
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
-    $this->config('system.theme')->set('default', 'stark')->save();
-    $this->placeBlock('page_title_block', ['region' => 'highlighted']);
-    $this->placeBlock('system_messages_block', ['region' => 'header']);
-    $this->placeBlock('system_powered_by_block', ['region' => 'header']);
-    $this->placeBlock('system_main_block');
-    $this->installConfig('canvas');
-    $this->installEntitySchema('user');
-    // Create the anon user.
-    User::create(['uid' => 0, 'name' => 'Bobby Dazzler'])->save();
-    $this->installEntitySchema('path_alias');
-    $this->installEntitySchema('node');
-    $this->installEntitySchema('file');
-    $this->installEntitySchema('media');
-    $this->installSchema('file', 'file_usage');
-    $this->installConfig('node');
-    $this->installConfig('system');
-    $this->createContentType(['type' => 'article']);
-    $this->installConfig('canvas_dev_standard');
-    $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
-    $this->setUpImages();
-    $this->generateComponentConfig();
-    $this->node = Node::create([
-      'title' => 'Eyes the size of an American mile',
-      'type' => 'article',
-      'field_canvas_demo' => [
-        [
-          'component_id' => 'sdc.canvas_test_sdc.two_column',
-          'uuid' => CanvasTestSetup::UUID_TWO_COLUMN_UUID,
-          'inputs' => [
-            'width' => 50,
-          ],
-        ],
-        [
-          'parent_uuid' => CanvasTestSetup::UUID_TWO_COLUMN_UUID,
-          'slot' => 'column_one',
-          'component_id' => 'sdc.canvas_test_sdc.image',
-          'uuid' => CanvasTestSetup::UUID_STATIC_IMAGE,
-          'inputs' => [
-            'image' => [
-              'target_id' => $this->referencedImage->id(),
-              'alt' => NULL,
-              'width' => NULL,
-              'height' => NULL,
-            ],
-          ],
-        ],
-        [
-          'parent_uuid' => CanvasTestSetup::UUID_TWO_COLUMN_UUID,
-          'slot' => 'column_one',
-          'component_id' => 'sdc.canvas_test_sdc.my-hero',
-          'uuid' => CanvasTestSetup::UUID_STATIC_CARD1,
-          'inputs' => [
-            'heading' => 'hello, world!',
-            'cta1href' => ['uri' => 'http://example.com', 'options' => []],
-          ],
-        ],
-        [
-          'parent_uuid' => CanvasTestSetup::UUID_TWO_COLUMN_UUID,
-          'slot' => 'column_one',
-          'uuid' => CanvasTestSetup::UUID_ALL_SLOTS_EMPTY,
-          'component_id' => 'sdc.canvas_test_sdc.one_column',
-          'inputs' => [
-            'width' => 'full',
-          ],
-        ],
-        [
-          'parent_uuid' => CanvasTestSetup::UUID_TWO_COLUMN_UUID,
-          'slot' => 'column_two',
-          'uuid' => CanvasTestSetup::UUID_STATIC_CARD2,
-          'component_id' => 'sdc.canvas_test_sdc.my-hero',
-          'inputs' => [
-            'heading' => 'This is card 2',
-            'cta1href' => ['uri' => 'http://example.com', 'options' => []],
-          ],
-        ],
-        [
-          'parent_uuid' => CanvasTestSetup::UUID_TWO_COLUMN_UUID,
-          'slot' => 'column_two',
-          'uuid' => CanvasTestSetup::UUID_STATIC_CARD3,
-          'component_id' => 'sdc.canvas_test_sdc.my-hero',
-          'inputs' => [
-            'heading' => 'This is card 3',
-            'cta1href' => ['uri' => 'http://example.com', 'options' => []],
-          ],
-        ],
-      ],
-    ]);
-    self::assertCount(0, $this->node->validate());
-    $this->node->save();
+    $this->container->get('module_installer')->install(['system', 'block']);
+    $this->container->get('theme_installer')->install(['stark']);
+    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
+
+    (new CanvasTestSetup())->setup();
+    $node = Node::load(1);
+    \assert($node instanceof NodeInterface);
+    $this->node = $node;
   }
 
   /**
@@ -186,7 +65,7 @@ abstract class ApiLayoutControllerMutateModelTestBase extends ApiLayoutControlle
   }
 
   public static function providerValid(): iterable {
-    yield 'fresh state, no global' => [];
+    yield 'fresh state, no global' => [FALSE, FALSE];
     yield 'fresh state, global' => [FALSE, TRUE];
     yield 'existing auto-save, no global' => [TRUE, FALSE];
     yield 'existing auto-save, global' => [TRUE, TRUE];

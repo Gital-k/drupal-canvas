@@ -22,7 +22,6 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Component\Utility\NestedArray;
-use Drupal\Core\DependencyInjection\ClassResolverInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
@@ -61,7 +60,6 @@ final class ApiLayoutController {
   public function __construct(
     private readonly AutoSaveManager $autoSaveManager,
     private readonly AutoSaveValidationManager $autoSaveValidationManager,
-    private readonly ClassResolverInterface $classResolver,
     private readonly ThemeManagerInterface $themeManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly FormBuilderInterface $formBuilder,
@@ -379,22 +377,15 @@ final class ApiLayoutController {
 
   /**
    * @see \Drupal\canvas\EventSubscriber\ClientDataModelOperationRouteSubscriber::alterRoutes
-   * @see \Drupal\canvas\ClientDataModel\Operation\ClientDataModelOperationInterface
+   * @see \Drupal\canvas\ClientDataModel\Operation\ArgumentResolver
    * @see \Drupal\canvas\ClientDataModel\Operation\ClientDataModelOperationBase
    */
-  public function mutateModel(Request $request, FieldableEntityInterface $entity, string $operation_class): PreviewEnvelope {
-    if (!\is_a($operation_class, ClientDataModelOperationInterface::class, TRUE)) {
-      throw new NotFoundHttpException();
-    }
-    $operation = $this->classResolver->getInstanceFromDefinition($operation_class);
-    \assert($operation instanceof ClientDataModelOperationInterface);
-    $body = \json_decode($request->getContent(), TRUE, flags: JSON_THROW_ON_ERROR);
-    $operation->setRequestBody($body);
-    $operation->setAutoSaveValidationManager($this->autoSaveValidationManager);
+  public function mutateModel(FieldableEntityInterface $entity, ClientDataModelOperationInterface $operation): PreviewEnvelope {
     $clientModel = $this->getLastStoredData($entity, includeAllRegions: TRUE);
     $clientModel = $operation($clientModel, $entity);
     \assert($operation->hasValidatedAutoSaves());
     \assert($clientModel->clientInstanceId !== NULL);
+    $renderable = $this->buildMutatePreviewRenderable($clientModel, $entity);
     $data = [
       'layout' => $clientModel->layout,
       'model' => $clientModel->model,
@@ -404,7 +395,7 @@ final class ApiLayoutController {
       // the preview.
       'autoSaves' => $this->autoSaveValidationManager->getAutoSaveHashes(array_merge([$entity], PageRegion::getEditableRegions())),
     ];
-    return new PreviewEnvelope($this->buildMutatePreviewRenderable($clientModel, $entity), $data);
+    return new PreviewEnvelope($renderable, $data);
   }
 
   /**
@@ -427,7 +418,7 @@ final class ApiLayoutController {
     $this->autoSaveManager->saveEntity($entity, $clientInstanceId);
 
     // Update all PageRegions' component trees.
-    $regions = $this->getAutoSavedVersionIfAvailable(PageRegion::loadForActiveTheme());
+    $regions = $this->getAutoSavedVersionIfAvailable(PageRegion::loadForActiveThemeByClientSideId());
     foreach ($region_layouts as $client_side_region_id => $region_layout) {
       if (!isset($regions[$client_side_region_id])) {
         continue;
@@ -458,7 +449,7 @@ final class ApiLayoutController {
     $regions = PageRegion::loadForActiveTheme();
     if (!empty($regions)) {
       $this->addGlobalRegions($regions, $model, $layout, $includeAllRegions);
-      $layout_keyed_by_region = array_combine(array_map(static fn($region) => $region['id'], $layout), $layout);
+      $layout_keyed_by_region = array_combine(\array_map(static fn($region) => $region['id'], $layout), $layout);
       // Reorder the layout to match theme order.
       $layout = array_values(array_replace(
         array_intersect_key(array_flip($this->regionsClientSideIds), $layout_keyed_by_region),

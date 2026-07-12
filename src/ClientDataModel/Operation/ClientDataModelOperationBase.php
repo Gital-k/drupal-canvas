@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ClientDataModel\Operation;
 
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\canvas\AutoSave\AutoSaveValidationManager;
 use Drupal\canvas\ClientDataModel\ClientDataModel;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
+use Drupal\Core\Entity\EntityInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
@@ -60,7 +60,7 @@ abstract class ClientDataModelOperationBase implements ClientDataModelOperationI
       $regionForComponentId = $clientModel->getRegionForComponentInstance($componentInstanceUuid);
       if ($regionForComponentId !== CanvasPageVariant::MAIN_CONTENT_REGION && NULL !== $regionForComponentId) {
         if (!$page_regions[$regionForComponentId]->access('edit')) {
-          throw new AccessDeniedHttpException(sprintf('Access denied for region %s', $regionForComponentId));
+          throw new AccessDeniedHttpException(\sprintf('Access denied for region %s', $regionForComponentId));
         }
       }
     }

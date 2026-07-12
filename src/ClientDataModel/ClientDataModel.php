@@ -262,7 +262,10 @@ final class ClientDataModel {
           [$componentInstanceUuid],
           \array_reduce(
             $layout,
-            static fn (array $carry, array $region) => [...$carry, ...self::collectChildComponentInstanceIds(self::getComponentByUuid($region, $componentInstanceUuid) ?? [])],
+            static fn (array $carry, array $region) => [
+              ...$carry,
+              ...self::collectChildComponentInstanceIds(self::getComponentByUuid($region, $componentInstanceUuid) ?? []),
+            ],
            []
           )
         )

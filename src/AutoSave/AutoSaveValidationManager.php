@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\canvas\AutoSave;
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
@@ -31,7 +30,6 @@ class AutoSaveValidationManager {
 
   public function __construct(
     private readonly AutoSaveManager $autoSaveManager,
-    private readonly EntityTypeManagerInterface $entityTypeManager,
   ) {
   }
 

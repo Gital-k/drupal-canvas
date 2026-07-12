@@ -483,7 +483,7 @@ export function getNodeDepth(
 export function replaceUUIDsAndUpdateModel(
   component: ComponentNode,
   model: ComponentModels,
-  uuidMap: Record<string, string>,
+  uuidMap: Record<string, string> = {},
 ): {
   updatedNode: ComponentNode;
   updatedModel: ComponentModels;

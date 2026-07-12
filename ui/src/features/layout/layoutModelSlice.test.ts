@@ -36,6 +36,9 @@ let layout: RootLayoutModel;
 beforeEach(() => {
   mockFetch();
   layout = layoutFixture as RootLayoutModel;
+  // The base query resolves {entity_type}/{entity_id} URL placeholders from
+  // the current location, so pretend we are in the editor.
+  window.history.pushState({}, '', '/canvas/editor/node/1');
 });
 
 afterEach(() => {

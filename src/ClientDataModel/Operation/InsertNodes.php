@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ClientDataModel\Operation;
 
-use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\canvas\ClientDataModel\ClientDataModel;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -57,7 +57,7 @@ final class InsertNodes extends ClientDataModelOperationBase {
         throw new NotFoundHttpException('No such region: ' . $parentRegionOrUuid);
       }
       if (!$regionsById[$parentRegionOrUuid]->access('update')) {
-        throw new AccessDeniedHttpException(sprintf('Access denied for region %s', $parentRegionOrUuid));
+        throw new AccessDeniedHttpException(\sprintf('Access denied for region %s', $parentRegionOrUuid));
       }
     }
 

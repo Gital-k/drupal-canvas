@@ -6,19 +6,23 @@ namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ClientDataModel\ClientDataModel;
+use Drupal\canvas\ClientDataModel\Operation\DeleteNode;
+use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-/**
- * @group canvas
- * @group ApiLayoutController
- * @covers \Drupal\canvas\ClientDataModel\Operation\DeleteNode
- * @covers \Drupal\canvas\Controller\ApiLayoutController
- */
+#[RunTestsInSeparateProcesses]
+#[CoversClass(DeleteNode::class)]
+#[CoversClass(ApiLayoutController::class)]
+#[Group('canvas')]
+#[Group('ApiLayoutController')]
 final class ApiLayoutControllerDeleteNodeTest extends ApiLayoutControllerMutateModelTestBase {
 
   protected static function getValidRequestBody(string $componentUuid): array {
@@ -49,7 +53,7 @@ final class ApiLayoutControllerDeleteNodeTest extends ApiLayoutControllerMutateM
   }
 
   #[DataProvider('providerValid')]
-  public function testOperation(bool $withAutoSave = FALSE, bool $withGlobal = FALSE): void {
+  public function testOperation(bool $withAutoSave, bool $withGlobal): void {
     $this->setUpCurrentUser([], [
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
@@ -70,7 +74,7 @@ final class ApiLayoutControllerDeleteNodeTest extends ApiLayoutControllerMutateM
     $response = $this->request(Request::create(\sprintf('/canvas/api/v0/layout/%s/node/1', static::getOperationPathSlug()), method: 'PATCH', content: \json_encode([
       'componentInstanceUuid' => CanvasTestSetup::UUID_STATIC_CARD2,
     ] + $this->getPatchContentsDefaults([$this->node]), JSON_THROW_ON_ERROR)));
-    $data = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
+    $data = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
@@ -91,13 +95,16 @@ final class ApiLayoutControllerDeleteNodeTest extends ApiLayoutControllerMutateM
       'componentInstanceUuid' => $region_component_uuid,
     ] + $this->getPatchContentsDefaults([$this->node]);
     $response = $this->request(Request::create(\sprintf('/canvas/api/v0/layout/%s/node/1', static::getOperationPathSlug()), method: 'PATCH', content: \json_encode($delete_region_component_body, JSON_THROW_ON_ERROR)));
-    $data = \json_decode($response->getContent() ?: '', TRUE, \JSON_THROW_ON_ERROR);
+    $data = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
     self::assertArrayHasKey(CanvasTestSetup::UUID_TWO_COLUMN_UUID, $data['model']);
     self::assertArrayNotHasKey($region_component_uuid, $data['model']);
     $clientModel = new ClientDataModel($data['layout'], (array) $data['model'], $data['entity_form_fields']);
     self::assertNull($clientModel->getRegionForComponentInstance($region_component_uuid));
+    // The region is still rendered (its wrapper markers remain so the UI can
+    // target it), but it no longer contains any component instance.
     $highlighted = $this->getRegion('highlighted');
-    self::assertNull($highlighted);
+    self::assertNotNull($highlighted);
+    self::assertStringNotContainsString('canvas-start-', $highlighted);
 
     $this->assertRequestAutoSaveConflict(Request::create(\sprintf('/canvas/api/v0/layout/%s/node/1', static::getOperationPathSlug()), method: 'PATCH', content: \json_encode([
       'componentInstanceUuid' => CanvasTestSetup::UUID_TWO_COLUMN_UUID,

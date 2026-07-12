@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit\ClientDataModel;
 
-use Drupal\Component\Utility\Random;
 use Drupal\canvas\ClientDataModel\ClientDataModel;
 use Drupal\canvas\ClientDataModel\ShiftComponentDirection;
+use Drupal\Component\Utility\Random;
 use Drupal\Tests\UnitTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
-/**
- * @coversDefaultClass \Drupal\canvas\ClientDataModel\ClientDataModel
- * @group canvas
- */
+#[CoversClass(ClientDataModel::class)]
+#[Group('canvas')]
 final class ClientDataModelTest extends UnitTestCase {
 
   private const string NO_EXPLICIT_INPUT = 'a7db19b0-b11e-4b45-b888-e78a94da8ce3';
@@ -23,7 +23,7 @@ final class ClientDataModelTest extends UnitTestCase {
     parent::setUp();
     $json = \file_get_contents(\sprintf('%s/ui/tests/fixtures/layout-default.json', dirname(__DIR__, 4)));
     \assert(\is_string($json));
-    $data = \json_decode($json, TRUE, \JSON_THROW_ON_ERROR);
+    $data = \json_decode($json, TRUE, flags: \JSON_THROW_ON_ERROR);
     \assert(\array_key_exists('layout', $data));
     \assert(\array_key_exists('model', $data));
     \assert(\array_key_exists('entity_form_fields', $data));
@@ -51,7 +51,7 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::withModelForComponent
+   * @legacy-covers ::withModelForComponent
    */
   public function testWithModelForComponent(): void {
     $original_values = [
@@ -97,7 +97,7 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::withClientInstanceId
+   * @legacy-covers ::withClientInstanceId
    */
   public function testWithClientInstanceId(): void {
     self::assertNull($this->clientDataModel->clientInstanceId);
@@ -106,7 +106,7 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::hasComponentInstance
+   * @legacy-covers ::hasComponentInstance
    */
   public function testHasComponentInstance(): void {
     self::assertFalse($this->clientDataModel->hasComponentInstance('532b795f-4f0c-4b1a-bb74-871835096941'));
@@ -115,8 +115,8 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::getRegionForComponentInstance
-   * @covers ::componentInstanceExistInComponentData
+   * @legacy-covers ::getRegionForComponentInstance
+   * @legacy-covers ::componentInstanceExistInComponentData
    */
   public function testGetRegionForComponentInstance(): void {
     self::assertEquals('content', $this->clientDataModel->getRegionForComponentInstance('eaa37ee1-7d50-4041-b04c-c80bdbac3412'));
@@ -125,13 +125,13 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::withoutComponent
-   * @covers ::getComponentByUuid
-   * @covers ::removeComponentByUuid
-   * @covers ::getChildrenFromNode
-   * @covers ::setChildrenForNode
-   * @covers ::nodeIsComponent
-   * @covers ::collectChildComponentInstanceIds
+   * @legacy-covers ::withoutComponent
+   * @legacy-covers ::getComponentByUuid
+   * @legacy-covers ::removeComponentByUuid
+   * @legacy-covers ::getChildrenFromNode
+   * @legacy-covers ::setChildrenForNode
+   * @legacy-covers ::nodeIsComponent
+   * @legacy-covers ::collectChildComponentInstanceIds
    */
   public function testWithoutComponent(): void {
     // Test item with no children.
@@ -164,11 +164,11 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::withMovedComponent
-   * @covers ::insertNodeAtFractal
-   * @covers ::insertNodeInSlotAtFractal
-   * @covers ::replaceComponent
-   * @covers ::__construct
+   * @legacy-covers ::withMovedComponent
+   * @legacy-covers ::insertNodeAtFractal
+   * @legacy-covers ::insertNodeInSlotAtFractal
+   * @legacy-covers ::replaceComponent
+   * @legacy-covers ::__construct
    */
   public function testWithMovedComponent(): void {
     // Move to between two existing items.
@@ -266,7 +266,7 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::getRegion
+   * @legacy-covers ::getRegion
    */
   public function testGetRegion(): void {
     self::assertEquals($this->clientDataModel->layout[0], $this->clientDataModel->getRegion('content'));
@@ -275,13 +275,13 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::withShiftedComponent
-   * @covers ::shiftChild
-   * @covers ::nodeIsSlot
-   * @covers ::nodeIsRegion
-   * @covers ::getParentNodeByComponentId
-   * @covers ::replaceSlot
-   * @covers \Drupal\canvas\ClientDataModel\ShiftComponentDirection::apply
+   * @legacy-covers ::withShiftedComponent
+   * @legacy-covers ::shiftChild
+   * @legacy-covers ::nodeIsSlot
+   * @legacy-covers ::nodeIsRegion
+   * @legacy-covers ::getParentNodeByComponentId
+   * @legacy-covers ::replaceSlot
+   * @legacy-covers \Drupal\canvas\ClientDataModel\ShiftComponentDirection::apply
    */
   public function testWithShiftedComponent(): void {
     self::assertEquals($this->clientDataModel, $this->clientDataModel->withShiftedComponent('no such component', ShiftComponentDirection::Up));
@@ -335,15 +335,15 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::withDuplicatedComponentTree
-   * @covers ::insertAfter
-   * @covers ::duplicate
-   * @covers ::collectChildComponentInstanceIds
-   * @covers ::getParentNodeByComponentId
-   * @covers ::getComponentByUuid
-   * @covers ::nodeIsRegion
-   * @covers ::nodeIsSlot
-   * @covers ::replaceSlot
+   * @legacy-covers ::withDuplicatedComponentTree
+   * @legacy-covers ::insertAfter
+   * @legacy-covers ::duplicate
+   * @legacy-covers ::collectChildComponentInstanceIds
+   * @legacy-covers ::getParentNodeByComponentId
+   * @legacy-covers ::getComponentByUuid
+   * @legacy-covers ::nodeIsRegion
+   * @legacy-covers ::nodeIsSlot
+   * @legacy-covers ::replaceSlot
    */
   public function testWithDuplicatedComponentTree(): void {
     self::assertEquals($this->clientDataModel, $this->clientDataModel->withDuplicatedComponentTree('no such component', []));
@@ -372,10 +372,12 @@ final class ClientDataModelTest extends UnitTestCase {
     self::assertEquals('content', $new->getRegionForComponentInstance('c850e3e9-3143-4cb4-b32e-6fb56f9c2b43'));
     self::assertEquals('content', $new->getRegionForComponentInstance('6a723ef3-ddff-49fa-80be-574c1f6863e0'));
     self::assertEquals('content', $new->getRegionForComponentInstance('2ff45524-3448-46d9-affb-a1369e8ea53c'));
-    \assert(\is_array($this->clientDataModel->model));
-    \assert(\is_array($new->model));
+    $originalModel = $this->clientDataModel->model;
+    $newModel = $new->model;
+    \assert(\is_array($originalModel));
+    \assert(\is_array($newModel));
     foreach ($uuidMap as $original => $duplicated) {
-      self::assertEquals($this->clientDataModel->model[$original], $new->model[$duplicated]);
+      self::assertEquals($originalModel[$original], $newModel[$duplicated]);
     }
     self::assertEquals([
       'static-static-card1ab',
@@ -397,7 +399,7 @@ final class ClientDataModelTest extends UnitTestCase {
   }
 
   /**
-   * @covers ::withInsertedComponents
+   * @legacy-covers ::withInsertedComponents
    */
   public function testWithInsertedComponents(): void {
     $uuid1 = 'afef79ad-4537-4a66-9af2-ed0e9b5fc5b9';

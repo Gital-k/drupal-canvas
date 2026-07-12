@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ClientDataModel\Operation;
 
+use Drupal\canvas\ClientDataModel\ClientDataModel;
+use Drupal\canvas\Entity\Component;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\canvas\ClientDataModel\ClientDataModel;
-use Drupal\canvas\Entity\Component;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;

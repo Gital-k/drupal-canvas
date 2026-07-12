@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ClientDataModel\Operation;
 
-use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\canvas\AutoSave\AutoSaveValidationManager;
 use Drupal\canvas\ClientDataModel\ClientDataModel;
+use Drupal\Core\Entity\FieldableEntityInterface;
 
 interface ClientDataModelOperationInterface {
 

@@ -3,10 +3,6 @@ import { vi } from 'vitest';
 export default () => {
   vi.useFakeTimers();
   vi.stubGlobal(
-    'URL',
-    vi.fn().mockImplementation((i) => i),
-  );
-  vi.stubGlobal(
     'fetch',
     vi.fn().mockImplementation((url: string | URL | Request) => {
       if (typeof url === 'string' && url.match(/session\/token/)) {
