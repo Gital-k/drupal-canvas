@@ -3,7 +3,7 @@ import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
 import {
-  setComponentModel,
+  setLayoutModel,
   syncLayoutModel,
 } from '@/features/layout/layoutModelSlice';
 import { setHtml, setSnapshotHTML } from '@/features/pagePreview/previewSlice';
@@ -225,16 +225,6 @@ export const previewApi = createApi({
       },
       async onQueryStarted(body, { dispatch, queryFulfilled, getState }) {
         const ticket = ++latestOperationTicket;
-        if (body.operation === 'update-model') {
-          // Stage the model change locally so prop edits create an undo
-          // entry; structural operations already do via their reducers.
-          dispatch(
-            setComponentModel({
-              componentInstanceUuid: body.componentInstanceUuid,
-              model: body.model,
-            }),
-          );
-        }
         // Force any ajax calls to wait.
         pushCanvasLayoutRequest();
         const {
@@ -283,7 +273,17 @@ export const previewApi = createApi({
         });
         // Pass update preview false to prevent a subsequent preview update,
         // we have the data here.
-        dispatch(syncLayoutModel({ layout, model, updatePreview: false }));
+        if (body.operation === 'update-model') {
+          // A prop edit has no client-side reducer, so its echo is what
+          // creates the undo entry (setLayoutModel is undoable). Staging the
+          // edit before the request would keep rejected values (e.g. an
+          // invalid URI) in the model, breaking later form rebuilds.
+          dispatch(setLayoutModel({ layout, model, updatePreview: false }));
+        } else {
+          // Structural operations already created their undo entry in the
+          // dispatching reducer; their echo must not cost an extra undo step.
+          dispatch(syncLayoutModel({ layout, model, updatePreview: false }));
+        }
       },
     }),
   }),

@@ -121,15 +121,70 @@ describe('updateComponent response ordering', () => {
     // The stale response must not rewind the preview.
     expect(selectPreviewHtml(store.getState() as any)).toBe('NEW');
 
-    // Each update-model operation staged its model change as an undo entry:
-    // the second entry captured the state after the first staging.
+    // Only the surviving (newest) response created an undo entry from its
+    // echo; the dropped stale response must not add one.
     const history = selectLayoutHistory(store.getState() as any);
-    expect(history.past.length).toBe(2);
-    expect((history.past[1].model as any)['uuid-1']).toEqual({
-      resolved: { text: 'edit 1' },
-    });
+    expect(history.past.length).toBe(1);
     expect((history.present.model as any)['uuid-2']).toEqual({
       resolved: { text: 'edit 2' },
+    });
+  });
+
+  it('leaves the model and undo history untouched when the server rejects an edit', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: Request | string) => {
+        const url = typeof input === 'string' ? input : input.url;
+        if (url.includes('session/token')) {
+          return Promise.resolve({ ok: true, text: async () => 'token' });
+        }
+        return Promise.resolve({
+          ok: false,
+          status: 422,
+          headers: new Headers({ 'Content-Type': 'application/json' }),
+          text: async () => JSON.stringify({ message: 'The URI is invalid.' }),
+          json: async () => ({ message: 'The URI is invalid.' }),
+          clone() {
+            return this;
+          },
+        });
+      }),
+    );
+
+    const store = makeStore({
+      layoutModel: {
+        present: {
+          ...initialState,
+          model: { existing: { resolved: { url: 'https://drupal.org' } } },
+        },
+        past: [],
+        future: [],
+      },
+      ui: uiInitialState,
+      configuration: {
+        baseUrl: 'https://example.com/',
+        entityType: 'node',
+        entity: '1',
+        isNew: false,
+        isPublished: true,
+        devMode: false,
+        homepageStagedConfigExists: false,
+      },
+    });
+
+    await store.dispatch(
+      previewApi.endpoints.updateComponent.initiate({
+        operation: 'update-model',
+        componentInstanceUuid: 'existing',
+        componentType: 'sdc.test@x',
+        model: { resolved: { url: 'ttp://google.com' } },
+      }) as any,
+    );
+
+    const history = selectLayoutHistory(store.getState() as any);
+    expect(history.past.length).toBe(0);
+    expect((history.present.model as any).existing).toEqual({
+      resolved: { url: 'https://drupal.org' },
     });
   });
 });
