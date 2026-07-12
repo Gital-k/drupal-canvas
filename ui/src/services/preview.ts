@@ -88,6 +88,13 @@ export type PatchLayoutAndModelQueryArg =
 // Re-export for backward compatibility
 export type { UpdateComponentQueryArg };
 
+// Monotonic ticket for updateComponent responses: with rapid edits several
+// operations are in flight at once, and an older response applying after a
+// newer one would flash the preview and model backwards. Every response
+// renders the full auto-saved state, so only the most recently started
+// operation's response needs to be applied.
+let latestOperationTicket = 0;
+
 const TEMPLATE_LAYOUT_URL =
   'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
 
@@ -214,6 +221,7 @@ export const previewApi = createApi({
         };
       },
       async onQueryStarted(body, { dispatch, queryFulfilled, getState }) {
+        const ticket = ++latestOperationTicket;
         // Force any ajax calls to wait.
         pushCanvasLayoutRequest();
         const {
@@ -237,6 +245,12 @@ export const previewApi = createApi({
         } finally {
           // Tell ajax calls they're good to go regardless of success/failure.
           popCanvasLayoutRequest();
+        }
+        if (ticket !== latestOperationTicket) {
+          // A newer operation started after this one: applying this response
+          // would briefly rewind the preview and model to a stale state that
+          // the newer response then has to correct.
+          return;
         }
         const { html, layout, model, autoSaves } = data;
         dispatch(
