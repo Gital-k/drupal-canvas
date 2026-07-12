@@ -275,7 +275,12 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
       CanvasTestSetup::UUID_STATIC_CARD3,
       CanvasTestSetup::UUID_STATIC_IMAGE2,
     ], \array_column($contentRegion['components'][0]['slots'][1]['components'], 'uuid'));
-    self::assertEquals(self::INSERTED_MODEL, $data['model'][self::INSERTED_COMPONENT_UUID]);
+    // The response echoes the server-normalized model (the same shape the GET
+    // route returns): the link source's field-shaped value differs from its
+    // resolved value, so the normalized model includes it.
+    $expected_model = self::INSERTED_MODEL;
+    $expected_model['source']['href']['value'] = ['uri' => 'https://drupal.org', 'options' => []];
+    self::assertEquals($expected_model, $data['model'][self::INSERTED_COMPONENT_UUID]);
 
     if (!$withGlobal) {
       return;
@@ -341,7 +346,11 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
       $uuid,
       ...$region_component_uuids,
     ], \array_column($highlightedRegion['components'], 'uuid'));
-    self::assertEquals($model, $data['model'][$uuid]);
+    // As above: the normalized echo includes the link source's field-shaped
+    // value.
+    $expected_region_model = $model;
+    $expected_region_model['source']['href']['value'] = ['uri' => 'https://drupal.org', 'options' => []];
+    self::assertEquals($expected_region_model, $data['model'][$uuid]);
 
     $this->assertRequestAutoSaveConflict(Request::create(\sprintf('/canvas/api/v0/layout/%s/node/1', static::getOperationPathSlug()), method: 'PATCH', content: \json_encode([
       'parentRegionOrUuid' => 'highlighted',

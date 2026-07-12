@@ -386,9 +386,19 @@ final class ApiLayoutController {
     \assert($operation->hasValidatedAutoSaves());
     \assert($clientModel->clientInstanceId !== NULL);
     $renderable = $this->buildMutatePreviewRenderable($clientModel, $entity);
+    // Echo the layout and model as the server normalizes them (the same shape
+    // the GET route returns), not the raw client-sent model: for example,
+    // multi-cardinality static prop sources carry their values only in
+    // `resolved`, without a `source.value`. The client compares the `source`
+    // of consecutive responses to decide when the component instance form
+    // must be rebuilt, so echoing the client's own model verbatim would
+    // trigger a form rebuild after every operation. Unlike the initial load
+    // above (which operations need to check cross-region access), the echo is
+    // client-facing and must only expose editable regions, like the GET route.
+    $storedData = $this->getLastStoredData($entity);
     $data = [
-      'layout' => $clientModel->layout,
-      'model' => $clientModel->model,
+      'layout' => $storedData->layout,
+      'model' => $storedData->model,
       // Add the auto-save hashes. We do this after building the preview
       // render array, because the auto-save entry is written during building
       // the preview.
