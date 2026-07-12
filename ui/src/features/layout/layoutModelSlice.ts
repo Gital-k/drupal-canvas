@@ -429,40 +429,6 @@ export const layoutModelSlice = createSlice({
         state.updatePreview = false;
       },
     ),
-    sortNode: create.reducer(
-      (state, action: PayloadAction<SortNodePayload>) => {
-        const { uuid, to } = action.payload;
-        if (!uuid || to === undefined) {
-          console.error(
-            `Cannot sort ${uuid} to position ${to}. Check both uuid and to are defined/valid.`,
-          );
-          return;
-        }
-
-        const cloneNode = JSON.parse(
-          JSON.stringify(findComponentByUuid(state.layout, uuid)),
-        );
-        const nodePath = findNodePathByUuid(state.layout, uuid);
-        const rootIndex = nodePath?.shift() ?? undefined;
-        if (rootIndex === undefined) {
-          throw new Error(
-            'Path should be at least two items long, starting from the root region',
-          );
-        }
-        if (cloneNode && nodePath) {
-          const insertPosition = [...nodePath.slice(0, -1), to];
-          const newLayout = removeComponentByUuid(state.layout, uuid);
-
-          state.layout[rootIndex] = insertNodeAtPath(
-            newLayout[rootIndex],
-            insertPosition,
-            cloneNode,
-          );
-          // This will be updated by the middleware.
-          state.updatePreview = false;
-        }
-      },
-    ),
     shiftNode: create.reducer(
       (state, action: PayloadAction<ShiftNodePayload>) => {
         const { uuid, direction } = action.payload;
@@ -496,8 +462,8 @@ export const layoutModelSlice = createSlice({
             insertPosition,
             cloneNode,
           );
-          // Flag a preview update.
-          state.updatePreview = true;
+          // This will be updated by the middleware.
+          state.updatePreview = false;
         }
       },
     ),
@@ -888,7 +854,6 @@ export const {
   setInitialized,
   setInitialLayoutModel,
   shiftNode,
-  sortNode,
   setUpdatePreview,
 } = layoutModelSlice.actions;
 
@@ -1020,6 +985,33 @@ export const moveNode =
         fractal,
       }),
     );
+  };
+
+/**
+ * Sorting is a move within the component's current parent: delegate to the
+ * moveNode thunk so the patch layout middleware persists it as a move-node
+ * operation.
+ */
+export const sortNode =
+  (payload: SortNodePayload): AppThunk =>
+  (dispatch, getState) => {
+    const { uuid, to } = payload;
+    if (!uuid || to === undefined) {
+      console.error(
+        `Cannot sort ${uuid} to position ${to}. Check both uuid and to are defined/valid.`,
+      );
+      return;
+    }
+    const nodePath = findNodePathByUuid(selectLayout(getState()), uuid);
+    if (!nodePath) {
+      return;
+    }
+    // The sort target is an index in the sibling list WITHOUT the moved
+    // component, but moveNode inserts before removing the original, so
+    // moving down needs a one-position adjustment.
+    const currentIndex = nodePath[nodePath.length - 1];
+    const target = to > currentIndex ? to + 1 : to;
+    dispatch(moveNode({ uuid, to: [...nodePath.slice(0, -1), target] }));
   };
 
 export type DeleteNodeAction = ReturnType<

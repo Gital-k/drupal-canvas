@@ -267,7 +267,7 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $contentRegion = $clientModel->getRegion('content');
     self::assertEquals([
       CanvasTestSetup::UUID_STATIC_CARD2,
@@ -335,7 +335,7 @@ final class ApiLayoutControllerInsertNodesTest extends ApiLayoutControllerMutate
 
     $highlighted = $this->getRegion('highlighted');
     self::assertNotNull($highlighted);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $highlightedRegion = $clientModel->getRegion('highlighted');
     self::assertEquals([
       $uuid,

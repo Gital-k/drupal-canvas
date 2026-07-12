@@ -135,7 +135,7 @@ final class ApiLayoutControllerDuplicateNodeTest extends ApiLayoutControllerMuta
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $contentRegion = $clientModel->getRegion('content');
     self::assertEquals($data['model'][CanvasTestSetup::UUID_STATIC_CARD1], $data['model']['dc65da5b-4ec1-40d9-8b05-8542daf9bc55']);
     self::assertEquals([
@@ -166,7 +166,7 @@ final class ApiLayoutControllerDuplicateNodeTest extends ApiLayoutControllerMuta
 
     $content = $this->getRegion('highlighted');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $headerRegion = $clientModel->getRegion('highlighted');
     \array_push($region_component_uuids, 'b19095cb-a258-479f-8353-c79de3220580');
     self::assertEquals($region_component_uuids, \array_column($headerRegion['components'], 'uuid'));

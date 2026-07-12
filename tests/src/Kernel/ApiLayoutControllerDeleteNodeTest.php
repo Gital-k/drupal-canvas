@@ -80,7 +80,7 @@ final class ApiLayoutControllerDeleteNodeTest extends ApiLayoutControllerMutateM
     self::assertNotNull($content);
     self::assertArrayHasKey(CanvasTestSetup::UUID_TWO_COLUMN_UUID, $data['model']);
     self::assertArrayNotHasKey(CanvasTestSetup::UUID_STATIC_CARD2, $data['model']);
-    $clientModel = new ClientDataModel($data['layout'], (array) $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], (array) $data['model'], []);
     self::assertNull($clientModel->getRegionForComponentInstance(CanvasTestSetup::UUID_STATIC_CARD2));
     if (!$withGlobal) {
       return;
@@ -98,7 +98,7 @@ final class ApiLayoutControllerDeleteNodeTest extends ApiLayoutControllerMutateM
     $data = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
     self::assertArrayHasKey(CanvasTestSetup::UUID_TWO_COLUMN_UUID, $data['model']);
     self::assertArrayNotHasKey($region_component_uuid, $data['model']);
-    $clientModel = new ClientDataModel($data['layout'], (array) $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], (array) $data['model'], []);
     self::assertNull($clientModel->getRegionForComponentInstance($region_component_uuid));
     // The region is still rendered (its wrapper markers remain so the UI can
     // target it), but it no longer contains any component instance.

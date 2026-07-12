@@ -128,6 +128,8 @@ describe('Move node', () => {
 });
 
 describe('Sort node', () => {
+  // sortNode is a thunk that delegates to moveNode (a sort is a move within
+  // the current parent), so it needs a store to dispatch through.
   it('Should sort node', () => {
     expect(layout.layout[0].components[0].slots[0].components[0].uuid).to.eq(
       'static-static-card1ab',
@@ -135,13 +137,17 @@ describe('Sort node', () => {
     expect(layout.layout[0].components[0].slots[0].components[1].uuid).to.eq(
       'static-image-udf7d',
     );
-    const state = layoutModelSlice.reducer(
-      layout,
+    const store = makeStore({
+      layoutModel: { present: layout, past: [], future: [] },
+      ui: uiInitialState,
+    });
+    store.dispatch(
       sortNode({
         uuid: 'static-static-card1ab',
         to: 1,
       }),
     );
+    const state = selectLayoutHistory(store.getState()).present;
     expect(state.layout[0].components[0].slots[0].components[0].uuid).to.eq(
       'static-image-udf7d',
     );

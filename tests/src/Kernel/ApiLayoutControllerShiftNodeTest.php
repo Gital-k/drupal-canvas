@@ -113,7 +113,7 @@ final class ApiLayoutControllerShiftNodeTest extends ApiLayoutControllerMutateMo
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $contentRegion = $clientModel->getRegion('content');
     self::assertEquals([
       CanvasTestSetup::UUID_STATIC_IMAGE,
@@ -131,7 +131,7 @@ final class ApiLayoutControllerShiftNodeTest extends ApiLayoutControllerMutateMo
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $contentRegion = $clientModel->getRegion('content');
     self::assertEquals([
       CanvasTestSetup::UUID_STATIC_IMAGE,
@@ -157,7 +157,7 @@ final class ApiLayoutControllerShiftNodeTest extends ApiLayoutControllerMutateMo
 
     $content = $this->getRegion('highlighted');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $headerRegion = $clientModel->getRegion('highlighted');
     \array_push($region_component_uuids, $region_component_uuid);
     self::assertEquals($region_component_uuids, \array_column($headerRegion['components'], 'uuid'));

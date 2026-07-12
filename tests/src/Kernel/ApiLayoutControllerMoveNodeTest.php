@@ -154,7 +154,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $contentRegion = $clientModel->getRegion('content');
     self::assertEquals([
       CanvasTestSetup::UUID_STATIC_CARD2,
@@ -174,7 +174,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $contentRegion = $clientModel->getRegion('content');
     self::assertEquals([
       CanvasTestSetup::UUID_STATIC_CARD2,
@@ -205,7 +205,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $contentRegion = $clientModel->getRegion('content');
     self::assertEquals([
       CanvasTestSetup::UUID_TWO_COLUMN_UUID,
@@ -232,7 +232,7 @@ final class ApiLayoutControllerMoveNodeTest extends ApiLayoutControllerMutateMod
 
     $content = $this->getRegion('content');
     self::assertNotNull($content);
-    $clientModel = new ClientDataModel($data['layout'], $data['model'], $data['entity_form_fields']);
+    $clientModel = new ClientDataModel($data['layout'], $data['model'], []);
     $contentRegion = $clientModel->getRegion('content');
     self::assertEquals([], \array_column($contentRegion['components'][1]['slots'][0]['components'], 'uuid'));
     $highlighted = $this->getRegion('highlighted');
