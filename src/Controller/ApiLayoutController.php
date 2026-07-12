@@ -508,8 +508,7 @@ final class ApiLayoutController {
     // @todo Currently ::validateAutoSaves() validates all page regions as well
     //   as `$entity` even though below we will only auto-save the entity
     //   containing the component, determine if here we should only validate
-    //   that entity in https://drupal.org/i/3532056 or implement concurrent
-    //   editing in https://drupal.org/i/3492065.
+    //   that entity in https://drupal.org/i/3532056.
     $this->autoSaveValidationManager->validateAutoSaves(
       array_merge([$entity], self::getEditableRegions($entity)),
       $autoSaves,
@@ -555,7 +554,7 @@ final class ApiLayoutController {
   /**
    * Updates the auto-saved layout, model and entity form fields.
    *
-   * @todo Remove this in https://drupal.org/i/3492065
+   * @todo Remove this legacy full-layout endpoint once the client performs all mutations via the operation-specific PATCH routes.
    */
   public function post(Request $request, FieldableEntityInterface|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): PreviewEnvelope {
     \assert(!$entity instanceof ContentTemplate || !\is_null($preview_entity));

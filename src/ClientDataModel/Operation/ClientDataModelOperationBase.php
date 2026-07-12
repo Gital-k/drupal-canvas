@@ -31,8 +31,7 @@ abstract class ClientDataModelOperationBase implements ClientDataModelOperationI
   public function validateAutoSaves(EntityInterface $entity): string {
     // @todo Currently ::validateAutoSaves() validates all page regions as well
     //   as `$entity`, determine if here we should only validate the entity
-    //   containing the component in https://drupal.org/i/3532056 or implement
-    //   concurrent editing in https://drupal.org/i/3492065.
+    //   containing the component in https://drupal.org/i/3532056.
     if (!\array_key_exists('autoSaves', $this->requestBody)) {
       throw new BadRequestHttpException('Missing autoSaves');
     }
