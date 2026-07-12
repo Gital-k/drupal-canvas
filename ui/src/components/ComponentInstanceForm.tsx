@@ -372,13 +372,7 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     const prevLatestUndoRedoActionId =
       previousLatestUndoRedoActionIdRef.current;
 
-    // Check if the source STRUCTURE changed (handle components without source
-    // like blocks). Values are deliberately ignored: rebuilding the form for a
-    // value change would race the user's typing (a server-built form replaces
-    // the inputs mid-edit), and the server enriches or omits `value` entries
-    // when it echoes a model back, which is not a structural change either.
-    // Structural changes (a prop linked to an entity field, a different
-    // source type) do need a new form.
+    // Check if source actually changed (handle components without source like blocks)
     const sourceChanged = (() => {
       const prevSource = prevModel?.source;
       const currentSource = builtPreparedModel.source;
@@ -391,39 +385,8 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
       // If one has source and the other doesn't, it changed
       if (!prevSource || !currentSource) return true;
 
-      // Compare everything except values, with stable key order.
-      const stableStringify = (input: unknown): string =>
-        JSON.stringify(input, (_key, val) =>
-          val && typeof val === 'object' && !Array.isArray(val)
-            ? Object.keys(val as Record<string, unknown>)
-                .sort()
-                .reduce((acc: Record<string, unknown>, k) => {
-                  acc[k] = (val as Record<string, unknown>)[k];
-                  return acc;
-                }, {})
-            : val,
-        );
-      // A prop source's structural identity on the wire: linking a prop or
-      // switching source type changes these. Everything else a source entry
-      // may carry (value, and client-side decoration like jsonSchema or
-      // default_values that buildPreparedModel copies from the component
-      // definition) is not structural.
-      const structureOnly = (source: object): Record<string, unknown> =>
-        Object.fromEntries(
-          Object.entries(source).map(([propName, propSource]) => {
-            const { sourceType, expression, sourceTypeSettings } =
-              (propSource ?? {}) as {
-                sourceType?: unknown;
-                expression?: unknown;
-                sourceTypeSettings?: unknown;
-              };
-            return [propName, { sourceType, expression, sourceTypeSettings }];
-          }),
-        );
-      return (
-        stableStringify(structureOnly(prevSource)) !==
-        stableStringify(structureOnly(currentSource))
-      );
+      // Both have source, compare them
+      return JSON.stringify(prevSource) !== JSON.stringify(currentSource);
     })();
 
     // Only build and update formQueryString if:
