@@ -122,12 +122,18 @@ const rootReducer = combineSlices(
         undoType: '@@redux-undo/layoutModel_UNDO',
         redoType: '@@redux-undo/layoutModel_REDO',
         clearHistoryType: '@@redux-undo/layoutModel_CLEAR_HISTORY',
+        // TRICKY: without syncFilter, a filtered action (e.g. the operation
+        // response echo, syncLayoutModel) leaves redux-undo's internal
+        // "latest unfiltered" state stale, and the next approved action
+        // commits it as a phantom undo entry.
+        syncFilter: true,
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
           return (
             Object.keys(present.model).length > 0 &&
             action.type !== setInitialLayoutModel.type &&
             action.type !== setUpdatePreview.type &&
+            action.type !== setInitialized.type &&
             action.type !== syncLayoutModel.type
           );
         },
@@ -142,6 +148,7 @@ const rootReducer = combineSlices(
         undoType: '@@redux-undo/pageData_UNDO',
         redoType: '@@redux-undo/pageData_REDO',
         clearHistoryType: '@@redux-undo/pageData_CLEAR_HISTORY',
+        syncFilter: true,
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
           return (
@@ -215,7 +222,8 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
       type === setUpdatePreview.type ||
       type === setInitialLayoutModel.type ||
       type === setInitialPageData.type ||
-      type === setInitialized.type
+      type === setInitialized.type ||
+      type === syncLayoutModel.type
     ) {
       // Ignore initial actions that set the state of the model or page data
       // from the return of API responses. The user should not be able to undo

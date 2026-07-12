@@ -1,7 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
-import { setLayoutModel } from '@/features/layout/layoutModelSlice';
+import { syncLayoutModel } from '@/features/layout/layoutModelSlice';
 import {
   setInitialPageData,
   setPageData,
@@ -304,7 +304,7 @@ export const componentAndLayoutApi = createApi({
         handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         // Pass update preview false to prevent a subsequent preview update,
         // we have the data here.
-        dispatch(setLayoutModel({ layout, model, updatePreview: false }));
+        dispatch(syncLayoutModel({ layout, model, updatePreview: false }));
       },
     }),
 

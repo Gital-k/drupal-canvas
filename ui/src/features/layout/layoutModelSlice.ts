@@ -81,6 +81,9 @@ export type ComponentModels = Record<
 export interface LayoutModelSliceState extends RootLayoutModel {
   updatePreview: boolean;
   isInitialized?: boolean;
+  // Identifies the entity (or template) the layout was initialized for, so
+  // loaders can tell a same-entity remount apart from real navigation.
+  initializedForEntity?: string;
   translations?: Record<string, any>;
 }
 
@@ -501,12 +504,14 @@ export const layoutModelSlice = createSlice({
           model,
           updatePreview,
           isInitialized = true,
+          initializedForEntity,
           translations,
         } = action.payload;
         state.layout = layout;
         state.model = model;
         state.updatePreview = updatePreview;
         state.isInitialized = isInitialized;
+        state.initializedForEntity = initializedForEntity;
         state.translations = translations || {};
       },
     ),
@@ -1061,6 +1066,9 @@ export const selectUpdatePreview = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.updatePreview;
 export const selectIsInitialized = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.isInitialized;
+
+export const selectInitializedForEntity = (state: StateWithHistoryWrapper) =>
+  state.layoutModel.present.initializedForEntity;
 export const selectTranslations = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.translations;
 const selectRegion = (state: RootState, regionName: string) => regionName;

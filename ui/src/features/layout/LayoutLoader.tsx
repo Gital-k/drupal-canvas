@@ -9,6 +9,7 @@ import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
 
 import {
+  selectInitializedForEntity,
   selectIsInitialized,
   setInitialized,
   setInitialLayoutModel,
@@ -17,7 +18,9 @@ import {
 const LayoutLoader = () => {
   const dispatch = useAppDispatch();
   const isInitialized = useAppSelector(selectIsInitialized);
+  const initializedForEntity = useAppSelector(selectInitializedForEntity);
   const { entityId, entityType } = useParams();
+  const entityKey = `${entityType}:${entityId}`;
 
   const {
     data: fetchedLayout,
@@ -36,11 +39,17 @@ const LayoutLoader = () => {
   const { dispatchClearUndoRedoHistory } = useUndoRedo();
 
   useEffect(() => {
+    // A remount for the entity that is already loaded (e.g. panel or route
+    // churn) must not reset editor state: that would wipe the undo history.
+    if (initializedForEntity === entityKey) {
+      return;
+    }
     dispatch(setInitialized(false));
     dispatch(clearSelection());
     if (entityId && entityType) {
       refetch();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refetch, entityType, entityId, dispatch]);
 
   useEffect(() => {
@@ -61,6 +70,7 @@ const LayoutLoader = () => {
           layout: fetchedLayout.layout,
           model: fetchedLayout.model,
           translations: fetchedLayout.translations || {},
+          initializedForEntity: entityKey,
           // We don't need to update the preview here - it is done in the layout
           // api's onQueryStarted method - @see componentAndLayout.ts
           updatePreview: false,
