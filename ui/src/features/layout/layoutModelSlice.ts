@@ -481,6 +481,17 @@ export const layoutModelSlice = createSlice({
         state.updatePreview = updatePreview;
       },
     ),
+    // Identical to setLayoutModel but excluded from undo history: applies the
+    // authoritative state echoed back by a layout operation response, which
+    // must not cost the user an extra undo step.
+    syncLayoutModel: create.reducer(
+      (state, action: PayloadAction<LayoutModelSliceState>) => {
+        const { layout, model, updatePreview } = action.payload;
+        state.layout = layout;
+        state.model = model;
+        state.updatePreview = updatePreview;
+      },
+    ),
     // Identical to setLayoutModel but with a different type for ensuring this
     // doesn't trigger an undo/redo action.
     setInitialLayoutModel: create.reducer(
@@ -855,6 +866,7 @@ export const {
   setInitialLayoutModel,
   shiftNode,
   setUpdatePreview,
+  syncLayoutModel,
 } = layoutModelSlice.actions;
 
 export const layoutModelReducer = layoutModelSlice.reducer;

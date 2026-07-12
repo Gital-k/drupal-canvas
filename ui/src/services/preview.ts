@@ -2,12 +2,14 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
-import { setLayoutModel } from '@/features/layout/layoutModelSlice';
+import { syncLayoutModel } from '@/features/layout/layoutModelSlice';
 import { setHtml, setSnapshotHTML } from '@/features/pagePreview/previewSlice';
 import {
   baseQueryWithAutoSaves,
+  extractEntityParams,
   popCanvasLayoutRequest,
   pushCanvasLayoutRequest,
+  replaceEntityParamsInUrl,
 } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
@@ -85,6 +87,23 @@ export type PatchLayoutAndModelQueryArg =
 
 // Re-export for backward compatibility
 export type { UpdateComponentQueryArg };
+
+const TEMPLATE_LAYOUT_URL =
+  'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
+
+// The auto-save hash for a content template is keyed by its resolved layout
+// URL, derived from the current editor location.
+const templateAutoSaveKey = () => {
+  const { entityType, entityId, templateBundle, templateViewMode } =
+    extractEntityParams(window.location.href);
+  return replaceEntityParamsInUrl(
+    TEMPLATE_LAYOUT_URL,
+    entityType,
+    entityId,
+    templateBundle,
+    templateViewMode,
+  );
+};
 
 export const previewApi = createApi({
   reducerPath: 'previewApi',
@@ -175,21 +194,37 @@ export const previewApi = createApi({
       UpdateComponentResultType,
       PatchLayoutAndModelQueryArg
     >({
-      query: ({ operation, ...body }) => ({
-        url: `canvas/api/v0/layout/${operation}/{entity_type}/{entity_id}`,
-        method: 'PATCH',
-        body,
-        autoSaveUrlKey: `canvas/api/v0/layout/{entity_type}/{entity_id}`,
-      }),
+      query: ({ operation, type, ...body }) => {
+        // Content templates have no operation routes yet; their only
+        // operation-shaped mutation (update-model) maps 1:1 onto the classic
+        // content template PATCH.
+        // @todo Add content template support to the operation routes in https://drupal.org/i/3532056
+        if (type === 'template') {
+          return {
+            url: TEMPLATE_LAYOUT_URL,
+            method: 'PATCH',
+            body,
+          };
+        }
+        return {
+          url: `canvas/api/v0/layout/${operation}/{entity_type}/{entity_id}`,
+          method: 'PATCH',
+          body,
+          autoSaveUrlKey: `canvas/api/v0/layout/{entity_type}/{entity_id}`,
+        };
+      },
       async onQueryStarted(body, { dispatch, queryFulfilled, getState }) {
         // Force any ajax calls to wait.
         pushCanvasLayoutRequest();
         const {
           configuration: { entityType, entity },
         } = getState() as RootState;
-        const autoSaveKey = `canvas/api/v0/layout/{entity_type}/{entity_id}`
-          .replace('{entity_type}', entityType)
-          .replace('{entity_id}', entity);
+        const autoSaveKey =
+          body.type === 'template'
+            ? templateAutoSaveKey()
+            : `canvas/api/v0/layout/{entity_type}/{entity_id}`
+                .replace('{entity_type}', entityType)
+                .replace('{entity_id}', entity);
         let data: any;
         try {
           ({ data } = await queryFulfilled);
@@ -221,7 +256,7 @@ export const previewApi = createApi({
         });
         // Pass update preview false to prevent a subsequent preview update,
         // we have the data here.
-        dispatch(setLayoutModel({ layout, model, updatePreview: false }));
+        dispatch(syncLayoutModel({ layout, model, updatePreview: false }));
       },
     }),
   }),

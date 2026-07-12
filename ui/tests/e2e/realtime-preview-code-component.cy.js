@@ -33,7 +33,7 @@ describe('⚡️ Real time code component previews', () => {
       cy.intercept(
         {
           method: 'PATCH',
-          url: '**/canvas/api/v0/layout/node/2',
+          url: '**/canvas/api/v0/layout/update-model/node/2',
           // Should only happen once, polled until the user-entry has settled
           times: 1,
         },

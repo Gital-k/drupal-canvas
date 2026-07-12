@@ -23,7 +23,7 @@ describe('Component transforms', () => {
     // Click a Hero component to open the component form.
     cy.clickComponentInPreview('Hero');
 
-    cy.intercept('PATCH', '**/canvas/api/layout/node/1');
+    cy.intercept('PATCH', '**/canvas/api/v0/layout/**/node/1');
 
     cy.findByTestId(/^canvas-component-form-.*/)
       .findByLabelText('CTA 1 link')

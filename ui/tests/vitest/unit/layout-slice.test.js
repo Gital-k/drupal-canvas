@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import { makeStore } from '@/app/store';
 import {
   deleteNode,
@@ -16,6 +18,28 @@ import {
 } from '@/features/ui/uiSlice';
 
 import layoutFixture from '../../fixtures/layout-default.json';
+
+// Layout mutations dispatched through a real store trigger the patch layout
+// middleware, whose fetch would otherwise reject (and can surface as an
+// unhandled rejection after the test file finishes on slow machines).
+beforeEach(() => {
+  const response = {
+    ok: true,
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+    text: async () =>
+      JSON.stringify({ html: '', layout: [], model: {}, autoSaves: {} }),
+    json: async () => ({ html: '', layout: [], model: {}, autoSaves: {} }),
+    clone() {
+      return this;
+    },
+  };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+  window.history.pushState({}, '', '/canvas/editor/node/1');
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 let layout;
 

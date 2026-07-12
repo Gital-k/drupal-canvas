@@ -14,6 +14,7 @@ import {
   setInitialized,
   setInitialLayoutModel,
   setUpdatePreview,
+  syncLayoutModel,
 } from '@/features/layout/layoutModelSlice';
 import { notificationsSlice } from '@/features/notifications/notificationsSlice';
 import {
@@ -27,8 +28,10 @@ import { dialogSlice } from '@/features/ui/dialogSlice';
 import { primaryPanelSlice } from '@/features/ui/primaryPanelSlice';
 import {
   clearUndoRedoHistory,
+  EditorFrameContext,
   performUndoOrRedo,
   pushUndo,
+  selectEditorFrameContext,
   setLatestUndoRedoActionId,
   uiSlice,
 } from '@/features/ui/uiSlice';
@@ -124,7 +127,8 @@ const rootReducer = combineSlices(
           return (
             Object.keys(present.model).length > 0 &&
             action.type !== setInitialLayoutModel.type &&
-            action.type !== setUpdatePreview.type
+            action.type !== setUpdatePreview.type &&
+            action.type !== syncLayoutModel.type
           );
         },
       }),
@@ -300,6 +304,18 @@ const patchLayoutMiddleware: Middleware<{}, RootState> = ((store) =>
     const patchAction = action as Action;
 
     if (isPatchLayoutAction(patchAction)) {
+      // Content templates have no operation routes yet: let the reducer apply
+      // the change, then flag a full template layout POST, the pre-operation
+      // behavior.
+      // @todo Add content template support to the operation routes in https://drupal.org/i/3532056
+      if (
+        selectEditorFrameContext(store.getState()) ===
+        EditorFrameContext.TEMPLATE
+      ) {
+        const result = next(action);
+        store.dispatch(setUpdatePreview(true));
+        return result;
+      }
       const patchLayoutAndModelQueryArg = queryArgFactory(patchAction);
       store.dispatch(
         previewApi.endpoints.updateComponent.initiate(
