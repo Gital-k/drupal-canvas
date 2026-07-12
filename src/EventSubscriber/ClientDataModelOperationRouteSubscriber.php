@@ -34,8 +34,10 @@ final class ClientDataModelOperationRouteSubscriber extends RouteSubscriberBase 
           ArgumentResolver::OPERATION_CLASS => $operation_class,
         ],
         [
+          '_canvas_authentication_required' => 'TRUE',
           '_canvas_component_tree_edit_access' => 'TRUE',
           '_entity_access' => 'entity.update',
+          '_format' => 'json',
         ],
         [
           '_canvas_use_template_draft' => TRUE,
@@ -44,7 +46,6 @@ final class ClientDataModelOperationRouteSubscriber extends RouteSubscriberBase 
               'type' => 'entity:{entity_type}',
             ],
           ],
-          '_format' => 'json',
         ],
         methods: ['PATCH']
       );
