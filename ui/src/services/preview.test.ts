@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeStore } from '@/app/store';
-import { initialState } from '@/features/layout/layoutModelSlice';
+import {
+  initialState,
+  selectLayoutHistory,
+} from '@/features/layout/layoutModelSlice';
 import { selectPreviewHtml } from '@/features/pagePreview/previewSlice';
 import { initialState as uiInitialState } from '@/features/ui/uiSlice';
 import { previewApi } from '@/services/preview';
@@ -44,7 +47,14 @@ describe('updateComponent response ordering', () => {
     );
 
     const store = makeStore({
-      layoutModel: { present: { ...initialState }, past: [], future: [] },
+      layoutModel: {
+        present: {
+          ...initialState,
+          model: { existing: { resolved: { text: 'original' } } },
+        },
+        past: [],
+        future: [],
+      },
       ui: uiInitialState,
       configuration: {
         baseUrl: 'https://example.com/',
@@ -75,12 +85,17 @@ describe('updateComponent response ordering', () => {
       expect(deferred.length).toBe(2);
     });
 
-    // Newer operation's response arrives first.
+    // Newer operation's response arrives first, echoing the full model as
+    // the server does.
     deferred[1](
       jsonResponse({
         html: 'NEW',
         layout: [],
-        model: {},
+        model: {
+          existing: { resolved: { text: 'original' } },
+          'uuid-1': { resolved: { text: 'edit 1' } },
+          'uuid-2': { resolved: { text: 'edit 2' } },
+        },
         autoSaves: {},
       }),
     );
@@ -93,7 +108,10 @@ describe('updateComponent response ordering', () => {
       jsonResponse({
         html: 'STALE',
         layout: [],
-        model: {},
+        model: {
+          existing: { resolved: { text: 'original' } },
+          'uuid-1': { resolved: { text: 'edit 1' } },
+        },
         autoSaves: {},
       }),
     );
@@ -102,5 +120,16 @@ describe('updateComponent response ordering', () => {
 
     // The stale response must not rewind the preview.
     expect(selectPreviewHtml(store.getState() as any)).toBe('NEW');
+
+    // Each update-model operation staged its model change as an undo entry:
+    // the second entry captured the state after the first staging.
+    const history = selectLayoutHistory(store.getState() as any);
+    expect(history.past.length).toBe(2);
+    expect((history.past[1].model as any)['uuid-1']).toEqual({
+      resolved: { text: 'edit 1' },
+    });
+    expect((history.present.model as any)['uuid-2']).toEqual({
+      resolved: { text: 'edit 2' },
+    });
   });
 });

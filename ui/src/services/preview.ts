@@ -2,7 +2,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
-import { syncLayoutModel } from '@/features/layout/layoutModelSlice';
+import {
+  setComponentModel,
+  syncLayoutModel,
+} from '@/features/layout/layoutModelSlice';
 import { setHtml, setSnapshotHTML } from '@/features/pagePreview/previewSlice';
 import {
   baseQueryWithAutoSaves,
@@ -222,6 +225,16 @@ export const previewApi = createApi({
       },
       async onQueryStarted(body, { dispatch, queryFulfilled, getState }) {
         const ticket = ++latestOperationTicket;
+        if (body.operation === 'update-model') {
+          // Stage the model change locally so prop edits create an undo
+          // entry; structural operations already do via their reducers.
+          dispatch(
+            setComponentModel({
+              componentInstanceUuid: body.componentInstanceUuid,
+              model: body.model,
+            }),
+          );
+        }
         // Force any ajax calls to wait.
         pushCanvasLayoutRequest();
         const {

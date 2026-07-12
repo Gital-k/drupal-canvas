@@ -484,6 +484,23 @@ export const layoutModelSlice = createSlice({
         state.updatePreview = updatePreview;
       },
     ),
+    // Optimistically stages a single component's model when an update-model
+    // operation is sent, so prop edits create undo history; the operation
+    // response then confirms the authoritative state via syncLayoutModel.
+    setComponentModel: create.reducer(
+      (
+        state,
+        action: PayloadAction<{
+          componentInstanceUuid: string;
+          model: ComponentModel | EvaluatedComponentModel;
+        }>,
+      ) => {
+        const { componentInstanceUuid, model } = action.payload;
+        state.model[componentInstanceUuid] = model;
+        // The operation response updates the preview.
+        state.updatePreview = false;
+      },
+    ),
     // Identical to setLayoutModel but excluded from undo history: applies the
     // authoritative state echoed back by a layout operation response, which
     // must not cost the user an extra undo step.
@@ -866,6 +883,7 @@ export const addNewPatternToLayout =
 // Action creators are generated for each case reducer function.
 export const {
   deleteNode,
+  setComponentModel,
   setLayoutModel,
   setInitialized,
   setInitialLayoutModel,
