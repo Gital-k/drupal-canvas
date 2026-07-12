@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeStore } from '@/app/store';
 import {
@@ -25,9 +25,10 @@ describe('updateComponent response ordering', () => {
     window.history.pushState({}, '', '/canvas/editor/node/1');
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  // TRICKY: fetch stays stubbed for the whole file (vitest isolates globals
+  // per test file): RTK Query can fire follow-up requests in microtasks after
+  // a test ends, and removing the stub would let those hit the real network, failing
+  // the run with an unhandled rejection on machines without network access.
 
   it('drops a stale response that resolves after a newer operation', async () => {
     // Two PATCH round-trips whose responses we resolve manually, so the
