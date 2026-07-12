@@ -21,6 +21,9 @@ final class ClientDataModel {
     public readonly array|\stdClass $model,
     public readonly array $entityFormFields,
     public readonly ?string $clientInstanceId = NULL,
+    // Client-side IDs of the regions the operations applied to this model
+    // have modified. Lets consumers persist only what actually changed.
+    public readonly array $dirtyRegions = [],
   ) {
     // Validate the passed layout.
     foreach ($this->layout as $delta => $layout_region) {
@@ -35,6 +38,22 @@ final class ClientDataModel {
       $this->regionMap[$layout_region['id']] = $layout_region;
       $this->regionDeltas[$layout_region['id']] = $delta;
     }
+  }
+
+  /**
+   * Creates a mutated copy, recording which regions the mutation touched.
+   *
+   * @param array $touchedRegions
+   *   Client-side region IDs modified by this mutation; NULLs are ignored.
+   */
+  private function withMutation(array $layout, array|\stdClass $model, array $touchedRegions): static {
+    return new static(
+      $layout,
+      $model,
+      $this->entityFormFields,
+      $this->clientInstanceId,
+      \array_values(\array_unique(\array_merge($this->dirtyRegions, \array_filter($touchedRegions)))),
+    );
   }
 
   protected static function duplicate(array $node, array $uuidMap): array {
@@ -225,12 +244,7 @@ final class ClientDataModel {
   public function withModelForComponent(string $componentInstanceUuid, array $model): static {
     $newModel = (array) $this->model;
     $newModel[$componentInstanceUuid] = $model;
-    return new static(
-      $this->layout,
-      $newModel,
-      $this->entityFormFields,
-      $this->clientInstanceId,
-    );
+    return $this->withMutation($this->layout, $newModel, [$this->getRegionForComponentInstance($componentInstanceUuid)]);
   }
 
   public function withClientInstanceId(string $clientInstanceId): static {
@@ -239,6 +253,7 @@ final class ClientDataModel {
       $this->model,
       $this->entityFormFields,
       $clientInstanceId,
+      $this->dirtyRegions,
     );
   }
 
@@ -275,12 +290,7 @@ final class ClientDataModel {
     if ($oldRegionId !== NULL) {
       $layout[$this->regionDeltas[$oldRegionId]] = self::removeComponentByUuid($this->regionMap[$oldRegionId], $componentInstanceUuid);
     }
-    return new static(
-      $layout,
-      $model,
-      $this->entityFormFields,
-      $this->clientInstanceId
-    );
+    return $this->withMutation($layout, $model, [$oldRegionId]);
   }
 
   protected static function insertAfter(array $parentNode, string $insertAfterUuid, array $node): array {
@@ -357,12 +367,7 @@ final class ClientDataModel {
       $layout[$this->regionDeltas[$oldRegionId]] = self::removeComponentByUuid($this->regionMap[$oldRegionId], $componentInstanceUuid);
       // And insert it into the region.
       $layout[$this->regionDeltas[$parentRegionOrUuid]] = self::insertNodeAtFractal($layout[$this->regionDeltas[$parentRegionOrUuid]], $component, $fractal);
-      return new static(
-        $layout,
-        $this->model,
-        $this->entityFormFields,
-        $this->clientInstanceId,
-      );
+      return $this->withMutation($layout, $this->model, [$oldRegionId, $parentRegionOrUuid]);
     }
     // We're moving to a slot, check the parent exists.
     $parentRegionId = $this->getRegionForComponentInstance($parentRegionOrUuid);
@@ -387,12 +392,7 @@ final class ClientDataModel {
     $parentComponent = self::insertNodeInSlotAtFractal($parentComponent, $component, $slot, $fractal);
     // Replace it in the layout.
     $layout[$this->regionDeltas[$parentRegionId]] = self::replaceComponent($layout[$this->regionDeltas[$parentRegionId]], $parentRegionOrUuid, $parentComponent);
-    return new static(
-      $layout,
-      $this->model,
-      $this->entityFormFields,
-      $this->clientInstanceId,
-    );
+    return $this->withMutation($layout, $this->model, [$oldRegionId, $parentRegionId]);
   }
 
   public function withShiftedComponent(string $componentInstanceUuid, ShiftComponentDirection $direction): static {
@@ -407,12 +407,7 @@ final class ClientDataModel {
     if (self::nodeIsRegion($parentNode)) {
       // We've moving a top-level component (inside a region).
       $layout[$this->regionDeltas[$regionId]] = self::shiftChild($this->regionMap[$regionId], $componentInstanceUuid, $direction);
-      return new static(
-        $layout,
-        $this->model,
-        $this->entityFormFields,
-        $this->clientInstanceId,
-      );
+      return $this->withMutation($layout, $this->model, [$regionId]);
     }
     // We're moving inside a slot.
     \assert(self::nodeIsSlot($parentNode));
@@ -423,12 +418,7 @@ final class ClientDataModel {
     \assert($parentComponent !== NULL);
     $parentComponent = self::replaceSlot($parentComponent, $slotName, $parentNode);
     $layout[$this->regionDeltas[$regionId]] = self::replaceComponent($layout[$this->regionDeltas[$regionId]], $parentComponentUuid, $parentComponent);
-    return new static(
-      $layout,
-      $this->model,
-      $this->entityFormFields,
-      $this->clientInstanceId,
-    );
+    return $this->withMutation($layout, $this->model, [$regionId]);
   }
 
   public function withDuplicatedComponentTree(string $componentUuid, array $uuidMap): static {
@@ -458,12 +448,7 @@ final class ClientDataModel {
     if (self::nodeIsRegion($parentNode)) {
       // We're duplication a top-level component (inside a region).
       $layout[$this->regionDeltas[$regionId]] = self::insertAfter($this->regionMap[$regionId], $componentUuid, self::duplicate($duplicate, $uuidMap));
-      return new static(
-        $layout,
-        $model,
-        $this->entityFormFields,
-        $this->clientInstanceId,
-      );
+      return $this->withMutation($layout, $model, [$regionId]);
     }
     // We're moving inside a slot.
     \assert(self::nodeIsSlot($parentNode));
@@ -474,12 +459,7 @@ final class ClientDataModel {
     \assert($parentComponent !== NULL);
     $parentComponent = self::replaceSlot($parentComponent, $slotName, $parentNode);
     $layout[$this->regionDeltas[$regionId]] = self::replaceComponent($layout[$this->regionDeltas[$regionId]], $parentComponentUuid, $parentComponent);
-    return new static(
-      $layout,
-      $model,
-      $this->entityFormFields,
-      $this->clientInstanceId,
-    );
+    return $this->withMutation($layout, $model, [$regionId]);
   }
 
   public function withInsertedComponents(
@@ -505,12 +485,7 @@ final class ClientDataModel {
       foreach (\array_values(\array_reverse($components)) as $component) {
         $layout[$this->regionDeltas[$parentRegionOrUuid]] = self::insertNodeAtFractal($layout[$this->regionDeltas[$parentRegionOrUuid]], $component, $fractal);
       }
-      return new static(
-        $layout,
-        $model,
-        $this->entityFormFields,
-        $this->clientInstanceId,
-      );
+      return $this->withMutation($layout, $model, [$parentRegionOrUuid]);
     }
     // We're inserting into a slot, check the parent exists.
     $parentRegionId = $this->getRegionForComponentInstance($parentRegionOrUuid);
@@ -530,12 +505,7 @@ final class ClientDataModel {
     }
     // Replace it in the layout.
     $layout[$this->regionDeltas[$parentRegionId]] = self::replaceComponent($this->regionMap[$parentRegionId], $parentRegionOrUuid, $parentComponent);
-    return new static(
-      $layout,
-      $model,
-      $this->entityFormFields,
-      $this->clientInstanceId,
-    );
+    return $this->withMutation($layout, $model, [$parentRegionId]);
   }
 
 }

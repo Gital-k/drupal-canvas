@@ -389,7 +389,6 @@ final class ApiLayoutController {
     $data = [
       'layout' => $clientModel->layout,
       'model' => $clientModel->model,
-      'entity_form_fields' => $clientModel->entityFormFields,
       // Add the auto-save hashes. We do this after building the preview
       // render array, because the auto-save entry is written during building
       // the preview.
@@ -411,16 +410,20 @@ final class ApiLayoutController {
     unset($region_layouts[CanvasPageVariant::MAIN_CONTENT_REGION]);
 
     // Update the main entity's component tree and save it to the auto-save
-    // store, so the preview reflects the mutated state.
+    // store, so the preview reflects the mutated state. Only when the
+    // operation actually touched the content region: operations record which
+    // regions they modified, so untouched trees need no conversion or write.
     $entity = $this->getAutoSavedVersionIfAvailable([$entity])[$entity->id()];
     \assert($entity instanceof FieldableEntityInterface);
-    $this->updateEntity($entity, $main_content_layout, (array) $clientModel->model, $clientModel->entityFormFields, NULL);
-    $this->autoSaveManager->saveEntity($entity, $clientInstanceId);
+    if (\in_array(CanvasPageVariant::MAIN_CONTENT_REGION, $clientModel->dirtyRegions, TRUE)) {
+      $this->updateEntity($entity, $main_content_layout, (array) $clientModel->model, $clientModel->entityFormFields, NULL);
+      $this->autoSaveManager->saveEntity($entity, $clientInstanceId);
+    }
 
-    // Update all PageRegions' component trees.
+    // Update the component trees of the PageRegions the operation modified.
     $regions = $this->getAutoSavedVersionIfAvailable(PageRegion::loadForActiveThemeByClientSideId());
     foreach ($region_layouts as $client_side_region_id => $region_layout) {
-      if (!isset($regions[$client_side_region_id])) {
+      if (!isset($regions[$client_side_region_id]) || !\in_array($client_side_region_id, $clientModel->dirtyRegions, TRUE)) {
         continue;
       }
       $regions[$client_side_region_id] = $regions[$client_side_region_id]->forAutoSaveData([
@@ -438,7 +441,9 @@ final class ApiLayoutController {
    */
   private function getLastStoredData(FieldableEntityInterface $entity, bool $includeAllRegions = FALSE): ClientDataModel {
     $model = [];
-    $entityFormFields = $this->getFilteredEntityData($entity);
+    // Operations never read nor change entity form fields, so skip building
+    // the entity form: it is one of the most expensive parts of the request.
+    $entityFormFields = [];
     $build_entity = $this->getAutoSavedVersionIfAvailable([$entity])[$entity->id()];
     \assert($build_entity instanceof FieldableEntityInterface);
     // Build the content region.

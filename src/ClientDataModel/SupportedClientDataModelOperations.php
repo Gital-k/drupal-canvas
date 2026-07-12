@@ -17,8 +17,11 @@ use Drupal\canvas\ClientDataModel\Operation\UpdateModel;
  *
  * Each case whose implementation exists is annotated with the corresponding
  * operation class via the #[OperationClass] attribute; a route is generated
- * for it. Cases without the attribute are planned but not yet implemented,
- * and get no route.
+ * for it. Cases without the attribute get no route.
+ *
+ * Note: the client expresses sorting as a move within the same parent and
+ * pattern insertion as a multi-component insert, so neither needs its own
+ * operation.
  *
  * @see \Drupal\canvas\EventSubscriber\ClientDataModelOperationRouteSubscriber
  */
@@ -34,9 +37,6 @@ enum SupportedClientDataModelOperations: string {
   case DeleteNode = 'delete-node';
   #[OperationClass(DuplicateNode::class)]
   case DuplicateNode = 'duplicate-node';
-  case AddNode = 'add-node';
-  case AddPattern = 'add-pattern';
-  case SortNode = 'sort-node';
   #[OperationClass(UpdateModel::class)]
   case UpdateModel = 'update-model';
 
