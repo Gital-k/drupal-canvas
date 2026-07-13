@@ -368,6 +368,47 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
   }
 
   /**
+   * Tests `type: string` `pattern: …` validation.
+   *
+   * Only the catch-all multiline pattern is storable: it maps to a `string_long`
+   * field using the `string_textarea` widget. Any other pattern has no matching
+   * prop shape, so config schema rejects it.
+   *
+   * @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
+   */
+  #[DataProvider('providerTestStringPatternPropDefinition')]
+  public function testStringPatternPropDefinition(string $pattern, string $example, array $expected_validation_errors): void {
+    $this->entity->set('props', [
+      'beep' => [
+        'type' => 'string',
+        'title' => 'A meaningful title, but irrelevant in this test',
+        'pattern' => $pattern,
+        'examples' => [$example],
+      ],
+    ]);
+    $this->assertValidationErrors($expected_validation_errors);
+  }
+
+  /**
+   * Data provider for ::testStringPatternPropDefinition().
+   */
+  public static function providerTestStringPatternPropDefinition(): \Generator {
+    yield 'multiline plain text: the only supported pattern' => [
+      '(.|\r?\n)*',
+      "Multiple\nlines",
+      [],
+    ];
+    yield 'any other pattern is unsupported' => [
+      '^[A-Z]+$',
+      'ABC',
+      [
+        '' => 'Drupal Canvas does not know of a field type/widget to allow populating the <code>beep</code> prop, with the shape <code>{"type":"string","pattern":"^[A-Z]+$"}</code>.',
+        'props.beep.pattern' => 'The value you selected is not a valid choice.',
+      ],
+    ];
+  }
+
+  /**
    * Tests `type: array` validation and edge cases.
    */
   #[DataProvider('providerTestArrayPropDefinition')]

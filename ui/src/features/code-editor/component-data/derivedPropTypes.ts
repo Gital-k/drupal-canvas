@@ -22,6 +22,17 @@
 
 import type { CodeComponentPropSerialized } from '@/types/CodeComponent';
 
+/**
+ * The JSON schema `pattern` denoting a string that may contain newlines.
+ *
+ * This is the only pattern Canvas can match to a storable prop shape: a
+ * `string_long` field using the `string_textarea` widget.
+ *
+ * @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
+ * @see config/schema/canvas.json_schema.yml#canvas.json_schema.prop_shape.string
+ */
+export const MULTILINE_TEXT_PATTERN = '(.|\\r?\\n)*';
+
 const derivedPropTypes = [
   {
     type: 'text' as const,
@@ -30,11 +41,22 @@ const derivedPropTypes = [
       prop.type === 'string' &&
       !prop.$ref &&
       !prop.format &&
+      !prop.pattern &&
       !prop.contentMediaType &&
       !prop['x-formatting-context'] &&
       (!prop.enum || prop.enum.length === 0),
     init: {
       type: 'string',
+    },
+  },
+  {
+    type: 'multilineText' as const,
+    displayName: 'Multiline text',
+    derive: (prop: CodeComponentPropSerialized) =>
+      prop.type === 'string' && prop.pattern === MULTILINE_TEXT_PATTERN,
+    init: {
+      type: 'string',
+      pattern: MULTILINE_TEXT_PATTERN,
     },
   },
   {

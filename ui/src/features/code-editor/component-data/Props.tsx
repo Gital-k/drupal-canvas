@@ -33,12 +33,12 @@ import FormPropTypeBoolean from '@/features/code-editor/component-data/forms/For
 import FormPropTypeContentEntityReference from '@/features/code-editor/component-data/forms/FormPropTypeContentEntityReference';
 import FormPropTypeDate from '@/features/code-editor/component-data/forms/FormPropTypeDate';
 import FormPropTypeEnum from '@/features/code-editor/component-data/forms/FormPropTypeEnum';
-import FormPropTypeFormattedText from '@/features/code-editor/component-data/forms/FormPropTypeFormattedText';
 import FormPropTypeImage from '@/features/code-editor/component-data/forms/FormPropTypeImage';
 import FormPropTypeLink, {
   DEFAULT_LINK_EXAMPLES,
   linkFormatMap,
 } from '@/features/code-editor/component-data/forms/FormPropTypeLink';
+import FormPropTypeTextArea from '@/features/code-editor/component-data/forms/FormPropTypeTextArea';
 import FormPropTypeTextField from '@/features/code-editor/component-data/forms/FormPropTypeTextField';
 import FormPropTypeVideo from '@/features/code-editor/component-data/forms/FormPropTypeVideo';
 import SortableList from '@/features/code-editor/component-data/SortableList';
@@ -63,6 +63,7 @@ export const DEFAULT_EXAMPLES: Record<string, string> = {
   integer: '0',
   number: '0',
   formattedText: '<p>Example text</p>',
+  multilineText: 'Example text\nspanning multiple lines',
   link: 'example',
   date: '2026-01-25',
   'date-time': '2026-01-25T12:00:00.000Z',
@@ -226,6 +227,7 @@ export default function Props() {
                           // When adding a new prop type with type-specific fields,
                           // add those fields here explicitly so they are cleared
                           // when switching away from that type.
+                          pattern: undefined,
                           contentMediaType: undefined,
                           'x-formatting-context': undefined,
                           'x-allowed-entity-type-id': undefined,
@@ -315,11 +317,13 @@ export default function Props() {
                 />
               );
             case 'formattedText':
+            case 'multilineText':
               return (
-                <FormPropTypeFormattedText
+                <FormPropTypeTextArea
                   id={prop.id}
                   example={prop.example}
                   required={required.includes(propName)}
+                  derivedType={prop.derivedType}
                 />
               );
             case 'link':

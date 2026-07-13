@@ -74,6 +74,7 @@ export interface CodeComponentProp {
     | CodeComponentPropVideoExample[];
   $ref?: string;
   format?: string;
+  pattern?: string;
   derivedType: (typeof derivedPropTypes)[number]['type'] | null;
   contentMediaType?: string;
   'x-formatting-context'?: string;
@@ -85,6 +86,7 @@ export interface CodeComponentProp {
   items?: {
     type: 'string' | 'integer' | 'number' | 'boolean' | 'object';
     format?: string;
+    pattern?: string;
     contentMediaType?: string;
     'x-formatting-context'?: string;
     'x-allowed-entity-type-id'?: string;
@@ -127,6 +129,7 @@ export interface CodeComponentPropSerialized {
   )[];
   $ref?: string;
   format?: string;
+  pattern?: string;
   contentMediaType?: string;
   'x-formatting-context'?: string;
   'x-allowed-entity-type-id'?: string;
@@ -135,6 +138,7 @@ export interface CodeComponentPropSerialized {
   items?: {
     type: 'string' | 'integer' | 'number' | 'boolean' | 'object';
     format?: string;
+    pattern?: string;
     contentMediaType?: string;
     'x-formatting-context'?: string;
     'x-allowed-entity-type-id'?: string;

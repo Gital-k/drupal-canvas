@@ -20,6 +20,7 @@ import {
   selectCodeComponentProperty,
   updateProp,
 } from '@/features/code-editor/codeEditorSlice';
+import { MULTILINE_TEXT_PATTERN } from '@/features/code-editor/component-data/derivedPropTypes';
 import { createDisplayArray } from '@/features/code-editor/utils/arrayPropUtils';
 import {
   getPropMachineName,
@@ -612,6 +613,40 @@ describe('props in code editor', () => {
           contentMediaType: 'text/html',
           'x-formatting-context': 'block',
         });
+      });
+    });
+
+    it('creates a new multiline text prop', async () => {
+      await addProp('Multiline text', 'Description');
+      expect(screen.getByLabelText('Example value')).toHaveAttribute(
+        'placeholder',
+        'Enter a text value',
+      );
+      await userEvent.type(
+        screen.getByRole('textbox', { name: 'Example value' }),
+        'First line{Enter}second line',
+      );
+      await waitFor(() => {
+        const prop = selectCodeComponentProperty('props')(store.getState())[0];
+        expect(prop).toMatchObject({
+          name: 'Description',
+          type: 'string',
+          derivedType: 'multilineText',
+          example: 'First line\nsecond line',
+          pattern: MULTILINE_TEXT_PATTERN,
+          format: undefined,
+          contentMediaType: undefined,
+        });
+      });
+
+      // The pattern must survive serialization: it is what makes the back end
+      // store the value in a `string_long` field with a textarea widget.
+      const serialized = serializeProps(
+        selectCodeComponentProperty('props')(store.getState()),
+      );
+      expect(Object.values(serialized)[0]).toMatchObject({
+        type: 'string',
+        pattern: MULTILINE_TEXT_PATTERN,
       });
     });
 
@@ -1530,6 +1565,11 @@ describe('props in code editor', () => {
         expectedDerivedType: 'listInteger' as const,
         expectedFormat: undefined,
       },
+      {
+        targetTypeName: 'Multiline text',
+        expectedDerivedType: 'multilineText' as const,
+        expectedFormat: undefined,
+      },
     ])(
       'clears contentMediaType and x-formatting-context when switching from formattedText to $targetTypeName',
       async ({ targetTypeName, expectedDerivedType, expectedFormat }) => {
@@ -1577,6 +1617,50 @@ describe('props in code editor', () => {
         if (expectedFormat) {
           expect(serializedProp.format).toBe(expectedFormat);
         }
+      },
+    );
+
+    it.each([
+      { targetTypeName: 'Text', expectedDerivedType: 'text' as const },
+      {
+        targetTypeName: 'Formatted text',
+        expectedDerivedType: 'formattedText' as const,
+      },
+      { targetTypeName: 'Integer', expectedDerivedType: 'integer' as const },
+      { targetTypeName: 'Link', expectedDerivedType: 'link' as const },
+    ])(
+      'clears pattern when switching from multilineText to $targetTypeName',
+      async ({ targetTypeName, expectedDerivedType }) => {
+        await addProp('Multiline text', 'MyProp');
+
+        await waitFor(() => {
+          const prop = selectCodeComponentProperty('props')(
+            store.getState(),
+          )[0];
+          expect(prop.pattern).toBe(MULTILINE_TEXT_PATTERN);
+        });
+
+        const typeSelect = screen.getByRole('combobox', { name: 'Type' });
+        await userEvent.click(typeSelect);
+        await userEvent.click(
+          await screen.findByRole('option', { name: targetTypeName }),
+        );
+
+        await waitFor(() => {
+          const prop = selectCodeComponentProperty('props')(
+            store.getState(),
+          )[0];
+          expect(prop.derivedType).toBe(expectedDerivedType);
+          // A stale pattern would make the prop re-derive as 'multilineText'
+          // after a page reload, and would fail config schema validation on any
+          // type that does not allow it.
+          expect(prop.pattern).toBeUndefined();
+        });
+
+        const serialized = serializeProps(
+          selectCodeComponentProperty('props')(store.getState()),
+        );
+        expect(Object.values(serialized)[0].pattern).toBeUndefined();
       },
     );
   });

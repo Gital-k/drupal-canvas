@@ -193,6 +193,7 @@ export function serializeProps(props: CodeComponentProp[]) {
           enum: enumValues,
           $ref,
           format,
+          pattern,
           contentMediaType,
           'x-formatting-context': xFormattingContext,
           derivedType,
@@ -257,6 +258,7 @@ export function serializeProps(props: CodeComponentProp[]) {
             type: items.type,
             ...($ref && { $ref }),
             ...(format && { format }),
+            ...(pattern && { pattern }),
             ...(contentMediaType && { contentMediaType }),
             ...(xFormattingContext && {
               'x-formatting-context': xFormattingContext,
@@ -281,6 +283,7 @@ export function serializeProps(props: CodeComponentProp[]) {
           // When not an array, metadata goes at top level
           if ($ref) processed.$ref = $ref;
           if (format) processed.format = format;
+          if (pattern) processed.pattern = pattern;
           if (contentMediaType) processed.contentMediaType = contentMediaType;
           if (xFormattingContext)
             processed['x-formatting-context'] = xFormattingContext;
@@ -315,6 +318,7 @@ export function deserializeProps(
       'meta:enum': metaEnum,
       $ref,
       format,
+      pattern,
       contentMediaType,
       'x-formatting-context': xFormattingContext,
       'x-allowed-entity-type-id': xAllowedEntityTypeId,
@@ -334,6 +338,7 @@ export function deserializeProps(
     // When it's an array, metadata is inside items; otherwise at top level
     const actualRef = allowMultiple ? items?.$ref : $ref;
     const actualFormat = allowMultiple ? items?.format : format;
+    const actualPattern = allowMultiple ? items?.pattern : pattern;
     const actualContentMediaType = allowMultiple
       ? items?.contentMediaType
       : contentMediaType;
@@ -359,6 +364,7 @@ export function deserializeProps(
             type: items.type,
             $ref: items.$ref,
             format: items.format,
+            pattern: items.pattern,
             contentMediaType: items.contentMediaType,
             'x-formatting-context': items['x-formatting-context'],
             'x-allowed-entity-type-id': items['x-allowed-entity-type-id'],
@@ -414,6 +420,7 @@ export function deserializeProps(
       }),
       ...(actualRef && { $ref: actualRef }),
       ...(actualFormat && { format: actualFormat }),
+      ...(actualPattern && { pattern: actualPattern }),
       ...(actualContentMediaType && {
         contentMediaType: actualContentMediaType,
       }),
