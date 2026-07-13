@@ -8,7 +8,6 @@ use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 
@@ -18,7 +17,6 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 final class ComponentTreeLoader {
 
   public function __construct(
-    private readonly EntityFieldManagerInterface $entityFieldManager,
     private readonly ModuleHandlerInterface $moduleHandler,
   ) {}
 
@@ -62,10 +60,8 @@ final class ComponentTreeLoader {
       throw new \LogicException('For now Canvas only works if the entity is a canvas_page! Other entity types and bundles must use content templates for now, see https://drupal.org/i/3498525');
     }
 
-    $map = $this->entityFieldManager->getFieldMapByFieldType(ComponentTreeItem::PLUGIN_ID);
-
-    foreach ($map[$entity->getEntityTypeId()] ?? [] as $field_name => $info) {
-      if (\in_array($entity->bundle(), $info['bundles'], TRUE)) {
+    foreach ($entity->getFieldDefinitions() as $field_name => $field_definition) {
+      if ($field_definition->getType() === ComponentTreeItem::PLUGIN_ID) {
         return $field_name;
       }
     }
