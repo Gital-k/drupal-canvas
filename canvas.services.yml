@@ -42,6 +42,7 @@ services:
       $reasonRepository: '@Drupal\canvas\ComponentIncompatibilityReasonRepository'
       $classResolver: '@Drupal\Core\DependencyInjection\ClassResolverInterface'
       $configInstaller: '@Drupal\Core\Config\ConfigInstallerInterface'
+      $typedConfigManager: '@Drupal\Core\Config\TypedConfigManagerInterface'
       $kernel: '@kernel'
     public: true
   Drupal\canvas\Extension\CanvasExtensionPluginManager:
