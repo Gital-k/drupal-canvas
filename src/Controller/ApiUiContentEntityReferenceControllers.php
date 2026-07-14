@@ -167,9 +167,9 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
         throw new NotFoundHttpException('Parent expression is not a reference expression.');
       }
       // A multi-target-bundle reference anywhere in the chain makes the leaf
-      // to compose onto ambiguous. The picker never composes such parents.
+      // to compose onto ambiguous. The picker browses per bundle, so it never
+      // composes such parents.
       // @see ::resolveReferenceTarget()
-      // @see \Drupal\canvas\Plugin\Validation\Constraint\MultiTargetBundleReferenceNotSupportedConstraint
       if ($parent_expression->findMultiTargetBundleReference() !== NULL) {
         throw new NotFoundHttpException('Multi-target-bundle parent expressions are not supported.');
       }
@@ -583,7 +583,6 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
     // ReferencedBundleSpecificBranches), which is not yet supported at render
     // time. Don't offer browsing into them until that lands; the field's own
     // leaf properties still surface.
-    // @see \Drupal\canvas\Plugin\Validation\Constraint\MultiTargetBundleReferenceNotSupportedConstraint
     // @todo https://git.drupalcode.org/project/canvas/-/work_items/3591656
     if (\count($resolved_bundles) > 1) {
       return [NULL, [], NULL];
