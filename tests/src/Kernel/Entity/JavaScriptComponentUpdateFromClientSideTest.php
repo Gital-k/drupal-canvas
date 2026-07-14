@@ -220,13 +220,12 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
     ];
 
     // Branch coalescing leaves bundles whose leaf shapes differ (object vs
-    // scalar) un-combined; no shape-match constraint is forced.
-    // @todo This situation was tested before, but cannot occur: the UI does not offer it, the back end does not accept it; support will be added in https://git.drupalcode.org/project/canvas/-/work_items/3591656
-    // @see \Drupal\Tests\canvas\Kernel\Controller\ApiUiContentEntityReferenceControllersTest::testFieldsEndpointMultiTargetBundleReferenceField
-    // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\JsComponentTest::testMultiTargetBundleReferenceThrows
-    // @phpcs:disable
-    /*
-    yield 'shape mismatch across bundles is not rejected' => [
+    // scalar) un-combined: the image picks combine into one object reference,
+    // the video pick stays a separate scalar reference. No multi-bundle-specific
+    // constraint rejects them; both are left un-combined on the same field, so
+    // the general same-field coalescing constraint still flags that pair (they
+    // must become a single branch to be storable).
+    yield 'shape mismatch across bundles stays un-combined' => [
       [
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝thumbnail␞␟alt',
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝thumbnail␞␟width',
@@ -236,20 +235,20 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝thumbnail␞␟{alt↠alt,width↠width}',
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝thumbnail␞␟target_id',
       ],
-      // No coalescing violation: the differing leaf shapes are left un-combined.
-      ['dataDependencies.entityFields.article_ref' => NULL],
+      ['dataDependencies.entityFields.article_ref' => "Multiple expressions on the same field 'entity:node:article.field_media' must be coalesced into a single FieldObjectPropsExpression."],
     ];
-    */
-    // @phpcs:enable
 
-    // A coalesced multi-bundle branch reference is rejected at render time.
-    yield 'multi-bundle branch reference is rejected' => [
+    // Two single-bundle references on different bundles coalesce into one
+    // multi-bundle branch reference, which is accepted: the former multi-bundle
+    // rejection is gone, so the branch entry `.0` carries only the pre-existing
+    // (irrelevant, uninstalled-entity-type) violation, not a rejection.
+    yield 'multi-bundle branch reference is accepted and coalesced' => [
       [
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝name␞␟value',
       ],
       ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝name␞␟value][␜entity:media:video␝name␞␟value]'],
-      ['dataDependencies.entityFields.article_ref.0' => "The reference field 'entity:node:article.field_media' targets multiple bundles, which is not yet supported."],
+      ['dataDependencies.entityFields.article_ref.0' => "The entity type 'node' does not exist."],
     ];
   }
 

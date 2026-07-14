@@ -50,6 +50,7 @@ use Drupal\link\LinkTitleVisibility;
 use Drupal\media\Entity\MediaType;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
+use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
 use Drupal\Tests\canvas\Traits\ComponentTreeItemInstantiatorTrait;
@@ -3312,42 +3313,190 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
   }
 
   /**
-   * Multi-target-bundle references are not yet supported.
+   * A multi-target-bundle reference resolves to the runtime entity's branch.
    *
-   * Storing such an expression is rejected by validation
-   * (MultiTargetBundleReferenceNotSupported), so this exercises the runtime
-   * guard as defense-in-depth: config that bypassed validation (e.g. legacy
-   * data) must still fail hard rather than fatal opaquely. The branch
-   * expression is therefore written straight to config storage, bypassing the
-   * config schema checker.
+   * When the reference field targets several bundles, the stored expression
+   * carries a `ReferencedBundleSpecificBranches` target — one branch per bundle.
+   * At render time `buildReferencePayload()` selects the branch keyed by the
+   * resolved entity's entity-type + bundle, so the component receives the picks
+   * for the bundle actually referenced. This exercises both bundles through one
+   * field sequentially: repointing the reference at an entity of the other
+   * bundle switches which branch (and hence which `__type`) surfaces.
+   *
+   * The branch expression is saved through the component's NORMAL save — no raw
+   * config-storage writes: the former save-time rejection is gone, so branch
+   * expressions validate like any other expression, which this proves end to
+   * end.
    *
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
-   * @see \Drupal\canvas\Plugin\Validation\Constraint\MultiTargetBundleReferenceNotSupportedConstraint
-   * @todo Add multi-target-bundle references support in https://git.drupalcode.org/project/canvas/-/work_items/3591656
+   * @see \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches
    */
-  public function testMultiTargetBundleReferenceThrows(): void {
+  public function testMultiTargetBundleReferenceResolvesPerBundle(): void {
     $fixtures = $this->setUpContentEntityReferenceFixtures();
 
-    // Widen the self-referencing field to target two node bundles: that is what
-    // makes a bundle-specific branch expression valid against it (and keeps the
-    // `ReferenceFieldPropExpression` constructor from emitting a deprecation
-    // about branches not matching the field's `target_bundles`).
+    // A second target bundle makes the reference field multi-bundle, which is
+    // what a bundle-specific branch expression is valid against. Create it
+    // before saving the component so branch validation passes.
     NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
-    $field = FieldConfig::loadByName('node', 'news_item', 'field_related_news');
-    self::assertInstanceOf(FieldConfig::class, $field);
-    $field->setSetting('handler_settings', [
-      'target_bundles' => ['blog_post' => 'blog_post', 'news_item' => 'news_item'],
-    ]);
-    $field->save();
+    self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
 
-    // Write the branch expression directly to config storage to bypass the
-    // config schema checker (which would otherwise reject it via
-    // MultiTargetBundleReferenceNotSupported), then refresh caches so the
-    // source loads the tampered config.
+    // Save a branch expression normally: it picks `title` from whichever of the
+    // two bundles the entity behind `field_related_news` turns out to be.
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜[␜entity:node:blog_post␝title␞␟value][␜entity:node:news_item␝title␞␟value]',
+    ];
+    $js_component->set('dataDependencies', $data_dependencies);
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    // Branch A: `field_related_news` resolves to a news_item — the news_item
+    // branch matches, so its `__type` and picked field surface.
+    $branch_news = Node::create([
+      'type' => 'news_item',
+      'title' => 'A related news item',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_news);
+    $branch_news->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_news->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'news_item',
+          'label' => 'A related news item',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+
+    // Branch B: repoint `field_related_news` at a blog_post — the other branch
+    // now matches, so a different `__type` and picked field surface.
+    $branch_blog = Node::create([
+      'type' => 'blog_post',
+      'title' => 'A related blog post',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_blog);
+    $branch_blog->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_blog->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'blog_post',
+          'label' => 'A related blog post',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+  }
+
+  /**
+   * A referenced bundle with no matching branch yields a `__type`-only payload.
+   *
+   * When `target_bundles` is wider than the bundles the expression branches on,
+   * an entity of an un-branched bundle still resolves; its payload is then a
+   * `__type`-only object (no picks), distinguishing it from a missing reference
+   * (NULL). The traversed entity's cacheability is still carried, so the render
+   * stays correctly invalidated.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
+   */
+  public function testMultiTargetBundleReferenceUnmatchedBundle(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
+    // A third bundle the branch expression deliberately does NOT pick.
+    NodeType::create(['type' => 'press_release', 'name' => 'Press release'])->save();
+    self::widenRelatedNewsToBundles(['news_item', 'blog_post', 'press_release']);
+
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜[␜entity:node:blog_post␝title␞␟value][␜entity:node:news_item␝title␞␟value]',
+    ];
+    $js_component->set('dataDependencies', $data_dependencies);
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    // `field_related_news` resolves to a press_release: neither branch matches.
+    $unmatched = Node::create([
+      'type' => 'press_release',
+      'title' => 'An un-branched press release',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($unmatched);
+    $unmatched->save();
+    $fixtures['referenced_news']->set('field_related_news', $unmatched->id());
+    $fixtures['referenced_news']->save();
+
+    $resolved = $this->resolveNewsItemReference($fixtures);
+
+    // The un-branched bundle contributes exactly its `__type`, nothing else.
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => ['__type' => 'press_release'],
+      ],
+      $resolved->value,
+    );
+
+    // The cacheability of how the reference was loaded is present, AND the
+    // un-branched entity's own cache tag: even though no leaf pick is evaluated
+    // against it, the `__type`-only payload still depends on that entity, so
+    // deleting it (or changing its bundle) invalidates this render.
+    $cacheability = new CacheableMetadata();
+    $cacheability->addCacheableDependency($resolved);
+    $expected_tags = [
+      'node:' . $fixtures['referenced_news']->id(),
+      'node:' . $fixtures['host_news']->id(),
+      'node:' . $unmatched->id(),
+    ];
+    \sort($expected_tags);
+    $actual_tags = $cacheability->getCacheTags();
+    \sort($actual_tags);
+    self::assertSame($expected_tags, $actual_tags);
+  }
+
+  /**
+   * Un-coalesced cross-bundle picks evaluate only against their own bundle.
+   *
+   * Per-bundle picks whose leaf shapes differ across bundles are deliberately
+   * left un-combined (they stay separate single-bundle references through one
+   * multi-bundle referencer, rather than a single branch expression). At render
+   * time `buildReferencePayload()` applies its uniform host-bundle matching
+   * rule: only the reference whose target bundle matches the resolved entity is
+   * evaluated; the other is skipped instead of evaluating a bundle-A expression
+   * against a bundle-B entity (which would fatal on a field it lacks).
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::coalesceBranches()
+   */
+  public function testMultiTargetBundleReferenceUnCoalescedCrossBundlePicks(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
+    self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
+
+    // Two single-bundle references through the same `field_related_news`, each
+    // picking a different final field (`title` vs `created`) so their leaf
+    // shapes differ and the Coalescer leaves them un-combined. The coalescing
+    // constraint would flag two references on one field, so these are written
+    // straight to config storage — the render path must handle this input.
     $config_name = 'canvas.js_component.content_entity_reference_test_component';
     $data = $this->config($config_name)->getRawData();
     $data['dataDependencies']['entityFields']['news_item_reference'] = [
-      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜[␜entity:node:blog_post␝title␞␟value][␜entity:node:news_item␝title␞␟value]',
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜␜entity:node:news_item␝title␞␟value',
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜␜entity:node:blog_post␝created␞␟value',
     ];
     $this->container->get('config.storage')->write($config_name, $data);
     $this->container->get('config.factory')->reset($config_name);
@@ -3355,8 +3504,66 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
       ->getStorage(JavaScriptComponent::ENTITY_TYPE_ID)
       ->resetCache(['content_entity_reference_test_component']);
 
-    // The host references a (single-bundle) news_item, so the prop resolves to a
-    // real entity and evaluation reaches the branch expression.
+    // `field_related_news` resolves to a news_item: only the news_item pick may
+    // be evaluated; the blog_post pick (on `created`) must be skipped, not
+    // evaluated against the news_item.
+    $branch_news = Node::create([
+      'type' => 'news_item',
+      'title' => 'Only-this-branch news item',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_news);
+    $branch_news->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_news->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'news_item',
+          'label' => 'Only-this-branch news item',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+  }
+
+  /**
+   * Widens the self-referencing `field_related_news` to target several bundles.
+   *
+   * @param list<string> $bundles
+   *   The node bundles to set as the field's `target_bundles`.
+   */
+  private static function widenRelatedNewsToBundles(array $bundles): void {
+    $field = FieldConfig::loadByName('node', 'news_item', 'field_related_news');
+    self::assertInstanceOf(FieldConfig::class, $field);
+    $field->setSetting('handler_settings', [
+      'target_bundles' => \array_combine($bundles, $bundles),
+    ]);
+    $field->save();
+  }
+
+  /**
+   * Resolves the `news_item_reference` prop against a freshly-loaded host.
+   *
+   * The node static cache is reset and the host reloaded so entity-reference
+   * field items don't return a statically-cached target from an earlier
+   * resolution (this test repoints `field_related_news` between resolutions).
+   *
+   * @param array{host_news: \Drupal\node\NodeInterface, component_id: string, source: \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent} $fixtures
+   *   The fixtures from ::setUpContentEntityReferenceFixtures().
+   *
+   * @return \Drupal\canvas\PropExpressions\StructuredData\EvaluationResult
+   *   The resolved `news_item_reference` payload.
+   */
+  private function resolveNewsItemReference(array $fixtures): EvaluationResult {
+    $node_storage = $this->container->get('entity_type.manager')->getStorage('node');
+    $node_storage->resetCache();
+    $host_id = $fixtures['host_news']->id();
+    self::assertNotNull($host_id);
+    $host = $node_storage->load($host_id);
+    self::assertInstanceOf(NodeInterface::class, $host);
     $rooted_item = $this->buildComponentTreeItem(
       $fixtures['component_id'],
       [
@@ -3365,15 +3572,15 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
           'expression' => 'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity',
         ],
       ],
-      $fixtures['host_news'],
+      $host,
     );
-
-    $this->expectException(\LogicException::class);
-    $this->expectExceptionMessage('Multi-target-bundle content entity references are not yet supported');
-    $fixtures['source']->getExplicitInput(
+    $result = $fixtures['source']->getExplicitInput(
       $this->container->get('uuid')->generate(),
       $rooted_item,
     );
+    $resolved = $result['resolved']['news_item_reference'];
+    self::assertInstanceOf(EvaluationResult::class, $resolved);
+    return $resolved;
   }
 
   /**

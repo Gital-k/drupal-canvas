@@ -229,11 +229,11 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
     }
 
     $cacheability->addCacheTags($entity_type_def->getListCacheTags());
-    // The field list — and the per-field decisions to skip multi-valued or
-    // multi-target-bundle references — derive from field definitions. Both the
-    // cardinality (field storage config) and the target bundles (field config)
-    // can change, so depend on the tag invalidated whenever field definitions
-    // change.
+    // The field list — the per-field decision to skip multi-valued references,
+    // and the target bundles a reference can be browsed into — derive from
+    // field definitions. Both the cardinality (field storage config) and target
+    // bundles (field config) can change, so depend on the tag invalidated
+    // whenever field definitions change.
     // @see \Drupal\Core\Field\FieldStorageDefinitionListener::onFieldStorageDefinitionUpdate()
     // @see \Drupal\Core\Field\FieldConfigBase::postSave()
     $cacheability->addCacheTags(['entity_field_info']);
@@ -532,12 +532,7 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
    *   is empty.
    *
    * For bundle-less target types (user, file, …) the entity type ID itself
-   * is used as the bundle ID. References whose `target_bundles` resolve to
-   * more than one bundle also return [NULL, [], NULL]: browsing into them is
-   * deferred, because the resulting multi-target-bundle expression is not
-   * yet supported at render time.
-   *
-   * @todo https://git.drupalcode.org/project/canvas/-/work_items/3591656
+   * is used as the bundle ID.
    *
    * @return array{0: ?string, 1: list<string>, 2: ?string}
    */
@@ -578,15 +573,6 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
     }
     $resolved_bundles = $target_bundles ? \array_values(\array_map('strval', $target_bundles)) : [$target_type];
     \sort($resolved_bundles);
-    // References targeting more than one bundle would let the picker compose a
-    // multi-target-bundle expression (coalescing into
-    // ReferencedBundleSpecificBranches), which is not yet supported at render
-    // time. Don't offer browsing into them until that lands; the field's own
-    // leaf properties still surface.
-    // @todo https://git.drupalcode.org/project/canvas/-/work_items/3591656
-    if (\count($resolved_bundles) > 1) {
-      return [NULL, [], NULL];
-    }
     $label_key = $target_entity_type->getKey('label');
     if (!$label_key) {
       $base_fields = $this->entityFieldManager->getBaseFieldDefinitions($target_type);
