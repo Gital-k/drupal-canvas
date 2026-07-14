@@ -1765,9 +1765,8 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       [],
     ];
 
-    // A single multi-bundle branch reference validates: the former save-time
-    // rejection (MultiTargetBundleReferenceNotSupported) is gone, so a branch
-    // expression whose per-bundle leaves are all pickable has no violation.
+    // A single multi-bundle branch reference validates: a branch expression
+    // whose per-bundle leaves are all pickable has no violation.
     yield 'entityFields multi-bundle branch ReferenceFieldPropExpression validates' => [
       ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_image␞␟alt][␜entity:media:video␝field_media_video_file␞␟target_id]']]],
       [],
