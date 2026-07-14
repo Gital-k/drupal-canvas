@@ -279,8 +279,12 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
 
     $payload = ['__type' => $entity->bundle()];
     // The resulting payload must still describe the cacheability of how
-    // $resolved_entity was loaded.
-    $payload_cacheability = CacheableMetadata::createFromObject($resolved_entity);
+    // $resolved_entity was loaded, plus the traversed entity itself: a
+    // `__type`-only payload (a bundle with no matching branch or target) has no
+    // leaf pick to attach the entity's own cache tags, so merge them here to
+    // keep the render invalidated when that entity changes.
+    $payload_cacheability = CacheableMetadata::createFromObject($resolved_entity)
+      ->addCacheableDependency($entity);
 
     // References sharing a referencer field are descended into once, with
     // their target sub-expressions merged into a single nested object.
