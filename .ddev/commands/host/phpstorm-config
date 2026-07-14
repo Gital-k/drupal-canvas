@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+## Description: Add the Drupal test bootstrap to PhpStorm's PHPUnit settings.
+## Usage: phpstorm-config
+## Example: ddev phpstorm-config
+## ExecRaw: true
+
+set -e
+
+# Canvas maps the project root 1:1 to /var/www/html, so PhpStorm's stock DDEV
+# integration already configures a working interpreter and path mappings. The one
+# thing it gets wrong for Drupal is the PHPUnit bootstrap: it runs PHPUnit with
+# --no-configuration and only the composer autoloader, which does not register
+# the Drupal\Tests\<module>\ PSR-4 test namespace. Tests whose parent class lives
+# there (e.g. a *TestBase) then fail with "Class ... not found". This patches
+# .idea/php.xml to add web/core/tests/bootstrap.php to the PHPUnit interpreter
+# settings. @see .ddev/scripts/scaffold-phpstorm-config.php
+
+# The helper reads/writes the host .idea via the project mount, so the project
+# must be running.
+if ! ddev exec true >/dev/null 2>&1; then
+  echo "The project is not running. Start it first with: ddev start"
+  exit 1
+fi
+
+# Run the patcher from inside the web container. It writes /var/www/html/.idea,
+# which is the host .idea/ (the Mutagen-synced project root).
+ddev exec 'php /mnt/ddev_config/scripts/scaffold-phpstorm-config.php'
+
+cat <<'EOF'
+
+PhpStorm PHPUnit bootstrap configured.
+
+If PhpStorm was open, close and reopen the project (or invalidate caches) so it
+re-reads .idea/php.xml. Then click the gutter arrow next to any test method to
+run it inside the ddev-canvas-web container.
+
+If the command reported no interpreter to patch, open Settings -> PHP -> Test
+Frameworks, add a PHPUnit-by-remote-interpreter config for the DDEV interpreter,
+apply, then re-run `ddev phpstorm-config`.
+EOF

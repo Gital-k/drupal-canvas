@@ -4,3 +4,7 @@
 docs/user/dist/**
 packages/**/dist/**
 ui/dist/**
+web
+vendor
+node_modules
+.ddev

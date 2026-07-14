@@ -75,6 +75,7 @@ greppable
 heredocs
 herobanner
 herobannersecond
+homeadditions
 hotfixes
 hyperscriptification
 hyperscriptified
@@ -87,6 +88,7 @@ interactable
 invariantly
 inwidget
 jangregor
+journaled
 Jsona
 JSONified
 jsxs
@@ -121,6 +123,7 @@ myfont
 nourl
 opsz
 phpat
+phpstorm
 placehold
 Postel
 replayable

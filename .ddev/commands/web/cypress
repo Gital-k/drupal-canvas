@@ -1,0 +1,58 @@
+#!/bin/bash
+
+## Description: Run Cypress tests headlessly in the web container.
+## Usage: cypress [--debug] [run|component] [args]
+## Example: ddev cypress run\nddev cypress component\nddev cypress run --spec "tests/e2e/my-test.cy.js"\nddev cypress --debug run
+## ExecRaw: true
+
+set -e
+
+PROJECT_DIR="${DDEV_COMPOSER_ROOT}/${DDEV_DOCROOT}/${DRUPAL_PROJECTS_PATH}/${DDEV_PROJECT}"
+cd "$PROJECT_DIR/ui"
+
+# Ensure .env exists with required variables
+if [[ ! -f .env ]]; then
+  cp .env.example .env
+  echo "BASE_URL='http://web'" >> .env
+  echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> .env
+  echo "DRUPAL_ROOT_CORE='${DDEV_COMPOSER_ROOT}/${DDEV_DOCROOT}/core'" >> .env
+fi
+
+echo "Cypress folder: ${CYPRESS_CACHE_FOLDER}"
+# Ensure Cypress is installed
+if [[ ! -d "$CYPRESS_CACHE_FOLDER" ]] || [[ -z "$(ls -A $CYPRESS_CACHE_FOLDER 2>/dev/null)" ]]; then
+  echo "Installing Cypress..."
+  npx cypress install
+fi
+
+# Check for --debug flag
+DEBUG=false
+if [[ "$1" == "--debug" ]]; then
+  DEBUG=true
+  shift
+fi
+
+COMMAND="${1:-run}"
+shift 2>/dev/null || true
+
+# Set reporter options only if --debug is passed
+REPORTER_OPTS=""
+if [[ "$DEBUG" == true ]]; then
+  REPORTER_OPTS='--reporter junit --reporter-options "mochaFile=junit-[hash].xml"'
+fi
+
+case "$COMMAND" in
+  run)
+    xvfb-run --auto-servernum npx cypress run --browser electron $REPORTER_OPTS "$@"
+    ;;
+  component)
+    xvfb-run --auto-servernum npx cypress run --component --browser electron $REPORTER_OPTS "$@"
+    ;;
+  *)
+    echo "Usage: ddev cypress [--debug] [run|component] [args]"
+    echo "  --debug   - Enable JUnit XML reporting"
+    echo "  run       - Run E2E tests headlessly"
+    echo "  component - Run component tests headlessly"
+    exit 1
+    ;;
+esac

@@ -1,0 +1,90 @@
+# Canvas-specific ddev configuration.
+web_environment:
+  - BASE_URL=http://web
+  # Drupal core test-runner env, formerly supplied by the removed
+  # config.contrib.yaml (the ddev-drupal-contrib add-on). BROWSERTEST_* and
+  # SIMPLETEST_BASE_URL are read by phpunit.xml.dist and tests/scripts/phpunit.sh.
+  # SIMPLETEST_DB is intentionally NOT set here: config.sqlite.yaml sets it to the
+  # tmpfs SQLite URL, which replaces contrib's old mysql default.
+  - BROWSERTEST_OUTPUT_BASE_URL=${DDEV_PRIMARY_URL}
+  - BROWSERTEST_OUTPUT_DIRECTORY=/tmp
+  - CYPRESS_CACHE_FOLDER=/var/www/html/.cache/cypress
+  - DB_URL=sqlite://localhost/sites/default/files/.ht.sqlite
+  - DISPLAY=host.docker.internal:0
+  - DRUPAL_PROJECT_FOLDER=/var/www/html/web/modules/contrib/canvas
+  # Module install path under the docroot. Read by commands/web/cypress and by
+  # the downloaded expand_composer_json.php (run via `ddev poser`). Formerly in
+  # config.contrib.yaml.
+  - DRUPAL_PROJECTS_PATH=modules/contrib
+  - DRUPAL_TEST_BASE_URL=https://${DDEV_HOSTNAME}
+  # Put per-test SQLite databases on tmpfs (RAM) so concurrent test installs do
+  # not serialize on the project mount's fsync path — which otherwise made
+  # `--workers >= 2` time out during setup. /tmp/sqlite is the tmpfs mount
+  # provided by the ddev-playwright add-on (docker-compose.sqlite.yaml), which
+  # `ddev setup` always installs; we reuse it rather than add our own mount. The
+  # per-test SQLite file is the dominant fsync writer, so moving it is enough
+  # even though the per-test site directories stay under sites/simpletest. NOT
+  # the dev-site DB (DB_URL above), which persists at
+  # sites/default/files/.ht.sqlite. Absolute path needs the double slash after
+  # the localhost host token.
+  - DRUPAL_TEST_DB_URL=sqlite://localhost//tmp/sqlite/.ht.sqlite
+  - DRUPAL_TEST_DRUPAL_ROOT=/var/www/html/web
+  # Tell Drush the site URI. DDEV normally records this as part of its settings
+  # management, but this project runs disable_settings_management (see below),
+  # so that step is skipped and `drush uli` would
+  # otherwise emit http://default/. Drush reads DRUSH_OPTIONS_URI as its --uri
+  # default.
+  - DRUSH_OPTIONS_URI=https://${DDEV_HOSTNAME}
+  # Prevent the downloaded expand_composer_json.php from pinning Drupal core to a
+  # version derived from the module's composer.json. Formerly in
+  # config.contrib.yaml.
+  - IGNORE_PROJECT_DRUPAL_CORE_VERSION=1
+  - SIMPLETEST_BASE_URL=http://web
+  - VITE_SERVER_ORIGIN=https://${DDEV_HOSTNAME}:5174
+
+# Canvas scalar flags. These are non-default values, so a normal merge applies
+# them — no override_config needed (unlike the hook suppression in
+# config.zzz.canvas.yaml). They live in this tracked overlay rather than
+# config.yaml, which `ddev setup` marks skip-worktree so DDEV's per-start
+# rewrites don't dirty git; edits to config.yaml would not reach a fresh clone.
+#
+# performance_mode is intentionally NOT set: each OS uses its default. Linux
+# uses a native bind mount (host-native speed, no Mutagen install needed);
+# macOS/Windows use Mutagen. Both expose the standard project mount at
+# /var/www/html, so the installed Drupal core and vendor/ are visible to the
+# host IDE either way. The earlier `Mutagen Docker volume is not mounted` error
+# came from no_project_mount bypassing the standard mount, not from the mode.
+#
+# - disable_settings_management: with the db container omitted and SQLite forced
+#   (settings.ddev.php), DDEV's settings management would write a mariadb
+#   connection to the absent db container; `ddev setup` writes our settings.
+# - fail_on_hook_fail: keep `ddev start` succeeding even if the first-run
+#   `ddev setup` hook fails, so the container stays up to debug or re-run setup.
+disable_settings_management: true
+fail_on_hook_fail: false
+
+# Keep the large repo-root node_modules out of Mutagen. upload_dirs are
+# bind-mounted rather than synced, which is the documented way to spare a big
+# node_modules from Mutagen on macOS/Windows; on Linux (native bind mount) it is
+# a harmless no-op since the whole project is already bind-mounted. Paths are
+# relative to the docroot (web), so `../node_modules` is the repo root's. Nested
+# workspace node_modules (ui/, packages/*) are smaller and left as-is; add them
+# here if Mutagen sync time regresses.
+upload_dirs:
+  - ../node_modules
+webimage_extra_packages:
+  - libasound2
+  - libgbm-dev
+  - libgtk-3-0
+  - libgtk2.0-0
+  - libnotify-dev
+  - libnss3
+  - libxss1
+  - libxtst6
+  - xauth
+  - xvfb
+web_extra_exposed_ports:
+  - name: vite-dev-server
+    container_port: 5173
+    http_port: 5173
+    https_port: 5174

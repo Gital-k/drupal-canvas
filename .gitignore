@@ -9,10 +9,16 @@
 *.sln
 *.sw?
 
+# DDEV environment assets
 .env
 .env.development.local
-
+/web
+/recipes
+/vendor
 node_modules
+
+# Cypress debug
+/ui/junit*
 
 # Playwright
 /test-results/
@@ -65,3 +71,5 @@ lerna-debug.log*
 
 # GitLab CI
 .cache
+/.editorconfig
+/.gitattributes

@@ -1,0 +1,107 @@
+#!/bin/bash
+
+## Description: Remove environment-specific folders and files ignored by .gitignore.
+## Usage: cleanup [--force]
+## Example: ddev cleanup
+## Example: ddev cleanup --force
+## Flags: [{"Name":"force","Shorthand":"f","Usage":"Skip confirmation prompt"}]
+## ExecRaw: true
+
+set -e
+
+# Flag handling
+FORCE=false
+while :; do
+  case ${1:-} in
+    -f | --force)
+      FORCE=true ;;
+    --)
+      shift
+      break ;;
+    -?*)
+      printf 'WARN: Unknown option (ignored): %s\n' "$1" >&2 ;;
+    *)
+      break ;;
+  esac
+  shift
+done
+
+# Confirm before proceeding unless --force is passed
+if [[ "$FORCE" != true ]]; then
+  echo "This will remove all environment-specific files (web, vendor, node_modules, build artifacts, etc.)"
+  read -p "Are you sure you want to continue? [y/N] " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Cleanup cancelled."
+    exit 0
+  fi
+fi
+
+echo "Cleaning up environment-specific files..."
+
+# The Drupal scaffold (web/, vendor/, recipes/) installs into the project root,
+# which is the Mutagen-synced project mount at /var/www/html, so these are
+# ordinary host directories (all git-ignored). Remove them on the host; Mutagen
+# propagates the deletions into the container, leaving a clean tree for
+# `ddev poser` to rebuild.
+#
+# web/modules/contrib/canvas is a SYMLINK back to the repo root (created by
+# `ddev symlink-project`). `rm -rf web` removes that symlink, not its target, so
+# the real repository is never touched. Drupal hardens web/sites/default to 0555
+# after a site install; restore write permission first so rm can remove it.
+[ -d web/sites ] && chmod -R u+w web/sites 2>/dev/null || true
+rm -rf web
+rm -rf vendor
+rm -rf recipes
+
+# Force setup to re-run after a cleanup.
+rm -f .ddev/.scaffold-built
+
+# Host-side node dependencies and caches (lint scripts write .cache into the
+# repo root; node_modules is the bind-mounted workspace root).
+rm -rf node_modules
+rm -rf .cache
+
+# UI build artifacts
+rm -rf ui/dist
+rm -rf ui/dist-ssr
+rm -rf ui/logs
+rm -rf ui/junit*
+rm -f ui/.env
+
+# Packages
+rm -rf packages/*/dist
+rm -rf packages/*/node_modules
+rm -rf packages/*/.astro
+
+# Documentation
+rm -rf docs/user/dist
+rm -rf docs/user/.astro
+rm -rf docs/user/node_modules
+
+# CLI
+rm -rf cli/dist
+rm -rf cli/node_modules
+rm -f cli/.env
+
+# Test artifacts
+rm -rf test-results
+rm -rf playwright-report
+rm -rf blob-report
+rm -rf playwright/.cache
+rm -rf playwright/.auth
+
+# Logs
+rm -rf logs
+rm -f *.log
+rm -f npm-debug.log*
+rm -f yarn-debug.log*
+rm -f yarn-error.log*
+rm -f pnpm-debug.log*
+rm -f lerna-debug.log*
+
+# GitLab CI local
+rm -rf .gitlab-ci-local
+rm -rf _drupal
+
+echo "Cleanup complete."

@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+## #ddev-generated
+## Description: Set up the Canvas development environment.
+## Usage: setup
+## Example: ddev setup\nddev setup --force
+## Flags: [{"Name":"force","Shorthand":"f","Usage":"Completely reset an existing environment if present and start over"}]
+## ExecRaw: true
+
+set -e
+
+# Flag handling
+FORCE=false
+while :; do
+  case ${1:-} in
+    -f | --force)
+      FORCE=true ;;
+    --)
+      shift
+      break ;;
+    -?*)
+      printf 'WARN: Unknown option (ignored): %s\n' "$1" >&2 ;;
+    *)
+      break ;;
+  esac
+  shift
+done
+
+# Exit early if already set up (unless --force).
+# Completion is tracked with a host-side sentinel; a fresh checkout has no
+# sentinel and triggers the full build below.
+SENTINEL=.ddev/.scaffold-built
+if [[ -f "$SENTINEL" ]] && [[ "$FORCE" != true ]]; then
+  echo "Development environment already set up."
+  echo "Run 'ddev setup --force' to reset and start over."
+  exit 0
+fi
+
+echo "Setting up Canvas development environment..."
+
+# Mark config.yaml as skip-worktree so local changes don't show in git status.
+# This file must exist for ddev to work, but DDEV modifies it on start.
+git update-index --skip-worktree .ddev/config.yaml 2>/dev/null || true
+
+# Remove any environment-specific files
+ddev cleanup --force
+
+# Install ddev-playwright add-on if not already installed
+if [[ ! -f .ddev/config.playwright.yml ]]; then
+  echo "Installing ddev-playwright add-on... This will setup playwright and restart ddev one time."
+  ddev add-on get Lullabot/ddev-playwright
+  cp .ddev/web-build/disabled.Dockerfile.playwright .ddev/web-build/Dockerfile.playwright
+  ddev restart
+  exit 0
+fi
+
+# Build Drupal core and dependencies. `ddev poser` reads the tracked repo-root
+# composer.json (drupal/canvas), writes a generated composer.contrib.json with
+# core + allow-plugins + installer-paths merged in, runs `composer install`, and
+# removes the generated file. The tracked composer.json is never mutated.
+ddev poser
+
+# Symlink the project into web/modules/contrib/canvas. This is Canvas' override
+# of the ddev-drupal-contrib command: identical to upstream except node_modules
+# is excluded from the symlink set (see .ddev/commands/web/symlink-project).
+ddev symlink-project
+
+# Create the simpletest directory that holds per-test Drupal site directories
+# for Playwright/PHPUnit installs. The per-test SQLite databases live on tmpfs
+# at /tmp/sqlite instead (see DRUPAL_TEST_DB_URL in config.canvas.yaml), so the
+# heavy write traffic stays off the Mutagen-synced project mount.
+ddev exec 'mkdir -p web/sites/simpletest && chmod 777 web/sites/simpletest'
+
+# Write Drupal settings into the docroot. DDEV's own settings management is
+# disabled (disable_settings_management: true): the db container is omitted and
+# SQLite is forced, so DDEV would otherwise write a mariadb connection to the
+# absent db container. The settings files are kept under .ddev/drupal-settings
+# (mounted at /mnt/ddev_config) and copied in here. settings.php includes
+# settings.ddev.php, which holds test-module discovery and a forced SQLite db.
+ddev exec 'cp /mnt/ddev_config/drupal-settings/settings.php /mnt/ddev_config/drupal-settings/settings.ddev.php web/sites/default/'
+
+# Install Drupal and enable the Drupal Canvas module.
+ddev drupal-install
+
+# Node dependencies for Drupal core's JS tooling.
+ddev exec --dir /var/www/html/web/core npm install
+
+# Node dependencies for the Canvas monorepo. npm runs at the Composer root
+# (/var/www/html), which is the real repo root and npm-workspaces root, so
+# node_modules is created there — NOT through the module symlink, which would
+# fork a divergent node_modules. node_modules is bind-mounted out of Mutagen
+# (upload_dirs in config.canvas.yaml).
+ddev exec --dir /var/www/html npm install
+
+# Build the Canvas UI. This (and `composer run phpunit`/`lint`/`fix`, plus
+# PhpStorm) invokes composer at the project root, which activates the Drupal
+# composer plugins (core-composer-scaffold, installers, patches, ...). The
+# tracked composer.json intentionally carries no `config.allow-plugins` (the
+# generated composer.contrib.json holds it only during `ddev poser`, then is
+# deleted), so those plugins are allow-listed via the container-global
+# .ddev/homeadditions/.composer/config.json, which DDEV copies into $HOME on
+# every start. Without it, composer aborts with a blocked-plugin error.
+ddev exec --dir /var/www/html composer run ui-build
+
+echo "Development environment ready!"
+
+# Record that setup completed so it does not re-run on every ddev start.
+touch "$SENTINEL"
+
+# Display a one time login link for user ID 1.
+ddev drush uli

@@ -1,0 +1,53 @@
+## DDev file ignores:
+
+# Sentinel written by `ddev setup` to mark the scaffold as built.
+/.scaffold-built
+
+# Re-entrancy lock held by `ddev setup` while it runs.
+/.setup-running
+
+/**/*.example
+/.dbimageBuild
+/.ddev-docker-*.yaml
+/.*downloads
+/.homeadditions
+/.importdb*
+/.sshimageBuild
+/.webimageBuild
+/apache/apache-site.conf
+/commands/.gitattributes
+/config.local.y*ml
+/config.*.local.y*ml
+/db_snapshots
+/mutagen/mutagen.yml
+/mutagen/.start-synced
+/nginx_full/nginx-site.conf
+/postgres/postgresql.conf
+/providers/acquia.yaml
+/providers/lagoon.yaml
+/providers/pantheon.yaml
+/providers/platform.yaml
+/providers/upsun.yaml
+/share-providers/cloudflared.sh
+/share-providers/ngrok.sh
+/traefik/config/canvas.yaml
+/traefik/certs/canvas.crt
+/traefik/certs/canvas.key
+/xhprof/xhprof_prepend.php
+/**/README.*
+/docker-compose.sqlite.yaml
+
+## Ignore Lullabot/playwright add-on files ##
+/addon-metadata/ddev-playwright/manifest.yaml
+/commands/host/install-playwright
+/config.playwright.yml
+/web-build/Dockerfile.task
+/web-build/Dockerfile.uv
+/web-build/install-kasmvnc.sh
+/web-build/install-task.sh
+/web-build/kasmvnc.yaml
+/web-build/xstartup
+/web-entrypoint.d/mkcert-nssdb.sh
+
+# Drupal Core ENV vars
+.env.web

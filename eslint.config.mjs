@@ -195,6 +195,10 @@ export default defineConfig([
       'js/assets/**/*',
       'ui/src/local_packages',
       '.cache/**',
+      'web',
+      'recipes',
+      'vendor',
+      'node_modules',
     ],
   },
 ]);

@@ -23,13 +23,19 @@ declare(strict_types=1);
 use Symfony\Component\Yaml\Yaml;
 
 // Locate and load the Composer autoloader by walking up from this script, so
-// the script works regardless of the working directory it is invoked from.
+// the script works regardless of the working directory it is invoked from. At
+// each level, check both a bare `autoload.php` (Drupal's `web/autoload.php`,
+// found when Canvas lives inside the docroot) and `vendor/autoload.php` (found
+// when Canvas is developed at a Composer project root and symlinked into the
+// docroot, so no bare `autoload.php` is ever encountered on the way up).
 $dir = __DIR__;
 $autoloader = NULL;
 for ($i = 0; $i < 15; $i++) {
-  if (is_file($dir . '/autoload.php')) {
-    $autoloader = $dir . '/autoload.php';
-    break;
+  foreach (['/autoload.php', '/vendor/autoload.php'] as $candidate) {
+    if (is_file($dir . $candidate)) {
+      $autoloader = $dir . $candidate;
+      break 2;
+    }
   }
   $dir = dirname($dir);
 }

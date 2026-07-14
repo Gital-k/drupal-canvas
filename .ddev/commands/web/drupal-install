@@ -1,0 +1,23 @@
+#!/bin/bash
+
+## Description: (Re)install Drupal and the Drupal Canvas module.
+## Example: ddev drupal-install
+## Aliases: drupal-install,si
+
+# Flush database
+drush sql:drop -y
+
+# Install Drupal.
+drush site:install -y \
+  --account-name=admin \
+  --account-pass=admin \
+  --site-name="Drupal Canvas Local Dev"
+
+# Enable the Canvas module.
+drush pm:install -y \
+  canvas \
+  canvas_dev_mode \
+  sdc_test_all_props
+
+# Without a cache rebuild, Drupal can't find test modules, leading to a WSOD.
+drush cache:rebuild

@@ -39,7 +39,15 @@ export default defineConfig({
   retries: { openMode: 0, runMode: 3 },
   env: {
     baseUrl: process.env.BASE_URL,
-    dbUrl: process.env.DB_URL,
+    // Per-test Drupal installs must target the throwaway test database, not the
+    // persistent dev-site database. DRUPAL_TEST_DB_URL points at a tmpfs (RAM)
+    // mount so concurrent installs do not serialize on the scaffold volume's
+    // filesystem journal — installing into the journaled dev DB (DB_URL) makes
+    // test-site.php install exceed Cypress's 60s exec timeout, which leaves
+    // drupalDbPrefix unset and surfaces as "Missing database prefix" in the
+    // teardown hook. Fall back to DB_URL for host/CI setups that do not define
+    // DRUPAL_TEST_DB_URL. Mirrors how Playwright and the CLI tests pick the DB.
+    dbUrl: process.env.DRUPAL_TEST_DB_URL || process.env.DB_URL,
     defaultTheme: 'olivero',
     adminTheme: 'claro',
     coreDir: process.env.DRUPAL_ROOT_CORE || getCoreDir(),

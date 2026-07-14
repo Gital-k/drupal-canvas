@@ -1,0 +1,6 @@
+web_environment:
+  # PHPUnit functional tests install throwaway sites; put their SQLite databases
+  # on the ddev-playwright add-on's tmpfs mount at /tmp/sqlite to keep concurrent
+  # installs off the Mutagen-synced project mount. Mirrors DRUPAL_TEST_DB_URL in
+  # config.canvas.yaml; see the longer note there.
+  - SIMPLETEST_DB=sqlite://localhost//tmp/sqlite/.ht.sqlite
