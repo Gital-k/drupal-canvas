@@ -297,7 +297,8 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
    */
   public function getTranslation(string $langcode): StagedLanguageConfigOverride {
     if ($langcode === $this->langcode) {
-      throw new \InvalidArgumentException(\sprintf('getTranslation() must not be called with the langcode of the default translation ("%s").', $this->langcode));
+      throw new \InvalidArgumentException(\sprintf('getTranslation() must not be called with the langcode of the default translation ("%s") on entity "%s" (ID: %s, type: %s).', $this->lan
+gcode, $this->label(), $this->id(), $this->getEntityTypeId()));
     }
 
     $language_manager = self::languageManager();
