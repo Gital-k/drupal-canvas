@@ -3320,7 +3320,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
    * At render time `buildReferencePayload()` selects the branch keyed by the
    * resolved entity's entity-type + bundle, so the component receives the picks
    * for the bundle actually referenced. This exercises both bundles through one
-   * field sequentially: repointing the reference at an entity of the other
+   * field sequentially: re-pointing the reference at an entity of the other
    * bundle switches which branch (and hence which `__type`) surfaces.
    *
    * The branch expression is saved through the component's NORMAL save — no raw
@@ -3375,7 +3375,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
       $this->resolveNewsItemReference($fixtures)->value,
     );
 
-    // Branch B: repoint `field_related_news` at a blog_post — the other branch
+    // Branch B: re-point `field_related_news` at a blog_post — the other branch
     // now matches, so a different `__type` and picked field surface.
     $branch_blog = Node::create([
       'type' => 'blog_post',
@@ -3549,7 +3549,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
    *
    * The node static cache is reset and the host reloaded so entity-reference
    * field items don't return a statically-cached target from an earlier
-   * resolution (this test repoints `field_related_news` between resolutions).
+   * resolution (this test re-points `field_related_news` between resolutions).
    *
    * @param array{host_news: \Drupal\node\NodeInterface, component_id: string, source: \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent} $fixtures
    *   The fixtures from ::setUpContentEntityReferenceFixtures().
