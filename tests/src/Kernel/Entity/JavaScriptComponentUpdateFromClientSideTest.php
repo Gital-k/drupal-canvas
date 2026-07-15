@@ -266,6 +266,31 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
    * exist".
    */
   public function testMultiBundleBranchReferenceValidates(): void {
+    self::installMultiBundleReferenceFixtures();
+
+    // Two props from different branches: an image field and a video field.
+    $component = self::createComponentWithEntityFields([
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
+    ]);
+
+    // The two picks coalesced into one branch reference.
+    self::assertSame(
+      ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_image␞␟alt][␜entity:media:video␝field_media_video_file␞␟target_id]'],
+      $component->get('dataDependencies')['entityFields'][self::PROP_NAME],
+    );
+
+    // The branch reference is accepted: no violation anywhere in entityFields.
+    self::assertSame([], self::entityFieldViolations($component));
+  }
+
+  /**
+   * Installs a node + two media types + a multi-bundle reference field.
+   *
+   * `field_media` on `article` targets both the `image` and `video` media
+   * bundles, so a code component can pick fields from each branch.
+   */
+  private function installMultiBundleReferenceFixtures(): void {
     // Enabled only here (each test runs in a separate process): enabling `node`
     // globally would make the Coalescer stop combining different-bundle picks
     // in the fixture-free coalescing providers.
@@ -292,30 +317,23 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
       'label' => 'Media',
       'settings' => ['handler_settings' => ['target_bundles' => ['image' => 'image', 'video' => 'video']]],
     ])->save();
+  }
 
-    // Two props from different branches: an image field and a video field.
-    $component = self::createComponentWithEntityFields([
-      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
-      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
-    ]);
-
-    // The two picks coalesced into one branch reference.
-    self::assertSame(
-      ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_image␞␟alt][␜entity:media:video␝field_media_video_file␞␟target_id]'],
-      $component->get('dataDependencies')['entityFields'][self::PROP_NAME],
-    );
-
-    // The branch reference is accepted: no violation anywhere in entityFields.
+  /**
+   * Returns validation messages keyed by property path under entityFields.
+   *
+   * @return array<string, string>
+   */
+  private static function entityFieldViolations(JavaScriptComponent $component): array {
     $violations = [];
     foreach ($component->getTypedData()->validate() as $violation) {
       $violations[$violation->getPropertyPath()] = (string) $violation->getMessage();
     }
-    $entity_field_violations = \array_filter(
+    return \array_filter(
       $violations,
       static fn (string $path): bool => \str_starts_with($path, 'dataDependencies.entityFields'),
       \ARRAY_FILTER_USE_KEY,
     );
-    self::assertSame([], $entity_field_violations);
   }
 
   /**
