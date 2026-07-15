@@ -10,6 +10,11 @@ use Drupal\canvas\PropExpressions\StructuredData\Coalescer;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\Component\Assertion\Inspector;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\field\FieldStorageConfigInterface;
+use Drupal\media\Entity\MediaType;
+use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
@@ -34,6 +39,10 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  *   for validation to flag or reject.
  * - ::providerNormalizeExpands — stored entries expand back to the atomic picks
  *   the client sent.
+ *
+ * ::testMultiBundleBranchReferenceValidates installs real entity types to prove
+ * a coalesced multi-bundle branch reference (a prop from each target bundle) is
+ * accepted, not rejected.
  *
  * @legacy-covers \Drupal\canvas\Entity\JavaScriptComponent::updateFromClientSide
  * @legacy-covers \Drupal\canvas\Entity\JavaScriptComponent::normalizeForClientSide
@@ -238,18 +247,91 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
       ['dataDependencies.entityFields.article_ref' => "Multiple expressions on the same field 'entity:node:article.field_media' must be coalesced into a single FieldObjectPropsExpression."],
     ];
 
-    // Two single-bundle references on different bundles coalesce into one
-    // multi-bundle branch reference, which is accepted: the former multi-bundle
-    // rejection is gone, so the branch entry `.0` carries only the pre-existing
-    // (irrelevant, uninstalled-entity-type) violation, not a rejection.
-    yield 'multi-bundle branch reference is accepted and coalesced' => [
-      [
-        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
-        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝name␞␟value',
-      ],
-      ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝name␞␟value][␜entity:media:video␝name␞␟value]'],
-      ['dataDependencies.entityFields.article_ref.0' => "The entity type 'node' does not exist."],
-    ];
+    // Acceptance of a coalesced multi-bundle branch reference (the former
+    // save-time rejection is gone) needs the referenced entity types to exist,
+    // so it is proven with real fixtures in
+    // ::testMultiBundleBranchReferenceValidates() rather than here.
+  }
+
+  /**
+   * A coalesced multi-bundle branch reference validates: it is accepted.
+   *
+   * The client sends two single-bundle picks on the same reference field but
+   * different bundles — one prop from the image branch, one from the video
+   * branch. They coalesce into a single `ReferencedBundleSpecificBranches`
+   * reference. With the multi-target-bundle save-time rejection removed, that
+   * stored branch reference now validates instead of being rejected. Real
+   * entity types are installed here (unlike ::providerCoalesceValidation) so
+   * the branch is validated for real, not masked by "entity type does not
+   * exist".
+   */
+  public function testMultiBundleBranchReferenceValidates(): void {
+    // Enabled only here (each test runs in a separate process): enabling `node`
+    // globally would make the Coalescer stop combining different-bundle picks
+    // in the fixture-free coalescing providers.
+    $this->enableModules(['field', 'node']);
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('media');
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+
+    // Two media types so one reference field can target multiple bundles.
+    self::createMediaType('image', 'image');
+    self::createMediaType('video', 'video_file');
+
+    // A multi-bundle reference field: field_media on article → image + video.
+    FieldStorageConfig::create([
+      'field_name' => 'field_media',
+      'entity_type' => 'node',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'media'],
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_media',
+      'entity_type' => 'node',
+      'bundle' => 'article',
+      'label' => 'Media',
+      'settings' => ['handler_settings' => ['target_bundles' => ['image' => 'image', 'video' => 'video']]],
+    ])->save();
+
+    // Two props from different branches: an image field and a video field.
+    $component = self::createComponentWithEntityFields([
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
+    ]);
+
+    // The two picks coalesced into one branch reference.
+    self::assertSame(
+      ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_image␞␟alt][␜entity:media:video␝field_media_video_file␞␟target_id]'],
+      $component->get('dataDependencies')['entityFields'][self::PROP_NAME],
+    );
+
+    // The branch reference is accepted: no violation anywhere in entityFields.
+    $violations = [];
+    foreach ($component->getTypedData()->validate() as $violation) {
+      $violations[$violation->getPropertyPath()] = (string) $violation->getMessage();
+    }
+    $entity_field_violations = \array_filter(
+      $violations,
+      static fn (string $path): bool => \str_starts_with($path, 'dataDependencies.entityFields'),
+      \ARRAY_FILTER_USE_KEY,
+    );
+    self::assertSame([], $entity_field_violations);
+  }
+
+  /**
+   * Creates a media type with its source field, for reference-field fixtures.
+   */
+  private static function createMediaType(string $id, string $source): void {
+    $media_type = MediaType::create(['id' => $id, 'label' => \ucfirst($id), 'source' => $source]);
+    $media_type->save();
+    $source_field = $media_type->getSource()->createSourceField($media_type);
+    $source_field_storage = $source_field->getFieldStorageDefinition();
+    \assert($source_field_storage instanceof FieldStorageConfigInterface);
+    if (!FieldStorageConfig::loadByName('media', $source_field->getName())) {
+      $source_field_storage->save();
+    }
+    $source_field->save();
+    $media_type->set('source_configuration', ['source_field' => $source_field->getName()])->save();
   }
 
   /**
