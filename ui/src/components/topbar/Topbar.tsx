@@ -164,7 +164,10 @@ const Topbar = () => {
             gap="0"
             className={styles.topBarSectionEnd}
           >
-            <div className={styles.topBarSectionEndInner}>
+            <div
+              className={styles.topBarSectionEndInner}
+              data-testid="topbar-actions-end"
+            >
               <NotificationBell />
               {isTranslationEnabled && <LanguageSelect />}
               <PreviewControls isPreview={isPreview} />

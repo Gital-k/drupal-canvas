@@ -51,6 +51,8 @@
 .topBarSectionEndInner {
   display: flex;
   overflow-x: auto;
+  align-items: center;
+  width: 100%;
   gap: var(--space-2);
   scrollbar-width: thin;
 
