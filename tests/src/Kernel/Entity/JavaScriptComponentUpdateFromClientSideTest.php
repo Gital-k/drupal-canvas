@@ -285,6 +285,39 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
   }
 
   /**
+   * Multiple picks per bundle across bundles coalesce into one branch.
+   *
+   * The client sends two picks on one target bundle (which combine into an
+   * object) plus a pick on another bundle. All three are on the same reference
+   * field, so they must coalesce into a single branch expression. Today they do
+   * not: the object-combined bundle bypasses branch coalescing, leaving two
+   * entries on the field, which the same-field coalescing constraint rejects.
+   *
+   * @todo Passes once the coalescer groups multi-bundle picks by field then by bundle — https://git.drupalcode.org/project/canvas/-/work_items/3591829
+   */
+  public function testMultiBundleBranchReferenceWithMultipleFieldsPerBundle(): void {
+    $this->markTestSkipped('Multiple fields per bundle do not yet coalesce into a branch — https://git.drupalcode.org/project/canvas/-/work_items/3591829');
+
+    // @phpstan-ignore deadCode.unreachable
+    self::installMultiBundleReferenceFixtures();
+
+    // Two picks on the image bundle (they object-combine) + one on video.
+    $component = self::createComponentWithEntityFields([
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
+    ]);
+
+    // All picks on field_media coalesce into ONE branch expression …
+    $stored = $component->get('dataDependencies')['entityFields'][self::PROP_NAME];
+    self::assertCount(1, $stored, 'Per-bundle picks did not coalesce into a single branch expression.');
+    self::assertStringContainsString('␜[', (string) $stored[0], 'The coalesced entry is not a bundle-specific branch expression.');
+
+    // … so nothing is left for the same-field coalescing constraint to flag.
+    self::assertSame([], self::entityFieldViolations($component));
+  }
+
+  /**
    * Installs a node + two media types + a multi-bundle reference field.
    *
    * `field_media` on `article` targets both the `image` and `video` media
