@@ -596,9 +596,9 @@ class TranslationTest extends FunctionalTestBase {
     $region->enable()->save();
 
     // Create the LanguageConfigOverride programmatically rather than via the
-    // config translation UI (cf. ::testContentTemplateConfigTranslationUi())
-    // because this is a test helper setting up fixtures, not testing the UI
-    // translation workflow itself.
+    // config translation UI because this is a test helper setting up fixtures,
+    // not testing the UI translation workflow itself. That workflow is covered
+    // by ConfigWithComponentTreeConfigTranslationUiTest.
     $language_manager = $this->container->get(LanguageManagerInterface::class);
     \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
     $region_override = $language_manager->getLanguageConfigOverride('fr', $region->getConfigDependencyName());
@@ -668,6 +668,10 @@ class TranslationTest extends FunctionalTestBase {
     $violations = $template->getTypedData()->validate();
     self::assertSame([], self::violationsToArray($violations), $template->getConfigTarget());
     $template->save();
+    // Create the LanguageConfigOverride programmatically rather than via the
+    // config translation UI: this test covers what the layout API returns for
+    // translated config entities, not the UI translation workflow. That
+    // workflow is covered by ConfigWithComponentTreeConfigTranslationUiTest.
     $language_manager = $this->container->get(LanguageManagerInterface::class);
     \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
     $template_override = $language_manager->getLanguageConfigOverride('fr', $template->getConfigDependencyName());
