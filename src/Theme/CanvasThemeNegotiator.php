@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * default templates only.
  *
  * @see ui/src/components/form/twig-to-jsx-component-map.js
- * @see ui/src/components/form/inputBehaviors.tsx
+ * @see ui/src/components/form/withRHF.tsx
  */
 final class CanvasThemeNegotiator implements ThemeNegotiatorInterface {
 
@@ -52,7 +52,11 @@ final class CanvasThemeNegotiator implements ThemeNegotiatorInterface {
     $still_in_media_library = $triggering_element_value !== (string) $this->t('Insert selected');
 
     if ($this->requestStack->getCurrentRequest()?->query->has('use_admin_theme') && $still_in_media_library) {
-      return $this->configFactory->get('system.theme')->get('admin');
+      // If the admin theme is not configured, use the default theme.
+      $theme_config = $this->configFactory->get('system.theme');
+      $admin = (string) $theme_config->get('admin');
+      $admin_theme_name = $admin !== '' ? $admin : $theme_config->get('default');
+      return $admin_theme_name;
     }
     $this->requestStack->getCurrentRequest()?->query->remove('use_admin_theme');
     return 'canvas_stark';

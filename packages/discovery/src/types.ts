@@ -10,7 +10,16 @@ export interface DiscoveryOptions {
   componentRoot?: string;
   pagesRoot?: string;
   contentTemplatesRoot?: string;
+  regionsRoot?: string;
   projectRoot?: string;
+  /**
+   * Extensions accepted for a component's entry file, in precedence order.
+   * Default: the JavaScript extensions (JS_EXTENSIONS). Consumers that only
+   * read component metadata — not the entry's code — widen this to
+   * framework single-file components (.astro, .vue, .svelte), whose entries
+   * the Canvas build pipeline could not compile.
+   */
+  entryExtensions?: readonly string[];
 }
 
 export interface DiscoveryWarning {
@@ -50,12 +59,19 @@ export interface DiscoveredContentTemplate {
   relativePath: string;
 }
 
+export interface DiscoveredRegion {
+  region: string;
+  path: string;
+  relativePath: string;
+}
+
 export interface DiscoveryResult {
   componentRoot: string;
   projectRoot: string;
   components: DiscoveredComponent[];
   pages: DiscoveredPage[];
   contentTemplates: DiscoveredContentTemplate[];
+  regions: DiscoveredRegion[];
   warnings: DiscoveryWarning[];
   stats: {
     scannedFiles: number;
@@ -70,6 +86,13 @@ export interface ComponentMetadata extends Pick<
   props: {
     properties: CodeComponentSerialized['props'];
   };
+  dataDependencies?: CodeComponentSerialized['dataDependencies'];
+}
+
+export interface CanvasSyncConfig {
+  pages: boolean;
+  contentTemplates: boolean;
+  regions: boolean;
 }
 
 export interface CanvasConfig {
@@ -78,6 +101,8 @@ export interface CanvasConfig {
   componentDir: string;
   pagesDir: string;
   contentTemplatesDir: string;
-  deprecatedComponentDir: string;
+  regionsDir: string;
   globalCssPath: string;
+  layoutPath: string;
+  sync: CanvasSyncConfig;
 }

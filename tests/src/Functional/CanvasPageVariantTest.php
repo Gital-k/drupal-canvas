@@ -8,9 +8,17 @@ use Behat\Mink\Element\NodeElement;
 use Behat\Mink\Session;
 use Drupal\block\Entity\Block;
 use Drupal\block\Plugin\DisplayVariant\BlockPageVariant;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\PropSource\PropSourceBase;
 use Drupal\Component\Serialization\Json;
@@ -21,14 +29,6 @@ use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Render\Plugin\DisplayVariant\SimplePageVariant;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\ComponentInterface;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Entity\PageRegion;
-use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
@@ -155,7 +155,7 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         [
           'uuid' => self::UUID_IN_ROOT,
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => 'b1e991f726a2a266',
+          'component_version' => 'd34b93534777207a',
           'inputs' => [
             'heading' => "Hello, world!",
           ],
@@ -211,7 +211,7 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         [
           'uuid' => self::UUID_IN_ROOT_ANOTHER,
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => '85a5c0c7dd53e0bb',
+          'component_version' => '0e79e884426a53ae',
           'inputs' => [
             'heading' => [
               'sourceType' => PropSource::Static->value . PropSourceBase::SOURCE_TYPE_PREFIX_SEPARATOR . 'field_item:entity_reference',
@@ -237,7 +237,7 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     // the Component config entity is configured to do exactly this: component
     // instances must comply with the referenced Component version.
     self::assertSame([
-      'Using a static prop source that deviates from the configuration for Component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em> at version <em class="placeholder">85a5c0c7dd53e0bb</em>.',
+      'Using a static prop source that deviates from the configuration for Component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em> at version <em class="placeholder">0e79e884426a53ae</em>.',
     ], \array_map(
       fn (ConstraintViolationInterface $v) => (string) $v->getMessage(),
       iterator_to_array($pageRegion->getTypedData()->validate()),
@@ -580,8 +580,11 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         // The `config:block_list` cache tag appears on top of the baseline.
         'config:block_list',
         // If >=1 Block config entity is placed, the `block_view` cache tag also
-        // appears.
-        ...(!empty($expected_cacheable_dependencies) ? ['block_view'] : []),
+        // appears — but Drupal 11.4 no longer bubbles it (it uses only the
+        // `config:block_list` list cache tag for blocks).
+        // @see https://www.drupal.org/project/drupal/issues/3341042
+        // @see \Drupal\block\Entity\Block::getCacheTagsToInvalidate()
+        ...(!empty($expected_cacheable_dependencies) && version_compare(\Drupal::VERSION, '11.4', '<') ? ['block_view'] : []),
         ...$expected_dependency_cacheability->getCacheTags(),
         ...$expected_additional_cache_tags,
       ],

@@ -72,6 +72,35 @@ interface EntityMetadata {
   bundle: string;
   entityTypeId: string;
   uuid: string;
+  // The language requested via the URL (the negotiated content language).
+  requestedLanguage: string;
+  // The language actually rendered. This can differ from `requestedLanguage` as
+  // the default translation is used when the requested language is unavailable.
+  renderedLanguage: string;
+  /**
+   * All enabled site languages for building a language switcher.
+   *
+   * Includes default and untranslated languages
+   * (`translationAvailable: false`). Untranslated entries still include a URL
+   * that resolves to the fallback translation. Empty when the entity type does
+   * not support translation or the site is monolingual.
+   */
+  translations: TranslationMetadata[];
+}
+
+interface TranslationMetadata {
+  langcode: string;
+  // The language name in the current display language (e.g. "German").
+  name: string;
+  // The language's own native name (e.g. "Deutsch").
+  nativeName: string;
+  url: string;
+  // Whether the entity has a translation in this language that the current
+  // user may view.
+  translationAvailable: boolean;
+  // Whether this is the requested language (the URL/content language), even
+  // when its content falls back to the default translation.
+  current: boolean;
 }
 
 interface PageData {
@@ -97,11 +126,11 @@ interface SiteData {
 
 export const getPageData = (): PageData => {
   const pageData = {
-    pageTitle: window.drupalSettings?.canvasData?.v0?.pageTitle || '',
-    breadcrumbs: window.drupalSettings?.canvasData?.v0?.breadcrumbs || [],
-    mainEntity: window.drupalSettings?.canvasData?.v0?.mainEntity || null,
+    pageTitle: globalThis?.drupalSettings?.canvasData?.v0?.pageTitle || '',
+    breadcrumbs: globalThis?.drupalSettings?.canvasData?.v0?.breadcrumbs || [],
+    mainEntity: globalThis?.drupalSettings?.canvasData?.v0?.mainEntity || null,
   };
-  window.parent.postMessage({
+  globalThis?.window?.parent.postMessage({
     type: '_canvas_useswr_data_fetch',
     id: 'getPageData()',
     data: pageData,
@@ -111,18 +140,18 @@ export const getPageData = (): PageData => {
 
 export const getSiteData = (): SiteData => {
   const siteData = {
-    branding: window.drupalSettings?.canvasData?.v0?.branding || {
+    branding: globalThis?.drupalSettings?.canvasData?.v0?.branding || {
       homeUrl: '',
       siteName: '',
       siteSlogan: '',
     },
-    baseUrl: window.drupalSettings?.canvasData?.v0?.baseUrl || '/',
-    themeAssets: window.drupalSettings?.canvasData?.v0?.themeAssets || {
+    baseUrl: globalThis?.drupalSettings?.canvasData?.v0?.baseUrl || '/',
+    themeAssets: globalThis?.drupalSettings?.canvasData?.v0?.themeAssets || {
       logo: { url: '' },
       favicon: { url: '', mimeType: '' },
     },
   };
-  window.parent.postMessage({
+  globalThis?.window?.parent.postMessage({
     type: '_canvas_useswr_data_fetch',
     id: 'getSiteData()',
     data: siteData,

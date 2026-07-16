@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\AutoSave;
 
-use PHPUnit\Framework\Attributes\Group;
-use Drupal\Core\Url;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
+use Drupal\Core\Url;
 use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
-use Symfony\Component\HttpFoundation\Request;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -81,9 +81,7 @@ final class AutoSaveConflictPageRegionLayoutTest extends ApiLayoutControllerTest
     self::assertSame('block.system_messages_block', $regionTree[0]['component_id']);
     self::assertSame([
       'label' => $text,
-      'label_display' => version_compare(\Drupal::VERSION, '11.3', '<')
-        ? ''
-        : '0',
+      'label_display' => '0',
     ], $regionTree[0]['inputs']);
   }
 

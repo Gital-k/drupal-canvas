@@ -27,6 +27,8 @@ import type {
   ContentTemplateListItem,
 } from '../types/ContentTemplate';
 import type { Page, PageListItem } from '../types/Page';
+import type { Region, RegionListItem } from '../types/Region';
+import type { ConfigComponentTreePayload } from '../utils/component-tree-payload';
 
 export interface ApiOptions {
   siteUrl: string;
@@ -43,6 +45,38 @@ export interface UploadedMedia<TInputsResolved = unknown> {
   id: number;
   uuid: string;
   inputs_resolved: TInputsResolved;
+}
+
+export interface ContentEntityReferenceBundle {
+  label: string;
+  links?: Record<string, { href: string }>;
+}
+
+export interface ContentEntityReferenceEntityType {
+  label: string;
+  bundles: Record<string, ContentEntityReferenceBundle>;
+}
+
+export interface ContentEntityReferenceFieldProperty {
+  name: string;
+  label: string;
+  expression: string;
+}
+
+export interface ContentEntityReferenceField {
+  name: string;
+  label: string;
+  hasChildren: boolean;
+  properties: ContentEntityReferenceFieldProperty[];
+  targetEntityType?: string;
+  targetBundles?: Record<
+    string,
+    {
+      label: string;
+      labelExpression: string;
+      links?: Record<string, { href: string }>;
+    }
+  >;
 }
 
 export class ApiService {
@@ -531,9 +565,14 @@ export class ApiService {
   /**
    * Create a new content template.
    */
-  async createContentTemplate(
-    template: ContentTemplate,
-  ): Promise<ContentTemplate> {
+  async createContentTemplate(template: {
+    label: string;
+    entityType: string;
+    bundle: string;
+    viewMode: string;
+    status: boolean;
+    component_tree: ConfigComponentTreePayload;
+  }): Promise<ContentTemplate> {
     try {
       const response = await this.client.post(
         '/canvas/api/v0/config/content_template',
@@ -550,7 +589,11 @@ export class ApiService {
    */
   async updateContentTemplate(
     id: string,
-    template: Partial<ContentTemplate>,
+    template: {
+      label?: string;
+      status?: boolean;
+      component_tree?: ConfigComponentTreePayload;
+    },
   ): Promise<ContentTemplate> {
     try {
       const response = await this.client.patch(
@@ -626,7 +669,7 @@ export class ApiService {
   ): Promise<{ model: Record<string, unknown> }> {
     try {
       const response = await this.client.post(
-        `/canvas/api/v0/layout-content-template-draft/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(previewEntityId)}?_format=json`,
+        `/canvas/api/v0/layout-content-template-draft/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(previewEntityId)}`,
         {
           bundle,
           viewMode,
@@ -634,6 +677,22 @@ export class ApiService {
         },
       );
       return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  async previewContentEntityReferenceFields(
+    entityTypeId: string,
+    entityId: string,
+    entityFields: Record<string, string[]>,
+  ): Promise<Record<string, unknown>> {
+    try {
+      const response = await this.client.post(
+        `/canvas/api/v0/ui/content-entity-reference/preview/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(entityId)}`,
+        { entityFields },
+      );
+      return response.data.data;
     } catch (error) {
       this.handleApiError(error);
     }
@@ -665,6 +724,115 @@ export class ApiService {
         `/canvas/api/v0/ui/content_template/suggestions/prop-sources/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(bundle)}/${encodeURIComponent(componentId)}`,
       );
       return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  async listContentEntityReferenceEntityTypes(): Promise<
+    Record<string, ContentEntityReferenceEntityType>
+  > {
+    try {
+      const response = await this.client.get(
+        '/canvas/api/v0/ui/content-entity-reference',
+      );
+      return response.data.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  async fetchContentEntityReferenceFields(
+    entityTypeId: string,
+    bundle: string,
+    href?: string,
+  ): Promise<ContentEntityReferenceField[]> {
+    try {
+      const response = await this.client.get(
+        href ??
+          `/canvas/api/v0/ui/content-entity-reference/${encodeURIComponent(entityTypeId)}/${encodeURIComponent(bundle)}`,
+      );
+      return response.data.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * List all regions.
+   */
+  async listRegions(): Promise<Record<string, RegionListItem>> {
+    try {
+      const response = await this.client.get(
+        '/canvas/api/v0/config/page_region',
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Get a single region.
+   */
+  async getRegion(id: string): Promise<Region> {
+    try {
+      const response = await this.client.get(
+        `/canvas/api/v0/config/page_region/${id}`,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Create a new region.
+   */
+  async createRegion(region: {
+    theme?: string;
+    region: string;
+    status: boolean;
+    component_tree: ConfigComponentTreePayload;
+  }): Promise<Region> {
+    try {
+      const response = await this.client.post(
+        '/canvas/api/v0/config/page_region',
+        region,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Update an existing region.
+   */
+  async updateRegion(
+    id: string,
+    region: {
+      status?: boolean;
+      component_tree?: ConfigComponentTreePayload;
+    },
+  ): Promise<Region> {
+    try {
+      const response = await this.client.patch(
+        `/canvas/api/v0/config/page_region/${id}`,
+        region,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Delete a region.
+   */
+  async deleteRegion(id: string): Promise<void> {
+    try {
+      await this.client.delete(`/canvas/api/v0/config/page_region/${id}`);
     } catch (error) {
       this.handleApiError(error);
     }
@@ -832,8 +1000,8 @@ export class ApiService {
   }
 
   /**
-   * Upload a font file for Brand Kit (same endpoint as UI: artifacts/upload).
-   * Returns uri and fid for building a Brand Kit font entry.
+   * Upload a font file for brand kit (same endpoint as UI: artifacts/upload).
+   * Returns uri and fid for building a brand kit font entry.
    * When filename is provided (e.g. slugified), it is used for the upload; otherwise the path basename is used.
    */
   async uploadFont(
@@ -862,7 +1030,7 @@ export class ApiService {
   }
 
   /**
-   * Get a Brand Kit config entity by id.
+   * Get a brand kit config entity by id.
    */
   async getBrandKit(id: string = BRAND_KIT_GLOBAL_ID): Promise<BrandKit> {
     try {
@@ -876,7 +1044,7 @@ export class ApiService {
   }
 
   /**
-   * Update the global Brand Kit (replace the fonts array).
+   * Update the global brand kit (replace the fonts array).
    */
   async updateBrandKit(data: {
     fonts: BrandKitFontEntry[];
@@ -982,7 +1150,7 @@ export class ApiService {
         'error_description' in data &&
         typeof data.error_description === 'string'
       ) {
-        message = `Authentication Error: ${data.error_description}\n\n${message}`;
+        message = `Authentication Error: ${data.error_description}`;
       }
 
       throw new Error(message);
@@ -1065,7 +1233,6 @@ export class ApiService {
       message += '  • Check if DDEV is running: ddev status\n';
       message += '  • Try HTTP instead of HTTPS\n';
       message += '  • Verify site is accessible in browser\n';
-      message += '  • For HTTPS issues, try: ddev auth ssl';
     } else {
       message += 'Check your site URL and internet connection.';
     }

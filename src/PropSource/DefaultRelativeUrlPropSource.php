@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\ComponentSource\UrlRewriteInterface;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropShape\PropShape;
+use Drupal\Component\Utility\SortArray;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\canvas\ComponentSource\UrlRewriteInterface;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
-use Drupal\canvas\PropShape\PropShape;
 
 /**
  * Prop source that is used to reference default relative URLs.
@@ -23,7 +24,7 @@ use Drupal\canvas\PropShape\PropShape;
  * that can be used as a default value.
  *
  * @see \Drupal\canvas\ComponentSource\UrlRewriteInterface
- * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
  * @internal
  *
  * @phpstan-import-type DefaultRelativeUrlPropSourceArray from PropSourceBase
@@ -86,8 +87,8 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
     )->schema;
 
     $sdc_prop_source_json_schema = $sdc_prop_source['jsonSchema'];
-    self::recursiveKsort($sdc_prop_source_json_schema);
-    self::recursiveKsort($minimal);
+    SortArray::sortByKeyRecursive($sdc_prop_source_json_schema);
+    SortArray::sortByKeyRecursive($minimal);
 
     if ($sdc_prop_source_json_schema !== $minimal) {
       throw new \LogicException(\sprintf('Extraneous JSON Schema information detected: %s should have been just %s.', json_encode($sdc_prop_source_json_schema, JSON_PRETTY_PRINT), json_encode($minimal, JSON_PRETTY_PRINT)));
@@ -98,18 +99,6 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
       $sdc_prop_source['jsonSchema'],
       $sdc_prop_source['componentId'],
     );
-  }
-
-  /**
-   * @todo Remove this once Canvas requires Drupal 11.3, which added this to Drupal core: https://www.drupal.org/project/drupal/issues/3556987
-   */
-  private static function recursiveKsort(array &$array): void {
-    ksort($array);
-    foreach ($array as &$value) {
-      if (\is_array($value)) {
-        self::recursiveKsort($value);
-      }
-    }
   }
 
   /**

@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\MissingHostEntityException;
 use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\canvas\Plugin\AdapterManager;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\Labeler;
+use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\Component\Plugin\Definition\PluginDefinitionInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\canvas\MissingHostEntityException;
-use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
@@ -32,7 +33,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
  * @phpstan-import-type PropSourceArray from PropSourceBase
  * @internal
  */
-final class EntityFieldPropSource extends PropSourceBase implements LinkedPropSourceInterface {
+final class EntityFieldPropSource extends PropSourceBase implements LinkablePropSourceInterface {
 
   /**
    * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $expression
@@ -111,12 +112,12 @@ final class EntityFieldPropSource extends PropSourceBase implements LinkedPropSo
     if ($host_entity === NULL) {
       throw new MissingHostEntityException();
     }
-    $raw_result = Evaluator::evaluate($host_entity, $this->expression, $is_required);
+    $raw_result = Evaluator::evaluate($host_entity, $this->expression, $is_required, NegotiatedLanguage::matchEntity($host_entity));
 
     // Only adapt non-empty results.
     if ($this->adapter && $raw_result->value !== NULL) {
       // Only adapter plugins with a single input are accepted, which is how
-      // this is able to remain much simpler than AdaptedPropSource
+      // this is able to remain much simpler than AdaptedPropSource.
       // @see ::__construct()
       // @see \Drupal\canvas\PropSource\AdaptedPropSource
       $sole_input_name = \array_keys($this->adapter->getInputs())[0];

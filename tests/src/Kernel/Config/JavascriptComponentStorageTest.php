@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
-use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -13,6 +12,7 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\MissingHostEntityException;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Traits\ComponentTreeItemInstantiatorTrait;
@@ -56,6 +56,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     parent::setUp();
     $this->installEntitySchema('user');
     $this->installEntitySchema('node');
+    $this->installEntitySchema('path_alias');
     NodeType::create(['type' => 'news_item', 'name' => 'News item'])->save();
     $this->createImageField('field_photo', 'node', 'news_item');
   }
@@ -140,7 +141,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     // Use a non-storable prop shape. The JavaScript Component config entity's
     // config schema SHOULD prevent the component author from choosing props
     // that the Drupal Canvas cannot generate an input UX for.
-    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase
     // @see the `Choice` constraints on `type: canvas.js_component.*`'s for prop `format`.
     $props['title']['format'] = 'hostname';
     $js_component->setProps($props);
@@ -231,6 +232,14 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     self::assertArrayNotHasKey('x-allowed-bundle', $sdc_definition['props']['properties']['fan']);
     self::assertSame('node', $sdc_definition['props']['properties']['featured_news']['x-allowed-entity-type-id']);
     self::assertSame('news_item', $sdc_definition['props']['properties']['featured_news']['x-allowed-bundle']);
+    // The UI-facing client representation should receive the same projected
+    // props so it can constrain content-entity-reference selection without
+    // parsing expressions.
+    $client_side_props = $js_component->normalizeForClientSide()->values['props'];
+    self::assertSame('user', $client_side_props['fan']['x-allowed-entity-type-id']);
+    self::assertArrayNotHasKey('x-allowed-bundle', $client_side_props['fan']);
+    self::assertSame('node', $client_side_props['featured_news']['x-allowed-entity-type-id']);
+    self::assertSame('news_item', $client_side_props['featured_news']['x-allowed-bundle']);
     // The persisted config entity's props are untouched by the projection.
     $persisted_props = $js_component->getProps();
     \assert(\is_array($persisted_props));
@@ -349,7 +358,6 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
    * payload keyed by entity-key-mapped field names (e.g. `title` → `label`).
    */
   public function testHostEntityPropSourceResolvesAgainstHost(): void {
-    $this->installEntitySchema('path_alias');
     $this->setUpCurrentUser([], ['access content']);
 
     $machine_name = 'host_entity_render_test';
@@ -400,7 +408,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
       $result['source']['host_node'],
     );
     self::assertInstanceOf(EvaluationResult::class, $result['resolved']['host_node']);
-    self::assertSame(['label' => 'The host news item'], $result['resolved']['host_node']->value);
+    self::assertSame(['__type' => 'news_item', 'label' => 'The host news item'], $result['resolved']['host_node']->value);
   }
 
   /**

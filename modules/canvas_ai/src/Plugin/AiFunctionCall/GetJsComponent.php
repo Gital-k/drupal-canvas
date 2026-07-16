@@ -2,9 +2,6 @@
 
 namespace Drupal\canvas_ai\Plugin\AiFunctionCall;
 
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Plugin\Context\ContextDefinition;
-use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
@@ -12,6 +9,9 @@ use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Plugin\Context\ContextDefinition;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Yaml\Yaml;
 
@@ -22,7 +22,7 @@ use Symfony\Component\Yaml\Yaml;
   id: 'ai_agent:get_js_component',
   function_name: 'ai_agent_get_js_component',
   name: 'Get JS Component',
-  description: 'This method gets the javascript and the css for a JS component.',
+  description: 'This method gets the javascript, css, props and slots for a JS component.',
   group: 'information_tools',
   module_dependencies: ['canvas'],
   context_definitions: [
@@ -35,6 +35,8 @@ use Symfony\Component\Yaml\Yaml;
   ],
 )]
 final class GetJsComponent extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface {
+
+  use AiGeneratedJsComponentPropsAndSlotsTrait;
 
   /**
    * The entity type manager.
@@ -105,10 +107,13 @@ final class GetJsComponent extends FunctionCallBase implements ExecutableFunctio
       $array = $save->entity->toArray();
     }
 
-    // Only give back the js and css.
+    // Give back the js, css and the props and slots in the shape the agent
+    // passes back to the create and edit tools.
     $output = [
       'js' => $array['js']['original'],
       'css' => $array['css']['original'],
+      'props_metadata' => $this->buildPropsMetadataFromStored($array['props'] ?? [], $array['required'] ?? []),
+      'slots_metadata' => $this->buildSlotsMetadataFromStored($array['slots'] ?? []),
     ];
 
     $this->information = Yaml::dump($output, 10, 2);

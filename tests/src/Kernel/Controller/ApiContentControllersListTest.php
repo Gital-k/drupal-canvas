@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Controller;
 
 // cspell:ignore Gábor Hojtsy uniquesearchterm gàbor autosave searchterm
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Entity\EntityPublishedInterface;
+
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\Page;
+use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -586,7 +587,9 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
       'canvas_page_list',
       'config:system.site',
       'test_create_access_cache_tag',
+      'canvas_page:1',
       AutoSaveManager::CACHE_TAG,
+      'canvas_page:5',
     ];
     $actual_cache_tags = $cache_metadata->getCacheTags();
     self::assertEquals($expected_cache_tags, $actual_cache_tags, 'Cache tags should match');

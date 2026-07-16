@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\Depends;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component as ComponentEntity;
-use Drupal\canvas\PropShape\PersistentPropShapeRepository;
-use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropShape\EphemeralPropShapeRepository;
+use Drupal\canvas\PropShape\PersistentPropShapeRepository;
+use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
+use Drupal\canvas\PropShape\StorablePropShape;
+use Drupal\canvas\PropSource\StaticPropSource;
+use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\canvas\Validation\JsonSchema\CustomConstraintError;
 use Drupal\canvas_test_storable_prop_shape_alter\Hook\CanvasTestStorablePropShapeAlterHooks;
 use Drupal\canvas_test_storable_prop_shape_alter\Plugin\Field\FieldType\MultipleOfItem;
@@ -22,24 +30,17 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormState;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
-use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
-use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
-use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
-use Drupal\canvas\PropShape\PropShape;
-use Drupal\canvas\PropShape\StorablePropShape;
-use Drupal\canvas\PropSource\StaticPropSource;
-use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\link\LinkItemInterface;
+use Drupal\link\LinkTitleVisibility;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\system\Functional\Form\StubForm;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use JsonSchema\Constraints\Constraint;
 use JsonSchema\Validator;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Depends;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -214,6 +215,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       new PropShape(['type' => 'string', 'enum' => ['horizontal', 'vertical']]),
       new PropShape(['type' => 'string', 'enum' => ['lazy', 'eager']]),
       PropShape::normalize(['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']]),
+      PropShape::normalize(['type' => 'string', 'enum' => ['php', 'html', 'md', 'js', 'ts', 'jsx', 'tsx'], 'meta:enum' => ['php' => 'PHP', 'html' => 'HTML', 'md' => 'Markdown', 'js' => 'JavaScript', 'ts' => 'TypeScript', 'jsx' => 'JSX', 'tsx' => 'TSX']]),
       new PropShape(['type' => 'string', 'enum' => ['power', 'like', 'external']]),
       new PropShape(['type' => 'string', 'enum' => ['prefix', 'suffix']]),
       new PropShape(['type' => 'string', 'enum' => ['primary', 'secondary']]),
@@ -402,6 +404,18 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ],
       ),
+      'type=string&enum[0]=php&enum[1]=html&enum[2]=md&enum[3]=js&enum[4]=ts&enum[5]=jsx&enum[6]=tsx' => new StorablePropShape(
+        shape: PropShape::normalize([
+          'type' => 'string',
+          'enum' => ['php', 'html', 'md', 'js', 'ts', 'jsx', 'tsx'],
+          'meta:enum' => ['php' => 'PHP', 'html' => 'HTML', 'md' => 'Markdown', 'js' => 'JavaScript', 'ts' => 'TypeScript', 'jsx' => 'JSX', 'tsx' => 'TSX'],
+        ]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
       'type=string&enum[0]=auto&enum[1]=manual' => new StorablePropShape(
         shape: new PropShape([
           'type' => 'string',
@@ -524,15 +538,10 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         shape: new PropShape(['type' => 'string', 'format' => 'uri']),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
         fieldInstanceSettings: [
-          'title' => DRUPAL_DISABLED,
+          'title' => LinkTitleVisibility::Disabled->value,
           'link_type' => LinkItemInterface::LINK_EXTERNAL,
         ],
         fieldWidget: 'link_default',
-      ),
-      'type=string&minLength=2' => new StorablePropShape(
-        shape: new PropShape(['type' => 'string', 'minLength' => 2]),
-        fieldTypeProp: new FieldTypePropExpression('string', 'value'),
-        fieldWidget: 'string_textfield',
       ),
       'type=string&format=date' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Date->value]),
@@ -564,7 +573,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         shape: new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Iri->value]),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
         fieldInstanceSettings: [
-          'title' => DRUPAL_DISABLED,
+          'title' => LinkTitleVisibility::Disabled->value,
           'link_type' => LinkItemInterface::LINK_EXTERNAL,
         ],
         fieldWidget: 'link_default',
@@ -573,7 +582,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         shape: new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::IriReference->value]),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
         fieldInstanceSettings: [
-          'title' => DRUPAL_DISABLED,
+          'title' => LinkTitleVisibility::Disabled->value,
           'link_type' => LinkItemInterface::LINK_GENERIC,
         ],
         fieldWidget: 'link_default',
@@ -582,7 +591,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         shape: new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::UriReference->value]),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
         fieldInstanceSettings: [
-          'title' => DRUPAL_DISABLED,
+          'title' => LinkTitleVisibility::Disabled->value,
           'link_type' => LinkItemInterface::LINK_GENERIC,
         ],
         fieldWidget: 'link_default',
@@ -591,7 +600,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         shape: new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::UriReference->value, CustomConstraintError::X_ALLOWED_SCHEMES => ['http', 'https']]),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
         fieldInstanceSettings: [
-          'title' => DRUPAL_DISABLED,
+          'title' => LinkTitleVisibility::Disabled->value,
           'link_type' => LinkItemInterface::LINK_GENERIC,
         ],
         fieldWidget: 'link_default',
@@ -877,7 +886,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldInstanceSettings: [
-          'title' => DRUPAL_DISABLED,
+          'title' => LinkTitleVisibility::Disabled->value,
           'link_type' => LinkItemInterface::LINK_EXTERNAL,
         ],
         fieldWidget: 'link_default',
@@ -887,7 +896,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
         cardinality: 3,
         fieldInstanceSettings: [
-          'title' => DRUPAL_DISABLED,
+          'title' => LinkTitleVisibility::Disabled->value,
           'link_type' => LinkItemInterface::LINK_EXTERNAL,
         ],
         fieldWidget: 'link_default',
@@ -897,7 +906,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldInstanceSettings: [
-          'title' => DRUPAL_DISABLED,
+          'title' => LinkTitleVisibility::Disabled->value,
           'link_type' => LinkItemInterface::LINK_GENERIC,
         ],
         fieldWidget: 'link_default',
@@ -907,7 +916,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
         cardinality: 3,
         fieldInstanceSettings: [
-          'title' => DRUPAL_DISABLED,
+          'title' => LinkTitleVisibility::Disabled->value,
           'link_type' => LinkItemInterface::LINK_GENERIC,
         ],
         fieldWidget: 'link_default',
@@ -963,6 +972,11 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       'type=string&format=time' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Time->value]),
       'type=string&format=uri-template' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::UriTemplate->value]),
       'type=string&format=uuid' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Uuid->value]),
+      // `minLength` cannot be enforced by Drupal core's string field types,
+      // nor by the existing translation systems (content translation, config
+      // translation, TMGMT).
+      // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
+      'type=string&minLength=2' => new PropShape(['type' => 'string', 'minLength' => 2]),
       'type=array&items[type]=integer&items[minimum]=-100&items[maximum]=100&maxItems=100&minItems=2' => new PropShape([
         'type' => 'array',
         'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100],
@@ -1050,12 +1064,9 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       //   parts of the generated value using the stored expression in such a
       //   way that the SDC component validator reports no errors.
       $randomized_prop_source = $prop_source->randomizeValue();
-
       // Some core SDCs have enums without meta:enums, which we aren't
       // supporting. So instead of option_list we are getting a textfield.
-      // So we would need to ignore those or just use one of the
-      // valid values for now. This should not be needed after requiring 11.2.x
-      // which will include https://drupal.org/i/3493070.
+      // So we would need to ignore those or just use one of the valid values.
       if (isset($storable_prop_shape->shape->schema['enum'])) {
         $randomized_prop_source = $prop_source->withValue($storable_prop_shape->shape->schema['enum'][0]);
       }

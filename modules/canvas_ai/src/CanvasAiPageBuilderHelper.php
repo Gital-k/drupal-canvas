@@ -2,24 +2,29 @@
 
 namespace Drupal\canvas_ai;
 
-use Drupal\Component\Serialization\Json;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Theme\ComponentPluginManager;
-use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\Url;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\HttpKernelInterface;
-use Symfony\Component\Yaml\Yaml;
-use Drupal\Component\Utility\DiffArray;
-use Drupal\Component\Uuid\UuidInterface;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\canvas\Component\Schema\PropMetadataNormalizer;
+use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\Component\Render\MarkupInterface;
+use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\DiffArray;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Component\Uuid\UuidInterface;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\VariationCacheInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\TypedConfigManagerInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ThemeHandlerInterface;
+use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\Template\Attribute as TemplateAttribute;
+use Drupal\Core\Theme\ComponentPluginManager;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Provides helper methods for AI page builder.
@@ -27,6 +32,11 @@ use Drupal\Component\Utility\NestedArray;
 class CanvasAiPageBuilderHelper {
 
   use StringTranslationTrait;
+
+  /**
+   * Cache key for storing all components keyed by source.
+   */
+  public const CACHE_KEY_ALL_COMPONENTS_BY_SOURCE = 'canvas_ai:all_components_by_source';
 
   /**
    * Constructor.
@@ -37,30 +47,90 @@ class CanvasAiPageBuilderHelper {
    *   The entity type manager.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory.
-   * @param \Symfony\Component\HttpKernel\HttpKernelInterface $httpKernel
-   *   The HTTP kernel.
-   * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
-   *   The stack of requests.
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
    *   The UUID service.
    * @param \Drupal\canvas_ai\CanvasAiTempStore $canvasAiTempstore
    *   The Canvas AI tempstore.
+   * @param \Drupal\Core\Cache\VariationCacheInterface $variationCache
+   *   The persistent variation cache.
+   * @param \Drupal\Core\Cache\VariationCacheInterface $memoryVariationCache
+   *   The in-request variation cache, backed by the memory bin so it honors
+   *   tag invalidations that happen mid-request.
    * @param \Drupal\Core\Extension\ThemeHandlerInterface $themeHandler
    *   The theme handler.
    * @param \Drupal\canvas\Component\Schema\PropMetadataNormalizer $propMetadataNormalizer
    *   The prop metadata normalizer.
+   * @param \Drupal\canvas\Controller\ApiConfigControllers $apiConfigControllers
+   *   The API config controllers service.
+   * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $loggerFactory
+   *   The logger channel factory.
+   * @param \Drupal\Core\Config\TypedConfigManagerInterface $typedConfigManager
+   *   The typed config manager.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly ConfigFactoryInterface $configFactory,
-    private readonly HttpKernelInterface $httpKernel,
-    private readonly RequestStack $requestStack,
     private readonly UuidInterface $uuidService,
     private readonly CanvasAiTempStore $canvasAiTempstore,
+    #[Autowire(service: 'cache.variation.canvas_ai')]
+    private readonly VariationCacheInterface $variationCache,
+    #[Autowire(service: 'cache.variation.canvas_ai_memory')]
+    private readonly VariationCacheInterface $memoryVariationCache,
     private readonly ThemeHandlerInterface $themeHandler,
     private readonly PropMetadataNormalizer $propMetadataNormalizer,
+    private readonly ApiConfigControllers $apiConfigControllers,
+    #[Autowire(service: 'logger.factory')]
+    private readonly LoggerChannelFactoryInterface $loggerFactory,
+    private readonly TypedConfigManagerInterface $typedConfigManager,
   ) {
+  }
+
+  /**
+   * Combines all canvas page entity field updates under a single key.
+   *
+   * @param array $response
+   *   The current response array from the orchestrator.
+   *
+   * @return array
+   *   The modified response array.
+   *
+   * @see ui/src/components/aiExtension/AiWizard.tsx
+   * @see \Drupal\canvas_ai\Plugin\AiFunctionCall\CreateFieldContent
+   * @see \Drupal\canvas_ai\Plugin\AiFunctionCall\EditFieldContent
+   * @see \Drupal\canvas_ai\Plugin\AiFunctionCall\AddMetadata
+   */
+  public function processCanvasPageFields(array $response): array {
+    $canvasPageData = [];
+
+    // 'created_content' is set when the AI creates a new title; 'refined_text'
+    // when it edits an existing one. They come from separate tools, so only one
+    // is expected per response. If the AI returns both, prefer the created title
+    // and drop the refined one to keep the result deterministic.
+    if (!empty($response['created_content']) && !empty($response['refined_text'])) {
+      $this->loggerFactory->get('canvas_ai')->info('AI returned both created_content and refined_text; using created_content.');
+      unset($response['refined_text']);
+    }
+    if (!empty($response['created_content'])) {
+      $canvasPageData['title[0][value]'] = $response['created_content'];
+      unset($response['created_content']);
+    }
+    elseif (!empty($response['refined_text'])) {
+      $canvasPageData['title[0][value]'] = $response['refined_text'];
+      unset($response['refined_text']);
+    }
+    if (!empty($response['metadata']['metatag_description'])) {
+      $canvasPageData['description[0][value]'] = $response['metadata']['metatag_description'];
+      unset($response['metadata']['metatag_description']);
+      if (empty($response['metadata'])) {
+        unset($response['metadata']);
+      }
+    }
+
+    if (!empty($canvasPageData)) {
+      $response['canvas_page_data'] = $canvasPageData;
+    }
+    return $response;
   }
 
   /**
@@ -247,28 +317,45 @@ class CanvasAiPageBuilderHelper {
    *   The components keyed by source.
    */
   public function getAllComponentsKeyedBySource(): array {
-    $output = [];
-    $current_request = $this->requestStack->getCurrentRequest();
-    $sub_request = Request::create(
-      Url::fromRoute('canvas.api.config.list', ['canvas_config_entity_type_id' => Component::ENTITY_TYPE_ID])->toString(),
-      'GET',
-      [],
-      $current_request?->cookies->all() ?? [],
-      [],
-      $current_request?->server->all() ?? []
-    );
-    $sub_request->attributes->set('_format', 'json');
-    try {
-      $available_components_response = $this->httpKernel->handle($sub_request, HttpKernelInterface::SUB_REQUEST);
-      $available_components = (string) $available_components_response->getContent();
-      $available_components = Json::decode($available_components);
+    $cache_keys = [self::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE];
+    $initial_cacheability = $this->getComponentListCacheability();
+
+    // First check the memory cache.
+    $memory_hit = $this->memoryVariationCache->get($cache_keys, $initial_cacheability);
+    if ($memory_hit instanceof \stdClass) {
+      return $memory_hit->data;
     }
-    catch (\Exception) {
+
+    // Then the persistent cache. On a hit, promote into the memory cache.
+    $cache = $this->variationCache->get($cache_keys, $initial_cacheability);
+    if ($cache instanceof \stdClass) {
+      $promoted_cacheability = (new CacheableMetadata())
+        ->setCacheTags((array) $cache->tags)
+        ->addCacheableDependency($initial_cacheability);
+      $this->memoryVariationCache->set($cache_keys, $cache->data, $promoted_cacheability, $initial_cacheability);
+      return $cache->data;
+    }
+
+    // Get the available components.
+    try {
+      $available_components_response = $this->apiConfigControllers->list(Component::ENTITY_TYPE_ID);
+      $available_components = Json::decode((string) $available_components_response->getContent());
+    }
+    catch (\Exception $e) {
+      $this->loggerFactory->get('canvas_ai')->error('Failed to load available components: @message', ['@message' => $e->getMessage()]);
+      // Cache the empty result in memory only so a failing call does not
+      // repeat within a single request, but is retried on the next one.
+      $this->memoryVariationCache->set($cache_keys, [], $initial_cacheability, $initial_cacheability);
       return [];
     }
     if (empty($available_components)) {
+      $empty_cacheability = CacheableMetadata::createFromObject($available_components_response->getCacheableMetadata());
+      $empty_cacheability->addCacheableDependency($initial_cacheability);
+      $this->memoryVariationCache->set($cache_keys, [], $empty_cacheability, $initial_cacheability);
       return [];
     }
+
+    $output = [];
 
     /** @var \Drupal\canvas\Entity\Component[] $component_entities */
     $component_entities = $this->entityTypeManager->getStorage(Component::ENTITY_TYPE_ID)->loadMultiple(\array_keys($available_components));
@@ -276,6 +363,15 @@ class CanvasAiPageBuilderHelper {
 
     foreach ($component_entities as $component) {
       $source = $component->getComponentSource()->getPluginId();
+      // Currently the agents only work with SDC, block and JS components.
+      $supported_sources = [
+        SingleDirectoryComponent::SOURCE_PLUGIN_ID,
+        JsComponent::SOURCE_PLUGIN_ID,
+        BlockComponent::SOURCE_PLUGIN_ID,
+      ];
+      if (!\in_array($source, $supported_sources, TRUE)) {
+        continue;
+      }
       $source_label = (string) $component->getComponentSource()->getPluginDefinition()['label'];
       if (empty($source_label)) {
         $source_label = $source;
@@ -290,15 +386,54 @@ class CanvasAiPageBuilderHelper {
         $this->processCodeComponents($component, $output, $available_components[$component_id]);
       }
       else {
-        // Other sources: id, name, description (description = name)
-        $output[$source]['components'][$component_id] = [
-          'id' => $component_id,
-          'name' => $component->label(),
-          'description' => $component->label(),
-        ];
+        $this->processBlock($component, $output);
       }
     }
+    $cacheability = CacheableMetadata::createFromObject($available_components_response->getCacheableMetadata());
+    $cacheability->addCacheableDependency($initial_cacheability);
+    $this->variationCache->set($cache_keys, $output, $cacheability, $initial_cacheability);
+    $this->memoryVariationCache->set($cache_keys, $output, $cacheability, $initial_cacheability);
+
     return $output;
+  }
+
+  /**
+   * Loads all block components from storage, keyed by component id.
+   *
+   * Helper for the 0007 post_update hook. That hook runs via `drush updb` as
+   * the anonymous user, for which getAllComponentsKeyedBySource() returns
+   * nothing because it access-checks the component listing. This loads block
+   * components straight from storage instead, so it is independent of the
+   * current user.
+   *
+   * @return array
+   *   Enabled block components keyed by component id, including their props.
+   *
+   * @see canvas_ai_post_update_0007_add_block_props_to_component_description_settings()
+   */
+  public function getEnabledBlockComponentsFromStorage(): array {
+    $output = [];
+    $components = $this->entityTypeManager
+      ->getStorage(Component::ENTITY_TYPE_ID)
+      ->loadByProperties(['status' => TRUE]);
+    foreach ($components as $component) {
+      if ($component->getComponentSource()->getPluginId() === BlockComponent::SOURCE_PLUGIN_ID) {
+        $this->processBlock($component, $output);
+      }
+    }
+    return $output[BlockComponent::SOURCE_PLUGIN_ID]['components'] ?? [];
+  }
+
+  /**
+   * Builds cacheable metadata for the component listing.
+   */
+  private function getComponentListCacheability(): CacheableMetadata {
+    $component_entity_type = $this->entityTypeManager->getDefinition(Component::ENTITY_TYPE_ID);
+    $cacheability = new CacheableMetadata();
+    $cacheability->setCacheContexts($component_entity_type->getListCacheContexts());
+    $cacheability->setCacheTags($component_entity_type->getListCacheTags());
+    $cacheability->addCacheContexts(['user.permissions']);
+    return $cacheability;
   }
 
   /**
@@ -500,19 +635,27 @@ class CanvasAiPageBuilderHelper {
       $client_normalized = $component->normalizeForClientSide()->values;
       $output[$source_id]['components'][$component_id]['props'] = [];
       foreach ($props as $prop_name => $prop_details) {
-        if ($prop_name === 'attributes') {
+        // Skip Drupal attributes prop.
+        if (($prop_details['type'] ?? NULL) === TemplateAttribute::class) {
           continue;
+        }
+        $default_value = $client_normalized["propSources"][$prop_name]["default_values"]["resolved"] ?? $prop_details['default'] ?? $prop_details['examples'][0] ?? NULL;
+        // Default values of some props may have HTML markup as default value.
+        // Convert it to string so that it can be safely YAML encoded when saving
+        // the CanvasAiComponentDescriptionSettingsForm config.
+        if ($default_value instanceof MarkupInterface) {
+          $default_value = (string) $default_value;
         }
         $prop_metadata = [
           'name' => $prop_details['title'] ?? $prop_name,
           'description' => $prop_details['description'] ?? 'No description available',
           'type' => $prop_details['type'],
-          'default' => $client_normalized["propSources"][$prop_name]["default_values"]["resolved"] ?? $prop_details['default'] ?? $prop_details['examples'][0] ?? NULL,
+          'default' => $default_value,
         ];
 
         // Mark required props.
         if (isset($sdc_definition['props']['required']) && \in_array($prop_name, $sdc_definition['props']['required'], TRUE)) {
-          $output[$source_id]['components'][$component_id]['props'][$prop_name]['required'] = TRUE;
+          $prop_metadata['required'] = TRUE;
         }
         if (isset($prop_details['enum'])) {
           $prop_metadata['enum'] = $prop_details['enum'];
@@ -544,9 +687,11 @@ class CanvasAiPageBuilderHelper {
     if (isset($component_data['propSources']) && \is_array($component_data['propSources'])) {
       $output[JsComponent::SOURCE_PLUGIN_ID]['components'][$component_id]['props'] = [];
       $metadata_properties = [];
+      $metadata_required = [];
       $component_source = $component->getComponentSource();
       if ($component_source instanceof JsComponent) {
         $metadata_properties = $component_source->getMetadata()->schema['properties'] ?? [];
+        $metadata_required = $component_source->getMetadata()->schema['required'] ?? [];
       }
       foreach ($component_data['propSources'] as $prop_name => $prop_details) {
         $prop_metadata = [
@@ -559,6 +704,9 @@ class CanvasAiPageBuilderHelper {
           'format' => $prop_details['jsonSchema']['format'] ?? '',
           'enum' => $prop_details['jsonSchema']['enum'] ?? '',
         ];
+        if (\in_array($prop_name, $metadata_required, TRUE)) {
+          $prop_metadata['required'] = TRUE;
+        }
         $prop_schema = $prop_details['jsonSchema'] ?? [];
         // The client-side prop schema strips meta:enum; pull labels from the
         // component metadata to keep option labels aligned with the UI.
@@ -584,6 +732,91 @@ class CanvasAiPageBuilderHelper {
         ];
       }
     }
+  }
+
+  /**
+   * Create the context data for Block components.
+   *
+   * @param \Drupal\canvas\Entity\Component $component
+   *   The component entity.
+   * @param array &$output
+   *   The output array to store the Block component data.
+   */
+  private function processBlock(Component $component, array &$output): void {
+    $component_id = $component->id();
+    $source_id = BlockComponent::SOURCE_PLUGIN_ID;
+    $output[$source_id]['components'][$component_id] = [
+      'id' => $component_id,
+      'name' => $component->label(),
+      'description' => $component->label(),
+    ];
+
+    $component_source = $component->getComponentSource();
+    if (!$component_source instanceof BlockComponent) {
+      return;
+    }
+
+    $raw_schema = $this->typedConfigManager->getDefinition('block.settings.' . $component->get('source_local_id'));
+    $mapping = $raw_schema['mapping'] ?? [];
+    if (!\is_array($mapping) || $mapping === []) {
+      return;
+    }
+
+    $settings = $component->getSettings();
+    $defaults = \is_array($settings['default_settings'] ?? NULL) ? $settings['default_settings'] : [];
+    $props = [];
+    foreach ($mapping as $prop_name => $prop_details) {
+      if (!\is_array($prop_details)) {
+        continue;
+      }
+      if (self::isBlockPropExcluded($prop_name)) {
+        continue;
+      }
+      $props[$prop_name] = [
+        'name' => $prop_details['label'] ?? $prop_name,
+        'description' => $prop_details['description'] ?? $prop_details['label'] ?? 'No description available',
+        'type' => $prop_details['type'] ?? 'string',
+        'default' => $defaults[$prop_name] ?? $prop_details['default'] ?? NULL,
+      ];
+      if (!\array_key_exists('requiredKey', $prop_details) || $prop_details['requiredKey'] !== FALSE) {
+        $props[$prop_name]['required'] = TRUE;
+      }
+      $enum = $this->getEnumFromSchemaConstraints($prop_details);
+      if (count($enum) > 0) {
+        $props[$prop_name]['enum'] = $enum;
+      }
+    }
+
+    if (!empty($props)) {
+      $output[$source_id]['components'][$component_id]['props'] = $props;
+    }
+  }
+
+  /**
+   * Returns TRUE if a block prop key should not be exposed to the agent.
+   *
+   * The context_mapping key is excluded because Canvas does not apply context
+   * mappings at render time, so any value written by the agent would have no
+   * effect.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentInstanceInputsConfigSchemaGenerator::getConfigSchemaMapping()
+   */
+  private static function isBlockPropExcluded(string $prop_name): bool {
+    return \in_array($prop_name, ['id', 'provider', 'admin_label', 'context_mapping'], TRUE);
+  }
+
+  /**
+   * Extracts enum values from config schema constraints.
+   *
+   * @param array $prop_details
+   *   The config schema definition for a prop.
+   *
+   * @return array
+   *   The enum values, if any.
+   */
+  private function getEnumFromSchemaConstraints(array $prop_details): array {
+    $choices = $prop_details['constraints']['Choice']['choices'] ?? [];
+    return \is_array($choices) ? $choices : [];
   }
 
   /**
@@ -1342,6 +1575,73 @@ class CanvasAiPageBuilderHelper {
 
     // For any other entity_type.
     return 'User has not created any entities';
+  }
+
+  /**
+   * Builds the state-specific prompt section for the component agent.
+   *
+   * Selects the prompt parts that match the current system state and returns
+   * them joined together, so the agent receives only the constraints that
+   * apply instead of evaluating the state itself.
+   *
+   * @param array $context
+   *   The current state, holding 'selected_component',
+   *   'selected_component_required_props', 'json_api_module_status' and
+   *   'menu_fetch_source'.
+   *
+   * @return string
+   *   The assembled prompt section.
+   *
+   * @see canvas_component_agent/dynamic_prompt_parts.yml
+   */
+  public function generateComponentAgentDynamicPromptSection(array $context): string {
+    $prompt_parts = Yaml::parseFile(__DIR__ . '/DynamicPrompts/canvas_component_agent/dynamic_prompt_parts.yml');
+
+    $selected_component = $context['selected_component'] ?? '';
+    $required_props = $context['selected_component_required_props'] ?? '';
+    $json_api_module_status = $context['json_api_module_status'] ?? '';
+    $menu_fetch_source = $context['menu_fetch_source'] ?? '';
+
+    $sections = [];
+
+    // Component editor state: which flow (create/edit) is available.
+    $sections[] = empty($selected_component)
+      ? $prompt_parts['selected_component']['empty']
+      : str_replace('{{selected_component}}', $selected_component, $prompt_parts['selected_component']['present']);
+
+    // Required props of the open component, when any are set.
+    if (!empty($selected_component) && !empty($required_props) && $required_props !== '[]') {
+      $sections[] = str_replace('{{required_props}}', $required_props, $prompt_parts['selected_component_required_props']);
+    }
+
+    // Content fetching constraints for the current JSON:API status.
+    if (isset($prompt_parts['json_api_module_status'][$json_api_module_status])) {
+      $sections[] = $prompt_parts['json_api_module_status'][$json_api_module_status];
+    }
+
+    // Menu fetching constraints for the current menu fetch source.
+    if (isset($prompt_parts['menu_fetch_source'][$menu_fetch_source])) {
+      $sections[] = $prompt_parts['menu_fetch_source'][$menu_fetch_source];
+    }
+
+    return implode("\n\n", \array_map('trim', $sections));
+  }
+
+  /**
+   * Formats user message and context into XML structure.
+   *
+   * @param string $context
+   *   The system context text.
+   * @param string $userMessage
+   *   The user message text.
+   *
+   * @return string
+   *   The formatted XML string with context and user message.
+   *
+   * @internal
+   */
+  public function formatMessageWithContext(string $context, string $userMessage): string {
+    return "<context>\n{$context}\n</context>\n\n<user_message>\n{$userMessage}\n</user_message>";
   }
 
 }

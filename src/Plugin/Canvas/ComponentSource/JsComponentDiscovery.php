@@ -8,6 +8,7 @@ use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -20,18 +21,22 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * @phpstan-import-type ComponentSourceSpecificId from \Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface
  * @internal
  */
-final class JsComponentDiscovery implements ComponentCandidatesDiscoveryInterface {
+final class JsComponentDiscovery extends JsonSchemaPropsComponentDiscoveryBase implements ComponentCandidatesDiscoveryInterface {
 
   public function __construct(
+    PropShapeRepositoryInterface $propShapeRepository,
     private readonly ConfigFactoryInterface $configFactory,
     private readonly EntityTypeManagerInterface $entityTypeManager,
-  ) {}
+  ) {
+    parent::__construct($propShapeRepository);
+  }
 
   /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container): self {
     return new static(
+      $container->get(PropShapeRepositoryInterface::class),
       $container->get(ConfigFactoryInterface::class),
       $container->get(EntityTypeManagerInterface::class),
     );
@@ -88,11 +93,17 @@ final class JsComponentDiscovery implements ComponentCandidatesDiscoveryInterfac
    */
   public function computeComponentSettings(string $source_specific_id): array {
     \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
-    $js_component = $this->discover()[$source_specific_id];
+    return $this->computeComponentSettingsForEntity($this->discover()[$source_specific_id]);
+  }
+
+  /**
+   * Computes component settings for a possibly unsaved Code Component.
+   */
+  public function computeComponentSettingsForEntity(JavaScriptComponent $js_component): array {
     $ephemeral_sdc_component = self::buildEphemeralSdcPluginInstance($js_component);
     // @see `type: canvas.component_source_settings.sdc`
     return [
-      'prop_field_definitions' => SingleDirectoryComponent::getPropsForComponentPlugin($ephemeral_sdc_component),
+      'prop_field_definitions' => $this->getPropsForComponentPlugin($ephemeral_sdc_component),
     ];
   }
 
@@ -147,7 +158,7 @@ final class JsComponentDiscovery implements ComponentCandidatesDiscoveryInterfac
    * @param array{required: bool, field_type: string, cardinality?: int, field_storage_settings?: array, field_instance_settings?: array, field_widget: string, default_value: array|null, expression: string}|null $prop_field_definitions
    *   (optional) Prop field definitions, when constructing an ephemeral SDC
    *   plugin instance for an existing Component version. Must match the
-   *   `type: canvas.generated_field_explicit_input_ux` config schema type.
+   *   `type: canvas.json_schema_props` config schema type.
    *
    * @throws \Drupal\Core\Render\Component\Exception\InvalidComponentException
    *   Thrown if invalid.

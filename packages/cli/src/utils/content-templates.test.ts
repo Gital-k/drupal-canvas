@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  authoredPropToServer,
+  contentTemplateToAuthored,
   serverPropToAuthored,
 } from './content-templates';
+
+import type { ContentTemplate } from '../types/ContentTemplate';
 
 describe('serverPropToAuthored', () => {
   it('passes simple entity-field prop sources through verbatim', () => {
@@ -82,59 +84,27 @@ describe('serverPropToAuthored', () => {
   });
 });
 
-describe('authoredPropToServer', () => {
-  it('passes prop-source objects through unchanged', () => {
-    const propSource = {
-      sourceType: 'entity-field',
-      expression: 'ℹ︎␜entity:node:article␝title␞␟value',
-    };
-    expect(authoredPropToServer(propSource)).toEqual(propSource);
-  });
-
-  it('passes host-entity-url prop sources through unchanged', () => {
-    const propSource = { sourceType: 'host-entity-url', absolute: false };
-    expect(authoredPropToServer(propSource)).toEqual(propSource);
-  });
-
-  it('passes plain values through unchanged', () => {
-    expect(authoredPropToServer('hello')).toBe('hello');
-    expect(authoredPropToServer(42)).toBe(42);
-    expect(authoredPropToServer(null)).toBe(null);
-  });
-
-  it('passes literal records through unchanged', () => {
-    const literal = { color: 'red', size: 'lg' };
-    expect(authoredPropToServer(literal)).toEqual(literal);
-  });
-});
-
-describe('roundtrip', () => {
-  it('preserves entity-field prop sources through pull and push', () => {
+describe('serverPropToAuthored roundtrip', () => {
+  it('preserves entity-field prop sources', () => {
     const original = {
       sourceType: 'entity-field',
       expression: 'ℹ︎␜entity:node:article␝title␞␟value',
     };
-    expect(authoredPropToServer(serverPropToAuthored(original))).toEqual(
-      original,
-    );
+    expect(serverPropToAuthored(original)).toEqual(original);
   });
 
-  it('preserves complex FieldObjectPropsExpression through pull and push', () => {
+  it('preserves complex FieldObjectPropsExpression', () => {
     const original = {
       sourceType: 'entity-field',
       expression:
         'ℹ︎␜entity:node:article␝field_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
     };
-    expect(authoredPropToServer(serverPropToAuthored(original))).toEqual(
-      original,
-    );
+    expect(serverPropToAuthored(original)).toEqual(original);
   });
 
-  it('preserves host-entity-url prop sources through pull and push', () => {
+  it('preserves host-entity-url prop sources', () => {
     const original = { sourceType: 'host-entity-url', absolute: false };
-    expect(authoredPropToServer(serverPropToAuthored(original))).toEqual(
-      original,
-    );
+    expect(serverPropToAuthored(original)).toEqual(original);
   });
 
   it('preserves adapter prop sources with nested entity-field inputs', () => {
@@ -148,8 +118,47 @@ describe('roundtrip', () => {
         imageStyle: { sourceType: 'static:field_item:string', value: 'large' },
       },
     };
-    expect(authoredPropToServer(serverPropToAuthored(original))).toEqual(
-      original,
-    );
+    expect(serverPropToAuthored(original)).toEqual(original);
+  });
+});
+
+describe('contentTemplateToAuthored', () => {
+  it('preserves authored content entity reference inputs instead of resolved values', () => {
+    const template: ContentTemplate = {
+      id: 'node.article.full',
+      label: 'Article full',
+      status: true,
+      entityType: 'node',
+      bundle: 'article',
+      viewMode: 'full',
+      component_tree: [
+        {
+          uuid: '11111111-1111-4111-8111-111111111111',
+          parent_uuid: null,
+          slot: null,
+          component_id: 'js.article-card',
+          component_version: 'v1',
+          inputs: {
+            article: { target_id: '42' },
+          },
+          inputs_resolved: {
+            article: {
+              __type: 'article',
+              title: 'Resolved article title',
+            },
+          },
+          label: null,
+        },
+      ],
+    };
+
+    expect(contentTemplateToAuthored(template).elements).toEqual({
+      '11111111-1111-4111-8111-111111111111': {
+        type: 'js.article-card',
+        props: {
+          article: { target_id: '42' },
+        },
+      },
+    });
   });
 });

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ShapeMatcher;
 
-use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\canvas\Plugin\Adapter\AdapterInterface;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
+use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\Labeler;
@@ -12,7 +14,7 @@ use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropSource\HostEntityUrlPropSource;
-use Drupal\canvas\PropSource\LinkedPropSourceInterface;
+use Drupal\canvas\PropSource\LinkablePropSourceInterface;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\Component\Utility\NestedArray;
@@ -22,8 +24,6 @@ use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Theme\Component\ComponentMetadata;
-use Drupal\canvas\Plugin\Adapter\AdapterInterface;
-use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 
 /**
  * Suggests prop sources for a component's props in a host entity type + bundle.
@@ -45,7 +45,7 @@ use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
  * @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher
  * @see \Drupal\canvas\ShapeMatcher\AdaptedPropSourceMatcher
  * @see \Drupal\canvas\ShapeMatcher\HostEntityUrlPropSourceMatcher
- * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getComponentInputsForMetadata()
  * @internal
  */
 final readonly class PropSourceSuggester {
@@ -101,12 +101,18 @@ final readonly class PropSourceSuggester {
     // 1. never suggest `default_langcode` base field
     // 2. never suggest `revision_log_message` base field
     // 3. never suggest `revision_default` base field
+    // 4. never suggest content_translation's `content_translation_source` and
+    //    `content_translation_outdated` base fields, added with fixed names to
+    //    a content entity type when one of its bundles is translatable.
+    // @see \Drupal\content_translation\ContentTranslationHandler::fieldStorageDefinitions()
     $content_entity_type_definition = $this->entityTypeManager->getDefinition($entity_type_id);
     \assert($content_entity_type_definition instanceof ContentEntityTypeInterface);
     $is_irrelevant = \in_array($expression_field_name, [
       $content_entity_type_definition->getKey('default_langcode'),
       $content_entity_type_definition->getRevisionMetadataKey('revision_default'),
       $content_entity_type_definition->getRevisionMetadataKey('revision_log_message'),
+      'content_translation_source',
+      'content_translation_outdated',
     ], TRUE);
     if ($is_irrelevant) {
       return TRUE;
@@ -244,7 +250,7 @@ final readonly class PropSourceSuggester {
   private function getRawMatches(string $component_plugin_id, ComponentMetadata $component_metadata, string $host_entity_type, string $host_entity_bundle): array {
     $raw_matches = [];
 
-    foreach (GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($component_plugin_id, $component_metadata) as $cpe_string => $prop_shape) {
+    foreach (JsonSchemaPropsComponentSourceBase::getComponentInputsForMetadata($component_plugin_id, $component_metadata) as $cpe_string => $prop_shape) {
       $cpe = ComponentPropExpression::fromString($cpe_string);
       // @see https://json-schema.org/understanding-json-schema/reference/object#required
       // @see https://json-schema.org/learn/getting-started-step-by-step#required
@@ -293,7 +299,7 @@ final readonly class PropSourceSuggester {
         // populate the component prop.
         fn (array $prop_sources): array => array_combine(
           \array_map(
-            fn (LinkedPropSourceInterface $prop_source): string => \hash('xxh64', $prop_source->asChoice()),
+            fn (LinkablePropSourceInterface $prop_source): string => \hash('xxh64', $prop_source->asChoice()),
             array_values($prop_sources),
           ),
           // Values: objects with "label" and "source" keys, with:
@@ -303,7 +309,7 @@ final readonly class PropSourceSuggester {
           //   selected by the human, the client should use verbatim as the
           //   source to populate this component instance's prop.
           \array_map(
-            function (string $label, LinkedPropSourceInterface $prop_source) {
+            function (string $label, LinkablePropSourceInterface $prop_source) {
               return [
                 'label' => $label,
                 'source' => $prop_source->toArray(),

@@ -2,34 +2,38 @@
 
 declare(strict_types=1);
 
-// cspell:ignore magnifique Propulsé Bienvenue savoir Découvrez Identité visuelle Nœud prévisualisation Bonjour région utilisant नोड
-
 namespace Drupal\Tests\canvas\Functional;
 
-use Drupal\canvas\Entity\Component;
+// cspell:ignore magnifique Propulsé Nœud prévisualisation Bonjour région utilisant नोड méthode Essayez
+
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Field\Entity\BaseFieldOverride;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\Url;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\language\Entity\ContentLanguageSettings;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Drupal\Core\Extension\ModuleInstallerInterface;
-use Drupal\Core\Url;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\ApiRequestTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\content_translation\Traits\ContentTranslationTestTrait;
+use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Psr\Http\Message\ResponseInterface;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Tests Translation.
@@ -81,8 +85,8 @@ class TranslationTest extends FunctionalTestBase {
   protected function setUp(): void {
     parent::setUp();
 
-    // In 11.2 and above we install modules in groups, which means this module
-    // cannot be installed in the same group as canvas
+    // Modules are installed in groups, which means this module cannot be
+    // installed in the same group as canvas
     \Drupal::service(ModuleInstallerInterface::class)->install(['canvas_test_config_node_article']);
 
     $article_template = ContentTemplate::create([
@@ -252,196 +256,6 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
-   * Tests config translation UI with mixed component instance input types.
-   *
-   * @see \Drupal\Tests\canvas\Kernel\Config\ContentTemplateTest::testTranslationLifeCycleInDepth()
-   * @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase::testGetTranslatableInputKeys()
-   * @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase::providerSymmetricallyTranslatableComponentInstanceScenarios()
-   */
-  public function testContentTemplateConfigTranslationUi(): void {
-    $module_installer = $this->container->get('module_installer');
-    \assert($module_installer instanceof ModuleInstallerInterface);
-    if (!$this->container->get('module_handler')->moduleExists('config_translation')) {
-      $module_installer->install(['config_translation']);
-      $this->rebuildContainer();
-      $module_installer = $this->container->get('module_installer');
-      \assert($module_installer instanceof ModuleInstallerInterface);
-    }
-
-    // 1. SETUP: create a fresh ContentTemplate with mixed component types.
-    $banner = Component::load('sdc.canvas_test_sdc.banner');
-    $my_hero = Component::load('sdc.canvas_test_sdc.my-hero');
-    $branding_block = Component::load('block.system_branding_block');
-    \assert($banner instanceof Component);
-    \assert($my_hero instanceof Component);
-    \assert($branding_block instanceof Component);
-
-    $banner_version = $banner->getActiveVersion();
-    $my_hero_version = $my_hero->getActiveVersion();
-    $branding_block_version = $branding_block->getActiveVersion();
-    $banner->loadVersion($banner_version);
-    $my_hero->loadVersion($my_hero_version);
-    $branding_block->loadVersion($branding_block_version);
-
-    $existing_template = ContentTemplate::load('node.article.full');
-    if ($existing_template instanceof ContentTemplate) {
-      $existing_template->delete();
-    }
-
-    $template = ContentTemplate::create([
-      'content_entity_type_id' => 'node',
-      'content_entity_type_bundle' => 'article',
-      'content_entity_type_view_mode' => 'full',
-      'component_tree' => self::populateActiveComponentVersionPlaceholders([
-        [
-          'uuid' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
-          'component_id' => 'sdc.canvas_test_sdc.banner',
-          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
-          'inputs' => [
-            'heading' => 'Welcome',
-            'text' => [
-              'value' => '<p>Hello</p>',
-              'format' => 'canvas_html_block',
-            ],
-          ],
-        ],
-        [
-          'uuid' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
-          'component_id' => 'sdc.canvas_test_sdc.my-hero',
-          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
-          'inputs' => [
-            'heading' => 'Welcome to Canvas',
-            // ⚠️ `subheading` is optional and not populated, but should still
-            // be translatable.
-            // @see \Drupal\canvas\ConfigTranslation\CanvasComponentTreeItemInputsMappingFormElement
-            'cta1' => [
-              'sourceType' => PropSource::EntityField->value,
-              'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
-            ],
-            'cta1href' => [
-              'sourceType' => PropSource::HostEntityUrl->value,
-              'absolute' => TRUE,
-            ],
-            'cta2' => 'Learn more',
-          ],
-        ],
-        [
-          'uuid' => 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3',
-          'component_id' => 'block.system_branding_block',
-          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
-          'inputs' => [
-            'label' => 'Branding',
-            'label_display' => 'visible',
-            'use_site_logo' => TRUE,
-            'use_site_name' => TRUE,
-            'use_site_slogan' => FALSE,
-          ],
-        ],
-      ]),
-    ]);
-    $violations = $template->getTypedData()->validate();
-    self::assertSame([], self::violationsToArray($violations), $template->getConfigTarget());
-    $template->save();
-
-    $config_name = 'canvas.content_template.node.article.full';
-    $translation_path = '/admin/structure/content-template/node.article.full/translate/fr/add';
-    $field_name_prefix = "translation[config_names][$config_name][component_tree]";
-    $field = static fn (string $suffix): string => $field_name_prefix . $suffix;
-
-    // 2. Confirm Templates are not translatable via the UI without
-    // `canvas_dev_translation` enabled.
-    $this->drupalLogin($this->rootUser);
-    $this->drupalGet($translation_path);
-    $assert_session = $this->assertSession();
-    $assert_session->statusCodeEquals(404);
-
-    if (!$this->container->get('module_handler')->moduleExists('canvas_dev_translation')) {
-      $module_installer->install(['canvas_dev_translation']);
-      $this->rebuildContainer();
-    }
-
-    // 3. Confirm Templates are translatable via the UI once
-    // `canvas_dev_translation` is enabled.
-    $this->drupalGet($translation_path);
-    $assert_session = $this->assertSession();
-    $assert_session->statusCodeEquals(200);
-
-    // 4. ASSERTIONS: verify rendered translatable/non-translatable fields.
-    $assert_session->fieldExists($field('[aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1][inputs][heading][0][value]'));
-    $assert_session->fieldExists($field('[aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1][inputs][text][0][value]'));
-    $assert_session->elementExists(
-      'css',
-      'input[type="hidden"][name="' . $field('[aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1][inputs][text][0][format]') . '"][value="canvas_html_block"]',
-    );
-
-    // My-hero: static props should exist
-    $assert_session->fieldExists($field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][heading][0][value]'));
-    $assert_session->fieldExists($field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][cta2][0][value]'));
-
-    // My-hero: non-static source props should NOT exist
-    $assert_session->fieldNotExists($field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][cta1]'));
-    $assert_session->fieldNotExists($field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][cta1][0][value]'));
-    $assert_session->fieldNotExists($field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][cta1href]'));
-    $assert_session->fieldNotExists($field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][cta1href][0][uri]'));
-
-    // My-hero: optional prop NOT in default SHOULD render: the translation of
-    // the component instance may opt to use it.
-    // @see \Drupal\canvas\ConfigTranslation\CanvasComponentTreeItemInputsMappingFormElement
-    $assert_session->fieldExists($field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][subheading][0][value]'));
-
-    $assert_session->fieldExists($field('[cccccccc-cccc-4ccc-8ccc-ccccccccccc3][inputs][label]'));
-
-    $assert_session->fieldNotExists($field('[cccccccc-cccc-4ccc-8ccc-ccccccccccc3][inputs][label_display]'));
-    $assert_session->fieldNotExists($field('[cccccccc-cccc-4ccc-8ccc-ccccccccccc3][inputs][use_site_logo]'));
-    $assert_session->fieldNotExists($field('[cccccccc-cccc-4ccc-8ccc-ccccccccccc3][inputs][use_site_name]'));
-    $assert_session->fieldNotExists($field('[cccccccc-cccc-4ccc-8ccc-ccccccccccc3][inputs][use_site_slogan]'));
-
-    // 5. SUBMIT: provide French translations in a single form submission.
-    $edit = [
-      $field('[aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1][inputs][heading][0][value]') => 'Welcome',
-      $field('[aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1][inputs][text][0][value]') => '<p>Bonjour</p>',
-      $field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][heading][0][value]') => 'Bienvenue à Canvas',
-      $field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][cta2][0][value]') => 'En savoir plus',
-      $field('[bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2][inputs][subheading][0][value]') => 'Découvrez Canvas',
-      $field('[cccccccc-cccc-4ccc-8ccc-ccccccccccc3][inputs][label]') => 'Identité visuelle',
-    ];
-    $this->submitForm($edit, 'Save translation');
-    $assert_session->pageTextContains('Successfully saved French translation');
-
-    // 6. VERIFY: ensure the exact expected LanguageConfigOverride is stored.
-    $language_manager = $this->container->get(LanguageManagerInterface::class);
-    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
-    $override = $language_manager->getLanguageConfigOverride('fr', $config_name);
-    self::assertFalse($override->isNew());
-    self::assertSame([
-      'component_tree' => [
-        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' => [
-          'inputs' => [
-            'text' => [
-              'value' => '<p>Bonjour</p>',
-            ],
-          ],
-        ],
-        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2' => [
-          'inputs' => [
-            'heading' => 'Bienvenue à Canvas',
-            'subheading' => 'Découvrez Canvas',
-            'cta2' => 'En savoir plus',
-          ],
-        ],
-        'cccccccc-cccc-4ccc-8ccc-ccccccccccc3' => [
-          'inputs' => [
-            'label' => 'Identité visuelle',
-          ],
-        ],
-      ],
-    ], $override->getRawData());
-
-    self::assertArrayNotHasKey('heading', $override->getRawData()['component_tree']['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1']['inputs']);
-    self::assertArrayNotHasKey(3, $override->getRawData()['component_tree']);
-  }
-
-  /**
    * Data provider for testCanvasFieldTranslation().
    *
    * @return array<array{0: array, 1: bool}>
@@ -573,6 +387,68 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
+   * Tests canvas_page content language settings enforce Canvas constraints.
+   */
+  public function testCanvasPageContentLanguageSettingsFormSubmitPersistsExpectedConfiguration(): void {
+    $assert_session = $this->assertSession();
+
+    // Verify enforced Canvas constraints in the form, then submit only visible
+    // controls and assert persisted config matches those constraints.
+    $this->drupalGet('admin/config/regional/content-language');
+
+    $assert_session->fieldValueEquals('settings[canvas_page][canvas_page][settings][language][langcode]', LanguageInterface::LANGCODE_SITE_DEFAULT);
+    $assert_session->elementAttributeExists('named', ['field', 'settings[canvas_page][canvas_page][settings][language][langcode]'], 'disabled');
+    $assert_session->fieldNotExists('settings[canvas_page][canvas_page][settings][language][language_alterable]');
+    $assert_session->fieldNotExists('settings[canvas_page][canvas_page][settings][content_translation][untranslatable_fields_hide]');
+
+    $this->submitForm([
+      'entity_types[canvas_page]' => 1,
+      'settings[canvas_page][canvas_page][translatable]' => 1,
+    ], 'Save configuration');
+
+    $assert_session->pageTextContains('Settings successfully updated.');
+
+    $content_language_settings = ContentLanguageSettings::loadByEntityTypeBundle(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID);
+    self::assertNotNull($content_language_settings);
+    self::assertSame(LanguageInterface::LANGCODE_SITE_DEFAULT, $content_language_settings->getDefaultLangcode());
+    self::assertFalse($content_language_settings->isLanguageAlterable());
+
+    $content_translation_manager = $this->container->get('content_translation.manager');
+    self::assertTrue($content_translation_manager->isEnabled(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID));
+    self::assertEquals([
+      'untranslatable_fields_hide' => 0,
+    ], $content_translation_manager->getBundleTranslationSettings(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID));
+
+    // The `components` base field override must have been forced to the
+    // symmetrical `translation_sync` combination, even though the form does
+    // not present the corresponding checkboxes.
+    // @see \Drupal\canvas\Hook\ModuleHooks::validateCanvasPageLanguageSettings()
+    $override = BaseFieldOverride::loadByName(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID, 'components');
+    self::assertNotNull($override);
+    self::assertSame([
+      'inputs' => 'inputs',
+      'tree' => '0',
+    ], $override->getThirdPartySetting('content_translation', 'translation_sync'));
+    self::assertSame([], self::violationsToArray($override->getTypedData()->validate()));
+
+    // Disable translation for the canvas_page bundle again:
+    // content_translation then saves the base field override without any
+    // `translation_sync` keys, which the config schema must allow.
+    // @see config/schema/canvas_symmetrical_translations_only.schema.yml
+    $this->drupalGet('admin/config/regional/content-language');
+    $this->submitForm([
+      'entity_types[canvas_page]' => 1,
+      'settings[canvas_page][canvas_page][translatable]' => 0,
+    ], 'Save configuration');
+    $assert_session->pageTextContains('Settings successfully updated.');
+
+    $override = BaseFieldOverride::loadByName(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID, 'components');
+    self::assertNotNull($override);
+    self::assertNull($override->getThirdPartySetting('content_translation', 'translation_sync'));
+    self::assertSame([], self::violationsToArray($override->getTypedData()->validate()));
+  }
+
+  /**
    * Creates an article node with a translation.
    *
    * @return \Drupal\node\Entity\Node
@@ -668,6 +544,14 @@ class TranslationTest extends FunctionalTestBase {
     $page->save();
 
     $fr_page = $page->addTranslation('fr');
+    // Set the translation source metadata, like the UI would: core's
+    // FieldTranslationSynchronizer — active for this field thanks to the
+    // `translation_sync` setting created on module install — requires
+    // it to synchronize a newly added translation.
+    // @see \Drupal\content_translation\Hook\ContentTranslationHooks::entityPresave()
+    $this->container->get('content_translation.manager')
+      ->getTranslationMetadata($fr_page)
+      ->setSource('en');
     $fr_page->set('title', 'Page de test Canvas');
     $fr_page->set('components', $page->get('components')->getValue());
     $fr_tree = $fr_page->getComponentTree();
@@ -731,22 +615,18 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
-   * Tests that the layout API returns translated content from language-prefixed routes when canvas_dev_translation is enabled.
+   * Tests that the layout API returns translated content from language-prefixed routes.
    *
    * @todo Replace with a Playwright test once translation preview UI exists.
    *   https://www.drupal.org/project/canvas/issues/3585452
    */
-  public function testCanvasDevTranslationLayoutApi(): void {
+  public function testTranslationLayoutApi(): void {
     // Delete the content template created in setUp() — this test needs a
     // heading-based template with explicit labels to assert translation.
     $existing_template = ContentTemplate::load('node.article.full');
     if ($existing_template instanceof ContentTemplate) {
       $existing_template->delete();
     }
-
-    $module_installer = $this->container->get(ModuleInstallerInterface::class);
-    $module_installer->install(['canvas_dev_translation']);
-    $this->rebuildContainer();
 
     $page = $this->createCanvasTranslationTestPage();
     $this->createPageRegionWithFrenchOverride();
@@ -812,7 +692,7 @@ class TranslationTest extends FunctionalTestBase {
     };
 
     // Helper: returns the first component's name from the first non-content
-    // region (the PageRegion created by canvas_dev_translation hook_install()).
+    // region (the PageRegion created by createPageRegionWithFrenchOverride()).
     $get_region_name_in_api_response = function (string $root_relative_url): ?string {
       $response = $this->makeApiRequest('GET', Url::fromUri("base:$root_relative_url"), []);
       self::assertSame(200, $response->getStatusCode());
@@ -868,6 +748,15 @@ class TranslationTest extends FunctionalTestBase {
     self::assertSame('Preview node', $get_resolved_title_in_api_response("/canvas/api/v0/layout-content-template/node.article.full/$node_id"));
     self::assertSame('Nœud de prévisualisation', $get_resolved_title_in_api_response("/fr/canvas/api/v0/layout-content-template/node.article.full/$node_id"));
 
+    // The preview ("example") entity must also be resolved in the requested
+    // language when the template is reached through the
+    // `?canvas_preview_langcode=` preview hint, which redirects to the
+    // negotiated URL asserted above.
+    $hinted = $this->makeApiRequest('GET', Url::fromUri("base:/canvas/api/v0/layout-content-template/node.article.full/$node_id", ['query' => ['canvas_preview_langcode' => 'fr']]), []);
+    self::assertSame(302, $hinted->getStatusCode());
+    self::assertStringContainsString("/fr/canvas/api/v0/layout-content-template/node.article.full/$node_id", $hinted->getHeaderLine('Location'));
+    self::assertSame('Nœud de prévisualisation', $get_resolved_title_in_api_response((string) parse_url($hinted->getHeaderLine('Location'), PHP_URL_PATH)));
+
     // Add a Hindi node translation to test fallback behavior when the
     // ContentTemplate has no Hindi translation. The template label should
     // fall back to English, but EntityFieldPropSource should resolve to the
@@ -886,16 +775,132 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
+   * Tests that the preview-language hint resolves the right translation.
+   *
+   * @see \Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber::redirectCanvasApiToPreviewLanguage()
+   */
+  #[DataProvider('previewLanguageNegotiationProvider')]
+  public function testCanvasPreviewLanguageNegotiation(string $method, ?string $prefix, string $expected_location): void {
+    $page = $this->createCanvasTranslationTestPage();
+    $layout_path = '/canvas/api/v0/layout/canvas_page/' . $page->id();
+
+    // Substitute the test site's base URL into the expected Location.
+    $base = parse_url($this->baseUrl);
+    self::assertIsArray($base);
+    $expected_location = strtr($expected_location, [
+      '{scheme}' => $base['scheme'] ?? 'http',
+      '{host}' => ($base['host'] ?? '') . (isset($base['port']) ? ':' . $base['port'] : ''),
+      '{base_path}' => $base['path'] ?? '',
+      '{layout_path}' => $layout_path,
+    ]);
+
+    switch ($method) {
+      case 'url':
+        if ($prefix !== NULL) {
+          $this->config('language.negotiation')->set('url.prefixes.fr', $prefix)->save();
+        }
+        break;
+
+      case 'domain':
+        // Negotiate the language from the domain instead of a URL prefix. The
+        // French domain is never requested; the test only asserts the redirect
+        // target.
+        $host = (string) parse_url($this->baseUrl, PHP_URL_HOST);
+        $this->config('language.negotiation')
+          ->set('url.source', LanguageNegotiationUrl::CONFIG_DOMAIN)
+          ->set('url.domains', ['en' => $host, 'fr' => 'fr.' . $host])
+          ->save();
+        break;
+
+      case 'session':
+        // Negotiate the language from the user-facing `language` query
+        // parameter via the session negotiator, with URL negotiation fully
+        // disabled — for the interface language too, since URL generation runs
+        // every enabled negotiation method's outbound processing, and the
+        // interface chain would otherwise still add a URL prefix to the
+        // redirect. The `language` parameter is a distinct concept from the
+        // internal `canvas_preview_langcode` hint; the redirect must translate
+        // the hint into it, via the negotiator's language switch links.
+        $this->config('language.negotiation')->set('session.parameter', 'language')->save();
+        $this->config('language.types')
+          ->set('negotiation.language_content.enabled', ['language-session' => -10, 'language-selected' => 12])
+          ->set('negotiation.language_interface.enabled', ['language-session' => -10, 'language-selected' => 12])
+          ->save();
+        break;
+
+      case 'session-content':
+        // Negotiate only the content language from the session negotiator,
+        // while the interface language keeps core's default URL-prefix
+        // negotiation: the redirect then carries both the interface chain's
+        // URL prefix (added by URL generation) and the content negotiator's
+        // query parameter.
+        $this->config('language.negotiation')->set('session.parameter', 'content_language')->save();
+        $this->config('language.types')
+          ->set('negotiation.language_content.enabled', ['language-session' => -10, 'language-selected' => 12])
+          ->save();
+        break;
+    }
+
+    // Requests a path (with an optional query) without following redirects.
+    $get = fn (string $path, array $query = []): ResponseInterface =>
+      $this->makeApiRequest('GET', Url::fromUri("base:$path", $query ? ['query' => $query] : []), []);
+    // Returns the first content-region component name from a 200 response.
+    $content_name = function (ResponseInterface $response): ?string {
+      self::assertSame(200, $response->getStatusCode());
+      $layout = json_decode((string) $response->getBody(), TRUE)['layout'];
+      $content_region = current(array_filter($layout, fn($r) => $r['id'] === 'content'));
+      return $content_region['components'][0]['name'];
+    };
+
+    // Baseline: no hint serves the default language.
+    self::assertSame('English heading', $content_name($get($layout_path)));
+
+    // A hint naming a language that does not exist is a request for a
+    // translation that cannot exist: 404, as a JSON:API-style error response
+    // (the exception is thrown after the router matched the Canvas API route, so
+    // ApiExceptionSubscriber converts it).
+    $not_found = $get($layout_path, ['canvas_preview_langcode' => 'xx']);
+    self::assertSame(404, $not_found->getStatusCode());
+    self::assertStringContainsString('application/json', $not_found->getHeaderLine('Content-Type'));
+    self::assertArrayHasKey('errors', json_decode((string) $not_found->getBody(), TRUE));
+
+    $response = $get($layout_path, ['canvas_preview_langcode' => 'fr']);
+    self::assertSame(302, $response->getStatusCode());
+    // The complete Location proves which negotiation method routed the
+    // translation: the URL prefix (which need not match the langcode), the
+    // language's domain, or the session negotiator's query parameter.
+    self::assertSame($expected_location, $response->getHeaderLine('Location'));
+
+    // Nothing persists the hint: repeating the hinted request redirects again.
+    self::assertSame(302, $get($layout_path, ['canvas_preview_langcode' => 'fr'])->getStatusCode());
+
+    // Regression: when the configured URL prefix differs from the langcode, the
+    // old langcode-as-prefix URL the buggy UI used no longer resolves.
+    if ($method === 'url' && $prefix !== NULL && $prefix !== 'fr') {
+      self::assertSame(404, $get("/fr$layout_path")->getStatusCode());
+    }
+  }
+
+  /**
+   * Data provider for ::testCanvasPreviewLanguageNegotiation().
+   */
+  public static function previewLanguageNegotiationProvider(): array {
+    return [
+      'URL prefix equal to langcode' => ['url', NULL, '{base_path}/fr{layout_path}'],
+      'URL prefix different from langcode' => ['url', 'francais', '{base_path}/francais{layout_path}'],
+      'domain per language' => ['domain', NULL, '{scheme}://fr.{host}{base_path}{layout_path}'],
+      'session (query parameter) negotiator' => ['session', NULL, '{base_path}{layout_path}?language=fr'],
+      'session content negotiation, URL-prefix interface negotiation' => ['session-content', NULL, '{base_path}/fr{layout_path}?content_language=fr'],
+    ];
+  }
+
+  /**
    * Tests canvas_page translation on /fr/page/{id}.
    *
    * Verifies that visiting /fr/page/{id} displays the French translation
    * of the canvas_page.
    */
   public function testTranslationForPage(): void {
-    $module_installer = $this->container->get(ModuleInstallerInterface::class);
-    $module_installer->install(['canvas_dev_translation']);
-    $this->rebuildContainer();
-
     $page = $this->createCanvasTranslationTestPage();
     $this->createPageRegionWithFrenchOverride();
     $page_id = $page->id();
@@ -1036,10 +1041,6 @@ class TranslationTest extends FunctionalTestBase {
    * it falls back to the default language (English).
    */
   public function testNonDefaultTranslationPageRegionTranslation(): void {
-    $module_installer = $this->container->get(ModuleInstallerInterface::class);
-    $module_installer->install(['canvas_dev_translation']);
-    $this->rebuildContainer();
-
     $this->createPageRegionWithFrenchOverride();
 
     // Create a plain article node with no French translation.
@@ -1060,6 +1061,150 @@ class TranslationTest extends FunctionalTestBase {
     // must fall back to the default language (English).
     $this->drupalGet("/hi/node/$nid");
     $this->assertSession()->pageTextContains('Hello from region');
+  }
+
+  /**
+   * Tests the Canvas API delete translation endpoint for canvas_page.
+   *
+   * Covers:
+   *  - 204 response when deleting a non-default translation.
+   *  - 400 response when attempting to delete the default translation.
+   *  - 400 response when the translation no longer exists.
+   *
+   * @see \Drupal\canvas\Controller\ApiTranslationControllers::delete()
+   */
+  public function testDeleteCanvasPageTranslation(): void {
+    $page_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Page::ENTITY_TYPE_ID);
+    $page = $this->createCanvasTranslationTestPage();
+    $page_id = (int) $page->id();
+    self::assertTrue($page->hasTranslation('fr'));
+    $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/content/canvas_page/{$page_id}/translations");
+
+    $user = $this->drupalCreateUser([]);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
+    // Attempting to delete non-default translation without the correct
+    // permission returns a 403.
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+    self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+    // Ensure the translation was not removed.
+    $reloaded = $page_storage->loadUnchanged($page_id);
+    self::assertInstanceOf(Page::class, $reloaded);
+    self::assertTrue($reloaded->hasTranslation('fr'));
+
+    // A user with entity update access but without the `delete content
+    // translations` permission must also be denied.
+    $user = $this->drupalCreateUser([Page::EDIT_PERMISSION]);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+    self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+    $reloaded = $page_storage->loadUnchanged($page_id);
+    self::assertInstanceOf(Page::class, $reloaded);
+    self::assertTrue($reloaded->hasTranslation('fr'));
+
+    // Only a user with both update access and `delete content translations`
+    // can successfully delete a translation.
+    $user = $this->drupalCreateUser([Page::EDIT_PERMISSION, 'delete content translations']);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
+
+    // Deleting a non-default translation removes it and returns 204.
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+    self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+
+    $reloaded = $page_storage->loadUnchanged($page_id);
+    self::assertInstanceOf(Page::class, $reloaded);
+    self::assertFalse($reloaded->hasTranslation('fr'));
+    self::assertTrue($reloaded->hasTranslation('en'));
+
+    // Trying to delete the default/source language is not allowed.
+    $delete_default_url = Url::fromUserInput("/canvas/api/v0/content/canvas_page/{$page_id}/translations");
+    $response = $this->makeApiRequest('DELETE', $delete_default_url, $request_options);
+    self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+    $reloaded = $page_storage->loadUnchanged($page_id);
+    self::assertInstanceOf(Page::class, $reloaded);
+    self::assertTrue($reloaded->hasTranslation('en'));
+
+    // Trying to delete a translation that no longer exists returns 400 because
+    // Drupal's entity translation negotiation will load the default translation.
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+    self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+  }
+
+  /**
+   * Data provider for testDeleteConfigEntityTranslation().
+   *
+   * @return array<string, array{string}>
+   *   Keyed by label, each value is [entity_type_id].
+   */
+  public static function deleteConfigEntityTranslationProvider(): array {
+    return [
+      'Content Template' => [ContentTemplate::ENTITY_TYPE_ID],
+      'Page Region' => [PageRegion::ENTITY_TYPE_ID],
+    ];
+  }
+
+  /**
+   * Tests the Canvas API delete translation endpoint for config entities.
+   *
+   * Covers:
+   *  - 204 response when deleting a non-default translation.
+   *  - 400 response when the translation no longer exists.
+   *
+   * @see \Drupal\canvas\Controller\ApiTranslationControllers::deleteConfigTranslation()
+   */
+  #[DataProvider('deleteConfigEntityTranslationProvider')]
+  public function testDeleteConfigEntityTranslation(string $entity_type_id): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['config_translation']);
+    $this->rebuildContainer();
+
+    if ($entity_type_id === ContentTemplate::ENTITY_TYPE_ID) {
+      $entity = ContentTemplate::load('node.article.full');
+      self::assertInstanceOf(ContentTemplate::class, $entity);
+    }
+    else {
+      $entity = $this->createPageRegionWithFrenchOverride();
+    }
+    $entity_id = $entity->id();
+
+    $language_manager = $this->container->get(LanguageManagerInterface::class);
+    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
+    $override = $language_manager->getLanguageConfigOverride('fr', $entity->getConfigDependencyName());
+    self::assertFalse($override->isNew());
+
+    $fr_delete_url = Url::fromUserInput("/fr/canvas/api/v0/config/{$entity_type_id}/{$entity_id}/translations");
+
+    $user = $this->drupalCreateUser([]);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
+    // Attempting to delete non-default translation without the correct
+    // permission returns a 403.
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+    self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+    // Ensure the translation was not removed.
+    $override = $language_manager->getLanguageConfigOverride('fr', $entity->getConfigDependencyName());
+    self::assertFalse($override->isNew());
+
+    $user = $this->drupalCreateUser(['translate configuration']);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
+
+    // Deleting a non-default translation removes it and returns 204.
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+    self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode(), $response->getBody()->__toString());
+
+    $override = $language_manager->getLanguageConfigOverride('fr', $entity->getConfigDependencyName());
+    self::assertTrue($override->isNew());
+
+    // Trying to delete a translation that no longer exists returns 400.
+    $response = $this->makeApiRequest('DELETE', $fr_delete_url, $request_options);
+    self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
   }
 
 }

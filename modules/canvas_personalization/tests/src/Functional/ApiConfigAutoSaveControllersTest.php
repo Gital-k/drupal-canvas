@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Functional;
 
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas_personalization\Entity\Segment;
+use Drupal\canvas_personalization\Entity\SegmentInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
-use Drupal\canvas\Entity\Page;
 use Drupal\Tests\canvas\Functional\HttpApiTestBase;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\user\UserInterface;
-use Drupal\canvas_personalization\Entity\Segment;
-use Drupal\canvas_personalization\Entity\SegmentInterface;
 use GuzzleHttp\RequestOptions;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Tests the details of auto-saving config entities, NOT the "live" version.
@@ -159,7 +159,7 @@ class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
     $this->drupalLogin($this->httpApiUser);
 
     // GETting the auto-save state for a config entity when that entity does not yet exist: 404.
-    $auto_save_data = $this->assertExpectedResponse('GET', $auto_save_url, $request_options, 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
+    $auto_save_data = $this->assertExpectedResponse('GET', $auto_save_url, $request_options, 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (404)');
     $this->assertSame([], $auto_save_data);
 
     // CSS and JS draft endpoints should be 404, no matter if logged-in or not.
@@ -181,7 +181,7 @@ class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
 
     // Insufficient Permissions: 403.
     $this->drupalLogin($this->limitedPermissionsUser);
-    $body = $this->assertExpectedResponse('GET', $auto_save_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', NULL);
+    $body = $this->assertExpectedResponse('GET', $auto_save_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', 'UNCACHEABLE (403)');
     $this->assertSame([
       'errors' => [
         $missingPermissionError,

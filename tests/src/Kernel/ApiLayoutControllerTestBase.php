@@ -67,7 +67,7 @@ abstract class ApiLayoutControllerTestBase extends KernelTestBase {
    */
   protected function filterLayoutForPost(string $content): string {
     $json = \json_decode($content, TRUE);
-    unset($json['isNew'], $json['isPublished'], $json['html'], $json['hasUnsavedStatusChange']);
+    unset($json['isNew'], $json['isPublished'], $json['html'], $json['hasUnsavedStatusChange'], $json['translations']);
     $json += ['clientInstanceId' => $this->randomString(100)];
     return \json_encode($json, JSON_THROW_ON_ERROR);
   }
@@ -101,7 +101,7 @@ abstract class ApiLayoutControllerTestBase extends KernelTestBase {
   protected function getRegion(string $region): ?string {
     $matches = [];
 
-    $content = $this->getRawContent() ?: '';
+    $content = (string) $this->getRawContent();
     // Covers 'application/json' endpoint responses with 'html' property.
     if (json_validate($content)) {
       $decoded = \json_decode($content, TRUE);

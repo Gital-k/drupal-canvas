@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\EcosystemSupport;
 
-use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropExpressions\StructuredData\Labeler;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
+use Drupal\canvas\PropSource\PropSource;
+use Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinitionInterface;
 use Drupal\Core\Plugin\Component;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\TypedData\DataReferenceTargetDefinition;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\PropSource\PropSource;
-use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
-use Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -81,7 +81,12 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
    *
    * (For example: the `password` field type never makes sense to match.)
    */
-  public const MATCHING_ALL_FIELD_TYPE_PROPERTIES = 0.7884615384615384;
+  public const float MATCHING_ALL_FIELD_TYPE_PROPERTIES = 82 / 106;
+
+  /**
+   * Drupal 11.3 doesn't have `resolvable_uri` on the `link` field type.
+   */
+  public const float MATCHING_ALL_FIELD_TYPE_PROPERTIES_11_3 = 82 / 104;
 
   /**
    * Supported field types (keys), with explicitly unsupported props (values).
@@ -135,6 +140,8 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     'link' => [
       // @todo Decide in https://www.drupal.org/project/canvas/issues/3512849 whether this is okay or not; if it is: document rationale here.
       'options' => FALSE,
+      // @todo Add support in https://git.drupalcode.org/project/canvas/-/work_items/3591770
+      'resolvable_uri' => FALSE,
     ],
     'list_float' => [],
     'list_integer' => [],
@@ -369,7 +376,9 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
       \sprintf('Not yet supported: a JSON schema (prop shape) for the following field properties: %s', implode(', ', $missing_field_props))
     );
     self::assertSame(
-      self::MATCHING_ALL_FIELD_TYPE_PROPERTIES,
+      version_compare(\Drupal::VERSION, '11.4', '>=')
+        ? self::MATCHING_ALL_FIELD_TYPE_PROPERTIES
+        : self::MATCHING_ALL_FIELD_TYPE_PROPERTIES_11_3,
       (float) count($expected_field_props) / (count($expected_supported_field_props) + count($expected_unsupported_field_props)),
     );
     // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed

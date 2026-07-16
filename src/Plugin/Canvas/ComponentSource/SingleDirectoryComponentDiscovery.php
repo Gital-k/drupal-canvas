@@ -4,27 +4,32 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\ComponentMetadataRequirementsChecker;
 use Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
-use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
  * @internal
  */
-final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDiscoveryInterface {
+final class SingleDirectoryComponentDiscovery extends JsonSchemaPropsComponentDiscoveryBase implements ComponentCandidatesDiscoveryInterface {
 
   public function __construct(
+    PropShapeRepositoryInterface $propShapeRepository,
     private readonly ComponentPluginManager $componentPluginManager,
-  ) {}
+  ) {
+    parent::__construct($propShapeRepository);
+  }
 
   /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container): self {
     return new static(
+      $container->get(PropShapeRepositoryInterface::class),
       $container->get(ComponentPluginManager::class),
     );
   }
@@ -61,13 +66,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
 
     $component_plugin = $this->componentPluginManager->createInstance($source_specific_id);
 
-    if (property_exists($component_plugin->metadata, 'noUi') && $component_plugin->metadata->noUi === TRUE) {
-      throw new ComponentDoesNotMeetRequirementsException(['Component flagged "noUi".']);
-    }
-    // The above only works on Drupal core >=11.3.
-    // @todo Remove in https://www.drupal.org/i/3537695
-    // @phpstan-ignore-next-line offsetAccess.nonOffsetAccessible
-    if ($component_plugin->getPluginDefinition()['noUi'] ?? FALSE) {
+    if ($component_plugin->metadata->noUi) {
       throw new ComponentDoesNotMeetRequirementsException(['Component flagged "noUi".']);
     }
 
@@ -86,7 +85,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
     $component_plugin = $this->componentPluginManager->createInstance($source_specific_id);
     // @see `type: canvas.component_source_settings.sdc`
     return [
-      'prop_field_definitions' => SingleDirectoryComponent::getPropsForComponentPlugin($component_plugin),
+      'prop_field_definitions' => $this->getPropsForComponentPlugin($component_plugin),
     ];
   }
 
@@ -107,11 +106,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
     $component_plugin = $this->componentPluginManager->createInstance($source_specific_id);
     // Disabled if obsolete or flagged with noUi.
     $initial_status = !(
-      (property_exists($component_plugin->metadata, 'noUi') && $component_plugin->metadata->noUi === TRUE)
-      // The above only works on Drupal core >=11.3.
-      // @todo Remove in https://www.drupal.org/i/3537695
-      // @phpstan-ignore offsetAccess.nonOffsetAccessible
-      || ($component_plugin->getPluginDefinition()['noUi'] ?? FALSE)
+      $component_plugin->metadata->noUi
       || (isset($component_plugin->metadata->status) && $component_plugin->metadata->status === 'obsolete')
     );
     return $initial_status;

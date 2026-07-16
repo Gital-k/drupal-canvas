@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Element;
 
-use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
-use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\Element\AstroIsland;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\DeprecationHelper;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
 use Drupal\Core\Cache\CacheCollectorInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
-use Drupal\canvas\Element\AstroIsland;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -152,6 +152,11 @@ final class AstroIslandTest extends CanvasKernelTestBase {
 
     $canvas_directory = $this->container->get(ExtensionPathResolver::class)->getPath('module', 'canvas');
     self::assertEquals(\sprintf('/%s/packages/astro-hydration/dist/client.js?2.1.0-alpha3', $canvas_directory), $element->attr('renderer-url'));
+
+    $scripts = $element->filter('script[type="module"][blocking="render"]');
+    self::assertCount(2, $scripts);
+    self::assertEquals($element->attr('renderer-url'), $scripts->first()->attr('src'));
+    self::assertEquals($component_url, $scripts->last()->attr('src'));
 
     $slots = $element->filter('template[data-astro-template]');
     self::assertCount(2, $slots);

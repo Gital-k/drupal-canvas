@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
-use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\canvas\Audit\RevisionAuditEnum;
 use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\Page;
-use Drupal\Core\Access\AccessResult;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -159,7 +159,11 @@ final class JavascriptComponentAccessTest extends CanvasKernelTestBase {
       ],
     ]);
     $auto_save_manager->saveEntity($page);
-    self::assertSame([Page::ENTITY_TYPE_ID => ['auto-save-8f48528246bf1d24' => '1']], $audit->getAutoSavesUsingComponentIds([$component_id]));
+    // The suffix is the auto-save `data_hash`: an xxh64 hash of the normalized
+    // entity. It changed because empty path aliases are no longer part of that
+    // normalization.
+    // @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
+    self::assertSame([Page::ENTITY_TYPE_ID => ['auto-save-4fbb5b01eba7863c' => '1']], $audit->getAutoSavesUsingComponentIds([$component_id]));
     // And reset the access cache.
     $entity_type_manager->getAccessControlHandler(JavaScriptComponent::ENTITY_TYPE_ID)->resetCache();
     self::assertEquals(

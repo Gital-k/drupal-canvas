@@ -1,6 +1,24 @@
 import type { Spec } from '@json-render/core';
 import type { PreviewManifest } from './preview-contract';
 
+const CSRF_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+export async function fetchCsrfToken(
+  signal?: AbortSignal,
+): Promise<string | null> {
+  try {
+    const response = await fetch('/session/token', {
+      credentials: 'include',
+      ...(signal ? { signal } : {}),
+    });
+    if (!response.ok) return null;
+    const token = (await response.text()).trim();
+    return CSRF_TOKEN_PATTERN.test(token) ? token : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchPreviewManifest(): Promise<PreviewManifest> {
   const response = await fetch('/__canvas/preview-manifest');
 
@@ -88,5 +106,33 @@ export async function fetchWorkbenchConfig(
   }
 
   const data = (await response.json()) as WorkbenchConfig;
+  return data;
+}
+
+export interface RegionPreviewResponse {
+  spec: Spec;
+  status: boolean;
+}
+
+export async function fetchPreviewRegionSpec(
+  id: string,
+  signal?: AbortSignal,
+): Promise<RegionPreviewResponse> {
+  const response = await fetch(
+    `/__canvas/region-preview-spec?${new URLSearchParams({ id }).toString()}`,
+    { signal },
+  );
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+    throw new Error(
+      errorBody?.error ??
+        `Region preview request failed with status ${response.status}.`,
+    );
+  }
+
+  const data = (await response.json()) as RegionPreviewResponse;
   return data;
 }

@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getDataDependenciesFromAst } from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
 import {
   buildCanvasComponentEntry,
   buildCanvasLocalArtifacts,
@@ -10,6 +11,7 @@ import {
 
 import { buildCanvasProject } from './build-project';
 import { buildTailwindForComponents } from './build-tailwind';
+import { validateComponents } from './validate';
 
 import type {
   DiscoveredComponent,
@@ -27,12 +29,13 @@ vi.mock('@drupal-canvas/ui/features/code-editor/utils/ast-utils', () => ({
 }));
 
 vi.mock('./validate', async () => {
-  const path = await import('node:path');
   return {
-    validateComponent: vi.fn(async (componentDir: string) => ({
-      itemName: path.basename(componentDir),
-      success: true,
-      details: [],
+    validateComponents: vi.fn(async (discoveryResult: DiscoveryResult) => ({
+      results: discoveryResult.components.map((component) => ({
+        itemName: component.name,
+        success: true,
+        details: [],
+      })),
     })),
   };
 });
@@ -151,6 +154,7 @@ describe('buildCanvasProject', () => {
       components: [component],
       pages: [],
       contentTemplates: [],
+      regions: [],
       warnings: [],
       stats: {
         scannedFiles: 2,
@@ -165,7 +169,6 @@ describe('buildCanvasProject', () => {
       outputDir,
       discoveryResult,
       cleanOutputDir: true,
-      buildTailwind: true,
       requireJsEntries: true,
     });
 
@@ -193,7 +196,6 @@ describe('buildCanvasProject', () => {
     );
     expect(buildTailwindForComponents).toHaveBeenCalledWith(
       [component],
-      true,
       path.resolve(outputDir),
     );
     expect(result.componentResults).toEqual([
@@ -229,6 +231,78 @@ describe('buildCanvasProject', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('includes entity field data dependencies from component metadata in the component payload', async () => {
+    vi.mocked(getDataDependenciesFromAst).mockReturnValueOnce({
+      drupalSettings: ['v0.branding'],
+    });
+    await fs.writeFile(
+      path.join(componentDir, 'card/component.yml'),
+      [
+        'name: card',
+        'machineName: card',
+        'status: true',
+        'props:',
+        '  properties:',
+        '    article:',
+        '      type: object',
+        '      $ref: json-schema-definitions://canvas.module/content-entity-reference',
+        '      x-allowed-entity-type-id: node',
+        '      x-allowed-bundle: article',
+        'slots: {}',
+        'dataDependencies:',
+        '  entityFields:',
+        '    article:',
+        '      - entity:node:article.title.value',
+      ].join('\n'),
+    );
+    const component = {
+      id: 'card',
+      name: 'card',
+      kind: 'index',
+      directory: path.join(componentDir, 'card'),
+      relativeDirectory: 'src/components/card',
+      metadataPath: path.join(componentDir, 'card/component.yml'),
+      jsEntryPath: path.join(componentDir, 'card/index.tsx'),
+      cssEntryPath: null,
+    } as DiscoveredComponent;
+    const discoveryResult = {
+      componentRoot: componentDir,
+      projectRoot: tmpDir,
+      components: [component],
+      pages: [],
+      contentTemplates: [],
+      regions: [],
+      warnings: [],
+      stats: {
+        scannedFiles: 2,
+        ignoredFiles: 0,
+      },
+    } as DiscoveryResult;
+
+    const result = await buildCanvasProject({
+      projectRoot: tmpDir,
+      componentDir,
+      aliasBaseDir: 'src',
+      outputDir,
+      discoveryResult,
+      cleanOutputDir: true,
+      requireJsEntries: true,
+    });
+
+    expect(
+      result.builtComponents[0]?.componentPayload.dataDependencies,
+    ).toEqual({
+      drupalSettings: ['v0.branding'],
+      entityFields: {
+        article: ['entity:node:article.title.value'],
+      },
+    });
+    expect(result.builtComponents[0]?.componentPayload.props.article).toEqual({
+      type: 'object',
+      $ref: 'json-schema-definitions://canvas.module/content-entity-reference',
+    });
+  });
+
   it('rejects componentDir outside aliasBaseDir', async () => {
     await expect(
       buildCanvasProject({
@@ -242,6 +316,7 @@ describe('buildCanvasProject', () => {
           components: [],
           pages: [],
           contentTemplates: [],
+          regions: [],
           warnings: [],
           stats: {
             scannedFiles: 0,
@@ -252,5 +327,59 @@ describe('buildCanvasProject', () => {
     ).rejects.toThrow(
       'Invalid Canvas config: componentDir "components" must be inside aliasBaseDir "src".',
     );
+  });
+
+  it('cleans stale output before returning validation failures', async () => {
+    const component = {
+      id: 'card',
+      name: 'card',
+      kind: 'index',
+      directory: path.join(componentDir, 'card'),
+      relativeDirectory: 'src/components/card',
+      metadataPath: path.join(componentDir, 'card/component.yml'),
+      jsEntryPath: path.join(componentDir, 'card/index.tsx'),
+      cssEntryPath: null,
+    } as DiscoveredComponent;
+    const staleManifestPath = path.join(outputDir, 'canvas-manifest.json');
+    await fs.mkdir(outputDir, { recursive: true });
+    await fs.writeFile(staleManifestPath, '{"stale":true}', 'utf-8');
+
+    vi.mocked(validateComponents).mockResolvedValueOnce({
+      results: [
+        {
+          itemName: 'card',
+          success: false,
+          details: [{ heading: 'index.tsx', content: 'Invalid component' }],
+        },
+      ],
+    });
+
+    const result = await buildCanvasProject({
+      projectRoot: tmpDir,
+      componentDir,
+      aliasBaseDir: 'src',
+      outputDir,
+      discoveryResult: {
+        componentRoot: componentDir,
+        projectRoot: tmpDir,
+        components: [component],
+        pages: [],
+        contentTemplates: [],
+        regions: [],
+        warnings: [],
+        stats: {
+          scannedFiles: 2,
+          ignoredFiles: 0,
+        },
+      } as DiscoveryResult,
+      cleanOutputDir: true,
+      requireJsEntries: true,
+    });
+
+    expect(result.componentResults).toEqual([
+      expect.objectContaining({ itemName: 'card', success: false }),
+    ]);
+    await expect(fs.access(staleManifestPath)).rejects.toThrow();
+    expect(buildCanvasComponentEntry).not.toHaveBeenCalled();
   });
 });

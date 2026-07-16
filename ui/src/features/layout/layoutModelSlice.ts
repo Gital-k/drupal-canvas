@@ -2,7 +2,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 
-import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import { previewApi } from '@/services/preview';
 import { hasSlotDefinitions, isPropSourceComponent } from '@/types/Component';
@@ -83,6 +82,7 @@ export type ComponentModels = Record<
 export interface LayoutModelSliceState extends RootLayoutModel {
   updatePreview: boolean;
   isInitialized?: boolean;
+  translations?: Record<string, any>;
 }
 
 export const initialState: LayoutModelSliceState = {
@@ -90,6 +90,7 @@ export const initialState: LayoutModelSliceState = {
   model: {},
   updatePreview: false,
   isInitialized: false,
+  translations: {},
 };
 
 // This wrapper is necessary because when using slices with redux-undo,
@@ -202,7 +203,7 @@ export interface EvaluatedComponentModel extends ComponentModel {
   // (PropSources are used by ComponentSources without an explicit input UX, but only a schema — such as SDCs. The
   // schema is mapped to PropSources that are able to meet the schema expectations, and to resolve the values stored in
   // those PropSources, evaluation is needed.)
-  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase
   // @see docs/components.md#3.1.1
   // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
   // @see docs/components.md#3.3.1
@@ -214,6 +215,66 @@ export const isEvaluatedComponentModel = (
   model: ComponentModel,
 ): model is EvaluatedComponentModel => {
   return 'source' in model;
+};
+
+export const syncPropSourcesToResolvedValues = (
+  sources: Sources,
+  component: CanvasComponent,
+  resolvedValues: ResolvedValues,
+): Sources => {
+  if (!isPropSourceComponent(component)) {
+    return sources;
+  }
+  const fieldData = component.propSources;
+
+  // We need to include a source entry for any props with a resolved value.
+  // We don't store a source entry for empty values, so once the value is no
+  // longer empty we need to populate the source data for it from the
+  // prop source defaults for this component.
+  const missingProps = Object.keys(fieldData).filter(
+    (key) => !(key in sources) && Object.keys(resolvedValues).includes(key),
+  );
+
+  // Likewise, if a resolved value is now empty, we need to remove it from
+  // the source data so it is not evaluated server side.
+  const emptyProps = Object.keys(fieldData).filter(
+    (key) => !Object.keys(resolvedValues).includes(key) && key in sources,
+  );
+
+  return missingProps.reduce(
+    (carry: Sources, propName: string) => ({
+      ...carry,
+      // Add in the missing source.
+      [propName]: fieldData[propName],
+    }),
+    Object.entries(sources).reduce((carry: Sources, [propName, source]) => {
+      if (emptyProps.includes(propName)) {
+        // Ignore this source as the value is now empty.
+        return carry;
+      }
+      return {
+        ...carry,
+        [propName]: {
+          ...source,
+          // Set the value from resolved values. This might duplicate the value
+          // in the resolved key for components where the source and resolved
+          // values are the same, however this method is generally called before
+          // a patchComponent request to Drupal which will remove values from
+          // the source key if it duplicates the resolved value. So for a simple
+          // component with e.g. a string property, we would have duplication
+          // here but this would be removed from the model returned from Drupal
+          // during patchComponent and hence the model stored in the redux store
+          // after this request. For a component with an expression such as an
+          // image component - at this point both resolved and source may be a
+          // media entity ID. When patchComponent is called in that instance,
+          // Drupal will retain the media entity ID in the source value, but
+          // return the evaluated expression for the resolved values - e.g. this
+          // might be the src, alt, height and width for the media entity.
+          value: resolvedValues[propName],
+        },
+      };
+    }, {}),
+  );
 };
 
 export const layoutModelSlice = createSlice({
@@ -457,11 +518,13 @@ export const layoutModelSlice = createSlice({
           model,
           updatePreview,
           isInitialized = true,
+          translations,
         } = action.payload;
         state.layout = layout;
         state.model = model;
         state.updatePreview = updatePreview;
         state.isInitialized = isInitialized;
+        state.translations = translations || {};
       },
     ),
   }),
@@ -842,6 +905,8 @@ export const selectUpdatePreview = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.updatePreview;
 export const selectIsInitialized = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.isInitialized;
+export const selectTranslations = (state: StateWithHistoryWrapper) =>
+  state.layoutModel.present.translations;
 const selectRegion = (state: RootState, regionName: string) => regionName;
 
 export const selectLayoutForRegion = createSelector(

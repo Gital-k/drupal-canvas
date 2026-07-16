@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-use Drupal\Core\Cache\Cache;
-use PHPUnit\Framework\Attributes\CoversClass;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiAutoSaveController;
-use PHPUnit\Framework\Attributes\Group;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
 use Drupal\dynamic_page_cache\EventSubscriber\DynamicPageCacheSubscriber;
-use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\ApiRequestTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use GuzzleHttp\RequestOptions;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -78,7 +78,7 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
     $url = Url::fromRoute('canvas.api.auto-save.get');
     $this->drupalGet($url);
     $this->assertSession()->responseHeaderEquals(DynamicPageCacheSubscriber::HEADER, 'MISS');
-    $response_body = \json_decode($this->getSession()->getPage()->getContent() ?: '{}', TRUE);
+    $response_body = \json_decode((string) $this->getSession()->getPage()->getContent(), TRUE);
     $this->assertArrayHasKey('data', $response_body);
     $content = $response_body['data'];
     self::assertEquals([
@@ -117,7 +117,7 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
     // Now the cache should be invalidated and we should get a MISS.
     $this->drupalGet($url);
     $this->assertSession()->responseHeaderEquals(DynamicPageCacheSubscriber::HEADER, 'MISS');
-    $response_body = \json_decode($this->getSession()->getPage()->getContent() ?: '{}', TRUE);
+    $response_body = \json_decode((string) $this->getSession()->getPage()->getContent(), TRUE);
     $this->assertArrayHasKey('data', $response_body);
     $content = $response_body['data'];
     self::assertEquals([

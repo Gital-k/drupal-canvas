@@ -7,6 +7,7 @@ namespace Drupal\canvas\PropSource;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
@@ -25,6 +26,7 @@ use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataDefinitionInterface;
+use Drupal\Core\TypedData\TranslatableInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
 
 /**
@@ -410,9 +412,13 @@ final class StaticPropSource extends PropSourceBase {
    * {@inheritdoc}
    */
   public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): EvaluationResult {
+    // @todo Use `NegotiatedLanguage::matchEntity($this->>fieldItemList->getRoot()->getEntity())` in https://git.drupalcode.org/project/canvas/-/work_items/3571785, and drop this conditional.
+    $language = $host_entity instanceof TranslatableInterface && $host_entity->isTranslatable()
+      ? NegotiatedLanguage::matchEntity($host_entity)
+      : NegotiatedLanguage::negotiateFromConfigAndContext();
     return match ($this->getCardinality()) {
-      1 => Evaluator::evaluate($this->fieldItemList->first(), $this->expression, $is_required),
-      default => Evaluator::evaluate($this->fieldItemList, $this->expression, $is_required)
+      1 => Evaluator::evaluate($this->fieldItemList->first(), $this->expression, $is_required, $language),
+      default => Evaluator::evaluate($this->fieldItemList, $this->expression, $is_required, $language)
     };
   }
 
@@ -580,7 +586,8 @@ final class StaticPropSource extends PropSourceBase {
       // @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase::createDefaultValue()
       for ($i = 0; $i < $this->fieldItemList->count(); $i++) {
         \assert($this->fieldItemList[$i] !== NULL);
-        // Only add default values to existing widget items. In some cases such
+
+        // Only update existing widget items. In some cases such
         // as a delete AJAX request, the widget item might not exist despite it
         // still being present in the fieldItemList.
         if (isset($widget_form['widget'][$i])) {
@@ -588,6 +595,14 @@ final class StaticPropSource extends PropSourceBase {
           // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItem::propertyDefinitions()
           // @phpstan-ignore property.notFound
           $widget_form['widget'][$i]['value']['#default_value'] = new DrupalDateTime($this->fieldItemList[$i]->value);
+
+          // No timezone adjusting takes place when entering or storing date
+          // values. It assumes the date time selected is literally the date
+          // time stored. Because of that, the form render needs to assume UTC
+          // as well, otherwise the input values will be different upon
+          // reloading the form.
+          // @see https://drupal.org/i/3501281
+          $widget_form['widget'][$i]['value']['#date_timezone'] = 'UTC';
         }
       }
     }

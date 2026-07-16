@@ -1,12 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as p from '@clack/prompts';
 
 import { getConfig, setConfig } from '../config';
 import {
+  applySyncOptionAliasesAndWarnings,
   parseBooleanOption,
   pluralizeComponent,
   updateConfigFromOptions,
-  validateComponentOptions,
 } from './command-helpers';
+
+vi.mock('@clack/prompts', () => ({
+  log: {
+    warn: vi.fn(),
+  },
+}));
 
 describe('command-helpers', () => {
   beforeEach(() => {
@@ -17,9 +24,11 @@ describe('command-helpers', () => {
       clientId: '',
       clientSecret: '',
       scope:
-        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view',
-      includePages: false,
-      componentDir: './components',
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:content_template canvas:page_region',
+      includePages: true,
+      includeContentTemplates: true,
+      includeRegions: true,
+      componentDir: 'components',
       userAgent: '',
       aliasBaseDir: '',
       outputDir: '',
@@ -28,26 +37,6 @@ describe('command-helpers', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  describe('validateComponentOptions', () => {
-    it('should allow --components flag alone', () => {
-      expect(() => {
-        validateComponentOptions({ components: 'button,card', all: false });
-      }).not.toThrow();
-    });
-
-    it('should allow --all flag alone', () => {
-      expect(() => {
-        validateComponentOptions({ all: true });
-      }).not.toThrow();
-    });
-
-    it('should error when both --components and --all are used', () => {
-      expect(() => {
-        validateComponentOptions({ components: 'button', all: true });
-      }).toThrow('Cannot use --all and --components options together');
-    });
   });
 
   describe('updateConfigFromOptions', () => {
@@ -73,10 +62,10 @@ describe('command-helpers', () => {
     });
 
     it('should update componentDir when dir is provided', () => {
-      updateConfigFromOptions({ dir: './my-components' });
+      updateConfigFromOptions({ dir: 'my-components' });
 
       const config = getConfig();
-      expect(config.componentDir).toBe('./my-components');
+      expect(config.componentDir).toBe('my-components');
     });
 
     it('should update aliasBaseDir when provided', () => {
@@ -100,49 +89,79 @@ describe('command-helpers', () => {
       expect(config.scope).toBe('custom:scope');
     });
 
-    it('should update includePages when provided', () => {
-      updateConfigFromOptions({ includePages: true });
+    it('should update includePages when sync.pages is provided', () => {
+      updateConfigFromOptions({ sync: { pages: true } });
 
       const config = getConfig();
       expect(config.includePages).toBe(true);
     });
 
-    it('should update the default scope when includePages changes', () => {
-      updateConfigFromOptions({ includePages: true });
+    it('should warn when deprecated include options are used', () => {
+      applySyncOptionAliasesAndWarnings({ includePages: true });
 
-      const config = getConfig();
-      expect(config.scope).toBe(
-        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit',
+      expect(p.log.warn).toHaveBeenCalledWith(
+        '--include-pages is deprecated because pages are included by default. Remove this flag.',
       );
     });
 
-    it('should preserve an explicit scope when includePages changes', () => {
+    it('should warn with the no-pages replacement for deprecated false include options', () => {
+      applySyncOptionAliasesAndWarnings({ includePages: false });
+
+      expect(p.log.warn).toHaveBeenCalledWith(
+        '--include-pages=false is deprecated and will be removed in a future release. Use --no-pages to exclude pages.',
+      );
+    });
+
+    it('should map friendly no options to include exclusions', () => {
+      const options = { pages: false, contentTemplates: false, regions: false };
+
+      applySyncOptionAliasesAndWarnings(options);
+
+      expect(options).toMatchObject({
+        sync: {
+          pages: false,
+          contentTemplates: false,
+          regions: false,
+        },
+      });
+    });
+
+    it('should update the default scope when includePages changes', () => {
+      updateConfigFromOptions({ sync: { pages: false } });
+
+      const config = getConfig();
+      expect(config.scope).toBe(
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:content_template canvas:page_region',
+      );
+    });
+
+    it('should update the default scope when includeRegions changes', () => {
+      updateConfigFromOptions({ sync: { regions: false } });
+
+      const config = getConfig();
+      expect(config.scope).toBe(
+        'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view canvas:page:create canvas:page:read canvas:page:edit canvas:content_template',
+      );
+    });
+
+    it('should preserve an explicit scope when sync.pages changes', () => {
       setConfig({ scope: 'custom:scope' });
 
-      updateConfigFromOptions({ includePages: true });
+      updateConfigFromOptions({ sync: { pages: true } });
 
       const config = getConfig();
       expect(config.scope).toBe('custom:scope');
-    });
-
-    it('should update all flag when provided', () => {
-      updateConfigFromOptions({ all: true });
-
-      const config = getConfig();
-      expect(config.all).toBe(true);
     });
 
     it('should update multiple options at once', () => {
       updateConfigFromOptions({
         clientId: 'test-id',
         siteUrl: 'https://example.com',
-        all: true,
       });
 
       const config = getConfig();
       expect(config.clientId).toBe('test-id');
       expect(config.siteUrl).toBe('https://example.com');
-      expect(config.all).toBe(true);
     });
 
     it('should not update config when option is undefined', () => {

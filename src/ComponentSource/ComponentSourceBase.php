@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace Drupal\canvas\ComponentSource;
 
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Component\Utility\SortArray;
 use Drupal\Core\Config\Schema\Mapping;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Plugin\ContextAwarePluginAssignmentTrait;
 use Drupal\Core\Plugin\ContextAwarePluginTrait;
 use Drupal\Core\Plugin\PluginBase;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\Core\TypedData\PrimitiveInterface;
+use Drupal\Core\TypedData\TraversableTypedDataInterface;
+use Drupal\Core\TypedData\TypedDataInterface;
 
 /**
  * @internal
@@ -47,8 +51,19 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
       array_diff_key($this->configuration, array_flip(['local_source_id'])),
     );
     \assert($typed_source_specific_settings instanceof Mapping);
+    // ⚠️ TRICKY: Use config-schema-*casted* values, NOT the raw
+    // `Mapping::toArray()`. A setting generated in PHP (e.g. an SDC
+    // `examples` default of int `2`) hashes differently from its
+    // config-schema-cast form (string `"2"`, since core types
+    // `field.value.list_float.value` as `string`). That cast only kicks in
+    // once config is read back through validation — config import, recipes,
+    // config sync — and NOT on a clean install, which skips config
+    // validation. That asymmetry is why config-export-driven setups (e.g.
+    // Drupal CMS recipes) hit this and few others did. Casting here makes
+    // generation and validation agree.
+    // @see \Drupal\canvas\Entity\Component::validateActiveVersion()
     $normalized_data = [
-      'settings' => $typed_source_specific_settings->toArray(),
+      'settings' => $this->settingsAffectingVersionHash(self::castRawTypedConfigToPhpTypes($typed_source_specific_settings)),
       'slot_definitions' => $this instanceof ComponentSourceWithSlotsInterface
         ? self::normalizeSlotDefinitions($this->getSlotDefinitions())
         : [],
@@ -64,20 +79,70 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
     // showing a different order. New versions of Component config entities are
     // only warranted if there is a change in the data needing to be stored for
     // a component instance.
-    self::recursiveKsort($normalized_data);
+    SortArray::sortByKeyRecursive($normalized_data);
     $hash = \hash('xxh64', \json_encode($normalized_data, JSON_THROW_ON_ERROR));
     // 💡 If you are debugging why a version hash does not match, put a
     // conditional breakpoint here.
     return $hash;
   }
 
-  protected static function recursiveKsort(array &$array): void {
-    ksort($array);
-    foreach ($array as &$value) {
-      if (\is_array($value)) {
-        self::recursiveKsort($value);
-      }
+  /**
+   * Filters the source-specific settings that define a version's identity.
+   *
+   * By default, ALL settings affect the version hash. A component source that
+   * retains purely *derived* metadata in its settings — data that cannot cause
+   * changes to component instances because it is fully derived from data that
+   * is already hashed — must override this method to strip it, so that
+   * recomputing or backfilling that metadata never changes existing component
+   * version ids.
+   *
+   * @param mixed $settings
+   *   The config-schema-casted source-specific settings.
+   *
+   * @return mixed
+   *   The settings that affect the version hash.
+   *
+   * @see ::generateVersionHash()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::settingsAffectingVersionHash()
+   */
+  protected function settingsAffectingVersionHash(mixed $settings): mixed {
+    return $settings;
+  }
+
+  /**
+   * Recursively calls PrimitiveInterface::getCastedValue()
+   *
+   * Unlike `Mapping::toArray()` (raw, un-cast values, possibly strings), this
+   * casts every primitive leaf via `PrimitiveInterface::getCastedValue()`, to
+   * use the corresponding native PHP type.
+   *
+   * @param \Drupal\Core\TypedData\TypedDataInterface $element
+   *   The typed config element to extract from.
+   *
+   * @return mixed
+   *   Scalar/NULL for primitives; an array (keys preserved) for mappings and
+   *   sequences.
+   */
+  private static function castRawTypedConfigToPhpTypes(TypedDataInterface $element): mixed {
+    if ($element instanceof PrimitiveInterface) {
+      return $element->getCastedValue();
     }
+    if ($element instanceof TraversableTypedDataInterface) {
+      // Preserve `toArray()`'s NULL-vs-array distinction: an optional, unset
+      // sequence/mapping stays NULL rather than becoming an empty array, which
+      // would needlessly change the hash of components that have such a key.
+      if ($element->getValue() === NULL) {
+        return NULL;
+      }
+      $casted = [];
+      foreach ($element as $name => $child) {
+        $casted[$name] = self::castRawTypedConfigToPhpTypes($child);
+      }
+      return $casted;
+    }
+    // Anything that is neither a primitive nor traversable (e.g. an `ignore`
+    // element) has no canonical config-schema type; use its value verbatim.
+    return $element->getValue();
   }
 
   private static function normalizeSlotDefinitions(array $slot_definitions): array {
@@ -86,12 +151,15 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
     });
     return \array_reduce(
       \array_keys(\array_filter($slot_definitions, \is_array(...))),
-      static fn(array $carry, string $slot_name) => $carry + [
-        $slot_name => [
-          'title' => $slot_definitions[$slot_name]['title'],
-          'example' => \current($slot_definitions[$slot_name]['examples'] ?? []) ?: '',
-        ],
-      ],
+      static function (array $carry, string $slot_name) use ($slot_definitions): array {
+        $slot_examples = $slot_definitions[$slot_name]['examples'] ?? [];
+        return $carry + [
+          $slot_name => [
+            'title' => $slot_definitions[$slot_name]['title'],
+            'example' => $slot_examples === [] ? '' : \current($slot_examples),
+          ],
+        ];
+      },
       []
     );
   }

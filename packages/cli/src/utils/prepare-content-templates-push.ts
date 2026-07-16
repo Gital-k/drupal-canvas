@@ -2,7 +2,9 @@ import fs from 'fs/promises';
 import chalk from 'chalk';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
-import { authoredElementsToComponentTree } from './content-templates';
+import { authoredElementMapToComponentTree } from './authored-elements';
+import { stripNullableKeysForConfigComponentTree } from './component-tree-payload';
+import { contentTemplateResultName } from './content-template-result-name';
 import { serializeElementMapForServer } from './prop-transforms';
 import { processInPool } from './request-pool';
 import { isRecord } from './utils';
@@ -17,16 +19,20 @@ import type {
   CanvasComponentTree,
 } from 'drupal-canvas/json-render-utils';
 import type { ApiService } from '../services/api';
-import type {
-  ContentTemplate,
-  ContentTemplateListItem,
-} from '../types/ContentTemplate';
+import type { ContentTemplateListItem } from '../types/ContentTemplate';
 import type { Result } from '../types/Result';
 
 export interface ContentTemplatePushResult {
   label: string;
   id: string;
   operation: 'Created' | 'Updated';
+}
+
+export interface ContentTemplatePushOperationResult {
+  success: boolean;
+  result?: ContentTemplatePushResult;
+  error?: Error;
+  index: number;
 }
 
 export interface PreparedContentTemplate {
@@ -109,7 +115,7 @@ export async function prepareContentTemplates(
     const legacyStatePaths = findLegacyStatePointers(spec.elements ?? {});
     if (legacyStatePaths.length > 0) {
       throw new Error(
-        `Cannot push content template "${spec.label}" (${localTemplate.path}): legacy "$state" pointers are no longer supported in authored files. Run \`canvas pull\` to regenerate, or replace each pointer with a prop-source object (e.g. {"sourceType":"entity-field","expression":"…"}). Affected props: ${legacyStatePaths.join(', ')}.`,
+        `Legacy "$state" pointers are no longer supported in authored files. Run \`canvas pull\` to regenerate, or replace each pointer with a prop-source object (e.g. {"sourceType":"entity-field","expression":"…"}). Affected props: ${legacyStatePaths.join(', ')}.`,
       );
     }
 
@@ -117,7 +123,7 @@ export async function prepareContentTemplates(
       spec.elements ?? {},
       componentMetadata,
     );
-    const tree = authoredElementsToComponentTree(
+    const tree = authoredElementMapToComponentTree(
       serializedElements,
       componentVersions,
     );
@@ -154,22 +160,19 @@ export async function pushContentTemplates(
     ApiService,
     'createContentTemplate' | 'updateContentTemplate'
   >,
-): Promise<
-  Array<{
-    success: boolean;
-    result?: ContentTemplatePushResult;
-    error?: Error;
-    index: number;
-  }>
-> {
-  return processInPool(prepared, async (entry) => {
+): Promise<ContentTemplatePushOperationResult[]> {
+  const results = await processInPool(prepared, async (entry) => {
     const template = entry.result;
     const remote = remoteById.get(template.id);
+
+    const component_tree = stripNullableKeysForConfigComponentTree(
+      template.components,
+    );
 
     if (remote) {
       await apiService.updateContentTemplate(template.id, {
         status: true,
-        component_tree: template.components,
+        component_tree,
       });
       return {
         label: template.label,
@@ -179,16 +182,25 @@ export async function pushContentTemplates(
     }
 
     await apiService.createContentTemplate({
+      label: template.label,
       entityType: template.entityTypeId,
       bundle: template.bundle,
       viewMode: template.viewMode,
       status: true,
-      component_tree: template.components,
-    } as ContentTemplate);
+      component_tree,
+    });
     return {
       label: template.label,
       id: template.id,
       operation: 'Created' as const,
+    };
+  });
+
+  return results.map((result) => {
+    const preparedTemplate = prepared[result.index];
+    return {
+      ...result,
+      index: preparedTemplate?.index ?? result.index,
     };
   });
 }
@@ -197,12 +209,7 @@ export async function pushContentTemplates(
  * Collects push results into `Result[]` for reporting.
  */
 export function collectContentTemplateResults(
-  pushResults: Array<{
-    success: boolean;
-    result?: ContentTemplatePushResult;
-    error?: Error;
-    index: number;
-  }>,
+  pushResults: ContentTemplatePushOperationResult[],
   failedPreps: Array<{ index: number; error: Error }>,
   discovered: DiscoveredContentTemplate[],
 ): Result[] {
@@ -223,12 +230,11 @@ export function collectContentTemplateResults(
         ],
       });
     } else {
-      const fallback =
-        discovered[result.index]?.label ??
-        discovered[result.index]?.slug ??
-        'unknown';
+      const discoveredTemplate = discovered[result.index];
       results.push({
-        itemName: fallback,
+        itemName: contentTemplateResultName(undefined, discoveredTemplate, {
+          includeFileName: true,
+        }),
         success: false,
         details: [{ content: result.error?.message || 'Unknown error' }],
       });
@@ -236,12 +242,11 @@ export function collectContentTemplateResults(
   }
 
   for (const failedPrep of failedPreps) {
-    const fallback =
-      discovered[failedPrep.index]?.label ??
-      discovered[failedPrep.index]?.slug ??
-      'unknown';
+    const discoveredTemplate = discovered[failedPrep.index];
     results.push({
-      itemName: fallback,
+      itemName: contentTemplateResultName(undefined, discoveredTemplate, {
+        includeFileName: true,
+      }),
       success: false,
       details: [
         {

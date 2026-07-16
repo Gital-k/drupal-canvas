@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit\EntityHandlers;
 
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\Folder;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler;
 use Drupal\Core\Access\AccessResultAllowed;
 use Drupal\Core\Access\AccessResultForbidden;
 use Drupal\Core\Access\AccessResultReasonInterface;
@@ -22,10 +23,10 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler;
 use Drupal\Tests\UnitTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Tests Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler.
@@ -78,6 +79,11 @@ final class CanvasConfigEntityAccessControlHandlerTest extends UnitTestCase {
       'id' => Component::ENTITY_TYPE_ID,
       'provider' => 'canvas',
       'config_prefix' => 'component',
+    ]));
+    $entityTypeManager->getDefinition(Folder::ENTITY_TYPE_ID)->willReturn(new ConfigEntityType([
+      'id' => Folder::ENTITY_TYPE_ID,
+      'provider' => 'canvas',
+      'config_prefix' => 'folder',
     ]));
     $sut = new CanvasConfigEntityAccessControlHandler($entityType, $configManager, $entityTypeManager->reveal());
     $sut->setModuleHandler($moduleHandler);

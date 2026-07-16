@@ -22,6 +22,11 @@ variables:
   # Disable npm lifecycle scripts.
   npm_config_ignore_scripts: "true"
 
+  # @see https://getcomposer.org/doc/03-cli.md#composer-no-blocking
+  COMPOSER_NO_BLOCKING: 1
+  # @todo Remove this once Composer 2.10 is released; this is necessary on Composer <2.10
+  # @see https://github.com/composer/composer/issues/12786
+  COMPOSER_NO_SECURITY_BLOCKING: 1
   COMPOSER_PROCESS_TIMEOUT: 0
   GIT_DEPTH: 1
 
@@ -30,8 +35,8 @@ variables:
 
   # Target a specific release, not 11.x.x-dev, to avoid breaking on evolving
   # test expectations unnecessarily.
-  DRUPAL_CORE: 11.2.11
-  DRUPAL_CORE_NEXT_MINOR: 11.3.8
+  DRUPAL_CORE: 11.3.10
+  DRUPAL_CORE_NEXT_MINOR: 11.4.1
 
   DRUPAL_TEST_WEBSERVER_USER: www-data
 
@@ -195,6 +200,20 @@ cache dependencies:
     - npx playwright install
     - npx cypress install
 
+renovate:
+  stage: validate
+  image: renovate/renovate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $CI_SCHEDULE_TYPE == "renovate"
+  variables:
+    RENOVATE_PLATFORM: gitlab
+    RENOVATE_BASE_BRANCHES: $CI_COMMIT_REF_NAME
+    RENOVATE_ENDPOINT: $CI_SERVER_URL/api/v4
+    RENOVATE_TOKEN: $GITLAB_CI_RENOVATE_TOKEN
+    RENOVATE_GIT_AUTHOR: "Renovate Bot <renovate@example.com>"
+  script:
+    - renovate $CI_PROJECT_PATH
+
 phpstan-is-up-to-date:
   stage: validate
   rules:
@@ -306,19 +325,20 @@ lint (php):
     - !reference [ .drupal-files-with-dev-dependencies ]
     - mkdir -p test-results
   script:
-    # PHPStan doesn't allow multiple outputs, but it will cache the result so
-    # the second run is very fast.
-    - composer run phpstan -- --error-format=junit > test-results/phpstan.xml || true
     - !reference [ .test_runner ]
     - run_test "composer validate" "composer validate --strict"
     - run_test "phpcs" "composer run phpcs"
     - run_test "phpstan" "composer run phpstan"
     - !reference [ .test_summary ]
-    # Regenerate the >=11.3 ignores from scratch — this ensures we avoid manual additions.
+    # PHPStan doesn't allow multiple outputs, but it will cache the result. Use the cache to expose in GitLab CI's UI.
+    # @todo Remove this in https://www.drupal.org/project/canvas/issues/3591277
+    - mkdir -p test-results && composer run phpstan -- --error-format=junit > test-results/phpstan.xml || true
+    # Regenerate PHPStan baseline for Canvas-provided features that require a core version beyond the minimum supported
+    # core version.
     # (Manual additions belong in phpstan.neon; this file should be purely auto-generated ignores.)
-    - composer run phpstan-regenerate-ignores-for-11.3-and-higher
-    - cp phpstan-11.3-and-higher-ignores.neon test-results/
-    - git diff --quiet -- phpstan-11.3-and-higher-ignores.neon && echo "✅ phpstan-11.3-and-higher-ignores.neon in sync." || (echo "❌ phpstan-11.3-and-higher-ignores.neon out of sync." && echo "🙏 Please run composer run phpstan-regenerate-ignores-for-11.3-and-higher or download the file from the CI artifacts, and commit the result." && exit 1)
+    - composer run phpstan-regenerate-ignores-for-non-min-core-version-features
+    - cp phpstan-ignores-non-min-core-version.neon test-results/
+    - git diff --quiet -- phpstan-ignores-non-min-core-version.neon && echo "✅ phpstan-ignores-non-min-core-version.neon in sync." || (echo "❌ phpstan-ignores-non-min-core-version.neon out of sync." && echo "🙏 Please run composer run phpstan-regenerate-ignores-for-non-min-core-version-features or download the file from the CI artifacts, and commit the result." && exit 1)
   after_script:
     - cp -R _drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/test-results $CI_PROJECT_DIR/test-results
   artifacts:
@@ -350,7 +370,7 @@ lint (node):
         exit 1
       fi
 
-phpunit (11.2 sqlite):
+phpunit (11.3 sqlite):
   rules:
     - *push-rule
     - <<: *mr-rule
@@ -372,8 +392,8 @@ phpunit (11.2 sqlite):
         KUBERNETES_CPU_REQUEST: "4"
         DRUPAL_TEST_CONCURRENCY: '24'
       - PHPUNIT_TESTSUITE: 'PHPUnit-Kernel'
-        CI_PARALLEL_NODE_INDEX: ['1', '2', '3']
-        CI_PARALLEL_NODE_TOTAL: '3'
+        CI_PARALLEL_NODE_INDEX: ['1', '2', '3', '4']
+        CI_PARALLEL_NODE_TOTAL: '4'
         KUBERNETES_CPU_REQUEST: "10"
         DRUPAL_TEST_CONCURRENCY: '20'
       - PHPUNIT_TESTSUITE: 'PHPUnit-Functional'
@@ -382,15 +402,17 @@ phpunit (11.2 sqlite):
   before_script:
     - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
-    # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
-    # (PHPUnit SourceMapper races with concurrent test cleanup under sites/simpletest,
-    # causing "RecursiveDirectoryIterator: Failed to open directory" random failures).
-    # Fixed on Drupal 11.x (commit 3753f904, 2026-03-30); not yet in 11.2.x. Idempotent —
-    # becomes a no-op once the minimum supported core version ships the fix.
-    - sed -i '\|<directory>\.\./sites</directory>|d' $CI_PROJECT_DIR/_drupal/web/core/phpunit.xml.dist
   script:
     - !reference [ .test_runner ]
-    - run_test "phpunit" "composer run phpunit -- --types $PHPUNIT_TESTSUITE --ci-parallel-node-index $CI_PARALLEL_NODE_INDEX --ci-parallel-node-total $CI_PARALLEL_NODE_TOTAL"
+    # Only pass --ci-parallel-node-* when this job is actually parallelized (i.e. the matrix
+    # entry sets CI_PARALLEL_NODE_TOTAL, as PHPUnit-Kernel does). Drupal 11.4's phpunit.sh
+    # errors out when --ci-parallel-node-index is passed without a value.
+    - |
+      PARALLEL_ARGS=""
+      if [ -n "$CI_PARALLEL_NODE_INDEX" ] && [ -n "$CI_PARALLEL_NODE_TOTAL" ]; then
+        PARALLEL_ARGS="--ci-parallel-node-index $CI_PARALLEL_NODE_INDEX --ci-parallel-node-total $CI_PARALLEL_NODE_TOTAL"
+      fi
+      run_test "phpunit" "composer run phpunit -- --types $PHPUNIT_TESTSUITE $PARALLEL_ARGS"
     - !reference [ .test_summary ]
   after_script:
     - cp -R _drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/test-results $CI_PROJECT_DIR/test-results
@@ -419,9 +441,9 @@ phpunit (11.2 sqlite):
         - test-results/*.xml
       annotations: test-results/links.json
 
-phpunit (11.2 mariadb):
-  extends: phpunit (11.2 sqlite)
-  # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
+phpunit (11.3 mariadb):
+  extends: phpunit (11.3 sqlite)
+  # Only run on nightly, not on push to 1.x — the PHPUnit 11.4 CI jobs already test all DBs, do not repeat for 11.3.
   rules:
     - *nightly-rule
     - *manual-rule
@@ -434,9 +456,9 @@ phpunit (11.2 mariadb):
     MYSQL_PASSWORD: drupal
     MYSQL_ROOT_PASSWORD: root
 
-phpunit (11.2 pgsql):
-  extends: phpunit (11.2 sqlite)
-  # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
+phpunit (11.3 pgsql):
+  extends: phpunit (11.3 sqlite)
+  # Only run on nightly, not on push to 1.x — the PHPUnit 11.4 CI jobs already test all DBs, do not repeat for 11.3.
   rules:
     - *nightly-rule
     - *manual-rule
@@ -448,9 +470,9 @@ phpunit (11.2 pgsql):
     POSTGRES_USER: drupal
     POSTGRES_PASSWORD: drupal
 
-phpunit (11.2 mysql):
-  extends: phpunit (11.2 sqlite)
-  # Only run on nightly, not on push to 1.x — the PHPUnit 11.3 CI jobs already test all DBs, do not repeat for 11.2.
+phpunit (11.3 mysql):
+  extends: phpunit (11.3 sqlite)
+  # Only run on nightly, not on push to 1.x — the PHPUnit 11.4 CI jobs already test all DBs, do not repeat for 11.3.
   rules:
     - *nightly-rule
     - *manual-rule
@@ -463,26 +485,23 @@ phpunit (11.2 mysql):
     MYSQL_PASSWORD: drupal
     MYSQL_ROOT_PASSWORD: root
 
-phpunit (11.3 sqlite):
-  extends: phpunit (11.2 sqlite)
-  rules:
-    - *nightly-rule
-    - *manual-rule
+phpunit (11.4 sqlite):
+  extends: phpunit (11.3 sqlite)
   variables:
     DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
 
-phpunit (11.3 mariadb):
-  extends: phpunit (11.2 mariadb)
+phpunit (11.4 mariadb):
+  extends: phpunit (11.3 mariadb)
   variables:
     DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
 
-phpunit (11.3 pgsql):
-  extends: phpunit (11.2 pgsql)
+phpunit (11.4 pgsql):
+  extends: phpunit (11.3 pgsql)
   variables:
     DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
 
-phpunit (11.3 mysql):
-  extends: phpunit (11.2 mysql)
+phpunit (11.4 mysql):
+  extends: phpunit (11.3 mysql)
   variables:
     DRUPAL_CORE: $DRUPAL_CORE_NEXT_MINOR
 
@@ -601,6 +620,7 @@ cypress unit:
 
 playwright:
   stage: test
+  allow_failure: true
   parallel:
     matrix:
       - SHARD: [ "1/6", "2/6", "3/6", "4/6", "5/6", "6/6" ]
@@ -682,6 +702,31 @@ playwright-reports:
         ]
       }
       EOF
+    - |
+      # Fail this job if any upstream Playwright jobs failed. Checking via the
+      # GitLab API (rather than the merged JUnit XML) catches infrastructure
+      # failures where no blob report was produced and tests="0" in the XML.
+      UPSTREAM_FAILURES=$(node -e '
+        (async () => {
+          const url = `${process.env.CI_API_V4_URL}/projects/${process.env.CI_PROJECT_ID}/pipelines/${process.env.CI_PIPELINE_ID}/jobs?per_page=100`;
+          const resp = await fetch(url, { headers: { "JOB-TOKEN": process.env.CI_JOB_TOKEN } });
+          if (!resp.ok) {
+            process.stderr.write(`GitLab API error: ${resp.status} ${resp.statusText}\n`);
+            process.exit(1);
+          }
+          const jobs = await resp.json();
+          const n = jobs.filter(j =>
+            j.name.startsWith("playwright") && !j.name.startsWith("playwright-") &&
+            j.status === "failed"
+          ).length;
+          process.stdout.write(String(n));
+        })().catch(e => { process.stderr.write(e.message + "\n"); process.exit(1); });
+      ')
+      if [ "${UPSTREAM_FAILURES}" -gt 0 ]; then
+        echo "❌ ${UPSTREAM_FAILURES} Playwright job(s) failed. See the HTML report for details."
+        exit 1
+      fi
+      echo "✅ All Playwright jobs passed."
   artifacts:
     expose_as: 'Playwright Test Reports'
     when: always
@@ -800,7 +845,7 @@ pages-publish:
   image: *image-node
   needs: []
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
       changes: *user-docs-files
   variables:
     ASTRO_SITE: https://$CI_PAGES_HOSTNAME

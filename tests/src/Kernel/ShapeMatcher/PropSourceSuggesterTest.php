@@ -4,28 +4,29 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\ShapeMatcher;
 
-use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
+use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropSource\HostEntityPropSource;
 use Drupal\canvas\PropSource\HostEntityUrlPropSource;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
-use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\Core\Plugin\Component;
 use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\link\LinkItemInterface;
+use Drupal\link\LinkTitleVisibility;
 use Drupal\node\Entity\NodeType;
 use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -53,6 +54,10 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
     'comment',
     'datetime_range',
     'telephone',
+    // Adds `content_translation_source`/`content_translation_outdated` base
+    // fields when a bundle is translatable, to assert they are never suggested.
+    'content_translation',
+    'language',
     // Create sample configurable fields on the `node` entity type.
     'node',
     'field',
@@ -148,7 +153,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
       'bundle' => 'foo',
       'required' => TRUE,
       'settings' => [
-        'title' => DRUPAL_OPTIONAL,
+        'title' => LinkTitleVisibility::Optional->value,
         'link_type' => LinkItemInterface::LINK_GENERIC,
       ],
     ])->save();
@@ -234,6 +239,54 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
 
     // Finally, the set of expectations must be complete.
     $this->assertSame(\array_keys($expected), \array_keys($suggestions));
+  }
+
+  /**
+   * Never suggests content_translation's bookkeeping base fields.
+   *
+   * When a bundle is translatable, content_translation adds the fixed-name
+   * `content_translation_source` and `content_translation_outdated` base fields
+   * to the entity type. These are bookkeeping fields that are never meaningful
+   * to display, so they must not be offered as prop sources.
+   *
+   * @see \Drupal\canvas\ShapeMatcher\PropSourceSuggester::isConsideredIrrelevant()
+   */
+  public function testTranslationMetadataFieldsAreConsideredIrrelevant(): void {
+    // Make the "Foo" node type translatable so content_translation adds its
+    // bookkeeping base fields to the node entity type.
+    \Drupal::service('content_translation.manager')->setEnabled('node', 'foo', TRUE);
+    $this->container->get('entity_field.manager')->clearCachedFieldDefinitions();
+
+    // Guard: the base fields exist, so there is something to omit. Without this,
+    // the omission assertion below would also pass if the fields were never
+    // created (e.g. if enabling translation silently failed).
+    // `content_translation_outdated` is a boolean, matched by boolean props.
+    $field_definitions = $this->container->get('entity_field.manager')->getFieldDefinitions('node', 'foo');
+    self::assertArrayHasKey('content_translation_source', $field_definitions);
+    self::assertArrayHasKey('content_translation_outdated', $field_definitions);
+
+    $component = \Drupal::service(ComponentPluginManager::class)->find('sdc_test_all_props:all-props');
+    \assert($component instanceof Component);
+    $suggestions = $this->container->get(PropSourceSuggester::class)
+      ->suggest(
+        'sdc_test_all_props:all-props',
+        $component->metadata,
+        EntityDataDefinition::createFromDataType('entity:node:foo'),
+      );
+
+    // No prop is offered a source expression that reads either bookkeeping
+    // field. `content_translation_outdated` is a boolean, so absent this
+    // heuristic it surfaces for the component's boolean props. The
+    // `content_translation_source` assertion is defensive: it is a `language`
+    // field, which the suggester does not currently match to any prop shape, so
+    // it guards against a future regression rather than a field offered today.
+    foreach ($suggestions as $prop_name => $suggestion) {
+      foreach ($suggestion[PropSource::EntityField->value] as $source) {
+        $expression = (string) $source->expression;
+        self::assertStringNotContainsString('content_translation_source', $expression, "Prop $prop_name should not be offered content_translation_source.");
+        self::assertStringNotContainsString('content_translation_outdated', $expression, "Prop $prop_name should not be offered content_translation_outdated.");
+      }
+    }
   }
 
   public static function provider(): \Generator {

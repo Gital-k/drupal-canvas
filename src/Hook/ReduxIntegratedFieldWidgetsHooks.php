@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\canvas\Form\ComponentInstanceForm;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Hook\Order\OrderAfter;
-use Drupal\Core\Security\TrustedCallbackInterface;
-use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\Url;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\Hook\Order\OrderAfter;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Routing\CurrentRouteMatch;
+use Drupal\Core\Security\TrustedCallbackInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Theme\ThemeManagerInterface;
-use Drupal\canvas\Form\ComponentInstanceForm;
+use Drupal\Core\Url;
 use Drupal\media_library\MediaLibraryState;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -305,6 +305,10 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       'datetime_default' => ['mainProperty' => [], 'dateTime' => []],
       'daterange_default' => ['dateRange' => []],
       'email_default' => ['mainProperty' => []],
+      'entity_reference_autocomplete' => [
+        'mainProperty' => ['name' => 'target_id'],
+        'entityAutocompleteTargetId' => [],
+      ],
       'file_generic' => ['mainProperty' => ['name' => 'fids']],
       'image_image' => ['mainProperty' => ['name' => 'fids']],
       'link_default' => ['link' => []],
@@ -367,6 +371,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       ComponentInstanceForm::FORM_ID,
       'config_translation_add_form',
       'config_translation_edit_form',
+      'tmgmt_job_item_edit_form',
     ];
     if (!\in_array($form_id, $forms_with_static_prop_sources, TRUE)) {
       // @see config/install/filter.format.canvas_html_block.yml
