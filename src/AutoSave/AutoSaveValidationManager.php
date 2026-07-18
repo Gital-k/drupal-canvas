@@ -2,16 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Drupal\canvas\Controller;
+namespace Drupal\canvas\AutoSave;
 
-use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\Core\Entity\EntityInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
- * Trait providing client auto-save validation infrastructure for controllers.
+ * Service providing client auto-save validation infrastructure for controllers.
  *
- * This trait is used to validate that the client is aware of the latest
+ * This service is used to validate that the client is aware of the latest
  * auto-saves for both:
  * 1. data part of the page preview:
  *    - the component tree (`layout` + `model` in the client-side
@@ -27,7 +26,12 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
  * @see \Drupal\canvas\Controller\ApiConfigAutoSaveControllers
  * @internal
  */
-trait AutoSaveValidateTrait {
+class AutoSaveValidationManager {
+
+  public function __construct(
+    private readonly AutoSaveManager $autoSaveManager,
+  ) {
+  }
 
   /**
    * Validates the client has the latest auto-saves for an array of entities.
@@ -50,7 +54,7 @@ trait AutoSaveValidateTrait {
    *
    * @see ::getClientAutoSaveData()
    */
-  protected function validateAutoSaves(array $entitiesToValidate, array $autoSaves, string $clientId): void {
+  public function validateAutoSaves(array $entitiesToValidate, array $autoSaves, string $clientId): void {
     $expected_auto_saves = [];
     $foundClientIdMismatch = FALSE;
     foreach ($entitiesToValidate as $entityToValidate) {
@@ -84,7 +88,7 @@ trait AutoSaveValidateTrait {
   /**
    * @todo Move this logic elsewhere in https://www.drupal.org/project/canvas/issues/3535458
    */
-  protected function getAutoSaveHashes(array $entities): array {
+  public function getAutoSaveHashes(array $entities): array {
     $autoSaveHashes = [];
     foreach ($entities as $entity) {
       \assert($entity instanceof EntityInterface);

@@ -272,7 +272,13 @@ export function getPropsValues(
           return transformsList[transformer as keyof Transforms](
             transformed,
             config as any,
-            (selectedModel as EvaluatedComponentModel).source[key] as any,
+            // A prop that has no value yet may have no source entry in the
+            // model (the server omits them), so fall back to the prop source
+            // structure from the component definition: without it the
+            // transform cannot process the value and the edit would be
+            // silently dropped.
+            ((selectedModel as EvaluatedComponentModel).source?.[key] ??
+              fieldData[key]) as any,
           );
         },
         value,

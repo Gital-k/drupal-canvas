@@ -84,6 +84,12 @@ services:
     arguments: ['@datetime.time', 100]
     tags:
       - { name: cache.bin.memory }
+  Drupal\canvas\AutoSave\AutoSaveValidationManager: {}
+  # Resolves ClientDataModelOperationInterface controller arguments. Added to
+  # core's controller argument resolver list by the service provider, because
+  # core hardcodes that list (there is no tag to collect).
+  # @see \Drupal\canvas\CanvasServiceProvider::alter
+  Drupal\canvas\ClientDataModel\Operation\ArgumentResolver: {}
   Drupal\canvas\Storage\ComponentTreeLoader: {}
   Drupal\canvas\CodeComponentDataProvider: {}
   Drupal\canvas\Version: {}
@@ -130,6 +136,7 @@ services:
     class: Drupal\canvas\EventSubscriber\ImageStyleRoutesEventSubscriber
     tags:
       - { name: event_subscriber }
+  Drupal\canvas\EventSubscriber\ClientDataModelOperationRouteSubscriber: {}
   Drupal\canvas\Routing\ViewModeRouteSubscriber:
     tags:
       - { name: event_subscriber }

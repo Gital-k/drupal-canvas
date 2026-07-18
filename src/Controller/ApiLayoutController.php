@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSave\AutoSaveValidationManager;
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\ClientDataModel\ClientDataModel;
+use Drupal\canvas\ClientDataModel\Operation\ClientDataModelOperationInterface;
 use Drupal\canvas\ClientDataToEntityConverter;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
@@ -48,7 +51,6 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 final class ApiLayoutController {
 
-  use AutoSaveValidateTrait;
   use ClientServerConversionTrait;
   use EntityFormTrait;
   public const string AUTO_SAVED_QUERY_KEY = 'autoSaved';
@@ -57,6 +59,7 @@ final class ApiLayoutController {
 
   public function __construct(
     private readonly AutoSaveManager $autoSaveManager,
+    private readonly AutoSaveValidationManager $autoSaveValidationManager,
     private readonly ThemeManagerInterface $themeManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly FormBuilderInterface $formBuilder,
@@ -152,7 +155,7 @@ final class ApiLayoutController {
       // an object and not empty array.
       'model' => empty($model) ? new \stdClass() : $model,
       'isNew' => $is_new,
-      'autoSaves' => $this->getAutoSaveHashes(array_merge(
+      'autoSaves' => $this->autoSaveValidationManager->getAutoSaveHashes(array_merge(
         [$entity],
         self::getEditableRegions($entity),
       )),
@@ -223,7 +226,7 @@ final class ApiLayoutController {
       $data['entity_form_fields'] = $this->getFilteredEntityData($entity);
 
       // Determine if there's an unsaved status change by comparing the current
-      // entity (which may be autosaved) with the original stored entity.
+      // entity (which may be auto-saved) with the original stored entity.
       $data['hasUnsavedStatusChange'] = FALSE;
       if ($original_entity instanceof EntityPublishedInterface
         && $entity !== $original_entity) {
@@ -374,6 +377,105 @@ final class ApiLayoutController {
   }
 
   /**
+   * @see \Drupal\canvas\EventSubscriber\ClientDataModelOperationRouteSubscriber::alterRoutes
+   * @see \Drupal\canvas\ClientDataModel\Operation\ArgumentResolver
+   * @see \Drupal\canvas\ClientDataModel\Operation\ClientDataModelOperationBase
+   */
+  public function mutateModel(FieldableEntityInterface $entity, ClientDataModelOperationInterface $operation): PreviewEnvelope {
+    $clientModel = $this->getLastStoredData($entity, includeAllRegions: TRUE);
+    $clientModel = $operation($clientModel, $entity);
+    \assert($operation->hasValidatedAutoSaves());
+    \assert($clientModel->clientInstanceId !== NULL);
+    $renderable = $this->buildMutatePreviewRenderable($clientModel, $entity);
+    // Echo the layout and model as the server normalizes them (the same shape
+    // the GET route returns), not the raw client-sent model: for example,
+    // multi-cardinality static prop sources carry their values only in
+    // `resolved`, without a `source.value`. The client compares the `source`
+    // of consecutive responses to decide when the component instance form
+    // must be rebuilt, so echoing the client's own model verbatim would
+    // trigger a form rebuild after every operation. Unlike the initial load
+    // above (which operations need to check cross-region access), the echo is
+    // client-facing and must only expose editable regions, like the GET route.
+    $storedData = $this->getLastStoredData($entity);
+    $data = [
+      'layout' => $storedData->layout,
+      'model' => $storedData->model,
+      // Add the auto-save hashes. We do this after building the preview
+      // render array, because the auto-save entry is written during building
+      // the preview.
+      'autoSaves' => $this->autoSaveValidationManager->getAutoSaveHashes(array_merge([$entity], PageRegion::getEditableRegions())),
+    ];
+    return new PreviewEnvelope($renderable, $data);
+  }
+
+  /**
+   * Builds a preview renderable for mutate operations using a ClientDataModel.
+   */
+  private function buildMutatePreviewRenderable(ClientDataModel $clientModel, FieldableEntityInterface $entity): array {
+    \assert($clientModel->clientInstanceId !== NULL);
+    $clientInstanceId = $clientModel->clientInstanceId;
+
+    $region_layouts = self::getRegionLayoutNodesKeyedByClientSideId($clientModel->layout);
+    \assert(\array_key_exists(CanvasPageVariant::MAIN_CONTENT_REGION, $region_layouts));
+    $main_content_layout = $region_layouts[CanvasPageVariant::MAIN_CONTENT_REGION];
+    unset($region_layouts[CanvasPageVariant::MAIN_CONTENT_REGION]);
+
+    // Update the main entity's component tree and save it to the auto-save
+    // store, so the preview reflects the mutated state. Only when the
+    // operation actually touched the content region: operations record which
+    // regions they modified, so untouched trees need no conversion or write.
+    $entity = $this->getAutoSavedVersionIfAvailable([$entity])[$entity->id()];
+    \assert($entity instanceof FieldableEntityInterface);
+    if (\in_array(CanvasPageVariant::MAIN_CONTENT_REGION, $clientModel->dirtyRegions, TRUE)) {
+      $this->updateEntity($entity, $main_content_layout, (array) $clientModel->model, $clientModel->entityFormFields, NULL);
+      $this->autoSaveManager->saveEntity($entity, $clientInstanceId);
+    }
+
+    // Update the component trees of the PageRegions the operation modified.
+    $regions = $this->getAutoSavedVersionIfAvailable(PageRegion::loadForActiveThemeByClientSideId());
+    foreach ($region_layouts as $client_side_region_id => $region_layout) {
+      if (!isset($regions[$client_side_region_id]) || !\in_array($client_side_region_id, $clientModel->dirtyRegions, TRUE)) {
+        continue;
+      }
+      $regions[$client_side_region_id] = $regions[$client_side_region_id]->forAutoSaveData([
+        'layout' => $region_layout['components'],
+        'model' => self::extractModelForSubtree($region_layout, (array) $clientModel->model),
+      ], validate: FALSE);
+      $this->autoSaveManager->saveEntity($regions[$client_side_region_id], $clientInstanceId);
+    }
+
+    return $this->buildPreviewRenderable($entity, NULL);
+  }
+
+  /**
+   * Get last stored data, taking auto-saved data into account if any.
+   */
+  private function getLastStoredData(FieldableEntityInterface $entity, bool $includeAllRegions = FALSE): ClientDataModel {
+    $model = [];
+    // Operations never read nor change entity form fields, so skip building
+    // the entity form: it is one of the most expensive parts of the request.
+    $entityFormFields = [];
+    $build_entity = $this->getAutoSavedVersionIfAvailable([$entity])[$entity->id()];
+    \assert($build_entity instanceof FieldableEntityInterface);
+    // Build the content region.
+    $tree = $this->componentTreeLoader->load($build_entity);
+    $layout = [$this->buildRegion(CanvasPageVariant::MAIN_CONTENT_REGION, $tree, $model)];
+    \assert(\is_array($model));
+
+    $regions = PageRegion::loadForActiveTheme();
+    if (!empty($regions)) {
+      $this->addGlobalRegions($regions, $model, $layout, $includeAllRegions);
+      $layout_keyed_by_region = array_combine(\array_map(static fn($region) => $region['id'], $layout), $layout);
+      // Reorder the layout to match theme order.
+      $layout = array_values(array_replace(
+        array_intersect_key(array_flip($this->regionsClientSideIds), $layout_keyed_by_region),
+        $layout_keyed_by_region
+      ));
+    }
+    return new ClientDataModel($layout, $model, $entityFormFields);
+  }
+
+  /**
    * Updates single component instance's auto-save entry and returns a preview.
    */
   public function patch(Request $request, FieldableEntityInterface|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): PreviewEnvelope {
@@ -422,9 +524,8 @@ final class ApiLayoutController {
     // @todo Currently ::validateAutoSaves() validates all page regions as well
     //   as `$entity` even though below we will only auto-save the entity
     //   containing the component, determine if here we should only validate
-    //   that entity in https://drupal.org/i/3532056 or implement concurrent
-    //   editing in https://drupal.org/i/3492065.
-    $this->validateAutoSaves(
+    //   that entity in https://drupal.org/i/3532056.
+    $this->autoSaveValidationManager->validateAutoSaves(
       array_merge([$entity], self::getEditableRegions($entity)),
       $autoSaves,
       $clientInstanceId,
@@ -456,7 +557,7 @@ final class ApiLayoutController {
     if ($entity instanceof FieldableEntityInterface) {
       $data['entity_form_fields'] = $this->getFilteredEntityData($entity);
     }
-    $data['autoSaves'] = $this->getAutoSaveHashes(array_merge(
+    $data['autoSaves'] = $this->autoSaveValidationManager->getAutoSaveHashes(array_merge(
       [$entity],
       self::getEditableRegions($entity),
     ));
@@ -469,7 +570,7 @@ final class ApiLayoutController {
   /**
    * Updates the auto-saved layout, model and entity form fields.
    *
-   * @todo Remove this in https://drupal.org/i/3492065
+   * @todo Remove this legacy full-layout endpoint once the client performs all mutations via the operation-specific PATCH routes.
    */
   public function post(Request $request, FieldableEntityInterface|ContentTemplate $entity, ?ContentEntityInterface $preview_entity = NULL): PreviewEnvelope {
     \assert(!$entity instanceof ContentTemplate || !\is_null($preview_entity));
@@ -503,7 +604,7 @@ final class ApiLayoutController {
       $entity_form_fields = NULL;
     }
 
-    $this->validateAutoSaves(
+    $this->autoSaveValidationManager->validateAutoSaves(
       array_merge([$entity], self::getEditableRegions($entity)),
       $autoSaves,
       $clientInstanceId,
@@ -552,7 +653,7 @@ final class ApiLayoutController {
     return new PreviewEnvelope(
       $this->buildPreviewRenderable($entity, $preview_entity),
       additionalData: [
-        'autoSaves' => $this->getAutoSaveHashes(array_merge(
+        'autoSaves' => $this->autoSaveValidationManager->getAutoSaveHashes(array_merge(
           [$entity],
           self::getEditableRegions($entity),
         )),

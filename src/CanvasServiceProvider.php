@@ -6,6 +6,7 @@ namespace Drupal\canvas;
 
 use Drupal\canvas\Access\CanvasUiAccessCheck;
 use Drupal\canvas\Access\ViewModeAccessCheck;
+use Drupal\canvas\ClientDataModel\Operation\ArgumentResolver as OperationArgumentResolver;
 use Drupal\canvas\Config\ThemeSettingsDiscovery;
 use Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSynchronizer;
 use Drupal\canvas\CoreBugFix\ConfigEntityQueryFactory;
@@ -119,6 +120,16 @@ class CanvasServiceProvider extends ServiceProviderBase {
     // @todo Remove this once Canvas relies on a Drupal core version that includes https://www.drupal.org/i/3400181.
     $container->getDefinition('config.typed')
       ->setClass(TypedConfigManagerWithCachePollutionFix::class);
+
+    // Prepend the client data model operation argument resolver to core's
+    // controller argument resolver list: core hardcodes that list, so there
+    // is no service tag to collect it.
+    // @see \Drupal\canvas\ClientDataModel\Operation\ArgumentResolver
+    $argument_resolver = $container->getDefinition('http_kernel.controller.argument_resolver');
+    $arguments = $argument_resolver->getArguments();
+    \assert(\is_array($arguments[1]));
+    \array_unshift($arguments[1], new Reference(OperationArgumentResolver::class));
+    $argument_resolver->setArguments($arguments);
 
     parent::alter($container);
   }

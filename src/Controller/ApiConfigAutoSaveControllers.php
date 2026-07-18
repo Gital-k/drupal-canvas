@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSave\AutoSaveValidationManager;
 use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\CanvasAssetInterface;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
@@ -16,10 +17,9 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 final class ApiConfigAutoSaveControllers extends ApiControllerBase {
 
-  use AutoSaveValidateTrait;
-
   public function __construct(
     private readonly AutoSaveManager $autoSaveManager,
+    private readonly AutoSaveValidationManager $autoSaveValidationManager,
   ) {}
 
   public function get(CanvasHttpApiEligibleConfigEntityInterface $canvas_config_entity): CacheableJsonResponse {
@@ -37,7 +37,7 @@ final class ApiConfigAutoSaveControllers extends ApiControllerBase {
     return (new CacheableJsonResponse(
       data: [
         'data' => $auto_save_normalization,
-        'autoSaves' => $this->getAutoSaveHashes([$canvas_config_entity]),
+        'autoSaves' => $this->autoSaveValidationManager->getAutoSaveHashes([$canvas_config_entity]),
       ],
       status: Response::HTTP_OK,
     ))->addCacheableDependency($auto_save)
@@ -88,7 +88,7 @@ final class ApiConfigAutoSaveControllers extends ApiControllerBase {
     if (!\array_key_exists('clientInstanceId', $decoded)) {
       throw new BadRequestHttpException('Missing clientInstanceId');
     }
-    $this->validateAutoSaves([$canvas_config_entity], $decoded['autoSaves'], $decoded['clientInstanceId']);
+    $this->autoSaveValidationManager->validateAutoSaves([$canvas_config_entity], $decoded['autoSaves'], $decoded['clientInstanceId']);
 
     $existing_auto_save = $this->autoSaveManager->getAutoSaveEntity($canvas_config_entity);
     if (!$existing_auto_save->isEmpty()) {
@@ -104,7 +104,7 @@ final class ApiConfigAutoSaveControllers extends ApiControllerBase {
     $this->autoSaveManager->saveEntity($auto_save_entity, $decoded['clientInstanceId']);
     \assert($auto_save_entity instanceof CanvasHttpApiEligibleConfigEntityInterface);
     BrandKit::syncAutoSaveFileUsage($source_entity, $auto_save_entity, (string) $canvas_config_entity->id());
-    return new JsonResponse(data: ['autoSaves' => $this->getAutoSaveHashes([$canvas_config_entity])], status: Response::HTTP_OK);
+    return new JsonResponse(data: ['autoSaves' => $this->autoSaveValidationManager->getAutoSaveHashes([$canvas_config_entity])], status: Response::HTTP_OK);
   }
 
 }

@@ -14,6 +14,7 @@ import {
   setInitialized,
   setInitialLayoutModel,
   setUpdatePreview,
+  syncLayoutModel,
 } from '@/features/layout/layoutModelSlice';
 import { notificationsSlice } from '@/features/notifications/notificationsSlice';
 import {
@@ -27,8 +28,10 @@ import { dialogSlice } from '@/features/ui/dialogSlice';
 import { primaryPanelSlice } from '@/features/ui/primaryPanelSlice';
 import {
   clearUndoRedoHistory,
+  EditorFrameContext,
   performUndoOrRedo,
   pushUndo,
+  selectEditorFrameContext,
   setLatestUndoRedoActionId,
   uiSlice,
 } from '@/features/ui/uiSlice';
@@ -51,9 +54,18 @@ import { rtkQueryErrorHandler } from '@/utils/rtkQuery-error';
 
 import type { Action, Middleware, ThunkAction } from '@reduxjs/toolkit';
 import type { UnknownAction } from 'redux';
-import type { LayoutModelSliceState } from '@/features/layout/layoutModelSlice';
+import type {
+  DeleteNodeAction,
+  DuplicateNodeAction,
+  InsertNodesAction,
+  LayoutModelSliceState,
+  MoveNodeAction,
+  PatchLayoutAction,
+  ShiftNodeAction,
+} from '@/features/layout/layoutModelSlice';
 import type { PageDataState } from '@/features/pageData/pageDataSlice';
 import type { UndoRedoStackItem, UndoRedoType } from '@/features/ui/uiSlice';
+import type { PatchLayoutAndModelQueryArg } from '@/services/preview';
 
 // Reducer enhancer to decorate undoable aware reducers and unset future state
 // if an action is performed on another undoable slice.
@@ -112,12 +124,19 @@ const rootReducer = combineSlices(
         undoType: '@@redux-undo/layoutModel_UNDO',
         redoType: '@@redux-undo/layoutModel_REDO',
         clearHistoryType: '@@redux-undo/layoutModel_CLEAR_HISTORY',
+        // TRICKY: without syncFilter, a filtered action (e.g. the operation
+        // response echo, syncLayoutModel) leaves redux-undo's internal
+        // "latest unfiltered" state stale, and the next approved action
+        // commits it as a phantom undo entry.
+        syncFilter: true,
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
           return (
             Object.keys(present.model).length > 0 &&
             action.type !== setInitialLayoutModel.type &&
-            action.type !== setUpdatePreview.type
+            action.type !== setUpdatePreview.type &&
+            action.type !== setInitialized.type &&
+            action.type !== syncLayoutModel.type
           );
         },
       }),
@@ -131,6 +150,7 @@ const rootReducer = combineSlices(
         undoType: '@@redux-undo/pageData_UNDO',
         redoType: '@@redux-undo/pageData_REDO',
         clearHistoryType: '@@redux-undo/pageData_CLEAR_HISTORY',
+        syncFilter: true,
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
           return (
@@ -184,6 +204,8 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
     if (matchesUndoRedo && matchesUndoRedo.length === 2) {
       const id = uuidv4();
       const [, undoOrRedo] = matchesUndoRedo;
+      // @todo implement history rewriting per
+      //    https://madebyevan.com/figma/how-figmas-multiplayer-technology-works/#implementing-undo
       store.dispatch(performUndoOrRedo(undoOrRedo === 'UNDO'));
       store.dispatch(setLatestUndoRedoActionId(id));
       return next({
@@ -204,7 +226,8 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
       type === setUpdatePreview.type ||
       type === setInitialLayoutModel.type ||
       type === setInitialPageData.type ||
-      type === setInitialized.type
+      type === setInitialized.type ||
+      type === syncLayoutModel.type
     ) {
       // Ignore initial actions that set the state of the model or page data
       // from the return of API responses. The user should not be able to undo
@@ -232,6 +255,89 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
     return next(action);
   };
 
+const patchLayoutMiddleware: Middleware<{}, RootState> = ((store) =>
+  (next) =>
+  (action) => {
+    const isPatchLayoutAction = (action: Action): action is PatchLayoutAction =>
+      action.type.match(
+        /^layoutModel\/(duplicateNode|insertNodes|moveNode|shiftNode|deleteNode)$/,
+      ) !== null;
+    const isDuplicateNodeAction = (
+      action: PatchLayoutAction,
+    ): action is DuplicateNodeAction =>
+      action.type === 'layoutModel/duplicateNode';
+    const isInsertNodesAction = (
+      action: PatchLayoutAction,
+    ): action is InsertNodesAction => action.type === 'layoutModel/insertNodes';
+    const isMoveNodeAction = (
+      action: PatchLayoutAction,
+    ): action is MoveNodeAction => action.type === 'layoutModel/moveNode';
+    const isShiftNodeAction = (
+      action: PatchLayoutAction,
+    ): action is ShiftNodeAction => action.type === 'layoutModel/shiftNode';
+    const isDeleteNodeAction = (
+      action: PatchLayoutAction,
+    ): action is DeleteNodeAction => action.type === 'layoutModel/deleteNode';
+    const queryArgFactory = (
+      action: PatchLayoutAction,
+    ): PatchLayoutAndModelQueryArg => {
+      if (isDuplicateNodeAction(action)) {
+        return {
+          ...action.payload,
+          operation: 'duplicate-node',
+        };
+      }
+      if (isInsertNodesAction(action)) {
+        return {
+          ...action.payload,
+          operation: 'insert-nodes',
+        };
+      }
+      if (isDeleteNodeAction(action)) {
+        return {
+          operation: 'delete-node',
+          componentInstanceUuid: action.payload,
+        };
+      }
+      if (isMoveNodeAction(action)) {
+        return {
+          operation: 'move-node',
+          ...action.payload,
+        };
+      }
+      if (isShiftNodeAction(action)) {
+        return {
+          operation: 'shift-node',
+          ...action.payload,
+        };
+      }
+      throw new Error('Unsupported');
+    };
+    const patchAction = action as Action;
+
+    if (isPatchLayoutAction(patchAction)) {
+      // Content templates have no operation routes yet: let the reducer apply
+      // the change, then flag a full template layout POST, the pre-operation
+      // behavior.
+      // @todo Add content template support to the operation routes in https://drupal.org/i/3532056
+      if (
+        selectEditorFrameContext(store.getState()) ===
+        EditorFrameContext.TEMPLATE
+      ) {
+        const result = next(action);
+        store.dispatch(setUpdatePreview(true));
+        return result;
+      }
+      const patchLayoutAndModelQueryArg = queryArgFactory(patchAction);
+      store.dispatch(
+        previewApi.endpoints.updateComponent.initiate(
+          patchLayoutAndModelQueryArg,
+        ),
+      );
+    }
+    return next(action);
+  }) as Middleware<{}, RootState, AppDispatch>;
+
 // The store setup is wrapped in `makeStore` to allow reuse
 // when setting up tests that need the same store config
 export const makeStore = (preloadedState?: Partial<RootState>) => {
@@ -257,6 +363,7 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
         pendingChangesApi.middleware,
         contentApi.middleware,
         contentEntityReferenceApi.middleware,
+        patchLayoutMiddleware,
         rtkQueryErrorHandler, // Add the error handling middleware
       );
     },

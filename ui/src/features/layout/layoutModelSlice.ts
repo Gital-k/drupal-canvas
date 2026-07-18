@@ -2,7 +2,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 
-import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import { previewApi } from '@/services/preview';
 import { hasSlotDefinitions, isPropSourceComponent } from '@/types/Component';
 import {
@@ -13,6 +12,7 @@ import {
 import {
   findComponentByUuid,
   findNodePathByUuid,
+  getNodeAtPath,
   insertNodeAtPath,
   moveNodeToPath,
   recurseNodes,
@@ -23,7 +23,6 @@ import {
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { StateWithHistory } from 'redux-undo';
 import type { AppThunk, RootState } from '@/app/store';
-import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type {
   CanvasComponent,
   ComponentsList,
@@ -82,6 +81,9 @@ export type ComponentModels = Record<
 export interface LayoutModelSliceState extends RootLayoutModel {
   updatePreview: boolean;
   isInitialized?: boolean;
+  // Identifies the entity (or template) the layout was initialized for, so
+  // loaders can tell a same-entity remount apart from real navigation.
+  initializedForEntity?: string;
   translations?: Record<string, any>;
 }
 
@@ -99,22 +101,29 @@ export interface StateWithHistoryWrapper {
   layoutModel: StateWithHistory<LayoutModelSliceState>;
 }
 
-type MoveNodePayload = {
-  uuid: string | undefined;
-  to: number[] | undefined;
+export type NodeParentPosition = {
+  parentRegionOrUuid: string;
+  slot: string | null;
+  // @see https://madebyevan.com/algos/crdt-fractional-indexing/
+  fractal: number;
 };
 
-type ShiftNodePayload = {
-  uuid: string | undefined;
+export type MoveNodePayload = {
+  uuid: string;
+  to: number[];
+};
+
+export type ShiftNodePayload = {
+  uuid: string;
   direction: 'up' | 'down';
 };
 
-type DuplicateNodePayload = {
+export type DuplicateNodePayload = {
   uuid: string;
 };
 
-type InsertMultipleNodesPayload = {
-  to: number[] | undefined;
+export type InsertMultipleNodesPayload = {
+  to: number[];
   layoutModel: LayoutModelPiece;
   /**
    * Pass an optional UUID that will be assigned to the last, top level node being inserted. Allows you to define the UUID
@@ -304,12 +313,17 @@ export const layoutModelSlice = createSlice({
       }
 
       state.layout = removeComponentByUuid(state.layout, action.payload);
-      // Flag a preview update.
-      state.updatePreview = true;
+      // This will be updated by the middleware.
+      state.updatePreview = false;
     }),
     duplicateNode: create.reducer(
-      (state, action: PayloadAction<DuplicateNodePayload>) => {
-        const { uuid } = action.payload;
+      (
+        state,
+        action: PayloadAction<
+          DuplicateNodePayload & { uuidMap: Record<string, string> }
+        >,
+      ) => {
+        const { uuid, uuidMap } = action.payload;
         const nodeToDuplicate = findComponentByUuid(state.layout, uuid);
 
         if (!nodeToDuplicate) {
@@ -327,6 +341,7 @@ export const layoutModelSlice = createSlice({
         const { updatedNode, updatedModel } = replaceUUIDsAndUpdateModel(
           nodeToDuplicate,
           state.model,
+          uuidMap,
         );
 
         // Add the updated model to the state
@@ -354,12 +369,12 @@ export const layoutModelSlice = createSlice({
           updatedNode,
         ) as RegionNode;
         state.layout = newState;
-        // Flag a preview update.
-        state.updatePreview = true;
+        // This will be updated by the middleware.
+        state.updatePreview = false;
       },
     ),
     moveNode: create.reducer(
-      (state, action: PayloadAction<MoveNodePayload>) => {
+      (state, action: PayloadAction<MoveNodePayload & NodeParentPosition>) => {
         const { uuid, to } = action.payload;
         if (!uuid || !Array.isArray(to)) {
           console.error(
@@ -370,13 +385,16 @@ export const layoutModelSlice = createSlice({
 
         // Create a mutable copy of the path array since action payloads are frozen.
         state.layout = moveNodeToPath(state.layout, uuid, [...to]);
-        // Flag a preview update.
-        state.updatePreview = true;
+        // This will be updated by the middleware.
+        state.updatePreview = false;
       },
     ),
     insertNodes: create.reducer(
-      (state, action: PayloadAction<InsertMultipleNodesPayload>) => {
-        const { layoutModel, to, useUUID } = action.payload;
+      (
+        state,
+        action: PayloadAction<InsertMultipleNodesPayload & NodeParentPosition>,
+      ) => {
+        const { layoutModel, to } = action.payload;
 
         if (!Array.isArray(to)) {
           console.error(
@@ -385,7 +403,6 @@ export const layoutModelSlice = createSlice({
           return;
         }
 
-        let updatedModel: ComponentModels = { ...state.model };
         const newLayout: Array<RegionNode> = JSON.parse(
           JSON.stringify(state.layout),
         );
@@ -406,55 +423,13 @@ export const layoutModelSlice = createSlice({
         // Loop through each node in reverse order to maintain the correct insert positions
         for (let i = components.length - 1; i >= 0; i--) {
           const node = components[i];
-          const specifyUUID = i === 0;
-          const { updatedNode, updatedModel: nodeUpdatedModel } =
-            replaceUUIDsAndUpdateModel(
-              node,
-              model,
-              specifyUUID ? useUUID : undefined,
-            );
-          updatedModel = { ...updatedModel, ...nodeUpdatedModel };
-          regionRoot = insertNodeAtPath(regionRoot, toPath, updatedNode);
+          regionRoot = insertNodeAtPath(regionRoot, toPath, node);
         }
 
-        state.model = updatedModel;
+        state.model = { ...state.model, ...model };
         state.layout[rootIndex] = regionRoot;
-        // Flag a preview update.
-        state.updatePreview = true;
-      },
-    ),
-    sortNode: create.reducer(
-      (state, action: PayloadAction<SortNodePayload>) => {
-        const { uuid, to } = action.payload;
-        if (!uuid || to === undefined) {
-          console.error(
-            `Cannot sort ${uuid} to position ${to}. Check both uuid and to are defined/valid.`,
-          );
-          return;
-        }
-
-        const cloneNode = JSON.parse(
-          JSON.stringify(findComponentByUuid(state.layout, uuid)),
-        );
-        const nodePath = findNodePathByUuid(state.layout, uuid);
-        const rootIndex = nodePath?.shift() ?? undefined;
-        if (rootIndex === undefined) {
-          throw new Error(
-            'Path should be at least two items long, starting from the root region',
-          );
-        }
-        if (cloneNode && nodePath) {
-          const insertPosition = [...nodePath.slice(0, -1), to];
-          const newLayout = removeComponentByUuid(state.layout, uuid);
-
-          state.layout[rootIndex] = insertNodeAtPath(
-            newLayout[rootIndex],
-            insertPosition,
-            cloneNode,
-          );
-          // Flag a preview update.
-          state.updatePreview = true;
-        }
+        // This will be updated by the middleware.
+        state.updatePreview = false;
       },
     ),
     shiftNode: create.reducer(
@@ -490,8 +465,8 @@ export const layoutModelSlice = createSlice({
             insertPosition,
             cloneNode,
           );
-          // Flag a preview update.
-          state.updatePreview = true;
+          // This will be updated by the middleware.
+          state.updatePreview = false;
         }
       },
     ),
@@ -509,6 +484,17 @@ export const layoutModelSlice = createSlice({
         state.updatePreview = updatePreview;
       },
     ),
+    // Identical to setLayoutModel but excluded from undo history: applies the
+    // authoritative state echoed back by a layout operation response, which
+    // must not cost the user an extra undo step.
+    syncLayoutModel: create.reducer(
+      (state, action: PayloadAction<LayoutModelSliceState>) => {
+        const { layout, model, updatePreview } = action.payload;
+        state.layout = layout;
+        state.model = model;
+        state.updatePreview = updatePreview;
+      },
+    ),
     // Identical to setLayoutModel but with a different type for ensuring this
     // doesn't trigger an undo/redo action.
     setInitialLayoutModel: create.reducer(
@@ -518,12 +504,14 @@ export const layoutModelSlice = createSlice({
           model,
           updatePreview,
           isInitialized = true,
+          initializedForEntity,
           translations,
         } = action.payload;
         state.layout = layout;
         state.model = model;
         state.updatePreview = updatePreview;
         state.isInitialized = isInitialized;
+        state.initializedForEntity = initializedForEntity;
         state.translations = translations || {};
       },
     ),
@@ -744,9 +732,11 @@ export const updateExistingComponentValues =
       ...values,
     };
 
-    const type = selectEditorFrameContext(state);
     const valuePayload = {
-      type,
+      operation: 'update-model' as const,
+      // Without the editor frame context, template edits would be sent to the
+      // operation route of the previewed entity instead of the template.
+      type: state.ui.editorFrameContext,
       componentInstanceUuid: componentToUpdateId,
       componentType: `${selectedComponentType}@${version}`,
       model: {
@@ -832,7 +822,10 @@ export const _linkPropToEntityValue =
       delete resolved[propName];
 
       const valuePayload = {
-        type: 'template' as EditorFrameContext,
+        operation: 'update-model' as const,
+        // Without the editor frame context, template edits would be sent to
+        // the operation route of the previewed entity instead of the template.
+        type: inputUIData.editorFrameContext,
         componentInstanceUuid: componentToUpdateId,
         componentType: `${selectedComponentType}@${version}`,
         model: {
@@ -882,15 +875,189 @@ export const {
   setLayoutModel,
   setInitialized,
   setInitialLayoutModel,
-  duplicateNode,
-  moveNode,
   shiftNode,
-  sortNode,
   setUpdatePreview,
-  insertNodes,
+  syncLayoutModel,
 } = layoutModelSlice.actions;
 
 export const layoutModelReducer = layoutModelSlice.reducer;
+
+export const isSlotNode = (node: LayoutNode | null): node is SlotNode =>
+  node !== null && node.nodeType === 'slot';
+export const isRegionNode = (node: LayoutNode | null): node is RegionNode =>
+  node !== null && node.nodeType === 'region';
+export const isComponentNode = (
+  node: LayoutNode | null,
+): node is ComponentNode => node !== null && node.nodeType === 'component';
+
+export const duplicateNode =
+  (payload: DuplicateNodePayload): AppThunk =>
+  (dispatch, getState) => {
+    const uuidMap: Record<string, string> = {};
+    const component = findComponentByUuid(
+      selectLayout(getState()),
+      payload.uuid,
+    );
+    if (component !== null) {
+      recurseNodes(component, (node) => {
+        if (isComponentNode(node)) {
+          uuidMap[node.uuid] = uuidv4();
+        }
+      });
+    }
+    dispatch(
+      layoutModelSlice.actions.duplicateNode({
+        ...payload,
+        uuidMap,
+      }),
+    );
+  };
+
+export const insertNodes =
+  (payload: InsertMultipleNodesPayload): AppThunk =>
+  (dispatch, getState) => {
+    const layout = selectLayout(getState());
+    const parentNode = getNodeAtPath(layout, payload.to.slice(0, -1));
+    const fractal = payload.to[payload.to.length - 1] + 0.5;
+
+    const uuidMap: Record<string, string> = {};
+
+    payload.layoutModel.layout.forEach((component) => {
+      if (isComponentNode(component)) {
+        uuidMap[component.uuid] = uuidv4();
+      }
+      recurseNodes(component, (node) => {
+        if (isComponentNode(node)) {
+          uuidMap[node.uuid] = uuidv4();
+        }
+      });
+    });
+
+    if (payload.useUUID) {
+      const firstKey = Object.keys(uuidMap).shift();
+      uuidMap[firstKey as keyof typeof uuidMap] = payload.useUUID;
+    }
+
+    let model: ComponentModels = { ...payload.layoutModel.model };
+    const updatedLayout: Array<ComponentNode> = [];
+    payload.layoutModel.layout.forEach((component, i) => {
+      const { updatedNode, updatedModel } = replaceUUIDsAndUpdateModel(
+        component,
+        model,
+        uuidMap,
+      );
+      updatedLayout[i] = updatedNode;
+      model = { ...model, ...updatedModel };
+    });
+
+    const layoutModel = {
+      model,
+      layout: updatedLayout,
+    };
+
+    if (isSlotNode(parentNode)) {
+      const [parentRegionOrUuid, slot] = parentNode.id.split('/');
+      dispatch(
+        layoutModelSlice.actions.insertNodes({
+          ...payload,
+          layoutModel,
+          parentRegionOrUuid,
+          slot,
+          fractal,
+        }),
+      );
+      return;
+    }
+    dispatch(
+      layoutModelSlice.actions.insertNodes({
+        ...payload,
+        layoutModel,
+        parentRegionOrUuid:
+          (isRegionNode(parentNode) ? parentNode.id : parentNode?.uuid) || '',
+        slot: null,
+        fractal,
+      }),
+    );
+  };
+
+export const moveNode =
+  (payload: MoveNodePayload): AppThunk =>
+  (dispatch, getState) => {
+    const layout = selectLayout(getState());
+    const parentNode = getNodeAtPath(layout, payload.to.slice(0, -1));
+    const fractal = payload.to[payload.to.length - 1] + 0.5;
+    if (isSlotNode(parentNode)) {
+      const [parentRegionOrUuid, slot] = parentNode.id.split('/');
+      dispatch(
+        layoutModelSlice.actions.moveNode({
+          ...payload,
+          parentRegionOrUuid,
+          slot,
+          fractal,
+        }),
+      );
+      return;
+    }
+
+    dispatch(
+      layoutModelSlice.actions.moveNode({
+        ...payload,
+        parentRegionOrUuid:
+          (isRegionNode(parentNode) ? parentNode.id : parentNode?.uuid) || '',
+        slot: null,
+        fractal,
+      }),
+    );
+  };
+
+/**
+ * Sorting is a move within the component's current parent: delegate to the
+ * moveNode thunk so the patch layout middleware persists it as a move-node
+ * operation.
+ */
+export const sortNode =
+  (payload: SortNodePayload): AppThunk =>
+  (dispatch, getState) => {
+    const { uuid, to } = payload;
+    if (!uuid || to === undefined) {
+      console.error(
+        `Cannot sort ${uuid} to position ${to}. Check both uuid and to are defined/valid.`,
+      );
+      return;
+    }
+    const nodePath = findNodePathByUuid(selectLayout(getState()), uuid);
+    if (!nodePath) {
+      return;
+    }
+    // The sort target is an index in the sibling list WITHOUT the moved
+    // component, but moveNode inserts before removing the original, so
+    // moving down needs a one-position adjustment.
+    const currentIndex = nodePath[nodePath.length - 1];
+    const target = to > currentIndex ? to + 1 : to;
+    dispatch(moveNode({ uuid, to: [...nodePath.slice(0, -1), target] }));
+  };
+
+export type DeleteNodeAction = ReturnType<
+  typeof layoutModelSlice.actions.deleteNode
+>;
+export type DuplicateNodeAction = ReturnType<
+  typeof layoutModelSlice.actions.duplicateNode
+>;
+export type ShiftNodeAction = ReturnType<
+  typeof layoutModelSlice.actions.shiftNode
+>;
+export type MoveNodeAction = ReturnType<
+  typeof layoutModelSlice.actions.moveNode
+>;
+export type InsertNodesAction = ReturnType<
+  typeof layoutModelSlice.actions.insertNodes
+>;
+export type PatchLayoutAction =
+  | DeleteNodeAction
+  | DuplicateNodeAction
+  | ShiftNodeAction
+  | MoveNodeAction
+  | InsertNodesAction;
 
 // When using redux-undo, you reference the current state by state.[sliceName].present.[targetKey].
 // These selectors are written outside the slice because the type of state is different. Here, we need
@@ -905,6 +1072,9 @@ export const selectUpdatePreview = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.updatePreview;
 export const selectIsInitialized = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.isInitialized;
+
+export const selectInitializedForEntity = (state: StateWithHistoryWrapper) =>
+  state.layoutModel.present.initializedForEntity;
 export const selectTranslations = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.translations;
 const selectRegion = (state: RootState, regionName: string) => regionName;

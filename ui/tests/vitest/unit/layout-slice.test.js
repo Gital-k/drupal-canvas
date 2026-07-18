@@ -1,10 +1,10 @@
+import { vi } from 'vitest';
+
 import { makeStore } from '@/app/store';
 import {
   deleteNode,
-  duplicateNode,
   initialState,
   layoutModelSlice,
-  moveNode,
   selectLayoutHistory,
   setLayoutModel,
   shiftNode,
@@ -18,6 +18,28 @@ import {
 } from '@/features/ui/uiSlice';
 
 import layoutFixture from '../../fixtures/layout-default.json';
+
+// Layout mutations dispatched through a real store trigger the patch layout
+// middleware, whose fetch would otherwise reject (and can surface as an
+// unhandled rejection after the test file finishes on slow machines).
+beforeEach(() => {
+  const response = {
+    ok: true,
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+    text: async () =>
+      JSON.stringify({ html: '', layout: [], model: {}, autoSaves: {} }),
+    json: async () => ({ html: '', layout: [], model: {}, autoSaves: {} }),
+    clone() {
+      return this;
+    },
+  };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+  window.history.pushState({}, '', '/canvas/editor/node/1');
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 let layout;
 
@@ -104,11 +126,16 @@ describe('Move node', () => {
     expect(
       layout.layout[0].components[0].slots[0].components[0].uuid,
     ).to.deep.equal('static-static-card1ab');
+    // Use the internal slice action: the exported moveNode thunk derives the
+    // parent position fields consumed by the patch layout middleware.
     const state = layoutModelSlice.reducer(
       layout,
-      moveNode({
+      layoutModelSlice.actions.moveNode({
         uuid: 'static-static-card1ab',
         to: [0, 4, 0, 1],
+        parentRegionOrUuid: 'content',
+        slot: null,
+        fractal: 1.5,
       }),
     );
     expect(state.layout[0].components[0].slots[0].components.length).to.eq(1);
@@ -125,6 +152,8 @@ describe('Move node', () => {
 });
 
 describe('Sort node', () => {
+  // sortNode is a thunk that delegates to moveNode (a sort is a move within
+  // the current parent), so it needs a store to dispatch through.
   it('Should sort node', () => {
     expect(layout.layout[0].components[0].slots[0].components[0].uuid).to.eq(
       'static-static-card1ab',
@@ -132,13 +161,17 @@ describe('Sort node', () => {
     expect(layout.layout[0].components[0].slots[0].components[1].uuid).to.eq(
       'static-image-udf7d',
     );
-    const state = layoutModelSlice.reducer(
-      layout,
+    const store = makeStore({
+      layoutModel: { present: layout, past: [], future: [] },
+      ui: uiInitialState,
+    });
+    store.dispatch(
       sortNode({
         uuid: 'static-static-card1ab',
         to: 1,
       }),
     );
+    const state = selectLayoutHistory(store.getState()).present;
     expect(state.layout[0].components[0].slots[0].components[0].uuid).to.eq(
       'static-image-udf7d',
     );
@@ -341,9 +374,15 @@ describe('Duplicate node', () => {
     );
 
     const nodeToDuplicateUUID = 'original-node';
+    // Use the internal slice action: the exported duplicateNode thunk builds
+    // the uuidMap consumed by the patch layout middleware. An empty map makes
+    // the reducer generate new UUIDs itself.
     const stateAfterDuplication = layoutModelSlice.reducer(
       initialStateWithLayout,
-      duplicateNode({ uuid: nodeToDuplicateUUID }),
+      layoutModelSlice.actions.duplicateNode({
+        uuid: nodeToDuplicateUUID,
+        uuidMap: {},
+      }),
     );
 
     const originalNode = initialStateWithLayout.layout[0].components.find(

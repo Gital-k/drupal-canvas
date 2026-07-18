@@ -232,6 +232,7 @@ const DrupalDatetimeMultivalueForm = ({
             return;
           }
           patchComponent({
+            operation: 'update-model',
             type: editorFrameContext,
             componentInstanceUuid: inputUIData.selectedComponent,
             componentType: `${inputUIData.selectedComponentType}@${inputUIData.version}`,

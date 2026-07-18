@@ -327,7 +327,9 @@ export function CanvasComponentsMixin<
       // Set up auto-save listener.
       const autoSavePromise = this.page.waitForResponse(
         (response) =>
-          response.url().includes('/canvas/api/v0/layout/canvas_page/') &&
+          response
+            .url()
+            .includes('/canvas/api/v0/layout/update-model/canvas_page/') &&
           response.request().method() === 'PATCH',
       );
 
@@ -376,7 +378,9 @@ export function CanvasComponentsMixin<
       // Set up auto-save listener.
       const autoSavePromise = this.page.waitForResponse(
         (response) =>
-          response.url().includes('/canvas/api/v0/layout/canvas_page/') &&
+          response
+            .url()
+            .includes('/canvas/api/v0/layout/update-model/canvas_page/') &&
           response.request().method() === 'PATCH',
       );
 
@@ -419,7 +423,9 @@ export function CanvasComponentsMixin<
       // Set up auto-save listener.
       const autoSavePromise = this.page.waitForResponse(
         (response) =>
-          response.url().includes('/canvas/api/v0/layout/canvas_page/') &&
+          response
+            .url()
+            .includes('/canvas/api/v0/layout/update-model/canvas_page/') &&
           response.request().method() === 'PATCH',
       );
 
@@ -461,7 +467,9 @@ export function CanvasComponentsMixin<
       // Set up auto-save listener.
       const autoSavePromise = this.page.waitForResponse(
         (response) =>
-          response.url().includes('/canvas/api/v0/layout/canvas_page/') &&
+          response
+            .url()
+            .includes('/canvas/api/v0/layout/update-model/canvas_page/') &&
           response.request().method() === 'PATCH',
       );
 
@@ -538,7 +546,9 @@ export function CanvasComponentsMixin<
       // Set up auto-save listener.
       const autoSavePromise = this.page.waitForResponse(
         (response) =>
-          response.url().includes('/canvas/api/v0/layout/canvas_page/') &&
+          response
+            .url()
+            .includes('/canvas/api/v0/layout/update-model/canvas_page/') &&
           response.request().method() === 'PATCH',
       );
 

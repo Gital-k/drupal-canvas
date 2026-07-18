@@ -2,12 +2,17 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
-import { setLayoutModel } from '@/features/layout/layoutModelSlice';
+import {
+  setLayoutModel,
+  syncLayoutModel,
+} from '@/features/layout/layoutModelSlice';
 import { setHtml, setSnapshotHTML } from '@/features/pagePreview/previewSlice';
 import {
   baseQueryWithAutoSaves,
+  extractEntityParams,
   popCanvasLayoutRequest,
   pushCanvasLayoutRequest,
+  replaceEntityParamsInUrl,
 } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
@@ -15,9 +20,14 @@ import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
 import type { RootState } from '@/app/store';
 import type {
   ComponentModel,
+  DuplicateNodePayload,
   EvaluatedComponentModel,
+  InsertMultipleNodesPayload,
+  MoveNodePayload,
+  NodeParentPosition,
   PropSource,
   ResolvedValues,
+  ShiftNodePayload,
 } from '@/features/layout/layoutModelSlice';
 import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
@@ -32,11 +42,77 @@ export type UpdateComponentResultType = {
   errors?: Array<ConflictError>;
 };
 
-export type UpdateComponentQueryArg = {
-  type: EditorFrameContext;
+interface MoveNodeQueryArg extends MoveNodePayload, NodeParentPosition {
+  type?: EditorFrameContext;
+  operation: 'move-node';
+}
+
+interface ShiftNodeQueryArg extends ShiftNodePayload {
+  type?: EditorFrameContext;
+  operation: 'shift-node';
+}
+
+interface DeleteNodeQueryArg {
+  type?: EditorFrameContext;
+  operation: 'delete-node';
+  componentInstanceUuid: string;
+}
+
+interface DuplicateNodeQueryArg extends DuplicateNodePayload {
+  type?: EditorFrameContext;
+  operation: 'duplicate-node';
+  uuidMap: Record<string, string>;
+}
+
+interface InsertNodesQueryArg
+  extends InsertMultipleNodesPayload, NodeParentPosition {
+  type?: EditorFrameContext;
+  operation: 'insert-nodes';
+}
+
+// @todo Split this up to only modify a single prop, not the
+//   whole model.
+type UpdateComponentQueryArg = {
+  type?: EditorFrameContext;
+  operation: 'update-model';
   componentInstanceUuid: string;
   componentType: string;
   model: Omit<ComponentModel, 'name'> | Omit<EvaluatedComponentModel, 'name'>;
+};
+
+export type PatchLayoutAndModelQueryArg =
+  | UpdateComponentQueryArg
+  | InsertNodesQueryArg
+  | DeleteNodeQueryArg
+  | ShiftNodeQueryArg
+  | MoveNodeQueryArg
+  | DuplicateNodeQueryArg;
+
+// Re-export for backward compatibility
+export type { UpdateComponentQueryArg };
+
+// Monotonic ticket for updateComponent responses: with rapid edits several
+// operations are in flight at once, and an older response applying after a
+// newer one would flash the preview and model backwards. Every response
+// renders the full auto-saved state, so only the most recently started
+// operation's response needs to be applied.
+let latestOperationTicket = 0;
+
+const TEMPLATE_LAYOUT_URL =
+  'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
+
+// The auto-save hash for a content template is keyed by its resolved layout
+// URL, derived from the current editor location.
+const templateAutoSaveKey = () => {
+  const { entityType, entityId, templateBundle, templateViewMode } =
+    extractEntityParams(window.location.href);
+  return replaceEntityParamsInUrl(
+    TEMPLATE_LAYOUT_URL,
+    entityType,
+    entityId,
+    templateBundle,
+    templateViewMode,
+  );
 };
 
 export const previewApi = createApi({
@@ -126,29 +202,43 @@ export const previewApi = createApi({
     }),
     updateComponent: builder.mutation<
       UpdateComponentResultType,
-      UpdateComponentQueryArg
+      PatchLayoutAndModelQueryArg
     >({
-      query: ({ type, ...body }) => {
-        let url = '';
-        if (type === 'entity') {
-          url = 'canvas/api/v0/layout/{entity_type}/{entity_id}';
-        } else if (type === 'template') {
-          url =
-            'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
+      query: ({ operation, type, ...body }) => {
+        // Content templates have no operation routes yet; their only
+        // operation-shaped mutation (update-model) maps 1:1 onto the classic
+        // content template PATCH.
+        // @todo Add content template support to the operation routes in https://drupal.org/i/3532056
+        if (type === 'template') {
+          return {
+            url: TEMPLATE_LAYOUT_URL,
+            method: 'PATCH',
+            body,
+          };
         }
         return {
-          url,
+          url: `canvas/api/v0/layout/${operation}/{entity_type}/{entity_id}`,
           method: 'PATCH',
           body,
+          autoSaveUrlKey: `canvas/api/v0/layout/{entity_type}/{entity_id}`,
         };
       },
-      async onQueryStarted(body, { dispatch, queryFulfilled }) {
+      async onQueryStarted(body, { dispatch, queryFulfilled, getState }) {
+        const ticket = ++latestOperationTicket;
         // Force any ajax calls to wait.
         pushCanvasLayoutRequest();
+        const {
+          configuration: { entityType, entity },
+        } = getState() as RootState;
+        const autoSaveKey =
+          body.type === 'template'
+            ? templateAutoSaveKey()
+            : `canvas/api/v0/layout/{entity_type}/{entity_id}`
+                .replace('{entity_type}', entityType)
+                .replace('{entity_id}', entity);
         let data: any;
-        let meta: any;
         try {
-          ({ data, meta } = await queryFulfilled);
+          ({ data } = await queryFulfilled);
         } catch {
           // If the request fails (e.g. the server rejects an invalid field
           // value), we must still release the lock so that subsequent Drupal
@@ -158,6 +248,12 @@ export const previewApi = createApi({
         } finally {
           // Tell ajax calls they're good to go regardless of success/failure.
           popCanvasLayoutRequest();
+        }
+        if (ticket !== latestOperationTicket) {
+          // A newer operation started after this one: applying this response
+          // would briefly rewind the preview and model to a stale state that
+          // the newer response then has to correct.
+          return;
         }
         const { html, layout, model, autoSaves } = data;
         dispatch(
@@ -170,10 +266,24 @@ export const previewApi = createApi({
         // preview snapshot, which selectPreviewHtml prefers while set.
         dispatch(setSnapshotHTML(''));
         dispatch(setHtml(html));
-        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+        handleAutoSavesHashUpdate(dispatch, autoSaves, {
+          request: {
+            url: autoSaveKey,
+          },
+        });
         // Pass update preview false to prevent a subsequent preview update,
         // we have the data here.
-        dispatch(setLayoutModel({ layout, model, updatePreview: false }));
+        if (body.operation === 'update-model') {
+          // A prop edit has no client-side reducer, so its echo is what
+          // creates the undo entry (setLayoutModel is undoable). Staging the
+          // edit before the request would keep rejected values (e.g. an
+          // invalid URI) in the model, breaking later form rebuilds.
+          dispatch(setLayoutModel({ layout, model, updatePreview: false }));
+        } else {
+          // Structural operations already created their undo entry in the
+          // dispatching reducer; their echo must not cost an extra undo step.
+          dispatch(syncLayoutModel({ layout, model, updatePreview: false }));
+        }
       },
     }),
   }),
@@ -209,7 +319,8 @@ export const usePatchComponent = () => {
       editorFrameContext,
     } = inputUIData;
 
-    const arg = {
+    const arg: UpdateComponentQueryArg = {
+      operation: 'update-model',
       type: editorFrameContext,
       componentInstanceUuid: selectedComponent,
       componentType: `${selectedComponentType}@${version}`,
@@ -262,6 +373,7 @@ export const usePatchProp = () => {
     }
 
     return updateComponent({
+      operation: 'update-model',
       type: editorFrameContext,
       componentInstanceUuid: selectedComponent,
       componentType: `${selectedComponentType}@${version}`,

@@ -1253,7 +1253,7 @@ Cypress.Commands.add('editHeroComponent', () => {
 
   // Monitor the endpoint that processes changed values in the prop edit form.
   cy.intercept('POST', '**/canvas/api/v0/layout/node/1').as('getPreview');
-  cy.intercept('PATCH', '**/canvas/api/v0/layout/node/1').as('patchPreview');
+  cy.intercept('PATCH', '**/canvas/api/v0/layout/**/node/1').as('patchPreview');
   expectedLabels.forEach((label) => {
     // Type a new value into a given input.
     cy.findByLabelText(label).focus();

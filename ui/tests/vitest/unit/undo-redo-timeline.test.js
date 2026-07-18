@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 import { makeStore } from '@/app/store';
 import {
   deleteNode,
@@ -16,6 +18,28 @@ import {
   initialState as uiInitialState,
   UndoRedoActionCreators,
 } from '@/features/ui/uiSlice';
+
+// Layout mutations dispatched through a real store trigger the patch layout
+// middleware, whose fetch would otherwise reject (and can surface as an
+// unhandled rejection after the test file finishes on slow machines).
+beforeEach(() => {
+  const response = {
+    ok: true,
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+    text: async () =>
+      JSON.stringify({ html: '', layout: [], model: {}, autoSaves: {} }),
+    json: async () => ({ html: '', layout: [], model: {}, autoSaves: {} }),
+    clone() {
+      return this;
+    },
+  };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+  window.history.pushState({}, '', '/canvas/editor/node/1');
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 let pageData = {
   title: [{ value: 'Some title' }],
@@ -634,8 +658,9 @@ describe('Undo/redo timeline works across slices', () => {
     // And a subsequent update.
     store.dispatch(deleteNode('static-static-card1ab'));
     layoutState = selectLayoutHistory(store.getState());
-    // updatePreview should be true as the preview would have been updated.
-    expect(layoutState.present.updatePreview).to.eq(true);
+    // updatePreview should be false: the patch layout middleware sends the
+    // operation to the backend and updates the preview from its response.
+    expect(layoutState.present.updatePreview).to.eq(false);
 
     // And the setLayoutModel in the past entry should also be true, even though
     // we passed 'false' when dispatching setLayoutModel.

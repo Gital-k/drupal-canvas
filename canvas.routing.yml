@@ -512,6 +512,8 @@ canvas.api.layout.get.content_template:
         # @see \Drupal\canvas\Routing\ContentTemplatePreviewEntityConverter
         type: canvas_content_template_preview_entity
 
+# @see \Drupal\canvas\EventSubscriber\ClientDataModelOperationRouteSubscriber
+# @todo Make this a redirect and trigger a deprecation error?
 canvas.api.layout.patch: &layout_patch_route
   path: '/canvas/api/v0/layout/{entity_type}/{entity}'
   defaults:

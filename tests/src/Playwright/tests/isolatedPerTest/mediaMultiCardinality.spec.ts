@@ -105,7 +105,9 @@ test.describe('Media Multi-Cardinality', () => {
     // Set up auto-save listener before the second insert
     const autoSavePromise = page.waitForResponse(
       (response) =>
-        response.url().includes('/canvas/api/v0/layout/canvas_page/') &&
+        response
+          .url()
+          .includes('/canvas/api/v0/layout/update-model/canvas_page/') &&
         response.request().method() === 'PATCH',
     );
 

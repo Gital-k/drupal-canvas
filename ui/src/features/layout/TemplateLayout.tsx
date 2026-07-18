@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { useGetTemplateLayoutQuery } from '@/services/componentAndLayout';
 
 import {
+  selectInitializedForEntity,
   selectIsInitialized,
   setInitialized,
   setInitialLayoutModel,
@@ -17,6 +18,8 @@ const TemplateLayout = () => {
   const { entityType, bundle, viewMode, previewEntityId } = useParams();
 
   const isInitialized = useAppSelector(selectIsInitialized);
+  const initializedForEntity = useAppSelector(selectInitializedForEntity);
+  const entityKey = `template:${entityType}:${bundle}:${viewMode}:${previewEntityId}`;
   const {
     data: fetchedLayout,
     error,
@@ -37,10 +40,16 @@ const TemplateLayout = () => {
   const { layout, model, translations } = fetchedLayout || {};
 
   useEffect(() => {
+    // A remount for the template that is already loaded (e.g. panel or route
+    // churn) must not reset editor state: that would wipe the undo history.
+    if (initializedForEntity === entityKey) {
+      return;
+    }
     dispatch(setInitialized(false));
     if (entityType && bundle && viewMode && previewEntityId) {
       refetch();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityType, bundle, viewMode, previewEntityId, refetch, dispatch]);
 
   useEffect(() => {
@@ -60,6 +69,7 @@ const TemplateLayout = () => {
           layout,
           model,
           translations: translations || {},
+          initializedForEntity: entityKey,
           // We don't need to update the preview here - it is done in the layout
           // api's onQueryStarted method - @see componentAndLayout.ts
           updatePreview: false,

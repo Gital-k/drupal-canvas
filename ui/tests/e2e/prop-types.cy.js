@@ -289,32 +289,6 @@ describe('Prop types editing', () => {
     const endDate = '2026-06-02';
     const settingsPanelViewport =
       '[data-testid="canvas-contextual-panel"] [data-radix-scroll-area-viewport]';
-    const getDateRangePayloadEntry = (params, suffixes) => {
-      return [...params.entries()].find(([key]) => {
-        return (
-          key.includes('[test_object_drupal_date_range]') &&
-          suffixes.some((suffix) => key.endsWith(suffix))
-        );
-      });
-    };
-    const findNestedValueByKey = (input, keyName) => {
-      const queue = [input];
-      while (queue.length > 0) {
-        const current = queue.shift();
-        if (current === null || typeof current !== 'object') {
-          continue;
-        }
-        if (Array.isArray(current)) {
-          queue.push(...current);
-          continue;
-        }
-        if (Object.hasOwn(current, keyName)) {
-          return current[keyName];
-        }
-        queue.push(...Object.values(current));
-      }
-      return undefined;
-    };
     const extractDateFromRangeValue = (input, fieldNames) => {
       const queue = [input];
       while (queue.length > 0) {
@@ -350,27 +324,6 @@ describe('Prop types editing', () => {
       }
       return undefined;
     };
-    const getDateRangePayloadValue = (requestBody, suffixes, fieldNames) => {
-      const params = new URLSearchParams(requestBody);
-      const directEntry = getDateRangePayloadEntry(params, suffixes);
-      if (directEntry !== undefined) {
-        return directEntry[1];
-      }
-      const formCanvasProps = params.get('form_canvas_props');
-      if (typeof formCanvasProps !== 'string') {
-        return undefined;
-      }
-      try {
-        const parsedFormCanvasProps = JSON.parse(formCanvasProps);
-        const rangeValue = findNestedValueByKey(
-          parsedFormCanvasProps,
-          'test_object_drupal_date_range',
-        );
-        return extractDateFromRangeValue(rangeValue, fieldNames);
-      } catch {
-        return undefined;
-      }
-    };
     const startDateSelector = [
       'input[name*="test_object_drupal_date_range"][name$="[value][date]"]',
       'input[name*="test_object_drupal_date_range"][name$="[from][date]"]',
@@ -395,36 +348,41 @@ describe('Prop types editing', () => {
       .first()
       .as('endDateInput');
 
-    cy.intercept(
-      'PATCH',
-      '**/canvas/api/v0/form/component-instance/node/1*',
-    ).as('patchDateRange');
+    // Editing a value no longer rebuilds the component instance form (only
+    // structural source changes do), so assert the date reaches the server
+    // through the update-model operation the edit dispatches.
+    cy.intercept('PATCH', '**/canvas/api/v0/layout/update-model/node/1*').as(
+      'patchDateRange',
+    );
+
+    // Other update-model operations can be in flight around the edit (e.g.
+    // syncing the just-inserted component's defaults), so keep waiting until
+    // one carries a date range value.
+    const waitForDateRangeValue = (fieldNames, attempts = 4) =>
+      cy.wait('@patchDateRange').then(({ request, response }) => {
+        expect(response?.statusCode).to.eq(200);
+        const model = request.body?.model ?? {};
+        const rangeValue =
+          model.resolved?.test_object_drupal_date_range ??
+          model.source?.test_object_drupal_date_range?.value;
+        const value = extractDateFromRangeValue(rangeValue, fieldNames);
+        if (value === undefined && attempts > 1) {
+          return waitForDateRangeValue(fieldNames, attempts - 1);
+        }
+        return cy.wrap(value);
+      });
 
     cy.get('@startDateInput').clear();
     cy.get('@startDateInput').type(startDate);
     cy.get('@startDateInput').blur();
-    cy.wait('@patchDateRange').then(({ request, response }) => {
-      expect(response?.statusCode).to.eq(200);
-      expect(request.body).to.be.a('string');
-      const startValue = getDateRangePayloadValue(
-        request.body,
-        ['[value][date]', '[from][date]'],
-        ['value', 'from'],
-      );
+    waitForDateRangeValue(['value', 'from']).then((startValue) => {
       expect(startValue, 'start date in PATCH payload').to.not.be.undefined;
       expect(startValue).to.eq(startDate);
     });
     cy.get('@endDateInput').clear();
     cy.get('@endDateInput').type(endDate);
     cy.get('@endDateInput').blur();
-    cy.wait('@patchDateRange').then(({ request, response }) => {
-      expect(response?.statusCode).to.eq(200);
-      expect(request.body).to.be.a('string');
-      const endValue = getDateRangePayloadValue(
-        request.body,
-        ['[end_value][date]', '[to][date]'],
-        ['end_value', 'to'],
-      );
+    waitForDateRangeValue(['end_value', 'to']).then((endValue) => {
       expect(endValue, 'end date in PATCH payload').to.not.be.undefined;
       expect(endValue).to.eq(endDate);
     });

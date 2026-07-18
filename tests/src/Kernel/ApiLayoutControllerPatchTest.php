@@ -216,7 +216,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       unset($content['autoSaves']);
       $content += $this->getClientAutoSaves([Node::load(1)]);
     }
-    $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1', method: 'PATCH', server: [
+    $this->parentRequest(Request::create('/canvas/api/v0/layout/update-model/node/1', method: 'PATCH', server: [
       'CONTENT_TYPE' => 'application/json',
       'HTTP_X_NO_OPENAPI_VALIDATION' => 'turned off because we want to validate the prod response here',
     ], content: \json_encode($content, JSON_FORCE_OBJECT | JSON_THROW_ON_ERROR)));

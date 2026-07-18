@@ -89,7 +89,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
   ).within(() => {
     cy.findAllByLabelText('Heading').should('exist');
   });
-  const lastStep = iterations.pop();
+  const lastStep = iterations[iterations.length - 1];
 
   // Switch back to entity edit form.
   cy.findByTestId('canvas-contextual-panel--page-data').click();

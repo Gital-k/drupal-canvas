@@ -85,6 +85,14 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
   }
 
   /**
+   * @return \Drupal\canvas\Entity\PageRegion[]
+   *   The editable regions for the active theme.
+   */
+  public static function getEditableRegions(): array {
+    return array_filter(self::loadForActiveTheme(), fn(PageRegion $region) => $region->access('update'));
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function label(): TranslatableMarkup {
