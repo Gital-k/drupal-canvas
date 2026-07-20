@@ -12,6 +12,7 @@ use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
 use Drupal\canvas\Resource\OffsetPage;
 use Drupal\canvas\Utility\HomePageHelper;
+use Drupal\Component\Serialization\Yaml;
 use Drupal\Component\Transliteration\TransliterationInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Access\AccessResult;
@@ -58,6 +59,7 @@ final class ApiContentControllers extends ApiControllerBase {
    * The maximum number of entity search results to return.
    */
   private const int MAX_SEARCH_RESULTS = 50;
+  public const string AUTO_SAVED_QUERY_KEY = 'autoSaved';
 
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
@@ -84,6 +86,72 @@ final class ApiContentControllers extends ApiControllerBase {
     $data = $this->normalizeWithMetadataAndComponents($canvas_page, $cacheability);
 
     $json_response = new CacheableJsonResponse($data);
+    $json_response->addCacheableDependency($cacheability);
+    return $json_response;
+  }
+
+  /**
+   * Returns a JSON response containing a Canvas page values as YAML text.
+   */
+  public function getValuesAsText(Request $request, Page $canvas_page): CacheableJsonResponse {
+    $cacheability = new CacheableMetadata();
+    $cacheability->addCacheableDependency($canvas_page)
+      ->addCacheContexts(['url.query_args:autoSaved']);
+
+    // Determine if we are working with auto-save or published version of the
+    // entity.
+    $auto_saved = $request->query->getBoolean(key: self::AUTO_SAVED_QUERY_KEY, default: TRUE);
+    if ($auto_saved) {
+      $cacheability->addCacheTags([AutoSaveManager::CACHE_TAG]);
+      $auto_save_data = $this->autoSaveManager->getAutoSaveEntity($canvas_page);
+      if ($auto_save_data->isEmpty()) {
+        $error = [
+          'detail' => \sprintf('No auto-save items for entity %s found', $canvas_page->id()),
+          'source' => [
+            'pointer' => AutoSaveManager::getAutoSaveKey($canvas_page),
+          ],
+        ];
+        return new CacheableJsonResponse(data: ['errors' => [$error]], status: Response::HTTP_NOT_FOUND);
+      }
+
+      $canvas_page = $auto_save_data->entity;
+      \assert($canvas_page instanceof Page);
+      $updated = $auto_save_data->updated;
+    }
+    else {
+      $updated = (int) $canvas_page->getRevisionCreationTime();
+    }
+
+    // This represents the values that can be stored in an auto-save item,
+    // therefore this is what the comparison should use.
+    $entity_values = AutoSaveManager::toStorableArray($canvas_page);
+    $component_trees = [];
+    foreach ($canvas_page->getFieldDefinitions() as $field_name => $field_definition) {
+      // Remove fields user can't update via auto-save.
+      if (!\array_key_exists($field_name, $entity_values)) {
+        continue;
+      }
+      $field_access = $canvas_page->get($field_name)->access(operation: 'view', return_as_object: TRUE);
+      $cacheability->addCacheableDependency($field_access);
+      if (!$field_access->isAllowed()) {
+        unset($entity_values[$field_name]);
+        continue;
+      }
+      // For UX reasons all component trees should be at the bottom of the
+      // response structure. Split component trees, so they can be appended.
+      if ($field_definition instanceof ComponentTreeItem) {
+        $component_trees[$field_name] = $entity_values[$field_name];
+        unset($entity_values[$field_name]);
+      }
+    }
+
+    $json_response = new CacheableJsonResponse(data: [
+      'data' => [
+        'language' => $canvas_page->language()->getId(),
+        'entity' => Yaml::encode($entity_values + $component_trees),
+        'updated' => $updated,
+      ],
+    ]);
     $json_response->addCacheableDependency($cacheability);
     return $json_response;
   }
