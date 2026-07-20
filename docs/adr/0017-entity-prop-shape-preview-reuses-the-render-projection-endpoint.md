@@ -1,8 +1,8 @@
-# 15. Entity reference prop shape preview reuses the render projection endpoint
+# 17. Entity reference prop shape preview reuses the render projection endpoint
 
 Date: 2026-07-10
 
-Issue: TBD (file against canvas 1.x when opening the MR)
+Issue: https://git.drupalcode.org/project/canvas/-/work_items/3591805
 
 ## Status
 
