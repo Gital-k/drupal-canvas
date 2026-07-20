@@ -8,7 +8,11 @@ use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableDependencyTrait;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
+use Drupal\Core\Entity\TranslatableInterface;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\TypedData\TypedDataInterface;
 
 /**
  * Defines a value object for a negotiated language and its cacheability.
@@ -63,6 +67,38 @@ final class NegotiatedLanguage implements CacheableDependencyInterface {
         // No cache context needed on monolingual sites.
         : (new CacheableMetadata())
     );
+  }
+
+  /**
+   * Creates a NegotiatedLanguage for a component tree's referenced entities.
+   *
+   * The referenced entities must be read in the same language as the rest of
+   * the component instance's props: the host entity's language, matching how
+   * EntityFieldPropSource and StaticPropSource resolve references. Determine
+   * that language from the same host the prop sources were evaluated against
+   * (the given host, else the component tree's root entity); without a
+   * fieldable host (e.g. a config-entity tree) fall back to the negotiated
+   * content language.
+   *
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|null $host_entity
+   *   The component instance's host entity, if any.
+   * @param \Drupal\Core\TypedData\TypedDataInterface $root
+   *   The root of the component tree the instance lives in.
+   *
+   * @return static
+   *
+   * @see \Drupal\canvas\PropSource\StaticPropSource::evaluate()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getExplicitInput()
+   */
+  public static function forReferenceHost(?FieldableEntityInterface $host_entity, TypedDataInterface $root): static {
+    $reference_host = match (TRUE) {
+      $host_entity instanceof FieldableEntityInterface => $host_entity,
+      $root instanceof EntityAdapter && $root->getEntity() instanceof FieldableEntityInterface => $root->getEntity(),
+      default => NULL,
+    };
+    return $reference_host instanceof TranslatableInterface && $reference_host->isTranslatable()
+      ? static::matchEntity($reference_host)
+      : static::negotiateFromConfigAndContext();
   }
 
 }

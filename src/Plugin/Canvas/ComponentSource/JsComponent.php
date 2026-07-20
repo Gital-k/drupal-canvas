@@ -29,11 +29,8 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
-use Drupal\Core\Entity\TranslatableInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
@@ -220,23 +217,10 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     }
 
     // The referenced entities must be read in the same language as the rest of
-    // this component instance's props: the host entity's language, matching how
-    // EntityFieldPropSource and StaticPropSource resolve references. Determine
-    // that language from the same host the parent evaluated the prop sources
-    // against (the given host, else the component tree's root entity); without
-    // a fieldable host (e.g. a config-entity tree) fall back to the negotiated
-    // content language.
-    // @see \Drupal\canvas\PropSource\StaticPropSource::evaluate()
-    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getExplicitInput()
-    $root = $item->getRoot();
-    $reference_host = match (TRUE) {
-      $host_entity instanceof FieldableEntityInterface => $host_entity,
-      $root instanceof EntityAdapter && $root->getEntity() instanceof FieldableEntityInterface => $root->getEntity(),
-      default => NULL,
-    };
-    $language = $reference_host instanceof TranslatableInterface && $reference_host->isTranslatable()
-      ? NegotiatedLanguage::matchEntity($reference_host)
-      : NegotiatedLanguage::negotiateFromConfigAndContext();
+    // this component instance's props: the host entity's language (with the
+    // component tree's root entity as fallback, and the negotiated content
+    // language when neither is fieldable).
+    $language = NegotiatedLanguage::forReferenceHost($host_entity, $item->getRoot());
 
     // Resolve all content-entity-reference props, by evaluating their entity
     // field expressions on the referenced entities. The parent already parsed
@@ -326,16 +310,9 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     $entity = $resolved_entity->value;
 
     // Resolve the referenced entity to $language before reading its field
-    // values. The expression that produced it (a FieldPropExpression ending in
-    // `entity`) yields the entity in its own default language, so without this
-    // its fields — and those of any entities it references in turn — would be
-    // read in that default language instead of the negotiated one.
-    // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::resolveTranslation()
-    if (!$language->language->isLocked() && $entity instanceof TranslatableInterface && $entity->isTranslatable()) {
-      $entity = \Drupal::service(EntityRepositoryInterface::class)
-        ->getTranslationFromContext($entity, $language->language->getId());
-      \assert($entity instanceof FieldableEntityInterface);
-    }
+    // values, so its fields (and those of any entities it references in turn)
+    // are read in the negotiated language rather than the entity's own default.
+    $entity = Evaluator::resolveTranslationForReference($entity, $language);
 
     $payload = ['__type' => $entity->bundle()];
     // The resulting payload must still describe the cacheability of how
