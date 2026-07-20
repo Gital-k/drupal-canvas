@@ -1874,6 +1874,160 @@ paths:
           $ref: '#/components/responses/ContentEntityResponse'
         '404':
           description: Content entity not found.
+  '/canvas/api/v0/content/canvas_page/values-as-text/{entityId}':
+    summary: Endpoint for retrieving a single page entity as a textual representation, with language and timestamp metadata.
+    description: When autoSaved is TRUE (default), the auto-save draft is returned. When FALSE, the published entity is returned.
+    get:
+      summary: Returns a single page entity with it's component tree encoded as YAML.
+      parameters:
+        - $ref: '#/components/parameters/entityId'
+        - in: query
+          name: autoSaved
+          required: false
+          description: Entity status, defaults to TRUE when not provided. On TRUE - the entity version stored in auto-save is used, on FALSE - the published entity is used to generate the response.
+          schema:
+            type: boolean
+          examples:
+            "load the auto-save entry for this entity, if any":
+              value: true
+            "load the actually stored entity":
+              value: false
+      responses:
+        '200':
+          description: Page entity retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - language
+                      - entity
+                      - updated
+                    properties:
+                      language:
+                        type: string
+                        title: Language code
+                        description: The langcode of the returned entity translation.
+                        examples:
+                          - en
+                          - lt
+                      entity:
+                        type: string
+                        title: Entity values as YAML
+                        # @see \Drupal\canvas\AutoSave\AutoSaveManager::toStorableArray()
+                        description: The entity's storable field values encoded as a YAML document with Component tree fields appended last.
+                        examples:
+                          - |
+                            title:
+                              -
+                                value: 'Canvas Page example with a Cosmo the cat image'
+                            components:
+                              -
+                                uuid: 7c0d237a-05b8-4c23-af00-95c5dd484579
+                                component_id: sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop
+                                component_version: c9543b26fa15297b
+                                inputs: '{"image":{"target_id":"2"},"heading":"Cosmo"}'
+                      updated:
+                        type: integer
+                        title: Updated timestamp
+                        # Used to populate "Updated" element in the side-by-side comparison UI.
+                        # @todo Revisit as part of https://www.drupal.org/project/canvas/issues/3591544
+                        description: Unix timestamp of when the returned entity version was last updated.
+                        examples:
+                          - 1784272636
+              example:
+                data:
+                  language: en
+                  # Example of Page entity encoded as YAML.
+                  entity: |
+                    id:
+                      -
+                        value: 4
+                    uuid:
+                      -
+                        value: db4fa04b-92c0-4102-a3b8-238d5e08fd4a
+                    revision_id:
+                      -
+                        value: 41
+                    langcode:
+                      -
+                        value: en
+                    revision_created:
+                      -
+                        value: 1784120276
+                    revision_user:
+                      -
+                        target_id: 0
+                    revision_log:
+                      - {  }
+                    status:
+                      -
+                        value: true
+                    owner:
+                      -
+                        target_id: 1
+                    title:
+                      -
+                        value: 'Cosmo the cat'
+                    description:
+                      -
+                        value: 'Meta test'
+                    components:
+                      -
+                        uuid: 7c0d237a-05b8-4c23-af00-95c5dd484579
+                        component_id: sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop
+                        component_version: c9543b26fa15297b
+                        inputs: '{"image":{"target_id":"2"},"heading":"Very chill cat."}'
+                    path:
+                      -
+                        alias: /edited-in-ui
+                        pid: 3
+                        langcode: en
+                    created:
+                      -
+                        value: 1784117626
+                    changed:
+                      -
+                        value: 1784273595
+                    image:
+                      -
+                        target_id: 1
+                    default_langcode:
+                      -
+                        value: true
+                    revision_default:
+                      -
+                        value: true
+                    revision_translation_affected:
+                      -
+                        value: true
+                  updated: 1784273619
+        '404':
+          description: No auto-save item found for the requested entity.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        detail:
+                          type: string
+                          example: No auto-save items for entity 1 found
+                        source:
+                          type: object
+                          properties:
+                            pointer:
+                              type: string
+                              example: canvas_page:1:en
   '/canvas/api/v0/content/canvas_page/{entityId}':
     description: Endpoint for retrieving or deleting content entities.
     get:
