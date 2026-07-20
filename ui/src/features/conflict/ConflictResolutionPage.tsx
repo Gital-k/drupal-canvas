@@ -21,7 +21,11 @@ import {
   componentAndLayoutApi,
   useGetConflictPageLayoutQuery,
 } from '@/services/componentAndLayout';
-import { contentApi, useUpdateContentMutation } from '@/services/content';
+import {
+  contentApi,
+  useGetContentExportQuery,
+  useUpdateContentMutation,
+} from '@/services/content';
 import {
   useDiscardPendingChangeMutation,
   useGetAllPendingChangesQuery,
@@ -34,6 +38,7 @@ import {
 
 import type { ConflictChangeEntry } from '@/features/conflict/conflictComparison';
 import type { LayoutApiResponse } from '@/services/componentAndLayout';
+import type { ContentExportResult } from '@/services/content';
 import type { ConflictVersionSelection } from './ConflictResolutionView';
 
 import styles from './ConflictResolutionPage.module.css';
@@ -312,6 +317,10 @@ const PageConflictComparison = ({
     useState<LayoutApiResponse>();
   const [publishedLayoutSnapshot, setPublishedLayoutSnapshot] =
     useState<LayoutApiResponse>();
+  const [draftExportSnapshot, setDraftExportSnapshot] =
+    useState<ContentExportResult>();
+  const [publishedExportSnapshot, setPublishedExportSnapshot] =
+    useState<ContentExportResult>();
   const {
     data: draftLayout,
     isFetching: isDraftLoading,
@@ -329,6 +338,23 @@ const PageConflictComparison = ({
     entityType: 'canvas_page',
     publishedVersion: true,
   });
+  const {
+    data: draftExport,
+    isFetching: isDraftExportLoading,
+    isError: isDraftExportError,
+  } = useGetContentExportQuery({
+    entityId,
+    entityType,
+  });
+  const {
+    data: publishedExport,
+    isFetching: isPublishedExportLoading,
+    isError: isPublishedExportError,
+  } = useGetContentExportQuery({
+    entityId,
+    entityType,
+    autoSaved: false,
+  });
 
   useEffect(() => {
     setDraftLayoutSnapshot((currentSnapshot) => currentSnapshot ?? draftLayout);
@@ -340,8 +366,20 @@ const PageConflictComparison = ({
     );
   }, [publishedLayout]);
 
+  useEffect(() => {
+    setDraftExportSnapshot((currentSnapshot) => currentSnapshot ?? draftExport);
+  }, [draftExport]);
+
+  useEffect(() => {
+    setPublishedExportSnapshot(
+      (currentSnapshot) => currentSnapshot ?? publishedExport,
+    );
+  }, [publishedExport]);
+
   const stableDraftLayout = draftLayoutSnapshot ?? draftLayout;
   const stablePublishedLayout = publishedLayoutSnapshot ?? publishedLayout;
+  const stableDraftExport = draftExportSnapshot ?? draftExport;
+  const stablePublishedExport = publishedExportSnapshot ?? publishedExport;
 
   if (
     (!stableDraftLayout && isDraftError) ||
@@ -373,7 +411,12 @@ const PageConflictComparison = ({
           model: stablePublishedLayout?.model ?? {},
         },
         loading: !stablePublishedLayout && isPublishedLoading,
-        updated: formatConflictVersionUpdated(stablePublishedLayout?.updated),
+        text: stablePublishedExport?.entity,
+        textLoading: !stablePublishedExport && isPublishedExportLoading,
+        textError: !stablePublishedExport && isPublishedExportError,
+        updated: formatConflictVersionUpdated(
+          stablePublishedExport?.updated ?? stablePublishedLayout?.updated,
+        ),
       }}
       newVersion={{
         html: stableDraftLayout?.html || EMPTY_HTML,
@@ -384,8 +427,13 @@ const PageConflictComparison = ({
         },
         loading: !stableDraftLayout && isDraftLoading,
         changed: true,
+        text: stableDraftExport?.entity,
+        textLoading: !stableDraftExport && isDraftExportLoading,
+        textError: !stableDraftExport && isDraftExportError,
         updated: formatConflictVersionUpdated(
-          stableDraftLayout?.updated ?? autoSaveUpdated,
+          stableDraftExport?.updated ??
+            stableDraftLayout?.updated ??
+            autoSaveUpdated,
         ),
       }}
       selectedVersion={selectedVersion}

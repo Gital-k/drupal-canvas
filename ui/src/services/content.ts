@@ -35,6 +35,26 @@ export interface UpdateContentRequest {
   conflictToResolve?: string;
 }
 
+export interface ContentExportRequest {
+  entityType: string;
+  entityId: string;
+  autoSaved?: boolean;
+}
+
+export interface ContentExportResponse {
+  data: {
+    entity: string;
+    updated?: number;
+    language?: string;
+  };
+}
+
+export interface ContentExportResult {
+  entity: string;
+  updated?: number;
+  language?: string;
+}
+
 export interface ContentListResult {
   items: ContentStub[];
   totalCount: number | null;
@@ -265,6 +285,22 @@ export const contentApi = createApi({
         }
       },
     }),
+    getContentExport: builder.query<ContentExportResult, ContentExportRequest>({
+      query: ({ entityType, entityId, autoSaved }) => ({
+        url: `/canvas/api/v0/export/content/${entityType}/${entityId}`,
+        method: 'GET',
+        params:
+          typeof autoSaved === 'boolean'
+            ? { autoSaved: String(autoSaved) }
+            : undefined,
+      }),
+      transformResponse: (
+        response: ContentExportResponse,
+      ): ContentExportResult => response.data,
+      providesTags: (_result, _error, { entityType, entityId }) => [
+        { type: 'Content', id: `export:${entityType}:${entityId}` },
+      ],
+    }),
     getStagedConfig: builder.query<StagedConfig, string>({
       query: (entityId) => ({
         url: `/canvas/api/v0/config/auto-save/staged_config_update/${entityId}`,
@@ -295,6 +331,7 @@ export const {
   useDeleteContentMutation,
   useCreateContentMutation,
   useUpdateContentMutation,
+  useGetContentExportQuery,
   useGetStagedConfigQuery,
   useSetStagedConfigMutation,
 } = contentApi;
