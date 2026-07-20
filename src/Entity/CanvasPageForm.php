@@ -7,6 +7,7 @@ namespace Drupal\canvas\Entity;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\Render\Element;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -59,19 +60,25 @@ final class CanvasPageForm extends ContentEntityForm {
     $form[$group]['description']['#weight'] = 10;
     unset($form['description']);
 
-    // Hide most metatags fields until further decision is made which ones to
-    // show and how. The fields are confusing and numerous.
+    // Hide all metatag groups except the basic title. The firehose widget
+    // renders all groups (schema.org, open_graph, twitter_cards, etc.) which
+    // can produce massive forms causing OOM errors.
+    // @see https://www.drupal.org/project/canvas/issues/3531991
     if (isset($form['metatags']['widget'][0])) {
       $form['metatags']['widget'][0]['#type'] = 'container';
-      $form['metatags']['widget'][0]['basic']['#type'] = 'container';
-      $form['metatags']['widget'][0]['basic']['description']['#access'] = FALSE;
-      $form['metatags']['widget'][0]['basic']['abstract']['#access'] = FALSE;
-      $form['metatags']['widget'][0]['basic']['keywords']['#access'] = FALSE;
-      $form['metatags']['widget'][0]['preamble']['#access'] = FALSE;
-      $form['metatags']['widget'][0]['tokens']['#access'] = FALSE;
-      $form['metatags']['widget'][0]['image_help']['#access'] = FALSE;
-      $form['metatags']['widget'][0]['intro_text']['#access'] = FALSE;
-      $form['metatags']['widget'][0]['advanced']['#access'] = FALSE;
+      foreach (Element::children($form['metatags']['widget'][0]) as $key) {
+        if ($key === 'basic') {
+          $form['metatags']['widget'][0]['basic']['#type'] = 'container';
+          foreach (Element::children($form['metatags']['widget'][0]['basic']) as $basic_key) {
+            if ($basic_key !== 'title') {
+              $form['metatags']['widget'][0]['basic'][$basic_key]['#access'] = FALSE;
+            }
+          }
+        }
+        else {
+          $form['metatags']['widget'][0][$key]['#access'] = FALSE;
+        }
+      }
     }
 
     if (isset($form['metatags']['widget'][0]['basic']['title'])) {
