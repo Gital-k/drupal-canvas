@@ -231,6 +231,8 @@ export default function Props() {
                           'x-allowed-entity-type-id': undefined,
                           'x-allowed-bundle': undefined,
                           entityFieldExpressions: undefined,
+                          previewEntity: undefined,
+                          previewResolvedValue: undefined,
                           example: defaultExample,
                           allowMultiple: false,
                           items: undefined,
@@ -396,6 +398,7 @@ export default function Props() {
               return (
                 <FormPropTypeContentEntityReference
                   id={prop.id}
+                  propName={propName}
                   expressions={prop.entityFieldExpressions ?? []}
                   targetEntityType={prop['x-allowed-entity-type-id'] ?? null}
                   targetBundle={prop['x-allowed-bundle'] ?? null}

@@ -333,16 +333,22 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     }
 
     // `title` (scalar string field): non-reference, one `value` property.
+    // `developerFacingKey` is `label`, not `title`: node's title field is
+    // that entity type's `label` entity key, and the payload normalizes
+    // entity keys to their generic name so components stay entity-agnostic.
+    // @see \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedExpressionTrait::getDeveloperFacingKey()
     self::assertSame(
       [
         'name' => 'title',
         'label' => 'Title',
         'hasChildren' => FALSE,
+        'developerFacingKey' => 'label',
         'properties' => [
           [
             'name' => 'value',
             'label' => 'Text value',
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
+            'type' => 'string',
           ],
         ],
       ],
@@ -371,6 +377,18 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
       'ℹ︎␜entity:node:article␝uid␞␟target_id',
       $uid_props_by_name['target_id']['expression'],
     );
+    // `type` is the property's typed-data data type, not always a string.
+    self::assertSame('integer', $uid_props_by_name['target_id']['type']);
+
+    // `developerFacingKey` flips entity keys to their generic name: node's
+    // `uid` field is its `owner` entity key and `status` its `published`
+    // entity key (when several entity keys map to one field, the flip keeps
+    // the last one, so `owner`/`published` win over `uid`/`status`). A plain
+    // configurable field is no entity key, so it keeps its own machine name.
+    // @see \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedExpressionTrait::getDeveloperFacingKey()
+    self::assertSame('owner', $by_name['uid']['developerFacingKey']);
+    self::assertSame('published', $by_name['status']['developerFacingKey']);
+    self::assertSame('field_image', $by_name['field_image']['developerFacingKey']);
   }
 
   /**
