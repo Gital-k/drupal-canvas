@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Kernel\Controller;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\Page;
+use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
