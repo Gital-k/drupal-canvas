@@ -33,7 +33,6 @@ use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
-use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -423,6 +422,7 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
   public function getLabelForExplicitInputKey(string $key): string|TranslatableMarkup {
     // Each defined prop is guaranteed to have a title.
     // @see \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
+    // @phpstan-ignore offsetAccess.notFound
     return $this->getMetadata()->schema['properties'][$key]['title'];
   }
 
