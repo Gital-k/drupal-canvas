@@ -252,7 +252,13 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
     if (!$language_manager instanceof ConfigurableLanguageManagerInterface) {
       return [];
     }
-    $default_langcode = $language_manager->getDefaultLanguage()->getId();
+    // The base config's default translation is the entity's own langcode, not
+    // the site default language. getTranslation() rejects $this->langcode, so
+    // this must match it. Otherwise, when the site default language differs
+    // from the entity langcode, the entity langcode is treated as a
+    // non-default translation here and later passed to getTranslation(),
+    // throwing InvalidArgumentException.
+    $default_langcode = $this->langcode;
     $config_name = $this->getConfigDependencyName();
     $languages = [];
     foreach ($language_manager->getLanguages() as $langcode => $language) {
