@@ -25,8 +25,8 @@ interface JQueryProxyCheckboxEvent extends CheckboxEvent {
 }
 
 // The checked property might be a string, and checked might be represented as
-// 'true' or 'checked'. This normalizes it to a boolean value, which is required
-// by React for its handling of 'checked'.
+// 'true' or 'checked'. This normalizes it to a boolean value, as required by
+// React for its handling of 'checked'.
 const castBoolean = (value: unknown): boolean => {
   if (typeof value === 'string') {
     return value === 'true' || value === 'checked';

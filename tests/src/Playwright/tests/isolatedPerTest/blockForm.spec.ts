@@ -9,7 +9,7 @@ test.describe('Block form', () => {
     page,
     drupal,
     canvas,
-  }) => {
+  }, testInfo) => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.createCanvas();
     await canvas.openLibraryPanel();
@@ -23,7 +23,9 @@ test.describe('Block form', () => {
     const inputsForm = page.locator(
       '[data-testid="canvas-contextual-panel"] [data-drupal-selector="component-instance-form"]',
     );
-    await expect(inputsForm).toContainText('Menu levels');
+    await expect(inputsForm).toContainText(
+      testInfo.retry === 0 ? 'Incorrect menu levels' : 'Menu levels',
+    );
     await expect(inputsForm.locator('select')).toHaveCount(2);
     await expect(inputsForm.locator('input[type="checkbox"]')).toBeVisible();
   });
