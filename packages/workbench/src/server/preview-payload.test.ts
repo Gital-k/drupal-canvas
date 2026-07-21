@@ -37,6 +37,38 @@ afterEach(async () => {
 });
 
 describe('preview-payload', () => {
+  it('reports invalid Canvas import root config before discovery', async () => {
+    const root = await makeTemporaryDirectory();
+
+    await writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify(
+        {
+          componentDir: 'components',
+          pagesDir: 'pages',
+          aliasBaseDir: 'src',
+        },
+        null,
+        2,
+      ),
+    );
+
+    const payload = await buildPreviewPayload({
+      mode: 'component',
+      inputPath: 'components/card/component.yml',
+      projectRoot: root,
+    });
+
+    expect(payload.ok).toBe(false);
+    expect(payload.errors).toEqual([
+      expect.objectContaining({
+        code: 'invalid_canvas_config',
+        message:
+          'Invalid Canvas config: componentDir "components" must be inside aliasBaseDir "src".',
+      }),
+    ]);
+  });
+
   it('builds interactive component preview payload with inlined css html', async () => {
     const root = await makeTemporaryDirectory();
 
@@ -44,10 +76,10 @@ describe('preview-payload', () => {
       path.join(root, 'canvas.config.json'),
       JSON.stringify(
         {
-          componentDir: './components',
-          pagesDir: './pages',
+          componentDir: 'src/components',
+          pagesDir: 'pages',
           aliasBaseDir: 'src',
-          globalCssPath: './src/components/global.css',
+          globalCssPath: 'src/global.css',
         },
         null,
         2,
@@ -55,7 +87,7 @@ describe('preview-payload', () => {
     );
 
     await writeFile(
-      path.join(root, 'components/card/component.yml'),
+      path.join(root, 'src/components/card/component.yml'),
       [
         'name: Card',
         'props:',
@@ -67,17 +99,14 @@ describe('preview-payload', () => {
       ].join('\n'),
     );
     await writeFile(
-      path.join(root, 'components/card/index.tsx'),
+      path.join(root, 'src/components/card/index.tsx'),
       'export default function Card() { return null; }',
     );
     await writeFile(
-      path.join(root, 'components/card/index.css'),
+      path.join(root, 'src/components/card/index.css'),
       '.card { color: red; }',
     );
-    await writeFile(
-      path.join(root, 'src/components/global.css'),
-      'body { margin: 0; }',
-    );
+    await writeFile(path.join(root, 'src/global.css'), 'body { margin: 0; }');
     await writeFile(
       path.join(root, '.env'),
       [
@@ -92,7 +121,7 @@ describe('preview-payload', () => {
     const payload = await buildPreviewPayload(
       {
         mode: 'component',
-        inputPath: 'components/card/component.yml',
+        inputPath: 'src/components/card/component.yml',
         projectRoot: root,
       },
       {
@@ -110,7 +139,7 @@ describe('preview-payload', () => {
     expect(payload.ok).toBe(true);
     expect(payload.renderMode).toBe('interactive');
     expect(payload.target?.projectRelativePath).toBe(
-      'components/card/component.yml',
+      'src/components/card/component.yml',
     );
     expect(payload.spec?.root).toBe('canvas-workbench-preview-root');
     expect(payload.css).toBe('body{background:black;color:white;}');
@@ -135,9 +164,58 @@ describe('preview-payload', () => {
     expect(capturedRoot).toBe('canvas-workbench-preview-root');
     expect(capturedCssEntryPaths).toEqual(
       expect.arrayContaining([
-        path.resolve(root, 'src/components/global.css'),
-        path.resolve(root, 'components/card/index.css'),
+        path.resolve(root, 'src/global.css'),
+        path.resolve(root, 'src/components/card/index.css'),
       ]),
+    );
+  });
+
+  it('warns and uses legacy global css fallback when the new default is missing', async () => {
+    const root = await makeTemporaryDirectory();
+
+    await writeFile(
+      path.join(root, 'src/components/card/component.yml'),
+      'name: Card\n',
+    );
+    await writeFile(
+      path.join(root, 'src/components/card/index.tsx'),
+      'export default function Card() { return null; }',
+    );
+    await writeFile(
+      path.join(root, 'src/components/global.css'),
+      'body { margin: 0; }',
+    );
+
+    let capturedCssEntryPaths: string[] = [];
+
+    const payload = await buildPreviewPayload(
+      {
+        mode: 'component',
+        inputPath: 'src/components/card/component.yml',
+        projectRoot: root,
+      },
+      {
+        bundleInteractivePreview: async (options) => {
+          capturedCssEntryPaths = options.cssEntryPaths;
+          return {
+            js: 'console.log("interactive");',
+            css: 'body{margin:0;}',
+          };
+        },
+      },
+    );
+
+    expect(payload.ok).toBe(true);
+    expect(payload.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'legacy_default_global_css_path',
+          path: './src/components/global.css',
+        }),
+      ]),
+    );
+    expect(capturedCssEntryPaths).toContain(
+      path.resolve(root, 'src/components/global.css'),
     );
   });
 
@@ -148,10 +226,10 @@ describe('preview-payload', () => {
       path.join(root, 'canvas.config.json'),
       JSON.stringify(
         {
-          componentDir: './components',
-          pagesDir: './pages',
+          componentDir: 'src/components',
+          pagesDir: 'pages',
           aliasBaseDir: 'src',
-          globalCssPath: './src/components/global.css',
+          globalCssPath: 'src/global.css',
         },
         null,
         2,
@@ -159,24 +237,24 @@ describe('preview-payload', () => {
     );
 
     await writeFile(
-      path.join(root, 'components/hero/component.yml'),
+      path.join(root, 'src/components/hero/component.yml'),
       'name: Hero\n',
     );
     await writeFile(
-      path.join(root, 'components/hero/index.tsx'),
+      path.join(root, 'src/components/hero/index.tsx'),
       'export default function Hero() { return null; }',
     );
 
     await writeFile(
-      path.join(root, 'components/card/component.yml'),
+      path.join(root, 'src/components/card/component.yml'),
       'name: Card\n',
     );
     await writeFile(
-      path.join(root, 'components/card/index.tsx'),
+      path.join(root, 'src/components/card/index.tsx'),
       'export default function Card() { return null; }',
     );
     await writeFile(
-      path.join(root, 'components/card/index.css'),
+      path.join(root, 'src/components/card/index.css'),
       '.card { padding: 1rem; }',
     );
 
@@ -205,10 +283,7 @@ describe('preview-payload', () => {
       ),
     );
 
-    await writeFile(
-      path.join(root, 'src/components/global.css'),
-      'body { margin: 0; }',
-    );
+    await writeFile(path.join(root, 'src/global.css'), 'body { margin: 0; }');
 
     let capturedRegistryNames: string[] = [];
 
@@ -244,18 +319,18 @@ describe('preview-payload', () => {
     const root = await makeTemporaryDirectory();
 
     await writeFile(
-      path.join(root, 'components/card/component.yml'),
+      path.join(root, 'src/components/card/component.yml'),
       'name: Card\n',
     );
     await writeFile(
-      path.join(root, 'components/card/index.tsx'),
+      path.join(root, 'src/components/card/index.tsx'),
       'export default function Card() { return null; }',
     );
 
     const payload = await buildPreviewPayload(
       {
         mode: 'component',
-        inputPath: 'components/card/component.yml',
+        inputPath: 'src/components/card/component.yml',
         projectRoot: root,
       },
       {
@@ -278,8 +353,8 @@ describe('preview-payload', () => {
       path.join(root, 'canvas.config.json'),
       JSON.stringify(
         {
-          componentDir: './components',
-          pagesDir: './pages',
+          componentDir: 'src/components',
+          pagesDir: 'pages',
         },
         null,
         2,
@@ -301,7 +376,7 @@ describe('preview-payload', () => {
       expect.objectContaining({
         code: 'component_not_found',
         message: expect.stringContaining(
-          'configured componentDir ("./components")',
+          'configured componentDir ("src/components")',
         ),
       }),
     ]);
@@ -317,8 +392,8 @@ describe('preview-payload', () => {
       path.join(root, 'canvas.config.json'),
       JSON.stringify(
         {
-          componentDir: './components',
-          pagesDir: './pages',
+          componentDir: 'src/components',
+          pagesDir: 'pages',
         },
         null,
         2,
@@ -346,11 +421,11 @@ describe('preview-payload', () => {
     expect(payload.errors).toEqual([
       expect.objectContaining({
         code: 'page_not_found',
-        message: expect.stringContaining('configured pagesDir ("./pages")'),
+        message: expect.stringContaining('configured pagesDir ("pages")'),
       }),
     ]);
     expect(payload.errors[0]?.message).toContain(
-      'components discovered under componentDir ("./components")',
+      'components discovered under componentDir ("src/components")',
     );
   });
 
@@ -422,16 +497,21 @@ describe('preview-payload', () => {
       path.join(root, 'src/components/asset-card/index.tsx'),
       [
         "import logoUrl from './logo.png';",
+        "import { label } from '@/lib/labels';",
         '',
         'export default function AssetCard() {',
         '  return (',
         "    <div style={{ fontFamily: 'DemoFont' }}>",
         '      <img alt="logo" src={logoUrl} />',
-        '      <p>Asset card</p>',
+        '      <p>{label}</p>',
         '    </div>',
         '  );',
         '}',
       ].join('\n'),
+    );
+    await writeFile(
+      path.join(root, 'src/lib/labels.ts'),
+      "export const label = 'Asset card';",
     );
 
     const bundled = await bundleInteractivePreview({
@@ -457,6 +537,7 @@ describe('preview-payload', () => {
 
     expect(bundled.css).toContain('data:font/woff2;base64');
     expect(bundled.js).toContain('data:image/png;base64');
+    expect(bundled.js).toContain('Asset card');
   });
 
   it('bundles jsx components without requiring an explicit React import', async () => {

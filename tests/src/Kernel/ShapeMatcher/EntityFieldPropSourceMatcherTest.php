@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-// cspell:ignore msword openxmlformats officedocument wordprocessingml
-
 namespace Drupal\Tests\canvas\Kernel\ShapeMatcher;
 
+// cspell:ignore msword openxmlformats officedocument wordprocessingml
+
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -17,10 +19,12 @@ use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\link\LinkItemInterface;
+use Drupal\link\LinkTitleVisibility;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -93,7 +97,6 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:user␝init␞␟value'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:user␝mail␞␟value'],
       ],
-      'type=string&minLength=2' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:user␝name␞␟value'],
     ],
     // The typical example; with a variety of field types.
     'entity:node:foo' => [
@@ -159,8 +162,8 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟width'],
       ],
       'type=object&$ref=json-schema-definitions://canvas.module/date-range' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_event_duration␞␟{from↠value,to↠end_value}'],
-      'type=object&$ref=json-schema-definitions://canvas.module/image' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
-      'type=object&$ref=json-schema-definitions://canvas.module/image!optional' => [
+      'type=object&$ref=' . JsonSchemaObjectRef::Image->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
+      'type=object&$ref=' . JsonSchemaObjectRef::Image->value . '!optional' => [
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟{src↠src_with_alternate_widths,width↝entity␜␜entity:file␝filesize␞␟value}'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟{src↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value,height↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value}'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟{src↠src_with_alternate_widths,width↝entity␜␜entity:file␝filesize␞␟value}'],
@@ -168,11 +171,11 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟{src↠src_with_alternate_widths,width↝entity␜␜entity:file␝filesize␞␟value}'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟{src↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value,height↝entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝filesize␞␟value}'],
       ],
-      'type=object&$ref=json-schema-definitions://canvas.module/video' => [
+      'type=object&$ref=' . JsonSchemaObjectRef::Video->value => [
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟{src↝entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url,poster↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url}'],
       ],
-      'type=object&$ref=json-schema-definitions://canvas.module/video!optional' => [
+      'type=object&$ref=' . JsonSchemaObjectRef::Video->value . '!optional' => [
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟{src↝entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url,poster↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url}'],
       ],
@@ -390,28 +393,6 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝revision_uid␞␟url'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝uid␞␟url'],
       ],
-      'type=string&minLength=2' => [
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝name␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝name␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝one_from_an_string_list␞␟label'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝title␞␟value'],
-      ],
-      'type=string&minLength=2!optional' => [
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_check_it_out␞␟title'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟alt'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟title'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media:press_releases␝field_media_file␞␟description'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_log_message␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟description'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝name␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_log_message␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟description'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟description'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_log_message␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝revision_log␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝name␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝name␞␟value'],
-      ],
       'type=string&pattern=(.|\r?\n)*!optional' => [
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_log_message␞␟value'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_log_message␞␟value'],
@@ -458,7 +439,7 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value'],
       ],
-      'type=object&$ref=json-schema-definitions://canvas.module/image!optional' => [
+      'type=object&$ref=' . JsonSchemaObjectRef::Image->value . '!optional' => [
         'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:media:press_releases␝thumbnail␞␟{src↠src_with_alternate_widths,alt↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:file␝filesize␞␟value}',
       ],
@@ -515,13 +496,6 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝thumbnail␞␟src_with_alternate_widths'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝uid␞␟url'],
       ],
-      'type=string&minLength=2' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝name␞␟value'],
-      'type=string&minLength=2!optional' => [
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝field_media_file␞␟description'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝revision_log_message␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝name␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝name␞␟value'],
-      ],
       'type=string&pattern=(.|\r?\n)*!optional' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝revision_log_message␞␟value'],
     ],
     'entity:media:baby_videos' => [
@@ -562,11 +536,11 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝filesize␞␟value'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value'],
       ],
-      'type=object&$ref=json-schema-definitions://canvas.module/image!optional' => [
+      'type=object&$ref=' . JsonSchemaObjectRef::Image->value . '!optional' => [
         'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟{src↠src_with_alternate_widths,alt↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:file␝filesize␞␟value}',
       ],
-      'type=object&$ref=json-schema-definitions://canvas.module/video' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}'],
+      'type=object&$ref=' . JsonSchemaObjectRef::Video->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}'],
       'type=string' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝name␞␟value'],
       'type=string!optional' => [
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟description'],
@@ -632,13 +606,6 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝uid␞␟url'],
       ],
-      'type=string&minLength=2' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝name␞␟value'],
-      'type=string&minLength=2!optional' => [
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟description'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝name␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝name␞␟value'],
-      ],
       'type=string&pattern=(.|\r?\n)*!optional' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟value'],
     ],
   ];
@@ -683,7 +650,7 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
       'bundle' => 'foo',
       'required' => TRUE,
       'settings' => [
-        'title' => DRUPAL_OPTIONAL,
+        'title' => LinkTitleVisibility::Optional->value,
         'link_type' => LinkItemInterface::LINK_GENERIC,
       ],
     ])->save();
@@ -877,6 +844,82 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         parent::test();
       }
     }
+  }
+
+  /**
+   * Tests content-entity-reference prop matching.
+   *
+   * @param array<string, string> $constraints
+   *   The `x-allowed-entity-type-id` (and optionally `x-allowed-bundle`).
+   * @param list<string> $expected_present
+   *   Host-entity reference field names that MUST be matched.
+   * @param list<string> $expected_absent
+   *   Host-entity reference field names that MUST NOT be matched.
+   *
+   * @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::matchContentEntityReferenceShape()
+   */
+  #[DataProvider('provideContentEntityReferencePropMatches')]
+  public function testContentEntityReferencePropMatching(array $constraints, array $expected_present, array $expected_absent): void {
+    // Referenceable bundles for the bundled target cases.
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+    NodeType::create(['type' => 'news_item', 'name' => 'News item'])->save();
+
+    // Host-entity reference fields attached to the "foo" node type:
+    // - field_ref_user     → user                      (bundleless target)
+    // - field_ref_article  → node:article              (bundled, article-only)
+    // - field_ref_news     → node:news_item            (bundled, news_item-only)
+    // - field_ref_multi    → node:[article, news_item] (bundled, multi-bundle)
+    // - field_ref_any_node → node                      (no target_bundles)
+    $this->createEntityReferenceField('node', 'foo', 'field_ref_user', 'Referenced user', 'user', 'default', [], cardinality: 1);
+    $this->createEntityReferenceField('node', 'foo', 'field_ref_article', 'Referenced article', 'node', 'default', ['target_bundles' => ['article']], cardinality: 1);
+    $this->createEntityReferenceField('node', 'foo', 'field_ref_news', 'Referenced news item', 'node', 'default', ['target_bundles' => ['news_item']], cardinality: 1);
+    $this->createEntityReferenceField('node', 'foo', 'field_ref_multi', 'Referenced multi', 'node', 'default', ['target_bundles' => ['article', 'news_item']], cardinality: 1);
+    $this->createEntityReferenceField('node', 'foo', 'field_ref_any_node', 'Referenced any node', 'node', 'default', [], cardinality: 1);
+
+    $prop_shape = PropShape::normalize(JsonSchemaObjectRef::ContentEntityReference->asPropShapeArray() + $constraints);
+    $matcher = \Drupal::service(EntityFieldPropSourceMatcher::class);
+    \assert($matcher instanceof EntityFieldPropSourceMatcher);
+    $matches = $matcher->match(FALSE, $prop_shape, 'node', 'foo');
+
+    $matched_field_names = \array_values(\array_map(
+      fn (EntityFieldPropSource $s): string => $s->expression->getFieldName(),
+      $matches,
+    ));
+
+    foreach ($expected_present as $field_name) {
+      self::assertContains($field_name, $matched_field_names, \sprintf('Expected "%s" to be matched.', $field_name));
+    }
+    foreach ($expected_absent as $field_name) {
+      self::assertNotContains($field_name, $matched_field_names, \sprintf('Expected "%s" NOT to be matched.', $field_name));
+    }
+  }
+
+  public static function provideContentEntityReferencePropMatches(): \Generator {
+    yield 'bundleless target (user)' => [
+      'constraints' => ['x-allowed-entity-type-id' => 'user'],
+      'expected_present' => ['field_ref_user'],
+      'expected_absent' => ['field_ref_article', 'field_ref_news', 'field_ref_multi', 'field_ref_any_node'],
+    ];
+    // Strict single-bundle equality: only a host field whose referenceable
+    // bundles set is exactly `[$x_allowed_bundle]` qualifies. A multi-bundle
+    // host field could surface a non-matching bundle at runtime, and an
+    // unrestricted field enumerates every bundle of the target entity type;
+    // neither can guarantee the prop's contract.
+    //
+    // Omitting `x-allowed-bundle` for a bundled entity type is intentionally
+    // not exercised — `ComponentMetadataRequirementsChecker` rejects that
+    // shape upstream, so the matcher's missing-bundle branch is reachable
+    // only for bundle-less target entity types (asserted at runtime).
+    yield 'bundled target (node:article)' => [
+      'constraints' => ['x-allowed-entity-type-id' => 'node', 'x-allowed-bundle' => 'article'],
+      'expected_present' => ['field_ref_article'],
+      'expected_absent' => ['field_ref_user', 'field_ref_news', 'field_ref_multi', 'field_ref_any_node'],
+    ];
+    yield 'bundled target (node:news_item)' => [
+      'constraints' => ['x-allowed-entity-type-id' => 'node', 'x-allowed-bundle' => 'news_item'],
+      'expected_present' => ['field_ref_news'],
+      'expected_absent' => ['field_ref_user', 'field_ref_article', 'field_ref_multi', 'field_ref_any_node'],
+    ];
   }
 
 }

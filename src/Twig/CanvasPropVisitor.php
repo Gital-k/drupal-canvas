@@ -8,8 +8,8 @@ use Drupal\Core\Template\TwigNodeTrans;
 use Masterminds\HTML5;
 use Twig\Environment;
 use Twig\Error\SyntaxError;
-use Twig\Node\Expression\FilterExpression;
 use Twig\Node\Expression\ConstantExpression;
+use Twig\Node\Expression\FilterExpression;
 use Twig\Node\Expression\NameExpression;
 use Twig\Node\ModuleNode;
 use Twig\Node\Node;
@@ -268,34 +268,6 @@ final class CanvasPropVisitor implements NodeVisitorInterface {
     }
 
     return ($double_quotes % 2 === 1) || ($single_quotes % 2 === 1);
-  }
-
-  /**
-   * Extracts the current attribute name from the buffer.
-   *
-   * @param string $buffer
-   *   The current HTML buffer.
-   *
-   * @return string|null
-   *   The attribute name, or NULL if not found.
-   */
-  protected static function extractAttributeName(string $buffer): ?string {
-    // Find last unclosed tag.
-    $last_lt = strrpos($buffer, '<');
-    if ($last_lt === FALSE) {
-      return NULL;
-    }
-
-    // Extract tag content after the last <.
-    $tag_content = substr($buffer, $last_lt + 1);
-
-    // Find the last attribute name before the current position.
-    // Look for pattern: attribute-name="
-    if (preg_match('/([a-z0-9_-]+)\s*=\s*["\'](?:[^"\']*)?$/i', $tag_content, $matches)) {
-      return $matches[1];
-    }
-
-    return NULL;
   }
 
   /**

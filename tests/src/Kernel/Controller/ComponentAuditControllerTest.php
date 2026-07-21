@@ -4,21 +4,32 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Controller;
 
-use PHPUnit\Framework\Attributes\Group;
+// cspell:ignore entiteit Nederlands
+
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\Entity\Pattern;
+use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Render\HtmlResponse;
 use Drupal\Core\Url;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\Page;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\language\ConfigurableLanguageManagerInterface;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\NodeType;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
+use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -29,6 +40,7 @@ use Symfony\Component\HttpFoundation\Request;
 #[Group('canvas')]
 final class ComponentAuditControllerTest extends CanvasKernelTestBase {
 
+  use DataProviderWithComponentTreeTrait;
   use PageTrait;
   use RequestTrait;
   use UserCreationTrait;
@@ -79,6 +91,126 @@ final class ComponentAuditControllerTest extends CanvasKernelTestBase {
         'inputs' => [],
       ],
     ])->save();
+  }
+
+  /**
+   * Tests controller output when config and content entity translations exist.
+   */
+  public function testControllerWithTranslations(): void {
+    $this->enableModules(['language', 'locale', 'config_translation', 'content_translation']);
+    $this->installSchema('locale', ['locales_location', 'locales_source', 'locales_target']);
+    $this->installConfig(['language']);
+    ConfigurableLanguage::createFromLangcode('nl')->save();
+
+    $this->setUpCurrentUser(permissions: [
+      'administer themes',
+      Component::ADMIN_PERMISSION,
+      Page::CREATE_PERMISSION,
+      Page::EDIT_PERMISSION,
+    ]);
+
+    $uuid = $this->container->get('uuid');
+    $heading_component_instance_uuid = $uuid->generate();
+    $component_tree = self::populateActiveComponentVersionPlaceholders([
+      [
+        'uuid' => $heading_component_instance_uuid,
+        'component_id' => 'sdc.canvas_test_sdc.heading',
+        'component_version' => '::ACTIVE_VERSION_IN_SUT::',
+        'inputs' => [
+          'text' => 'Hello in English!',
+          'element' => 'h1',
+        ],
+      ],
+    ]);
+
+    // Create one config entity per type, each containing the `heading` SDC.
+    $page_region = PageRegion::create([
+      'theme' => 'stark',
+      'region' => 'sidebar_first',
+      'component_tree' => $component_tree,
+    ]);
+    $page_region->save();
+
+    $pattern = Pattern::create([
+      'id' => 'test_pattern',
+      'label' => 'Test Pattern',
+      'component_tree' => $component_tree,
+    ]);
+    $pattern->save();
+
+    EntityViewMode::create([
+      'id' => 'node.teaser',
+      'label' => 'Teaser',
+      'targetEntityType' => 'node',
+    ])->save();
+    $content_template = ContentTemplate::create([
+      'id' => 'node.article.teaser',
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'teaser',
+      'component_tree' => $component_tree,
+    ]);
+    $content_template->save();
+
+    // Write an nl override to each Canvas config entity: translate the `text`
+    // prop of their `sdc.canvas_test_sdc.heading` component instance.
+    $language_manager = $this->container->get(LanguageManagerInterface::class);
+    \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
+    foreach ([$page_region, $pattern, $content_template] as $config_entity) {
+      $nl_form_values = $config_entity->toArray();
+      NestedArray::setValue($nl_form_values, ['component_tree', $heading_component_instance_uuid, 'inputs', 'text'], [0 => ['value' => 'Hallo in het Nederlands!']]);
+      // Note: $nl_form_values is the complete raw data of the config entity,
+      // with only a single (deeply nested!) key-value pair changed
+      // (translated). The config translation system ensures only the actually
+      // translated values are saved.
+      $this->saveConfigEntityTranslation($config_entity, 'nl', $nl_form_values);
+      self::assertSame(
+        [
+          'component_tree' => [
+            $heading_component_instance_uuid => [
+              'inputs' => [
+                'text' => 'Hallo in het Nederlands!',
+              ],
+            ],
+          ],
+        ],
+        $language_manager->getLanguageConfigOverride('nl', $config_entity->getConfigDependencyName())->getRawData()
+      );
+    }
+
+    // Create a content entity (node) with an nl translation.
+    $entity_type_manager = $this->container->get('entity_type.manager');
+    $node_storage = $entity_type_manager->getStorage('node');
+    $node = $node_storage->create([
+      'title' => 'Test entity',
+      'status' => TRUE,
+      'type' => 'article',
+      'field_canvas_test' => $component_tree,
+    ]);
+    $node->save();
+    $node->addTranslation('nl', [
+      'title' => 'Test entiteit',
+      'status' => TRUE,
+      'field_canvas_test' => $node->get('field_canvas_test')->getValue(),
+    ])->save();
+
+    $audit_url = Url::fromRoute('entity.component.audit', ['component' => 'sdc.canvas_test_sdc.heading'])->toString();
+    $response = $this->request(Request::create($audit_url));
+    \assert($response instanceof HtmlResponse);
+    // Config entity tables with only a title column: language is column 2.
+    foreach (['table-page-region', 'table-pattern'] as $table) {
+      $this->assertTableCellContains($table, 1, 2, 'Default (en)');
+      $this->assertTableCellContains($table, 2, 2, 'Translation (nl)');
+    }
+    // Content template table: title, entity type, bundle, mode, language.
+    $this->assertTableCellContains('table-content-template', 1, 5, 'Default (en)');
+    $this->assertTableCellContains('table-content-template', 2, 5, 'Translation (nl)');
+
+    // The content table must show a Default row and a Translation row.
+    // Columns: title, entity type, bundle, id, revision id, in latest,
+    // in default, language.
+    $this->assertTableCellContains('table-content', 1, 8, 'Default (en)');
+    $this->assertTableCellContains('table-content', 2, 8, 'Translation (nl)');
   }
 
   /**
@@ -222,7 +354,7 @@ final class ComponentAuditControllerTest extends CanvasKernelTestBase {
     $this->assertStringContainsString($needle, trim((string) $xpath_element[0]->asXML()));
   }
 
-  private function entityData(): array {
+  private static function entityData(): array {
     return [
       Page::ENTITY_TYPE_ID => [
         Page::ENTITY_TYPE_ID => [

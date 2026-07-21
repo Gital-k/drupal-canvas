@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
-use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\canvas\Entity\ParametrizedImageStyle;
+use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\image\Entity\ImageStyle;
 
 final class ImageStyleHooks {
@@ -14,7 +14,7 @@ final class ImageStyleHooks {
    * Implements hook_image_style_flush().
    */
   #[Hook('image_style_flush')]
-  public function imageStyleFlush(ImageStyle $style, ?string $path = NULL): void {
+  public static function imageStyleFlush(ImageStyle $style, ?string $path = NULL): void {
     // Avoid recursion.
     if ($style instanceof ParametrizedImageStyle) {
       return;

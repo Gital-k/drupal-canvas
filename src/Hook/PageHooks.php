@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\canvas\Entity\Page;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
@@ -16,7 +17,6 @@ use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\canvas\Entity\Page;
 use Drupal\pathauto\PathautoItem;
 use Drupal\pathauto\PathautoState;
 
@@ -123,7 +123,12 @@ final class PageHooks {
   #[Hook('canvas_page_presave')]
   public function ensurePathautoSkipped(Page $page): void {
     if ($this->moduleHandler->moduleExists('pathauto')) {
-      $pathauto_item = $page->get('path')->first();
+      // Path items with an explicit empty alias are filtered out as empty
+      // before presave hooks run, so pages without an alias need a fresh item
+      // here.
+      // @see \Drupal\Core\Entity\ContentEntityStorageBase::invokeHook()
+      // @see \Drupal\Core\Field\FieldItemList::preSave()
+      $pathauto_item = $page->get('path')->first() ?? $page->get('path')->appendItem();
       \assert($pathauto_item instanceof PathautoItem);
       $pathauto_item->set('pathauto', PathautoState::SKIP);
     }
@@ -139,7 +144,7 @@ final class PageHooks {
    *   all eligible content entity types.
    */
   #[Hook('gin_ignore_sticky_form_actions')]
-  public function ignoreGinStickyForm(): array {
+  public static function ignoreGinStickyForm(): array {
     return ['canvas_page_form'];
   }
 

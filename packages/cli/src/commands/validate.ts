@@ -3,27 +3,47 @@ import * as p from '@clack/prompts';
 import { discoverCanvasProject } from '@drupal-canvas/discovery';
 
 import { getConfig } from '../config.js';
+import { createApiService, isUserAuthenticated } from '../services/api.js';
+import { updateConfigFromOptions } from '../utils/command-helpers';
+import { printCommandIntro } from '../utils/command-intro.js';
 import {
-  pluralize,
-  pluralizeComponent,
-  updateConfigFromOptions,
-  validateComponentOptions,
-} from '../utils/command-helpers';
-import { selectLocalComponents } from '../utils/component-selector.js';
-import { reportResults } from '../utils/report-results.js';
+  COMMAND_RESULT_REPORT_OPTIONS,
+  reportResults,
+  splitFailedResultsByFile,
+} from '../utils/report-results.js';
+import { validateContentTemplates } from '../utils/validate-content-template.js';
 import { validatePages } from '../utils/validate-page.js';
-import { validateComponent } from '../utils/validate.js';
+import { validateRegions } from '../utils/validate-region.js';
+import { validateComponents } from '../utils/validate.js';
 
 import type { Command } from 'commander';
+import type { ApiService } from '../services/api.js';
 import type { Result } from '../types/Result.js';
 
 interface ValidateOptions {
   dir?: string;
-  all?: boolean;
-  components?: string;
-  yes?: boolean;
   fix?: boolean;
-  deprecated?: boolean;
+}
+
+async function createOptionalValidationApiService(): Promise<
+  ApiService | undefined
+> {
+  const config = getConfig();
+  if (!config.siteUrl) {
+    return undefined;
+  }
+  const hasClientCredentials =
+    Boolean(config.clientId) &&
+    Boolean(config.clientSecret) &&
+    Boolean(config.scope);
+  if (!isUserAuthenticated(config.siteUrl) && !hasClientCredentials) {
+    return undefined;
+  }
+  try {
+    return await createApiService();
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -38,128 +58,107 @@ export function validateCommand(program: Command): void {
       'Component directory to validate the components in',
     )
     .option(
-      '-c, --components <names>',
-      'Specific component(s) to validate (comma-separated)',
-    )
-    .option('--all', 'Validate all components')
-    .option('-y, --yes', 'Skip confirmation prompts')
-    .option(
       '--fix',
       'Apply available automatic fixes for linting issues',
       false,
     )
-    .option(
-      '--deprecated',
-      'Validate using deprecated rules and component selection.',
-      false,
-    )
     .action(async (options: ValidateOptions) => {
       try {
-        p.intro(chalk.bold('Drupal Canvas CLI: validate'));
+        printCommandIntro('validate');
 
         // Update config with CLI options
         updateConfigFromOptions(options);
 
-        let componentDirectoriesToValidate: string[] = [];
-        let discoveryResult;
-
-        if (options.deprecated) {
-          // Validate options
-          validateComponentOptions(options);
-
-          // Default to --all when --yes is used without --components
-          const allFlag =
-            options.all || (options.yes && !options.components) || false;
-
-          // Select components to validate
-          const { directories } = await selectLocalComponents({
-            all: allFlag,
-            components: options.components,
-            skipConfirmation: options.yes,
-            selectMessage: 'Select components to validate',
-          });
-          componentDirectoriesToValidate = directories;
-        } else {
-          if (options.all) {
-            p.log.warn(
-              '--all option is deprecated and ignored unless used with the --deprecated flag.',
-            );
-          }
-          if (options.components) {
-            p.log.warn(
-              '--components option is deprecated and ignored unless used with the --deprecated flag.',
-            );
-          }
-
-          const config = getConfig();
-          discoveryResult = await discoverCanvasProject({
-            componentRoot: config.componentDir,
-            pagesRoot: config.pagesDir,
-            projectRoot: process.cwd(),
-          });
-          componentDirectoriesToValidate = discoveryResult.components.map(
-            (c) => c.directory,
-          );
-        }
-
-        const componentPluralized = pluralizeComponent(
-          componentDirectoriesToValidate.length,
-        );
-
+        const config = getConfig();
+        const discoveryResult = await discoverCanvasProject({
+          componentRoot: config.componentDir,
+          pagesRoot: config.pagesDir,
+          contentTemplatesRoot: config.contentTemplatesDir,
+          regionsRoot: config.regionsDir,
+          projectRoot: process.cwd(),
+        });
         const results: Result[] = [];
+        const apiService = await createOptionalValidationApiService();
 
         const s = p.spinner();
-        s.start(`Validating ${componentPluralized}`);
+        s.start('Validating components');
 
-        for (const componentDir of componentDirectoriesToValidate) {
-          const result = await validateComponent(
-            componentDir,
-            options.fix,
-            options.deprecated,
-          );
+        const { results: componentResults } = await validateComponents(
+          discoveryResult,
+          {
+            fix: options.fix,
+            apiService,
+          },
+        );
+        for (const result of componentResults) {
           results.push({ ...result, itemType: 'Component' });
         }
 
-        s.stop(
-          chalk.green(
-            `Processed ${componentDirectoriesToValidate.length} ${componentPluralized}`,
-          ),
-        );
+        s.stop('Validated components', 0);
 
         if (discoveryResult && discoveryResult.pages.length > 0) {
           const pageSpinner = p.spinner();
-          pageSpinner.start(
-            `Validating ${discoveryResult.pages.length} ${pluralize(discoveryResult.pages.length, 'page')}`,
-          );
+          pageSpinner.start('Validating pages');
 
           const { results: pageResults } = await validatePages(discoveryResult);
           for (const result of pageResults) {
             results.push({ ...result, itemType: 'Page' });
           }
 
-          pageSpinner.stop(
-            chalk.green(
-              `Processed ${discoveryResult.pages.length} ${pluralize(discoveryResult.pages.length, 'page')}`,
-            ),
-          );
+          pageSpinner.stop('Validated pages', 0);
         }
 
-        reportResults(results, 'Validation results', 'Item');
+        if (discoveryResult && discoveryResult.contentTemplates.length > 0) {
+          const ctSpinner = p.spinner();
+          ctSpinner.start('Validating content templates');
+
+          const { results: ctResults } = await validateContentTemplates(
+            discoveryResult,
+            apiService ? { apiService } : undefined,
+          );
+          for (const result of ctResults) {
+            results.push({ ...result, itemType: 'Content template' });
+          }
+
+          ctSpinner.stop('Validated content templates', 0);
+        }
+
+        if (discoveryResult && discoveryResult.regions.length > 0) {
+          const regionSpinner = p.spinner();
+          regionSpinner.start('Validating global regions');
+
+          const { results: regionResults } =
+            await validateRegions(discoveryResult);
+          for (const result of regionResults) {
+            results.push({ ...result, itemType: 'Global region' });
+          }
+
+          regionSpinner.stop('Validated global regions', 0);
+        }
+
+        reportResults(
+          splitFailedResultsByFile(results),
+          'Validation results',
+          'Item',
+          COMMAND_RESULT_REPORT_OPTIONS,
+        );
 
         const hasErrors = results.some((r) => !r.success);
         if (hasErrors) {
-          p.outro(`❌ Validation completed with errors`);
-          process.exit(1);
+          p.outro(`Validation failed`);
+          process.exitCode = 1;
+          return;
         }
 
-        p.outro(`✅ Validation completed`);
+        p.outro(`Validation completed`);
       } catch (error) {
         if (error instanceof Error) {
-          p.note(chalk.red(`Error: ${error.message}`));
+          p.log.error(chalk.red(`Error: ${error.message}`));
         } else {
-          p.note(chalk.red(`Unknown error: ${String(error)}`));
+          p.log.error(chalk.red(`Unknown error: ${String(error)}`));
         }
-        process.exit(1);
+        p.outro('Validation failed');
+        process.exitCode = 1;
       }
     });
 }

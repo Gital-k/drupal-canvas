@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Adapter;
 
-use Drupal\Core\Plugin\PluginBase;
 use Drupal\canvas\PropShape\PropShape;
+use Drupal\Core\Plugin\PluginBase;
 use JsonSchema\Constraints\Constraint;
 use JsonSchema\Validator;
 
@@ -54,7 +54,7 @@ abstract class AdapterBase extends PluginBase implements AdapterInterface {
    * @return bool
    * @throws \Exception
    */
-  public function validateConformanceToJsonSchemaType(array $schema, mixed $value): bool {
+  public static function validateConformanceToJsonSchemaType(array $schema, mixed $value): bool {
     $schema = Validator::arrayToObjectRecursive($schema);
     $validator = new Validator();
     $validator->validate($value, $schema, Constraint::CHECK_MODE_TYPE_CAST);

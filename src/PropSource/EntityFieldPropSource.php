@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\MissingHostEntityException;
 use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\canvas\Plugin\AdapterManager;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
+use Drupal\canvas\PropExpressions\StructuredData\Labeler;
+use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\Component\Plugin\Definition\PluginDefinitionInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\canvas\MissingHostEntityException;
-use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
@@ -30,7 +33,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
  * @phpstan-import-type PropSourceArray from PropSourceBase
  * @internal
  */
-final class EntityFieldPropSource extends PropSourceBase {
+final class EntityFieldPropSource extends PropSourceBase implements LinkablePropSourceInterface {
 
   /**
    * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $expression
@@ -109,12 +112,12 @@ final class EntityFieldPropSource extends PropSourceBase {
     if ($host_entity === NULL) {
       throw new MissingHostEntityException();
     }
-    $raw_result = Evaluator::evaluate($host_entity, $this->expression, $is_required);
+    $raw_result = Evaluator::evaluate($host_entity, $this->expression, $is_required, NegotiatedLanguage::matchEntity($host_entity));
 
     // Only adapt non-empty results.
     if ($this->adapter && $raw_result->value !== NULL) {
       // Only adapter plugins with a single input are accepted, which is how
-      // this is able to remain much simpler than AdaptedPropSource
+      // this is able to remain much simpler than AdaptedPropSource.
       // @see ::__construct()
       // @see \Drupal\canvas\PropSource\AdaptedPropSource
       $sole_input_name = \array_keys($this->adapter->getInputs())[0];
@@ -154,13 +157,8 @@ final class EntityFieldPropSource extends PropSourceBase {
     return $deps;
   }
 
-  public function label(): TranslatableMarkup|string {
-    $field_name = $this->expression->getFieldName();
-    $entity_data_definition = $this->expression->getHostEntityDataDefinition();
-    $field_definitions = $entity_data_definition->getPropertyDefinitions();
-    \assert(\array_key_exists($field_name, $field_definitions));
-    // @phpstan-ignore-next-line return.type
-    return $field_definitions[$field_name]->getLabel();
+  public function label(EntityDataDefinitionInterface $host_entity_data_definition): TranslatableMarkup {
+    return Labeler::flatten(Labeler::label($this->expression, $host_entity_data_definition));
   }
 
 }

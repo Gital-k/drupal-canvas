@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Controller;
 
-use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Controller\ApiContentControllers;
@@ -20,8 +19,6 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * Tests the ApiContentControllers::patch() method.
@@ -142,7 +139,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
           [
             'uuid' => '09365c2d-1ee1-47fd-b5a3-7e4f34866186',
             'component_id' => 'sdc.canvas_test_sdc.props-slots',
-            'component_version' => '85a5c0c7dd53e0bb',
+            'component_version' => '0e79e884426a53ae',
             'inputs' => ['heading' => 'Welcome'],
             'parent_uuid' => NULL,
             'slot' => NULL,
@@ -151,7 +148,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
           [
             'uuid' => 'af5fc5ab-1457-4258-880f-541a69c0110b',
             'component_id' => 'sdc.canvas_test_sdc.props-slots',
-            'component_version' => '85a5c0c7dd53e0bb',
+            'component_version' => '0e79e884426a53ae',
             'inputs' => ['heading' => 'Nested'],
             'parent_uuid' => '09365c2d-1ee1-47fd-b5a3-7e4f34866186',
             'slot' => 'the_body',
@@ -174,7 +171,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
             'slot' => NULL,
             'uuid' => '09365c2d-1ee1-47fd-b5a3-7e4f34866186',
             'component_id' => 'sdc.canvas_test_sdc.props-slots',
-            'component_version' => '85a5c0c7dd53e0bb',
+            'component_version' => '0e79e884426a53ae',
             'inputs' => ['heading' => 'Welcome'],
             'label' => NULL,
             'inputs_resolved' => ['heading' => 'Welcome'],
@@ -184,7 +181,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
             'slot' => 'the_body',
             'uuid' => 'af5fc5ab-1457-4258-880f-541a69c0110b',
             'component_id' => 'sdc.canvas_test_sdc.props-slots',
-            'component_version' => '85a5c0c7dd53e0bb',
+            'component_version' => '0e79e884426a53ae',
             'inputs' => ['heading' => 'Nested'],
             'label' => NULL,
             'inputs_resolved' => ['heading' => 'Nested'],
@@ -250,45 +247,6 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
       [],
       0,
     ];
-  }
-
-  public function testConflictErrorIfPatchingEntityWithAutoSaveDataPresent(): void {
-    $this->expectException(ConflictHttpException::class);
-    $page = Page::create([
-      'title' => 'Initial title',
-      'status' => FALSE,
-      'path' => ['alias' => '/this-is-the-old-path'],
-      'components' => [],
-    ]);
-    self::assertEntityIsValid($page);
-    $page->save();
-
-    // Create some auto-save data. We don't know yet if should be discarded or
-    // not, so better have explicit coverage of it.
-    $autoSaveManager = \Drupal::service(AutoSaveManager::class);
-    \assert($autoSaveManager instanceof AutoSaveManager);
-    $page->set('title', 'autosaved title');
-    $page->set('path', '/autosaved/path');
-    $autoSaveManager->saveEntity($page);
-
-    $request = Request::create(\sprintf(self::URL, $page->id()),
-      'PATCH',
-      server: ['CONTENT_TYPE' => 'application/json'],
-      content: \json_encode([
-        'title' => 'My patched title',
-        'status' => TRUE,
-        'path' => '/patched',
-        'components' => [],
-      ], JSON_THROW_ON_ERROR),
-    );
-    $response = $this->request($request);
-    // The response of a patch shouldn't be cacheable.
-    \assert($response instanceof JsonResponse && !$response instanceof CacheableJsonResponse);
-
-    $this->assertSame(Response::HTTP_CONFLICT, $response->getStatusCode());
-    $this->assertSame([
-      'error' => 'Page with ID 1 has existing auto-saved data. Please use the UI to publish it or discard it.',
-    ], $this->decodeResponse($response));
   }
 
 }

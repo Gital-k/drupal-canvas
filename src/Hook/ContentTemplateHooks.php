@@ -6,6 +6,9 @@ namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\ContentTemplateRoutes;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
@@ -17,9 +20,6 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Url;
 
 /**
@@ -69,7 +69,7 @@ final class ContentTemplateHooks {
    * Implements hook_entity_type_alter.
    */
   #[Hook('entity_type_alter')]
-  public function entityTypeAlter(array $definitions): void {
+  public static function entityTypeAlter(array $definitions): void {
     /** @var \Drupal\Core\Entity\EntityTypeInterface $entity_type */
     foreach ($definitions as $entity_type) {
       // Canvas pages don't have any structured data, and therefore don't
@@ -117,12 +117,19 @@ final class ContentTemplateHooks {
     // Add content template cacheability for routes where content templates
     // apply, otherwise the content template links in the local tasks will not
     // update when templates are created or deleted.
-    // Also apply to the main "Manage display" page
-    // (entity.entity_view_display.node.default) so tabs update correctly when
-    // templates are created/deleted.
+    // Also apply to the main "Manage display" page so tabs update correctly
+    // when templates are created/deleted. That page is
+    // `entity.entity_view_display.node.default` on Drupal < 11.4, and the new
+    // display-mode overview (`entity.entity_view_display_overview.node`) as of
+    // Drupal 11.4.
+    // @see https://www.drupal.org/node/3574383
     // @todo Remove the hardcoded node "entity_view_display" route check after
     //   https://www.drupal.org/project/canvas/issues/3498525 is resolved.
-    if (ContentTemplateRoutes::applies($route_name) || $route_name === 'entity.entity_view_display.node.default') {
+    $manage_display_routes = [
+      'entity.entity_view_display.node.default',
+      'entity.entity_view_display_overview.node',
+    ];
+    if (ContentTemplateRoutes::applies($route_name) || \in_array($route_name, $manage_display_routes, TRUE)) {
       // Add list cache tags to invalidate when entity ContentTemplate is
       // created/deleted. This ensures menu local tasks rebuild when template
       // availability changes.

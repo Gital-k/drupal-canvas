@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace Drupal\canvas;
 
 use Drupal\canvas\Entity\ComponentInterface;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
-use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
-use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\Storage\ComponentTreeLoader;
+use Drupal\Core\Entity\FieldableEntityInterface;
 
 /**
  * Extracts inputs from the component tree.
@@ -36,9 +37,24 @@ final readonly class ComponentTreeInputExtractor {
    *   The input extracted from the component tree.
    */
   public function extract(ComponentTreeEntityInterface|FieldableEntityInterface $entity, array $ignored_prop_names): array {
-    $extracted = [];
     // Extracts the component tree input from the entity.
     $tree = $this->componentTreeLoader->load($entity);
+    return self::extractFromTree($tree, $ignored_prop_names);
+  }
+
+  /**
+   * Extracts inputs from a specific component tree.
+   *
+   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList $tree
+   *   The component tree to inspect.
+   * @param array<string> $ignored_prop_names
+   *   An array of prop names to ignore during extraction.
+   *
+   * @return array<string, array<int, mixed>>
+   *   The input extracted from the component tree.
+   */
+  public static function extractFromTree(ComponentTreeItemList $tree, array $ignored_prop_names): array {
+    $extracted = [];
 
     foreach ($tree as $component_tree_item) {
       \assert($component_tree_item instanceof ComponentTreeItem);
@@ -69,7 +85,7 @@ final readonly class ComponentTreeInputExtractor {
   /**
    * Gets the prop shapes for the given component.
    *
-   * Only works for GeneratedFieldExplicitInputUxComponentSourceBase based
+   * Only works for JsonSchemaPropsComponentSourceBase based
    * component sources, which excludes Blocks.
    *
    * @param \Drupal\canvas\Entity\ComponentInterface $component
@@ -80,11 +96,11 @@ final readonly class ComponentTreeInputExtractor {
    */
   private static function getPropShapes(ComponentInterface $component): array {
     $component_source = $component->getComponentSource();
-    if (!$component_source instanceof GeneratedFieldExplicitInputUxComponentSourceBase) {
+    if (!$component_source instanceof JsonSchemaPropsComponentSourceBase) {
       return [];
     }
     $metadata = $component_source->getMetadata();
-    return GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($component_source->getPluginId(), $metadata);
+    return JsonSchemaPropsComponentSourceBase::getComponentInputsForMetadata($component_source->getPluginId(), $metadata);
   }
 
   /**

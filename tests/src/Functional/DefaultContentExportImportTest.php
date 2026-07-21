@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Functional;
 
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\EventSubscriber\DefaultContentSubscriber;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropShape\PersistentPropShapeRepository;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\Core\DefaultContent\Exporter;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\EventSubscriber\DefaultContentSubscriber;
 use Drupal\Core\DefaultContent\Finder;
 use Drupal\Core\DefaultContent\Importer;
 use Drupal\Core\DefaultContent\InvalidEntityException;
@@ -380,8 +380,6 @@ final class DefaultContentExportImportTest extends BrowserTestBase {
       'field_related' => $node1->id(),
     ]);
 
-    // This functionality is >= 11.3 only, but we want phpstan to pass with 11.2
-    // @phpstan-ignore-next-line class.notFound
     $related = \Drupal::service(Exporter::class)->export($node2)->data['default']['field_related'];
     $this->assertNotEmpty($related);
     $this->assertArrayHasKey('entity', $related[0]);

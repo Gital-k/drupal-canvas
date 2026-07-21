@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\media\Entity\Media;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -19,17 +16,20 @@ use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\file\FileInterface;
+use Drupal\media\Entity\Media;
 use Drupal\media\MediaInterface;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -350,7 +350,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     if ($entity instanceof Node) {
       // Check that the client only receives field data they have access to.
       // @see ApiLayoutController::filterFormValues()
-      $this->assertSame([
+      $expected_entity_form_fields = [
         'changed',
         'field_hero[0][target_id]',
         'field_hero[0][alt]',
@@ -367,7 +367,12 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'title[0][value]',
         'langcode[0][value]',
         'revision',
-      ], \array_keys($data['entity_form_fields']));
+      ];
+      if (version_compare(\Drupal::VERSION, '11.4', '>=')) {
+        // Drupal 11.4 dropped the langcode element from the path (alias) widget.
+        $expected_entity_form_fields = \array_values(\array_diff($expected_entity_form_fields, ['path[0][langcode]']));
+      }
+      $this->assertSame($expected_entity_form_fields, \array_keys($data['entity_form_fields']));
     }
 
     $model = $data['model'];
@@ -419,6 +424,11 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $image_url = $image->get('src_with_alternate_widths');
     self::assertInstanceOf(ComputedUrlWithQueryString::class, $image_url);
     self::assertEquals($image_url->getValue()->getGeneratedUrl(), $data['model'][CanvasTestSetup::UUID_STATIC_IMAGE]['resolved']['image']['src']);
+    // The computed `src` field property is just an alias for
+    // `src_with_alternate_widths`.
+    $src = $image->get('src');
+    self::assertInstanceOf(ComputedUrlWithQueryString::class, $src);
+    self::assertEquals($src->getValue()->getGeneratedUrl(), $data['model'][CanvasTestSetup::UUID_STATIC_IMAGE]['resolved']['image']['src']);
 
     self::assertFalse($autoSave->getAutoSaveEntity($entity)->isEmpty());
     foreach ($regions as $region) {
@@ -653,7 +663,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         [
           'uuid' => $child_in_description_uuid,
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => 'b1e991f726a2a266',
+          'component_version' => 'd34b93534777207a',
           'inputs' => [
             'heading' => 'Child in description slot',
           ],
@@ -663,7 +673,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         [
           'uuid' => $child_in_sidebar_uuid,
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => 'b1e991f726a2a266',
+          'component_version' => 'd34b93534777207a',
           'inputs' => [
             'heading' => 'Child in sidebar slot',
           ],

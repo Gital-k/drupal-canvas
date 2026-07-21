@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel\Plugin\AiFunctionCall;
 
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\ai\Service\FunctionCalling\FunctionCallPluginManager;
-use Drupal\canvas\Entity\Component;
-use Drupal\Core\Session\AccountInterface;
-use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
-use Drupal\Tests\user\Traits\UserCreationTrait;
-use Drupal\Tests\canvas_ai\Traits\FunctionalCallTestTrait;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas_ai\CanvasAiPermissions;
 use Drupal\canvas_ai\CanvasAiTempStore;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\SetAIGeneratedTemplateData;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use Drupal\Tests\canvas_ai\Traits\FunctionalCallTestTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\Yaml\Yaml;
 
@@ -27,6 +28,7 @@ use Symfony\Component\Yaml\Yaml;
 #[Group('canvas_ai')]
 final class SetAIGeneratedTemplateDataTest extends CanvasKernelTestBase {
 
+  use CreateTestJsComponentTrait;
   use FunctionalCallTestTrait;
   use UserCreationTrait;
 
@@ -42,7 +44,7 @@ final class SetAIGeneratedTemplateDataTest extends CanvasKernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    ...CanvasKernelTestBase::CANVAS_KERNEL_TEST_MINIMAL_MODULES,
+    ...self::CANVAS_KERNEL_TEST_MINIMAL_MODULES,
     'ai',
     'ai_agents',
     'canvas_ai',
@@ -142,6 +144,46 @@ YAML;
   }
 
   /**
+   * Tests that a prop that does not exist on a component fails validation.
+   */
+  public function testValidationErrorForNonExistentProp(): void {
+    $this->container->get('current_user')->setAccount($this->privilegedUser);
+
+    // Code components (JS source) resolve props the same way as SDCs, so an
+    // undefined prop must fail for both through the shared validator.
+    $this->createTestCodeComponent();
+    $bogus_prop_yaml = <<<YAML
+content:
+  - sdc.canvas_test_sdc.props-no-slots:
+      props:
+        heading: 'A valid heading'
+        nonexistent_prop: 'This prop does not exist'
+  - js.test-code-component:
+      props:
+        heading: 'A valid heading'
+        nonexistent_prop: 'This prop does not exist'
+YAML;
+
+    $mock_layout = [
+      "regions" => [
+        "content" => [
+          "nodePathPrefix" => [0],
+          "components" => [],
+        ],
+      ],
+    ];
+    $layout_json = \json_encode($mock_layout);
+
+    $this->mockTempStore->expects($this->once())
+      ->method('getData')
+      ->with(CanvasAiTempStore::CURRENT_LAYOUT_KEY)
+      ->willReturn($layout_json);
+
+    $result = $this->getTemplateToolOutput($bogus_prop_yaml);
+    $this->assertSame('Failed to save: Component validation errors: components.0.[sdc.canvas_test_sdc.props-no-slots].props.nonexistent_prop: Component `sdc.canvas_test_sdc.props-no-slots`: the `nonexistent_prop` prop is not defined. (code garbage) components.1.[js.test-code-component].props.nonexistent_prop: Component `js.test-code-component`: the `nonexistent_prop` prop is not defined. (code garbage)', self::normalizeErrorString($result));
+  }
+
+  /**
    * Tests invalid region error.
    */
   public function testInvalidRegionError(): void {
@@ -198,7 +240,7 @@ YAML;
         [
           'sdc.canvas_test_sdc.card' => [
             'props' => [
-              'title' => 'Test Card',
+              'heading' => 'Test Card',
               'content' => 'Test content',
               'loading' => 'lazy',
               'image' => $default_values,
@@ -241,7 +283,7 @@ YAML;
               'id' => 'sdc.canvas_test_sdc.card',
               'nodePath' => [0, 0],
               'fieldValues' => [
-                'title' => 'Test Card',
+                'heading' => 'Test Card',
                 'content' => 'Test content',
                 'loading' => 'lazy',
                 'image' => $default_values,

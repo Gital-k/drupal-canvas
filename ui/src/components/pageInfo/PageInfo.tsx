@@ -7,6 +7,7 @@ import {
   CodeIcon,
   CubeIcon,
   FileTextIcon,
+  GlobeIcon,
   HomeIcon,
   SectionIcon,
   StackIcon,
@@ -32,16 +33,13 @@ import {
   setHomepagePath,
 } from '@/features/configuration/configurationSlice';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
-import {
-  DEFAULT_REGION,
-  selectEditorFrameContext,
-  selectPreviouslyEdited,
-} from '@/features/ui/uiSlice';
+import { DEFAULT_REGION, selectPreviouslyEdited } from '@/features/ui/uiSlice';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useEntityTitle } from '@/hooks/useEntityTitle';
 import { usePaginatedContentList } from '@/hooks/usePaginatedContentList';
 import { useSmartRedirect } from '@/hooks/useSmartRedirect';
 import { useTemplateCaption } from '@/hooks/useTemplateCaption';
+import { useTemplateRef } from '@/hooks/useTemplateRef';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import {
   useCreateContentMutation,
@@ -98,9 +96,8 @@ const PageInfo = () => {
   const location = useLocation();
   const title = useEntityTitle();
 
-  // Check if we're on a template route
-  const isTemplateRoute =
-    useAppSelector(selectEditorFrameContext) === 'template';
+  const { isTemplateContext, isTemplatePreviewRoute } = useTemplateRef();
+  const isTemplateRoute = isTemplateContext || isTemplatePreviewRoute;
   const templateCaption = useTemplateCaption();
 
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -281,6 +278,8 @@ const PageInfo = () => {
     }
   }, [updateContentError, showBoundary]);
 
+  const isHeadlessFrontends = location.pathname.startsWith('/headless');
+
   return (
     <Flex gap="2" align="center">
       {isCodeEditor && previouslyEdited.path ? (
@@ -317,7 +316,12 @@ const PageInfo = () => {
               data-testid="canvas-navigation-button"
             >
               <Flex gap="2" align="center">
-                {isCodeEditor ? (
+                {isHeadlessFrontends ? (
+                  <>
+                    <GlobeIcon />
+                    Headless frontends
+                  </>
+                ) : isCodeEditor ? (
                   <>
                     <CodeIcon />
                     {codeComponentName}

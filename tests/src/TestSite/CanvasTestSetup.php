@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\TestSite;
 
-use Drupal\canvas\Entity\Component as ComponentEntity;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
-use Drupal\Component\FileCache\FileCacheFactory;
-use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\Component as ComponentEntity;
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\PropSource\StaticPropSource;
-use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\Component\FileCache\FileCacheFactory;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
@@ -36,6 +36,7 @@ use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
 use Symfony\Component\Yaml\Yaml as SymfonyYaml;
 
+// @phpstan-ignore function.impossibleType
 if (!\class_exists(TestSetupInterface::class)) {
   // We're running test-discovery inside run-tests.sh which is before
   // autoloading for the \Drupal\TestSite namespace has been established.
@@ -91,6 +92,13 @@ class CanvasTestSetup implements TestSetupInterface {
     // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements()
     // @see /ui/tests/e2e/prop-types.cy.js
     'canvas.' . ComponentEntity::ENTITY_TYPE_ID . '.' . SingleDirectoryComponent::SOURCE_PLUGIN_ID . '.sdc_test_all_props.all-props',
+    // Canvas forward-ported a fix for `type: field.value.boolean`, which in
+    // turn causes core's `article_content_type` recipe's
+    // core.base_field_override.node.article.promote config's `default_value` to
+    // fail validation.
+    // @see https://www.drupal.org/project/drupal/issues/3534717
+    // @see \Drupal\canvas\Hook\ComponentSourceHooks::configSchemaInfoAlter()
+    'core.base_field_override.node.article.promote',
   ];
 
   public function setup(bool $createContentTemplate = FALSE): void {
@@ -582,8 +590,9 @@ class CanvasTestSetup implements TestSetupInterface {
     \assert([] === $violations, print_r($violations, TRUE));
     $canvas_user->save();
 
-    if (getenv('CANVAS_EXTRA_MODULES')) {
-      $modules = \explode(',', getenv('CANVAS_EXTRA_MODULES') ?: '');
+    $env_modules = getenv('CANVAS_EXTRA_MODULES');
+    if (\is_string($env_modules)) {
+      $modules = \explode(',', $env_modules);
       $module_installer->install($modules);
 
       // Rebuild the container before the test starts making HTTP requests.
@@ -591,10 +600,11 @@ class CanvasTestSetup implements TestSetupInterface {
       $kernel->invalidateContainer();
       $kernel->rebuildContainer();
     }
-    if (getenv('CANVAS_EXTRA_PERMISSIONS')) {
+    $env_permissions = getenv('CANVAS_EXTRA_PERMISSIONS');
+    if (\is_string($env_permissions)) {
       $role = Role::load('canvas');
       if ($role) {
-        $permissions = \explode(',', getenv('CANVAS_EXTRA_PERMISSIONS') ?: '');
+        $permissions = \explode(',', $env_permissions);
         foreach ($permissions as $permission) {
           $role->grantPermission($permission);
         }
@@ -607,6 +617,7 @@ class CanvasTestSetup implements TestSetupInterface {
    * TRICKY: to allow reusing MediaTypeCreationTrait, simulate `::assertSame()`.
    *
    * @see \Drupal\Tests\media\Traits\MediaTypeCreationTrait
+   * @phpstan-ignore-next-line shipmonk.deadMethod
    */
   public static function assertSame(mixed $expected, mixed $actual, string $message = ''): void {
     // Intentionally empty;

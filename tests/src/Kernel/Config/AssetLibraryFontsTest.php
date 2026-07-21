@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Config;
 
 // cspell:ignore Brien obrien
+
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
 use Drupal\Core\File\FileSystemInterface;
-use Drupal\canvas\Entity\BrandKit;
 use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
 use Drupal\file\FileUsage\FileUsageInterface;
@@ -26,7 +27,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class AssetLibraryFontsTest extends CanvasKernelTestBase {
 
-  private function createFontFile(string $filename = 'test-font.woff2'): string {
+  private static function createFontFile(string $filename = 'test-font.woff2'): string {
     return BrandKit::ARTIFACTS_DIRECTORY . $filename;
   }
 

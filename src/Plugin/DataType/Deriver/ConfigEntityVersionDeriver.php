@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\DataType\Deriver;
 
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Plugin\Discovery\ContainerDeriverInterface;
 use Drupal\canvas\Entity\VersionedConfigEntityInterface;
 use Drupal\canvas\Plugin\DataType\ConfigEntityVersionAdapter;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Plugin\Discovery\ContainerDeriverInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -15,15 +15,15 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 final class ConfigEntityVersionDeriver implements ContainerDeriverInterface {
 
+  /**
+   * @var array<string, array<string, mixed>>
+   */
   protected array $derivatives = [];
-  protected string $basePluginId;
   protected EntityTypeManagerInterface $entityTypeManager;
 
   public function __construct(
-    string $base_plugin_id,
     EntityTypeManagerInterface $entity_type_manager,
   ) {
-    $this->basePluginId = $base_plugin_id;
     $this->entityTypeManager = $entity_type_manager;
   }
 
@@ -32,7 +32,6 @@ final class ConfigEntityVersionDeriver implements ContainerDeriverInterface {
    */
   public static function create(ContainerInterface $container, $base_plugin_id): static {
     return new static(
-      $base_plugin_id,
       $container->get(EntityTypeManagerInterface::class),
     );
   }

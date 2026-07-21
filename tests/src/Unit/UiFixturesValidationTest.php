@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit;
 
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\RequiresFunction;
+use cebe\openapi\Reader;
 use Drupal\Component\Serialization\Json;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\Tests\UnitTestCase;
+use League\OpenAPIValidation\Schema\SchemaValidator;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RequiresMethod;
 
 /**
  * Validate the fixtures in the UI against the OpenAPI schema.
  */
-#[RequiresFunction('cebe\\openapi\\Reader::readFromYaml')]
-#[RequiresFunction('League\\OpenAPIValidation\\Schema\\SchemaValidator::validate')]
+#[RequiresMethod(Reader::class, 'readFromYaml')]
+#[RequiresMethod(SchemaValidator::class, 'validate')]
 #[Group('canvas')]
 class UiFixturesValidationTest extends UnitTestCase {
 
@@ -29,7 +31,7 @@ class UiFixturesValidationTest extends UnitTestCase {
    * @return array
    *   Fixture data.
    */
-  protected function getUiFixtureData(string $filename): array {
+  protected static function getUiFixtureData(string $filename): array {
     $fixturesDirectory = dirname(__FILE__, 4) . '/ui/tests/fixtures';
     $json = file_get_contents(\sprintf('%s/%s', $fixturesDirectory, $filename));
     \assert(\is_string($json));

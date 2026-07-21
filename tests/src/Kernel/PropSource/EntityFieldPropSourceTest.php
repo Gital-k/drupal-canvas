@@ -2,15 +2,10 @@
 
 declare(strict_types=1);
 
-// cspell:ignore Qqzr
-
 namespace Drupal\Tests\canvas\Kernel\PropSource;
 
-use Drupal\Component\Plugin\Exception\PluginNotFoundException;
-use Drupal\Component\Utility\UrlHelper;
-use Drupal\Core\Cache\CacheableMetadata;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+// cspell:ignore Qqzr
+
 use Drupal\canvas\Plugin\Adapter\UnixTimestampToDateAdapter;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
@@ -19,6 +14,12 @@ use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\Component\Plugin\Exception\PluginNotFoundException;
+use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\node\Entity\NodeType;
@@ -36,10 +37,11 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 #[Group('canvas_data_model')]
 #[Group('canvas_data_model__prop_expressions')]
+#[Group('#slow')]
 #[RunTestsInSeparateProcesses]
 class EntityFieldPropSourceTest extends PropSourceTestBase {
 
-  #[DataProvider('providerTest')]
+  #[DataProvider('provider')]
   public function test(
     array $permissions,
     string $expression,
@@ -53,7 +55,12 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
     ?array $expected_node_access_denied_message,
     array $expected_dependencies_expression_only,
     array $expected_dependencies_with_host_entity,
+    ?string $langcode,
   ): void {
+    if ($langcode !== NULL) {
+      $this->setupContentTranslation();
+      $this->switchContentLanguage($langcode);
+    }
     // Evaluating entity field props requires entity and field access of the
     // data being accessed.
 
@@ -99,11 +106,38 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
       ],
       cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
     );
+
+    // For testing a simple FieldPropExpression pointing to a computed field
+    // property provided by Canvas.
+    // @see \Drupal\canvas\Plugin\DataType\ListStringItemLabel
+    FieldStorageConfig::create([
+      'field_name' => 'one_from_an_string_list',
+      'entity_type' => 'node',
+      'type' => 'list_string',
+      'cardinality' => 1,
+      'settings' => [
+        'allowed_values' => [
+          'first_key' => 'First Value',
+          'second_key' => 'Second Value',
+          // Make sure that the allowed value's label is properly sanitized.
+          'sanitization_required' => 'Some <script>dangerous</script> & unescaped <strong>markup</strong>',
+        ],
+      ],
+    ])->save();
+    FieldConfig::create([
+      'label' => 'A pre-defined string',
+      'field_name' => 'one_from_an_string_list',
+      'entity_type' => 'node',
+      'bundle' => 'page',
+      'field_type' => 'list_string',
+      'required' => TRUE,
+    ])->save();
     $node = $this->createNode([
       'type' => 'page',
       'uid' => $user->id(),
       'field_image' => ['target_id' => 1],
       'field_photos' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
+      'one_from_an_string_list' => ['value' => 'sanitization_required'],
     ]);
 
     $original = EntityFieldPropSource::parse(match ($adapter_plugin_id) {
@@ -217,6 +251,60 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
     $this->assertSame($expected_dependencies_with_host_entity, $parsed->calculateDependencies($correct_host_entity));
   }
 
+  /**
+   * Cross-product of providerTest() scenarios and langcodes.
+   *
+   * @see \Drupal\Tests\canvas\Kernel\PropSource\PropSourceTestBase::langcodes()
+   */
+  public static function provider(): \Generator {
+    $list_string_key = "simple: FieldPropExpression, but for a `list_string` field type's Canvas-specific computed `label` property";
+    foreach (self::providerTest() as $scenario_key => $scenario) {
+      // All scenarios must be tested in a monolingual context.
+      yield $scenario_key => [...$scenario, 'langcode' => NULL];
+
+      // For expressions that do not follow a reference, there's no point in
+      // generating multilingual scenarios: if there's no references being
+      // followed, there also cannot be any translation impact.
+      if (!\str_contains($scenario['expression'], '␜␜')) {
+        // The one exception to the above rule: the test scenario with the
+        // `list_string` field type, which has a very special way of generating
+        // labels, and hence a special multilingual impact worth testing.
+        if ($scenario_key !== $list_string_key) {
+          continue;
+        }
+      }
+
+      // In a multilingual context, loading the FieldStorageConfig entity via
+      // ConfigFactory triggers LanguageConfigFactoryOverride, which adds
+      // languages:language_interface to the bubbled cacheability. This happens
+      // in ListStringItemLabel::computeValue() via addCacheableDependency() on
+      // the field storage definition. On a monolingual site the override
+      // machinery is inactive, so the context is absent.
+      // @see \Drupal\canvas\Plugin\DataType\ListStringItemLabel::computeValue()
+      // @see \Drupal\language\Config\LanguageConfigFactoryOverride::getCacheableMetadata()
+      if ($scenario_key === $list_string_key) {
+        $evaluation = $scenario['expected_evaluation_with_node_host_entity'];
+        \assert($evaluation instanceof EvaluationResult);
+        $scenario['expected_evaluation_with_node_host_entity'] = new EvaluationResult(
+          $evaluation->value,
+          (new CacheableMetadata())
+            ->setCacheTags($evaluation->getCacheTags())
+            ->setCacheContexts([
+              ...$evaluation->getCacheContexts(),
+              'languages:' . LanguageInterface::TYPE_INTERFACE,
+            ])
+            ->setCacheMaxAge($evaluation->getCacheMaxAge()),
+        );
+      }
+      foreach (self::langcodes() as $langcode) {
+        yield "[$langcode] $scenario_key" => [
+          'langcode' => $langcode,
+          ...$scenario,
+        ];
+      }
+    }
+  }
+
   public static function providerTest(): \Generator {
     yield "simple: FieldPropExpression" => [
       'permissions' => ['access user profiles'],
@@ -244,6 +332,54 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
       'expected_node_access_denied_message' => NULL,
       'expected_dependencies_expression_only' => ['module' => ['user']],
       'expected_dependencies_with_host_entity' => ['module' => ['user']],
+    ];
+
+    yield "simple: FieldPropExpression, but for a `list_string` field type's Canvas-specific computed `label` property" => [
+      'permissions' => ['access content'],
+      'expression' => 'ℹ︎␜entity:node:page␝one_from_an_string_list␞␟label',
+      'adapter_plugin_id' => NULL,
+      'is_required' => TRUE,
+      'expected_array_representation' => [
+        'sourceType' => PropSource::EntityField->value,
+        'expression' => 'ℹ︎␜entity:node:page␝one_from_an_string_list␞␟label',
+      ],
+      'expected_expression_class' => FieldPropExpression::class,
+      'expected_evaluation_with_user_host_entity' => NULL,
+      'expected_user_access_denied_message' => NULL,
+      'expected_evaluation_with_node_host_entity' => new EvaluationResult(
+        'Some <script>dangerous</script> & unescaped <strong>markup</strong>',
+        (new CacheableMetadata())
+          ->setCacheTags([
+            // The host entity.
+            'node:1',
+            // The bundle field that is evaluated.
+            'config:field.storage.node.one_from_an_string_list',
+          ])
+          ->setCacheContexts([
+            // Cache context added during the computing of the `label` field
+            // property.
+            // @see \Drupal\canvas\Plugin\DataType\ListStringItemLabel::computeValue
+            'languages:language_content',
+            // Cache context added by host entity access checking.
+            // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
+            'user.permissions',
+          ]),
+      ),
+      'expected_node_access_denied_message' => ["Access denied to entity while evaluating expression, ℹ︎␜entity:node:page␝one_from_an_string_list␞␟label, reason: The 'access content' permission is required."],
+      'expected_dependencies_expression_only' => [
+        'module' => ['node'],
+        'config' => [
+          'node.type.page',
+          'field.field.node.page.one_from_an_string_list',
+        ],
+      ],
+      'expected_dependencies_with_host_entity' => [
+        'module' => ['node'],
+        'config' => [
+          'node.type.page',
+          'field.field.node.page.one_from_an_string_list',
+        ],
+      ],
     ];
 
     yield "simple, with adapter: FieldPropExpression" => [
@@ -957,6 +1093,125 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
       'expression' => "ℹ︎␜entity:user␝name␞␟value",
     ]);
     self::assertInstanceOf(EntityFieldPropSource::class, $prop_source);
+  }
+
+  /**
+   * A broken reference (deleted target entity) contributes the target's tag.
+   *
+   * When a referenced entity is deleted, the field still stores its ID but
+   * EntityReference::getValue() returns NULL. The cached NULL result must
+   * carry the former target's cache tag so that a new entity written at the
+   * same ID correctly busts any cached output.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
+   */
+  public function testBrokenReferenceContributesCacheTag(): void {
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('user');
+    NodeType::create(['type' => 'page', 'name' => 'Page'])->save();
+    FieldStorageConfig::create([
+      'field_name' => 'field_ref',
+      'entity_type' => 'node',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'user'],
+      'cardinality' => 1,
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_ref',
+      'entity_type' => 'node',
+      'bundle' => 'page',
+      'label' => 'Ref',
+      'settings' => [
+        'handler' => 'default:user',
+        'handler_settings' => [],
+      ],
+    ])->save();
+
+    $target_user = User::create(['name' => 'Soon deleted', 'status' => 1]);
+    $target_user->save();
+    $target_uid = $target_user->id();
+
+    $node = $this->createNode([
+      'type' => 'page',
+      'field_ref' => $target_uid,
+    ]);
+
+    // Delete the target; the node still stores the ID.
+    $target_user->delete();
+
+    $this->setUpCurrentUser(permissions: ['access content', 'access user profiles']);
+
+    $prop_source = EntityFieldPropSource::parse([
+      'sourceType' => PropSource::EntityField->value,
+      'expression' => 'ℹ︎␜entity:node:page␝field_ref␞␟entity␜␜entity:user␝name␞␟value',
+    ]);
+
+    $result = $prop_source->evaluate($node, is_required: FALSE);
+
+    // The referenced entity is gone; the result is NULL.
+    self::assertNull($result->value);
+
+    // The deleted entity's cache tag must be present so that if the entity is
+    // recreated (or otherwise written at that ID), the cached NULL invalidates.
+    self::assertContains('user:' . $target_uid, $result->getCacheTags());
+  }
+
+  /**
+   * Tests that an EntityFieldPropSource resolves references in the host language.
+   *
+   * Verifies that when a node's entity reference field points to a translated
+   * Media image entity, evaluating the prop expression via EntityFieldPropSource
+   * returns the alt text matching the host entity's own language. The host node
+   * is translated, and each case evaluates the node translation for $langcode;
+   * the referenced Media resolves in that same language.
+   *
+   * Also verifies language fallback: the node has a French translation but the
+   * Media does not, so the French case falls back to the default language.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage::matchEntity()
+   */
+  public function testTranslatedEntityReference(): void {
+    $this->setupContentTranslation();
+    $this->installEntitySchema('node');
+    NodeType::create(['type' => 'page', 'name' => 'page'])->save();
+    \Drupal::service('content_translation.manager')
+      ->setEnabled('node', 'page', TRUE);
+    $this->createEntityReferenceField('node', 'page', 'field_hero_image', 'Hero Image', 'media',
+      selection_handler_settings: ['target_bundles' => ['image' => 'image']],
+    );
+
+    $this->setUpCurrentUser(permissions: ['access content', 'view media']);
+    $media = $this->createTranslatedMediaFixture();
+
+    $node = $this->createNode([
+      'type' => 'page',
+      'langcode' => 'en',
+      'field_hero_image' => ['target_id' => $media->id()],
+    ]);
+    $node->addTranslation('es', [
+      'title' => 'Spanish title',
+      'field_hero_image' => ['target_id' => $media->id()],
+    ]);
+    $node->addTranslation('fr', [
+      'title' => 'French title',
+      'field_hero_image' => ['target_id' => $media->id()],
+    ]);
+
+    // Expression: node:page → field_hero_image → entity → media:image →
+    // field_media_image → alt.
+    $expression = 'ℹ︎␜entity:node:page␝field_hero_image␞␟entity␜␜entity:media:image␝field_media_image␞␟alt';
+    $prop_source = EntityFieldPropSource::parse([
+      'sourceType' => PropSource::EntityField->value,
+      'expression' => $expression,
+    ]);
+
+    foreach (self::providerTranslatedReferencedMedia() as $scenario_name => ['langcode' => $langcode, 'expected_alt' => $expected_alt]) {
+      $host_entity = $node->getTranslation($langcode);
+      $result = $prop_source->evaluate(clone $host_entity, is_required: TRUE);
+      self::assertSame($expected_alt, $result->value, $scenario_name);
+      self::assertNotContains('languages:' . LanguageInterface::TYPE_CONTENT, $result->getCacheContexts(), $scenario_name);
+    }
   }
 
 }

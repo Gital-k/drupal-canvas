@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity\Routing;
 
+use Drupal\canvas\Controller\CanvasController;
 use Drupal\Core\Routing\EnhancerInterface;
 use Drupal\Core\Routing\RouteObjectInterface;
-use Drupal\canvas\Controller\CanvasController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Route;
 
@@ -51,7 +51,7 @@ final class CanvasHtmlRouteEnhancer implements EnhancerInterface {
    * @return bool
    *   Whether the route applies to this enhancer.
    */
-  private function applies(Route $route): bool {
+  private static function applies(Route $route): bool {
     return $route->hasDefault('_canvas');
   }
 

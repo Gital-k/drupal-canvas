@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
-use Drupal\Core\Entity\EntityStorageInterface;
-use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
-use Drupal\canvas\Exception\ConstraintViolationException;
-use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
-use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler;
+use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
+use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
+use Drupal\Core\Entity\Attribute\ConfigEntityType;
+use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Theme\ThemeManagerInterface;
 
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
@@ -39,13 +43,11 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
   ],
   constraints: [
     'ImmutableProperties' => [
-      'id',
-      'theme',
-      'region',
+      'properties' => ['id', 'theme', 'region'],
     ],
   ],
 )]
-final class PageRegion extends ComponentTreeConfigEntityBase {
+final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHttpApiEligibleConfigEntityInterface {
 
   public const string ENTITY_TYPE_ID = 'page_region';
   public const string ADMIN_PERMISSION = 'administer page template';
@@ -115,9 +117,12 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
 
     $items = self::clientToServerTree($autoSaveData['layout'], $autoSaveData['model'], NULL, $validate);
 
-    $auto_saved_page_region = static::create([
-      'component_tree' => $items,
-    ] + $this->toArray());
+    $auto_saved_page_region = static::create($this->toArray())
+      // Auto-saves can only exist for existing entities.
+      ->enforceIsNew(FALSE)
+      // Ensure that sequence keys are retained when this PageRegion has been
+      // translated.
+      ->setComponentTree($items);
     if (!$validate) {
       return $auto_saved_page_region;
     }
@@ -138,6 +143,65 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
     $field_items->setValue(\array_values($this->component_tree ?? []));
 
     return $field_items;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function normalizeForClientSide(): ClientSideRepresentation {
+    return ClientSideRepresentation::create(
+      values: [
+        'id' => $this->id(),
+        'theme' => $this->theme,
+        'region' => $this->region,
+        'status' => $this->status(),
+        'component_tree' => $this->getComponentTree()->getValue(),
+      ],
+      preview: NULL,
+    )->addCacheableDependency($this);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function createFromClientSide(array $data): static {
+    // Default `theme` to the active theme when the client omits it,
+    // so single-theme consumers (Canvas CLI) don't have to
+    // discover and send the theme name themselves.
+    if (!\array_key_exists('theme', $data)) {
+      $data['theme'] = \Drupal::service(ThemeManagerInterface::class)->getActiveTheme()->getName();
+    }
+    $values = [];
+    foreach (['theme', 'region'] as $key) {
+      if (\array_key_exists($key, $data)) {
+        $values[$key] = $data[$key];
+      }
+    }
+    $entity = static::create($values);
+    $entity->updateFromClientSide($data);
+    return $entity;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function updateFromClientSide(array $data): void {
+    if (\array_key_exists('component_tree', $data)) {
+      $this->setComponentTree($data['component_tree'] ?? []);
+    }
+    if (\array_key_exists('status', $data)) {
+      $this->setStatus($data['status']);
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function refineListQuery(QueryInterface &$query, RefinableCacheableDependencyInterface $cacheability): void {
+    // Only the active theme regions render on the site.
+    $active_theme = \Drupal::service(ThemeManagerInterface::class)->getActiveTheme()->getName();
+    $query->condition('theme', $active_theme);
+    $cacheability->addCacheContexts(['theme']);
   }
 
   /**
@@ -284,17 +348,6 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
     }
 
     return $region_instances;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function set($property_name, $value): self {
-    if ($property_name === 'component_tree') {
-      // Ensure predictable order of tree items.
-      $value = self::generateComponentTreeKeys($value);
-    }
-    return parent::set($property_name, $value);
   }
 
 }

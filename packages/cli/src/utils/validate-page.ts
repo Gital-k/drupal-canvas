@@ -2,104 +2,27 @@ import fs from 'fs/promises';
 import path from 'path';
 import addFormats from 'ajv-formats';
 import Ajv from 'ajv/dist/2020.js';
-import {
-  canvasTreeToSpec,
-  defineComponentCatalog,
-} from 'drupal-canvas/json-render-utils';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
 import pageSpecSchema from '../../../workbench/src/lib/schemas/page-spec.schema.json';
-import { authoredSpecToComponentTree } from './pages';
+import {
+  formatPagePathAliasChangeError,
+  getPathAliasChange,
+} from './page-path-alias-validation';
+import { pageResultName } from './page-result-name';
+import { collectUnreconciledMediaProps } from './prop-transforms';
+import {
+  buildElementsValidationContext,
+  validateElements,
+} from './validate-elements';
 
-import type {
-  ComponentMetadata,
-  DiscoveryResult,
-} from '@drupal-canvas/discovery';
+import type { DiscoveryResult } from '@drupal-canvas/discovery';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
+import type { PageListItem } from '../types/Page';
 import type { Result } from '../types/Result';
 
-export interface ElementsValidationContext {
-  catalog: ReturnType<typeof defineComponentCatalog>;
-  allComponentIds: Set<string>;
-  enabledComponentIds: Set<string>;
-}
-
-export function buildElementsValidationContext(
-  metadata: ComponentMetadata[],
-): ElementsValidationContext {
-  const enabledMetadata = metadata.filter((m) => m.status);
-  return {
-    catalog: defineComponentCatalog(enabledMetadata),
-    allComponentIds: new Set(metadata.map((m) => `js.${m.machineName}`)),
-    enabledComponentIds: new Set(
-      enabledMetadata.map((m) => `js.${m.machineName}`),
-    ),
-  };
-}
-
-/**
- * Validates an AuthoredSpecElementMap against a prebuilt validation context.
- */
-export function validateElements(
-  elements: AuthoredSpecElementMap,
-  context: ElementsValidationContext,
-): Omit<Result, 'itemName'> {
-  const { catalog, allComponentIds, enabledComponentIds } = context;
-
-  if (Object.keys(elements).length === 0) {
-    return {
-      success: true,
-      details: [{ content: 'Empty page (no elements)' }],
-    };
-  }
-
-  // Check for disabled components before catalog validation.
-  const disabledErrors: { heading: string; content: string }[] = [];
-  for (const [id, element] of Object.entries(elements)) {
-    if (
-      allComponentIds.has(element.type) &&
-      !enabledComponentIds.has(element.type)
-    ) {
-      disabledErrors.push({
-        heading: `elements.${id}.type`,
-        content: `Component "${element.type}" is disabled. Set "status: true" in its component.yml to enable it.`,
-      });
-    }
-  }
-
-  if (disabledErrors.length > 0) {
-    return { success: false, details: disabledErrors };
-  }
-
-  // Validate the full spec against the catalog schema.
-  const componentTree = authoredSpecToComponentTree(elements);
-  const jsonRenderSpec = canvasTreeToSpec(componentTree);
-
-  // Ensure every element has children and slots defaults — the catalog
-  // schema requires them even when the component has no slots. Authored specs
-  // may omit props when the component does not need any input.
-  for (const element of Object.values(jsonRenderSpec.elements)) {
-    if (element.props == null) element.props = {};
-    if (!element.children) element.children = [];
-    if (!element.slots) element.slots = {};
-  }
-
-  const result = catalog.validate(jsonRenderSpec);
-
-  if (result.success) {
-    return { success: true };
-  }
-
-  const details: { heading?: string; content: string }[] = [];
-  if (result.error) {
-    for (const issue of result.error.issues) {
-      details.push({
-        heading: issue.path.length > 0 ? issue.path.join('.') : undefined,
-        content: issue.message,
-      });
-    }
-  }
-  return { success: false, details };
+export interface PageValidationOptions {
+  remotePageByUuid?: Map<string, PageListItem>;
 }
 
 /**
@@ -111,6 +34,7 @@ export function validateElements(
  */
 export async function validatePages(
   discoveryResult: DiscoveryResult,
+  options: PageValidationOptions = {},
 ): Promise<{ results: Result[] }> {
   const ajv = new Ajv();
   addFormats(ajv);
@@ -127,6 +51,7 @@ export async function validatePages(
     try {
       const fileContent = await fs.readFile(page.path, 'utf-8');
       const spec = JSON.parse(fileContent) as Record<string, unknown>;
+      const pageTitle = typeof spec.title === 'string' ? spec.title : undefined;
 
       const details: { heading?: string; content: string }[] = [];
 
@@ -150,15 +75,48 @@ export async function validatePages(
       if (!elementsResult.success && elementsResult.details) {
         details.push(...elementsResult.details);
       }
+      const unreconciledMedia = collectUnreconciledMediaProps(
+        elements,
+        metadata,
+      );
+      for (const entry of unreconciledMedia) {
+        details.push({
+          heading: `elements.${entry.elementId}.props.${entry.propName}`,
+          content: `Unreconciled external media URL "${entry.src}". Run \`canvas reconcile-media\` to resolve.`,
+        });
+      }
 
+      // Prefer the UUID from the parsed spec, but fall back to discovery so
+      // remote-aware validation can still run if discovery already found one.
+      let uuid: string | null = null;
+      if (typeof spec.uuid === 'string') {
+        uuid = spec.uuid;
+      } else if (typeof page.uuid === 'string') {
+        uuid = page.uuid;
+      }
+      const pagePath = typeof spec.path === 'string' ? spec.path : '';
+      if (options.remotePageByUuid && uuid) {
+        const remotePage = options.remotePageByUuid.get(uuid);
+        const pathAliasChange = remotePage
+          ? getPathAliasChange(pagePath, remotePage.path)
+          : null;
+        if (pathAliasChange) {
+          details.push({
+            heading: 'path',
+            content: formatPagePathAliasChangeError(pathAliasChange),
+          });
+        }
+      }
+
+      const success = details.length === 0 && elementsResult.success;
       results.push({
-        itemName: page.slug,
-        success: details.length === 0 && elementsResult.success,
+        itemName: pageResultName(pageTitle, page, { includePath: !success }),
+        success,
         details: details.length > 0 ? details : undefined,
       });
     } catch (error) {
       results.push({
-        itemName: page.slug,
+        itemName: pageResultName(undefined, page, { includePath: true }),
         success: false,
         details: [
           {

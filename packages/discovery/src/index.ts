@@ -7,13 +7,17 @@ export {
   SVG_EXTENSIONS,
   VIDEO_EXTENSIONS,
 } from './asset-extensions';
-export { resolveCanvasConfig } from './config';
+export { DEFAULT_CANVAS_CONFIG, resolveCanvasConfig } from './config';
+export type { CanvasConfigWarning } from './config';
 export { findDuplicateMachineNames, loadComponentsMetadata } from './metadata';
 export type {
   CanvasConfig,
+  CanvasSyncConfig,
   ComponentMetadata,
   DiscoveredComponent,
+  DiscoveredContentTemplate,
   DiscoveredPage,
+  DiscoveredRegion,
   DiscoveryOptions,
   DiscoveryResult,
   DiscoveryWarning,

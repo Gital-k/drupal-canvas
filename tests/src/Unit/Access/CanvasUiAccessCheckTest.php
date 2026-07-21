@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit\Access;
 
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\Access\CanvasUiAccessCheck;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
@@ -18,6 +15,9 @@ use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Tests\UnitTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Tests Drupal\canvas\Access\CanvasUiAccessCheck.
@@ -49,14 +49,9 @@ class CanvasUiAccessCheckTest extends UnitTestCase {
       ->willReturn([]);
     $entityTypeManager = $this->prophesize(EntityTypeManagerInterface::class);
     $account = $this->createMock(AccountInterface::class);
-    if ($permission) {
-      $account->expects($this->atLeastOnce())
-        ->method('hasPermission')
-        ->willReturnCallback(fn (string $argPermission) => match ($argPermission) {
-          $permission => TRUE,
-          default => FALSE
-        });
-    }
+    $account->expects($this->atLeastOnce())
+      ->method('hasPermission')
+      ->willReturnCallback(fn (string $argPermission): bool => $argPermission === $permission);
     $accessChecker = new CanvasUiAccessCheck($entityFieldManager->reveal(), $entityTypeManager->reveal());
     $result = $accessChecker->access($account);
     $this->assertEquals($accessGranted, $result->isAllowed());

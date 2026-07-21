@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\RequiresFunction;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\EntityFormController;
 use Drupal\canvas\Entity\Page;
@@ -13,10 +11,13 @@ use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
+use Drupal\metatag\MetatagManager;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
-use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RequiresMethod;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -24,7 +25,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * Tests Page Metatag Integration.
  */
 #[RunTestsInSeparateProcesses]
-#[RequiresFunction('Drupal\\metatag\\MetatagManager::tagsFromEntity')]
+#[RequiresMethod(MetatagManager::class, 'tagsFromEntity')]
 #[Group('canvas')]
 final class PageMetatagIntegrationTest extends CanvasKernelTestBase {
 

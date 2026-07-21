@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\canvas\AssetRenderer;
+use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Pattern;
+use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
+use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\Core\Access\AccessManagerInterface;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Cache\Cache;
@@ -23,12 +29,6 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AccountSwitcherInterface;
 use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Core\Url;
-use Drupal\canvas\AssetRenderer;
-use Drupal\canvas\ClientSideRepresentation;
-use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
-use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
-use Drupal\canvas\Exception\ConstraintViolationException;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -320,7 +320,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     ]);
   }
 
-  public function delete(CanvasHttpApiEligibleConfigEntityInterface $canvas_config_entity): JsonResponse {
+  public static function delete(CanvasHttpApiEligibleConfigEntityInterface $canvas_config_entity): JsonResponse {
     // @todo First validate that there is no other entity depending on this. If there is, respond with a 400, 409, 412 or 422 (TBD).
     // @todo Permissions take into account config dependencies, but we might have content dependencies depending on it too. See https://www.drupal.org/project/canvas/issues/3516839
     // @see https://www.drupal.org/project/drupal/issues/3423459
@@ -349,7 +349,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     return new JsonResponse(status: 200, data: $representation->values);
   }
 
-  private function validate(CanvasHttpApiEligibleConfigEntityInterface $canvas_config_entity): void {
+  private static function validate(CanvasHttpApiEligibleConfigEntityInterface $canvas_config_entity): void {
     $violations = $canvas_config_entity->getTypedData()->validate();
     if ($violations->count()) {
       throw new ConstraintViolationException($violations);

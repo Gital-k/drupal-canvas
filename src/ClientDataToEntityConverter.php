@@ -4,27 +4,27 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
-use Drupal\Component\Render\PlainTextOutput;
-use Drupal\Component\Utility\NestedArray;
 use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\Core\Render\Element;
+use Drupal\canvas\Controller\ClientServerConversionTrait;
+use Drupal\canvas\Controller\EntityFormTrait;
+use Drupal\canvas\Entity\EntityConstraintViolationList;
+use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Form\ClientFormSubmissionHelper;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\canvas\Storage\ComponentTreeLoader;
+use Drupal\Component\Render\PlainTextOutput;
 use Drupal\Component\Utility\Crypt;
+use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Access\AccessException;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Entity\EntityChangedInterface;
-use Drupal\Core\Form\FormCacheInterface;
-use Drupal\canvas\Controller\EntityFormTrait;
-use Drupal\canvas\Entity\EntityConstraintViolationList;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Form\FormCacheInterface;
 use Drupal\Core\Form\FormState;
-use Drupal\canvas\Controller\ClientServerConversionTrait;
-use Drupal\canvas\Exception\ConstraintViolationException;
-use Drupal\canvas\Storage\ComponentTreeLoader;
+use Drupal\Core\Render\Element;
 use Drupal\file\Plugin\Field\FieldType\FileItem;
 use GuzzleHttp\Psr7\Query;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -123,7 +123,7 @@ class ClientDataToEntityConverter {
    *
    * @see \Drupal\jsonapi\Controller\EntityResource::checkPatchFieldAccess
    */
-  private function checkPatchFieldAccess(FieldItemListInterface $original_field, FieldItemListInterface $received_field): bool {
+  private static function checkPatchFieldAccess(FieldItemListInterface $original_field, FieldItemListInterface $received_field): bool {
     // If the user is allowed to edit the field, it is always safe to set the
     // received value. We may be setting an unchanged value, but that is ok.
     $field_edit_access = $original_field->access('edit', NULL, TRUE);

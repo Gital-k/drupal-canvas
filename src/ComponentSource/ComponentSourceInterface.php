@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ComponentSource;
 
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Component\Plugin\ConfigurableInterface;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Plugin\DerivativeInspectionInterface;
@@ -13,8 +15,6 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContextAwarePluginInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 /**
@@ -254,7 +254,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    * @param \Drupal\canvas\Entity\Component $component
    *   A component config entity that uses this source.
    *
-   * @return array{'source'?: string, 'build': array<string, mixed>, propSources?: array<string, array>}
+   * @return array{'source'?: string, 'build': array<string, mixed>, propSources?: array<string, array>, type?: 'external', hasFallbackImplementation?: bool}
    *   Client side metadata including a build array for the default markup.
    *
    * @see \Drupal\canvas\Controller\ApiComponentsController

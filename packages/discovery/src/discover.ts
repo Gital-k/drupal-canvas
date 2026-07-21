@@ -8,7 +8,9 @@ import { findDuplicateMachineNames, loadComponentsMetadata } from './metadata';
 
 import type {
   DiscoveredComponent,
+  DiscoveredContentTemplate,
   DiscoveredPage,
+  DiscoveredRegion,
   DiscoveryOptions,
   DiscoveryResult,
   DiscoveryWarning,
@@ -95,6 +97,36 @@ async function getCandidatePageFiles(pagesRoot: string): Promise<string[]> {
   });
 }
 
+async function getCandidateContentTemplateFiles(
+  contentTemplatesRoot: string,
+): Promise<string[]> {
+  return glob('*.json', {
+    cwd: contentTemplatesRoot,
+    nodir: true,
+    dot: true,
+    posix: true,
+    ignore: [...ALWAYS_IGNORED_PATTERNS],
+  });
+}
+
+async function getCandidateRegionFiles(regionsRoot: string): Promise<string[]> {
+  return glob('*.json', {
+    cwd: regionsRoot,
+    nodir: true,
+    dot: true,
+    posix: true,
+    ignore: [...ALWAYS_IGNORED_PATTERNS],
+  });
+}
+
+function parseRegionFilename(filename: string): { region: string } | null {
+  const base = filename.replace(/\.json$/, '');
+  if (!/^[a-z0-9_]+$/.test(base) || base.length === 0) {
+    return null;
+  }
+  return { region: base };
+}
+
 /**
  * Discovers code components under a scan root by pairing metadata files with
  * JavaScript entries.
@@ -105,8 +137,9 @@ async function getCandidatePageFiles(pagesRoot: string): Promise<string[]> {
  * emitted.
  *
  * For each active metadata file, it resolves the JavaScript entry by extension
- * precedence (`.ts`, `.tsx`, `.js`, `.jsx`) and emits warnings for missing or
- * duplicate entries. It also attaches an optional `.css` entry when present.
+ * precedence (`.ts`, `.tsx`, `.js`, `.jsx` by default; see
+ * `entryExtensions`) and emits warnings for missing or duplicate entries.
+ * It also attaches an optional `.css` entry when present.
  *
  * Page discovery scans top-level `.json` files from `pagesRoot`, which defaults
  * to `<componentRoot>/pages`.
@@ -122,13 +155,26 @@ export async function discoverCanvasProject(
   const pagesRoot = path.resolve(
     options.pagesRoot ?? path.join(componentRoot, 'pages'),
   );
+  const contentTemplatesRoot = path.resolve(
+    options.contentTemplatesRoot ??
+      path.join(componentRoot, 'content-templates'),
+  );
+  const regionsRoot = path.resolve(
+    options.regionsRoot ?? path.join(componentRoot, 'regions'),
+  );
+  const entryExtensions = options.entryExtensions ?? JS_EXTENSIONS;
   const gitignoreMatcher = await readGitignore(projectRoot);
 
   const allCandidates = await getCandidateMetadataFiles(componentRoot);
   const pageCandidates = await getCandidatePageFiles(pagesRoot);
+  const contentTemplateCandidates =
+    await getCandidateContentTemplateFiles(contentTemplatesRoot);
+  const regionCandidates = await getCandidateRegionFiles(regionsRoot);
   const warnings: DiscoveryWarning[] = [];
   const components: DiscoveredComponent[] = [];
   const pages: DiscoveredPage[] = [];
+  const contentTemplates: DiscoveredContentTemplate[] = [];
+  const regions: DiscoveredRegion[] = [];
 
   let ignoredFiles = 0;
 
@@ -195,6 +241,95 @@ export async function discoverCanvasProject(
     });
   }
 
+  for (const templateRelativePath of contentTemplateCandidates) {
+    const normalizedRelativePath = toPosixPath(templateRelativePath);
+    const absoluteTemplatePath = path.resolve(
+      contentTemplatesRoot,
+      normalizedRelativePath,
+    );
+    const projectRelativePath = toPosixPath(
+      path.relative(projectRoot, absoluteTemplatePath),
+    );
+
+    if (
+      !projectRelativePath.startsWith('..') &&
+      gitignoreMatcher.ignores(projectRelativePath)
+    ) {
+      ignoredFiles += 1;
+      continue;
+    }
+
+    const templateFilename = path.posix.basename(normalizedRelativePath);
+    const slug = templateFilename.replace(/\.json$/, '');
+    let label: string | null = null;
+    let entityTypeId: string | null = null;
+    let bundle: string | null = null;
+    let viewMode: string | null = null;
+    try {
+      const content = JSON.parse(
+        await fs.readFile(absoluteTemplatePath, 'utf-8'),
+      );
+      if (typeof content.label === 'string' && content.label) {
+        label = content.label;
+      }
+      if (typeof content.entityType === 'string' && content.entityType) {
+        entityTypeId = content.entityType;
+      }
+      if (typeof content.bundle === 'string' && content.bundle) {
+        bundle = content.bundle;
+      }
+      if (typeof content.viewMode === 'string' && content.viewMode) {
+        viewMode = content.viewMode;
+      }
+    } catch {
+      // Skip files that can't be read/parsed.
+    }
+    contentTemplates.push({
+      name: label ?? slug,
+      slug,
+      label,
+      entityTypeId,
+      bundle,
+      viewMode,
+      path: absoluteTemplatePath,
+      relativePath: projectRelativePath.startsWith('..')
+        ? normalizedRelativePath
+        : projectRelativePath,
+    });
+  }
+
+  for (const regionRelativePath of regionCandidates) {
+    const normalizedRelativePath = toPosixPath(regionRelativePath);
+    const absoluteRegionPath = path.resolve(
+      regionsRoot,
+      normalizedRelativePath,
+    );
+    const projectRelativePath = toPosixPath(
+      path.relative(projectRoot, absoluteRegionPath),
+    );
+
+    if (
+      !projectRelativePath.startsWith('..') &&
+      gitignoreMatcher.ignores(projectRelativePath)
+    ) {
+      ignoredFiles += 1;
+      continue;
+    }
+
+    const filename = path.posix.basename(normalizedRelativePath);
+    const parsed = parseRegionFilename(filename);
+    if (!parsed) {
+      continue;
+    }
+    regions.push({
+      region: parsed.region,
+      path: absoluteRegionPath,
+      relativePath: projectRelativePath.startsWith('..')
+        ? normalizedRelativePath
+        : projectRelativePath,
+    });
+  }
+
   const sortedDirectories = [...byDirectory.keys()].sort();
 
   for (const relativeDirectoryRaw of sortedDirectories) {
@@ -240,7 +375,7 @@ export async function discoverCanvasProject(
       const metadataPath = path.resolve(absoluteDirectory, metadataFilename);
 
       const jsCandidates = await Promise.all(
-        JS_EXTENSIONS.map(async (extension) => {
+        entryExtensions.map(async (extension) => {
           const candidatePath = path.resolve(
             absoluteDirectory,
             `${componentBaseName}${extension}`,
@@ -257,15 +392,19 @@ export async function discoverCanvasProject(
         (candidate) => candidate.exists,
       );
 
-      if (existingJsCandidates.length > 1) {
+      // Destructured (the emptiness check follows) so consumers compiling
+      // with noUncheckedIndexedAccess see no undefined.
+      const [entryCandidate] = existingJsCandidates;
+
+      if (entryCandidate && existingJsCandidates.length > 1) {
         warnings.push({
           code: 'duplicate_definition',
-          message: `Multiple JavaScript entry files found for ${metadataFilename}. Using ${path.basename(existingJsCandidates[0].candidatePath)} by extension precedence.`,
+          message: `Multiple JavaScript entry files found for ${metadataFilename}. Using ${path.basename(entryCandidate.candidatePath)} by extension precedence.`,
           path: metadataPath,
         });
       }
 
-      if (existingJsCandidates.length === 0) {
+      if (!entryCandidate) {
         warnings.push({
           code: 'missing_js_entry',
           message: `Missing JavaScript entry file for ${metadataFilename}.`,
@@ -290,7 +429,7 @@ export async function discoverCanvasProject(
           path.relative(projectRoot, absoluteDirectory),
         ),
         metadataPath,
-        jsEntryPath: existingJsCandidates[0].candidatePath,
+        jsEntryPath: entryCandidate.candidatePath,
         cssEntryPath,
       });
     }
@@ -298,15 +437,23 @@ export async function discoverCanvasProject(
 
   components.sort((a, b) => a.metadataPath.localeCompare(b.metadataPath));
   pages.sort((a, b) => a.path.localeCompare(b.path));
+  contentTemplates.sort((a, b) => a.path.localeCompare(b.path));
+  regions.sort((a, b) => a.region.localeCompare(b.region));
 
   const result: DiscoveryResult = {
     componentRoot,
     projectRoot,
     components,
     pages,
+    contentTemplates,
+    regions,
     warnings,
     stats: {
-      scannedFiles: allCandidates.length + pageCandidates.length,
+      scannedFiles:
+        allCandidates.length +
+        pageCandidates.length +
+        contentTemplateCandidates.length +
+        regionCandidates.length,
       ignoredFiles,
     },
   };

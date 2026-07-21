@@ -5,13 +5,28 @@ declare(strict_types=1);
 namespace Drupal\canvas\Entity;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSaveEntity;
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\ClientSideRepresentation;
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\ComponentMetadataRequirementsChecker;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\EntityHandlers\JavascriptComponentStorage;
+use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
+use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\PropExpressions\StructuredData\Coalescer;
+use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
+use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
+use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\Component\Assertion\Inspector;
+use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
@@ -20,16 +35,16 @@ use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Url;
-use Drupal\canvas\AutoSaveEntity;
-use Drupal\canvas\ClientSideRepresentation;
-use Drupal\canvas\EntityHandlers\JavascriptComponentStorage;
-use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
-use Drupal\canvas\Exception\ConstraintViolationException;
 use Symfony\Component\Validator\ConstraintViolation;
 
+/**
+ * @phpstan-import-type JsonSchema from \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType
+ */
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
   label: new TranslatableMarkup('Code component'),
@@ -49,6 +64,7 @@ use Symfony\Component\Validator\ConstraintViolation;
   config_export: [
     'machineName',
     'name',
+    'type',
     'props',
     'required',
     'slots',
@@ -58,6 +74,7 @@ use Symfony\Component\Validator\ConstraintViolation;
   ],
   constraints: [
     'JsComponentHasValidAndSupportedSdcMetadata' => NULL,
+    'JsComponentAssetsMatchType' => NULL,
   ],
 )]
 final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetInterface, FolderItemInterface {
@@ -78,6 +95,11 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    * The human-readable label of the component.
    */
   protected ?string $name;
+
+  /**
+   * The Code Component implementation type.
+   */
+  protected ?string $type = NULL;
 
   /**
    * The props of the component.
@@ -122,6 +144,23 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     return $this->machineName;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function toArray(): array {
+    $data = parent::toArray();
+    if ($this->type === NULL || $this->type === 'react') {
+      unset($data['type']);
+    }
+    if ($this->js === NULL) {
+      unset($data['js']);
+    }
+    if ($this->css === NULL) {
+      unset($data['css']);
+    }
+    return $data;
+  }
+
   private function getEntityOperations(): CanvasResourceLinkCollection {
     $links = new CanvasResourceLinkCollection([]);
     // Link relation type => route name.
@@ -160,26 +199,41 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     // TRICKY: config entity properties may allow NULL, but only valid, saved
     // config entities are ever normalized: those that have passed validation
     // against config schema.
-    \assert(\is_array($this->js));
-    \assert(\is_array($this->css));
     $linkCollection = $this->getEntityOperations();
-    return ClientSideRepresentation::create(
-      values: [
-        'machineName' => $this->id(),
-        'name' => (string) $this->label(),
-        'status' => $this->status(),
-        'props' => $this->props,
-        'required' => $this->required,
-        'slots' => $this->slots,
+    $values = [
+      'machineName' => $this->id(),
+      'name' => (string) $this->label(),
+      'status' => $this->status(),
+      ...($this->isExternal() ? ['type' => 'external'] : []),
+      // Provide props with projected `x-allowed-entity-type-id` and
+      // `x-allowed-bundle` (for `content-entity-reference` props).
+      'props' => $this->toSdcDefinition()['props']['properties'] ?? $this->props,
+      'required' => $this->required,
+      'slots' => $this->slots,
+    ];
+    if (!$this->isExternal()) {
+      \assert(\is_array($this->js));
+      \assert(\is_array($this->css));
+      $values += [
         'sourceCodeJs' => $this->js['original'] ?? '',
         'sourceCodeCss' => $this->css['original'] ?? '',
         'compiledJs' => $this->js['compiled'] ?? '',
         'compiledCss' => $this->css['compiled'] ?? '',
-        'dataDependencies' => $this->dataDependencies,
-        // @see https://jsonapi.org/format/#document-links
-        'links' => $linkCollection->asArray(),
-      ],
-      preview: $this->buildPreview(),
+      ];
+    }
+    $values += [
+      // The UI should not need to have any knowledge/understanding of "field
+      // prop expressions" per ADR #5. To the UI, these should simply be
+      // opaque strings that are associated with some checkbox that can be
+      // picked by a Code Component Developer.
+      // @see ::updateFromClientSide()
+      'dataDependencies' => self::expandEntityFields($this->dataDependencies ?? []),
+      // @see https://jsonapi.org/format/#document-links
+      'links' => $linkCollection->asArray(),
+    ];
+    return ClientSideRepresentation::create(
+      values: $values,
+      preview: $this->isExternal() ? NULL : $this->buildPreview(),
     )->addCacheableDependency($this)
       ->addCacheableDependency($linkCollection);
   }
@@ -308,10 +362,64 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    * @see docs/adr/0005-Keep-the-front-end-simple.md
    */
   public function updateFromClientSide(array $data): void {
+    // Coalesce loose FieldPropExpression entries sharing the same host+field
+    // into one FieldObjectPropsExpression — server is the source of truth for
+    // the "one entry per host entity field" invariant.
+    // This ensures the client side does not need to incorporate an
+    // understanding of these expressions: it can just pass the leaf nodes the
+    // Code Component Developer picks in the UI, this coalesces them as needed.
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsSameFieldMustBeCoalescedConstraint
+    if (isset($data['dataDependencies']) && \is_array($data['dataDependencies'])) {
+      $data['dataDependencies'] = self::coalesceEntityFields($data['dataDependencies']);
+    }
+    // The external application's component metadata owns the identity of an
+    // external component: client-side renames, status changes, and type
+    // changes would be reverted by the next synchronization, so reject them.
+    // (The synchronization itself writes entity properties directly and is
+    // not affected.)
+    if (!$this->isNew()) {
+      $violation_list = new EntityConstraintViolationList($this);
+      if ($this->isExternal()) {
+        if (\array_key_exists('name', $data) && $data['name'] !== $this->label()) {
+          $violation_list->add(new ConstraintViolation(
+            'External code components cannot be renamed: the external application owns the component name.',
+            'External code components cannot be renamed: the external application owns the component name.',
+            [],
+            NULL,
+            'name',
+            $data['name'],
+          ));
+        }
+        if (\array_key_exists('status', $data) && $data['status'] !== $this->status()) {
+          $violation_list->add(new ConstraintViolation(
+            'External code components cannot be exposed or unexposed: the external application owns the component status.',
+            'External code components cannot be exposed or unexposed: the external application owns the component status.',
+            [],
+            NULL,
+            'status',
+            $data['status'],
+          ));
+        }
+      }
+      if (\array_key_exists('type', $data) && $data['type'] !== $this->getComponentType()) {
+        $violation_list->add(new ConstraintViolation(
+          'The code component type cannot be changed.',
+          NULL,
+          [],
+          NULL,
+          'type',
+          $data['type'],
+        ));
+      }
+      if ($violation_list->count() > 0) {
+        throw new ConstraintViolationException($violation_list);
+      }
+    }
     foreach (array_intersect_key($data, array_flip([
       'machineName',
       'name',
       'status',
+      'type',
       'required',
       'props',
       'slots',
@@ -333,6 +441,42 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
           unset($this->props[$prop_name]['minItems']);
         }
       }
+    }
+
+    $code_fields = [
+      'sourceCodeJs',
+      'compiledJs',
+      'sourceCodeCss',
+      'compiledCss',
+    ];
+    if ($this->isExternal()) {
+      $violation_list = new EntityConstraintViolationList($this);
+      foreach ($code_fields as $code_field) {
+        if (\array_key_exists($code_field, $data)) {
+          $violation_list->add(new ConstraintViolation(
+            'External code components cannot contain JavaScript or CSS.',
+            'External code components cannot contain JavaScript or CSS.',
+            [],
+            NULL,
+            $code_field,
+            $data[$code_field],
+          ));
+        }
+      }
+      if (!empty($data['importedJsComponents'])) {
+        $violation_list->add(new ConstraintViolation(
+          'External code components cannot import other code components.',
+          'External code components cannot import other code components.',
+          [],
+          NULL,
+          'importedJsComponents',
+          $data['importedJsComponents'],
+        ));
+      }
+      if ($violation_list->count() > 0) {
+        throw new ConstraintViolationException($violation_list);
+      }
+      return;
     }
 
     if (\array_key_exists('sourceCodeCss', $data) || \array_key_exists('compiledCss', $data)) {
@@ -383,6 +527,114 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   }
 
   /**
+   * Parses list of expression strings and coalesces same-field entries.
+   *
+   * @param list<string> $expression_strings
+   *
+   * @return list<\Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface>
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::coalesce()
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsSameFieldMustBeCoalescedConstraint
+   * @internal
+   */
+  public static function parseAndCoalesceEntityFieldExpressions(array $expression_strings): array {
+    $expressions = [];
+    foreach ($expression_strings as $expression_string) {
+      try {
+        $expressions[] = StructuredDataPropExpression::fromString($expression_string);
+      }
+      catch (\Throwable $e) {
+        throw new \InvalidArgumentException(\sprintf("'%s' is not a valid prop expression.", $expression_string), previous: $e);
+      }
+    }
+    $entity_field_expressions = [];
+    foreach ($expressions as $expression) {
+      if (!$expression instanceof EntityFieldBasedPropExpressionInterface) {
+        return $expressions;
+      }
+      $entity_field_expressions[] = $expression;
+    }
+    return Coalescer::coalesce($entity_field_expressions);
+  }
+
+  /**
+   * Coalesces same-field entries in `dataDependencies.entityFields` into one.
+   *
+   * Groups entries by `(host data type, fieldName, delta)` and merges them into
+   * a single `FieldObjectPropsExpression`. Single-leaf groups are stored as the
+   * lone `FieldPropExpression`.
+   *
+   * @param array<string, mixed> $dataDependencies
+   *
+   * @return array<string, mixed>
+   */
+  private static function coalesceEntityFields(array $dataDependencies): array {
+    if (!isset($dataDependencies['entityFields']) || !\is_array($dataDependencies['entityFields'])) {
+      return $dataDependencies;
+    }
+    foreach ($dataDependencies['entityFields'] as $prop_name => $expression_strings) {
+      if (!\is_array($expression_strings)) {
+        continue;
+      }
+      if (!\array_is_list($expression_strings) || !Inspector::assertAllStrings($expression_strings)) {
+        continue;
+      }
+      try {
+        $expressions = self::parseAndCoalesceEntityFieldExpressions($expression_strings);
+      }
+      catch (\Throwable) {
+        // Leave invalid expressions unchanged for config validation: the
+        // ValidStructuredDataPropExpression constraint catches invalid strings
+        // on save. The config schema restricts each entry to an
+        // entity-field-based expression.
+        // @see canvas.schema.yml (canvas.js_component.*: dataDependencies.entityFields)
+        continue;
+      }
+      $dataDependencies['entityFields'][$prop_name] = \array_map(
+        static fn (StructuredDataPropExpressionInterface $expression): string => (string) $expression,
+        $expressions,
+      );
+    }
+    return $dataDependencies;
+  }
+
+  /**
+   * Inverse of coalesceEntityFields(): expand coalesced entries to leaves.
+   *
+   * The wire format the client sees is always per-property entries: one
+   * `FieldPropExpression` per simple field property, one
+   * `ReferenceFieldPropExpression` (with a `FieldPropExpression` final target)
+   * per reference-chain pick.
+   * The symmetry with `coalesceEntityFields()` keeps the client out of
+   * expression-string parsing.
+   *
+   * @param array<string, mixed> $dataDependencies
+   *
+   * @return array<string, mixed>
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::expand()
+   */
+  private static function expandEntityFields(array $dataDependencies): array {
+    if (!isset($dataDependencies['entityFields']) || !\is_array($dataDependencies['entityFields'])) {
+      return $dataDependencies;
+    }
+    foreach ($dataDependencies['entityFields'] as $prop_name => $expression_strings) {
+      if (!\is_array($expression_strings)) {
+        continue;
+      }
+      \assert(\array_is_list($expression_strings));
+      \assert(Inspector::assertAllStrings($expression_strings));
+      $expressions = \array_map(StructuredDataPropExpression::fromString(...), $expression_strings);
+      \assert(Inspector::assertAllObjects($expressions, EntityFieldBasedPropExpressionInterface::class));
+      $dataDependencies['entityFields'][$prop_name] = \array_map(
+        static fn (EntityFieldBasedPropExpressionInterface $expression): string => (string) $expression,
+        Coalescer::expand($expressions),
+      );
+    }
+    return $dataDependencies;
+  }
+
+  /**
    * {@inheritdoc}
    */
   public static function refineListQuery(QueryInterface &$query, RefinableCacheableDependencyInterface $cacheability): void {
@@ -402,6 +654,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    * @see core/assets/schemas/v1/metadata-full.schema.json
    * @see \Drupal\Core\Theme\Component\ComponentValidator::validateDefinition()
    * @see \Drupal\Tests\Core\Theme\Component\ComponentValidatorTest::loadComponentDefinitionFromFs()
+   * @see ::calculateDependencies()
    */
   public function toSdcDefinition(): array {
     $definition = [
@@ -441,13 +694,189 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     if ($this->required) {
       $definition['props']['required'] = $this->required;
     }
+    // The projected SDC definition carries the concrete target entity type
+    // (and bundle, where applicable) for every content-entity-reference prop.
+    // The code component developer-facing prop definition deliberately does
+    // NOT contain these keys; they are injected here from the single source
+    // of truth: `dataDependencies.entityFields`. The mutation is local to the
+    // returned array — `$this->props` is never touched, so the stored config
+    // entity remains unchanged and repeated calls are idempotent.
+    // @see ::getContentEntityReferenceProps()
+    // @see ::getReferencedTargetEntityDefinition()
+    foreach (\array_keys($this->getContentEntityReferenceProps()) as $prop_name) {
+      // Skip projection for content-entity-reference props whose `entityFields`
+      // entry is empty, unparseable, or targets a non-existent entity type.
+      $target = $this->getReferencedTargetEntityDefinition($prop_name);
+      if (!$target instanceof BetterEntityDataDefinition) {
+        continue;
+      }
+      $definition['props']['properties'][$prop_name]['x-allowed-entity-type-id'] = $target->getEntityTypeId();
+      if ($target->getEntityType()->hasKey('bundle')) {
+        $bundles = $target->getBundles();
+        \assert(\is_array($bundles));
+        // When the expression targets `entity:node:article`, $bundles is
+        // guaranteed to be `['article']` — invariantly a single bundle, per the
+        // EntityFieldExpressionsSameTarget constraint.
+        $definition['props']['properties'][$prop_name]['x-allowed-bundle'] = reset($bundles);
+      }
+    }
     return $definition;
+  }
+
+  /**
+   * Resolves a content-entity-reference prop's target entity data definition.
+   *
+   * @param string $prop_name
+   *   A prop returned by ::getContentEntityReferenceProps().
+   *
+   * @return \Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface|null
+   *
+   * @see ::getEntityFieldExpressions()
+   */
+  private function getReferencedTargetEntityDefinition(string $prop_name): ?EntityDataDefinitionInterface {
+    $expressions = $this->getEntityFieldExpressions($prop_name);
+    if (count($expressions) === 0) {
+      return NULL;
+    }
+    try {
+      // All expressions must point to the same target entity type + bundle.
+      // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsSameTargetConstraintValidator
+      $expression = StructuredDataPropExpression::fromString($expressions[0]);
+    }
+    catch (\Throwable) {
+      return NULL;
+    }
+    if (!$expression instanceof EntityFieldBasedPropExpressionInterface) {
+      return NULL;
+    }
+    $target = $expression->getHostEntityDataDefinition();
+    if ($target instanceof BetterEntityDataDefinition) {
+      try {
+        // Probe entity-type resolution eagerly — `BetterEntityDataDefinition`
+        // lazily loads the entity type, so the exception only fires when a
+        // caller inspects the definition.
+        $target->getEntityType();
+      }
+      catch (PluginNotFoundException) {
+        return NULL;
+      }
+    }
+    return $target;
+  }
+
+  /**
+   * Checks this code component meets Canvas's metadata requirements.
+   *
+   * Combines the shape/schema requirements that apply to all component sources,
+   * via `ComponentMetadataRequirementsChecker::check()` and JS-specific
+   * contracts (e.g. relative URLs cannot be resolved).
+   *
+   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
+   *   When this component does not meet requirements.
+   */
+  public function checkRequirements(): void {
+    $definition = $this->toSdcDefinition();
+    $metadata = new ComponentMetadata($definition, app_root: '', enforce_schemas: TRUE);
+    $messages = [];
+    try {
+      ComponentMetadataRequirementsChecker::check(
+        $definition['id'],
+        $metadata,
+        $definition['props']['required'] ?? [],
+      );
+    }
+    catch (ComponentDoesNotMeetRequirementsException $e) {
+      $messages = $e->getMessages();
+    }
+
+    // Per-prop checks specific to code components.
+    foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
+      // Code component metadata is persisted as a Drupal config entity, so
+      // `meta:enum` keys cannot contain dots.
+      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+      array_push($messages, ...self::checkPropMetaEnumKeys($prop_name, $prop));
+
+      // Image src in any example must satisfy JsComponent's runtime URL
+      // contract, which does not resolve relative paths.
+      foreach (self::imagesInExamples($prop) as $src) {
+        try {
+          JsComponent::validateExampleUrl($src);
+        }
+        catch (\InvalidArgumentException) {
+          $messages[] = \sprintf('Image prop "%s" example src "%s" must be a fully-qualified URL with both scheme and host. Use a placeholder URL such as https://placehold.co/600x400.', $prop_name, $src);
+        }
+      }
+    }
+
+    if (!empty($messages)) {
+      throw new ComponentDoesNotMeetRequirementsException($messages);
+    }
+  }
+
+  /**
+   * Validates `meta:enum` keys for a prop against config storage constraints.
+   *
+   * @param string $prop_name
+   *   Prop name (for error messages).
+   * @param array<string, mixed> $prop
+   *   The prop's JSON Schema.
+   *
+   * @return list<string>
+   *   Error messages, or an empty list if no issues found.
+   */
+  private static function checkPropMetaEnumKeys(string $prop_name, array $prop): array {
+    $enum_container = \in_array('array', (array) ($prop['type'] ?? []), TRUE)
+      ? $prop['items'] ?? []
+      : $prop;
+    if (!isset($enum_container['enum'], $enum_container['meta:enum'])) {
+      return [];
+    }
+    $messages = [];
+    foreach (\array_keys($enum_container['meta:enum']) as $meta_key) {
+      if (\str_contains((string) $meta_key, '.')) {
+        $messages[] = \sprintf('The "meta:enum" keys for the "%s" prop enum cannot contain a dot. Offending key: "%s"', $prop_name, $meta_key);
+      }
+    }
+    $expected_keys = \array_map(
+      static fn($value): string => \str_replace('.', '_', (string) $value),
+      $enum_container['enum'],
+    );
+    $missing_keys = \array_diff($expected_keys, \array_keys($enum_container['meta:enum']));
+    if (!empty($missing_keys)) {
+      $messages[] = \sprintf('The values for the "%s" prop enum must be defined in "meta:enum". Missing keys: "%s"', $prop_name, \implode(', ', $missing_keys));
+    }
+    return $messages;
+  }
+
+  /**
+   * Yields image src values for each `examples` entry matching $schema.
+   *
+   * @param array<string, mixed> $schema
+   *   The (sub-)schema (still containing `$ref` references).
+   *
+   * @return \Generator<int, string>
+   */
+  private static function imagesInExamples(array $schema): \Generator {
+    $is_image = ($schema['$ref'] ?? NULL) === 'json-schema-definitions://canvas.module/image';
+    foreach ($schema['examples'] ?? [] as $value) {
+      if (!\is_array($value)) {
+        continue;
+      }
+      if ($is_image) {
+        if (isset($value['src']) && \is_string($value['src'])) {
+          yield $value['src'];
+        }
+      }
+      elseif (isset($schema['items']) && \is_array($schema['items'])) {
+        yield from self::imagesInExamples($schema['items'] + ['examples' => $value]);
+      }
+    }
   }
 
   /**
    * Sets value for props.
    *
-   * @param array<string, array{type: string, format?: string, examples?: string|array<string>, title: string}> $props
+   * @param array<string, JsonSchema> $props
    *   Value for Props.
    */
   public function setProps(array $props): self {
@@ -471,6 +900,27 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   }
 
   /**
+   * Gets the Code Component implementation type.
+   */
+  public function getComponentType(): string {
+    return $this->type ?? 'react';
+  }
+
+  /**
+   * Whether this component is implemented by an external application.
+   */
+  public function isExternal(): bool {
+    return $this->getComponentType() === 'external';
+  }
+
+  /**
+   * Whether this external component retains a fallback implementation.
+   */
+  public function hasFallbackImplementation(): bool {
+    return $this->isExternal() && $this->js !== NULL && $this->css !== NULL;
+  }
+
+  /**
    * Gets component props.
    *
    * @return array|null
@@ -478,6 +928,45 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    */
   public function getProps(): ?array {
     return $this->props;
+  }
+
+  /**
+   * Gets the subset of this code component's props that reference entities.
+   *
+   * @return array<string, array>
+   *   Keys are prop names; values are the full prop definitions.
+   *
+   * @see ::getEntityFieldExpressions()
+   */
+  public function getContentEntityReferenceProps(): array {
+    // Compare by normalized shape, not raw prop definition: key order,
+    // title/description, and other shape-irrelevant metadata must not affect
+    // the match. Props with extra schema keys (e.g. `x-allowed-entity-type-id`)
+    // are deliberately excluded: those props fail validation and downstream
+    // code must not act on them.
+    // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef::isContentEntityReference()
+    // for the lenient `$ref`-only check used by validation code paths.
+    $entity_reference_prop_shape = PropShape::normalizePropSchema(JsonSchemaObjectRef::ContentEntityReference->asPropShapeArray());
+    return array_filter(
+      $this->getProps() ?? [],
+      fn (array $prop_def) => PropShape::normalizePropSchema($prop_def) === $entity_reference_prop_shape,
+    );
+  }
+
+  /**
+   * Returns the entity-field expressions for a content-entity-reference prop.
+   *
+   * @param string $content_entity_reference_prop_name
+   *   A prop returned by ::getContentEntityReferenceProps().
+   *
+   * @return list<string>
+   *   The list of entity-field expression strings declared under
+   *   `dataDependencies.entityFields.<prop>`. Empty if none are declared.
+   *
+   * @see ::getContentEntityReferenceProps()
+   */
+  public function getEntityFieldExpressions(string $content_entity_reference_prop_name): array {
+    return \array_values($this->dataDependencies['entityFields'][$content_entity_reference_prop_name] ?? []);
   }
 
   /**

@@ -4,18 +4,28 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\canvas\AssetRenderer;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
-use Drupal\canvas\GlobalImports;
 use Drupal\canvas\Config\ThemeSettingsDiscovery;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Folder;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Extension\CanvasExtensionPluginManager;
+use Drupal\canvas\Extension\CanvasExtensionTypeEnum;
+use Drupal\canvas\GlobalImports;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
@@ -23,6 +33,8 @@ use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\WidgetPluginManager;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Render\HtmlResponse;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Routing\UrlGeneratorInterface;
@@ -31,14 +43,6 @@ use Drupal\Core\Template\Attribute;
 use Drupal\Core\Theme\ThemeInitializationInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
-use Drupal\canvas\AssetRenderer;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\BrandKit;
-use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\Entity\PageRegion;
-use Drupal\canvas\Entity\Pattern;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 final class CanvasController {
@@ -61,6 +65,7 @@ final class CanvasController {
     private readonly CanvasExtensionPluginManager $extensionPluginManager,
     private readonly ThemeSettingsDiscovery $themeSettingsDiscovery,
     private readonly GlobalImports $globalImports,
+    private readonly LanguageManagerInterface $languageManager,
   ) {}
 
   private const HTML = <<<HTML
@@ -119,7 +124,10 @@ HTML;
 
     $canvas_module_path = $this->moduleHandler->getModule('canvas')->getPath();
     $dev_mode = $this->moduleHandler->moduleExists('canvas_dev_mode');
-    $dev_translation_mode = $this->moduleHandler->moduleExists('canvas_dev_translation');
+    // @todo Remove the use of 'canvas_dev_cd' flag in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+    $dev_conflict_detection = $this->moduleHandler->moduleExists('canvas_dev_cd');
+    $content_translation_enabled = $this->moduleHandler->moduleExists('content_translation');
+    $config_translation_enabled = $this->moduleHandler->moduleExists('config_translation');
     // ⚠️ This is highly experimental and *will* be refactored.
     $ai_extension_available = $this->moduleHandler->moduleExists('canvas_ai');
     // ⚠️ This is highly experimental and *will* be refactored.
@@ -141,6 +149,30 @@ HTML;
     }
     $extensions = $this->extensionPluginManager->getDefinitions();
 
+    // Build the page-extensions list: any extension that declares type=page
+    // in its .canvas_extension.yml is automatically promoted to a full-page
+    // Canvas app. Extensions self-promote; no allowlist in core is required.
+    $page_extensions = [];
+    foreach ($extensions as $ext) {
+      /** @var \Drupal\canvas\Extension\CanvasExtensionInterface $ext */
+      if ($ext->getType() === CanvasExtensionTypeEnum::Page) {
+        // Hide page extensions the current user cannot access. The same
+        // permissions are enforced on the canvas.boot.app route.
+        // @see \Drupal\canvas\Access\ExtensionPageAccessCheck
+        $missing_permissions = \array_filter($ext->getPermissions(), fn (string $permission): bool => !$this->currentUser->hasPermission($permission));
+        if ($missing_permissions !== []) {
+          continue;
+        }
+        $page_extensions[] = [
+          'id' => $ext->id(),
+          'name' => (string) $ext->label(),
+          'url' => Url::fromRoute('canvas.boot.app', ['extension_id' => $ext->id()])->toString(),
+          'extension_url' => $ext->getUrl(),
+          'icon' => $ext->getIcon(),
+        ];
+      }
+    }
+
     // Get theme-level Canvas settings from the default theme.
     $theme_config = $this->configFactory->get('system.theme');
     $default_theme_name = $theme_config->get('default');
@@ -156,10 +188,27 @@ HTML;
       \assert($create_link instanceof CanvasResourceLink);
       $content_entity_create_operations[$entity_type_id][$bundle] = $create_link->getTargetAttributes()['label'];
     }
+
+    // STATE_CONFIGURABLE excludes locked system placeholders (und/zxx) and
+    // returns only languages visible at /admin/config/regional/language —
+    // the only languages with URL prefixes a user can preview content in.
+    // @see \Drupal\language\ConfigurableLanguageManager::isMultilingual()
+    $languages_data = [];
+    foreach ($this->languageManager->getLanguages(LanguageInterface::STATE_CONFIGURABLE) as $language) {
+      $languages_data[] = [
+        'id' => $language->getId(),
+        'name' => $language->getName(),
+        'direction' => $language->getDirection(),
+        'isDefault' => $language->isDefault(),
+      ];
+    }
+    $languages_cacheability = (new CacheableMetadata())->setCacheTags(['config:configurable_language_list']);
+
     return (new HtmlResponse($this->buildHtml()))
       ->addCacheableDependency($extensions)
       ->addCacheableDependency($system_site_config)
       ->addCacheableDependency($all_content_entity_create_links)
+      ->addCacheableDependency($languages_cacheability)
       ->setAttachments([
         'library' => [
           'canvas/canvas-ui',
@@ -183,8 +232,13 @@ HTML;
             'entityTypeKeys' => $entity_types_with_keys,
             'entityTypeLabels' => $entity_type_labels,
             'devMode' => $dev_mode,
-            'devTranslationMode' => $dev_translation_mode,
+            // @todo Remove the use of 'canvas_dev_cd' flag in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+            'devConflictDetectionMode' => $dev_conflict_detection,
+            'contentTranslationEnabled' => $content_translation_enabled,
+            'configTranslationEnabled' => $config_translation_enabled,
+            'languages' => $languages_data,
             'extensionsAvailable' => count($extensions) > 0,
+            'pageExtensions' => $page_extensions,
             'aiExtensionAvailable' => $ai_extension_available,
             'personalizationExtensionAvailable' => $personalization_extension_available,
           // Allow for perfect component previews, by letting the client side
@@ -204,6 +258,7 @@ HTML;
               'contentTemplates' => $this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION),
               'publishChanges' => $this->currentUser->hasPermission(AutoSaveManager::PUBLISH_PERMISSION),
               'folders' => $this->currentUser->hasPermission(Folder::ADMIN_PERMISSION),
+              'configureLanguages' => $this->currentUser->hasPermission('administer languages'),
             ],
             'contentEntityCreateOperations' => $content_entity_create_operations,
             'homepagePath' => $system_site_config->get('page.front'),
@@ -260,7 +315,8 @@ HTML;
    */
   private function buildHtml(): string {
     $theme_config = $this->configFactory->get('system.theme');
-    $admin_theme_name = $theme_config->get('admin') ?: $theme_config->get('default');
+    $admin = (string) $theme_config->get('admin');
+    $admin_theme_name = $admin !== '' ? $admin : $theme_config->get('default');
     $active_admin_theme = $this->themeInitialization->getActiveThemeByName($admin_theme_name);
     $actual_active_theme = $this->themeManager->getActiveTheme();
     $this->themeManager->setActiveTheme($active_admin_theme);
@@ -314,7 +370,7 @@ HTML;
    * @return string[]
    *   A list of asset libraries.
    *
-   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase
    */
   private function getTransformAssetLibraries(): array {
     $libraries = [];

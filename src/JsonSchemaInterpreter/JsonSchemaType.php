@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\JsonSchemaInterpreter;
 
-use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\canvas\Plugin\Validation\Constraint\StringSemanticsConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\canvas\ShapeMatcher\DataTypeShapeRequirement;
 use Drupal\canvas\ShapeMatcher\DataTypeShapeRequirements;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
 /**
  * Interprets JSON schema types (with type-specific constraints) to Typed Data.
@@ -48,7 +48,6 @@ use Drupal\canvas\TypedData\BetterEntityDataDefinition;
  * @todo Disallow JSON schema string formats that do not make sense/are obscure enough — these should be disallowed in \Drupal\sdc\Component\ComponentValidator::validateProps()
  *
  * Will have to fix eventually, but high confidence that it will work:
- * @todo `minLength` and `maxLength` for `string`
  * @todo `multipleOf`, `minimum`, `exclusiveMinimum`, `maximum` and `exclusiveMaximum` support for `integer` and `number`.
  * @todo Question: can we reuse \JsonSchema\Constraints\FormatConstraint to validate just prior to passing information from fields to components, only when developing?
  * @todo Use `justinrainbow/json-schema`'s \JsonSchema\Constraints\FormatConstraint to ensure data flowing from Drupal entity is guaranteed to match with JSON schema constraint; log errors in production, throw errors in dev?
@@ -83,14 +82,6 @@ enum JsonSchemaType: string {
       // @see \Drupal\Core\TypedData\TraversableTypedDataInterface
       self::Array, self::Object => FALSE,
     };
-  }
-
-  public function isIterable(): bool {
-    return !$this->isScalar();
-  }
-
-  public function isTraversable(): bool {
-    return !$this->isScalar();
   }
 
   /**
@@ -339,10 +330,16 @@ enum JsonSchemaType: string {
           default => NULL,
         },
         // @see \Drupal\Core\Field\Plugin\Field\FieldType\StringItem
-        // @todo Support `minLength`.  ⚠️
+        // TRICKY: using `maxLength` prevents it from being translated.
+        // @see \Drupal\canvas\PropShape\PropShape::isPlainOrRichProse()
         \array_key_exists('maxLength', $schema) => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('string', 'value'), fieldWidget: 'string_textfield', fieldStorageSettings: [
+          // @todo Are arbitrary max lengths truly supported by the `string` field type? Harden in https://git.drupalcode.org/project/canvas/-/work_items/3591761
           'max_length' => $schema['maxLength'],
         ]),
+        // Drupal core's string field types do not support `minLength` settings.
+        // TRICKY: using `maxLength` prevents it from being translated.
+        // @see \Drupal\canvas\PropShape\PropShape::isPlainOrRichProse()
+        \array_key_exists('minLength', $schema) => NULL,
         TRUE => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('string', 'value'), fieldWidget: 'string_textfield'),
       },
 
@@ -395,13 +392,35 @@ enum JsonSchemaType: string {
       },
 
       JsonSchemaType::Object => match (TRUE) {
+        // Content entity reference: at minimum, `x-allowed-entity-type-id` is
+        // required (validated upstream). Optionally `x-allowed-bundle` narrows
+        // selection to a single bundle via the `default` selection handler.
+        // @see docs/shape-matching.md#3.2.3
+        // @see \Drupal\canvas\ComponentMetadataRequirementsChecker
+        JsonSchemaObjectRef::isContentEntityReference($schema)
+          && \array_key_exists('x-allowed-entity-type-id', $shape->schema) => new StorablePropShape(
+            shape: $shape,
+            fieldTypeProp: new FieldTypePropExpression('entity_reference', 'entity'),
+            fieldWidget: 'entity_reference_autocomplete',
+            fieldStorageSettings: [
+              'target_type' => $schema['x-allowed-entity-type-id'],
+            ],
+            fieldInstanceSettings: !\array_key_exists('x-allowed-bundle', $schema)
+              ? NULL
+              : [
+                'handler' => 'default',
+                'handler_settings' => [
+                  'target_bundles' => [$schema['x-allowed-bundle']],
+                ],
+              ],
+        ),
         // For object shapes, it's far simpler to match on the `$ref` than on
         // minutiae.
-        \array_key_exists('$ref', $schema) => match ($schema['$ref']) {
+        \array_key_exists('$ref', $schema) => match (JsonSchemaObjectRef::tryFrom($schema['$ref'])) {
           // @see \Drupal\image\Plugin\Field\FieldType\ImageItem
           // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
           // @todo Try decorating with adapter in https://www.drupal.org/project/canvas/issues/3536115.
-          'json-schema-definitions://canvas.module/image' => new StorablePropShape(shape: $shape, fieldWidget: 'image_image', fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
+          JsonSchemaObjectRef::Image => new StorablePropShape(shape: $shape, fieldWidget: 'image_image', fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
             // TRICKY: Additional computed property on image fields added by
             // Drupal Canvas.
             // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride
@@ -421,7 +440,7 @@ enum JsonSchemaType: string {
           ])),
           // @see \Drupal\file\Plugin\Field\FieldType\FileItem
           // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
-          'json-schema-definitions://canvas.module/video' => new StorablePropShape(
+          JsonSchemaObjectRef::Video => new StorablePropShape(
             shape: $shape,
             fieldWidget: 'file_generic',
             fieldTypeProp: new FieldTypeObjectPropsExpression('file', [

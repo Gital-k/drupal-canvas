@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Extension\ThemeSettingsProvider;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Language\LanguageManager;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Link;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\TypedData\TranslatableInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -33,7 +39,9 @@ readonly final class CodeComponentDataProvider {
     private RouteMatchInterface $routeMatch,
     private TitleResolverInterface $titleResolver,
     private ChainBreadcrumbBuilderInterface $breadcrumbManager,
+    private LanguageManagerInterface $languageManager,
     private ContainerInterface $container,
+    private ThemeSettingsProvider $themeSettingsProvider,
   ) {}
 
   /**
@@ -109,7 +117,7 @@ readonly final class CodeComponentDataProvider {
     return [
       self::V0 => [
         // @todo improve title in https://www.drupal.org/i/3502371
-        'pageTitle' => $this->titleResolver->getTitle($request, $route) ?: '',
+        'pageTitle' => $this->titleResolver->getTitle($request, $route) ?? '',
       ],
     ];
   }
@@ -153,11 +161,11 @@ readonly final class CodeComponentDataProvider {
       self::V0 => [
         'themeAssets' => [
           'logo' => [
-            'url' => theme_get_setting('logo.url') ?? '',
+            'url' => $this->themeSettingsProvider->getSetting('logo.url') ?? '',
           ],
           'favicon' => [
-            'url' => theme_get_setting('favicon.url') ?? '',
-            'mimeType' => theme_get_setting('favicon.mimetype') ?? '',
+            'url' => $this->themeSettingsProvider->getSetting('favicon.url') ?? '',
+            'mimeType' => $this->themeSettingsProvider->getSetting('favicon.mimetype') ?? '',
           ],
         ],
       ],
@@ -165,25 +173,15 @@ readonly final class CodeComponentDataProvider {
   }
 
   /**
-   * Parses the js code and attach the associated library.
-   *
-   * @param string $jsCode
-   *   The JavaScript code.
-   *
-   * @return array|string[]
-   *   The array of the drupalSettings libraries.
-   */
-  public static function getRequiredCanvasDataLibraries(string $jsCode): array {
-    @trigger_error('Calling ' . __METHOD__ . '() is deprecated in canvas:0.7.3-alpha1 and will be removed from canvas:1.0.0. There is no replacement. See https://www.drupal.org/node/3538276', E_USER_DEPRECATED);
-    return [];
-  }
-
-  /**
    * Returns main entity data for V0 of drupalSettings.canvasData.
+   *
+   * @param \Drupal\Core\Cache\RefinableCacheableDependencyInterface|null $cacheability
+   *   (optional) When given, the cacheability of the per-translation `view`
+   *   access results embedded in the returned data is added to it.
    *
    * @return array
    */
-  public function getCanvasDataMainEntityV0(): array {
+  public function getCanvasDataMainEntityV0(?RefinableCacheableDependencyInterface $cacheability = NULL): array {
     // List of likely route parameters to check for the entity.
     $likelyEntityIdentifiers = ['preview_entity', 'node', 'entity', 'canvas_page'];
     $currentRouteParams = $this->routeMatch->getParameters()->keys();
@@ -198,12 +196,84 @@ readonly final class CodeComponentDataProvider {
       $entity = $this->routeMatch->getParameter($identifier);
 
       if ($entity instanceof EntityInterface) {
+        // The requested language is negotiated from the request (e.g. the URL
+        // prefix). The rendered language is the translation the entity actually
+        // loaded as; it falls back to the default when the requested language
+        // has no translation. They differ on `/de/page/1` when the page has no
+        // German translation: requested `de`, rendered `en`.
+        $requested_langcode = $this->languageManager
+          ->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)
+          ->getId();
+        $rendered_langcode = $entity->language()->getId();
+        $translations = [];
+        // The translations list powers language switchers, so it is provided
+        // for every content entity on a multilingual site, regardless of
+        // whether the entity (its type or bundle) is translatable: every
+        // enabled language must be listed for the switcher to be complete.
+        // Whether a translation actually exists in a language is conveyed
+        // per language by `translationAvailable`; for an untranslatable
+        // entity every other language simply reports
+        // `translationAvailable: false` with a fallback URL. On a monolingual
+        // site `translations` stays empty: there is nothing to switch to.
+        if ($entity instanceof TranslatableInterface
+          && $this->languageManager->isMultilingual()) {
+          // Native names (e.g. "Deutsch") come from the predefined language
+          // list; `ConfigurableLanguage` only stores the localized name.
+          $native_names = LanguageManager::getStandardLanguageList();
+          foreach ($this->languageManager->getLanguages() as $language) {
+            $langcode = $language->getId();
+            // A translation is reported as available only when the entity has
+            // a translation the current user may view. Gating on view access
+            // folds in the translation's published state: node and Canvas Page
+            // access deny viewing an unpublished translation without the
+            // relevant permission. So an unpublished or otherwise inaccessible
+            // translation is reported like an untranslated language
+            // (`translationAvailable: false` with a fallback URL), and is not
+            // disclosed.
+            // TRICKY: `hook_js_settings_alter()`, where this data is attached,
+            // runs during asset rendering and cannot bubble cacheability. The
+            // access result cacheability (e.g. the `user.permissions` cache
+            // context) is therefore bubbled into the page via the
+            // $cacheability parameter by JsComponent::renderComponent(), for
+            // every code component depending on this data. The other
+            // dependencies need no bubbling here: the per-entity cache tags
+            // are already on the response because the main entity is rendered
+            // on this page (so creating, updating or deleting a translation
+            // invalidates it), and the language config cache tags are added in
+            // JsComponent::renderComponent() too.
+            // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+            $translation_available = FALSE;
+            if ($entity->hasTranslation($langcode)) {
+              $access_result = $entity->getTranslation($langcode)->access('view', NULL, TRUE);
+              $cacheability?->addCacheableDependency($access_result);
+              $translation_available = $access_result->isAllowed();
+            }
+            $translations[] = [
+              'langcode' => $langcode,
+              // Localized name (e.g. "German") and the language's own native
+              // name (e.g. "Deutsch"), so a switcher can show either.
+              'name' => $language->getName(),
+              'nativeName' => $native_names[$langcode][1] ?? $language->getName(),
+              // Unavailable translations fall back to the default translation,
+              // in that language's URL form (path prefix, domain, etc.) per
+              // the site's language negotiation.
+              'url' => ($translation_available ? $entity->getTranslation($langcode) : $entity)
+                ->toUrl('canonical', ['language' => $language])
+                ->toString(),
+              'translationAvailable' => $translation_available,
+              'current' => $langcode === $requested_langcode,
+            ];
+          }
+        }
         return [
           self::V0 => [
             'mainEntity' => [
               'bundle' => $entity->bundle(),
               'entityTypeId' => $entity->getEntityTypeId(),
               'uuid' => $entity->uuid(),
+              'requestedLanguage' => $requested_langcode,
+              'renderedLanguage' => $rendered_langcode,
+              'translations' => $translations,
             ],
           ],
         ];

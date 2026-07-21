@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
-import { useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import PublishReview from '@/components/review/PublishReview';
@@ -9,22 +9,24 @@ import {
   selectErrors,
   selectPreviousPendingChanges,
   setConflicts,
-  setPreviousPendingChanges,
 } from '@/components/review/PublishReview.slice';
+import { usePublishPendingChanges } from '@/components/review/usePublishPendingChanges';
 import {
   resetCodeEditor,
   setForceRefresh,
 } from '@/features/code-editor/codeEditorSlice';
+import {
+  getConflictRouteForChange,
+  isConflictUxEnabled,
+} from '@/features/conflict/conflictUtils';
 import { FORM_TYPES } from '@/features/form/constants';
 import { clearFieldValues } from '@/features/form/formStateSlice';
+import { setInitialized } from '@/features/layout/layoutModelSlice';
+import { selectPageData } from '@/features/pageData/pageDataSlice';
 import {
-  setInitialized,
-  setUpdatePreview,
-} from '@/features/layout/layoutModelSlice';
-import {
-  selectPageData,
-  setInitialPageData,
-} from '@/features/pageData/pageDataSlice';
+  getReviewRouteForChange,
+  isReviewableChange,
+} from '@/features/review/reviewChanges';
 import {
   clearSelection,
   selectSelectedComponentUuid,
@@ -33,40 +35,35 @@ import { brandKitApi } from '@/services/brandKit';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import { contentApi, useGetContentListQuery } from '@/services/content';
 import {
-  CONFLICT_CODE,
-  pendingChangesApi,
   useDiscardPendingChangeMutation,
   useGetAllPendingChangesQuery,
-  usePublishAllPendingChangesMutation,
 } from '@/services/pendingChangesApi';
 import {
-  usePostPreviewMutation,
+  useQueuedPostPreviewMutation,
   useUpdateComponentMutation,
 } from '@/services/preview';
-import { findInChanges } from '@/utils/function-utils';
 
-import type { PendingChanges } from '@/services/pendingChangesApi';
 import type { UnpublishedChange } from '@/types/Review';
 
 const REFETCH_INTERVAL_MS = 10000;
+const REVIEW_CHANGES_QUERY_PARAM = 'reviewChanges';
 
 const UnpublishedChanges = () => {
   const previousPendingChanges = useAppSelector(selectPreviousPendingChanges);
   const conflicts = useAppSelector(selectConflicts);
   const errorResponse = useAppSelector(selectErrors);
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
-  const [publishAllChanges, { isLoading: isPublishing }] =
-    usePublishAllPendingChangesMutation();
   const [discardChange, { isLoading: isDiscarding }] =
     useDiscardPendingChangeMutation();
   const [, { isLoading: isUpdatingComponent }] = useUpdateComponentMutation({
     fixedCacheKey: selectedComponent,
   });
-  const [, { isLoading: isUpdatingPreview }] = usePostPreviewMutation({
+  const [, { isLoading: isUpdatingPreview }] = useQueuedPostPreviewMutation({
     fixedCacheKey: 'editorFramePreview',
   });
   const [pollingInterval, setPollingInterval] =
     useState<number>(REFETCH_INTERVAL_MS);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const {
     data: changes,
     error,
@@ -77,14 +74,23 @@ const UnpublishedChanges = () => {
     skipPollingIfUnfocused: true,
   });
   const { entityType, entityId, codeComponentId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { showBoundary } = useErrorBoundary();
   const entity_form_fields = useAppSelector(selectPageData);
+  const [publishPendingChanges, { isLoading: isPublishing }] =
+    usePublishPendingChanges({
+      currentEntityId: entityId,
+      currentEntityType: entityType,
+      entityFormFields: entity_form_fields,
+    });
   // Fetch content list to get status information for all pages
   const { data: contentListData } = useGetContentListQuery({
     entityType: 'canvas_page',
   });
   const pageItems = contentListData?.items;
+  const conflictUxEnabled = isConflictUxEnabled();
 
   // If either the selected component or the preview layout is being updated, disable the Publish button.
   const isUpdating = isUpdatingComponent || isUpdatingPreview;
@@ -110,117 +116,62 @@ const UnpublishedChanges = () => {
     if (previousPendingChanges) refetch();
   }, [previousPendingChanges, refetch]);
 
-  const onOpenChangeHandler = (open: boolean): void => {
-    if (open) {
-      refetch().then(() => {
+  const onOpenChangeHandler = useCallback(
+    (open: boolean): void => {
+      setReviewOpen(open);
+      if (open) {
         setPollingInterval(0);
-      });
-    } else {
-      setPollingInterval(REFETCH_INTERVAL_MS);
+        refetch();
+      } else {
+        setPollingInterval(REFETCH_INTERVAL_MS);
+      }
+    },
+    [refetch],
+  );
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get(REVIEW_CHANGES_QUERY_PARAM) !== '1') {
+      return;
     }
-  };
+
+    onOpenChangeHandler(true);
+    searchParams.delete(REVIEW_CHANGES_QUERY_PARAM);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: searchParams.toString() ? `?${searchParams.toString()}` : '',
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate,
+    onOpenChangeHandler,
+  ]);
 
   const onPublishClick = async (selectedChanges: UnpublishedChange[]) => {
-    if (selectedChanges?.length) {
-      const changesToPublish = selectedChanges.reduce((acc, change) => {
-        acc[change.pointer] = {
-          entity_type: change.entity_type,
-          entity_id: change.entity_id,
-          data_hash: change.data_hash,
-          langcode: change.langcode,
-          owner: change.owner,
-          label: change.label,
-          updated: change.updated,
-        };
-        return acc;
-      }, {} as PendingChanges);
-      const isCurrentChanged = findInChanges(
-        changesToPublish,
-        entityId,
-        entityType,
-      );
-      const changedCodeComponentIds = Object.values(changesToPublish)
-        .filter((change) => change.entity_type === 'js_component')
-        .map((change) => change.entity_id);
-      const changedBrandKitIds = Object.values(changesToPublish)
-        .filter((change) => change.entity_type === 'brand_kit')
-        .map((change) => String(change.entity_id));
+    await publishPendingChanges(selectedChanges);
+  };
 
-      await publishAllChanges(changesToPublish);
-
-      if (isCurrentChanged && entityId && entityType) {
-        // Update the isPublished and isNew status.
-        dispatch(
-          componentAndLayoutApi.util.updateQueryData(
-            'getPageLayout',
-            { entityId, entityType },
-            (draft) => {
-              draft.isPublished = true;
-              draft.isNew = false;
-            },
-          ),
-        );
-
-        // Pause updating the preview/POSTing to Drupal for this action.
-        dispatch(setUpdatePreview(false));
-
-        // Avoid the "The content has either been modified by another user, or
-        // you have already submitted modifications. As a result, your changes
-        // cannot be saved" error.
-        if ('changed' in entity_form_fields) {
-          // Pause updating the preview/POSTing to Drupal for this action.
-          dispatch(setUpdatePreview(false));
-          dispatch(
-            setInitialPageData({
-              ...entity_form_fields,
-              changed: Math.floor(new Date().getTime() / 1000),
-            }),
-          );
-        }
-      }
-
-      // After publishing, the list of other pages might be out of date where the pages' title/alias has been updated.
-      dispatch(
-        contentApi.util.invalidateTags([{ type: 'Content', id: 'LIST' }]),
-      );
-
-      if (changedCodeComponentIds.length) {
-        // Invalidate cache of all changed code component entities. This is
-        // critical to prevent data loss, which would otherwise occur in the
-        // following scenario:
-        // 1. A code component change is auto-saved, then published.
-        // 2. As a result, the auto-save entry gets deleted on the backend.
-        // 3. The auto-save that occurred previously invalidated the auto-save
-        //    query cache, so fetching data for the code component will correctly
-        //    see the 204 response that is now returned.
-        // 4. That will cause a fallback to the canonical source of the config
-        //    entity. This is why we need to invalidate the cache for those.
-        //    In the absence of this, a stale version would be returned, which
-        //    would get auto-saved if anything changes, resulting to the loss of
-        //    changes in step 1. E.g. with newly created and first-time published
-        //    code components, this would wipe out all data.
-        dispatch(
-          componentAndLayoutApi.util.invalidateTags(
-            changedCodeComponentIds.map((id) => ({
-              type: 'CodeComponents',
-              id,
-            })),
-          ),
-        );
-      }
-
-      if (changedBrandKitIds.length) {
-        dispatch(
-          brandKitApi.util.invalidateTags([
-            ...changedBrandKitIds.flatMap((id) => [
-              { type: 'BrandKits' as const, id },
-              { type: 'BrandKitsAutoSave' as const, id },
-            ]),
-            { type: 'BrandKits' as const, id: 'LIST' },
-          ]),
-        );
-      }
+  const navigateToReview = (selectedChanges: UnpublishedChange[]) => {
+    if (!conflictUxEnabled) {
+      return;
     }
+    const reviewableChanges = selectedChanges.filter(isReviewableChange);
+    const firstReviewableChange = reviewableChanges[0];
+    if (!firstReviewableChange) {
+      return;
+    }
+    navigate(getReviewRouteForChange(firstReviewableChange), {
+      state: {
+        selectedPointers: selectedChanges.map((change) => change.pointer),
+        reviewPointers: reviewableChanges.map((change) => change.pointer),
+      },
+    });
   };
 
   const onDiscardClick = async (selectedChange: UnpublishedChange) => {
@@ -228,6 +179,14 @@ const UnpublishedChanges = () => {
 
     try {
       await discardChange(selectedChange).unwrap();
+      const remainingConflicts = conflicts?.filter(
+        (conflict) => conflict.source.pointer !== selectedChange.pointer,
+      );
+      dispatch(
+        setConflicts(
+          remainingConflicts?.length ? remainingConflicts : undefined,
+        ),
+      );
       // After discarding, refresh the editor state from canonical server data.
       dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
       dispatch(
@@ -280,43 +239,13 @@ const UnpublishedChanges = () => {
     }
   };
 
-  if (!isFetching && conflicts && conflicts.length) {
-    window.setTimeout(() => {
-      conflicts.forEach((conflict) => {
-        if (conflict.code === CONFLICT_CODE.UNEXPECTED) {
-          dispatch(
-            pendingChangesApi.util.updateQueryData(
-              'getAllPendingChanges',
-              undefined,
-              (draft) => {
-                if (previousPendingChanges) {
-                  draft[conflict.source.pointer] = {
-                    ...previousPendingChanges[conflict.source.pointer],
-                    hasConflict: true,
-                  };
-                }
-              },
-            ),
-          );
-        }
-        if (conflict.code === CONFLICT_CODE.EXPECTED) {
-          dispatch(
-            pendingChangesApi.util.updateQueryData(
-              'getAllPendingChanges',
-              undefined,
-              (draft) => {
-                if (draft[conflict.source.pointer]) {
-                  draft[conflict.source.pointer].hasConflict = true;
-                }
-              },
-            ),
-          );
-        }
-      });
-      dispatch(setConflicts());
-      dispatch(setPreviousPendingChanges());
-    }, 100);
-  }
+  const conflictCount = useMemo(
+    () =>
+      conflictUxEnabled
+        ? unpublishedChanges.filter((change) => change.hasConflict).length
+        : 0,
+    [conflictUxEnabled, unpublishedChanges],
+  );
 
   // Create a map of entity_id -> { status, isNew, hasUnsavedStatusChange } for quick lookup
   const pageStatusMap = useMemo(() => {
@@ -337,13 +266,27 @@ const UnpublishedChanges = () => {
 
   return (
     <PublishReview
+      open={reviewOpen}
       isUpdating={isUpdating}
       isFetching={isFetching}
       changes={unpublishedChanges}
+      conflictCount={conflictCount}
       errors={errorResponse}
       onOpenChangeCallback={onOpenChangeHandler}
       onPublishClick={onPublishClick}
       onDiscardClick={onDiscardClick}
+      onReviewSelectedChanges={conflictUxEnabled ? navigateToReview : undefined}
+      onViewClick={
+        conflictUxEnabled ? (change) => navigateToReview([change]) : undefined
+      }
+      isViewChangeAvailable={conflictUxEnabled ? isReviewableChange : undefined}
+      onResolveConflict={(change) => {
+        if (change && conflictUxEnabled) {
+          navigate(getConflictRouteForChange(change));
+          return;
+        }
+        refetch();
+      }}
       isPublishing={isPublishing}
       isDiscarding={isDiscarding}
       pageStatusMap={pageStatusMap}

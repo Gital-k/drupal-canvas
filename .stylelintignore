@@ -1,4 +1,14 @@
 # @todo Fix d.o GitLab CI template to support relative paths correctly.
 # @see https://www.drupal.org/project/gitlab_templates/issues/3417807#comment-15419921
 **/modules/canvas_vite
+docs/user/dist/**
+packages/**/dist/**
 ui/dist/**
+# Example app build outputs.
+modules/canvas_headless/examples/**/dist/**
+modules/canvas_headless/examples/**/.astro/**
+modules/canvas_headless/examples/**/.nuxt/**
+modules/canvas_headless/examples/**/.output/**
+modules/canvas_headless/examples/**/.next/**
+# Example app styles are checked by their framework-specific toolchains.
+modules/canvas_headless/examples/**/*.css

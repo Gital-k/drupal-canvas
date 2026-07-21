@@ -17,7 +17,7 @@ import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 <CardGrid>
   <LinkCard
-    title="Code components"
+    title="Code Components"
     href={`${import.meta.env.BASE_URL}/code-components`.replace(/^\/\//, '/')}
   />
 </CardGrid>
@@ -31,6 +31,12 @@ import { CardGrid, LinkCard } from '@astrojs/starlight/components';
   <LinkCard
     title="AI Assistant"
     href={`${import.meta.env.BASE_URL}/ai-assistant`.replace(/^\/\//, '/')}
+  />
+</CardGrid>
+<CardGrid>
+  <LinkCard
+    title="Guides"
+    href={`${import.meta.env.BASE_URL}/guides`.replace(/^\/\//, '/')}
   />
 </CardGrid>
 <CardGrid>

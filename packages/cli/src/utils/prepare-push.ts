@@ -3,26 +3,15 @@ import path from 'path';
 import chalk from 'chalk';
 import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
-import {
-  getDataDependenciesFromAst,
-  getImportsFromAst,
-} from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
+import { getImportsFromAst } from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
 
-import { buildComponent } from './build-component';
 import { getGlobalCss } from './build-tailwind.js';
-import { pluralizeComponent } from './command-helpers';
 import { sortByDependencies } from './dependency-sort';
-import {
-  createComponentPayload,
-  processComponentFiles,
-} from './process-component-files';
 import { createProgressCallback, processInPool } from './request-pool';
 import { fileExists } from './utils';
 
-import type { DiscoveredComponent } from '@drupal-canvas/discovery';
-import type { DataDependencies } from '@drupal-canvas/ui/types/CodeComponent';
 import type { ApiService } from '../services/api.js';
-import type { Component } from '../types/Component.js';
+import type { AssetLibrary, Component } from '../types/Component.js';
 import type { Result } from '../types/Result.js';
 
 type ComponentOperation = 'create' | 'update' | 'delete';
@@ -50,23 +39,36 @@ interface ComponentUploadResult {
   error?: Error;
 }
 
-interface PreparedComponent {
+interface BuiltComponentForPush {
   machineName: string;
   componentName: string;
-  componentPayload: ReturnType<typeof createComponentPayload>;
+  componentPayload: Component;
   importedJsComponents: string[];
+}
+
+interface PushProgressSpinner {
+  start: (message?: string) => void;
+  stop: (message?: string) => void;
+  message: (message?: string) => void;
 }
 
 /**
  * Determine the operation for each component (create, update, or delete)
  * and build upload tasks with payloads attached.
  */
-export async function buildComponentUploadTasks(
-  preparedByName: Map<string, PreparedComponent>,
+async function buildComponentUploadTasks(
+  preparedByName: Map<string, BuiltComponentForPush>,
   apiService: { listComponents: () => Promise<Record<string, unknown>> },
   onProgress: () => void,
 ): Promise<ComponentUploadTask[]> {
-  const existingComponents = await apiService.listComponents();
+  // External components are implemented by the configured external
+  // application and synced into Drupal as metadata only: the CLI must never
+  // update or delete them, so they are invisible to push planning.
+  const existingComponents = Object.fromEntries(
+    Object.entries(await apiService.listComponents()).filter(
+      ([, component]) => (component as Component).type !== 'external',
+    ),
+  );
   const remoteNames = new Set(Object.keys(existingComponents));
 
   const tasks: ComponentUploadTask[] = [];
@@ -104,13 +106,13 @@ export async function buildComponentUploadTasks(
       // Parse imports from server component's source code (no local file exists)
       let importedJsComponents: string[] = [];
       try {
-        const ast = parse(serverComponent.sourceCodeJs, {
+        const ast = parse(serverComponent.sourceCodeJs ?? '', {
           sourceType: 'module',
           plugins: ['jsx', 'typescript'],
         });
         importedJsComponents = getImportsFromAst(ast, '@/components/');
       } catch (error) {
-        p.note(chalk.red(`Error: ${error}`));
+        p.log.error(chalk.red(`Error: ${String(error)}`));
       }
       tasks.push({
         machineName: name,
@@ -295,150 +297,61 @@ async function processTaskBatch(
   });
 }
 
-async function prepareComponentsForUpload(
-  successfulBuilds: Result[],
-  componentsToUpload: DiscoveredComponent[],
-): Promise<{ prepared: PreparedComponent[]; failed: Result[] }> {
-  const prepared: PreparedComponent[] = [];
-  const failed: Result[] = [];
-
-  for (const buildResult of successfulBuilds) {
-    const component = buildResult.itemName
-      ? componentsToUpload.find((c) => c.name === buildResult.itemName)
-      : undefined;
-
-    if (!component) continue;
-
-    try {
-      const componentName = component.name;
-      const { sourceCodeJs, compiledJs, sourceCodeCss, compiledCss, metadata } =
-        await processComponentFiles(
-          component.directory,
-          componentName,
-          component.kind,
-        );
-      if (!metadata) {
-        throw new Error('Invalid metadata file');
-      }
-
-      const machineName =
-        buildResult.itemName ||
-        metadata.machineName ||
-        componentName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-
-      let importedJsComponents = [] as string[];
-      let dataDependencies: DataDependencies = {};
-      try {
-        const ast = parse(sourceCodeJs, {
-          sourceType: 'module',
-          plugins: ['jsx', 'typescript'],
-        });
-        importedJsComponents = getImportsFromAst(ast, '@/components/');
-        dataDependencies = getDataDependenciesFromAst(ast);
-      } catch (error) {
-        p.note(chalk.red(`Error: ${error}`));
-      }
-
-      const componentPayload = createComponentPayload({
-        metadata,
-        machineName,
-        componentName,
-        sourceCodeJs,
-        compiledJs,
-        sourceCodeCss,
-        compiledCss,
-        importedJsComponents,
-        dataDependencies,
-      });
-
-      prepared.push({
-        machineName,
-        componentName,
-        componentPayload,
-        importedJsComponents,
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      failed.push({
-        itemName: buildResult.itemName,
-        success: false,
-        details: [{ content: errorMessage }],
-      });
-    }
-  }
-
-  return { prepared, failed };
-}
-
 /**
- * Build, prepare, and upload components to Drupal.
+ * Upload already-built components to Drupal.
  *
- * Shared by both the push and upload commands.
+ * This is the push path used by the shared build service. Backend dependency
+ * metadata is still extracted before this point so create/delete ordering is
+ * preserved.
  */
-export async function buildAndPushComponents(
-  componentsToUpload: DiscoveredComponent[],
+export async function pushBuiltComponents(
+  builtComponents: BuiltComponentForPush[],
   apiService: ApiService,
-  includeGlobalCss: boolean,
   actionLabel: string = 'Uploading',
+  activeSpinner?: PushProgressSpinner,
 ): Promise<Result[]> {
   const results: Result[] = [];
-  const spinner = p.spinner();
+  const spinner = activeSpinner ?? p.spinner();
+  const spinnerStarted = activeSpinner !== undefined;
 
-  const buildResults: Result[] = [];
-  spinner.start('Building components');
-  for (const component of componentsToUpload) {
-    buildResults.push(await buildComponent(component, includeGlobalCss));
+  if (builtComponents.length === 0) {
+    return results;
   }
 
-  const successfulBuilds = buildResults.filter((build) => build.success);
-  const failedBuilds = buildResults.filter((build) => !build.success);
+  const preparedByName = new Map(
+    builtComponents.map((component) => [
+      component.machineName,
+      {
+        machineName: component.machineName,
+        componentName: component.componentName,
+        componentPayload: component.componentPayload,
+        importedJsComponents: component.importedJsComponents,
+      },
+    ]),
+  );
 
-  if (failedBuilds.length > 0) {
-    spinner.stop(
-      chalk.red(
-        `Build failed for ${failedBuilds.length} ${pluralizeComponent(failedBuilds.length)}.`,
-      ),
-    );
-    return buildResults;
-  }
-
-  if (successfulBuilds.length === 0) {
-    spinner.stop(chalk.red('All component builds failed.'));
-    return failedBuilds;
-  }
-
-  spinner.message(`Preparing components for ${actionLabel.toLowerCase()}`);
-  const { prepared, failed: preparationFailures } =
-    await prepareComponentsForUpload(successfulBuilds, componentsToUpload);
-
-  if (preparationFailures.length > 0) {
-    spinner.stop(
-      chalk.red(
-        `Preparation failed for ${preparationFailures.length} ${pluralizeComponent(preparationFailures.length)}.`,
-      ),
-    );
-    return [...successfulBuilds, ...preparationFailures];
-  }
-
-  if (prepared.length === 0) {
-    spinner.stop(chalk.red('No components were prepared for upload.'));
-    return [...successfulBuilds, ...preparationFailures];
-  }
-
-  const preparedByName = new Map(prepared.map((c) => [c.machineName, c]));
   const existenceProgress = createProgressCallback(
     spinner,
     'Checking component existence',
     preparedByName.size,
   );
 
-  spinner.message('Checking component operations');
-  const uploadTasks = await buildComponentUploadTasks(
-    preparedByName,
-    apiService,
-    existenceProgress,
-  );
+  if (spinnerStarted) {
+    spinner.message('Checking component operations');
+  } else {
+    spinner.start('Checking component operations');
+  }
+  let uploadTasks: ComponentUploadTask[];
+  try {
+    uploadTasks = await buildComponentUploadTasks(
+      preparedByName,
+      apiService,
+      existenceProgress,
+    );
+  } catch (error) {
+    spinner.stop('Component operation check failed', 2);
+    throw error;
+  }
 
   const uploadProgress = createProgressCallback(
     spinner,
@@ -453,35 +366,17 @@ export async function buildAndPushComponents(
     uploadProgress,
   );
 
-  const failedUploads = uploadResults
-    .map((uploadResult, index) => {
-      if (uploadResult.success) {
-        return null;
-      }
-      const componentName =
-        prepared[index]?.componentName || uploadResult.machineName || 'unknown';
-      const message =
-        uploadResult.error?.message?.trim() || 'Unknown upload error';
-      return `${componentName} (${message})`;
-    })
-    .filter((value): value is string => Boolean(value));
-
-  if (failedUploads.length > 0) {
-    throw new Error(
-      `Component upload failed for ${failedUploads.length} ${pluralizeComponent(failedUploads.length)}: ${failedUploads.join(', ')}`,
-    );
-  }
-
   const operationLabels: Record<ComponentOperation, string> = {
     create: 'Created',
     update: chalk.cyan('Updated'),
     delete: chalk.dim('Deleted'),
   };
-  for (let i = 0; i < uploadResults.length; i++) {
-    const uploadResult = uploadResults[i];
-
+  for (const uploadResult of uploadResults) {
+    const builtComponent = builtComponents.find((component) => {
+      return component.machineName === uploadResult.machineName;
+    });
     results.push({
-      itemName: prepared[i]?.componentName ?? uploadResult.machineName,
+      itemName: builtComponent?.componentName ?? uploadResult.machineName,
       success: uploadResult.success,
       details: [
         {
@@ -493,21 +388,20 @@ export async function buildAndPushComponents(
     });
   }
 
-  spinner.stop(
-    chalk.green(
-      `Processed ${results.length} ${pluralizeComponent(results.length)}`,
-    ),
-  );
+  const hasFailures = results.some((result) => !result.success);
+  spinner.stop('Pushed components', hasFailures ? 2 : 0);
   return results;
 }
 
 /**
- * Upload the global asset library (CSS/JS) to Drupal.
+ * Prepare the global asset library (CSS/JS) update for Drupal.
  */
-export async function uploadGlobalAssetLibrary(
-  apiService: ApiService,
+export async function prepareGlobalAssetLibraryUpdate(
   outputDir: string,
-): Promise<Result> {
+): Promise<{
+  result: Result;
+  assetLibrary?: Partial<AssetLibrary>;
+}> {
   try {
     const globalCompiledCssPath = path.join(outputDir, 'index.css');
     const globalCompiledCssExists = await fileExists(globalCompiledCssPath);
@@ -521,24 +415,63 @@ export async function uploadGlobalAssetLibrary(
         'utf-8',
       );
       const originalCss = await getGlobalCss();
-      await apiService.updateGlobalAssetLibrary({
-        css: { original: originalCss, compiled: globalCompiledCss },
-        js: { original: classNameCandidateIndexFile, compiled: '' },
-      });
-      return { success: true, itemName: 'Global CSS' };
+      return {
+        result: {
+          success: true,
+          itemName: 'Global CSS (Tailwind CSS build)',
+          details: [{ content: 'Pushed' }],
+        },
+        assetLibrary: {
+          css: { original: originalCss, compiled: globalCompiledCss },
+          js: { original: classNameCandidateIndexFile, compiled: '' },
+        },
+      };
     }
     return {
-      success: false,
-      itemName: 'Global CSS',
-      details: [
-        { content: `Global CSS file not found at ${globalCompiledCssPath}.` },
-      ],
+      result: {
+        success: false,
+        itemName: 'Global CSS (Tailwind CSS build)',
+        details: [
+          {
+            content: `Compiled Tailwind CSS file not found at ${globalCompiledCssPath}.`,
+          },
+        ],
+      },
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return {
+      result: {
+        success: false,
+        itemName: 'Global CSS (Tailwind CSS build)',
+        details: [{ content: errorMessage }],
+      },
+    };
+  }
+}
+
+/**
+ * Upload the global asset library (CSS/JS) to Drupal.
+ */
+export async function uploadGlobalAssetLibrary(
+  apiService: ApiService,
+  outputDir: string,
+): Promise<Result> {
+  const { result, assetLibrary } =
+    await prepareGlobalAssetLibraryUpdate(outputDir);
+
+  if (!result.success || !assetLibrary) {
+    return result;
+  }
+
+  try {
+    await apiService.updateGlobalAssetLibrary(assetLibrary);
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
       success: false,
-      itemName: 'Global CSS',
+      itemName: 'Global CSS (Tailwind CSS build)',
       details: [{ content: errorMessage }],
     };
   }

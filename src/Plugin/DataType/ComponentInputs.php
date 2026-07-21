@@ -4,25 +4,25 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\DataType;
 
+use Drupal\canvas\ComponentSource\ComponentInstanceInputsConfigSchemaGeneratorInterface;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\MissingComponentInputsException;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\PropExpressions\StructuredData\ContentAwareDependentInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropSource\AdaptedPropSource;
+use Drupal\canvas\PropSource\PropSource;
+use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\Schema\Mapping;
 use Drupal\Core\Config\TypedConfigManagerInterface;
+use Drupal\Core\DependencyInjection\ClassResolverInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\Attribute\DataType;
 use Drupal\Core\TypedData\TypedData;
-use Drupal\canvas\MissingComponentInputsException;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\ComponentSource\ComponentInstanceInputsConfigSchemaGeneratorInterface;
-use Drupal\canvas\Entity\Component;
-use Drupal\Core\DependencyInjection\ClassResolverInterface;
-use Drupal\canvas\PropExpressions\StructuredData\ContentAwareDependentInterface;
-use Drupal\canvas\PropSource\PropSource;
-use Drupal\canvas\PropSource\StaticPropSource;
 
 /**
  * @phpstan-import-type PropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
@@ -30,9 +30,9 @@ use Drupal\canvas\PropSource\StaticPropSource;
  * @phpstan-import-type DefaultRelativeUrlPropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
  * @phpstan-type SingleComponentInputArray array<string, PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray>
  * @see \Drupal\canvas\ComponentSource\ComponentSourceInterface::optimizeExplicitInput()
- * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::optimizeExplicitInput()
- * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()
- * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::uncollapse()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::optimizeExplicitInput()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::collapse()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::uncollapse()
  * @phpstan-type OptimizedExplicitInput bool|int|float|string|bool[]|int[]|float[]|string[]
  * @phpstan-type OptimizedSingleComponentInputArray array<string, PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray|OptimizedExplicitInput>
  */
@@ -196,8 +196,8 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
       if (!\is_array($raw_prop_source) || !\array_key_exists('sourceType', $raw_prop_source)) {
         // This is likely a *collapsed* StaticPropSource.
         /** @var OptimizedExplicitInput $raw_prop_source */
-        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()
-        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::uncollapse()
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::collapse()
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::uncollapse()
         try {
           $parsed_default_prop_source = \array_key_exists($name, $default_prop_sources) && \is_array($default_prop_sources[$name]) && \array_key_exists('sourceType', $default_prop_sources[$name])
             ? PropSource::parse($default_prop_sources[$name])
@@ -214,8 +214,8 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
         catch (\LogicException) {
         }
 
-        // This isn't a component source using \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase.
-        // @todo Move this logic into \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase.
+        // This isn't a component source using \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase.
+        // @todo Move this logic into \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase.
         // @see https://www.drupal.org/project/canvas/issues/3467954
         continue;
       }

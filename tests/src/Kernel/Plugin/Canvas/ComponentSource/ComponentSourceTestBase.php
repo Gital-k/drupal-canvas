@@ -5,25 +5,30 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 // cspell:ignore Druplicons
+
+use Drupal\canvas\ComponentIncompatibilityReasonRepository;
+use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
+use Drupal\canvas\Controller\ApiConfigControllers;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\node\Entity\NodeType;
-use Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType\ComponentTreeItemListTest;
-use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\Depends;
-use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\canvas\Form\ComponentInstanceForm;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\DependencyInjection\ServiceModifierInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\RfcLoggerTrait;
@@ -32,25 +37,20 @@ use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
-use Drupal\canvas\ComponentIncompatibilityReasonRepository;
-use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
-use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\ComponentInterface;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\PropSource\StaticPropSource;
-use Drupal\canvas\Storage\ComponentTreeLoader;
+use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType\ComponentTreeItemListTest;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
+use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\UninstallValidatorTestTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Depends;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
@@ -126,7 +126,6 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
 
   protected readonly EntityStorageInterface $componentStorage;
   protected readonly ComponentIncompatibilityReasonRepository $componentReasonRepository;
-  protected readonly ComponentTreeLoader $componentTreeLoader;
   protected readonly RendererInterface $renderer;
 
   /**
@@ -136,7 +135,6 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
     parent::setUp();
     $this->componentReasonRepository = $this->container->get(ComponentIncompatibilityReasonRepository::class);
     $this->componentStorage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Component::ENTITY_TYPE_ID);
-    $this->componentTreeLoader = $this->container->get(ComponentTreeLoader::class);
     $this->renderer = $this->container->get(RendererInterface::class);
     $this->installEntitySchema('user');
     $this->installEntitySchema('path_alias');
@@ -308,19 +306,19 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   /**
    * For use with ::renderComponentsLive() for Sources with generated input UX.
    *
-   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
-   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getDefaultStaticPropSource()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getDefaultStaticPropSource()
    */
-  protected static function getDefaultInputForGeneratedInputUx(Component $component): array {
-    \assert($component->getComponentSource() instanceof GeneratedFieldExplicitInputUxComponentSourceBase);
+  protected static function getDefaultInputForJsonSchemaProps(Component $component): array {
+    \assert($component->getComponentSource() instanceof JsonSchemaPropsComponentSourceBase);
     $explicit_inputs = [];
     foreach ($component->getSettings()['prop_field_definitions'] as $sdc_prop_name => $prop_field_definition) {
       if ($prop_field_definition['default_value'] === NULL) {
         continue;
       }
 
-      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
-      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getDefaultStaticPropSource()
+      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
+      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::getDefaultStaticPropSource()
       if ($prop_field_definition['default_value'] === []) {
         // @phpstan-ignore-next-line
         $client_side_info_for_prop = $component->getComponentSource()
@@ -348,7 +346,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
         // Static prop sources can be evaluated without a host entity.
         ->evaluate(NULL, is_required: TRUE);
     }
-    return [GeneratedFieldExplicitInputUxComponentSourceBase::EXPLICIT_INPUT_NAME => $explicit_inputs];
+    return [JsonSchemaPropsComponentSourceBase::EXPLICIT_INPUT_NAME => $explicit_inputs];
   }
 
   /**
@@ -653,7 +651,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
       self::assertCount(1, $out->filter(\sprintf('h1:contains("This is %s")', $slot)));
     }
     // We should also have the HTML comments that allow overlays to work.
-    $html = \trim(\preg_replace('/\s+/', ' ', $out->html()) ?: '');
+    $html = \trim(\preg_replace('/\s+/', ' ', $out->html()) ?? '');
     foreach ($slots as $slot_name) {
       self::assertMatchesRegularExpression(\sprintf('/<!-- canvas-slot-start-%s\/%s -->/', self::UUID_FALLBACK_ROOT, $slot_name), $html);
       self::assertMatchesRegularExpression(\sprintf('/canvas-slot-end-(.*)\/%s -->/', $slot_name), $html);
@@ -813,7 +811,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
 
     // Should not trigger an exception during component list rendering.
     $listOutput = \Drupal::classResolver(ApiConfigControllers::class)->list(Component::ENTITY_TYPE_ID);
-    $list = \json_decode($listOutput->getContent() ?: '[]', TRUE, \JSON_THROW_ON_ERROR);
+    $list = \json_decode((string) $listOutput->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
     self::assertArrayHasKey($component->id(), $list);
     // Component should be flagged as broken.
     self::assertTrue($list[$component->id()]['broken']);
@@ -832,7 +830,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
 
     // Component list's preview should also output verbose error.
     $listOutput = \Drupal::classResolver(ApiConfigControllers::class)->list(Component::ENTITY_TYPE_ID);
-    $list = \json_decode($listOutput->getContent() ?: '[]', TRUE, \JSON_THROW_ON_ERROR);
+    $list = \json_decode((string) $listOutput->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
     self::assertArrayHasKey($component->id(), $list);
     // Component should be flagged as broken.
     self::assertTrue($list[$component->id()]['broken']);

@@ -41,7 +41,7 @@ Access information about the current page.
 import { getPageData } from 'drupal-canvas';
 
 const { pageTitle, breadcrumbs, mainEntity } = getPageData();
-const { bundle, entityTypeId, uuid } = mainEntity;
+const { bundle, entityTypeId, uuid, translations } = mainEntity;
 ```
 
 #### Main entity metadata
@@ -49,7 +49,10 @@ const { bundle, entityTypeId, uuid } = mainEntity;
 The main entity is the primary Drupal entity (e.g. article, canvas_page, blog)
 associated with the current page. Access main entity metadata of the page you
 are on with `getPageData`. This can be used to construct JSON:API parameters for
-requests.
+requests. `mainEntity.translations` lists every enabled site language
+(`langcode`, `name`, `nativeName`, `url`, `translationAvailable`, `current`) for
+building a language switcher, alongside `requestedLanguage` and
+`renderedLanguage`.
 [View documentation and example here.](https://project.pages.drupalcode.org/canvas/code-components/data-fetching#main-entity-metadata)
 
 ### `getSiteData`
@@ -200,7 +203,7 @@ const components = [
     parent_uuid: '872cde09-809a-4f48-8bf5-88f37127cb55',
     slot: 'body',
     component_id: 'js.text',
-    component_version: 'b1e991f726a2a266',
+    component_version: 'd34b93534777207a',
     inputs: { content: 'World' },
     label: 'Text',
   },
@@ -374,6 +377,47 @@ export default function MyComponent({ photo }) {
     />
   );
 }
+```
+
+### Region / RegionsProvider
+
+Render Drupal Canvas global regions inside a layout component.
+`<Region name="..." />` slots in the region whose machine name matches `name`,
+and `<RegionsProvider regions={...}>` supplies the region node map. On the
+Drupal side, region placement is handled by the active theme; these components
+are used by standalone renderers (such as
+[Workbench](https://project.pages.drupalcode.org/canvas/code-components/workbench/regions))
+that compose a page with its surrounding regions on their own.
+
+```jsx
+import { Region } from 'drupal-canvas';
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <Region name="header" />
+      <main>{children}</main>
+      <Region name="footer" />
+    </>
+  );
+}
+```
+
+Pass a `fallback` to render placeholder content when a region is not provided:
+
+```jsx
+<Region name="sidebar" fallback={<aside>No sidebar configured</aside>} />
+```
+
+When composing a renderer outside of Drupal or Workbench, wrap the tree in
+`RegionsProvider` with a map of region machine names to React nodes:
+
+```jsx
+import { RegionsProvider } from 'drupal-canvas';
+
+<RegionsProvider regions={{ header: <SiteHeader />, footer: <SiteFooter /> }}>
+  <Layout>{pageContent}</Layout>
+</RegionsProvider>;
 ```
 
 ## Development

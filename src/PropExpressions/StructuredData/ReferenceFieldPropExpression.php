@@ -9,6 +9,7 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
+use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
@@ -34,12 +35,22 @@ final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressi
       // to the specified bundle-specific branches. However:
       // 1. the `target_bundles` settings can change over time!
       // 2. the entity type manager is not available in all circumstances
+      // 3. the host entity type may not be registered yet (e.g. during PHPUnit
+      //    test discovery, when this expression is constructed inside a data
+      //    provider before any kernel bootstrap has registered modules)
       // Hence trigger a deprecation error if we can perform the validation, but
       // do not throw an exception.
       // @see \Drupal\Tests\canvas\Kernel\PropExpressionKernelTest::testInvalidReferenceFieldTypePropExpressionDueToMismatchedLeafExpressionCardinality
-      // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
-      if (\Drupal::getContainer()->has('entity_type.manager')) {
-        $reference_field_definition = $referencer->getHostEntityDataDefinition()
+      $host_entity_data_definition = $referencer->getHostEntityDataDefinition();
+      $host_entity_type_id = $host_entity_data_definition->getEntityTypeId();
+      if (
+        $host_entity_type_id !== NULL
+        // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
+        && \Drupal::getContainer()->has('entity_type.manager')
+        // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
+        && \Drupal::entityTypeManager()->hasDefinition($host_entity_type_id)
+      ) {
+        $reference_field_definition = $host_entity_data_definition
           ->getPropertyDefinition($referencer->getFieldName());
         \assert($reference_field_definition instanceof FieldDefinitionInterface);
         $target_entity_type_id = $reference_field_definition->getSettings()['target_type'];
@@ -57,7 +68,7 @@ final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressi
             (string) $this,
             implode(', ', $actual_branches),
             $referencer->getFieldName(),
-            $referencer->getHostEntityDataDefinition()->getEntityTypeId(),
+            $host_entity_type_id,
             implode(', ', $expected_branches),
           ), E_USER_DEPRECATED);
         }
@@ -148,17 +159,15 @@ final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressi
       $dependencies = NestedArray::mergeDeep($dependencies, $this->referenced->calculateDependencies());
     }
     else {
-      // ⚠️ Do not require values while calculating dependencies: this MUST not
-      // fail.
-      $referenced_content_entities = Evaluator::evaluate($host_entity, $this->referencer, is_required: FALSE)->value;
-      $referenced_content_entities = match (gettype($referenced_content_entities)) {
-        // Reference field containing nothing.
-        'NULL' => [],
-        // Reference field containing multiple references.
-        'array' => $referenced_content_entities,
-        // Reference field containing a single reference.
-        default => [$referenced_content_entities],
-      };
+      $reference_field = $host_entity->get($this->referencer->getFieldName());
+      \assert($reference_field instanceof EntityReferenceFieldItemListInterface);
+      $referenced_content_entities = $reference_field->referencedEntities();
+      if ($this->referencer->delta !== NULL) {
+        $referenced_content_entities = \array_intersect_key(
+          $referenced_content_entities,
+          \array_flip([$this->referencer->delta]),
+        );
+      }
       \assert(Inspector::assertAllObjects($referenced_content_entities, FieldableEntityInterface::class));
       $dependencies['content'] = [
         ...$dependencies['content'] ?? [],
@@ -178,13 +187,6 @@ final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressi
       }
     }
     return $dependencies;
-  }
-
-  public function withDelta(int $delta): static {
-    return new static(
-      $this->referencer->withDelta($delta),
-      $this->referenced,
-    );
   }
 
   public static function fromString(string $representation): static {
@@ -312,11 +314,52 @@ final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressi
   }
 
   /**
+   * Returns a copy of this expression with the final target replaced.
+   *
+   * Walks the reference chain to the leaf (the deepest non-reference) and
+   * substitutes the provided expression in its place, preserving every
+   * referencer along the way.
+   *
+   * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $new_leaf
+   *   The expression to use as the new leaf. May itself be a
+   *   ReferenceFieldPropExpression to extend the chain.
+   *
+   * @throws \LogicException
+   *   Thrown when this expression targets multiple bundles, because the branch
+   *   to replace is ambiguous.
+   */
+  public function withFinalTargetReplaced(EntityFieldBasedPropExpressionInterface $new_leaf): static {
+    if ($this->referenced instanceof ReferencedBundleSpecificBranches) {
+      throw new \LogicException('Cannot replace the final target of a multi-bundle reference expression; the branch to replace is ambiguous.');
+    }
+    $new_referenced = $this->referenced instanceof self
+      ? $this->referenced->withFinalTargetReplaced($new_leaf)
+      : $new_leaf;
+    return new static($this->referencer, $new_referenced);
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function targetsMultipleBundles(): bool {
     // @see ::withoutBranch()
     return $this->referenced instanceof ReferencedBundleSpecificBranches;
+  }
+
+  /**
+   * Finds the first reference in the chain that targets multiple bundles.
+   *
+   * Walks the whole reference chain, because a multi-target-bundle reference
+   * can be nested inside an otherwise single-bundle chain.
+   */
+  public function findMultiTargetBundleReference(): ?self {
+    if ($this->targetsMultipleBundles()) {
+      return $this;
+    }
+    if ($this->referenced instanceof self) {
+      return $this->referenced->findMultiTargetBundleReference();
+    }
+    return NULL;
   }
 
 }

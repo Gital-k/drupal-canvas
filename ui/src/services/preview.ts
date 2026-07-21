@@ -3,7 +3,7 @@ import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
 import { setLayoutModel } from '@/features/layout/layoutModelSlice';
-import { setHtml } from '@/features/pagePreview/previewSlice';
+import { setHtml, setSnapshotHTML } from '@/features/pagePreview/previewSlice';
 import {
   baseQueryWithAutoSaves,
   popCanvasLayoutRequest,
@@ -88,6 +88,42 @@ export const previewApi = createApi({
         }
       },
     }),
+    // Snapshot preview updates the preview frame without changing the active
+    // model in the UI.
+    getSnapshotPreview: builder.query<
+      { html: string },
+      {
+        entityType: string;
+        entityId: string;
+        language: string;
+        isTemplate?: boolean;
+        templateInfo?: { bundle?: string; viewMode?: string };
+      }
+    >({
+      query: ({ entityType, entityId, language, isTemplate, templateInfo }) => {
+        // Request the translation via the `canvas_preview_langcode` query
+        // parameter. The backend routes the request through the site's
+        // configured language negotiation — redirecting when needed — so the
+        // right translation is served regardless of the negotiation method.
+        const path = isTemplate
+          ? `canvas/api/v0/layout-content-template/${entityType}.${templateInfo?.bundle}.${templateInfo?.viewMode}/${entityId}`
+          : `canvas/api/v0/layout/${entityType}/${entityId}`;
+        const url = language
+          ? `${path}?canvas_preview_langcode=${encodeURIComponent(language)}`
+          : path;
+        return { url, method: 'GET' };
+      },
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          const { html } = data;
+          // Update the snapshot HTML for preview-only display.
+          dispatch(setSnapshotHTML(html));
+        } catch {
+          // Error is handled by the component.
+        }
+      },
+    }),
     updateComponent: builder.mutation<
       UpdateComponentResultType,
       UpdateComponentQueryArg
@@ -109,15 +145,30 @@ export const previewApi = createApi({
       async onQueryStarted(body, { dispatch, queryFulfilled }) {
         // Force any ajax calls to wait.
         pushCanvasLayoutRequest();
-        const { data, meta } = await queryFulfilled;
-        // Tell ajax calls they're good to go.
-        popCanvasLayoutRequest();
+        let data: any;
+        let meta: any;
+        try {
+          ({ data, meta } = await queryFulfilled);
+        } catch {
+          // If the request fails (e.g. the server rejects an invalid field
+          // value), we must still release the lock so that subsequent Drupal
+          // AJAX calls are not permanently blocked.
+          // @see https://www.drupal.org/project/canvas/issues/3579026
+          return;
+        } finally {
+          // Tell ajax calls they're good to go regardless of success/failure.
+          popCanvasLayoutRequest();
+        }
         const { html, layout, model, autoSaves } = data;
         dispatch(
           pendingChangesApi.util.invalidateTags([
             { type: 'PendingChanges', id: 'LIST' },
           ]),
         );
+        // Clear any stale snapshot (e.g. from a prior language/template preview)
+        // so selectPreviewHtml returns this fresh editor html instead of the
+        // preview snapshot, which selectPreviewHtml prefers while set.
+        dispatch(setSnapshotHTML(''));
         dispatch(setHtml(html));
         handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         // Pass update preview false to prevent a subsequent preview update,
@@ -128,8 +179,11 @@ export const previewApi = createApi({
   }),
 });
 
-export const { usePostPreviewMutation, useUpdateComponentMutation } =
-  previewApi;
+export const {
+  usePostPreviewMutation,
+  useGetSnapshotPreviewQuery,
+  useUpdateComponentMutation,
+} = previewApi;
 
 let lastBody = {};
 /**
