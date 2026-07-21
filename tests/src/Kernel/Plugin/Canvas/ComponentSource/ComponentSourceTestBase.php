@@ -972,13 +972,6 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   /**
    * Tests getLabelForExplicitInputKey() returns correct labels.
    *
-   * When a ComponentSource does not override
-   * `ComponentSourceBase::getLabelForExplicitInputKey()`, there is nothing
-   * component-specific to test. Its
-   * ::providerGetLabelForExplicitInputKey() then yields a single NULL
-   * dummy entry (a data provider yielding zero entries is treated by
-   * PHPUnit as invalid), and this test skips itself upon seeing it.
-   *
    * @param string|null $component_id
    *   The component config entity ID, or NULL for the "nothing to test"
    *   dummy entry.
@@ -1005,6 +998,8 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    * Data provider for ::testGetLabelForExplicitInputKey().
    *
    * By default, this yields a single NULL dummy entry to skip the test.
+   * We need it to prevent PHPUnit from treating a data provider that yields
+   * zero entries as invalid.
    *
    * @return \Generator<string, array{component_id: string|null, key: string|null, expected_label: string|null}>
    */
