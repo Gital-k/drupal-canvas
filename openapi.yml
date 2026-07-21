@@ -2407,51 +2407,6 @@ paths:
                   error:
                     type: string
                     example: Cannot find entity to duplicate.
-  '/canvas/api/v0/export/content/canvas_page/{entityId}':
-    get:
-      summary: Returns a page entity as a textual representation, with language and timestamp metadata.
-      description: When autoSaved is TRUE (default), the auto-save draft is returned. When FALSE, the published entity is returned.
-      parameters:
-        - $ref: '#/components/parameters/entityId'
-        - in: query
-          name: autoSaved
-          required: false
-          description: Entity status, defaults to TRUE when not provided. On TRUE - the entity version stored in auto-save is used, on FALSE - the published entity is used to generate the response.
-          schema:
-            type: boolean
-          examples:
-            "load the auto-save entry for this entity, if any":
-              value: true
-            "load the actually stored entity":
-              value: false
-      responses:
-        '200':
-          description: Content entity retrieved successfully.
-          content:
-            application/json:
-              schema:
-                type: object
-        '404':
-          description: No auto-save item found for the requested entity.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  errors:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        detail:
-                          type: string
-                          example: No auto-save items for entity 1 found
-                        source:
-                          type: object
-                          properties:
-                            pointer:
-                              type: string
-                              example: canvas_page:1:en
   '/canvas/api/v0/extensions':
     description: Returns the available extensions metadata
     get:
