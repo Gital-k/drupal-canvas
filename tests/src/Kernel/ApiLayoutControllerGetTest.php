@@ -330,6 +330,89 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
   }
 
   /**
+   * Global regions keep working when the site default language changes.
+   *
+   * PageRegion config entities keep their original langcode when the site
+   * default language changes later. The layout GET endpoint must still render
+   * the preview when such a region has an auto-save draft (whose component
+   * tree is delta-keyed, since drafts never run preSave()) and a config
+   * translation override (which targets component instances by UUID key).
+   *
+   * @see https://www.drupal.org/i/3591850
+   */
+  public function testGlobalRegionsWhenSiteDefaultLanguageDiffersFromRegionLangcode(): void {
+    $this->container->get('module_installer')->install(['language', 'config_translation']);
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+
+    $entity = $this->getTestEntity('node');
+    $this->setUpCurrentUser([], [self::getAdminPermission($entity), PageRegion::ADMIN_PERMISSION]);
+    // The PageRegion config entities are created while 'en' is the site
+    // default language, so they get `langcode: en`.
+    $regions = $this->enableGlobalRegions();
+    self::assertSame('en', $regions['stark.highlighted']->get('langcode'));
+
+    // Change the site default language: the PageRegions keep `langcode: en`.
+    $this->config('system.site')->set('default_langcode', 'fr')->save();
+    $language_manager = $this->container->get('language_manager');
+    \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
+    $language_manager->reset();
+    self::assertSame('fr', $language_manager->getDefaultLanguage()->getId());
+
+    // Store an auto-save draft for a region, mirroring what the client sends:
+    // a delta-keyed component tree.
+    $component_instance_uuid = 'c3f3c22c-c22e-4bb6-ad16-635f069148e4';
+    $layoutData = [
+      'layout' => [
+        [
+          "nodeType" => "component",
+          "slots" => [],
+          "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
+          "uuid" => $component_instance_uuid,
+        ],
+      ],
+      'model' => [
+        $component_instance_uuid => [
+          "label" => "Page title",
+          "label_display" => "0",
+          "provider" => "core",
+        ],
+      ],
+    ];
+    $stark_highlighted = $regions['stark.highlighted']->forAutoSaveData($layoutData, validate: TRUE);
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    $autoSave->saveEntity($stark_highlighted);
+
+    // Rendering the preview validates the auto-saved PageRegion. This must not
+    // treat the region's own langcode ('en') as a translation of itself.
+    // @see \Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant::build()
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\CanvasConfigEntityTranslationsAreValidConstraintValidator
+    $url = $this->getLayoutUrl($entity);
+    $response = $this->request(Request::create($url->toString()));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+
+    // Add a config translation override for the region, targeting the
+    // component instance by its UUID sequence key — the shape
+    // config_translation (and tmgmt_config) writes. Validating the draft now
+    // merges the delta-keyed draft tree with the UUID-keyed override; the
+    // merge must align the two rather than produce phantom, instance-less
+    // entries.
+    $language_manager->getLanguageConfigOverride('fr', $regions['stark.highlighted']->getConfigDependencyName())
+      ->set('component_tree', [
+        $component_instance_uuid => [
+          'inputs' => [
+            'label' => 'Titre de la page',
+          ],
+        ],
+      ])
+      ->save();
+
+    $response = $this->request(Request::create($url->toString()));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $json = static::decodeResponse($response);
+    self::assertArrayHasKey($component_instance_uuid, $json['model']);
+  }
+
+  /**
    * Global regions are hidden when editing a content template for non-full view mode.
    */
   public function testNonFullContentTemplateHidesGlobalRegions(): void {
