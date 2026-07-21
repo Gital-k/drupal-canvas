@@ -66,7 +66,13 @@ final class CanvasConfigEntityTranslationsAreValidConstraintValidator extends Co
       // consequences.
       $value = clone $value;
     }
-    $default_langcode = $this->languageManager->getDefaultLanguage()->getId();
+    // The base config's default translation is the entity's own langcode, not
+    // the site default language. getTranslation() rejects $value->langcode, so
+    // this must match it. Otherwise, when the site default language differs
+    // from the entity langcode, the entity langcode is treated as a
+    // non-default translation here and later passed to getTranslation(),
+    // throwing InvalidArgumentException.
+    $default_langcode = $value->language()->getId();
     $languages = $this->languageManager->getLanguages();
 
     foreach ($languages as $langcode => $language) {
