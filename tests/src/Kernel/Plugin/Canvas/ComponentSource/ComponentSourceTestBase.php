@@ -972,17 +972,28 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   /**
    * Tests getLabelForExplicitInputKey() returns correct labels.
    *
-   * @param string $component_id
-   *   The component config entity ID.
-   * @param string $key
+   * When a ComponentSource does not override
+   * `ComponentSourceBase::getLabelForExplicitInputKey()`, there is nothing
+   * component-specific to test. Its
+   * ::providerGetLabelForExplicitInputKey() then yields a single NULL
+   * dummy entry (a data provider yielding zero entries is treated by
+   * PHPUnit as invalid), and this test skips itself upon seeing it.
+   *
+   * @param string|null $component_id
+   *   The component config entity ID, or NULL for the "nothing to test"
+   *   dummy entry.
+   * @param string|null $key
    *   The explicit input key to test.
-   * @param string $expected_label
+   * @param string|null $expected_label
    *   The expected label for the prop.
    *
    * @legacy-covers ::getLabelForExplicitInputKey
    */
   #[DataProvider('providerGetLabelForExplicitInputKey')]
-  public function testGetLabelForExplicitInputKey(string $component_id, string $key, string $expected_label): void {
+  public function testGetLabelForExplicitInputKey(?string $component_id, ?string $key, ?string $expected_label): void {
+    if ($component_id === NULL || $key === NULL || $expected_label === NULL) {
+      self::markTestSkipped('Nothing to test: this ComponentSource reuses ComponentSourceBase::getLabelForExplicitInputKey().');
+    }
     $this->generateComponentConfig();
     $component = Component::load($component_id);
     self::assertInstanceOf(ComponentInterface::class, $component);
@@ -993,9 +1004,13 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   /**
    * Data provider for ::testGetLabelForExplicitInputKey().
    *
-   * @return \Generator<string, array{component_id: string, key: string, expected_label: string}>
+   * By default, this yields a single NULL dummy entry to skip the test.
+   *
+   * @return \Generator<string, array{component_id: string|null, key: string|null, expected_label: string|null}>
    */
-  abstract public static function providerGetLabelForExplicitInputKey(): \Generator;
+  public static function providerGetLabelForExplicitInputKey(): \Generator {
+    yield 'n/a' => [NULL, NULL, NULL];
+  }
 
   abstract protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface;
 
