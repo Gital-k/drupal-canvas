@@ -421,7 +421,9 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
    * {@inheritdoc}
    */
   public function getLabelForExplicitInputKey(string $key): string|TranslatableMarkup {
-    return $this->getMetadata()->schema['properties'][$key]['title'] ?? Unicode::ucfirst($key);
+    // Each defined prop is guaranteed to have a title.
+    // @see \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
+    return $this->getMetadata()->schema['properties'][$key]['title'];
   }
 
   /**
