@@ -16,7 +16,7 @@
   ],
   "packageManager": "npm@11.18.0",
   "scripts": {
-    "packages:build": "turbo run build --filter='./packages/*'",
+    "packages:build": "turbo run build --filter='./packages/*' --filter='!@drupal-canvas/astro-hydration'",
     "packages:check": "npm run check:repo && npm run packages:type-check && eslint packages",
     "packages:dev": "turbo run dev --filter='./packages/*'",
     "packages:test": "turbo run test --filter='./packages/*'",
