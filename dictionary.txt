@@ -259,4 +259,6 @@ rovodev
 tabnine
 trae
 videomedia
+xclip
+xsel
 zencoder
