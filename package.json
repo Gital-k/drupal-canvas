@@ -29,6 +29,7 @@
     "packages:test": "turbo run test --filter='./packages/*'",
     "packages:type-check": "turbo run type-check --filter='./packages/*'",
     "test:playwright": "playwright install && playwright test",
+    "build": "turbo run build --filter='!./packages/*'",
     "lint:eslint": "eslint . --ignore-pattern 'packages/**'",
     "lint:openapi": "redocly lint openapi.yml",
     "lint:prettier": "prettier tests/src/Playwright playwright.config.ts ui eslint.config.mjs --check",
