@@ -484,6 +484,7 @@ changesets:
         echo ""
         echo "ERROR: This merge request changes files in packages/ but has no changeset."
         echo "To fix: run 'npx changeset', pick the affected packages and bump levels, and commit the result."
+        echo "To write the changeset with an AI coding agent, run 'npm run changeset:prompt'."
         echo "For changes that must not be released (e.g. tests only), run 'npx changeset --empty' instead."
         exit 1
       fi
