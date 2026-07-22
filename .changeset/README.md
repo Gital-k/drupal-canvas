@@ -58,8 +58,15 @@ The summary is copied verbatim into every package listed in the frontmatter.
 When a change means something different for each affected package, write a
 separate changeset per package instead of sharing one summary.
 
-To write changesets with an AI coding agent, use the `canvas-changeset`
-skill.
+To write a changeset with an AI coding agent, run:
+
+```sh
+npm run changeset:prompt
+```
+
+It prints a prompt covering this branch's package changes, the expected
+format, and the bump-level rules, and copies it to the clipboard so you can
+paste it into your coding agent.
 
 For the release flow, see `docs/release-process.md`. General documentation:
 https://github.com/changesets/changesets
