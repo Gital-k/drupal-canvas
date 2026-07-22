@@ -919,11 +919,24 @@ version packages:
   image: *image-node
   interruptible: false
   needs: []
+  # Serialize with other pipelines' runs of this job so concurrent pipelines
+  # cannot force-push the version branch simultaneously.
+  resource_group: version-packages
   variables:
     GIT_DEPTH: "50"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
   script:
+    - |
+      # When commits merge in quick succession, their pipelines can run this
+      # job in any order. Only the pipeline of the branch's current tip may
+      # update the version merge request; an older pipeline running late
+      # would force-push stale content over it.
+      LATEST=$(git ls-remote origin "refs/heads/${CI_DEFAULT_BRANCH}" | cut -f1)
+      if [ "$LATEST" != "$CI_COMMIT_SHA" ]; then
+        echo "${CI_DEFAULT_BRANCH} has moved on to ${LATEST}; that commit's pipeline maintains the version merge request."
+        exit 0
+      fi
     - |
       if ! find .changeset -name '*.md' ! -name 'README.md' | grep -q .; then
         echo "No pending changesets; nothing to version."
@@ -964,6 +977,9 @@ publish packages:
   stage: publish
   image: *image-node
   interruptible: false
+  # Serialize publishes across pipelines; `changeset publish` skips versions
+  # that are already on the registry, so ordering resolves safely.
+  resource_group: publish-packages
   # Gate on the package jobs only; unrelated report-stage failures (e.g.
   # Playwright flakiness) must not block publishing.
   needs:
