@@ -18,6 +18,8 @@ variables:
   PLAYWRIGHT_BROWSERS_PATH: $CI_PROJECT_DIR/.cache/ms-playwright
   COMPOSER_CACHE_DIR: $CI_PROJECT_DIR/.cache/composer
   npm_config_cache: $CI_PROJECT_DIR/.cache/npm
+  # Persist Turborepo's task cache between jobs and pipelines.
+  TURBO_CACHE_DIR: $CI_PROJECT_DIR/.cache/turbo
 
   # Disable npm lifecycle scripts.
   npm_config_ignore_scripts: "true"
@@ -195,6 +197,7 @@ default:
       - .cache/npm
       - .cache/astro
       - .cache/tsc
+      - .cache/turbo
     policy: pull
 
 cache dependencies:
@@ -216,6 +219,7 @@ cache dependencies:
         - .cache/npm
         - .cache/astro
         - .cache/tsc
+        - .cache/turbo
     - key: ${CI_PARENT_PROJECT_NAME}-phplint-${CI_COMMIT_REF_NAME}
       paths:
         - .cache/phpcs
@@ -350,6 +354,7 @@ lint (php):
         - .cache/npm
         - .cache/astro
         - .cache/tsc
+        - .cache/turbo
       policy: pull
     - key: ${CI_PARENT_PROJECT_NAME}-phplint-${CI_COMMIT_REF_NAME}
       fallback_keys:
@@ -658,6 +663,7 @@ vitest:
         - .cache/npm
         - .cache/astro
         - .cache/tsc
+        - .cache/turbo
       policy: pull
     - key: ${CI_PARENT_PROJECT_NAME}-cypress-${CI_COMMIT_REF_NAME}
       fallback_keys:
@@ -770,6 +776,7 @@ playwright:
         - .cache/npm
         - .cache/astro
         - .cache/tsc
+        - .cache/turbo
       policy: pull
     - key: ${CI_PARENT_PROJECT_NAME}-playwright-${CI_COMMIT_REF_NAME}
       fallback_keys:
