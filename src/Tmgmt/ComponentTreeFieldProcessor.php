@@ -144,6 +144,16 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
   }
 
   /**
+   * The ∅ sentinel used by ComponentInputsTranslatablesExtractor.
+   *
+   * Empty optional inputs in the source language are represented as this
+   * placeholder so that TMGMT does not silently drop them from the review UI.
+   *
+   * @see \Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor::extractTranslatablesOptionallyIncludingEmpty()
+   */
+  private const string EMPTY_SENTINEL = '∅';
+
+  /**
    * Writes TMGMT translations back into a nested component input value.
    *
    * Unlike the SDC/JS path (where each prop maps 1:1 to a field item and
@@ -154,9 +164,11 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
    * raw $inputs array at the exact nested position they were extracted from.
    *
    * Recursively walks the TMGMT data tree: at translatable leaves (#translate
-   * TRUE), returns the #translation['#text'] value; at intermediate nodes,
-   * merges translated children back into the existing input array, preserving
-   * non-translated sibling keys.
+   * TRUE), returns NULL if the translation is empty or the ∅ sentinel (so
+   * setInput omits the key and Drupal falls back to the source), the
+   * translated string otherwise; at intermediate nodes, merges translated
+   * children back into the existing input array, preserving non-translated
+   * sibling keys.
    *
    * @param array $tmgmt_data
    *   TMGMT data node, e.g. ['#text' => ..., '#translation' => [...], ...].
@@ -173,11 +185,34 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
       \assert(\array_key_exists('#translation', $tmgmt_data));
       \assert(\array_key_exists('#text', $tmgmt_data['#translation']));
       $found = TRUE;
-      return $tmgmt_data['#translation']['#text'];
+      $text = $tmgmt_data['#translation']['#text'];
+      // Returning NULL causes setInput's array_filter to omit the key, so
+      // Drupal's standard translation fallback applies at render time.
+      if ($text === self::EMPTY_SENTINEL || $text === '') {
+        return NULL;
+      }
+      return $text;
     }
     $result = \is_array($existing) ? $existing : [];
+    $any_translated = FALSE;
+    $all_translated_null = TRUE;
     foreach (Element::children($tmgmt_data) as $key) {
-      $result[$key] = self::writeNestedTranslationsToInputs($tmgmt_data[$key], $result[$key] ?? NULL, $found);
+      $child_found = FALSE;
+      $result[$key] = self::writeNestedTranslationsToInputs($tmgmt_data[$key], $result[$key] ?? NULL, $child_found);
+      if ($child_found) {
+        $found = TRUE;
+        $any_translated = TRUE;
+        if ($result[$key] !== NULL) {
+          $all_translated_null = FALSE;
+        }
+      }
+    }
+    // If every translatable leaf in this subtree resolved to NULL (empty or
+    // sentinel), return NULL for the whole composite input so setInput's
+    // array_filter omits the key entirely and the default value shows instead.
+    // This handles compound inputs such as text_format (value + format).
+    if ($any_translated && $all_translated_null) {
+      return NULL;
     }
     return $result;
   }

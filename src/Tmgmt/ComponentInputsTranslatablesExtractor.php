@@ -26,6 +26,14 @@ use Drupal\Core\TypedData\DataDefinitionInterface;
  */
 final class ComponentInputsTranslatablesExtractor {
 
+  /**
+   * Placeholder for optional component inputs that are empty in the source.
+   *
+   * @see \Drupal\canvas\Hook\TmgmtHooks::tmgmtDataItemTextInputAlter()
+   * @see \Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor
+   */
+  public const string EMPTY_SENTINEL = '∅';
+
   public function __construct(
     private readonly TypedConfigManagerInterface $typedConfigManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
@@ -273,7 +281,7 @@ final class ComponentInputsTranslatablesExtractor {
           if (self::isComponentInstanceInputs($schema)) {
             // Customized behavior, to allow translating optional component
             // props not populated in the default translation.
-            $config_data[$key] = '∅';
+            $config_data[$key] = self::EMPTY_SENTINEL;
           }
           else {
             // Same behavior as the parent implementation.
