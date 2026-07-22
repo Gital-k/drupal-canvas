@@ -17,7 +17,11 @@ DDEV setup is fully automated through our custom add-on: https://github.com/drup
 
 #### Build steps
 1. `npm install` from /modules/canvas
-2. `npm run build` from /modules/canvas/ui
+2. `npm run ui:build` from /modules/canvas
+   - This uses Turborepo to first build the workspace packages the UI depends
+     on (`headless`, `astro-hydration`, and their dependencies), then the UI
+     itself. Running `npm run build` inside the `ui` directory only runs the
+     Vite build and requires those packages to be built already.
 
 ##### Development mode
 1. `npm install` from /modules/canvas
@@ -38,7 +42,8 @@ DDEV setup is fully automated through our custom add-on: https://github.com/drup
 #### Running E2E Tests
 - In your `.env` file, set `BASE_URL` and `DB_URL`. See `.env.example` for an example.
 - The e2e tests use the application file in /ui/dist, which is only updated by
-  running `npm run build`. Be sure to do this before running e2e tests.
+  running `npm run ui:build` from /modules/canvas. Be sure to do this before
+  running e2e tests.
 - Then, _either_:
   - Use `npm run cy:open` to run e2e with the (very helpful) Cypress GUI test runner (do that in its own terminal). This runs the test in a visible browser.
   - Use `npm run cy:run` to run the same e2e tests in the terminal (this is also the command used by Gitlab CI). This runs the test in a "headless" browser.

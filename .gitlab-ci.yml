@@ -887,11 +887,7 @@ test (packages):
     - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
   script:
-    # astro-hydration is excluded: its build script also rebuilds
-    # drupal-canvas (a chain the UI build flow relies on), which deletes and
-    # recreates drupal-canvas/dist while concurrent tasks read it. Its build
-    # runs in the UI jobs instead.
-    - npx turbo run build --filter='./packages/*' --filter='!@drupal-canvas/astro-hydration'
+    - npx turbo run build --filter='./packages/*'
     - npx turbo run test --filter='./packages/*'
 
 # Pre-release dependency vulnerability check on the automated version merge
@@ -979,9 +975,7 @@ publish packages:
     - npm ci
     # Lifecycle scripts (including prepack) are disabled in CI through
     # npm_config_ignore_scripts: the published dist comes from this build step.
-    # astro-hydration is excluded for the same reason as in test (packages);
-    # it is private and never published.
-    - npx turbo run build --filter='./packages/*' --filter='!@drupal-canvas/astro-hydration'
+    - npx turbo run build --filter='./packages/*'
     - git config --local user.email "no-reply@drupal.org"
     - git config --local user.name "drupal.org GitLab CI"
     - git remote set-url origin https://gitlab-ci-token:${GITLAB_CI_RELEASE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
@@ -1069,8 +1063,8 @@ release:
       npm ci
       cd ui
       npm version $VERSION --allow-same-version --no-git-tag-version
-      npm run build
       cd ..
+      npx turbo run build --filter=@drupal-canvas/ui
     - echo "!/ui/dist" >> .gitignore
     - echo "!/packages/astro-hydration/dist" >> .gitignore
     - git add .gitignore
