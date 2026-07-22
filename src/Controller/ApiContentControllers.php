@@ -139,7 +139,7 @@ final class ApiContentControllers extends ApiControllerBase {
       }
       // For UX reasons all component trees should be at the bottom of the
       // response structure. Split component trees, so they can be appended.
-      if ($field_definition instanceof ComponentTreeItem) {
+      if ($field_definition->getType() === ComponentTreeItem::PLUGIN_ID) {
         $component_trees[$field_name] = $entity_values[$field_name];
         unset($entity_values[$field_name]);
       }

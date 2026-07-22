@@ -64,7 +64,13 @@ class ApiContentControllersGetValuesAsTextTest extends CanvasKernelTestBase {
       'title' => 'Page 1',
       'status' => TRUE,
       'path' => ['alias' => '/page-1'],
-      'components' => [],
+      'components' => [
+        [
+          'uuid' => '09365c2d-1ee1-47fd-b5a3-7e4f34866186',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'inputs' => ['heading' => 'Welcome'],
+        ],
+      ],
     ]);
     $page->save();
     \assert($page instanceof Page);
@@ -108,6 +114,13 @@ class ApiContentControllersGetValuesAsTextTest extends CanvasKernelTestBase {
     self::assertIsInt($response_body['data']['updated']);
     self::assertIsString($response_body['data']['entity']);
     self::assertStringContainsString('Page 1', $response_body['data']['entity']);
+
+    // Component tree fields must be appended to the bottom of the structure.
+    $entity_values = Yaml::decode($response_body['data']['entity']);
+    self::assertIsArray($entity_values);
+    self::assertArrayHasKey('components', $entity_values);
+    self::assertNotSame('components', \array_key_first($entity_values));
+    self::assertSame('components', \array_key_last($entity_values));
   }
 
   /**
@@ -132,6 +145,13 @@ class ApiContentControllersGetValuesAsTextTest extends CanvasKernelTestBase {
     self::assertEquals($updated, $response_body['data']['updated']);
     self::assertIsString($response_body['data']['entity']);
     self::assertStringContainsString('Auto-saved title', $response_body['data']['entity']);
+
+    // Component tree fields must be appended to the bottom of the structure.
+    $entity_values = Yaml::decode($response_body['data']['entity']);
+    self::assertIsArray($entity_values);
+    self::assertArrayHasKey('components', $entity_values);
+    self::assertNotSame('components', \array_key_first($entity_values));
+    self::assertSame('components', \array_key_last($entity_values));
   }
 
   /**
@@ -143,16 +163,6 @@ class ApiContentControllersGetValuesAsTextTest extends CanvasKernelTestBase {
    * @see \Drupal\canvas_test_field_view_access\Hook\CanvasTestFieldViewAccessHooks
    */
   public function testGetValuesAsTextOmitsComponentsWithoutViewAccess(): void {
-    // Add a component so the "components" field is populated in the response.
-    $this->page->set('components', [
-      [
-        'uuid' => '09365c2d-1ee1-47fd-b5a3-7e4f34866186',
-        'component_id' => 'sdc.canvas_test_sdc.props-slots',
-        'inputs' => ['heading' => 'Welcome'],
-      ],
-    ]);
-    $this->page->save();
-
     // Without any denial registered, "components" is present.
     $response = $this->request(Request::create(\sprintf(self::URL, $this->page->id()), 'GET', [
       ApiContentControllers::AUTO_SAVED_QUERY_KEY => 'false',
@@ -177,6 +187,7 @@ class ApiContentControllersGetValuesAsTextTest extends CanvasKernelTestBase {
 
     // The inaccessible "components" field is omitted from the response.
     $entity_values = Yaml::decode($this->decodeResponse($response)['data']['entity']);
+    self::assertIsArray($entity_values);
     self::assertArrayNotHasKey('components', $entity_values);
     // A viewable field remains present.
     self::assertArrayHasKey('title', $entity_values);
