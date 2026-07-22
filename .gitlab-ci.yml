@@ -1063,8 +1063,8 @@ release:
       npm ci
       cd ui
       npm version $VERSION --allow-same-version --no-git-tag-version
+      npm run build
       cd ..
-      npx turbo run build --filter=@drupal-canvas/ui
     - echo "!/ui/dist" >> .gitignore
     - echo "!/packages/astro-hydration/dist" >> .gitignore
     - git add .gitignore
