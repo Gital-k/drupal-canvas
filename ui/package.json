@@ -11,7 +11,8 @@
   "scripts": {
     "drupaldev": "VITE_DRUPAL=true vite",
     "start": "vite",
-    "build": "vite build",
+    "build": "turbo run build:app --filter=@drupal-canvas/ui",
+    "build:app": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest watch",
