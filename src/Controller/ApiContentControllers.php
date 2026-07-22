@@ -92,6 +92,15 @@ final class ApiContentControllers extends ApiControllerBase {
 
   /**
    * Returns a JSON response containing a Canvas page values as YAML text.
+   *
+   * The returned values match what is stored in an auto-save item: only
+   * storable (non-computed, or persisted-computed) fields are included.
+   *
+   * Fields the current user cannot *view* are omitted from the YAML output.
+   * Auto-save conflict detection is not affected by this filtering — it
+   * operates on the full stored data regardless of view access.
+   *
+   * @see \Drupal\canvas\AutoSave\AutoSaveManager::toStorableArray()
    */
   public function getValuesAsText(Request $request, Page $canvas_page): CacheableJsonResponse {
     $cacheability = new CacheableMetadata();
@@ -116,9 +125,17 @@ final class ApiContentControllers extends ApiControllerBase {
 
       $canvas_page = $auto_save_data->entity;
       \assert($canvas_page instanceof Page);
+      // The auto-save timestamp: the time at which user's in-progress changes
+      // were last recorded by AutoSaveManager in the auto-save item, not when
+      // the entity was last saved.
       $updated = $auto_save_data->updated;
     }
     else {
+      // The revision creation timestamp: the time the entity was last saved to
+      // storage. This is *not* the same as the auto-save updated time above —
+      // an auto-save item may be newer than the last published save.
+      // When comparing timestamps across both sides of a diff (auto-save vs
+      // stored), use this value only to establish the baseline revision time.
       $updated = (int) $canvas_page->getRevisionCreationTime();
     }
 
@@ -131,6 +148,13 @@ final class ApiContentControllers extends ApiControllerBase {
       if (!\array_key_exists($field_name, $entity_values)) {
         continue;
       }
+      // Note: auto-save items store and hash *all* storable fields, regardless
+      // of the current user's view access. Filtering by view access here means
+      // the returned YAML is a subset of what is actually stored. A text diff
+      // built on this output will therefore not reflect changes to fields the
+      // current user cannot view. Conflicts in those fields will still be
+      // detected by AutoSaveManager (which operates on the full stored data),
+      // but they will not be visible in the diff presented to the user.
       $field_access = $canvas_page->get($field_name)->access(operation: 'view', return_as_object: TRUE);
       $cacheability->addCacheableDependency($field_access);
       if (!$field_access->isAllowed()) {
