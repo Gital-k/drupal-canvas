@@ -1004,7 +1004,11 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    * @return \Generator<string, array{component_id: string|null, key: string|null, expected_label: string|null}>
    */
   public static function providerGetLabelForExplicitInputKey(): \Generator {
-    yield 'n/a' => [NULL, NULL, NULL];
+    yield 'n/a' => [
+      'component_id' => NULL,
+      'key' => NULL,
+      'expected_label' => NULL,
+    ];
   }
 
   abstract protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface;
