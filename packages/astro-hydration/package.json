@@ -2,6 +2,7 @@
   "name": "@drupal-canvas/astro-hydration",
   "type": "module",
   "version": "0.0.0",
+  "private": true,
   "license": "GPL-2.0-or-later",
   "scripts": {
     "build": "npm run build:drupal-canvas && astro build && node extract-hydration-script.js",
