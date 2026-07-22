@@ -9,6 +9,7 @@ use Drupal\canvas\Tmgmt\ComponentInputsConfigProcessor;
 use Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor;
 use Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor;
 use Drupal\Core\Entity\EntityFormInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
@@ -153,7 +154,7 @@ final readonly class TmgmtHooks {
       $entity = \Drupal::entityTypeManager()
         ->getStorage($entity_type_id)
         ->load($item->getItemId());
-      if ($entity !== NULL) {
+      if ($entity instanceof FieldableEntityInterface) {
         foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
           if ($definition->getType() === ComponentTreeItem::PLUGIN_ID) {
             $component_tree_field_names[] = $field_name;
