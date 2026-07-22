@@ -415,11 +415,11 @@ lint (ui):
     - *manual-rule
   script:
     - npm ci
-    # Runs the repo-wide checks, then type-checks the non-package workspaces
-    # (Turborepo builds workspace dependencies first where type-checking needs
-    # their compiled dist, e.g. the UI depends on @drupal-canvas/headless-host),
-    # then lints everything outside packages/.
-    - npm run ui:check
+    # Runs every lint:* script; they all scope to everything outside
+    # packages/. Turborepo builds workspace dependencies first where
+    # type-checking needs their compiled dist (e.g. the UI depends on
+    # @drupal-canvas/headless-host).
+    - npm run lint
     - |
       if [ "$E2E_TESTS_ENABLED" != "true" ]; then
         echo "❌ 'E2E_TESTS_ENABLED' is $E2E_TESTS_ENABLED — E2E tests must not be disabled when merging. Reset it to 'true'."
@@ -440,9 +440,8 @@ lint (packages):
     - *manual-rule
   script:
     - npm ci
-    # Runs the repo-wide checks, then type-checks every package (building
-    # workspace dependencies first), then lints packages/.
-    - npm run packages:check
+    # Runs every packages:lint:* script; they all scope to packages/ only.
+    - npm run packages:lint
 
 # Every merge request that changes a package must declare its release intent
 # with a changeset (or explicitly opt out with an empty changeset).
@@ -894,8 +893,8 @@ test (packages):
     - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
   script:
-    - npx turbo run build --filter='./packages/*'
-    - npx turbo run test --filter='./packages/*'
+    - npm run packages:build
+    - npm run packages:test
 
 # Pre-release dependency vulnerability check on the automated version merge
 # request, as a warning rather than a blocker: an unfixable upstream advisory
@@ -998,7 +997,7 @@ publish packages:
     - npm ci
     # Lifecycle scripts (including prepack) are disabled in CI through
     # npm_config_ignore_scripts: the published dist comes from this build step.
-    - npx turbo run build --filter='./packages/*'
+    - npm run packages:build
     - git config --local user.email "no-reply@drupal.org"
     - git config --local user.name "drupal.org GitLab CI"
     - git remote set-url origin https://gitlab-ci-token:${GITLAB_CI_RELEASE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
