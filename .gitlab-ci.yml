@@ -447,7 +447,8 @@ lint (packages):
 # with a changeset (or explicitly opt out with an empty changeset).
 changesets:
   stage: validate
-  image: *image-node
+  # Runs git commands, so it uses the default drupal-testing image; the node
+  # images do not contain git.
   needs: []
   variables:
     # `changeset status` diffs against the target branch, which requires
@@ -915,7 +916,8 @@ audit (packages):
 # `publish packages`. Requires GITLAB_CI_RELEASE_TOKEN with api scope.
 version packages:
   stage: publish
-  image: *image-node
+  # Runs git commands, so it uses the default drupal-testing image; the node
+  # images do not contain git.
   interruptible: false
   needs: []
   # Serialize with other pipelines' runs of this job so concurrent pipelines
@@ -974,7 +976,8 @@ version packages:
 # published versions are skipped, so a failed job can be retried safely.
 publish packages:
   stage: publish
-  image: *image-node
+  # Runs git commands, so it uses the default drupal-testing image; the node
+  # images do not contain git.
   interruptible: false
   # Serialize publishes across pipelines; `changeset publish` skips versions
   # that are already on the registry, so ordering resolves safely.
