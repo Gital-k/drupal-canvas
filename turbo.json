@@ -6,6 +6,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "build:app": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
     "type-check": {
       "dependsOn": ["^build"]
     },

@@ -21,7 +21,7 @@
     "packages:dev": "turbo run dev --filter='./packages/*'",
     "packages:test": "turbo run test --filter='./packages/*'",
     "packages:type-check": "turbo run type-check --filter='./packages/*'",
-    "ui:build": "turbo run build --filter=@drupal-canvas/ui",
+    "ui:build": "npm run build --workspace=@drupal-canvas/ui",
     "ui:check": "npm run check:repo && turbo run type-check --filter='!./packages/*' && eslint . --ignore-pattern 'packages/**'",
     "check:repo": "npx concurrently --group npm:lint:prettier npm:lint:stylelint npm:lint:cspell npm:lint:yaml npm:lint:openapi",
     "changeset:prompt": "node scripts/changeset-prompt.js",
