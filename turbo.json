@@ -33,24 +33,27 @@
       "cache": false,
       "persistent": true
     },
-    // Root lint tasks cache on scoped inputs. Inputs may be broader than a
-    // task reads (extra cache misses) but never narrower (stale results):
-    // lint:* hashes everything outside packages/, and packages:lint:* hashes
-    // the packages tree plus all root-level files, so shared configs at the
-    // root are always covered. If eslint.config.mjs ever imports
+    // Root lint tasks cache on scoped inputs, always starting from
+    // $TURBO_DEFAULT$ so gitignored files (dist, node_modules, caches) never
+    // enter the hash. Inputs may be broader than a task reads (extra cache
+    // misses) but never narrower (stale results): lint:* hashes everything
+    // outside packages/, and packages:lint:* subtracts the non-package
+    // top-level directories (mirror of .non-packages-files in
+    // .gitlab-ci.yml), leaving root-level files and the packages and
+    // .changeset trees. If eslint.config.mjs ever imports
     // packages/eslint-config, add "packages/eslint-config/**" to the lint:*
     // inputs.
-    "//#lint:cspell": { "inputs": ["**/*", "!packages/**"] },
-    "//#lint:eslint": { "inputs": ["**/*", "!packages/**"] },
-    "//#lint:openapi": { "inputs": ["**/*", "!packages/**"] },
-    "//#lint:prettier": { "inputs": ["**/*", "!packages/**"] },
-    "//#lint:stylelint": { "inputs": ["**/*", "!packages/**"] },
-    "//#lint:yaml": { "inputs": ["**/*", "!packages/**"] },
-    "//#packages:lint:cspell": { "inputs": ["*", "packages/**"] },
-    "//#packages:lint:eslint": { "inputs": ["*", "packages/**"] },
-    "//#packages:lint:prettier": { "inputs": ["*", "packages/**"] },
-    "//#packages:lint:stylelint": { "inputs": ["*", "packages/**"] },
-    "//#packages:lint:yaml": { "inputs": ["*", "packages/**"] },
+    "//#lint:cspell": { "inputs": ["$TURBO_DEFAULT$", "!packages/**"] },
+    "//#lint:eslint": { "inputs": ["$TURBO_DEFAULT$", "!packages/**"] },
+    "//#lint:openapi": { "inputs": ["$TURBO_DEFAULT$", "!packages/**"] },
+    "//#lint:prettier": { "inputs": ["$TURBO_DEFAULT$", "!packages/**"] },
+    "//#lint:stylelint": { "inputs": ["$TURBO_DEFAULT$", "!packages/**"] },
+    "//#lint:yaml": { "inputs": ["$TURBO_DEFAULT$", "!packages/**"] },
+    "//#packages:lint:cspell": { "inputs": ["$TURBO_DEFAULT$", "!.gitlab/**", "!.tugboat/**", "!assets/**", "!coding_standards/**", "!components/**", "!config/**", "!css/**", "!docs/**", "!experimental/**", "!js/**", "!modules/**", "!phpstan_rules/**", "!scripts/**", "!src/**", "!templates/**", "!tests/**", "!themes/**", "!ui/**"] },
+    "//#packages:lint:eslint": { "inputs": ["$TURBO_DEFAULT$", "!.gitlab/**", "!.tugboat/**", "!assets/**", "!coding_standards/**", "!components/**", "!config/**", "!css/**", "!docs/**", "!experimental/**", "!js/**", "!modules/**", "!phpstan_rules/**", "!scripts/**", "!src/**", "!templates/**", "!tests/**", "!themes/**", "!ui/**"] },
+    "//#packages:lint:prettier": { "inputs": ["$TURBO_DEFAULT$", "!.gitlab/**", "!.tugboat/**", "!assets/**", "!coding_standards/**", "!components/**", "!config/**", "!css/**", "!docs/**", "!experimental/**", "!js/**", "!modules/**", "!phpstan_rules/**", "!scripts/**", "!src/**", "!templates/**", "!tests/**", "!themes/**", "!ui/**"] },
+    "//#packages:lint:stylelint": { "inputs": ["$TURBO_DEFAULT$", "!.gitlab/**", "!.tugboat/**", "!assets/**", "!coding_standards/**", "!components/**", "!config/**", "!css/**", "!docs/**", "!experimental/**", "!js/**", "!modules/**", "!phpstan_rules/**", "!scripts/**", "!src/**", "!templates/**", "!tests/**", "!themes/**", "!ui/**"] },
+    "//#packages:lint:yaml": { "inputs": ["$TURBO_DEFAULT$", "!.gitlab/**", "!.tugboat/**", "!assets/**", "!coding_standards/**", "!components/**", "!config/**", "!css/**", "!docs/**", "!experimental/**", "!js/**", "!modules/**", "!phpstan_rules/**", "!scripts/**", "!src/**", "!templates/**", "!tests/**", "!themes/**", "!ui/**"] },
     // End-to-end tests run against a live Drupal site; their result is not a
     // pure function of repository files, so they are never cached.
     "//#test:playwright": { "cache": false }
