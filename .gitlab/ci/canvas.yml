@@ -1,5 +1,5 @@
 .canvas-ui: &canvas-ui
   - npm ci
-  # Turborepo builds the UI's workspace dependencies (headless,
-  # astro-hydration, and their dependencies) in order first.
-  - npx turbo run build --filter=@drupal-canvas/ui
+  # The UI's build script runs through Turborepo, which builds its workspace
+  # dependencies (headless, astro-hydration, and their dependencies) first.
+  - npm run build -w ui
