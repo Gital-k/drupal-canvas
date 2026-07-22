@@ -21,5 +21,45 @@ npx changeset --empty
 
 Merge requests that do not touch `packages/*` never need a changeset.
 
+## Summary format
+
+Each changeset becomes one bullet point in the `CHANGELOG.md` of every
+package it lists, under a "Minor Changes" or "Patch Changes" heading. The
+whole summary is that bullet: the first line becomes the bullet text, and
+any further lines are indented under it, so a nested markdown list renders
+as sub-bullets.
+
+Example changeset:
+
+```markdown
+---
+"@drupal-canvas/headless": minor
+---
+
+Add draft-session recovery to the preview protocol.
+
+- The host retries activation once after an expired session.
+- `createHeadlessPreviewHost` accepts an `onRecovery` callback.
+```
+
+Resulting `CHANGELOG.md` entry after the next release:
+
+```markdown
+## 0.1.0
+
+### Minor Changes
+
+- Add draft-session recovery to the preview protocol.
+  - The host retries activation once after an expired session.
+  - `createHeadlessPreviewHost` accepts an `onRecovery` callback.
+```
+
+The summary is copied verbatim into every package listed in the frontmatter.
+When a change means something different for each affected package, write a
+separate changeset per package instead of sharing one summary.
+
+To write changesets with an AI coding agent, use the `canvas-changeset`
+skill.
+
 For the release flow, see `docs/release-process.md`. General documentation:
 https://github.com/changesets/changesets
