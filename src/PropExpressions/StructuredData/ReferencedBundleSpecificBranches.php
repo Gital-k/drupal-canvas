@@ -121,6 +121,17 @@ final class ReferencedBundleSpecificBranches {
         throw new \InvalidArgumentException(\sprintf('`%s` targets multiple bundles: only a single bundle per branch is allowed.', (string) $expr));
       }
 
+      // A branch that descends through a multi-bundle reference at any depth
+      // would make this a nested branch, which is not yet supported. Reject it
+      // as an invalid branch set here — before the assert below fires — so
+      // callers (like the Coalescer) can bail cleanly.
+      // @todo Remove this guard once nested branching is supported, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
+      for ($branch_cursor = $expr; $branch_cursor instanceof ReferenceFieldPropExpression; $branch_cursor = $branch_cursor->referenced) {
+        if ($branch_cursor->targetsMultipleBundles()) {
+          throw new NestedBranchNotSupportedException(\sprintf('`%s` is a nested branch: descending through a multi-bundle reference within a branch is not yet supported.', (string) $expr));
+        }
+      }
+
       // Gather information for cross-branch validation.
       $leaf = match (TRUE) {
         $expr instanceof ReferencePropExpressionInterface => $expr->getFinalTargetExpression(),

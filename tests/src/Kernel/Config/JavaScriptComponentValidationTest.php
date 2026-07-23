@@ -1636,6 +1636,25 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       ])->save();
     }
 
+    // A self-referential multi-target-bundle reference on BOTH media bundles —
+    // for the case asserting a nested branch (descending through a second
+    // multi-bundle reference inside a branch) is rejected gracefully, not fatal.
+    FieldStorageConfig::create([
+      'field_name' => 'field_media_related',
+      'entity_type' => 'media',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'media'],
+    ])->save();
+    foreach (['image', 'video'] as $media_bundle) {
+      FieldConfig::create([
+        'field_name' => 'field_media_related',
+        'entity_type' => 'media',
+        'bundle' => $media_bundle,
+        'label' => 'Related media',
+        'settings' => ['handler_settings' => ['target_bundles' => ['image' => 'image', 'video' => 'video']]],
+      ])->save();
+    }
+
     // Add `my_reference` as a content-entity-reference prop when the test row
     // targets it, so `entityFields` keys have a valid target.
     if (\array_key_exists('entityFields', $test) && \array_key_exists('my_reference', $test['entityFields'])) {
@@ -1916,6 +1935,27 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     yield 'entityFields valid leaf in a nested chain inside a branch is accepted' => [
       ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝name␞␟value][␜entity:media:video␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝name␞␟value]']]],
       [],
+      [],
+    ];
+
+    // (e) A branch that descends through a SECOND multi-bundle reference is a
+    // nested branch (a branch inside a branch), which is not yet supported.
+    // `field_media_related` targets both media bundles, so descending it inside
+    // one `field_media` branch would nest. Coalescing bails gracefully (no
+    // fatal) and the same-field coalescing guard reports the precise reason
+    // instead of implying the picks can be combined.
+    // @todo Becomes an accepted case once nested branching is supported, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
+    yield 'entityFields nested branch (multi-bundle reference within a branch) is rejected' => [
+      [
+        'entityFields' => [
+          'my_reference' => [
+            'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_related␞␟entity␜␜entity:media:image␝name␞␟value',
+            'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_related␞␟entity␜␜entity:media:video␝name␞␟value',
+            'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝name␞␟value',
+          ],
+        ],
+      ],
+      ['dataDependencies.entityFields.my_reference' => "The expressions on field 'entity:node:article.field_media' descend through a multi-bundle reference more than once, which is not yet supported."],
       [],
     ];
 

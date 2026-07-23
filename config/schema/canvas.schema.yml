@@ -276,6 +276,10 @@ canvas.js_component.*:
               # expand → edit → coalesce round trip without losing data.
               # @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::expand()
               EntityFieldExpressionsMustBeIdempotent: ~
+              # A nested branch (a branch inside a branch) is not yet supported;
+              # reject selections that would coalesce into one.
+              # @todo Remove once nested branching is supported, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
+              EntityFieldExpressionsMustNotNestBranches: ~
             sequence:
               type: string
               label: 'Entity field prop expression'
