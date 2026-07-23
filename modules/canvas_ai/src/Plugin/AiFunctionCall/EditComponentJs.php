@@ -2,18 +2,18 @@
 
 namespace Drupal\canvas_ai\Plugin\AiFunctionCall;
 
-use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
-use Drupal\Component\Serialization\Json;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Plugin\Context\ContextDefinition;
-use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
+use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
+use Drupal\Component\Serialization\Json;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Plugin\Context\ContextDefinition;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Yaml\Yaml;
@@ -41,6 +41,12 @@ use Symfony\Component\Yaml\Yaml;
       description: new TranslatableMarkup("Metadata for props"),
       required: TRUE
     ),
+    'slots_metadata' => new ContextDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup("Slots"),
+      description: new TranslatableMarkup("Metadata for slots. A JSON array where each entry is an object with an 'id' (slot machine name), 'name' (human-readable title) and an optional 'example' (sample child markup)."),
+      required: FALSE
+    ),
     'component_machine_name' => new ContextDefinition(
       data_type: 'string',
       label: new TranslatableMarkup("Component machine name"),
@@ -58,6 +64,7 @@ use Symfony\Component\Yaml\Yaml;
 final class EditComponentJs extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface, BuilderResponseFunctionCallInterface {
 
   use ConstraintPropertyPathTranslatorTrait;
+  use AiGeneratedJsComponentPropsAndSlotsTrait;
 
   /**
    * The entity type manager.
@@ -91,6 +98,7 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
       $machine_name = $this->getContextValue('component_machine_name');
       $js = $this->getContextValue('javascript');
       $props = $this->getContextValue('props_metadata');
+      $slots = $this->getContextValue('slots_metadata') ?? '';
       $props_array = Json::decode($props);
       // Check if the component exists.
       /** @var \Drupal\canvas\Entity\JavaScriptComponent $component */
@@ -112,7 +120,11 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
               'type' => $prop['type'],
               'examples' => [$prop['example']],
             ];
-            foreach (['format', '$ref', 'enum'] as $optional) {
+            // 'contentMediaType' (with optional 'x-formatting-context') is what
+            // marks a string prop as formatted/rich text in Canvas; it must be
+            // preserved or the prop is stored as plain text.
+            // @see \Drupal\canvas\PropShape\PropShape
+            foreach (['format', '$ref', 'enum', 'contentMediaType', 'x-formatting-context'] as $optional) {
               if (isset($prop[$optional])) {
                 $transformed[$optional] = $prop[$optional];
               }
@@ -140,6 +152,8 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
 
       $required_props = array_unique($required_props);
 
+      $transformed_slots = $this->transformSlotsMetadata($slots);
+
       $output = [
         'name' => $component->get('name'),
         'machineName' => $machine_name,
@@ -153,6 +167,7 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
         'importedJsComponents' => [],
         'props' => $transformed_props,
         'required' => $required_props,
+        'slots' => $transformed_slots,
         'dataDependencies' => [],
       ];
       $violations = JavaScriptComponent::createFromClientSide($output)->getTypedData()->validate();
@@ -178,10 +193,22 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
     $output = [
       'js_structure' => $js,
       'props_metadata' => Json::encode($transformed_props),
+      'slots_metadata' => Json::encode($transformed_slots),
       'required_props' => $required_props,
     ];
     $this->setStructuredOutput($output);
-    $this->setOutput('Component with id "' . $machine_name . '" has been successfully updated.');
+    $message = 'Component with id "' . $machine_name . '" has been successfully updated.';
+    $warning = $this->buildRemovedMetadataWarning(
+      $component->get('props') ?? [],
+      $transformed_props,
+      $component->get('slots') ?? [],
+      $transformed_slots,
+    );
+    if ($warning !== '') {
+      $message .= ' ' . $warning;
+    }
+    $this->setOutput($message);
+    $this->logger->info($message);
   }
 
 }

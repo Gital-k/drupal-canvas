@@ -4,25 +4,25 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use PHPUnit\Framework\Attributes\Group;
 use ColinODell\PsrTestLogger\TestLogger;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
-use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\filter\Entity\FilterFormat;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
+use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
-use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\TestWith;
 
@@ -356,7 +356,7 @@ HTML;
         [
           'uuid' => '2842cc6f-9e2b-42a5-8400-e7d6363e08bf',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => '85a5c0c7dd53e0bb',
+          'component_version' => '0e79e884426a53ae',
           'inputs' => [
             'heading' => [
               'sourceType' => PropSource::EntityField->value,

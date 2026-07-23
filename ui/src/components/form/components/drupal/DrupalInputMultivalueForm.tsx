@@ -6,7 +6,10 @@ import { Box, Button, Flex, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
-import { toPropName } from '@/components/form/formUtil';
+import {
+  DEBOUNCE_TIMEOUT,
+  toPropName,
+} from '@/components/form/react-hook-form/fields/componentFormData';
 import { removeFieldValue } from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
@@ -60,7 +63,7 @@ const DrupalInputMultivalueForm = ({
   const isAutocomplete =
     attributes?.class instanceof Array &&
     attributes?.class?.includes('form-autocomplete');
-  const initialValue = attributes.value || attributes.defaultValue || '';
+  const initialValue = attributes.value ?? attributes.defaultValue ?? '';
   const refs = useRef<MultivalueRefs>({
     triggerRow: null,
     triggerButton: null,
@@ -70,16 +73,17 @@ const DrupalInputMultivalueForm = ({
   });
 
   const [displayValue, setDisplayValue] = useState<string>(
-    initialValue as string,
+    String(initialValue ?? ''),
   );
 
   const hasError = () =>
     refs.current.popoverInput &&
-    !!refs.current.popoverInput.closest('[data-has-field-error="true"]');
+    refs.current.popoverInput.dataset.invalidPropValue === 'true';
 
   // Controlled popover state so we can close it programmatically on remove.
   const [popoverOpen, setPopoverOpen] = useState(false);
   const fieldLabel = attributes['data-field-label'] || '';
+  const displayText = displayValue === '' ? 'Empty' : String(displayValue);
 
   const setPopoverOpenAndRefocus = (open: boolean) => {
     setPopoverOpen(open);
@@ -223,14 +227,14 @@ const DrupalInputMultivalueForm = ({
             }}
             className={styles.listItem}
             type="button"
-            aria-label={`Edit ${fieldLabel}: ${displayValue || 'Empty'}`}
+            aria-label={`Edit ${fieldLabel}: ${displayText}`}
           >
             <Text
               size="2"
               className={styles.itemText}
               data-canvas-multivalue-label
             >
-              {displayValue || 'Empty'}
+              {displayText}
             </Text>
             <ArrowRightIcon className={styles.arrowIcon} />
           </button>
@@ -278,8 +282,12 @@ const DrupalInputMultivalueForm = ({
               onKeyDown: handleKeyDown,
               onInput: (e: any) => {
                 setTimeout(() => {
-                  if (!hasError()) setDisplayValue(e.target.value);
-                });
+                  if (e.target.dataset.invalidPropValue !== 'true')
+                    setDisplayValue(e.target.value);
+                  // Delay onInput checks by twice the debounce
+                  // timeout. This ensures that current value has been run
+                  // through validation.
+                }, DEBOUNCE_TIMEOUT * 2);
               },
             }}
           />

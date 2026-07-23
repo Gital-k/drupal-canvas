@@ -22,6 +22,12 @@ function validateRawMetadata(
     );
   }
 
+  if (raw.name !== undefined && typeof raw.name !== 'string') {
+    throw new Error(
+      `Invalid "name" in ${metadataPath}: expected a string, got ${typeof raw.name}.`,
+    );
+  }
+
   if (raw.machineName !== undefined && typeof raw.machineName !== 'string') {
     throw new Error(
       `Invalid "machineName" in ${metadataPath}: expected a string, got ${typeof raw.machineName}.`,
@@ -44,6 +50,12 @@ function validateRawMetadata(
   if (raw.status !== undefined && typeof raw.status !== 'boolean') {
     throw new Error(
       `Invalid "status" in ${metadataPath}: expected a boolean, got ${typeof raw.status}.`,
+    );
+  }
+
+  if (raw.dataDependencies !== undefined && !isRecord(raw.dataDependencies)) {
+    throw new Error(
+      `Invalid "dataDependencies" in ${metadataPath}: expected an object, got ${typeof raw.dataDependencies}.`,
     );
   }
 
@@ -113,12 +125,16 @@ export async function loadComponentsMetadata(
           : {};
 
       const metadata: ComponentMetadata = {
-        name: component.name,
+        // The display label from the metadata file; the discovered
+        // (directory- or file-derived) name is the fallback.
+        name: (raw.name as string) || component.name,
         machineName: (raw.machineName as string) ?? component.name,
         status: (raw.status as boolean) ?? true,
         props: { properties: rawProps },
         required: (raw.required as string[]) ?? [],
         slots: (raw.slots as ComponentMetadata['slots']) ?? {},
+        dataDependencies:
+          (raw.dataDependencies as ComponentMetadata['dataDependencies']) ?? {},
       };
 
       return metadata;
@@ -143,9 +159,15 @@ export function findDuplicateMachineNames(
     Array<{ component: DiscoveredComponent; metadata: ComponentMetadata }>
   >();
 
-  for (let i = 0; i < components.length; i++) {
-    const component = components[i];
+  // The two arrays are positionally parallel: metadata[i] describes
+  // components[i]. The guard below can therefore never skip anything; it
+  // exists because consuming apps may compile this source under stricter
+  // compiler settings, where indexing into an array is possibly undefined.
+  components.forEach((component, i) => {
     const meta = metadata[i];
+    if (!meta) {
+      return;
+    }
     const machineName = meta.machineName;
 
     const existing = byMachineName.get(machineName);
@@ -154,7 +176,7 @@ export function findDuplicateMachineNames(
     } else {
       byMachineName.set(machineName, [{ component, metadata: meta }]);
     }
-  }
+  });
 
   // Generate warnings for duplicates
   const warnings: DiscoveryWarning[] = [];

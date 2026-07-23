@@ -165,4 +165,76 @@ test.describe('AI Features', () => {
       'Experience a journey through our interactive digital space, designed to engage and inspire visitors with immersive content and seamless navigation.',
     );
   });
+
+  test('Create and edit a component with slots', async ({
+    page,
+    drupal,
+    canvas,
+    ai,
+  }) => {
+    await drupal.login({ username: 'ai_editor', password: 'ai_editor' });
+    await canvas.createCanvas();
+    await ai.openPanel();
+
+    // Create flow: the component_structure includes a `slots` map, which is
+    // persisted via createCodeComponent and surfaced in the Slots panel.
+    await ai.submitQuery('Create component with slots');
+    await expect(page).toHaveURL(
+      /\/canvas\/code-editor\/component\/cardwithslot/,
+    );
+    await page.getByRole('tab', { name: 'Slots' }).click();
+    await expect(page.getByLabel('Slot name').first()).toHaveValue('Children');
+
+    // Edit flow: the response carries `slots_metadata`, which the
+    // slotsMetadataHandler in AiWizard applies to the open component's slots.
+    await ai.submitQuery('Edit component slots');
+    await page.getByRole('tab', { name: 'Slots' }).click();
+    await expect(page.getByLabel('Slot name').first()).toHaveValue('Sidebar');
+  });
+
+  test('Typed prompt survives page metadata edits', async ({
+    page,
+    drupal,
+    canvas,
+    ai,
+  }) => {
+    await drupal.login({ username: 'ai_editor', password: 'ai_editor' });
+    await canvas.createCanvas();
+    await ai.openPanel();
+
+    // Type a prompt into the AI input but do not submit it.
+    const prompt = page.getByRole('textbox', { name: 'Build me a' });
+    await prompt.fill('Build me a pricing table');
+    await expect(prompt).toHaveText('Build me a pricing table');
+
+    // Editing page metadata re-renders the AI panel. DeepChat must keep the
+    // typed prompt instead of resetting and clearing it.
+    const metaDescription = page.getByRole('textbox', {
+      name: 'Meta description',
+    });
+    await metaDescription.fill('A new meta description');
+    await metaDescription.blur();
+    // Wait for the metadata change to commit before asserting persistence.
+    await expect(metaDescription).toHaveValue('A new meta description');
+
+    await expect(prompt).toHaveText('Build me a pricing table');
+
+    // After a completed exchange the history store holds messages; a metadata
+    // edit re-renders the panel, and both the newly typed prompt and the
+    // completed answer remain.
+    await ai.submitQuery('What is a CMS?');
+    await expect(
+      page.getByText('A Content Management System (CMS)'),
+    ).toBeVisible();
+
+    await prompt.fill('Build me a hero banner');
+    await metaDescription.fill('Another meta description');
+    await metaDescription.blur();
+    await expect(metaDescription).toHaveValue('Another meta description');
+
+    await expect(prompt).toHaveText('Build me a hero banner');
+    await expect(
+      page.getByText('A Content Management System (CMS)'),
+    ).toBeVisible();
+  });
 });

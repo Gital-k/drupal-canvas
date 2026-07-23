@@ -1,0 +1,18 @@
+services:
+  _defaults:
+    autoconfigure: true
+    autowire: true
+  Drupal\canvas_headless\PreviewAssertionFactoryInterface:
+    class: Drupal\canvas_headless\PreviewAssertionFactory
+  Drupal\canvas_headless\PreviewUrlGeneratorInterface:
+    class: Drupal\canvas_headless\PreviewUrlGenerator
+  Drupal\canvas_headless\Access\PreviewCeilingAccessPolicy:
+    tags:
+      - { name: access_policy }
+  Drupal\canvas_headless\ExternalComponentSync: {}
+  Drupal\canvas_headless\Controller\ExternalComponentSyncController: {}
+  Drupal\canvas_headless\RenderConverter\JsComponentCanvasRenderConverter:
+    decorates: custom_elements.canvas_render_converter
+    decoration_on_invalid: ignore
+  Drupal\canvas_headless\Controller\AutoSavePreviewController: {}
+  Drupal\canvas_headless\EventSubscriber\AutoSavePreviewControllerSubscriber: {}

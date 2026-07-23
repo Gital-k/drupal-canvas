@@ -55,6 +55,8 @@ services:
     public: false
   Drupal\canvas\ShapeMatcher\HostEntityUrlPropSourceMatcher:
     public: false
+  Drupal\canvas\ShapeMatcher\HostEntityPropSourceMatcher:
+    public: false
 
   # Utilities.
   Drupal\canvas\CanvasNotificationHandler: {}
@@ -74,12 +76,36 @@ services:
     arguments: ['@asset.resolver.canvas.inner', '@library.discovery', '@library.dependency_resolver', '@module_handler', '@theme.manager', '@language_manager', '@cache.data', '@theme_handler']
   Drupal\canvas\ClientDataToEntityConverter: {}
   Drupal\canvas\AutoSave\AutoSaveManager: {}
+  # Non-serializing in-memory cache for AutoSaveManager's reconstructed entities.
+  # Bounded (LRU) like core's entity.memory_cache so it cannot grow without
+  # limit in long-running processes (e.g. FrankenPHP/RoadRunner worker mode).
+  # @see \Drupal\canvas\AutoSave\AutoSaveManager::getAutoSaveEntity()
+  canvas.auto_save.entity_memory_cache:
+    class: Drupal\Core\Cache\MemoryCache\LruMemoryCache
+    arguments: ['@datetime.time', 100]
+    tags:
+      - { name: cache.bin.memory }
   Drupal\canvas\Storage\ComponentTreeLoader: {}
   Drupal\canvas\CodeComponentDataProvider: {}
   Drupal\canvas\Version: {}
   Drupal\canvas\CanvasConfigUpdater: ~
   Drupal\canvas\ComponentTreeInputExtractor: {}
   Drupal\canvas\GlobalImports: {}
+  Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor: ~
+
+  # Health.
+  # Note: the `canvas:doctor` command is discovered and registered automatically by core's ConsoleCompilerPass.
+  Drupal\canvas\Health\Environment:
+    public: true
+  # Alias so consumers can type-hint the interface (Environment is
+  # final and cannot be mocked/subclassed; tests substitute a stub instead).
+  Drupal\canvas\Health\EnvironmentInterface: '@Drupal\canvas\Health\Environment'
+  Drupal\canvas\Health\HealthRecords:
+    public: true
+  Drupal\canvas\Health\Inventory:
+    public: true
+  Drupal\canvas\Health\Doctor:
+    public: true
 
   # Cache contexts.
   cache_context.route.name.is_canvas_editor_ui:
@@ -111,7 +137,11 @@ services:
     class: Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber
     tags:
       - { name: 'event_subscriber' }
+  Drupal\canvas\EventSubscriber\ComponentConfigImportValidator: ~
   Drupal\canvas\EventSubscriber\ComponentTreeConfigEntityTransformer: ~
+  Drupal\canvas\EventSubscriber\DefaultContentSubscriber: ~
+  # @todo Remove in https://git.drupalcode.org/project/canvas/-/work_items/3571130
+  Drupal\canvas\EventSubscriber\SymmetricalTranslationsConfigImportValidator: ~
   canvas.image_style.route_alter:
     class: Drupal\canvas\EventSubscriber\ImageStyleRoutesEventSubscriber
     tags:
@@ -169,6 +199,9 @@ services:
   Drupal\canvas\Access\ArtifactUploadAccessCheck:
     tags:
       - { name: access_check, applies_to: _canvas_artifact_upload_access }
+  Drupal\canvas\Access\ExtensionPageAccessCheck:
+    tags:
+      - { name: access_check, applies_to: _canvas_extension_page_access }
   Drupal\canvas\Access\AuthenticationAccessChecker:
     tags:
       - { name: access_check, applies_to: _canvas_authentication_required }
@@ -188,10 +221,12 @@ services:
   Drupal\canvas\Controller\ApiContentControllers: {}
   Drupal\canvas\Controller\ApiMediaControllers: {}
   Drupal\canvas\Controller\ApiStagedConfigUpdateAutoSaveController: {}
+  Drupal\canvas\Controller\ApiTranslationControllers: {}
   Drupal\canvas\Controller\ComponentStatusController: {}
   Drupal\canvas\Controller\ComponentAuditController: {}
   Drupal\canvas\Controller\CanvasController: {}
   Drupal\canvas\Controller\ApiAutoSaveController: {}
+  Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers: {}
   Drupal\canvas\Controller\ApiUiContentTemplateControllers: {}
   Drupal\canvas\Controller\ApiUsageControllers: {}
   Drupal\canvas\Controller\AddPageController: {}
@@ -199,6 +234,7 @@ services:
   Drupal\canvas\Controller\ApiArtifactController: {}
   Drupal\canvas\Controller\ApiNotificationController: {}
   Drupal\canvas\Controller\ApiPushController: {}
+  Drupal\canvas\Controller\SiteDataController: {}
 
   # Decorators.
   Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor:

@@ -20,6 +20,20 @@ use ShipMonk\PHPStan\DeadCode\Provider\VirtualUsageData;
  *    Drupal\canvas\Plugin\search_api\ implement ProcessorInterface;
  *    search_api calls methods like supportsIndex() and
  *    getPropertyDefinitions() via plugin dispatch.
+ *
+ * 2. TMGMT Config Processor plugins: canvas classes in Drupal\canvas\Tmgmt\
+ *    registered via `tmgmt_config_processor` in config schema definitions;
+ *    tmgmt_config calls extractTranslatables() via plugin dispatch.
+ *
+ * 3. TMGMT Content Field Processor plugins: canvas classes in
+ *    Drupal\canvas\Tmgmt\ registered via `tmgmt_field_processor` in
+ *    hook_field_info_alter(); tmgmt_content calls extractTranslatableData()
+ *    and setTranslations() via plugin dispatch.
+ *
+ * 4. Simple OAuth grant plugins: canvas_headless classes in
+ *    Drupal\canvas_headless\Plugin\Oauth2Grant\ implement
+ *    Oauth2GrantInterface; simple_oauth's grant manager calls
+ *    getGrantType() via plugin dispatch.
  */
 final class ContribPluginsUsageProvider extends ReflectionBasedMemberUsageProvider {
 
@@ -31,6 +45,30 @@ final class ContribPluginsUsageProvider extends ReflectionBasedMemberUsageProvid
     ) {
       return VirtualUsageData::withNote(
         \sprintf('Called by search_api plugin dispatch: %s::%s().', $method->getDeclaringClass()->getShortName(), $method->getName()),
+      );
+    }
+
+    if ($method->getName() === 'extractTranslatables'
+      && str_starts_with($method->getDeclaringClass()->getName(), 'Drupal\\canvas\\Tmgmt\\')
+    ) {
+      return VirtualUsageData::withNote(
+        \sprintf('Called by tmgmt_config plugin dispatch via tmgmt_config_processor config schema key: %s::extractTranslatables().', $method->getDeclaringClass()->getShortName()),
+      );
+    }
+
+    if (\in_array($method->getName(), ['extractTranslatableData', 'setTranslations'], TRUE)
+      && str_starts_with($method->getDeclaringClass()->getName(), 'Drupal\\canvas\\Tmgmt\\')
+    ) {
+      return VirtualUsageData::withNote(
+        \sprintf('Called by tmgmt_content field processor dispatch via tmgmt_field_processor field info key: %s::%s().', $method->getDeclaringClass()->getShortName(), $method->getName()),
+      );
+    }
+
+    if ($method->getName() === 'getGrantType'
+      && str_starts_with($method->getDeclaringClass()->getName(), 'Drupal\\canvas_headless\\Plugin\\Oauth2Grant\\')
+    ) {
+      return VirtualUsageData::withNote(
+        \sprintf('Called by simple_oauth grant plugin dispatch: %s::getGrantType().', $method->getDeclaringClass()->getShortName()),
       );
     }
 

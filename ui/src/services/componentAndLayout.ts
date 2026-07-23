@@ -1,12 +1,19 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
-import { setLayoutModel } from '@/features/layout/layoutModelSlice';
+import {
+  setLayoutModel,
+  setTranslations,
+} from '@/features/layout/layoutModelSlice';
 import {
   setInitialPageData,
   setPageData,
 } from '@/features/pageData/pageDataSlice';
-import { setHtml } from '@/features/pagePreview/previewSlice';
+import {
+  setHtml,
+  setSnapshotHTML,
+  setSnapshotTitle,
+} from '@/features/pagePreview/previewSlice';
 import { baseQueryWithAutoSaves } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
@@ -25,13 +32,16 @@ type getComponentsQueryOptions = {
   mode: 'include' | 'exclude';
 };
 
-type LayoutApiResponse = RootLayoutModel & {
+export type LayoutApiResponse = RootLayoutModel & {
   entity_form_fields: Record<string, any>;
   isNew: boolean;
   isPublished: boolean;
+  publishedVersion?: boolean;
+  updated?: number;
   hasUnsavedStatusChange?: boolean;
   html: string;
   autoSaves: AutoSavesHash;
+  translations?: Record<string, any>;
 };
 
 export type TemplateViewMode = {
@@ -174,25 +184,64 @@ export const componentAndLayoutApi = createApi({
     }),
     getPageLayout: builder.query<
       LayoutApiResponse,
-      { entityId: string; entityType: string }
+      { entityId: string; entityType: string; language?: string }
     >({
-      query: ({ entityId, entityType }) => {
-        return `canvas/api/v0/layout/${entityType}/${entityId}`;
+      query: ({ entityId, entityType, language }) => {
+        // When a language code is provided, request that translation via the
+        // `canvas_preview_langcode` query parameter. The backend routes the
+        // request through the site's configured language negotiation —
+        // redirecting when needed — so the right translation is served
+        // regardless of the negotiation method.
+        const path = `canvas/api/v0/layout/${entityType}/${entityId}`;
+        return language
+          ? `${path}?canvas_preview_langcode=${encodeURIComponent(language)}`
+          : path;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const {
-            data: { entity_form_fields, html, autoSaves },
+            data: { entity_form_fields, html, autoSaves, translations },
             meta,
           } = await queryFulfilled;
-          dispatch(setInitialPageData(entity_form_fields));
-          dispatch(setHtml(html));
+          // Only update page data and HTML for the default language. Translation
+          // queries (with a language parameter) must not overwrite the editor's
+          // active entity form fields or preview HTML — those are managed
+          // separately by the snapshot preview query.
+          if (!arg.language) {
+            dispatch(setInitialPageData(entity_form_fields));
+            // Clear any stale snapshot (e.g. from a prior template preview) so
+            // selectPreviewHtml returns the fresh html.
+            dispatch(setSnapshotHTML(''));
+            dispatch(setSnapshotTitle(''));
+            dispatch(setHtml(html));
+          }
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+          dispatch(setTranslations(translations || {}));
         } catch (err) {
-          dispatch(setPageData({}));
+          // Only reset page data when the default-language query fails.
+          // Translated-language query failures should not affect the
+          // editor's active entity form fields.
+          if (!arg.language) {
+            dispatch(setPageData({}));
+          }
         }
       },
+    }),
+    getConflictPageLayout: builder.query<
+      LayoutApiResponse,
+      {
+        entityId: string;
+        entityType: 'canvas_page';
+        publishedVersion?: boolean;
+        versionKey?: string;
+      }
+    >({
+      query: ({ entityId, entityType, publishedVersion = false }) => ({
+        url: `canvas/api/v0/layout/${entityType}/${entityId}`,
+        params: publishedVersion ? { autoSaved: false } : undefined,
+      }),
+      providesTags: () => [{ type: 'Layout' }],
     }),
     getTemplateLayout: builder.query<
       LayoutApiResponse,
@@ -214,12 +263,24 @@ export const componentAndLayoutApi = createApi({
             meta,
           } = await queryFulfilled;
           dispatch(setInitialPageData(entity_form_fields));
+          // Clear any stale snapshot (e.g. from a prior language/template
+          // preview) so selectPreviewHtml returns this fresh editor html.
+          // Mirrors getPageLayout; without it a leftover preview snapshot masks
+          // the template editor frame.
+          dispatch(setSnapshotHTML(''));
+          dispatch(setSnapshotTitle(''));
           dispatch(setHtml(html));
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         } catch (err) {
           dispatch(setPageData({}));
         }
       },
+    }),
+    deletePageTranslation: builder.mutation<void, string>({
+      query: (url) => ({
+        url,
+        method: 'DELETE',
+      }),
     }),
     postTemplateLayout: builder.mutation<
       { html: string; autoSaves: AutoSavesHash },
@@ -602,6 +663,7 @@ export const {
   useGetComponentUsageDetailsQuery,
   useGetComponentUsageListQuery,
   useGetPageLayoutQuery,
+  useGetConflictPageLayoutQuery,
   useGetTemplateLayoutQuery,
   usePostTemplateLayoutMutation,
   useUpdateComponentInTemplateMutation,
@@ -621,4 +683,5 @@ export const {
   useGetContentTemplatesQuery,
   useGetViewModesQuery,
   useGetPreviewContentEntitiesQuery,
+  useDeletePageTranslationMutation,
 } = componentAndLayoutApi;

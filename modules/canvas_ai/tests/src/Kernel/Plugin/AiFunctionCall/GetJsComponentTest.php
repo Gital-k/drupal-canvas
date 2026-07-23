@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel\Plugin\AiFunctionCall;
 
+use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\TestWith;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
-use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\Tests\user\Traits\UserCreationTrait;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -61,9 +61,20 @@ final class GetJsComponentTest extends CanvasKernelTestBase {
       'machineName' => 'test_component',
       'name' => 'Test Component',
       'status' => FALSE,
-      'props' => [],
-      'required' => [],
-      'slots' => [],
+      'props' => [
+        'content' => [
+          'type' => 'string',
+          'title' => 'Content',
+          'examples' => ['Short title or info'],
+        ],
+      ],
+      'required' => ['content'],
+      'slots' => [
+        'cardContent' => [
+          'title' => 'Card Content',
+          'examples' => ['<p>Place components here</p>'],
+        ],
+      ],
       'js' => [
         'original' => 'console.log("hey");',
         'compiled' => 'console.log("hey");',
@@ -98,6 +109,27 @@ final class GetJsComponentTest extends CanvasKernelTestBase {
     $this->assertArrayHasKey('css', $parsed);
     $this->assertEquals('console.log("hey");', $parsed['js']);
     $this->assertEquals('.test { display: none; }' . ($with_auto_save ? '/**/' : ''), $parsed['css']);
+
+    // The tool also exposes the component's props and slots, converted to the
+    // agent-facing metadata format by the trait.
+    // @see \Drupal\canvas_ai\Plugin\AiFunctionCall\AiGeneratedJsComponentPropsAndSlotsTrait::buildPropsMetadataFromStored()
+    // @see \Drupal\canvas_ai\Plugin\AiFunctionCall\AiGeneratedJsComponentPropsAndSlotsTrait::buildSlotsMetadataFromStored()
+    $this->assertEquals([
+      [
+        'id' => 'content',
+        'name' => 'Content',
+        'type' => 'string',
+        'example' => 'Short title or info',
+        'required' => TRUE,
+      ],
+    ], $parsed['props_metadata']);
+    $this->assertEquals([
+      [
+        'id' => 'cardContent',
+        'name' => 'Card Content',
+        'example' => '<p>Place components here</p>',
+      ],
+    ], $parsed['slots_metadata']);
   }
 
   /**

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
@@ -23,10 +22,11 @@ use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
-use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests Client Server Conversion Trait.
@@ -65,7 +65,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $createComponentWithSlots = fn(string $uuid, array $body_component = []) => [
       'nodeType' => 'component',
       'uuid' => $uuid,
-      'type' => 'sdc.canvas_test_sdc.props-slots@85a5c0c7dd53e0bb',
+      'type' => 'sdc.canvas_test_sdc.props-slots@0e79e884426a53ae',
       'slots' => [
         [
           'id' => "$uuid/the_body",
@@ -161,12 +161,12 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       [
         'uuid' => self::TOP_LEVEL_SLOT_COMPONENT_UUID,
         'component_id' => 'sdc.canvas_test_sdc.props-slots',
-        'component_version' => '85a5c0c7dd53e0bb',
+        'component_version' => '0e79e884426a53ae',
       ],
       [
         'uuid' => self::NESTED_SLOT_COMPONENT_UUID,
         'component_id' => 'sdc.canvas_test_sdc.props-slots',
-        'component_version' => '85a5c0c7dd53e0bb',
+        'component_version' => '0e79e884426a53ae',
         'slot' => 'the_body',
         'parent_uuid' => self::TOP_LEVEL_SLOT_COMPONENT_UUID,
       ],

@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_oauth\Kernel;
 
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Drupal\Core\Routing\RouteObjectInterface;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas_oauth\Authentication\Provider\CanvasOauthAuthenticationProvider;
+use Drupal\Core\Routing\RouteObjectInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Route;
@@ -116,6 +116,7 @@ class CanvasOauthAuthenticationProviderTest extends CanvasKernelTestBase {
       ['canvas.api.push.complete', [], TRUE],
       ['canvas.api.push.fail', [], TRUE],
       ['canvas.api.push.start', [], TRUE],
+      ['canvas.api.ui.content_entity_reference.preview', [], TRUE],
     ];
   }
 

@@ -36,6 +36,23 @@ test.describe('Perform CRUD operations on components', () => {
     ).toMatchAriaSnapshot({
       name: 'Perform-CRUD-operations-on-components-Layer-and-Components-Panel-1.aria.yml',
     });
+    await canvas.addComponent({ id: 'sdc.canvas_test_sdc.heading' });
+    await canvas.clickPreviewComponent('sdc.canvas_test_sdc.heading');
+    // Heading.
+    await canvas.testInPreviewFrame(
+      'h1[data-component-id="canvas_test_sdc:heading"].primary',
+      async (heading) => {
+        await expect(heading).toBeAttached();
+      },
+    );
+    await canvas.editComponentProp('style', 'secondary', 'select');
+    await canvas.editComponentProp('element', 'h3', 'select');
+    await canvas.testInPreviewFrame(
+      'h3[data-component-id="canvas_test_sdc:heading"].secondary',
+      async (heading) => {
+        await expect(heading).toBeAttached();
+      },
+    );
   });
 
   test('Component hovers and clicks', async ({ page, drupal, canvas }) => {
@@ -117,11 +134,12 @@ test.describe('Perform CRUD operations on components', () => {
     await canvas.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
 
     // Heading.
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText('There goes my hero');
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText('There goes my hero');
+      },
+    );
     await expect(page.getByText('The main heading of the hero')).toHaveCount(1);
     await expect(
       page.getByText('Start typing the title of a piece of content', {
@@ -164,46 +182,52 @@ test.describe('Perform CRUD operations on components', () => {
     await canvas.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
 
     // Heading.
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText('There goes my hero');
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText('There goes my hero');
+      },
+    );
     await canvas.editComponentProp('heading', '');
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).not.toContainText('There goes my hero');
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).not.toContainText('There goes my hero');
+      },
+    );
 
     // Refresh the page.
     await page.reload();
     await expect(page.getByLabel('Heading', { exact: true })).not.toHaveValue(
       'There goes my hero',
     );
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).not.toContainText('There goes my hero');
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] .my-hero__subheading',
-      ),
-    ).toContainText('Watch him as he goes!');
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).not.toContainText('There goes my hero');
+      },
+    );
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] .my-hero__subheading',
+      async (subheading) => {
+        await expect(subheading).toContainText('Watch him as he goes!');
+      },
+    );
 
     // CTAs.
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] a[href="https://example.com"]',
-      ),
-    ).toBeVisible();
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] a[href="https://example.com"]',
+      async (cta) => {
+        await expect(cta).toBeVisible();
+      },
+    );
     await canvas.editComponentProp('cta1href', 'https://drupal.org');
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] a.my-hero__cta--primary',
-      ),
-    ).toHaveAttribute('href', /drupal\.org/);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] a.my-hero__cta--primary',
+      async (cta) => {
+        await expect(cta).toHaveAttribute('href', /drupal\.org/);
+      },
+    );
   });
 
   test('Can handle empty required formatted body prop', async ({
@@ -221,10 +245,9 @@ test.describe('Perform CRUD operations on components', () => {
     const contextualForm =
       '[data-testid="canvas-contextual-panel"] [data-drupal-selector="component-instance-form"]';
 
-    const previewFrame = await canvas.getActivePreviewFrame();
-    await expect(
-      previewFrame.getByText('Example', { exact: true }),
-    ).toBeVisible();
+    await canvas.testInPreviewFrame('text=Example', async (el) => {
+      await expect(el).toBeVisible();
+    });
 
     const bodyEditable = page.locator(
       `${contextualForm} .field--name-body .ck-editor__editable`,
@@ -237,18 +260,18 @@ test.describe('Perform CRUD operations on components', () => {
       .locator('label.js-form-required')
       .click();
 
-    await expect(
-      (await canvas.getActivePreviewFrame()).getByText('Example'),
-    ).toHaveCount(0);
+    await canvas.testInPreviewFrame('text=Example', async (el) => {
+      await expect(el).toHaveCount(0);
+    });
 
     await page.reload();
 
     await expect(
       page.locator(`${contextualForm} .field--name-body textarea`),
     ).toHaveValue('');
-    await expect(
-      (await canvas.getActivePreviewFrame()).getByText('Example'),
-    ).toHaveCount(0);
+    await canvas.testInPreviewFrame('text=Example', async (el) => {
+      await expect(el).toHaveCount(0);
+    });
   });
 
   // Assertions are made in the helper functions.
@@ -362,17 +385,19 @@ test.describe('Perform CRUD operations on components', () => {
       subType,
     );
     await page.getByLabel('CTA 1 text').click();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText(headType);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText(headType);
+      },
+    );
 
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] p',
-      ),
-    ).toContainText(subType);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] p',
+      async (p) => {
+        await expect(p).toContainText(subType);
+      },
+    );
 
     // Type in the autocomplete field, then blur by clicking another field
     await page.getByLabel('CTA 1 link', { exact: true }).fill('com');
@@ -390,17 +415,19 @@ test.describe('Perform CRUD operations on components', () => {
     await page.waitForLoadState('networkidle');
 
     // Assert the preview still has the correct values
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] h1',
-      ),
-    ).toContainText(headType);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      async (h1) => {
+        await expect(h1).toContainText(headType);
+      },
+    );
 
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(
-        '[data-component-id="canvas_test_sdc:my-hero"] p',
-      ),
-    ).toContainText(subType);
+    await canvas.testInPreviewFrame(
+      '[data-component-id="canvas_test_sdc:my-hero"] p',
+      async (p) => {
+        await expect(p).toContainText(subType);
+      },
+    );
     await expect(page.getByLabel('Heading', { exact: true })).toHaveValue(
       headType,
     );

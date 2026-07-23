@@ -3,23 +3,27 @@
 namespace Drupal\canvas_ai\Controller;
 
 use Drupal\ai\AiProviderPluginManager;
-use Drupal\ai_agents\Enum\AiAgentStatusItemTypes;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai\OperationType\GenericType\ImageFile;
+use Drupal\ai_agents\Enum\AiAgentStatusItemTypes;
+use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
 use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
+use Drupal\canvas_ai\CanvasAiChatHelper;
+use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\canvas_ai\CanvasAiTempStore;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface;
 use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\Environment;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Controller\ControllerBase;
-use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\Core\File\FileExists;
-use Drupal\Core\File\FileSystemInterface;
-use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
-use Drupal\canvas_ai\CanvasAiTempStore;
+use Drupal\file\Upload\FileUploadHandlerInterface;
+use Drupal\file\Upload\FormUploadedFile;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -39,8 +43,9 @@ final class CanvasBuilder extends ControllerBase {
     protected CsrfTokenGenerator $csrfTokenGenerator,
     protected CanvasAiPageBuilderHelper $canvasAiPageBuilderHelper,
     protected CanvasAiTempStore $canvasAiTempStore,
-    protected FileSystemInterface $fileSystem,
+    protected FileUploadHandlerInterface $fileUploadHandler,
     protected AiAgentStatusPollerServiceInterface $poller,
+    protected CanvasAiChatHelper $canvasAiChatHelper,
   ) {}
 
   /**
@@ -53,8 +58,9 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('csrf_token'),
       $container->get('canvas_ai.page_builder_helper'),
       $container->get('canvas_ai.tempstore'),
-      $container->get('file_system'),
+      $container->get('file.upload_handler'),
       $container->get('ai_agents.agent_status_poller'),
+      $container->get('canvas_ai.chat_helper'),
     );
   }
 
@@ -111,28 +117,36 @@ final class CanvasBuilder extends ControllerBase {
     }
     $image_files = [];
     foreach ($files as $file) {
-      $allowed_image_types = ['image/jpeg', 'image/png'];
-      $mime_type = $file->getClientMimeType();
-
-      if (!\in_array($mime_type, $allowed_image_types, TRUE)) {
+      if (!$file instanceof UploadedFile) {
+        continue;
+      }
+      // Validate and store the upload through the core file upload pipeline.
+      // Once validated, we discard it, but we want to centralize validation.
+      $upload_result = $this->fileUploadHandler->handleFileUpload(
+        new FormUploadedFile($file),
+        validators: [
+          'FileNameLength' => [],
+          'FileExtension' => ['extensions' => 'png jpg jpeg'],
+          'FileSizeLimit' => ['fileLimit' => Environment::getUploadMaxSize()],
+          'FileIsImage' => [],
+        ],
+        destination: 'temporary://',
+        fileExists: FileExists::Rename,
+      );
+      if ($upload_result->hasViolations()) {
         return new JsonResponse([
           'status' => FALSE,
           'message' => 'Only image files are allowed (jpeg, png, jpg).',
         ]);
       }
-      // Copy the file to the temp directory.
-      $filename = $file->getClientOriginalName();
-      $tmp_name = 'temporary://' . $filename;
-      $this->fileSystem->copy($file->getPathname(), $tmp_name, FileExists::Replace);
-      // Create actual file entities.
-      $file = $this->entityTypeManager()->getStorage('file')->create([
-        'uid' => $this->currentUser()->id(),
-        'filename' => $filename,
-        'uri' => $tmp_name,
-        'status' => 0,
-      ]);
-      $file->save();
-      $binary = file_get_contents($tmp_name);
+      $uploaded_file = $upload_result->getFile();
+      $mime_type = (string) $uploaded_file->getMimeType();
+      $filename = (string) $uploaded_file->getFilename();
+      $binary = file_get_contents((string) $uploaded_file->getFileUri());
+
+      // Delete the managed file immediately, we only care about the contents.
+      $uploaded_file->delete();
+
       if ($binary === FALSE) {
         return new JsonResponse([
           'status' => FALSE,
@@ -150,8 +164,15 @@ final class CanvasBuilder extends ControllerBase {
       ]);
     }
     $task_message = array_pop($prompt['messages']);
+
+    // Generate verbose context for orchestrator.
+    $context = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
+
+    // Append the necessary context to the user message.
+    $message_xml = $this->canvasAiPageBuilderHelper->formatMessageWithContext($context, $task_message['text']);
+
     $agent->setChatInput(new ChatInput([
-      new ChatMessage($task_message['role'], $task_message['text'], $image_files),
+      new ChatMessage($task_message['role'], $message_xml, $image_files),
     ]));
 
     // Store the current layout in the temp store. This will be later used by
@@ -162,33 +183,8 @@ final class CanvasBuilder extends ControllerBase {
       $this->canvasAiTempStore->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, Json::encode($current_layout));
     }
 
-    $task = $prompt['messages'];
-    $messages = [];
-    foreach ($task as $message) {
-      if (!empty($message['files'])) {
-        $images = [];
-        foreach ($message['files'] as $file_info) {
-          if (!empty($file_info['src']) && preg_match('/^data:(image\/(?:jpeg|png));base64,(.+)$/i', $file_info['src'], $matches)) {
-            $mime_type = $matches[1];
-            $binary = base64_decode($matches[2], TRUE);
-            if ($binary !== FALSE) {
-              $images[] = new ImageFile($binary, $mime_type, 'temp');
-            }
-          }
-        }
-        // The text is intentionally kept empty while setting it in comments
-        // so that the AI only takes the image as a context/history for the
-        // next prompt not any text related to it.
-        $messages[] = new ChatMessage($message['role'], '', $images);
-        break;
-      }
-      else {
-        if (!empty($message['text'])) {
-          $messages[] = new ChatMessage($message['role'] === 'user' ? 'user' : 'assistant', $message['text']);
-        }
-      }
-    }
-    $agent->setChatHistory($messages);
+    $chat_history = $this->canvasAiChatHelper->getFilteredChatHistory($prompt['messages']);
+    $agent->setChatHistory($chat_history);
     $agent->setProgressThreadId($prompt['request_id']);
     $agent->setDetailedProgressTracking([
       AiAgentStatusItemTypes::Started,
@@ -214,21 +210,28 @@ final class CanvasBuilder extends ControllerBase {
     $agent->setModelName($default['model_id']);
     $agent->setAiConfiguration([]);
     $agent->setCreateDirectly(TRUE);
+    $selected_component = $prompt['selected_component'] ?? NULL;
+    $selected_component_required_props = isset($prompt['selected_component_required_props']) ? Json::encode($prompt['selected_component_required_props']) : NULL;
+    $component_agent_dynamic_state = $this->canvasAiPageBuilderHelper->generateComponentAgentDynamicPromptSection([
+      'selected_component' => $selected_component,
+      'selected_component_required_props' => $selected_component_required_props,
+      'json_api_module_status' => $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled',
+      'menu_fetch_source' => $this->getMenuFetchSource(),
+    ]);
     $agent->setTokenContexts([
       'entity_type' => $prompt['entity_type'] ?? NULL,
       'entity_id' => $prompt['entity_id'] ?? NULL,
-      'selected_component' => $prompt['selected_component'] ?? NULL,
-      'selected_component_required_props' => isset($prompt['selected_component_required_props']) ? Json::encode($prompt['selected_component_required_props']) : NULL,
+      'selected_component' => $selected_component,
       'layout' => $prompt['layout'] ?? NULL,
       'derived_proptypes' => isset($prompt['derived_proptypes']) ? Json::encode($prompt['derived_proptypes']) : NULL,
       'page_title' => $prompt['page_title'] ?? NULL,
       'page_description' => $prompt['page_description'] ?? NULL,
       'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None',
-      'menu_fetch_source' => $this->getMenuFetchSource(),
-      'json_api_module_status' => $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled',
+      'component_agent_dynamic_state' => $component_agent_dynamic_state,
       'available_regions' => Json::encode($this->canvasAiPageBuilderHelper->getAvailableRegions(Json::encode($prompt['current_layout']))) ?? NULL,
-      'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
-      'custom_libraries' => $this->getSupportedLibraries(),
+      // JSON-encode so the libraries render as readable data in the system
+      // prompt token rather than the string "Array".
+      'custom_libraries' => Json::encode($this->getSupportedLibraries()),
     ]);
     try {
       $solvability = $agent->determineSolvability();
@@ -270,6 +273,7 @@ final class CanvasBuilder extends ControllerBase {
       }
       // The final message seen by the user should be the one from the orchestrator agent.
       $response['message'] = $agent->solve();
+      $response = $this->canvasAiPageBuilderHelper->processCanvasPageFields($response);
       return new JsonResponse(
         $response,
       );
@@ -428,12 +432,6 @@ final class CanvasBuilder extends ControllerBase {
    */
   protected function getSupportedLibraries(): array {
     return [
-      [
-        "name" => "importing_packages",
-        "type" => "External npm package",
-        "description" => "Although a number of useful built-in and bundled packages are provided, you can also import any npm package through the web.",
-        "code" => "```js\nimport { motion } from 'https://esm.sh/motion@12.23.26/react?external=react,react-dom'\n```",
-      ],
       [
         "name" => "formatted_text",
         "type" => "Built-in custom package",

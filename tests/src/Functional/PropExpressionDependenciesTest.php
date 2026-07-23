@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\PropShape\PersistentPropShapeRepository;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\file\Entity\File;
@@ -19,6 +18,7 @@ use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\TestWith;
 
@@ -121,7 +121,7 @@ class PropExpressionDependenciesTest extends FunctionalTestBase {
     $imageComponent = Component::load($component_id);
     \assert($imageComponent instanceof ComponentInterface);
     $imageComponentSource = $imageComponent->getComponentSource();
-    \assert($imageComponentSource instanceof GeneratedFieldExplicitInputUxComponentSourceBase);
+    \assert($imageComponentSource instanceof JsonSchemaPropsComponentSourceBase);
     // @phpstan-ignore-next-line
     $expression_string = $imageComponentSource->getDefaultExplicitInput()['image']['expression'];
     self::assertStringNotContainsString('entity:media', $expression_string);

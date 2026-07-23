@@ -1,5 +1,6 @@
 import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
+import { fetchCsrfToken } from '@/utils/csrf';
 import { getCanvasSettings } from '@/utils/drupal-globals';
 
 import type {
@@ -46,7 +47,9 @@ export const popCanvasLayoutRequest = () => {
     const event = new CustomEvent('canvasLayoutRequestComplete');
     document.dispatchEvent(event);
     setTimeout(() => {
-      document.body.removeAttribute('data-canvas-layout-request-in-progress');
+      if (canvasSettings.canvasLayoutRequestInProgress.length === 0) {
+        document.body.removeAttribute('data-canvas-layout-request-in-progress');
+      }
     }, 10);
   }
 };
@@ -138,12 +141,10 @@ const rawBaseQuery = (appConfiguration: AppConfiguration) => {
     baseUrl,
     prepareHeaders: async (headers, api) => {
       if (api.type === 'mutation') {
-        const csrfResponse = await fetch(`${baseUrl}session/token`);
-        if (csrfResponse.ok) {
-          const csrfToken = await csrfResponse.text();
-          headers.set('X-CSRF-Token', csrfToken);
-        } else {
-          console.error('Failed to generate the CSRF token.');
+        try {
+          headers.set('X-CSRF-Token', await fetchCsrfToken(baseUrl));
+        } catch (error) {
+          console.error((error as Error).message);
         }
       }
     },

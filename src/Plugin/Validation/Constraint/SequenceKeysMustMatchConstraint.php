@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
-use Drupal\Core\Validation\Attribute\Constraint;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Validation\Attribute\Constraint;
 
 /**
  * Checks the validated sequence's keys against another sequence's keys.
@@ -32,5 +32,26 @@ final class SequenceKeysMustMatchConstraint extends SequenceDependentConstraintB
    * How the validated sequence's keys must relate to the target sequence.
    */
   public string $matchType = self::MATCH_TYPE_SAME_SET;
+
+  /**
+   * Optional filter conditions to apply to the sequence before extracting keys.
+   *
+   * Each condition is a `key => primitive-value` pair. A mapping element in the
+   * target sequence passes the filter only if all listed keys exist on it and
+   * each of their cast primitive values equals the expected value.
+   *
+   * For example:
+   * @code
+   * ['status' => TRUE]
+   * @endcode
+   * or
+   * @code
+   * [
+   *   'type' => 'object',
+   *   '$ref' => 'json-schema-definitions://canvas.module/content-entity-reference',
+   * ]
+   * @endcode
+   */
+  public ?array $conditions = NULL;
 
 }

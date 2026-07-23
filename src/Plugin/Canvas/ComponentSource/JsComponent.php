@@ -4,11 +4,33 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\Attribute\ComponentSource;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSaveEntity;
+use Drupal\canvas\CodeComponentDataProvider;
+use Drupal\canvas\ComponentSource\UrlRewriteInterface;
+use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\GlobalImports;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
+use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
@@ -16,15 +38,6 @@ use Drupal\Core\Plugin\Component as ComponentPlugin;
 use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
-use Drupal\canvas\Attribute\ComponentSource;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\AutoSaveEntity;
-use Drupal\canvas\Entity\AssetLibrary;
-use Drupal\canvas\Entity\BrandKit;
-use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\canvas\GlobalImports;
-use Drupal\canvas\ComponentSource\UrlRewriteInterface;
-use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -35,14 +48,26 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   label: new TranslatableMarkup('Code Components'),
   supportsImplicitInputs: FALSE,
   discovery: JsComponentDiscovery::class,
-  updater: GeneratedFieldExplicitInputUxComponentInstanceUpdater::class,
-  inputs_config_schema_generator: GeneratedFieldExplicitInputUxComponentInstanceInputsConfigSchemaGenerator::class,
+  updater: JsonSchemaPropsComponentInstanceUpdater::class,
+  inputs_config_schema_generator: JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator::class,
   // @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()
   discoveryCacheTags: ['config:js_component_list'],
 )]
-final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase implements UrlRewriteInterface {
+final class JsComponent extends JsonSchemaPropsComponentSourceBase implements UrlRewriteInterface {
 
   public const SOURCE_PLUGIN_ID = 'js';
+
+  /**
+   * Render-array metadata used to describe an external component.
+   *
+   * Without a fallback implementation, or while a headless frontend is
+   * configured, the component renders as empty markup in Drupal. Consumers
+   * that serialize component trees can use this metadata to preserve its
+   * structure.
+   *
+   * @see \Drupal\canvas_headless\RenderConverter\JsComponentCanvasRenderConverter
+   */
+  public const EXTERNAL_RENDER_METADATA = '#canvas_external_component';
 
   public const EXAMPLE_VIDEO_HORIZONTAL = '/ui/assets/videos/mountain_wide.mp4';
   public const EXAMPLE_VIDEO_VERTICAL = '/ui/assets/videos/bird_vertical.mp4';
@@ -52,6 +77,9 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   protected FileUrlGeneratorInterface $fileUrlGenerator;
   protected ?JavaScriptComponent $jsComponent = NULL;
   protected GlobalImports $globalImports;
+  protected EntityTypeManagerInterface $entityTypeManager;
+  protected CodeComponentDataProvider $codeComponentDataProvider;
+  protected ConfigFactoryInterface $configFactory;
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
@@ -59,6 +87,9 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $instance->autoSaveManager = $container->get(AutoSaveManager::class);
     $instance->fileUrlGenerator = $container->get(FileUrlGeneratorInterface::class);
     $instance->globalImports = $container->get(GlobalImports::class);
+    $instance->entityTypeManager = $container->get(EntityTypeManagerInterface::class);
+    $instance->codeComponentDataProvider = $container->get(CodeComponentDataProvider::class);
+    $instance->configFactory = $container->get(ConfigFactoryInterface::class);
     return $instance;
   }
 
@@ -148,8 +179,219 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   /**
    * {@inheritdoc}
    */
+  public function getClientSideInfo(Component $component): array {
+    $info = parent::getClientSideInfo($component);
+    $js_component = $this->getJavaScriptComponent();
+    return $js_component->isExternal()
+      ? $info + [
+        'type' => 'external',
+        'hasFallbackImplementation' => $js_component->hasFallbackImplementation(),
+      ]
+      : $info;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
+    $explicit_input = parent::getExplicitInput($uuid, $item, $host_entity);
+
+    $js_component = $this->getJavaScriptComponent();
+    $content_entity_reference_prop_names = \array_keys($js_component->getContentEntityReferenceProps());
+
+    // Nothing extra to do if this code component has no
+    // content-entity-reference props.
+    if (empty($content_entity_reference_prop_names)) {
+      return $explicit_input;
+    }
+
+    // Nothing extra to do if none of this code component's content-entity-
+    // reference props are populated in the stored inputs.
+    $raw_inputs = $item->getInputs() ?? [];
+    $populated_content_entity_reference_props = \array_intersect(
+      $content_entity_reference_prop_names,
+      \array_keys($raw_inputs)
+    );
+    if (empty($populated_content_entity_reference_props)) {
+      return $explicit_input;
+    }
+
+    // Resolve all content-entity-reference props, by evaluating their entity
+    // field expressions on the referenced entities. The parent already parsed
+    // each prop's PropSource and evaluated it against the host entity (with the
+    // tree-root fallback for missing $host_entity), so reuse those resolved
+    // EvaluationResults instead of re-parsing and re-evaluating here.
+    foreach ($populated_content_entity_reference_props as $prop_name) {
+      \assert(isset($explicit_input['resolved']) && \is_array($explicit_input['resolved']));
+      $referenced_entity = $explicit_input['resolved'][$prop_name] ?? NULL;
+
+      // Evaluate every entity field expression declared for this prop against
+      // the resolved entity, and assemble a nested payload that mirrors the
+      // reference structure of the expressions.
+      $expression_strings = $js_component->getEntityFieldExpressions($prop_name);
+      if (empty($expression_strings)) {
+        continue;
+      }
+      // Entity field expressions for content-entity-reference props must be
+      // entity-field-based (validated at save time): the schema restricts
+      // `entityFields.*.*` to a FieldPropExpression, a
+      // FieldObjectPropsExpression, or a ReferenceFieldPropExpression.
+      // @see canvas.schema.yml (canvas.js_component.*: dataDependencies.entityFields)
+      // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidStructuredDataPropExpressionConstraintValidator
+      $expressions = \array_map(function (string $expression_string): EntityFieldBasedPropExpressionInterface {
+        $expression = StructuredDataPropExpression::fromString($expression_string);
+        \assert($expression instanceof EntityFieldBasedPropExpressionInterface);
+        return $expression;
+      }, $expression_strings);
+
+      // buildReferencePayload() returns an EvaluationResult whose cacheability
+      // is composed (by EvaluationResult) from every entity it traverses into.
+      // Add the prop source's cacheability: the host entity and reference field
+      // that resolved $referenced_entity.
+      \assert(isset($explicit_input['resolved']) && \is_array($explicit_input['resolved']));
+      $explicit_input['resolved'][$prop_name] = self::buildReferencePayload($referenced_entity, $expressions);
+    }
+
+    return $explicit_input;
+  }
+
+  /**
+   * Builds the nested developer-facing payload for one resolved entity.
+   *
+   * Each entity field expression declared for a content-entity-reference
+   * prop is placed into a JSON object mirroring the expression's reference
+   * structure:
+   * - scalar leaves, and mixed objects (a directly-picked `↠` leaf alongside
+   *   any follow-reference entries), become a key on the current entity object
+   *   (keyed by the field/entity-key name, e.g. `label` or `title`);
+   * - reference expressions — and reference-only objects, the coalesced form of
+   *   several references through one field — descend into the referenced
+   *   entity, producing a nested object (those sharing a referencer merge);
+   * - every entity object carries a `__type` set to the resolved entity's
+   *   bundle, so code components can branch on it (including for
+   *   multi-target-bundle references, where the bundle is only known at
+   *   runtime).
+   *
+   * @param \Drupal\canvas\PropExpressions\StructuredData\EvaluationResult $resolved_entity
+   *   The resolved entity to evaluate the expressions against, wrapped in an
+   *   EvaluationResult to carry the cacheability describing how this entity was
+   *   loaded.
+   * @param array<\Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface> $expressions
+   *   The expressions, relative to $entity.
+   *
+   * @return \Drupal\canvas\PropExpressions\StructuredData\EvaluationResult
+   *   The payload object (always containing a `__type` key), wrapped in an
+   *   EvaluationResult that carries the cacheability of every traversed entity.
+   *
+   * @see ::getExplicitInput()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EvaluationResult
+   * @internal
+   */
+  public static function buildReferencePayload(EvaluationResult $resolved_entity, array $expressions): EvaluationResult {
+    if (!$resolved_entity->value instanceof FieldableEntityInterface) {
+      if ($resolved_entity->value === NULL) {
+        // Either:
+        // - no entity was selected
+        // - the selected entity has been deleted
+        // The payload must hence be NULL, while retaining cacheability.
+        return new EvaluationResult(NULL, CacheableMetadata::createFromObject($resolved_entity));
+      }
+      throw new \LogicException('Expected a fieldable entity wrapped in an EvaluationResult to convey how this entity was retrieved.');
+    }
+    $entity = $resolved_entity->value;
+
+    $payload = ['__type' => $entity->bundle()];
+    // The resulting payload must still describe the cacheability of how
+    // $resolved_entity was loaded.
+    $payload_cacheability = CacheableMetadata::createFromObject($resolved_entity);
+
+    // References sharing a referencer field are descended into once, with
+    // their target sub-expressions merged into a single nested object.
+    $reference_groups = [];
+    foreach ($expressions as $expression) {
+      // A reference, or its coalesced form (a FieldObjectPropsExpression whose
+      // entries are all follow-references), descends into a referenced entity:
+      // decompose the object into the same reference groups as the equivalent
+      // separate references so it yields an identical nested object (`__type`).
+      // A mixed object (any `↠` leaf) stays a flat object leaf below.
+      $reference_entries = match (TRUE) {
+        $expression instanceof ReferenceFieldPropExpression => [$expression],
+        $expression instanceof FieldObjectPropsExpression && $expression->isReferenceOnly() => \array_values($expression->objectPropsToFieldProps),
+        $expression instanceof FieldPropExpression || $expression instanceof FieldObjectPropsExpression => NULL,
+        default => throw new \UnhandledMatchError(\sprintf("'%s' is not a valid content-entity-reference prop expression.", (string) $expression)),
+      };
+      if ($reference_entries !== NULL) {
+        foreach ($reference_entries as $reference) {
+          \assert($reference instanceof ReferenceFieldPropExpression);
+          // @todo Multi-target-bundle references (a `ReferencedBundleSpecificBranches` target) are deferred; add support in https://git.drupalcode.org/project/canvas/-/work_items/3591656.
+          if (!$reference->referenced instanceof EntityFieldBasedPropExpressionInterface) {
+            throw new \LogicException(\sprintf('Multi-target-bundle content entity references are not yet supported, but the expression `%s` targets bundle-specific branches.', (string) $reference));
+          }
+          $key = $reference->referencer->getDeveloperFacingKey();
+          $reference_groups[$key]['referencer'] ??= $reference->referencer;
+          $reference_groups[$key]['targets'][] = $reference->referenced;
+        }
+        continue;
+      }
+      // Scalar or object leaf: its EvaluationResult (value + cacheability) is
+      // hoisted by the EvaluationResult returned below.
+      $payload[$expression->getDeveloperFacingKey()] = Evaluator::evaluate($entity, $expression,
+        is_required: FALSE,
+        language: NegotiatedLanguage::matchEntity($entity),
+      );
+    }
+
+    // Call recursively for each expression that follows a reference.
+    foreach ($reference_groups as $key => $group) {
+      $referenced = Evaluator::evaluate($entity, $group['referencer'],
+        is_required: FALSE,
+        language: NegotiatedLanguage::matchEntity($entity),
+      );
+      $payload[$key] = self::buildReferencePayload($referenced, $group['targets']);
+    }
+
+    return new EvaluationResult($payload, $payload_cacheability);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
     $component = $this->getJavaScriptComponent();
+    $headless_settings = NULL;
+
+    if ($component->isExternal()) {
+      $headless_settings = $this->configFactory->get('canvas_headless.settings');
+      $frontends = $headless_settings->get('frontends');
+      $has_configured_frontend = \is_array($frontends) && $frontends !== [];
+
+      if (!$component->hasFallbackImplementation() || $has_configured_frontend) {
+        // The configured external application owns the implementation: it
+        // renders external components itself, from its own codebase. Drupal
+        // renders them as nothing — in previews and on live pages alike.
+        // Expose their identity and resolved props as render-array metadata so
+        // serializers can represent the app-owned component.
+        [$props, $props_cacheability] = self::getResolvedPropsAndCacheability(
+          \array_intersect_key(
+            $inputs[self::EXPLICIT_INPUT_NAME] ?? [],
+            $component->getProps() ?? [],
+          ),
+        );
+        $build = [
+          '#markup' => '',
+          self::EXTERNAL_RENDER_METADATA => [
+            'component_id' => self::componentIdFromJavascriptComponentId($component->id()),
+            'component_uuid' => $componentUuid,
+            'props' => $props,
+          ],
+        ];
+        CacheableMetadata::createFromObject($component)
+          ->addCacheableDependency($headless_settings)
+          ->addCacheableDependency($props_cacheability)
+          ->applyTo($build);
+        return $build;
+      }
+    }
 
     // Rendering will validate the props against the version that is published,
     // but on preview the auto-saved version will be used for those components
@@ -245,16 +487,33 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     // @see \Drupal\canvas\Element\RenderSafeComponentContainer::handleComponentException()
     // @see https://www.drupal.org/project/canvas/issues/3583639
     \assert($this->componentValidator->validateProps($props, $this->getComponentPlugin()));
-    CacheableMetadata::createFromRenderArray($build)
+    $cacheability = CacheableMetadata::createFromRenderArray($build)
       ->addCacheableDependency($component)
-      ->addCacheableDependency($props_cacheability)
-      ->applyTo($build);
+      ->addCacheableDependency($props_cacheability);
+    if ($headless_settings !== NULL) {
+      $cacheability->addCacheableDependency($headless_settings);
+    }
+    // When this component reads `canvasData.v0.mainEntity`, its data embeds the
+    // per-language translation list, derived from the enabled-language list and
+    // the URL negotiation config. Rebuild it when either changes.
+    if (\in_array('canvas/canvasData.v0.mainEntity', $component->getAssetLibraryDependencies(), TRUE)) {
+      $cacheability->addCacheTags(['config:configurable_language_list', 'config:language.negotiation']);
+      // The data also embeds per-translation view access results. Their
+      // cacheability (e.g. the `user.permissions` cache context) must be
+      // bubbled here: the data itself is attached in hook_js_settings_alter(),
+      // which runs during asset rendering, outside the render pipeline. The
+      // returned data is discarded; it is recomputed there.
+      // @see \Drupal\canvas\Hook\ComponentSourceHooks::jsSettingsAlter()
+      $this->codeComponentDataProvider->getCanvasDataMainEntityV0($cacheability);
+    }
+    $cacheability->applyTo($build);
 
     return $build + [
       '#type' => 'astro_island',
       '#uuid' => $componentUuid,
       '#import_maps' => $import_maps,
       '#name' => $component->label(),
+      '#machine_name' => $component->id(),
       '#component_url' => $component_url,
       '#props' => $props + [
         'canvas_uuid' => $componentUuid,

@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\canvas\ContentTemplateRepository;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
@@ -15,10 +19,6 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\canvas\Entity\Page;
-use Drupal\canvas\ContentTemplateRepository;
-use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
-use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Url;
 
 /**

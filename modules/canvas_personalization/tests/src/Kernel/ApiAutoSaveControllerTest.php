@@ -4,25 +4,25 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Kernel;
 
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\TestWith;
-use Drupal\Core\Cache\CacheableJsonResponse;
-use Drupal\Core\Url;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiAutoSaveController;
 use Drupal\canvas\Controller\ErrorCodesEnum;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas_personalization\Entity\Segment;
+use Drupal\Core\Cache\CacheableJsonResponse;
+use Drupal\Core\Url;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
+use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
-use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
-use Drupal\canvas_personalization\Entity\Segment;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -136,7 +136,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertCount(0, \array_diff($account->getCacheTags(), $response->getCacheableMetadata()->getCacheTags()));
     self::assertCount(0, \array_diff($account->getCacheContexts(), $response->getCacheableMetadata()->getCacheContexts()));
     self::assertContains('config:user.settings', $response->getCacheableMetadata()->getCacheTags());
-    $response_body = \json_decode($response->getContent() ?: '{}', TRUE);
+    $response_body = \json_decode((string) $response->getContent(), TRUE);
     \assert(\array_key_exists('data', $response_body));
     $content = $response_body['data'];
     $segmentIdentifier = \sprintf('segment:%s', $segment->id());
@@ -242,7 +242,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $autoSave->saveEntity($segment);
 
     $response = $this->makePublishAllRequest();
-    $json = json_decode($response->getContent() ?: '', TRUE);
+    $json = json_decode((string) $response->getContent(), TRUE);
     self::assertEquals(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
     $errors[] = [
       'detail' => "'negate' is a required key because rules.%key is utm_parameters (see config schema type condition.plugin.utm_parameters).",
@@ -306,7 +306,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         'code' => ErrorCodesEnum::UnexpectedItemInPublishRequest->value,
       ],
       ],
-    ], \json_decode($response->getContent() ?: '', TRUE, flags: JSON_THROW_ON_ERROR));
+    ], \json_decode((string) $response->getContent(), TRUE, flags: JSON_THROW_ON_ERROR));
 
     $out_dated_auto_save_data = $auto_save_data;
     $out_dated_auto_save_data[$segment_auto_save_key]['data_hash'] = 'old-hash';
@@ -328,10 +328,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
           ],
         ],
       ],
-    ], \json_decode($response->getContent() ?: '', TRUE, flags: JSON_THROW_ON_ERROR));
+    ], \json_decode((string) $response->getContent(), TRUE, flags: JSON_THROW_ON_ERROR));
 
     $response = $this->makePublishAllRequest();
-    $json = json_decode($response->getContent() ?: '', TRUE);
+    $json = json_decode((string) $response->getContent(), TRUE);
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
     self::assertEquals(['message' => 'Successfully published 1 item.'], $json);
 

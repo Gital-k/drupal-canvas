@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Update;
 
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use Drupal\canvas\Entity\Component;
 use Drupal\media\Entity\MediaType;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
@@ -186,6 +186,19 @@ final class ComponentMultiBundleReferencePropExpressionsUpdateTest extends Canva
       ->setSyncing(TRUE)
       ->save();
     self::assertActiveVersionIsValid($sdc_with_image_object_prop_shape);
+
+    // The seeded content still pins the image instance to the single-bundle
+    // version just deleted. Re-stamp it to the multi-bundle version so the
+    // fixture is coherent — as if the site had always been multi-bundle,
+    // matching the component-config rewrite. Without this the post-update data
+    // health check flags a dangling component version on the node content.
+    $connection = \Drupal::database();
+    foreach (['node__field_canvas_demo', 'node_revision__field_canvas_demo'] as $table) {
+      $connection->update($table)
+        ->fields(['field_canvas_demo_component_version' => self::EXPECTED_ORIGINAL_MULTI_BUNDLE_IMAGE_OBJECT_VERSION])
+        ->condition('field_canvas_demo_component_version', self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_OBJECT_VERSION)
+        ->execute();
+    }
 
     // Generate new version of the image URI component that is multi-bundle.
     $settings = $sdc_with_image_uri_shape->getSettings();

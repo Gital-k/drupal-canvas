@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\AutoSave;
 
-use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Url;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -44,7 +44,7 @@ class AutoSaveConflictContentTemplateLayoutTest extends ApiLayoutControllerTestB
         [
           'uuid' => '09365c2d-1ee1-47fd-b5a3-7e4f34866186',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => 'b1e991f726a2a266',
+          'component_version' => 'd34b93534777207a',
           'inputs' => ['heading' => 'Hello, world!'],
         ],
       ],

@@ -226,3 +226,85 @@ function canvas_oauth_post_update_0004_media_view_scope(array &$sandbox): void {
     ])->save();
   }
 }
+
+/**
+ * Install scopes for content templates and viewing content entities.
+ */
+function canvas_oauth_post_update_0005_canvas_content_template_scope(array &$sandbox): void {
+  $scope = Oauth2Scope::load('canvas_content_template');
+  if (!$scope) {
+    Oauth2Scope::create([
+      'id' => 'canvas_content_template',
+      'name' => 'canvas:content_template',
+      'description' => 'Drupal Canvas: Full access to content templates',
+      'status' => TRUE,
+      'grant_types' => [
+        'authorization_code' => [
+          'status' => TRUE,
+          'description' => 'Authorization code access',
+        ],
+        'refresh_token' => [
+          'status' => TRUE,
+          'description' => 'Refresh token access',
+        ],
+        'client_credentials' => [
+          'status' => TRUE,
+          'description' => 'Client credentials access',
+        ],
+      ],
+      'umbrella' => FALSE,
+      'granularity_id' => 'permission',
+      'granularity_configuration' => [
+        'permission' => 'administer content templates',
+      ],
+      'dependencies' => [
+        'enforced' => [
+          'module' => [
+            'canvas_oauth',
+          ],
+        ],
+      ],
+    ])->save();
+  }
+}
+
+/**
+ * Install the canvas:page_region scope.
+ */
+function canvas_oauth_post_update_0006_page_region_scope(array &$sandbox): void {
+  $scope = Oauth2Scope::load('canvas_page_region');
+  if (!$scope) {
+    Oauth2Scope::create([
+      'id' => 'canvas_page_region',
+      'name' => 'canvas:page_region',
+      'description' => 'Drupal Canvas: Full access to global regions (page regions)',
+      'status' => TRUE,
+      'grant_types' => [
+        'authorization_code' => [
+          'status' => TRUE,
+          'description' => 'Authorization code access for global regions',
+        ],
+        'refresh_token' => [
+          'status' => TRUE,
+          'description' => 'Refresh token access for global regions',
+        ],
+        'client_credentials' => [
+          'status' => TRUE,
+          'description' => 'Client credentials access for global regions',
+        ],
+      ],
+      'umbrella' => FALSE,
+      'granularity_id' => 'permission',
+      'granularity_configuration' => [
+        'permission' => 'administer page template',
+      ],
+      'dependencies' => [
+        'enforced' => [
+          'module' => [
+            'canvas_oauth',
+          ],
+        ],
+      ],
+    ])->save();
+  }
+}

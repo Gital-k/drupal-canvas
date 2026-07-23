@@ -25,6 +25,10 @@ export interface PreviewManifestComponent {
   previewable: boolean;
   ineligibilityReason: PreviewIneligibilityReason | null;
   exampleProps: Record<string, unknown>;
+  props: Record<string, unknown>;
+  dataDependencies: {
+    entityFields?: Record<string, string[]>;
+  };
   mocks: PreviewManifestComponentMock[];
 }
 
@@ -58,18 +62,31 @@ export interface WorkbenchDiscoveryRefresh {
   type: 'workbench:discovery-refresh';
 }
 
+export interface PreviewRenderLayout {
+  /** Vite `/@fs/` URL for the layout component module (default export). */
+  jsEntryUrl: string;
+  /** Spec for each region rendered into the layout, keyed by region machine name. */
+  regions: Record<string, Spec>;
+}
+
 export interface PreviewRenderRequest {
   source: 'canvas-workbench-parent';
   type: 'preview:render';
   payload: {
     renderId: string;
-    renderType: 'component' | 'page';
+    renderType: 'component' | 'page' | 'region';
     spec: Spec;
     registrySources: Array<{
       name: string;
       jsEntryUrl: string;
     }>;
     cssUrls: string[];
+    /**
+     * Optional layout payload. When present and `renderType === 'page'`, the
+     * page spec is rendered as `children` inside the layout component, with
+     * region specs exposed via `<RegionsProvider>` from `drupal-canvas`.
+     */
+    layout?: PreviewRenderLayout;
     /** Workbench shell path (pathname + search) so the preview iframe MemoryRouter stays aligned. */
     shellPath?: string;
   };
@@ -84,7 +101,7 @@ export interface PreviewFrameRendered {
   source: 'canvas-workbench-frame';
   type: 'preview:rendered';
   payload: {
-    type: 'component' | 'page';
+    type: 'component' | 'page' | 'region';
     renderId: string;
   };
 }
@@ -141,6 +158,8 @@ export function toPreviewManifestComponent(component: {
       previewable: false,
       ineligibilityReason: 'missing_js_entry',
       exampleProps: {},
+      props: {},
+      dataDependencies: {},
       mocks: [],
     };
   }
@@ -164,6 +183,8 @@ export function toPreviewManifestComponent(component: {
       previewable: false,
       ineligibilityReason: 'unsupported_js_extension',
       exampleProps: {},
+      props: {},
+      dataDependencies: {},
       mocks: [],
     };
   }
@@ -186,6 +207,8 @@ export function toPreviewManifestComponent(component: {
     previewable: true,
     ineligibilityReason: null,
     exampleProps: {},
+    props: {},
+    dataDependencies: {},
     mocks: [],
   };
 }
@@ -233,17 +256,44 @@ export function isPreviewRenderRequest(
     return false;
   }
 
-  const { renderId, renderType, spec, registrySources, cssUrls, shellPath } =
-    value.payload;
+  const {
+    renderId,
+    renderType,
+    spec,
+    registrySources,
+    cssUrls,
+    layout,
+    shellPath,
+  } = value.payload;
   if (
     shellPath !== undefined &&
     (typeof shellPath !== 'string' || shellPath.length === 0)
   ) {
     return false;
   }
+  if (layout !== undefined) {
+    if (
+      !isRecord(layout) ||
+      typeof layout.jsEntryUrl !== 'string' ||
+      !isRecord(layout.regions)
+    ) {
+      return false;
+    }
+    for (const regionSpec of Object.values(layout.regions)) {
+      if (
+        !isRecord(regionSpec) ||
+        typeof regionSpec.root !== 'string' ||
+        !isRecord(regionSpec.elements)
+      ) {
+        return false;
+      }
+    }
+  }
   return (
     typeof renderId === 'string' &&
-    (renderType === 'component' || renderType === 'page') &&
+    (renderType === 'component' ||
+      renderType === 'page' ||
+      renderType === 'region') &&
     isRecord(spec) &&
     typeof spec.root === 'string' &&
     isRecord(spec.elements) &&
@@ -273,7 +323,9 @@ export function isPreviewFrameEvent(
   if (value.type === 'preview:rendered') {
     return (
       isRecord(value.payload) &&
-      (value.payload.type === 'component' || value.payload.type === 'page') &&
+      (value.payload.type === 'component' ||
+        value.payload.type === 'page' ||
+        value.payload.type === 'region') &&
       typeof value.payload.renderId === 'string'
     );
   }

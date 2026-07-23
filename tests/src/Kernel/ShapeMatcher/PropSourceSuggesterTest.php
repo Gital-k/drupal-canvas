@@ -4,31 +4,36 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\ShapeMatcher;
 
-use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
+use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
+use Drupal\canvas\PropSource\HostEntityPropSource;
 use Drupal\canvas\PropSource\HostEntityUrlPropSource;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
-use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\Core\Plugin\Component;
+use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\link\LinkItemInterface;
+use Drupal\link\LinkTitleVisibility;
 use Drupal\node\Entity\NodeType;
 use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests Prop Source Suggester.
  *
  * @phpstan-import-type HostEntityUrlPropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
+ * @phpstan-import-type HostEntityPropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
  */
 #[CoversClass(PropSourceSuggester::class)]
 #[RunTestsInSeparateProcesses]
@@ -49,6 +54,10 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
     'comment',
     'datetime_range',
     'telephone',
+    // Adds `content_translation_source`/`content_translation_outdated` base
+    // fields when a bundle is translatable, to assert they are never suggested.
+    'content_translation',
+    'language',
     // Create sample configurable fields on the `node` entity type.
     'node',
     'field',
@@ -144,7 +153,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
       'bundle' => 'foo',
       'required' => TRUE,
       'settings' => [
-        'title' => DRUPAL_OPTIONAL,
+        'title' => LinkTitleVisibility::Optional->value,
         'link_type' => LinkItemInterface::LINK_GENERIC,
       ],
     ])->save();
@@ -200,7 +209,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
   /**
    * Tests .
    *
-   * @param array<string, array{'required': bool, 'entity-field': array<string, string>, 'adapter': array<string, string>, 'host-entity-url': array<string, HostEntityUrlPropSourceArray>}> $expected
+   * @param array<string, array{'required': bool, 'entity-field': array<string, string>, 'adapter': array<string, string>, 'host-entity-url': array<string, HostEntityUrlPropSourceArray>, 'host-entity': array<string, HostEntityPropSourceArray>}> $expected
    */
   #[DataProvider('provider')]
   public function test(string $component_plugin_id, string $data_type_context, array $expected): void {
@@ -222,6 +231,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           PropSource::EntityField->value => \array_map(fn (EntityFieldPropSource $s): array => $s->toArray(), $suggestions[$prop_name][PropSource::EntityField->value]),
           PropSource::Adapter->value => \array_map(fn (AdapterInterface $a): string => $a->getPluginId(), $suggestions[$prop_name][PropSource::Adapter->value]),
           PropSource::HostEntityUrl->value => \array_map(fn (HostEntityUrlPropSource $s): array => $s->toArray(), $suggestions[$prop_name][PropSource::HostEntityUrl->value]),
+          PropSource::HostEntity->value => \array_map(fn (HostEntityPropSource $s): array => $s->toArray(), $suggestions[$prop_name][PropSource::HostEntity->value]),
         ],
         "Unexpected prop source suggestion for $prop_name"
       );
@@ -229,6 +239,54 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
 
     // Finally, the set of expectations must be complete.
     $this->assertSame(\array_keys($expected), \array_keys($suggestions));
+  }
+
+  /**
+   * Never suggests content_translation's bookkeeping base fields.
+   *
+   * When a bundle is translatable, content_translation adds the fixed-name
+   * `content_translation_source` and `content_translation_outdated` base fields
+   * to the entity type. These are bookkeeping fields that are never meaningful
+   * to display, so they must not be offered as prop sources.
+   *
+   * @see \Drupal\canvas\ShapeMatcher\PropSourceSuggester::isConsideredIrrelevant()
+   */
+  public function testTranslationMetadataFieldsAreConsideredIrrelevant(): void {
+    // Make the "Foo" node type translatable so content_translation adds its
+    // bookkeeping base fields to the node entity type.
+    \Drupal::service('content_translation.manager')->setEnabled('node', 'foo', TRUE);
+    $this->container->get('entity_field.manager')->clearCachedFieldDefinitions();
+
+    // Guard: the base fields exist, so there is something to omit. Without this,
+    // the omission assertion below would also pass if the fields were never
+    // created (e.g. if enabling translation silently failed).
+    // `content_translation_outdated` is a boolean, matched by boolean props.
+    $field_definitions = $this->container->get('entity_field.manager')->getFieldDefinitions('node', 'foo');
+    self::assertArrayHasKey('content_translation_source', $field_definitions);
+    self::assertArrayHasKey('content_translation_outdated', $field_definitions);
+
+    $component = \Drupal::service(ComponentPluginManager::class)->find('sdc_test_all_props:all-props');
+    \assert($component instanceof Component);
+    $suggestions = $this->container->get(PropSourceSuggester::class)
+      ->suggest(
+        'sdc_test_all_props:all-props',
+        $component->metadata,
+        EntityDataDefinition::createFromDataType('entity:node:foo'),
+      );
+
+    // No prop is offered a source expression that reads either bookkeeping
+    // field. `content_translation_outdated` is a boolean, so absent this
+    // heuristic it surfaces for the component's boolean props. The
+    // `content_translation_source` assertion is defensive: it is a `language`
+    // field, which the suggester does not currently match to any prop shape, so
+    // it guards against a future regression rather than a field offered today.
+    foreach ($suggestions as $prop_name => $suggestion) {
+      foreach ($suggestion[PropSource::EntityField->value] as $source) {
+        $expression = (string) $source->expression;
+        self::assertStringNotContainsString('content_translation_source', $expression, "Prop $prop_name should not be offered content_translation_source.");
+        self::assertStringNotContainsString('content_translation_outdated', $expression, "Prop $prop_name should not be offered content_translation_outdated.");
+      }
+    }
   }
 
   public static function provider(): \Generator {
@@ -249,6 +307,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'Make relative image URL absolute' => 'image_url_rel_to_abs',
           ],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
       ],
     ];
@@ -282,6 +341,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'Make relative image URL absolute' => 'image_url_rel_to_abs',
           ],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
       ],
     ];
@@ -307,6 +367,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'Make relative image URL absolute' => 'image_url_rel_to_abs',
           ],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲canvas_test_sdc:image-srcset-candidate-template-uri␟srcSetCandidateTemplate' => [
           'required' => FALSE,
@@ -326,6 +387,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
       ],
     ];
@@ -352,6 +414,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
       ],
     ];
@@ -386,6 +449,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'UNIX timestamp to date' => 'unix_to_date',
           ],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲canvas_test_sdc:date␟caption' => [
           'required' => FALSE,
@@ -437,6 +501,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
       ],
     ];
@@ -471,6 +536,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_bool_default_true' => [
           'required' => FALSE,
@@ -498,6 +564,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string' => [
           'required' => FALSE,
@@ -549,12 +616,14 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_multiline' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_REQUIRED_string' => [
           'required' => TRUE,
@@ -566,18 +635,21 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_enum' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_integer_enum' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_date_time' => [
           'required' => FALSE,
@@ -593,6 +665,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_date' => [
           'required' => FALSE,
@@ -620,18 +693,21 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'UNIX timestamp to date' => 'unix_to_date',
           ],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_time' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_duration' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_email' => [
           'required' => FALSE,
@@ -655,6 +731,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_idn_email' => [
           'required' => FALSE,
@@ -678,30 +755,35 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_hostname' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_idn_hostname' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_ipv4' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_ipv6' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uuid' => [
           'required' => FALSE,
@@ -745,6 +827,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_format_uri' => [
           'required' => TRUE,
@@ -761,6 +844,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
               'absolute' => TRUE,
             ],
           ],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_format_uri_reference_web_links' => [
           'required' => TRUE,
@@ -785,6 +869,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
               'absolute' => FALSE,
             ],
           ],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri' => [
           'required' => FALSE,
@@ -809,6 +894,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
               'absolute' => TRUE,
             ],
           ],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri_image' => [
           'required' => FALSE,
@@ -846,6 +932,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'Extract image URL' => 'image_extract_url',
           ],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri_image_using_ref' => [
           'required' => FALSE,
@@ -883,6 +970,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'Extract image URL' => 'image_extract_url',
           ],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri_public_stream_wrapper' => [
           'required' => FALSE,
@@ -902,6 +990,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri_public_stream_wrapper_using_ref' => [
           'required' => FALSE,
@@ -921,6 +1010,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri_reference' => [
           'required' => FALSE,
@@ -997,6 +1087,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
               'absolute' => FALSE,
             ],
           ],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_iri' => [
           'required' => FALSE,
@@ -1021,6 +1112,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
               'absolute' => TRUE,
             ],
           ],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_iri_reference' => [
           'required' => FALSE,
@@ -1097,30 +1189,35 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
               'absolute' => FALSE,
             ],
           ],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri_template' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_json_pointer' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_relative_json_pointer' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_regex' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_integer' => [
           'required' => FALSE,
@@ -1162,12 +1259,14 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'Count days' => 'day_count',
           ],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_integer_range_minimum' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_integer_range_minimum_maximum_timestamps' => [
           'required' => FALSE,
@@ -1235,12 +1334,14 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_integer_by_the_dozen' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_number' => [
           'required' => FALSE,
@@ -1280,6 +1381,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_object_drupal_image' => [
           'required' => FALSE,
@@ -1306,6 +1408,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'Make relative image URL absolute' => 'image_url_rel_to_abs',
           ],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_object_drupal_image_ARRAY' => [
           'required' => FALSE,
@@ -1317,12 +1420,14 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_object_drupal_video' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_object_drupal_date_range' => [
           'required' => FALSE,
@@ -1334,12 +1439,14 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_html_inline' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_html_block' => [
           'required' => FALSE,
@@ -1359,6 +1466,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_html' => [
           'required' => FALSE,
@@ -1378,12 +1486,14 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_html_inline' => [
           'required' => TRUE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_html_block' => [
           'required' => TRUE,
@@ -1395,6 +1505,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_html' => [
           'required' => TRUE,
@@ -1406,6 +1517,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_array_integer' => [
           'required' => FALSE,
@@ -1429,6 +1541,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_array_integer_minItems' => [
           'required' => FALSE,
@@ -1452,6 +1565,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_array_integer_maxItems' => [
           'required' => FALSE,
@@ -1471,12 +1585,14 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_array_integer_minItemsMultiple' => [
           'required' => FALSE,
           PropSource::EntityField->value => [],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_array_integer_minMaxItems' => [
           'required' => FALSE,
@@ -1496,6 +1612,7 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_array_string' => [
           'required' => FALSE,
@@ -1515,9 +1632,110 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           ],
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
+          PropSource::HostEntity->value => [],
         ],
       ],
     ];
+  }
+
+  /**
+   * Tests the `HostEntity` bucket is populated iff the host satisfies the prop's `x-allowed-*` constraints.
+   *
+   * @param array<string, string> $constraints
+   *   The `x-allowed-entity-type-id` (and optionally `x-allowed-bundle`).
+   * @param string $host_data_type
+   *   The host entity data type, e.g. `entity:node:foo` or `entity:user:user`.
+   * @param bool $expect_match
+   *   Whether the HostEntity bucket should contain a `HostEntityPropSource`.
+   *
+   * @see \Drupal\canvas\ShapeMatcher\HostEntityPropSourceMatcher
+   */
+  #[DataProvider('provideHostEntityPropSourceCases')]
+  public function testHostEntityPropSourceSuggestion(array $constraints, string $host_data_type, bool $expect_match, ?string $expected_label): void {
+    $bucket = $this->suggestHostEntityBucketForReferenceProp('test:host', 'ref', $constraints, EntityDataDefinition::createFromDataType($host_data_type));
+
+    if ($expect_match) {
+      $this->assertCount(1, $bucket);
+      $this->assertNotNull($expected_label);
+      $this->assertArrayHasKey($expected_label, $bucket);
+    }
+    else {
+      $this->assertSame([], $bucket);
+    }
+  }
+
+  public static function provideHostEntityPropSourceCases(): \Generator {
+    yield 'bundleless target (user); host=user:user → match' => [
+      'constraints' => ['x-allowed-entity-type-id' => 'user'],
+      'host_data_type' => 'entity:user:user',
+      'expect_match' => TRUE,
+      'expected_label' => 'This user',
+    ];
+    yield 'bundleless target (user); host=node:foo → entity-type mismatch' => [
+      'constraints' => ['x-allowed-entity-type-id' => 'user'],
+      'host_data_type' => 'entity:node:foo',
+      'expect_match' => FALSE,
+      'expected_label' => NULL,
+    ];
+    yield 'bundled target (node:foo); host=node:foo → match' => [
+      'constraints' => ['x-allowed-entity-type-id' => 'node', 'x-allowed-bundle' => 'foo'],
+      'host_data_type' => 'entity:node:foo',
+      'expect_match' => TRUE,
+      'expected_label' => 'This Foo content item',
+    ];
+    yield 'bundled target (node:foo); host=user:user → entity-type mismatch' => [
+      'constraints' => ['x-allowed-entity-type-id' => 'node', 'x-allowed-bundle' => 'foo'],
+      'host_data_type' => 'entity:user:user',
+      'expect_match' => FALSE,
+      'expected_label' => NULL,
+    ];
+    // Bundle mismatch path: the host node bundle differs from the prop's
+    // `x-allowed-bundle` on the same entity type.
+    yield 'bundled target (node:article); host=node:foo → bundle mismatch' => [
+      'constraints' => ['x-allowed-entity-type-id' => 'node', 'x-allowed-bundle' => 'article'],
+      'host_data_type' => 'entity:node:foo',
+      'expect_match' => FALSE,
+      'expected_label' => NULL,
+    ];
+  }
+
+  /**
+   * Returns the HostEntity bucket for a synthetic single-prop entity-ref component.
+   *
+   * @param string $plugin_id
+   *   A synthetic component plugin id (only used for CPE strings).
+   * @param string $prop_name
+   *   The prop name.
+   * @param array<string, string> $constraints
+   *   The `x-allowed-entity-type-id` (and optionally `x-allowed-bundle`).
+   * @param \Drupal\Core\Entity\TypedData\EntityDataDefinition $host_entity_type
+   *   The host entity type + bundle data definition.
+   *
+   * @return array<string, HostEntityPropSource>
+   */
+  private function suggestHostEntityBucketForReferenceProp(string $plugin_id, string $prop_name, array $constraints, EntityDataDefinition $host_entity_type): array {
+    $prop_shape = JsonSchemaObjectRef::ContentEntityReference->asPropShapeArray() + $constraints;
+    $definition = [
+      'machineName' => $plugin_id,
+      'extension_type' => 'module',
+      'id' => $plugin_id,
+      'provider' => 'canvas',
+      'name' => $plugin_id,
+      'props' => [
+        'type' => 'object',
+        'properties' => [
+          $prop_name => $prop_shape + ['title' => $prop_name],
+        ],
+      ],
+      'library' => [],
+      'path' => '',
+      'template' => 'phony',
+    ];
+    $metadata = new ComponentMetadata($definition, app_root: '', enforce_schemas: FALSE);
+    $suggestions = $this->container->get(PropSourceSuggester::class)
+      ->suggest($plugin_id, $metadata, $host_entity_type);
+    $cpe = "⿲{$plugin_id}␟{$prop_name}";
+    return $suggestions[$cpe][PropSource::HostEntity->value];
   }
 
 }

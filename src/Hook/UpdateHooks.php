@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\Core\Config\ConfigInstallerInterface;
 use Drupal\Core\Hook\Attribute\Hook;
-use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\field\Entity\FieldConfig;
 
 final class UpdateHooks {
@@ -21,6 +21,7 @@ final class UpdateHooks {
   public function fieldConfigPreSave(FieldConfig $field): void {
     $this->configUpdater->updateConfigEntityWithComponentTreeInputs($field);
     $this->configUpdater->updateConfigEntityWithComponentTreeInputsAsArrays($field);
+    $this->configUpdater->updateConfigEntityBlockLabelDisplay($field);
     // We might need to update dependencies even on import.
     // @see \canvas_post_update_0002_intermediate_component_dependencies_in_field_config_component_trees
     if ($this->configInstaller->isSyncing()) {

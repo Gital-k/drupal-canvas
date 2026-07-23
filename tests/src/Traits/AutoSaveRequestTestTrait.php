@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Traits;
 
-use Drupal\Core\Url;
 use Drupal\canvas\Controller\ApiAutoSaveController;
+use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -26,8 +26,8 @@ trait AutoSaveRequestTestTrait {
 
   protected function assertNoAutoSaveData(): void {
     $response = $this->makePublishAllRequest([]);
-    $json = json_decode($response->getContent() ?: '', TRUE);
     self::assertEquals(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+    $json = json_decode((string) $response->getContent(), TRUE);
     self::assertEquals(['message' => 'No items to publish.'], $json);
   }
 

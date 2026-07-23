@@ -14,6 +14,8 @@ interface ChangeListProps {
   setSelectedChanges: (changes: UnpublishedChange[]) => void;
   onDiscardClick: (change: UnpublishedChange) => void;
   onViewClick?: (change: UnpublishedChange) => void;
+  isViewChangeAvailable?: (change: UnpublishedChange) => boolean;
+  onResolveConflict?: (change: UnpublishedChange) => void;
   pageStatusMap?: Record<
     string,
     { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
@@ -27,6 +29,8 @@ const ChangeList = ({
   setSelectedChanges,
   onDiscardClick,
   onViewClick,
+  isViewChangeAvailable,
+  onResolveConflict,
   pageStatusMap,
 }: ChangeListProps) => {
   return (
@@ -43,6 +47,8 @@ const ChangeList = ({
               setSelectedChanges={setSelectedChanges}
               onDiscardClick={onDiscardClick}
               onViewClick={onViewClick}
+              isViewChangeAvailable={isViewChangeAvailable}
+              onResolveConflict={onResolveConflict}
               pageStatusMap={pageStatusMap}
             />
           );

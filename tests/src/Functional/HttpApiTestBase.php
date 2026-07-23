@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
-use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\Tests\ApiRequestTrait;
 use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\user\UserInterface;
 use GuzzleHttp\RequestOptions;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -39,6 +39,21 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
     $response = $this->makeApiRequest($method, $url, $request_options);
     $body = (string) $response->getBody();
     $this->assertSame($expected_status, $response->getStatusCode(), $body);
+
+    // Since Drupal 11.4 (#3584640) every 4xx/5xx response reports the HTTP
+    // status code as the uncacheable reason: "UNCACHEABLE (<status>)". Before
+    // 11.4 the header depended on how the response was generated:
+    // - 401/403 responses are generated during access checking, before the
+    //   Dynamic Page Cache subscriber runs, so they carried no
+    //   X-Drupal-Dynamic-Cache header at all.
+    // - other 4xx/5xx responses reached that subscriber and reported
+    //   "UNCACHEABLE (no cacheability)".
+    // @see https://www.drupal.org/node/3584640
+    if ($expected_status >= 400 && $expected_dynamic_page_cache === "UNCACHEABLE ($expected_status)" && version_compare(\Drupal::VERSION, '11.4', '<')) {
+      $expected_dynamic_page_cache = \in_array($expected_status, [401, 403], TRUE)
+        ? NULL
+        : 'UNCACHEABLE (no cacheability)';
+    }
 
     // Cacheability headers.
     $this->assertSame($expected_page_cache !== NULL, $response->hasHeader('X-Drupal-Cache'));
@@ -139,7 +154,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
       $this->assertSame($expected_auto_save, $auto_save_data['data']);
     }
     else {
-      $this->assertExpectedResponse('GET', $auto_save_url, $request_options, $expected_status_code, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
+      $this->assertExpectedResponse('GET', $auto_save_url, $request_options, $expected_status_code, NULL, NULL, 'UNCACHEABLE (request policy)', "UNCACHEABLE ($expected_status_code)");
     }
 
     if ($expected_status_code < 400) {
@@ -160,7 +175,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
       // The entity is deleted.
       $this->assertNull($entity);
       // No corresponding auto-save entries exists.
-      $auto_save_keys = \array_keys($this->container->get(AutoSaveManager::class)->getAllAutoSaveList());
+      $auto_save_keys = \array_keys($this->container->get(AutoSaveManager::class)->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE));
       // Auto save keys start with the entity type ID and ID, but could also
       // include a language ID if the entity supports translation.
       self::assertCount(0, \array_filter($auto_save_keys, static fn (string $key): bool => \str_starts_with($key, "$entity_type_id:$entity_id")));
@@ -201,7 +216,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
       \assert(str_contains($list_url->getUri(), 'folder'));
       $this->assertSameFoldersSansUuids($default_list, $body ?? []);
     }
-    $individual_body = $this->assertExpectedResponse('GET', $resource_url, [], 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
+    $individual_body = $this->assertExpectedResponse('GET', $resource_url, [], 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (404)');
     if (empty($default_list)) {
       $this->assertSame([], $individual_body);
     }

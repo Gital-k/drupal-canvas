@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
+import { useSearchParams } from 'react-router-dom';
 import { Badge } from '@radix-ui/themes';
 import { skipToken } from '@reduxjs/toolkit/query';
 
 import { useAppDispatch } from '@/app/hooks';
 import { HOMEPAGE_CONFIG_ID } from '@/components/pageInfo/PageInfo';
 import { setHomepageStagedConfigExists } from '@/features/configuration/configurationSlice';
+import { useTemplateRef } from '@/hooks/useTemplateRef';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
 import { useGetAllPendingChangesQuery } from '@/services/pendingChangesApi';
 import { findInChanges } from '@/utils/function-utils';
@@ -65,11 +67,17 @@ const PageStatus = () => {
   const { data: changes, isSuccess: isGetPendingChangesSuccess } =
     useGetAllPendingChangesQuery();
   const { entityType, entityId } = useParams();
+  const [searchParams] = useSearchParams();
+  const language = searchParams.get('language') || undefined;
   const [hasAutoSave, setHasAutoSave] = useState(false);
   // skipToken prevents the query from running until both args are defined.
   // "Pass skipToken to a query selector to have that selector return an uninitialized state."
+  // Pass current language to match the displayed page.
+  const { isTemplatePreviewRoute } = useTemplateRef();
   const { data: fetchedLayout, isError } = useGetPageLayoutQuery(
-    entityId && entityType ? { entityId, entityType } : skipToken,
+    !isTemplatePreviewRoute && entityId && entityType
+      ? { entityId, entityType, language }
+      : skipToken,
   );
   const dispatch = useAppDispatch();
 
