@@ -30,8 +30,15 @@ class ViewModeAccessCheck implements AccessInterface {
   public function access(Route $route, RouteMatchInterface $route_match, AccountInterface $account, string $view_mode_name = 'default', ?string $bundle = NULL): AccessResultInterface {
     $template = $this->loadFromRoute($view_mode_name, $route_match, $bundle);
     // Add the ContentTemplate as a cacheable dependency, so access rebuilds
-    // when content templates are enabled or disabled.
-    $cacheable_metadata = $template ? CacheableMetadata::createFromObject($template) : new CacheableMetadata();
+    // when content templates are enabled or disabled. When no template exists,
+    // the list cache tag rebuilds access when one is created.
+    $cacheable_metadata = new CacheableMetadata();
+    if ($template !== NULL) {
+      $cacheable_metadata->addCacheableDependency($template);
+    }
+    else {
+      $cacheable_metadata->addCacheTags($this->entityTypeManager->getDefinition(ContentTemplate::ENTITY_TYPE_ID)->getListCacheTags());
+    }
     if ($template?->status()) {
       return AccessResult::allowedIfHasPermission($account, ContentTemplate::ADMIN_PERMISSION)
         ->addCacheableDependency($cacheable_metadata);
