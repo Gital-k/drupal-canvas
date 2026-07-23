@@ -85,31 +85,6 @@ variables:
   # The CLI tests check these components so changes may affect test results.
   - tests/modules/canvas_test_code_components/**/*
 
-# Everything except the npm workspace packages in packages/. GitLab's
-# `rules:changes` cannot express negation, so this enumerates the repository's
-# top-level directories. When a new top-level directory is added, it must be
-# added here, too. "*" covers all root-level files.
-.non-packages-files: &non-packages-files
-  - "*"
-  - ".gitlab/**/*"
-  - ".tugboat/**/*"
-  - assets/**/*
-  - coding_standards/**/*
-  - components/**/*
-  - config/**/*
-  - css/**/*
-  - docs/**/*
-  - experimental/**/*
-  - js/**/*
-  - modules/**/*
-  - phpstan_rules/**/*
-  - scripts/**/*
-  - src/**/*
-  - templates/**/*
-  - tests/**/*
-  - themes/**/*
-  - ui/**/*
-
 .data-integrity-files: &data-integrity-files
   # Configuration schema, which references many validation constraints.
   - config/schema/**/*
@@ -394,29 +369,17 @@ lint (php):
         - test-results/phpcs.xml
         - test-results/phpstan.xml
 
-# Lints the UI and the other module-side JavaScript (js, docs, tests) plus the
-# repo-wide checks. The npm workspace packages in packages/ are covered by
-# `lint (packages)`; packages the UI consumes also trigger this job through
-# the ui-files rule.
-lint (ui):
+lint (node):
   stage: validate
   image: *image-node
   needs: []
   rules:
     - *push-rule
-    - <<: *mr-rule
-      changes:
-        paths: *non-packages-files
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
-    - <<: *mr-rule
-      changes:
-        paths: *ui-files
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
-    - *manual-rule
+    - *mr-rule
   script:
     - npm ci
-    # Runs every lint:* script; they all scope to everything outside
-    # packages/. Turborepo builds workspace dependencies first where
+    # Runs every lint:* script across the whole repository, plus type-check
+    # in every workspace. Turborepo builds workspace dependencies first where
     # type-checking needs their compiled dist (e.g. the UI depends on
     # @drupal-canvas/headless-host).
     - npm run lint
@@ -425,23 +388,6 @@ lint (ui):
         echo "❌ 'E2E_TESTS_ENABLED' is $E2E_TESTS_ENABLED — E2E tests must not be disabled when merging. Reset it to 'true'."
         exit 1
       fi
-
-# Lints the npm workspace packages in packages/, plus the repo-wide checks.
-lint (packages):
-  stage: validate
-  image: *image-node
-  needs: []
-  rules:
-    - *push-rule
-    - <<: *mr-rule
-      changes:
-        paths: *packages-files
-        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
-    - *manual-rule
-  script:
-    - npm ci
-    # Runs every packages:lint:* script; they all scope to packages/ only.
-    - npm run packages:lint
 
 # Every merge request that changes a package must declare its release intent
 # with a changeset (or explicitly opt out with an empty changeset).
@@ -982,10 +928,10 @@ publish packages:
   # Serialize publishes across pipelines; `changeset publish` skips versions
   # that are already on the registry, so ordering resolves safely.
   resource_group: publish-packages
-  # Gate on the package jobs only; unrelated report-stage failures (e.g.
+  # Gate on the node jobs only; unrelated report-stage failures (e.g.
   # Playwright flakiness) must not block publishing.
   needs:
-    - job: lint (packages)
+    - job: lint (node)
       optional: true
     - job: test (packages)
       optional: true
