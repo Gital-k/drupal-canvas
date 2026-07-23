@@ -64,13 +64,10 @@ final class FieldUiHooks {
     if ($route_name === NULL) {
       return;
     }
-    $is_supported_route = FALSE;
-    foreach ($this->contentTemplateRepository->getSupportedEntityTypeIds() as $entity_type_id) {
-      if (\str_starts_with($route_name, "entity.entity_view_display.$entity_type_id.")) {
-        $is_supported_route = TRUE;
-        break;
-      }
-    }
+    $is_supported_route = \array_any(
+      $this->contentTemplateRepository->getSupportedEntityTypeIds(),
+      fn (string $entity_type_id): bool => \str_starts_with($route_name, "entity.entity_view_display.$entity_type_id."),
+    );
     if (!$is_supported_route) {
       return;
     }
