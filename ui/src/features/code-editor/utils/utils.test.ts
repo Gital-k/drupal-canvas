@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectValidPropOrSlotChange } from './utils';
+import {
+  detectValidPropOrSlotChange,
+  parsePropValueForPreview,
+  serializeProps,
+} from './utils';
+
+import type { CodeComponentProp } from '@/types/CodeComponent';
 
 describe('detectValidSlotsOrPropChange', () => {
   it('invalid change when arrays are identical', () => {
@@ -131,5 +137,47 @@ describe('detectValidSlotsOrPropChange', () => {
       { id: '2', name: 'test2' },
     ];
     expect(detectValidPropOrSlotChange(current, last)).toBe(true);
+  });
+});
+
+describe('content entity reference props', () => {
+  const cerProp: CodeComponentProp = {
+    id: 'cer-prop',
+    name: 'Author',
+    type: 'object',
+    example: '',
+    derivedType: 'contentEntityReference',
+    $ref: 'json-schema-definitions://canvas.module/content-entity-reference',
+    entityFieldExpressions: ['ℹ︎␜entity:node:article␝title␞␟value'],
+  };
+
+  it('parsePropValueForPreview passes the resolved payload through, defaulting to null', () => {
+    expect(
+      parsePropValueForPreview({
+        ...cerProp,
+        previewResolvedValue: { __type: 'article', label: 'Hello' },
+      }),
+    ).toEqual({ __type: 'article', label: 'Hello' });
+    // An unset/unresolved reference is null, never undefined: the runtime
+    // payload contract for components.
+    expect(parsePropValueForPreview(cerProp)).toBeNull();
+    expect(
+      parsePropValueForPreview({ ...cerProp, previewResolvedValue: null }),
+    ).toBeNull();
+  });
+
+  it('serializeProps excludes the ephemeral preview state', () => {
+    const serialized = serializeProps([
+      {
+        ...cerProp,
+        previewEntity: { entityTypeId: 'node', entityId: '1' },
+        previewResolvedValue: { __type: 'article' },
+      },
+    ]);
+    const serializedProp = serialized.author;
+    expect(serializedProp).toBeDefined();
+    expect(serializedProp).not.toHaveProperty('previewEntity');
+    expect(serializedProp).not.toHaveProperty('previewResolvedValue');
+    expect(serializedProp).not.toHaveProperty('entityFieldExpressions');
   });
 });
