@@ -228,6 +228,52 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
   }
 
   /**
+   * Tests the template link for an entity type without a bundle entity type.
+   *
+   * The user entity type has no bundle entity type, so its Field UI routes
+   * carry no bundle route parameter. The template link must still point to the
+   * Canvas template editor using the implicit bundle (the entity type ID).
+   */
+  public function testBundlelessEntityTypeTemplateLink(): void {
+    $account = $this->drupalCreateUser([
+      'administer account settings',
+      'administer user display',
+    ]);
+    \assert($account instanceof UserInterface);
+    $account->addRole('canvas_template_admin')->save();
+    $this->drupalLogin($account);
+
+    $this->viewDisplayStorage->create([
+      'targetEntityType' => 'user',
+      'bundle' => 'user',
+      'mode' => 'compact',
+      'status' => TRUE,
+    ])->save();
+
+    $template = $this->contentTemplateStorage->create([
+      'id' => 'user.user.compact',
+      'content_entity_type_id' => 'user',
+      'content_entity_type_bundle' => 'user',
+      'content_entity_type_view_mode' => 'compact',
+      'component_tree' => [],
+      'status' => TRUE,
+    ]);
+    \assert($template instanceof ConfigEntityInterface);
+    $template->save();
+
+    $html = $this->drupalGet('admin/config/people/accounts/display');
+    $this->assertSession()->pageTextNotContains('Undefined array key');
+    $crawler = new Crawler($html);
+    $template_link = $crawler->filterXPath(self::TEMPLATE_LINK_XPATH);
+    $this->assertCount(1, $template_link, 'Exactly one template link should exist.');
+    $this->assertStringContainsString(
+      'canvas/template/user/user/compact',
+      (string) $template_link->attr('href'),
+      'Template link href should point to Canvas template editor.'
+    );
+  }
+
+  /**
    * Creates a view display for the given bundle and view mode.
    */
   private function createViewDisplay(string $bundle, string $view_mode_id): void {

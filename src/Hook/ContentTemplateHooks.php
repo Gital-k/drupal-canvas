@@ -159,7 +159,10 @@ final class ContentTemplateHooks {
       ->getDefinition($entity_type_id)->getBundleEntityType();
 
     $route_parameters = $url->getRouteParameters();
-    $bundle = $route_parameters[$bundle_entity_type];
+    // Entity types without a bundle entity type (for example, user) have a
+    // single implicit bundle equal to the entity type ID, and their Field UI
+    // routes carry no bundle route parameter.
+    $bundle = $bundle_entity_type !== NULL ? $route_parameters[$bundle_entity_type] : $entity_type_id;
     $view_mode_id = $route_parameters['view_mode_name'] ?? 'default';
     $template_id = "$entity_type_id.$bundle.$view_mode_id";
 
