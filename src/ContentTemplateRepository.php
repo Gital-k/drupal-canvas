@@ -29,7 +29,7 @@ final readonly class ContentTemplateRepository {
    * @todo Handle content entity types powered by base fields only (no
    *   configurable fields via Field UI). Follow-up issue needed.
    */
-  public function isSupportedEntityType(EntityTypeInterface $entity_type): bool {
+  public static function isSupportedEntityType(EntityTypeInterface $entity_type): bool {
     return $entity_type instanceof ContentEntityTypeInterface && (bool) $entity_type->get('field_ui_base_route');
   }
 
@@ -42,7 +42,7 @@ final readonly class ContentTemplateRepository {
   public function getSupportedEntityTypeIds(): array {
     $definitions = array_filter(
       $this->entityTypeManager->getDefinitions(),
-      fn($entity_type): bool => $this->isSupportedEntityType($entity_type),
+      fn($entity_type): bool => self::isSupportedEntityType($entity_type),
     );
     return \array_keys($definitions);
   }
