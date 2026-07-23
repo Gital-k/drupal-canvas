@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
-use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\ContentTemplateRepository;
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Entity\Display\EntityDisplayInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
