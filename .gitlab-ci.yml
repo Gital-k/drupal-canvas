@@ -391,6 +391,8 @@ lint (node):
 
 # Every merge request that changes a package must declare its release intent
 # with a changeset (or explicitly opt out with an empty changeset).
+# `changeset status` ignores private packages, so merge requests that only
+# change private packages pass without one.
 changesets:
   stage: validate
   # Runs git commands, so it uses the default drupal-testing image; the node
@@ -411,24 +413,6 @@ changesets:
         compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
   script:
     - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
-    # Only public packages need changesets. Exit early when every changed
-    # package is private, before the expensive `npm ci`. (`changeset status`
-    # ignores private packages anyway; this only saves the job the wait.)
-    - |
-      CHANGED_PACKAGES=$(git diff --name-only "origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}...HEAD" -- packages/ | cut -d/ -f2 | sort -u)
-      PUBLIC_CHANGED=""
-      for PKG in $CHANGED_PACKAGES; do
-        # A deleted package cannot be versioned; skip it.
-        [ -f "packages/$PKG/package.json" ] || continue
-        if [ "$(node -p "require('./packages/$PKG/package.json').private === true")" != "true" ]; then
-          PUBLIC_CHANGED="$PUBLIC_CHANGED $PKG"
-        fi
-      done
-      if [ -z "$PUBLIC_CHANGED" ]; then
-        echo "OK: Only private packages changed; no changeset required."
-        exit 0
-      fi
-      echo "Public packages changed:$PUBLIC_CHANGED"
     - npm ci
     - |
       if ! npx changeset status --since="origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"; then
