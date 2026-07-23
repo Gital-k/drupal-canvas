@@ -114,7 +114,8 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
       $item = $field->offsetGet($delta);
       \assert($item instanceof ComponentTreeItem);
 
-      $inputs = $item->getInputs() ?? [];
+      $source_inputs = $item->getInputs() ?? [];
+      $inputs = $source_inputs;
 
       $changed = FALSE;
       foreach (Element::children($item_data) as $prop_key) {
@@ -137,6 +138,15 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
           // $inputs filtered to schema keys only.
           \array_intersect_key($inputs, \array_flip($config_schema_order)),
         );
+        // For keys where the translation was cleared (NULL) but the source
+        // had a value, restore the source value.
+        // Optional props absent in both source and translation remain NULL
+        // and are filtered out below.
+        foreach ($inputs_in_schema_order as $key => $value) {
+          if ($value === NULL && isset($source_inputs[$key])) {
+            $inputs_in_schema_order[$key] = $source_inputs[$key];
+          }
+        }
         // Write only non-NULL (preserve FALSE, 0, '', []).
         $item->setInput(\array_filter($inputs_in_schema_order, static fn($v) => $v !== NULL));
       }

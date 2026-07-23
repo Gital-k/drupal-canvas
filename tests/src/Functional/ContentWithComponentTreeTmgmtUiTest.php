@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-// cspell:ignore Bienvenue savoir Découvrez Identité visuelle Charte graphique
+// cspell:ignore Bienvenue savoir Découvrez Identité visuelle Charte graphique Bonjour
 
 use Behat\Mink\Element\NodeElement;
 use Drupal\canvas\Entity\Page;
@@ -263,6 +263,142 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
       $fr_inputs = $fr_item->getInputs();
       self::assertSame($inputs, $fr_inputs);
     }
+  }
+
+  /**
+   * Tests the ∅-placeholder acceptance criteria for content translation.
+   *
+   * AC1: Source has value "Welcome", translation cleared → field falls back to
+   *      the source value ("Welcome") at render time; ∅ must never be stored.
+   * AC2: Source has value, real translation provided → translated value stored.
+   * AC3: Source is empty (∅ placeholder shown), translator leaves/clears it →
+   *      field must render the source value (also empty); ∅ must never be
+   *      stored in the translation inputs.
+   * AC4: Source is empty (∅ placeholder shown), translator provides "Bonjour"
+   *      → "Bonjour" is stored and renders; source field remains empty.
+   */
+  public function testEmptySetPlaceholderBehavior(): void {
+    $module_installer = $this->container->get(ModuleInstallerInterface::class);
+    $module_installer->install(['tmgmt', 'tmgmt_content', 'tmgmt_test']);
+    $this->rebuildContainer();
+
+    $this->enableContentTranslation(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID);
+
+    $uuid_hero = 'ac1ac2ac-0000-4000-8000-000000000001';
+    $uuid_block = 'ac3ac4ac-0000-4000-8000-000000000002';
+
+    $canvas_page = Page::create([
+      'title' => 'Empty-set AC test page',
+      'components' => self::populateActiveComponentVersionPlaceholders([
+        [
+          'uuid' => $uuid_hero,
+          'component_id' => 'sdc.canvas_test_sdc.my-hero',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
+          'inputs' => [
+            'heading' => 'Welcome',
+            'cta1href' => ['uri' => 'https://example.com', 'options' => []],
+            'cta2' => 'Learn more',
+            // Subheading intentionally absent → ∅ placeholder in TMGMT form.
+          ],
+        ],
+        [
+          'uuid' => $uuid_block,
+          'component_id' => 'block.canvas_test_block_input_validatable',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
+          'inputs' => [
+            'label' => '',
+            'label_display' => '0',
+            'name' => '',
+          ],
+        ],
+      ]),
+    ]);
+    $violations = $canvas_page->getTypedData()->validate();
+    self::assertSame([], self::violationsToArray($violations));
+    $canvas_page->save();
+    $page_id = $canvas_page->id();
+
+    $translator = $this->createTranslator([
+      'name' => 'test_tmgmt_ac',
+      'label' => 'Test TMGMT AC',
+      'plugin' => 'test_translator',
+      'remote_languages_mappings' => [],
+      'settings' => ['key' => 'test', 'another_key' => 'test'],
+    ]);
+    $job = $this->createJob('en', 'fr', $this->rootUser->id(), ['translator' => $translator->id()]);
+    $job_item = $job->addItem('content', Page::ENTITY_TYPE_ID, (string) $page_id);
+    $job->setState(Job::STATE_ACTIVE);
+    $translator->getPlugin()->requestTranslation($job);
+
+    $this->drupalGet('admin/tmgmt/items/' . $job_item->id());
+    $assert = $this->assertSession();
+    $assert->statusCodeEquals(200);
+
+    // The ∅ placeholder must be visible in the TMGMT source column for empty
+    // source inputs (label, name, subheading), confirming they are offered
+    // for translation.
+    $assert->pageTextContains('∅');
+
+    $hero_delta = 0;
+    $block_delta = 1;
+
+    $this->submitForm([
+      // AC1: clear heading — no translation provided; must fall back to source.
+      "components|{$hero_delta}|heading[translation]" => '',
+      // AC2: real French translation for a non-empty source field.
+      "components|{$hero_delta}|cta2[translation]" => 'En savoir plus',
+      // Subheading is optional and absent in source (shown as ∅); clear it.
+      "components|{$hero_delta}|subheading[translation]" => '',
+      // Override auto-prefixed URI to keep it valid.
+      "components|{$hero_delta}|cta1href|uri[translation]" => 'https://fr.example.com',
+      // AC3: label source is empty (∅); re-submit ∅ — must not be stored.
+      "components|{$block_delta}|label[translation]" => '∅',
+      // AC4: name source is empty (∅); provide a real French value.
+      "components|{$block_delta}|name[translation]" => 'Bonjour',
+    ], 'Save as completed');
+    $assert->pageTextContains(\sprintf('The translation for %s has been accepted', $canvas_page->label()));
+
+    $canvas_page = Page::load($page_id);
+    self::assertNotNull($canvas_page);
+    $fr_page = $canvas_page->getTranslation('fr');
+    $fr_tree = $fr_page->getComponentTree();
+
+    $hero_item = $fr_tree->getComponentTreeItemByUuid($uuid_hero);
+    self::assertNotNull($hero_item);
+    $hero_inputs = $hero_item->getInputs();
+
+    // AC1: heading translation was cleared → synchronizer falls back to the
+    // source value, so "Welcome" is present in the rendered translation.
+    self::assertSame('Welcome', $hero_inputs['heading'] ?? NULL,
+      'AC1: Cleared translation must fall back to the source value.'
+    );
+
+    // AC2: real translation stored verbatim.
+    self::assertSame('En savoir plus', $hero_inputs['cta2'],
+      'AC2: Provided translation must be stored verbatim.'
+    );
+
+    $block_item = $fr_tree->getComponentTreeItemByUuid($uuid_block);
+    self::assertNotNull($block_item);
+    $block_inputs = $block_item->getInputs();
+
+    // AC3: label source was empty (∅); translator submitted ∅ unchanged →
+    // synchronizer falls back to source value (empty string); ∅ never stored.
+    self::assertSame('', $block_inputs['label'] ?? NULL,
+      'AC3: Empty-source field with no translation must render the source value (empty string).'
+    );
+    foreach ($block_inputs as $key => $value) {
+      self::assertNotSame(
+        '∅',
+        $value,
+        "AC3/AC4: The ∅ sentinel must never appear as a stored input value (key: $key)."
+      );
+    }
+
+    // AC4: real French value stored for an empty-source field.
+    self::assertSame('Bonjour', $block_inputs['name'],
+      'AC4: A real translation for an empty-source field must be stored.'
+    );
   }
 
   private function getTmgmtFormElementsForComponentInstances(): array {
