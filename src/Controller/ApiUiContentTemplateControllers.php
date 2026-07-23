@@ -140,22 +140,22 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
 
     foreach ($this->contentTemplateRepository->getSupportedEntityTypeIds() as $entity_type_id) {
       $entity_view_modes = $this->entityDisplayRepository->getViewModeOptions($entity_type_id);
+      // @see \Drupal\Core\Entity\Entity\EntityViewMode
+      unset($entity_view_modes['default']);
+      if ($entity_view_modes === []) {
+        continue;
+      }
+
+      $bundle_info = $this->bundleInfo->getBundleInfo($entity_type_id);
+      $template_keys = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID)->getQuery()
+        // TRICKY: not checking access is acceptable. The route requires
+        // "create" access for ContentTemplates. This is only exposing labels
+        // (the "view label" operation) and whether a ContentTemplate exists.
+        ->accessCheck(FALSE)
+        ->condition('content_entity_type_id', $entity_type_id)
+        ->execute();
 
       foreach ($entity_view_modes as $view_mode => $view_mode_label) {
-        // @see \Drupal\Core\Entity\Entity\EntityViewMode
-        if ($view_mode === 'default') {
-          continue;
-        }
-
-        $bundle_info = $this->bundleInfo->getBundleInfo($entity_type_id);
-        $template_keys = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID)->getQuery()
-          // TRICKY: not checking access is acceptable. The route requires
-          // "create" access for ContentTemplates. This is only exposing labels
-          // (the "view label" operation) and whether a ContentTemplate exists.
-          ->accessCheck(FALSE)
-          ->condition('content_entity_type_id', $entity_type_id)
-          ->condition('content_entity_type_view_mode', $view_mode)
-          ->execute();
         foreach (\array_keys($bundle_info) as $bundle) {
           $template_id = "$entity_type_id.$bundle.$view_mode";
           $data[$entity_type_id][$bundle][$view_mode] = [
