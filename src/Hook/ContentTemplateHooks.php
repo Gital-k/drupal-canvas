@@ -69,7 +69,7 @@ final class ContentTemplateHooks {
    * Implements hook_entity_type_alter.
    */
   #[Hook('entity_type_alter')]
-  public static function entityTypeAlter(array $definitions): void {
+  public function entityTypeAlter(array $definitions): void {
     /** @var \Drupal\Core\Entity\EntityTypeInterface $entity_type */
     foreach ($definitions as $entity_type) {
       // Canvas pages don't have any structured data, and therefore don't
@@ -115,8 +115,12 @@ final class ContentTemplateHooks {
     // Add content template cacheability on Field UI's entity view display
     // routes. Field UI only generates these routes for entity types with
     // field_ui_base_route, which is the same criterion Canvas uses, so any
-    // entity.entity_view_display.* route is a supported entity type.
-    if (\str_starts_with($route_name, 'entity.entity_view_display.')) {
+    // entity.entity_view_display.* route is a supported entity type. This
+    // covers both the "Manage display" page (`entity.entity_view_display.*`)
+    // on Drupal < 11.4, and the display-mode overview
+    // (`entity.entity_view_display_overview.*`) as of Drupal 11.4.
+    // @see https://www.drupal.org/node/3574383
+    if (\str_starts_with($route_name, 'entity.entity_view_display.') || \str_starts_with($route_name, 'entity.entity_view_display_overview.')) {
       // Add list cache tags to invalidate when entity ContentTemplate is
       // created/deleted. This ensures menu local tasks rebuild when template
       // availability changes.
