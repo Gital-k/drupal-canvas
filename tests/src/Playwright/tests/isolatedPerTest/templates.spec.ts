@@ -507,7 +507,7 @@ test.describe('Templates - General', () => {
 
     // Select "Content" and verify the content type dropdown becomes enabled.
     await page.getByRole('option', { name: 'Content' }).click();
-    await expect(page.locator('#content-type')).not.toBeDisabled();
+    await expect(page.locator('#content-type')).toBeEnabled();
   });
 });
 

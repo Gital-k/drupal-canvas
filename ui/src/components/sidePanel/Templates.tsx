@@ -100,25 +100,18 @@ const AddTemplateButton = () => {
 interface TemplateDialogProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
-  contentType?: string | null;
-  entityType?: string | null;
 }
 
-const AddTemplateDialog = ({
-  isOpen,
-  setIsOpen,
-  contentType = null,
-  entityType = null,
-}: TemplateDialogProps) => {
+const AddTemplateDialog = ({ isOpen, setIsOpen }: TemplateDialogProps) => {
   const { navigateToTemplateEditor } = useEditorNavigation();
   const supportedEntityTypes =
     canvasSettings?.contentTemplateEntityTypes ??
     ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
   const entityTypeIds = Object.keys(supportedEntityTypes);
   const defaultEntityType =
-    entityType ?? (entityTypeIds.length === 1 ? entityTypeIds[0] : null);
+    entityTypeIds.length === 1 ? entityTypeIds[0] : null;
   const [selectedContentType, setSelectedContentType] = useState<string | null>(
-    contentType,
+    null,
   );
   const [selectedEntityType, setSelectedEntityType] = useState<string | null>(
     defaultEntityType,
@@ -207,7 +200,7 @@ const AddTemplateDialog = ({
     typeof selectedEntityType === 'string' &&
     canvasSettings?.entityTypeLabels?.[selectedEntityType];
   const bundleLabelType = typeof entityBundleLabels;
-  const showEntityTypeDropdown = !entityType && entityTypeIds.length > 1;
+  const showEntityTypeDropdown = entityTypeIds.length > 1;
   return (
     <Dialog
       open={isOpen}
@@ -283,7 +276,7 @@ const AddTemplateDialog = ({
             </Select.Root>
           </Flex>
         )}
-        {!contentType && hasBundleSelection && (
+        {hasBundleSelection && (
           <Flex direction="column" gap="2">
             <Box>
               <DialogFieldLabel htmlFor="content-type">
