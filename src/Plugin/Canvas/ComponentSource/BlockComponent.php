@@ -15,6 +15,7 @@ use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Component\Render\PlainTextOutput;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Block\BlockPluginInterface;
@@ -317,6 +318,15 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // and until these are exposed to the Content Creator, it is pointless for
     // all block component instances.)
     return $this->getBlockPlugin()->defaultConfiguration();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getLabelForExplicitInputKey(string $key): string|TranslatableMarkup {
+    $plugin_id = $this->getSourceSpecificComponentId();
+    $mapping = $this->typedConfigManager->getDefinition('block.settings.' . $plugin_id)['mapping'] ?? [];
+    return $mapping[$key]['label'] ?? Unicode::ucfirst($key);
   }
 
   /**

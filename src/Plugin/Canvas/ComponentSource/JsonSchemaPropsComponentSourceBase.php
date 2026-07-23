@@ -420,6 +420,13 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
   /**
    * {@inheritdoc}
    */
+  public function getLabelForExplicitInputKey(string $key): string|TranslatableMarkup {
+    return $this->getMetadata()->schema['properties'][$key]['title'] ?? Unicode::ucfirst($key);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
     if (!$this->requiresExplicitInput()) {
       return [
@@ -911,7 +918,7 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       }
 
       $field_widget_plugin_id = $static_prop_source_field_definition['field_widget'];
-      $label = $component_schema['properties'][$sdc_prop_name]['title'] ?? Unicode::ucfirst($sdc_prop_name);
+      $label = (string) $this->getLabelForExplicitInputKey($sdc_prop_name);
       $description = $component_schema['properties'][$sdc_prop_name]['description'] ?? NULL;
       $widget = $source->getWidget($component->id(), $component->getLoadedVersion(), $sdc_prop_name, $label, $field_widget_plugin_id, $description);
       $is_required = $static_prop_source_field_definition['required'];

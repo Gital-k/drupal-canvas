@@ -26,15 +26,12 @@ final readonly class FallbackComponentInstanceInputsConfigSchemaGenerator implem
     foreach ($valid_inputs as $key) {
       $mapping_definition[$key] = [
         'type' => 'ignore',
+        'label' => (string) $component_source->getLabelForExplicitInputKey($key),
       ];
       if (!\in_array($key, $required_inputs, TRUE)) {
         $mapping_definition[$key]['requiredKey'] = FALSE;
       }
     }
-
-    // Note: It is impossible for this fallback strategy to generate an
-    // appropriate `label` for each explicit input.
-    // @todo Set `label` for each explicit input in https://www.drupal.org/i/3586490
     return $mapping_definition;
   }
 

@@ -969,6 +969,48 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    */
   abstract public static function providerSymmetricallyTranslatableComponentInstanceScenarios(string $host_entity_type_id): \Generator;
 
+  /**
+   * Tests getLabelForExplicitInputKey() returns correct labels.
+   *
+   * @param string|null $component_id
+   *   The component config entity ID, or NULL for the "nothing to test"
+   *   dummy entry.
+   * @param string|null $key
+   *   The explicit input key to test.
+   * @param string|null $expected_label
+   *   The expected label for the prop.
+   *
+   * @legacy-covers ::getLabelForExplicitInputKey
+   */
+  #[DataProvider('providerGetLabelForExplicitInputKey')]
+  public function testGetLabelForExplicitInputKey(?string $component_id, ?string $key, ?string $expected_label): void {
+    if ($component_id === NULL || $key === NULL || $expected_label === NULL) {
+      self::markTestSkipped('Nothing to test: this ComponentSource reuses ComponentSourceBase::getLabelForExplicitInputKey().');
+    }
+    $this->generateComponentConfig();
+    $component = Component::load($component_id);
+    self::assertInstanceOf(ComponentInterface::class, $component);
+    $actual_label = (string) $component->getComponentSource()->getLabelForExplicitInputKey($key);
+    self::assertSame($expected_label, $actual_label);
+  }
+
+  /**
+   * Data provider for ::testGetLabelForExplicitInputKey().
+   *
+   * By default, this yields a single NULL dummy entry to skip the test.
+   * We need it to prevent PHPUnit from treating a data provider that yields
+   * zero entries as invalid.
+   *
+   * @return \Generator<string, array{component_id: string|null, key: string|null, expected_label: string|null}>
+   */
+  public static function providerGetLabelForExplicitInputKey(): \Generator {
+    yield 'n/a' => [
+      'component_id' => NULL,
+      'key' => NULL,
+      'expected_label' => NULL,
+    ];
+  }
+
   abstract protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface;
 
   abstract protected function getExpectedVerboseErrorMessage(): string;

@@ -2843,6 +2843,22 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     ];
   }
 
+  public static function providerGetLabelForExplicitInputKey(): \Generator {
+    // Test case: prop with title in schema
+    yield 'prop_with_title_in_schema' => [
+      'component_id' => 'js.canvas_test_code_components_with_enums',
+      'key' => 'favorite_color',
+      'expected_label' => 'Favorite color',
+    ];
+
+    // Test case: prop with title matching lowercase prop name
+    yield 'prop_with_title_matching_prop_name' => [
+      'component_id' => 'js.canvas_test_code_components_with_props',
+      'key' => 'name',
+      'expected_label' => 'name',
+    ];
+  }
+
   protected function getExpectedVerboseErrorMessage(): string {
     // The code component was deleted by bypassing lots of protections.
     // @see ::triggerBrokenComponent()
