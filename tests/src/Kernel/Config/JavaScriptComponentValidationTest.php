@@ -1619,6 +1619,23 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       ])->save();
     }
 
+    // A link field on BOTH media bundles — for the case asserting a raw `uri`
+    // leaf *inside a branch* is still rejected. Both branches must share the
+    // same leaf shape, so the field exists on image + video.
+    FieldStorageConfig::create([
+      'field_name' => 'field_media_link',
+      'entity_type' => 'media',
+      'type' => 'link',
+    ])->save();
+    foreach (['image', 'video'] as $media_bundle) {
+      FieldConfig::create([
+        'field_name' => 'field_media_link',
+        'entity_type' => 'media',
+        'bundle' => $media_bundle,
+        'label' => 'Link',
+      ])->save();
+    }
+
     // Add `my_reference` as a content-entity-reference prop when the test row
     // targets it, so `entityFields` keys have a valid target.
     if (\array_key_exists('entityFields', $test) && \array_key_exists('my_reference', $test['entityFields'])) {
@@ -1866,6 +1883,16 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     yield 'entityFields multi-valued field leaf inside a branch is rejected' => [
       ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_tags␞␟value][␜entity:media:video␝field_media_tags␞␟value]']]],
       ['dataDependencies.entityFields.my_reference.0' => "The field 'entity:media:image.field_media_tags' is multi-valued, which is not yet supported."],
+      [],
+    ];
+
+    // A raw `uri` field leaf inside one branch: `field_media_link`'s raw `uri`
+    // is not resolvable to a browser-accessible URL. Both branches pick it, so
+    // the resolvable-URIs guard descends into each branch and rejects it.
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionMayOnlyTargetResolvableUrisConstraint
+    yield 'entityFields raw uri field leaf inside a branch is rejected' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_link␞␟uri][␜entity:media:video␝field_media_link␞␟uri]']]],
+      ['dataDependencies.entityFields.my_reference.0' => "The field property 'entity:media:image.field_media_link.uri' is a raw URI, not guaranteed to resolve to a browser-accessible URL, and cannot be referenced."],
       [],
     ];
 
