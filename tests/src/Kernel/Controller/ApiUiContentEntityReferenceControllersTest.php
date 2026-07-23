@@ -241,6 +241,25 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
       'label' => 'Media',
       'settings' => ['handler_settings' => ['target_bundles' => ['video' => 'video', 'image' => 'image']]],
     ])->save();
+
+    // A self-referential multi-target-bundle reference on the media bundles —
+    // exercises withholding a further multi-bundle descent when the parent chain
+    // already descends through one (which would coalesce into a nested branch).
+    FieldStorageConfig::create([
+      'field_name' => 'field_media_related',
+      'entity_type' => 'media',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'media'],
+    ])->save();
+    foreach (['image', 'video'] as $media_bundle) {
+      FieldConfig::create([
+        'field_name' => 'field_media_related',
+        'entity_type' => 'media',
+        'bundle' => $media_bundle,
+        'label' => 'Related media',
+        'settings' => ['handler_settings' => ['target_bundles' => ['image' => 'image', 'video' => 'video']]],
+      ])->save();
+    }
   }
 
   public function testContentEntityTypesEndpoint(): void {
@@ -731,6 +750,40 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
       'ℹ︎␜entity:node:article␝field_image␞␟entity␜␜entity:file␝uri␞␟url',
       $uri_props_by_name['url']['expression'],
     );
+  }
+
+  /**
+   * A further multi-bundle reference descent is withheld to prevent nesting.
+   *
+   * `field_media` targets two bundles; descending into one and then offering
+   * `field_media_related` (also multi-bundle) would let the developer pick
+   * across bundles at both levels, coalescing into a branch inside a branch —
+   * nested branching, not yet supported. So the second reference's descent is
+   * withheld (no targetBundles, hasChildren = FALSE), though its own leaf
+   * properties still surface.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustNotNestBranchesConstraint
+   */
+  public function testFieldsEndpointWithholdsNestedMultiBundleDescent(): void {
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'view media']);
+
+    // Top level: field_media (multi-bundle) is descendable into both bundles.
+    $response = $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'article')));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $by_name = \array_column(self::decodeResponse($response)['data'], NULL, 'name');
+    self::assertTrue($by_name['field_media']['hasChildren']);
+    self::assertCount(2, $by_name['field_media']['targetBundles']);
+    $href = $by_name['field_media']['targetBundles']['image']['links'][CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER]['href'];
+
+    // One level in (inside a multi-bundle reference): field_media_related's
+    // descent is withheld, but its leaf properties still surface.
+    $descend = $this->request(Request::create($href));
+    self::assertSame(Response::HTTP_OK, $descend->getStatusCode());
+    $media_fields = \array_column(self::decodeResponse($descend)['data'], NULL, 'name');
+    self::assertArrayHasKey('field_media_related', $media_fields);
+    self::assertFalse($media_fields['field_media_related']['hasChildren']);
+    self::assertArrayNotHasKey('targetBundles', $media_fields['field_media_related']);
+    self::assertNotEmpty($media_fields['field_media_related']['properties']);
   }
 
   /**
