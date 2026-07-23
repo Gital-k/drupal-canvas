@@ -1873,18 +1873,22 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     // violating leaf: each branch descends via `field_media_et_ref` into
     // `entity_test` and picks the internal `internal_string_field`. The internal
     // guard descends through both the branch AND the nested chain to reject the
-    // leaf (`.0`). A nested-chain branch cannot be reproduced by expand/recombine
-    // (the intermediate host is bundle-specific), so the idempotency constraint
-    // additionally flags it — the point here is that the internal descent still
-    // fires.
+    // leaf (`.0`).
     // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionMustNotTargetInternalPropertyConstraint
-    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustBeIdempotentConstraint
     yield 'entityFields internal leaf in a nested chain inside a branch is rejected' => [
       ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝internal_string_field␞␟value][␜entity:media:video␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝internal_string_field␞␟value]']]],
       [
-        'dataDependencies.entityFields.my_reference' => "The expression 'ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝internal_string_field␞␟value][␜entity:media:video␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝internal_string_field␞␟value]' cannot be reproduced by the content selection UI; expanding and re-combining it yields 'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_et_ref␞␟entity␜␜entity:entity_test␝internal_string_field␞␟value, ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_et_ref␞␟entity␜␜entity:entity_test␝internal_string_field␞␟value'. Its object property names must be the field property or referenced-field name.",
         'dataDependencies.entityFields.my_reference.0' => "The field property 'entity:entity_test.internal_string_field.value' is internal and cannot be referenced.",
       ],
+      [],
+    ];
+
+    // (d) The same shape as (c) but with a valid leaf: each branch descends via
+    // `field_media_et_ref` into `entity_test` and picks the public `name` base
+    // field. Nothing rejects it, so it is accepted.
+    yield 'entityFields valid leaf in a nested chain inside a branch is accepted' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝name␞␟value][␜entity:media:video␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝name␞␟value]']]],
+      [],
       [],
     ];
 
