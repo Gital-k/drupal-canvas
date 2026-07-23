@@ -851,7 +851,17 @@ version packages:
   interruptible: false
   needs: []
   # Serialize with other pipelines' runs of this job so concurrent pipelines
-  # cannot force-push the version branch simultaneously.
+  # cannot force-push the version branch simultaneously. Note that resource
+  # group process modes cannot replace the tip-of-branch check in the script
+  # below: even with `newest_first`, jobs from older pipelines still run
+  # after the newest one and would force-push stale content again.
+  # @see https://docs.gitlab.com/ci/resource_groups/#change-the-process-mode
+  # GitLab's "prevent outdated deployment jobs" setting could fail the stale
+  # runs instead, but it requires declaring this job as an `environment:`
+  # deployment and enabling a project setting that lives outside the
+  # repository; the in-script check keeps the behavior versioned here and
+  # exits green.
+  # @see https://docs.gitlab.com/ci/environments/deployment_safety/#prevent-outdated-deployment-jobs
   resource_group: version-packages
   variables:
     GIT_DEPTH: "50"
