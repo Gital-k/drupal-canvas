@@ -93,8 +93,13 @@ const Topbar = () => {
         })}
         pr="4"
       >
-        <Grid columns="1fr 1fr 1fr" gap="0" width="100%" height="100%">
-          <Flex align="center" gap="2">
+        <Grid
+          columns="minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)"
+          gap="0"
+          width="100%"
+          height="100%"
+        >
+          <Flex align="center" gap="2" className={styles.topBarSection}>
             <Tooltip content="Exit Drupal Canvas">
               <a
                 href={backHref}
@@ -147,7 +152,12 @@ const Topbar = () => {
               <FrontendSelect settings={headlessSettings} />
             )}
           </Flex>
-          <Flex align="center" justify="center" gap="2">
+          <Flex
+            align="center"
+            justify="center"
+            gap="2"
+            className={styles.topBarSection}
+          >
             <PageInfo />
             {isTemplateEditorContext && (
               <ContentPreviewSelector
@@ -157,11 +167,21 @@ const Topbar = () => {
               />
             )}
           </Flex>
-          <Flex align="center" justify="end" gap="2">
-            <NotificationBell />
-            {isTranslationEnabled && <LanguageSelect />}
-            <PreviewControls isPreview={isPreview} />
-            <UnpublishedChanges />
+          <Flex
+            align="center"
+            justify="end"
+            gap="0"
+            className={styles.topBarSectionEnd}
+          >
+            <div
+              className={styles.topBarSectionEndInner}
+              data-testid="topbar-actions-end"
+            >
+              <NotificationBell />
+              {isTranslationEnabled && <LanguageSelect />}
+              <PreviewControls isPreview={isPreview} />
+              <UnpublishedChanges />
+            </div>
           </Flex>
         </Grid>
       </Box>
