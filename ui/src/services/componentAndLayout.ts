@@ -1,12 +1,19 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
-import { setLayoutModel } from '@/features/layout/layoutModelSlice';
+import {
+  setLayoutModel,
+  setTranslations,
+} from '@/features/layout/layoutModelSlice';
 import {
   setInitialPageData,
   setPageData,
 } from '@/features/pageData/pageDataSlice';
-import { setHtml, setSnapshotHTML } from '@/features/pagePreview/previewSlice';
+import {
+  setHtml,
+  setSnapshotHTML,
+  setSnapshotTitle,
+} from '@/features/pagePreview/previewSlice';
 import { baseQueryWithAutoSaves } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
@@ -194,17 +201,30 @@ export const componentAndLayoutApi = createApi({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const {
-            data: { entity_form_fields, html, autoSaves },
+            data: { entity_form_fields, html, autoSaves, translations },
             meta,
           } = await queryFulfilled;
-          dispatch(setInitialPageData(entity_form_fields));
-          // Clear any stale snapshot (e.g. from a prior template preview) so
-          // selectPreviewHtml returns the fresh html.
-          dispatch(setSnapshotHTML(''));
-          dispatch(setHtml(html));
+          // Only update page data and HTML for the default language. Translation
+          // queries (with a language parameter) must not overwrite the editor's
+          // active entity form fields or preview HTML — those are managed
+          // separately by the snapshot preview query.
+          if (!arg.language) {
+            dispatch(setInitialPageData(entity_form_fields));
+            // Clear any stale snapshot (e.g. from a prior template preview) so
+            // selectPreviewHtml returns the fresh html.
+            dispatch(setSnapshotHTML(''));
+            dispatch(setSnapshotTitle(''));
+            dispatch(setHtml(html));
+          }
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+          dispatch(setTranslations(translations || {}));
         } catch (err) {
-          dispatch(setPageData({}));
+          // Only reset page data when the default-language query fails.
+          // Translated-language query failures should not affect the
+          // editor's active entity form fields.
+          if (!arg.language) {
+            dispatch(setPageData({}));
+          }
         }
       },
     }),
@@ -214,6 +234,7 @@ export const componentAndLayoutApi = createApi({
         entityId: string;
         entityType: 'canvas_page';
         publishedVersion?: boolean;
+        versionKey?: string;
       }
     >({
       query: ({ entityId, entityType, publishedVersion = false }) => ({
@@ -247,6 +268,7 @@ export const componentAndLayoutApi = createApi({
           // Mirrors getPageLayout; without it a leftover preview snapshot masks
           // the template editor frame.
           dispatch(setSnapshotHTML(''));
+          dispatch(setSnapshotTitle(''));
           dispatch(setHtml(html));
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         } catch (err) {

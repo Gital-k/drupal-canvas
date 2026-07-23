@@ -83,7 +83,9 @@ hyperscriptifying
 ianvs
 importmap
 inlines
+instantiator
 interactable
+interruptibility
 invariantly
 inwidget
 jangregor
@@ -107,6 +109,7 @@ mymodule
 navigations
 naïvely
 networkidle
+nitropack
 nodepath
 nodepaths
 nums
@@ -114,6 +117,7 @@ Nygard
 Nygard's
 OPENCOLLECTIVE
 outro
+parallelizable
 personalizable
 phenaproxima
 fontshare
@@ -123,10 +127,13 @@ opsz
 phpat
 placehold
 Postel
+preflight
+preflights
 replayable
 slugified
 slugifies
 Slugifies
+pasteable
 Prebundle
 prebundling
 previewable
@@ -144,10 +151,12 @@ redocly
 refetched
 reduxjs
 reimplementation
+renderless
 renderify
 reparse
 reparsed
 requiredness
+rescanning
 rightbar
 rightclick
 roundtripped
@@ -167,6 +176,7 @@ sparkline
 STACKLIMIT
 Starshot
 subcontent
+subresource
 subroute
 subtrigger
 subtyping
@@ -181,8 +191,10 @@ toctou
 toolset
 topbar
 trackpad
+transpiles
 tsconfigs
 tseslint
+turbopack
 unbuilt
 unifont
 Unifont
@@ -192,9 +204,11 @@ uncollapsed
 uncollapses
 unhydrated
 unlayered
+unloadable
 unmixable
 unmodeled
 unparseable
+unpartitioned
 unrooted
 unstorable
 unstub
@@ -202,6 +216,7 @@ untampered
 unvalidatable
 unvalidated
 updb
+updatedb
 upserting
 upserts
 upstreaming
@@ -211,6 +226,7 @@ Validatable
 vaul
 wdth
 webform
+WSODs
 wght
 xmdi
 ymls
@@ -250,5 +266,7 @@ rovo
 rovodev
 tabnine
 trae
+unwindowed
 videomedia
+wrappable
 zencoder

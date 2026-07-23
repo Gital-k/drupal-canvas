@@ -7,6 +7,7 @@ import { Box, Button, Flex, Grid, Tooltip } from '@radix-ui/themes';
 
 import { useAppSelector } from '@/app/hooks';
 import AIToggleButton from '@/components/aiExtension/AiToggleButton';
+import FrontendSelect from '@/components/frontendSelect/FrontendSelect';
 import LanguageSelect from '@/components/languageSelect/LanguageSelect';
 import PreviewControls from '@/components/PreviewControls';
 import UnpublishedChanges from '@/components/review/UnpublishedChanges';
@@ -14,11 +15,13 @@ import ContentPreviewSelector from '@/components/templates/ContentPreviewSelecto
 import UndoRedo from '@/components/UndoRedo';
 import NotificationBell from '@/features/notifications/NotificationBell';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import { useCanvasHeadlessSettings } from '@/hooks/useCanvasHeadlessSettings';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout';
 import { getCanvasSettings } from '@/utils/drupal-globals';
 
 import PageInfo from '../pageInfo/PageInfo';
+import { isPreviewPath } from './topbarPreviewMode';
 
 import styles from './Topbar.module.css';
 
@@ -28,11 +31,10 @@ const Topbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { entityType, bundle, previewEntityId } = useParams();
-  const isPreview =
-    location.pathname.includes('/preview') ||
-    location.pathname.includes('/conflict-preview');
+  const isPreview = isPreviewPath(location.pathname);
   const isEditor = location.pathname.includes('/editor');
   const isSegments = location.pathname.includes('/segments');
+  const isHeadlessFrontends = location.pathname.startsWith('/headless');
   const isTemplateEditorContext =
     useAppSelector(selectEditorFrameContext) === 'template';
   const { setTemplatePreviewEntityId } = useEditorNavigation();
@@ -41,6 +43,14 @@ const Topbar = () => {
   let hasPersonalizeExtensionAvailable = false;
 
   const canvasSettings = getCanvasSettings();
+  const headlessSettings = useCanvasHeadlessSettings();
+  const isEntityPreview =
+    location.pathname.startsWith('/preview/') &&
+    !location.pathname.startsWith('/preview/template/');
+  const isFrontendEmbedded =
+    headlessSettings !== undefined &&
+    Boolean(entityType) &&
+    (isEditor || isEntityPreview);
 
   const isTranslationEnabled =
     canvasSettings?.contentTranslationEnabled ||
@@ -132,10 +142,9 @@ const Topbar = () => {
               </>
             )}
             <div className={clsx(styles.verticalDivider)}></div>
-            {!isPreview && (
-              <>
-                <UndoRedo />
-              </>
+            {!isPreview && !isHeadlessFrontends && <UndoRedo />}
+            {isFrontendEmbedded && (
+              <FrontendSelect settings={headlessSettings} />
             )}
           </Flex>
           <Flex align="center" justify="center" gap="2">

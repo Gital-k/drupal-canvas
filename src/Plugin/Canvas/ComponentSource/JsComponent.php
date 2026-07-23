@@ -11,6 +11,7 @@ use Drupal\canvas\CodeComponentDataProvider;
 use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\GlobalImports;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -26,6 +27,7 @@ use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -56,6 +58,18 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
 
   public const SOURCE_PLUGIN_ID = 'js';
 
+  /**
+   * Render-array metadata used to describe an external component.
+   *
+   * Without a fallback implementation, or while a headless frontend is
+   * configured, the component renders as empty markup in Drupal. Consumers
+   * that serialize component trees can use this metadata to preserve its
+   * structure.
+   *
+   * @see \Drupal\canvas_headless\RenderConverter\JsComponentCanvasRenderConverter
+   */
+  public const EXTERNAL_RENDER_METADATA = '#canvas_external_component';
+
   public const EXAMPLE_VIDEO_HORIZONTAL = '/ui/assets/videos/mountain_wide.mp4';
   public const EXAMPLE_VIDEO_VERTICAL = '/ui/assets/videos/bird_vertical.mp4';
 
@@ -66,6 +80,7 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
   protected GlobalImports $globalImports;
   protected EntityTypeManagerInterface $entityTypeManager;
   protected CodeComponentDataProvider $codeComponentDataProvider;
+  protected ConfigFactoryInterface $configFactory;
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
@@ -75,6 +90,7 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     $instance->globalImports = $container->get(GlobalImports::class);
     $instance->entityTypeManager = $container->get(EntityTypeManagerInterface::class);
     $instance->codeComponentDataProvider = $container->get(CodeComponentDataProvider::class);
+    $instance->configFactory = $container->get(ConfigFactoryInterface::class);
     return $instance;
   }
 
@@ -159,6 +175,20 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     catch (\Exception) {
       return new TranslatableMarkup('Invalid/broken code component');
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getClientSideInfo(Component $component): array {
+    $info = parent::getClientSideInfo($component);
+    $js_component = $this->getJavaScriptComponent();
+    return $js_component->isExternal()
+      ? $info + [
+        'type' => 'external',
+        'hasFallbackImplementation' => $js_component->hasFallbackImplementation(),
+      ]
+      : $info;
   }
 
   /**
@@ -374,6 +404,40 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
    */
   public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
     $component = $this->getJavaScriptComponent();
+    $headless_settings = NULL;
+
+    if ($component->isExternal()) {
+      $headless_settings = $this->configFactory->get('canvas_headless.settings');
+      $frontends = $headless_settings->get('frontends');
+      $has_configured_frontend = \is_array($frontends) && $frontends !== [];
+
+      if (!$component->hasFallbackImplementation() || $has_configured_frontend) {
+        // The configured external application owns the implementation: it
+        // renders external components itself, from its own codebase. Drupal
+        // renders them as nothing — in previews and on live pages alike.
+        // Expose their identity and resolved props as render-array metadata so
+        // serializers can represent the app-owned component.
+        [$props, $props_cacheability] = self::getResolvedPropsAndCacheability(
+          \array_intersect_key(
+            $inputs[self::EXPLICIT_INPUT_NAME] ?? [],
+            $component->getProps() ?? [],
+          ),
+        );
+        $build = [
+          '#markup' => '',
+          self::EXTERNAL_RENDER_METADATA => [
+            'component_id' => self::componentIdFromJavascriptComponentId($component->id()),
+            'component_uuid' => $componentUuid,
+            'props' => $props,
+          ],
+        ];
+        CacheableMetadata::createFromObject($component)
+          ->addCacheableDependency($headless_settings)
+          ->addCacheableDependency($props_cacheability)
+          ->applyTo($build);
+        return $build;
+      }
+    }
 
     // Rendering will validate the props against the version that is published,
     // but on preview the auto-saved version will be used for those components
@@ -472,6 +536,9 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     $cacheability = CacheableMetadata::createFromRenderArray($build)
       ->addCacheableDependency($component)
       ->addCacheableDependency($props_cacheability);
+    if ($headless_settings !== NULL) {
+      $cacheability->addCacheableDependency($headless_settings);
+    }
     // When this component reads `canvasData.v0.mainEntity`, its data embeds the
     // per-language translation list, derived from the enabled-language list and
     // the URL negotiation config. Rebuild it when either changes.

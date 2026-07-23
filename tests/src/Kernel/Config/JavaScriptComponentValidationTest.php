@@ -70,6 +70,11 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
   /**
    * {@inheritdoc}
    */
+  protected static array $propertiesWithOptionalValues = ['type'];
+
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('node');
@@ -129,6 +134,20 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
   /**
    * {@inheritdoc}
    */
+  public function testRequiredPropertyValuesMissing(?array $additional_expected_validation_errors_when_missing = NULL): void {
+    parent::testRequiredPropertyValuesMissing([
+      'js' => [
+        'js' => 'React code components must contain JavaScript and CSS.',
+      ],
+      'css' => [
+        'css' => 'React code components must contain JavaScript and CSS.',
+      ],
+    ]);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function testEntityIsValid(): void {
     parent::testEntityIsValid();
 
@@ -149,6 +168,21 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         'canvas',
       ],
     ], $this->getAllDependencies($this->entity));
+  }
+
+  public function testAssetsMatchComponentType(): void {
+    $this->entity->set('type', 'external');
+    $this->assertValidationErrors([]);
+
+    $this->entity->set('js', NULL);
+    $this->entity->set('css', NULL);
+    $this->assertValidationErrors([]);
+
+    $this->entity->set('type', 'react');
+    $this->assertValidationErrors([
+      'js' => 'React code components must contain JavaScript and CSS.',
+      'css' => 'React code components must contain JavaScript and CSS.',
+    ]);
   }
 
   /**

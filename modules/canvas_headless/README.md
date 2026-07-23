@@ -13,22 +13,23 @@ hooks, and configuration may change without a deprecation path.
 - The [Lupus Decoupled](https://lupus-decoupled.org/) CE API stack (`custom_elements`, `lupus_ce_renderer`,
   `lupus_decoupled_ce_api`), declared as module dependencies; it provides the rendered-routes endpoint
   (`/ce-api/{path}`).
-- A frontend app implementing the draft SDK and the host protocol. The bundled example app (`examples/nextjs-app`)
-  is a working Next.js reference; see its README for setup. It additionally expects JSON:API for listings.
+- A frontend app built on the Drupal Canvas Headless SDK. The SDK ships as the workspace package
+  `@drupal-canvas/headless` (framework-agnostic core) plus one adapter per framework —
+  `@drupal-canvas/headless-next` (Next.js), `@drupal-canvas/headless-astro` (Astro),
+  `@drupal-canvas/headless-nuxt` (Nuxt), and `@drupal-canvas/headless-tanstack-start` (TanStack Start) — with
+  `@drupal-canvas/headless-react` as the shared React binding. The bundled example apps (`examples/next`, `examples/astro`, `examples/nuxt`,
+  `examples/tanstack-start`) are working references built on them; see their READMEs for setup. They additionally
+  expect JSON:API for listings.
 
 ## Setup
 
 1. Install the module. It provisions the OAuth consumer and scope it needs; there is nothing to create manually.
-2. Point it at the frontend app:
+2. Grant `administer canvas headless frontends` to the roles that may manage the site-wide frontend list.
+3. Grant `access canvas headless preview` to the editorial roles that should preview through a frontend app. The
+   permission lets its holders mint preview credentials for themselves.
+4. Open **Headless frontends** in Canvas, and add the frontend app URL, such as `http://localhost:3000`.
 
-   ```bash
-   drush config:set canvas_headless.settings frontend_url http://localhost:3000
-   ```
-
-3. Grant the `access canvas headless preview` permission to the editorial roles that should preview through the
-   app. The permission lets its holders mint preview credentials for themselves.
-
-Opening an entity in the Canvas editor then loads the app in the editor frame with an active draft session.
+Opening an entity in the Canvas editor then loads the first frontend in the list with an active draft session.
 
 In cloned environments, regenerate the Simple OAuth keypair per environment; with shared keys, preview credentials
 minted on one clone would redeem on another.
@@ -57,16 +58,17 @@ hook documentation, including the site-policy `_alter` hook.
 
 ## Known limitations
 
-- The CE API serves the default revision: an unpublished entity previews fully, but a published entity's forward
-  revision appears only in JSON:API-driven listings (the SDK hydrates working copies), not on CE-rendered pages.
+- The rendered-content endpoint serves the default revision: an unpublished entity previews fully, but a published entity's forward
+  revision appears only in JSON:API-driven listings (the SDK hydrates working copies), not on pages rendered
+  through `fetchPage()`.
 - Core JSON:API filtered collections exclude unpublished content regardless of permissions; the example app avoids
   filtered collection queries for draft content.
 - Content gated by a view permission not declared preview-safe is invisible in previews until the owning module
   declares it.
 - Editors need view access to the entity they preview, not only edit access; without it the preview fails to start.
-- `frontend_url` is a single site-wide setting: enabling the module replaces the Drupal-rendered preview for every
-  entity editing context. An entity without a canonical URL, or one the app does not serve, shows a preview-start
-  failure.
+- The first URL in the site-wide frontend list is used for previews; reorder the list to change the active app.
+  Enabling the module replaces the Drupal-rendered preview for every entity editing context. An entity without a
+  canonical URL, or one the active app does not serve, shows a preview-start failure.
 
 ## Further reading
 
