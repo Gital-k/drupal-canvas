@@ -3511,6 +3511,10 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
    * (NULL). The traversed entity's cacheability is still carried, so the render
    * stays correctly invalidated.
    *
+   * Finally asserts the complementary case: a NULL/absent reference yields a
+   * NULL payload, not a `__type`-only object. Both funnel through the same
+   * empty-`$resolved_targets` recursion, so this pins that NULL != absence.
+   *
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
    */
   public function testMultiTargetBundleReferenceUnmatchedBundle(): void {
@@ -3568,6 +3572,23 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     $actual_tags = $cacheability->getCacheTags();
     \sort($actual_tags);
     self::assertSame($expected_tags, $actual_tags);
+
+    // NULL != absence: a NULL/absent reference (not merely an un-branched
+    // bundle) yields a NULL payload, not a `__type`-only object. Clearing the
+    // referenced entity's own `field_related_news` makes the branch's referencer
+    // resolve to NULL, exercising the other empty-`$resolved_targets` path
+    // through the same recursion — the divergence lives entirely in
+    // buildReferencePayload()'s instanceof check.
+    $fixtures['referenced_news']->set('field_related_news', NULL);
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => NULL,
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
   }
 
   /**
