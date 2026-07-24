@@ -66,6 +66,8 @@ class CanvasAiPageBuilderHelper {
    *   The logger channel factory.
    * @param \Drupal\Core\Config\TypedConfigManagerInterface $typedConfigManager
    *   The typed config manager.
+   * @param \Drupal\canvas_ai\CanvasAiPlacementDto $placementDto
+   *   Per-request storage for placement results.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
@@ -83,6 +85,7 @@ class CanvasAiPageBuilderHelper {
     #[Autowire(service: 'logger.factory')]
     private readonly LoggerChannelFactoryInterface $loggerFactory,
     private readonly TypedConfigManagerInterface $typedConfigManager,
+    private readonly CanvasAiPlacementDto $placementDto,
   ) {
   }
 
@@ -136,9 +139,16 @@ class CanvasAiPageBuilderHelper {
   /**
    * Gets the data of all the usable component entities.
    *
-   * The output will be used as the context for the AI agent.
+   * Returns a flat map keyed by component id, each value carrying the
+   * component's id, name, description, props, and slots. Callers that need a
+   * lighter or id-filtered view build it from this map.
+   *
+   * @return array
+   *   The component data, keyed by component id.
+   *
+   * @see \Drupal\canvas_ai\CanvasAiComponentContextHelper
    */
-  public function getComponentContextForAi(): string {
+  public function getComponentContextForAi(): array {
     $component_context = [];
     $component_context_from_config = $this->getComponentContextFromConfig();
     $available_components = !empty($component_context_from_config) ? $component_context_from_config : $this->getAllComponentsKeyedBySource();
@@ -153,7 +163,7 @@ class CanvasAiPageBuilderHelper {
       }
 
     }
-    return Yaml::dump($component_context, 4, 2);
+    return $component_context;
   }
 
   /**
@@ -176,9 +186,12 @@ class CanvasAiPageBuilderHelper {
     ];
     $parsed_yaml = Yaml::parse($yaml_string);
     $parsed_yaml = \is_array($parsed_yaml) ? $parsed_yaml : [];
-    // Add UUIDs to all components in the page builder output, so that their
-    // nodePaths can be extracted later from the expected layout.
+    // Assign backend-generated UUIDs before anything else.
+    // @see \Drupal\canvas_ai\Plugin\AiFunctionCall\PlaceComponents — reads them
+    // back from the DTO and includes them in its tool result, so the model sees
+    // real UUIDs for reference_uuid chaining without an extra round-trip.
     $data_to_process = $this->addUuidToAllComponents($parsed_yaml);
+    $this->placementDto->setComponentStructureWithUuids($data_to_process);
 
     $current_layout = $this->canvasAiTempstore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '';
     $current_layout = Json::decode($current_layout);
@@ -187,6 +200,10 @@ class CanvasAiPageBuilderHelper {
     // Create the final layout structure by adding the components at the expected
     // positions in the layout.
     $predicted_layout = $this->createExpectedPageLayout($current_layout, $data_to_process);
+    // @see \Drupal\canvas_ai\Plugin\AiFunctionCall\PlaceComponents — dumps this
+    // as YAML in the tool result so the model can see where placed components
+    // land and reference their UUIDs in follow-up placements.
+    $this->placementDto->setPredictedLayout($predicted_layout);
 
     // Get the nodePaths of newly added components from the predicted layout.
     // Then append them to the result.
@@ -219,6 +236,7 @@ class CanvasAiPageBuilderHelper {
         // the uuid.
         $node_path = $this->getCalculatedNodepath($predicted_layout, $component_data['uuid'], $target);
         $component_data_to_append['id'] = $id;
+        $component_data_to_append['uuid'] = $component_data['uuid'];
         $component_data_to_append['nodePath'] = $node_path;
         $component_data_to_append['fieldValues'] = $component_data['props'] ?? [];
         $result_components[] = $component_data_to_append;
@@ -938,6 +956,57 @@ class CanvasAiPageBuilderHelper {
   }
 
   /**
+   * Indexes every component in the current layout by its UUID.
+   *
+   * Walks all regions and nested slots, collecting each component's id and its
+   * resolved prop values.
+   *
+   * @param array $current_layout
+   *   The decoded current layout, as stored under
+   *   \Drupal\canvas_ai\CanvasAiTempStore::CURRENT_LAYOUT_KEY.
+   *
+   * @return array
+   *   An array keyed by component UUID, each value being
+   *   ['component_id' => string, 'props' => array].
+   */
+  public function getComponentsByUuid(array $current_layout): array {
+    $components_by_uuid = [];
+    foreach ($current_layout['regions'] ?? [] as $region_data) {
+      if (!\is_array($region_data)) {
+        continue;
+      }
+      $this->collectComponentsByUuid($region_data['components'] ?? [], $components_by_uuid);
+    }
+    return $components_by_uuid;
+  }
+
+  /**
+   * Recursively collects components keyed by UUID.
+   *
+   * @param array $components
+   *   The components at a given region or slot.
+   * @param array &$components_by_uuid
+   *   Reference to the accumulating UUID-keyed array.
+   */
+  private function collectComponentsByUuid(array $components, array &$components_by_uuid): void {
+    foreach ($components as $component) {
+      if (!\is_array($component) || !isset($component['uuid'])) {
+        continue;
+      }
+      $components_by_uuid[$component['uuid']] = [
+        'component_id' => $component['name'] ?? '',
+        'props' => \is_array($component['props'] ?? NULL) ? $component['props'] : [],
+      ];
+      if (isset($component['slots']) && \is_array($component['slots'])) {
+        foreach ($component['slots'] as $slot_payload) {
+          $slot_components = \is_array($slot_payload) ? ($slot_payload['components'] ?? []) : [];
+          $this->collectComponentsByUuid(\is_array($slot_components) ? $slot_components : [], $components_by_uuid);
+        }
+      }
+    }
+  }
+
+  /**
    * Extracts the slot name from slot id.
    *
    * @param string $slot_id
@@ -1556,7 +1625,7 @@ class CanvasAiPageBuilderHelper {
 
       // Add page title.
       if (empty($prompt['page_title']) || $prompt['page_title'] === 'Untitled page') {
-        $base_message .= 'Page title is empty. GENERATE THE TITLE FOR THE PAGE using canvas_title_generation_agent. This is a **CRITICAL** step to ensure that request is successful. ';
+        $base_message .= 'Page title is empty.';
       }
       else {
         $base_message .= 'Page title: ' . $prompt['page_title'] . '. ';
@@ -1567,7 +1636,7 @@ class CanvasAiPageBuilderHelper {
         $base_message .= 'Page description: ' . $prompt['page_description'];
       }
       else {
-        $base_message .= 'Page description is empty. GENERATE THE DESCRIPTION FOR THE PAGE using canvas_metadata_generation_agent. This is a **CRITICAL** step to ensure that request is successful.';
+        $base_message .= 'Page description is empty.';
       }
 
       return $base_message;

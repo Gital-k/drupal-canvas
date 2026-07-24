@@ -18,8 +18,15 @@ services:
     arguments: ['canvas_ai_memory']
   canvas_ai.page_builder_helper:
     class: Drupal\canvas_ai\CanvasAiPageBuilderHelper
+  canvas_ai.component_context_helper:
+    class: Drupal\canvas_ai\CanvasAiComponentContextHelper
+    arguments:
+      - '@canvas_ai.page_builder_helper'
   canvas_ai.tempstore:
     class: Drupal\canvas_ai\CanvasAiTempStore
+  canvas_ai.placement_dto:
+    class: Drupal\canvas_ai\CanvasAiPlacementDto
+  Drupal\Core\Cache\CacheBackendInterface: '@cache.default'
   canvas_ai.response_validator:
     class: Drupal\canvas_ai\AiResponseValidator
     arguments:
@@ -30,3 +37,4 @@ services:
     arguments:
       - '@config.factory'
   Drupal\canvas_ai\CanvasAiTempStore: '@canvas_ai.tempstore'
+  Drupal\canvas_ai\CanvasAiPlacementDto: '@canvas_ai.placement_dto'

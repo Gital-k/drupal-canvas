@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import AiWelcome from '@assets/icons/ai-welcome.svg?react';
 import { Box, Flex, Text } from '@radix-ui/themes';
 
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { useAppDispatch, useAppSelector, useAppStore } from '@/app/hooks';
 import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
@@ -31,17 +31,17 @@ import {
   useCreateCodeComponentMutation,
   useGetComponentsQuery,
 } from '@/services/componentAndLayout';
-import { isPropSourceComponent } from '@/types/Component';
 import { getBaseUrl, getDrupalSettings } from '@/utils/drupal-globals';
 
 import fixtureProps from '../../../../modules/canvas_ai/src/PropsSchema.json';
 
 import type {
+  ComponentModels,
   ComponentNode,
   LayoutModelSliceState,
 } from '@/features/layout/layoutModelSlice';
 import type { CodeComponent } from '@/types/CodeComponent';
-import type { CanvasComponent, PropSourceComponent } from '@/types/Component';
+import type { CanvasComponent } from '@/types/Component';
 
 import styles from './AiWizard.module.css';
 
@@ -99,7 +99,7 @@ const createHistoryStore = () => {
       db.clear();
       subscribers.forEach((callback) => callback());
     },
-    // @todo No subscribers remain since the history prop is frozen at mount; remove subscribe and the subscribers Set in https://git.drupalcode.org/project/canvas/-/work_items/3591731.
+    // @todo No subscribers remain since the history prop is captured once at mount; remove subscribe and the subscribers Set in https://git.drupalcode.org/project/canvas/-/work_items/3591731.
     subscribe(callback: () => void) {
       subscribers.add(callback);
       return () => subscribers.delete(callback);
@@ -209,30 +209,27 @@ const canvasPageDataHandler = {
   },
 };
 
-// Filters out 'media' fields from a js component instance's fieldValues based on the
-// component definition's propSources, forcing the component to use the example
-// image from its definition.
-// Block components do not have propSources, so we cannot set field values while
-// placing them - return unchanged in that case.
-// @todo Refactor this after https://www.drupal.org/i/3552000 is fixed.
+function isEntityId(value: unknown): boolean {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0;
+}
+
+// Strips media fields from AI-supplied fieldValues only when the value is not a
+// numeric entity ID. Placeholder objects from the component catalog
+// (e.g. { src: "...", width: N, height: N, alt: "..." }) are discarded so the
+// component falls back to its example image. Real references (bare integer or
+// string-encoded integer) are kept.
 function removeMediaFields(componentDef: CanvasComponent, componentInst: any) {
-  if (!isPropSourceComponent(componentDef)) {
-    return componentInst;
-  }
-  const newFieldValues = {} as any;
-  const fieldValues = componentInst.fieldValues || {};
-  for (const [key, value] of Object.entries(fieldValues)) {
-    const prop = (componentDef as PropSourceComponent).propSources[key];
-    const isMedia =
-      (prop?.sourceTypeSettings?.storage as any)?.target_type === 'media';
-    if (!isMedia) {
-      newFieldValues[key] = value;
+  const newFieldValues: any = {};
+  for (const [key, value] of Object.entries(componentInst.fieldValues || {})) {
+    const prop = (componentDef as any).propSources?.[key];
+    const isMedia = prop?.sourceTypeSettings?.storage?.target_type === 'media';
+    if (isMedia && !isEntityId(value)) {
+      continue;
     }
+    newFieldValues[key] = value;
   }
-  return {
-    ...componentInst,
-    fieldValues: newFieldValues,
-  };
+  return { ...componentInst, fieldValues: newFieldValues };
 }
 
 // Helper to delay the placement of components.
@@ -245,17 +242,11 @@ const operationsHandler = {
     dispatch,
     availableComponents,
     layoutUtils,
-    componentSelectionUtils,
-    navigate,
-    params,
   }: {
     message: any;
     dispatch: any;
     availableComponents: any;
     layoutUtils: any;
-    componentSelectionUtils: any;
-    navigate: any;
-    params: any;
   }) => {
     // Logic for placing components (SDCs/Blocks/Code components) to the editor frame.
     for (const op of message.operations) {
@@ -270,19 +261,22 @@ const operationsHandler = {
           if (component.id && availableComponents[component.id]) {
             const componentToUse: CanvasComponent =
               availableComponents[component.id];
-            const componentAfterFilteringImageProps = removeMediaFields(
+            const filteredComponent = removeMediaFields(
               componentToUse,
               component,
             );
+            // No selection callback is passed: auto-selecting a placed
+            // component navigates the URL to …/component/<uuid>, which remounts
+            // AiWizard (each route mounts its own UiShell) and wipes the live
+            // progress and answer messages. The UUID is assigned server-side and
+            // echoed back so the next hop can chain reference_uuid.
             dispatch(
-              layoutUtils.addNewComponentToLayout(
-                {
-                  component: componentToUse,
-                  withValues: componentAfterFilteringImageProps.fieldValues,
-                  to: component.nodePath,
-                },
-                componentSelectionUtils.setSelectedComponent,
-              ),
+              layoutUtils.addNewComponentToLayout({
+                component: componentToUse,
+                withValues: filteredComponent.fieldValues,
+                to: component.nodePath,
+                uuid: component.uuid,
+              }),
             );
             // Wait for a second before placing the next component, for the UI to render the component.
             await delay(1000);
@@ -290,9 +284,31 @@ const operationsHandler = {
         }
       }
     }
-    const { entityId, entityType } = params;
-    // Redirect to /editor.
-    navigate(`/editor/${entityType}/${entityId}`);
+  },
+};
+
+const editComponentsHandler = {
+  canHandle: (msg: any) => 'component_updates' in msg && msg.component_updates,
+  handle: async ({
+    message,
+    layoutUtils,
+    dispatch,
+  }: {
+    message: any;
+    layoutUtils: any;
+    dispatch: any;
+  }) => {
+    // Updates the props of components already on the page, keyed by UUID.
+    for (const [uuid, values] of Object.entries(message.component_updates)) {
+      dispatch(
+        layoutUtils.updateExistingComponentValues({
+          componentToUpdateId: uuid,
+          values,
+        }),
+      );
+      // Wait for a second before updating the next component.
+      await delay(1000);
+    }
   },
 };
 
@@ -305,172 +321,91 @@ const messageHandlers = [
   slotsMetadataHandler,
   requiredPropsHandler,
   operationsHandler,
+  editComponentsHandler,
 ];
 
-const startPolling = (
-  requestId: string,
-  csrfToken: string,
-  chatEl: any,
-  onPollingComplete?: () => void,
-  stopSignal?: { stopped: boolean },
-) => {
-  let pollCount = 0;
-  const maxPolls = 500;
-  const itemStatuses = new Map();
-  let hasAddedInitialMessage = false;
-  let pollingMessageIndex = -1;
+// Renders agent/tool progress for a turn into a single HTML chat message. The
+// progress items come from each `/ai` hop response (no separate poll channel),
+// so the hop loop is the only writer of this message.
+const buildProgressHtml = (items: any[]): string => {
+  if (!items?.length) return '';
 
-  const getStatusIcon = (status: string) =>
-    status === 'completed'
-      ? '<span class="aiCompletedIcon"></span>'
-      : '<span class="aiLoader"></span>';
+  let html = '<div style="margin-top: 10px;">';
+  items.forEach((item) => {
+    const icon =
+      item.status === 'completed'
+        ? '<span class="aiCompletedIcon"></span>'
+        : '<span class="aiLoader"></span>';
 
-  const buildHtmlContent = () => {
-    if (itemStatuses.size === 0) return '';
+    // Narration first, then the icon + label row beneath it, so the active
+    // spinner stays as the last line of the block. As narration grows, the
+    // "still running" cue stays pinned at the bottom instead of being pushed
+    // out of view at the top.
+    if (item.type === 'agent' && item.generated_text?.trim()) {
+      html += `<div style="padding: 8px; background-color: white; font-size: 14px; line-height: 1.26;">
+          ${item.generated_text.replace(/\n/g, '<br>')}
+        </div>`;
+    }
 
-    let htmlContent = '<div style="margin-top: 10px;">';
-
-    itemStatuses.forEach((item) => {
-      const icon = getStatusIcon(item.status);
-
-      htmlContent += `<div style="display: flex; align-items: center; padding: 8px; background-color: white;">
+    html += `<div style="display: flex; align-items: center; padding: 8px; background-color: white;">
         <span style="margin-right: 8px;">${icon}</span>
         <span style="font-weight: 400;">${item.description}</span>
       </div>`;
+  });
 
-      if (item.type === 'agent' && item.generated_text?.trim()) {
-        htmlContent += `<div style="padding: 8px; background-color: white; font-size: 14px; line-height: 1.26;">
-          ${item.generated_text.replace(/\n/g, '<br>')}
-        </div>`;
-      }
-    });
-
-    return htmlContent + '</div>';
-  };
-
-  const updateChatDisplay = () => {
-    const htmlContent = buildHtmlContent();
-    if (!chatEl) return;
-
-    const scrollContainer = chatEl.shadowRoot?.querySelector('#messages');
-    const shouldAutoScroll = scrollContainer
-      ? scrollContainer.scrollHeight -
-          scrollContainer.scrollTop -
-          scrollContainer.clientHeight <
-        5
-      : false;
-
-    if (!hasAddedInitialMessage) {
-      chatEl.addMessage({ html: htmlContent, role: 'ai' });
-      hasAddedInitialMessage = true;
-      pollingMessageIndex = chatEl.getMessages().length - 1;
-    } else {
-      try {
-        if (pollingMessageIndex >= 0) {
-          chatEl.updateMessage({ html: htmlContent }, pollingMessageIndex);
-        }
-      } catch (error) {
-        console.warn('UpdateMessage failed:', error);
-        chatEl.addMessage({ html: htmlContent, role: 'ai' });
-        pollingMessageIndex = chatEl.getMessages().length - 1;
-      }
-    }
-
-    if (scrollContainer && shouldAutoScroll) {
-      setTimeout(
-        () => (scrollContainer.scrollTop = scrollContainer.scrollHeight),
-        0,
-      );
-    }
-  };
-
-  const cleanupPollingMessageOnError = () => {
-    if (chatEl && pollingMessageIndex >= 0) {
-      try {
-        chatEl.updateMessage({ html: '' }, pollingMessageIndex);
-        pollingMessageIndex = -1;
-      } catch (error) {
-        console.warn('Failed to hide polling message on error:', error);
-      }
-    }
-  };
-
-  const handlePollingComplete = () => {
-    // The final response message will be the orchestrator's message,
-    // so remove it here to prevent it from appearing twice.
-    itemStatuses.delete('canvas_ai_orchestrator');
-    const finalContent = buildHtmlContent();
-    if (finalContent) {
-      historyStore.addMessage({ html: finalContent, role: 'ai' });
-    }
-    onPollingComplete?.();
-  };
-
-  const poll = async () => {
-    if (stopSignal?.stopped) {
-      cleanupPollingMessageOnError();
-      return;
-    }
-    try {
-      pollCount++;
-      const response = await fetch(
-        `/admin/api/canvas/ai-progress?request_id=${requestId}`,
-        {
-          method: 'GET',
-          headers: { 'X-CSRF-Token': csrfToken },
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`Polling HTTP error. Status: ${response.status}`);
-      }
-
-      const pollingData = await response.json();
-
-      if (pollingData.items?.length) {
-        pollingData.items.forEach((item: any) => {
-          itemStatuses.set(item.id, {
-            type: item.type,
-            description: item.description || item.name || '',
-            status: item.status,
-            generated_text: item.generated_text || '',
-          });
-        });
-
-        // Always place the polling message for the orchestrator agent at the end.
-        const orchestratorId = 'canvas_ai_orchestrator';
-        const orchestratorItem = itemStatuses.get(orchestratorId);
-        if (orchestratorItem) {
-          // Remove from the current position and set it again to move it to the end.
-          itemStatuses.delete(orchestratorId);
-          itemStatuses.set(orchestratorId, orchestratorItem);
-        }
-      }
-
-      updateChatDisplay();
-
-      if (pollingData.is_finished) {
-        handlePollingComplete();
-        return;
-      }
-
-      if (pollCount < maxPolls) {
-        setTimeout(poll, 2000);
-      } else {
-        console.error('Polling timeout reached');
-        handlePollingComplete();
-      }
-    } catch (error) {
-      console.error('Polling request failed:', error);
-      cleanupPollingMessageOnError();
-      handlePollingComplete();
-    }
-  };
-  setTimeout(poll, 1000);
+  return html + '</div>';
 };
 
 function getHandlersForMessage(message: any) {
   return messageHandlers.filter((handler) => handler.canHandle(message));
+}
+
+// Runs `mutate` (an imperative add/update on DeepChat's message list) while
+// preserving the user's scroll position: if they were pinned to the bottom we
+// follow the new content, but if they scrolled up to read earlier output we
+// leave them be. The "pinned" check must run BEFORE the mutation (otherwise the
+// grown content has already changed scrollHeight); the scroll runs AFTER,
+// deferred via setTimeout(0), so DeepChat has painted the new message. DeepChat's scroll
+// container lives in its shadow root as `#messages`.
+function withStickyScroll(chatEl: any, mutate: () => void) {
+  const container = chatEl?.shadowRoot?.querySelector('#messages');
+  // No container yet (first message) → treat as pinned so we scroll into view.
+  const pinned = container
+    ? container.scrollHeight - container.scrollTop - container.clientHeight < 5
+    : true;
+  mutate();
+  if (container && pinned) {
+    setTimeout(() => {
+      container.scrollTop = container.scrollHeight;
+    }, 0);
+  }
+}
+
+// Recursively flattens a region's component tree into the wire shape the
+// backend expects (name + uuid + resolved props + nested slots). Pure — kept
+// at module scope so it carries no render-cycle identity. nodePath is computed
+// server-side in the hop pipeline, so it is not sent from here.
+function processComponents(
+  components: ComponentNode[] | undefined,
+  model: ComponentModels,
+): any[] {
+  if (!components) return [];
+  return components.map((component) => {
+    const transformedComponent: any = {
+      name: component.type?.split('@')[0],
+      uuid: component.uuid,
+      props: model[component.uuid]?.resolved ?? {},
+    };
+    if (component.slots && component.slots.length > 0) {
+      transformedComponent.slots = {};
+      component.slots.forEach((slot) => {
+        transformedComponent.slots[slot.id] = {
+          components: processComponents(slot.components, model),
+        };
+      });
+    }
+    return transformedComponent;
+  });
 }
 
 // Stable references for static DeepChat props. These are defined at module
@@ -606,75 +541,78 @@ const DEEP_CHAT_SUBMIT_BUTTON_STYLES = {
 } as const;
 
 const DEEP_CHAT_AUXILIARY_STYLE = `
-  :host {
-    border: none !important;
-  }
-  .aiLoader, .aiCompletedIcon {
-    display: inline-block;
-    box-sizing: border-box;
-    vertical-align: middle;
-    margin-right: 8px;
-  }
-  .aiLoader {
-    width: 12px;
-    height: 12px;
-    border: 2px solid #8B8D98;
-    border-bottom-color: transparent;
-    border-radius: 50%;
-    animation: ai-wizard-rotation 0.8s linear infinite;
-  }
-  @keyframes ai-wizard-rotation {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  .aiCompletedIcon {
-    position: relative;
-    width: 12px;
-    height: 12px;
-    border: 1.5px solid #30A46C;
-    border-radius: 50%;
-  }
-  .aiCompletedIcon::after {
-    content: '';
-    position: absolute;
-    top: 0px;
-    left: 3px;
-    width: 3px;
-    height: 6px;
-    border: solid #30A46C;
-    border-width: 0 1.5px 1.5px 0;
-    transform: rotate(45deg);
-  }
-  #chat-view:has(#messages:empty) {
-    display: block;
-  }
-  #chat-view:has(#messages:empty) #input:has(#file-attachment-container[style*='display: block']) {
-    margin-top: 40px;
-  }
-  .text-message h1 {
-    font-size: var(--font-size-5);
-  }
-  .text-message h2 {
-    font-size: var(--font-size-4);
-  }
-  .text-message h3 {
-    font-size: var(--font-size-3);
-  }
-  .text-message h4 {
-    font-size: var(--font-size-2);
-  }
-  .text-message h5 {
-    font-size: var(--font-size-1);
-  }
-` as const;
+:host {
+  border: none !important;
+}
+.aiLoader, .aiCompletedIcon {
+  display: inline-block;
+  box-sizing: border-box;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.aiLoader {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #8B8D98;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  animation: ai-wizard-rotation 0.8s linear infinite;
+}
+@keyframes ai-wizard-rotation {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.aiCompletedIcon {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #30A46C;
+  border-radius: 50%;
+}
+.aiCompletedIcon::after {
+  content: '';
+  position: absolute;
+  top: 0px;
+  left: 3px;
+  width: 3px;
+  height: 6px;
+  border: solid #30A46C;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+#chat-view:has(#messages:empty) {
+  display: block;
+}
+#chat-view:has(#messages:empty) #input:has(#file-attachment-container[style*='display: block']) {
+  margin-top: 40px;
+}
+.text-message h1 {
+  font-size: var(--font-size-5);
+}
+.text-message h2 {
+  font-size: var(--font-size-4);
+}
+.text-message h3 {
+  font-size: var(--font-size-3);
+}
+.text-message h4 {
+  font-size: var(--font-size-2);
+}
+.text-message h5 {
+  font-size: var(--font-size-1);
+}
+`;
 
-// Memoized DeepChat so it only re-renders when its props change identity.
+// DeepChat is rendered through `memo` so that re-renders of AiWizard (e.g. when
+// the layout model changes as components are placed) do not re-seed DeepChat
+// from its `history` prop, which would wipe imperatively-added progress
+// messages. For the memo to hold, every object prop must be a stable reference,
+// so the static configuration objects live at module scope and the `connect`
+// handler is kept referentially stable (see connectHandler).
 const MemoDeepChat = memo(DeepChat);
 
 const AiWizard = () => {
-  const pageData = useAppSelector(selectPageData);
   const dispatch = useAppDispatch();
-  const drupalSettings = getDrupalSettings();
   const chatElementRef = useRef<any>(null);
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const [createCodeComponent] = useCreateCodeComponentMutation();
@@ -686,43 +624,33 @@ const AiWizard = () => {
   const codeComponentRequiredProps = useAppSelector(
     selectCodeComponentProperty('required'),
   );
-  const model = useAppSelector(selectModel);
-  const textPropsMap = Object.fromEntries(
-    Object.entries(model).map(([uuid, comp]) => [uuid, comp.resolved]),
-  );
-  const textPropsMapString = JSON.stringify(textPropsMap);
-  // deep-chat resets its view (clearing the typed prompt and any in-progress
-  // messages) whenever the `history` prop reference changes, and
-  // `historyStore.addMessage` swaps the snapshot without notifying
-  // subscribers, so any unrelated re-render would push a new reference in.
-  // Capture the snapshot once at mount to keep the prop stable; messages are
-  // still written to IndexedDB.
+  // The Redux store is read directly (store.getState()) at request time. During
+  // the hop loop a handler dispatches a placement and the loop rebuilds the next
+  // request body immediately after; a render-synced ref would still hold the
+  // pre-placement layout because React has not re-committed yet. useAppStore()
+  // returns a stable store reference, so closing over it does not churn identity.
+  const store = useAppStore();
+  // `history` only seeds DeepChat (initial mount + reload restore). During a
+  // live turn the progress message is added to DeepChat's own list imperatively
+  // and addressed by index — it is not in historyStore until the final hop. If
+  // the `history` prop reference changed mid-turn DeepChat would re-seed and
+  // wipe that message, invalidating the cached index ("Message index not
+  // found"). Capture the snapshot once at mount so the prop never changes;
+  // messages are still written to IndexedDB for reload restore.
   // @todo Decide whether IndexedDB chat persistence is still needed now that uploads are size-limited; restore or remove it in https://git.drupalcode.org/project/canvas/-/work_items/3591731.
   const initialHistoryRef = useRef(historyStore.getSnapshot());
   const isComponentRenderedRef = useRef(false);
   const welcomeTextRef = useRef<HTMLSpanElement>(null);
-  // AbortController to cancel ongoing requests when component unmounts
+  // AbortController to cancel ongoing requests when component unmounts.
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pollingStopSignalRef = useRef<{ stopped: boolean }>({ stopped: false });
-  // Get the current layout, selected component, and available components from Redux state
-  const theLayoutModel = useAppSelector(
-    (state) => state?.layoutModel?.present as LayoutModelSliceState,
-  );
 
-  const selectedComponent = useAppSelector(
-    (state) => state.ui.selection.items[0],
-  );
-
-  // Create a ref to store current values for Deep Chat's connect prop.
-  // Accessing these ensures we're working with fresh values even after the Deep
-  // Chat component has been mounted.
+  // Ref for values that do not change during a turn (route params, the open
+  // code component). Layout, page data, and selection are read straight from
+  // the Redux store at request time instead — a ref lags the store by a render
+  // cycle, which is too late between hops.
   const currentValuesRef = useRef({
     codeComponentName,
-    textPropsMapString,
-    pageData,
     params,
-    theLayoutModel,
-    selectedComponent,
     codeComponentRequiredProps,
   });
 
@@ -730,26 +658,12 @@ const AiWizard = () => {
   useEffect(() => {
     currentValuesRef.current = {
       codeComponentName,
-      textPropsMapString,
-      pageData,
       params,
-      theLayoutModel,
-      selectedComponent,
       codeComponentRequiredProps,
     };
-  }, [
-    codeComponentName,
-    textPropsMapString,
-    pageData,
-    params,
-    selectedComponent,
-    theLayoutModel,
-    codeComponentRequiredProps,
-  ]);
-  // Access layoutUtils and componentSelectionUtils from drupalSettings.canvas
-  const layoutUtils = drupalSettings.canvas?.layoutUtils as any;
-  const componentSelectionUtils = drupalSettings.canvas
-    ?.componentSelectionUtils as any;
+  }, [codeComponentName, params, codeComponentRequiredProps]);
+  // Access layoutUtils from drupalSettings.canvas.
+  const layoutUtils = getDrupalSettings().canvas?.layoutUtils as any;
 
   const { data: availableComponents } = useGetComponentsQuery();
   const componentsRef = useRef<any>(null);
@@ -760,70 +674,31 @@ const AiWizard = () => {
     }
   }, [availableComponents]);
 
-  // Helper to transform the current layout into a JSON representation.
-  const transformLayout = () => {
-    const theLayout = currentValuesRef.current.theLayoutModel;
+  // Helper to transform the current layout into a JSON representation. Reads
+  // the layout straight from the Redux store: ref- and render-based snapshots
+  // lag by a render cycle, which is too late when the next hop request is
+  // built right after a handler dispatched layout changes.
+  const transformLayout = useCallback(() => {
+    const theLayout = store.getState()?.layoutModel?.present as
+      | LayoutModelSliceState
+      | undefined;
     if (!theLayout?.layout) return null;
     const result: any = { regions: {} };
     theLayout.layout.forEach((region, regionIndex) => {
       result.regions[region.id] = {
         nodePathPrefix: [regionIndex],
-        components: [],
+        components: processComponents(region.components, theLayout.model),
       };
-      result.regions[region.id].components = processComponents(
-        region.components,
-      );
     });
     return result;
-  };
+  }, [store]);
 
-  // Helper to recursively process components
-  const processComponents = (
-    components: ComponentNode[] | undefined,
-    parentPath: string[] = [],
-  ): any[] => {
-    if (!components) return [];
-    return components.map((component) => {
-      let nodePath: number[] | null = null;
-      try {
-        nodePath = layoutUtils.findNodePathByUuid(
-          currentValuesRef.current.theLayoutModel.layout,
-          component.uuid,
-        );
-      } catch (e) {
-        console.warn(`Could not find nodePath for ${component.uuid}`);
-      }
-      const transformedComponent: any = {
-        name: component.type?.split('@')[0],
-        uuid: component.uuid,
-        nodePath: nodePath,
-      };
-      // Handle slots if they exist
-      if (component.slots && component.slots.length > 0) {
-        transformedComponent.slots = {};
-        component.slots.forEach((slot) => {
-          transformedComponent.slots[slot.id] = {
-            components: processComponents(slot.components, [
-              ...parentPath,
-              component.uuid,
-            ]),
-          };
-        });
-      }
-      return transformedComponent;
-    });
-  };
-
-  // Cleanup effect to abort requests when component unmounts
+  // Cleanup effect to abort requests when component unmounts. Aborting the
+  // in-flight fetch rejects the hop loop, which ends it.
   useEffect(() => {
     return () => {
-      // Abort any ongoing requests.
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
-      }
-      // Stop polling also if request is aborted.
-      if (pollingStopSignalRef.current) {
-        pollingStopSignalRef.current.stopped = true;
       }
     };
   }, []);
@@ -858,56 +733,26 @@ const AiWizard = () => {
     fetchToken();
   }, []);
 
-  // Function to handle message response from AI.
+  // Function to handle message response from AI. Handlers are awaited
+  // sequentially so the hop loop only sends the next request after every side
+  // effect (component placement, page data updates) has been applied. Errors
+  // propagate to the hop loop, which aborts the conversation.
   const receiveMessage = useCallback(
     async (message: any) => {
-      try {
-        const handlers = getHandlersForMessage(message);
-        for (const handler of handlers) {
-          // If the handler is operationsHandler, do not await it here.
-          if (handler === operationsHandler) {
-            setTimeout(() => {
-              // Do the async work in the background.
-              operationsHandler.handle({
-                message,
-                dispatch,
-                availableComponents: componentsRef.current,
-                layoutUtils,
-                componentSelectionUtils,
-                navigate,
-                params,
-              });
-            }, 0);
-          } else {
-            await handler.handle({
-              message,
-              dispatch,
-              createCodeComponent,
-              navigate,
-              availableComponents: componentsRef.current,
-              layoutUtils,
-              componentSelectionUtils,
-              params,
-            });
-          }
-        }
-        return { text: message.message };
-      } catch (error) {
-        console.error('AI response processing failed:', error);
-        return {
-          text: 'An error occurred while processing your request. Please try again.',
-          role: 'error',
-        };
+      const handlers = getHandlersForMessage(message);
+      for (const handler of handlers) {
+        await handler.handle({
+          message,
+          dispatch,
+          createCodeComponent,
+          navigate,
+          availableComponents: componentsRef.current,
+          layoutUtils,
+        });
       }
+      return { text: message.message };
     },
-    [
-      dispatch,
-      layoutUtils,
-      componentSelectionUtils,
-      navigate,
-      createCodeComponent,
-      params,
-    ],
+    [dispatch, layoutUtils, navigate, createCodeComponent],
   );
 
   // Keep the latest receiveMessage and csrfToken in refs so connectHandler can
@@ -923,8 +768,9 @@ const AiWizard = () => {
 
   // Stable handler for DeepChat's connect prop. It reads up-to-date data via
   // refs (currentValuesRef, receiveMessageRef, csrfTokenRef, chatElementRef,
-  // abortControllerRef, pollingStopSignalRef), so it never needs to be
-  // recreated and the connect prop keeps a stable identity.
+  // abortControllerRef) and the Redux store, so it never needs to be recreated
+  // and the connect prop keeps a stable identity. Both `store` and
+  // `transformLayout` are stable, so the handler identity never changes.
   const connectHandler = useCallback(
     async (body: any, signals: any) => {
       const csrfToken = csrfTokenRef.current;
@@ -933,15 +779,16 @@ const AiWizard = () => {
       if (!csrfToken) {
         return;
       }
-      let pendingResponse: any = null;
-      const stopPolling = { stopped: false };
-
+      const drupalSettings = getDrupalSettings();
       try {
         const hasFiles = body instanceof FormData;
-        let requestBody: FormData | string;
+        let requestBody: FormData | string = '';
         const headers: Record<string, string> = {
           'X-CSRF-Token': csrfToken,
         };
+        // Generate a unique request ID. It stays constant across hops:
+        // the backend resolves the serialized agent state by it.
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
         if (hasFiles) {
           const files = body.getAll('files');
@@ -969,8 +816,8 @@ const AiWizard = () => {
             'selected_component',
             // Prefer the code-editor route param: it identifies the open
             // component immediately after navigation (e.g. right after
-            // creating one), whereas the Redux machineName is only set
-            // once the editor finishes its async data load.
+            // creating one), whereas the Redux machineName is only set once
+            // the editor finishes its async data load.
             currentValuesRef.current.params.codeComponentId ||
               currentValuesRef.current.codeComponentName,
           );
@@ -982,112 +829,165 @@ const AiWizard = () => {
           );
           requestBody.append(
             'layout',
-            currentValuesRef.current.textPropsMapString,
+            JSON.stringify(
+              Object.fromEntries(
+                Object.entries(selectModel(store.getState())).map(
+                  ([uuid, comp]) => [uuid, comp.resolved],
+                ),
+              ),
+            ),
           );
           requestBody.append('derived_proptypes', JSON.stringify(fixtureProps));
+          requestBody.append('request_id', requestId);
         } else {
-          requestBody = JSON.stringify({
-            ...body,
-            entity_type: currentValuesRef.current.params.entityType,
-            entity_id: currentValuesRef.current.params.entityId,
-            selected_component:
-              currentValuesRef.current.params.codeComponentId ||
-              currentValuesRef.current.codeComponentName,
-            selected_component_required_props:
-              currentValuesRef.current.codeComponentRequiredProps || [],
-            layout: currentValuesRef.current.textPropsMapString,
-            active_component_uuid:
-              currentValuesRef.current.selectedComponent ?? '',
-            current_layout: transformLayout(),
-            derived_proptypes: fixtureProps,
-            page_title: currentValuesRef.current.pageData['title[0][value]'],
-            page_description:
-              currentValuesRef.current.pageData['description[0][value]'],
-          });
           headers['Content-Type'] = 'application/json';
-        }
-        // Generate a unique request ID
-        const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-        if (hasFiles) {
-          (requestBody as FormData).append('request_id', requestId);
-        } else {
-          const parsedBody = JSON.parse(requestBody as string);
-          parsedBody.request_id = requestId;
-          requestBody = JSON.stringify(parsedBody);
         }
 
         // Create a new AbortController for this request.
         const abortController = new AbortController();
         abortControllerRef.current = abortController;
-        pollingStopSignalRef.current = stopPolling;
-        // Start polling first
-        const chatEl = chatElementRef.current;
-        if (chatEl) {
-          startPolling(
-            requestId,
-            csrfToken,
-            chatEl,
-            async () => {
-              // Process the main response after polling completes
-              if (pendingResponse) {
-                const processedMessage =
-                  await receiveMessageRef.current(pendingResponse);
-                await signals.onResponse(processedMessage);
-                chatEl.disableSubmitButton();
-              }
-            },
-            stopPolling,
-          );
-        }
 
-        // Make the main API call but don't process the response immediately
-        fetch('/admin/api/canvas/ai', {
-          method: 'POST',
-          headers,
-          body: requestBody,
-          signal: abortController.signal,
-        })
-          .then(async (response) => {
+        // Live progress is rendered into a single chat message that the hop
+        // loop updates in place. Each hop's response carries the cumulative
+        // narration (`data.progress`), so this is the only writer of the
+        // message — no concurrent poller, hence no stale-index races.
+        let progressIndex = -1;
+        const renderProgress = (items: any[]) => {
+          const chatEl = chatElementRef.current;
+          const html = buildProgressHtml(items);
+          if (!chatEl || !html) return;
+          withStickyScroll(chatEl, () => {
+            if (progressIndex < 0) {
+              chatEl.addMessage({ html, role: 'ai' });
+              progressIndex = chatEl.getMessages().length - 1;
+            } else {
+              try {
+                chatEl.updateMessage({ html }, progressIndex);
+              } catch (error) {
+                console.warn('UpdateMessage failed:', error);
+                chatEl.addMessage({ html, role: 'ai' });
+                progressIndex = chatEl.getMessages().length - 1;
+              }
+            }
+          });
+        };
+        const removeProgress = () => {
+          const chatEl = chatElementRef.current;
+          if (chatEl && progressIndex >= 0) {
+            try {
+              chatEl.updateMessage({ html: '' }, progressIndex);
+              progressIndex = -1;
+            } catch (error) {
+              console.warn('Failed to remove progress message:', error);
+            }
+          }
+        };
+
+        // The agent pauses after each tool decision and returns
+        // `should_continue: true`. We re-POST the same conversation
+        // (identified by request_id) to resume it, applying each hop's
+        // result, until the agent is finished.
+        const runHops = async () => {
+          let data: any;
+          do {
+            if (!hasFiles) {
+              // Rebuild the body every hop: the previous hop's handlers may
+              // have placed components or set page data, and the backend
+              // needs the resulting state. Read from the Redux store — refs
+              // and render-time values lag by a render cycle.
+              const state = store.getState();
+              const freshPageData = selectPageData(state);
+              const freshModel = selectModel(state);
+              requestBody = JSON.stringify({
+                ...body,
+                entity_type: currentValuesRef.current.params.entityType,
+                entity_id: currentValuesRef.current.params.entityId,
+                selected_component:
+                  currentValuesRef.current.params.codeComponentId ||
+                  currentValuesRef.current.codeComponentName,
+                selected_component_required_props:
+                  currentValuesRef.current.codeComponentRequiredProps || [],
+                layout: JSON.stringify(
+                  Object.fromEntries(
+                    Object.entries(freshModel).map(([uuid, comp]) => [
+                      uuid,
+                      comp.resolved,
+                    ]),
+                  ),
+                ),
+                active_component_uuid:
+                  (state as any)?.ui?.selection?.items[0] ?? '',
+                current_layout: transformLayout(),
+                derived_proptypes: fixtureProps,
+                page_title: freshPageData['title[0][value]'],
+                page_description: freshPageData['description[0][value]'],
+                request_id: requestId,
+              });
+            }
+            const response = await fetch('/admin/api/canvas/ai', {
+              method: 'POST',
+              headers,
+              body: requestBody,
+              signal: abortController.signal,
+            });
             if (!response.ok) {
               throw new Error(`HTTP error. Status: ${response.status}`);
             }
-            const data = await response.json();
-
+            data = await response.json();
             if (data.status === false) {
               throw new Error(
                 data.message ||
                   'An error occurred while processing your request. Please try again.',
               );
             }
-            // Store the response instead of processing it
-            pendingResponse = data;
-          })
-          .catch((error) => {
-            // Don't show error if request was aborted intentionally
-            if (error.name === 'AbortError') {
-              console.log('AI request was aborted');
-              return;
+            // Update the live progress message with this hop's narration.
+            if (data.progress?.length) {
+              renderProgress(data.progress);
             }
-            console.error('AI request failed:', error);
-            stopPolling.stopped = true;
-            signals.onResponse({
-              text: error.message
-                ? error.message
-                : 'An error occurred while processing your request. Please try again.',
-              role: 'error',
-            });
-            setTimeout(() => {
+            // Apply this hop's side effects (component placement, page
+            // data, etc.).
+            const processedMessage = await receiveMessageRef.current(data);
+            if (!data.should_continue) {
+              // Final hop: persist the progress block to history (before the
+              // answer, so a reload shows user → progress → answer), then
+              // show the agent's answer.
+              if (data.progress?.length) {
+                const html = buildProgressHtml(data.progress);
+                if (html) {
+                  historyStore.addMessage({ html, role: 'ai' });
+                }
+              }
+              await signals.onResponse(processedMessage);
               chatElementRef.current?.disableSubmitButton();
-            }, 0);
+            }
+          } while (data.should_continue);
+        };
+
+        runHops().catch((error) => {
+          removeProgress();
+          // Don't show error if request was aborted intentionally.
+          if (error.name === 'AbortError') {
+            console.log('AI request was aborted');
+            return;
+          }
+          console.error('AI request failed:', error);
+          signals.onResponse({
+            text: error.message
+              ? error.message
+              : 'An error occurred while processing your request. Please try again.',
+            role: 'error',
           });
+          setTimeout(() => {
+            chatElementRef.current?.disableSubmitButton();
+          }, 0);
+        });
       } catch (error: any) {
-        // Don't show error if request was aborted intentionally
+        // Don't show error if request was aborted intentionally.
         if (error.name === 'AbortError') {
           console.log('AI request was aborted');
           return;
         }
         console.error('AI request failed:', error);
-        stopPolling.stopped = true;
         await signals.onResponse({
           text: 'An error occurred while processing your request. Please try again.',
           role: 'error',
@@ -1100,26 +1000,22 @@ const AiWizard = () => {
         chatElementRef.current?.disableSubmitButton();
       }, 0);
     },
-    // The handler is intentionally stable so MemoDeepChat is not re-rendered
-    // (and the typed prompt cleared) when unrelated state such as page metadata
-    // changes. It reads every dynamic value via refs (currentValuesRef,
-    // receiveMessageRef, csrfTokenRef) and transformLayout(), so the deps stay
-    // empty.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [store, transformLayout],
   );
 
   const connectConfig = useMemo(
     () => ({
       // Defining a handler instead of an object to ensure we can work with
-      // up-to-date data. Otherwise `connect.additionalBodyProps` captures
-      // the values at the time the component was mounted.
+      // up-to-date data; everything mutable is read from refs or the Redux
+      // store at request time.
       // @see https://deepchat.dev/docs/connect/#Handler
       handler: connectHandler,
     }),
     [connectHandler],
   );
 
+  // Reset chat state the first time DeepChat renders. Ref-guarded so this only
+  // runs once and the callback identity stays stable for `memo`.
   const handleComponentRender = useCallback(() => {
     if (!isComponentRenderedRef.current) {
       chatElementRef.current.clearMessages();

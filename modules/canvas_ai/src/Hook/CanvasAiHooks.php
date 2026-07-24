@@ -79,6 +79,10 @@ class CanvasAiHooks {
             'name' => $this->t('Component Agent Dynamic State'),
             'description' => $this->t('Returns the assembled state and constraints for the component agent.'),
           ],
+          'execution_strategy' => [
+            'name' => $this->t('Execution strategy'),
+            'description' => $this->t('Returns the page-builder execution-strategy instructions (incremental or batch) for the current request.'),
+          ],
         ],
       ],
     ];
@@ -136,6 +140,10 @@ class CanvasAiHooks {
 
           case 'component_agent_dynamic_state':
             $replacements[$original] = $data['component_agent_dynamic_state'] ?? NULL;
+            break;
+
+          case 'execution_strategy':
+            $replacements[$original] = $data['execution_strategy'] ?? NULL;
             break;
         }
       }

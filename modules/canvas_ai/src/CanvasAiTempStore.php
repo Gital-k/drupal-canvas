@@ -16,6 +16,14 @@ class CanvasAiTempStore {
   public const CURRENT_LAYOUT_KEY = 'current_layout';
 
   /**
+   * Key prefix for the serialized orchestrator agent state, per conversation.
+   *
+   * The orchestrator is paused after each tool decision and resumed on the
+   * next request; its state is stored under this prefix keyed by job id.
+   */
+  public const THREAD_KEY_PREFIX = 'thread_';
+
+  /**
    * The private tempstore object.
    *
    * @var \Drupal\Core\TempStore\PrivateTempStore
@@ -71,6 +79,45 @@ class CanvasAiTempStore {
    */
   public function deleteData(string $key): void {
     $this->tempStore->delete($key);
+  }
+
+  /**
+   * Stores the serialized orchestrator agent state for a conversation.
+   *
+   * @param string $jobId
+   *   The conversation/job id (the frontend request id).
+   * @param array $state
+   *   The serialized agent state, as returned by the agent's ::toArray().
+   *
+   * @throws \Drupal\Core\TempStore\TempStoreException
+   */
+  public function setThreadState(string $jobId, array $state): void {
+    $this->tempStore->set(self::THREAD_KEY_PREFIX . $jobId, $state);
+  }
+
+  /**
+   * Gets the serialized orchestrator agent state for a conversation.
+   *
+   * @param string $jobId
+   *   The conversation/job id (the frontend request id).
+   *
+   * @return array|null
+   *   The serialized agent state, or NULL if the conversation is not paused.
+   */
+  public function getThreadState(string $jobId): ?array {
+    return $this->tempStore->get(self::THREAD_KEY_PREFIX . $jobId);
+  }
+
+  /**
+   * Removes the serialized orchestrator agent state for a conversation.
+   *
+   * @param string $jobId
+   *   The conversation/job id (the frontend request id).
+   *
+   * @throws \Drupal\Core\TempStore\TempStoreException
+   */
+  public function deleteThreadState(string $jobId): void {
+    $this->tempStore->delete(self::THREAD_KEY_PREFIX . $jobId);
   }
 
 }

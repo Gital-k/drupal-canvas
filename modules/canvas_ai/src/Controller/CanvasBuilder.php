@@ -11,6 +11,7 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
 use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
 use Drupal\canvas_ai\CanvasAiChatHelper;
+use Drupal\canvas_ai\CanvasAiExecutionStrategy;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Drupal\canvas_ai\CanvasAiTempStore;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface;
@@ -76,8 +77,9 @@ final class CanvasBuilder extends ControllerBase {
       throw new AccessDeniedHttpException('Invalid CSRF token');
     }
 
+    $main_agent_id = $this->config('canvas_ai.settings')->get('main_agent') ?? 'canvas_page_builder_agent';
     /** @var \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper $agent */
-    $agent = $this->agentManager->createInstance('canvas_ai_orchestrator');
+    $agent = $this->agentManager->createInstance($main_agent_id);
     $contentType = $request->getContentTypeFormat();
     $files = [];
     if ($contentType === 'json') {
@@ -163,17 +165,13 @@ final class CanvasBuilder extends ControllerBase {
         'message' => 'No prompt provided',
       ]);
     }
-    $task_message = array_pop($prompt['messages']);
 
-    // Generate verbose context for orchestrator.
-    $context = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
-
-    // Append the necessary context to the user message.
-    $message_xml = $this->canvasAiPageBuilderHelper->formatMessageWithContext($context, $task_message['text']);
-
-    $agent->setChatInput(new ChatInput([
-      new ChatMessage($task_message['role'], $message_xml, $image_files),
-    ]));
+    // Check if the agent is mid-turn (resuming a paused hop) or starting fresh.
+    // @see \Drupal\ai_assistant_api\Service\AgentRunner::runAsAgent()
+    // @see \Drupal\canvas_ai\CanvasAiTempStore::getThreadState()
+    // @see \Drupal\canvas_ai\CanvasAiTempStore::setThreadState()
+    $job_id = (string) ($prompt['request_id'] ?? '');
+    $thread_state = $job_id !== '' ? $this->canvasAiTempStore->getThreadState($job_id) : NULL;
 
     // Store the current layout in the temp store. This will be later used by
     // the ai agents.
@@ -183,14 +181,6 @@ final class CanvasBuilder extends ControllerBase {
       $this->canvasAiTempStore->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, Json::encode($current_layout));
     }
 
-    $chat_history = $this->canvasAiChatHelper->getFilteredChatHistory($prompt['messages']);
-    $agent->setChatHistory($chat_history);
-    $agent->setProgressThreadId($prompt['request_id']);
-    $agent->setDetailedProgressTracking([
-      AiAgentStatusItemTypes::Started,
-      AiAgentStatusItemTypes::TextGenerated,
-      AiAgentStatusItemTypes::Finished,
-    ]);
     $default = $this->providerService->getDefaultProviderForOperationType('chat');
     if (!\is_array($default) || empty($default['provider_id']) || empty($default['model_id'])) {
       return new JsonResponse([
@@ -206,6 +196,40 @@ final class CanvasBuilder extends ControllerBase {
       $default['provider_id'],
       ['http_client_options' => $http_client_options]
     );
+
+    if ($thread_state !== NULL) {
+      // Resume a paused orchestrator: restore its serialized state and let it
+      // execute the next tool decision. The chat input and history are restored
+      // by ::fromArray(), so they must not be set again here.
+      $agent->fromArray($thread_state);
+    }
+    else {
+      // Fresh turn: seed the orchestrator with the user message and history.
+      $task_message = array_pop($prompt['messages']);
+
+      // Generate verbose context for orchestrator.
+      $context = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
+
+      // Append the necessary context to the user message.
+      $message_xml = $this->canvasAiPageBuilderHelper->formatMessageWithContext($context, $task_message['text']);
+
+      $agent->setChatInput(new ChatInput([
+        new ChatMessage($task_message['role'], $message_xml, $image_files),
+      ]));
+
+      $chat_history = $this->canvasAiChatHelper->getFilteredChatHistory($prompt['messages']);
+      $agent->setChatHistory($chat_history);
+    }
+
+    // Per-hop configuration. The token contexts, provider and progress tracking
+    // are not part of the serialized agent state, so they are (re)applied on
+    // every hop. setLooped(FALSE) makes the orchestrator stop after a single
+    // tool decision, so each request returns quickly.
+    $agent->setProgressThreadId($job_id);
+    $agent->setDetailedProgressTracking([
+      AiAgentStatusItemTypes::Started,
+      AiAgentStatusItemTypes::TextGenerated,
+    ]);
     $agent->setAiProvider($provider);
     $agent->setModelName($default['model_id']);
     $agent->setAiConfiguration([]);
@@ -232,16 +256,37 @@ final class CanvasBuilder extends ControllerBase {
       // JSON-encode so the libraries render as readable data in the system
       // prompt token rather than the string "Array".
       'custom_libraries' => Json::encode($this->getSupportedLibraries()),
+      'execution_strategy' => CanvasAiExecutionStrategy::get(!$config->get('disable_real_time_page_generation')),
     ]);
+    $agent->setLooped(FALSE);
+
     try {
       $solvability = $agent->determineSolvability();
     }
     catch (\Exception $e) {
+      // Drop any half-serialized state so the next turn starts clean.
+      if ($job_id !== '') {
+        $this->canvasAiTempStore->deleteThreadState($job_id);
+      }
       return new JsonResponse([
         'status' => FALSE,
         'message' => $e->getMessage(),
       ]);
     }
+
+    // Persist the orchestrator state while it still has work to do, otherwise
+    // clear it. should_continue tells the frontend whether to poll again to
+    // resume the next tool decision.
+    $should_continue = !$agent->isFinished();
+    if ($job_id !== '') {
+      if ($should_continue) {
+        $this->canvasAiTempStore->setThreadState($job_id, $agent->toArray());
+      }
+      else {
+        $this->canvasAiTempStore->deleteThreadState($job_id);
+      }
+    }
+
     $status = FALSE;
     $message = '';
     $response = [];
@@ -263,16 +308,19 @@ final class CanvasBuilder extends ControllerBase {
           if ($tool instanceof BuilderResponseFunctionCallInterface) {
             $response = array_merge($response, $tool->getStructuredOutput());
           }
-          if (\in_array($tool->getPluginId(), [
-            'ai_agents::ai_agent::canvas_page_builder_agent',
-            'ai_agents::ai_agent::canvas_template_builder_agent',
-          ], TRUE)) {
+          if ($tool->getPluginId() === 'ai_agents::ai_agent::' . $main_agent_id) {
             $this->canvasAiTempStore->deleteData(CanvasAiTempStore::CURRENT_LAYOUT_KEY);
           }
         }
       }
-      // The final message seen by the user should be the one from the orchestrator agent.
-      $response['message'] = $agent->solve();
+      $response['should_continue'] = $should_continue;
+      // Only the final hop carries a message: the orchestrator's answer.
+      if (!$should_continue) {
+        $response['message'] = $agent->solve();
+      }
+      // Every hop carries the cumulative agent narration so the frontend can
+      // render live progress in a single message without a separate poll.
+      $response['progress'] = $this->getProgressItems($job_id, $should_continue, $main_agent_id, $response['message'] ?? NULL);
       $response = $this->canvasAiPageBuilderHelper->processCanvasPageFields($response);
       return new JsonResponse(
         $response,
@@ -281,6 +329,7 @@ final class CanvasBuilder extends ControllerBase {
     return new JsonResponse([
       'status' => $status,
       'message' => $message,
+      'should_continue' => $should_continue,
     ]);
   }
 
@@ -317,24 +366,32 @@ final class CanvasBuilder extends ControllerBase {
   }
 
   /**
-   * Poller function to get the AI progress.
+   * Returns per-agent progress items for the current turn.
    *
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The current request.
+   * Collects the text each agent generates while using tools, so the frontend
+   * can show the user what the agent is doing. Included in every hop response
+   * so no separate poll endpoint is needed.
    *
-   * @return \Symfony\Component\HttpFoundation\JsonResponse
-   *   The JSON response.
+   * @param string $job_id
+   *   The request_id shared across all hops of a single turn.
+   * @param bool $should_continue
+   *   Whether the turn continues after this hop. When FALSE (final hop) every
+   *   item is marked completed, independent of the status-event stream.
+   * @param string $main_agent_id
+   *   The configured main agent id, used to trim its trailing final answer.
+   * @param string|null $final_message
+   *   The agent's final answer, when on the last hop. The poller tracks all
+   *   text the agent generates, including the final answer, so it is stripped
+   *   here to avoid showing it twice.
+   *
+   * @return array
+   *   Progress items, each with: id, type, name, description, status,
+   *   generated_text, agent_runner_id.
    */
-  public function getAiProgress(Request $request): JsonResponse {
-    $token = $request->headers->get('X-CSRF-Token') ?? '';
-    if (!$this->csrfTokenGenerator->validate($token, 'canvas_ai.canvas_builder')) {
-      throw new AccessDeniedHttpException('Invalid CSRF token');
-    }
-
-    $progress = $this->poller->getLatestStatusUpdates($request->query->getString('request_id'));
+  private function getProgressItems(string $job_id, bool $should_continue, string $main_agent_id, ?string $final_message = NULL): array {
+    $progress = $this->poller->getLatestStatusUpdates($job_id);
     $items = [];
     $agent_runner_to_agent_id = [];
-    $is_finished = FALSE;
 
     foreach ($progress->getItems() as $event) {
       /** @var \Drupal\ai_agents\Service\AgentStatus\Interfaces\UpdateItems\StatusBaseInterface $event */
@@ -348,20 +405,11 @@ final class CanvasBuilder extends ControllerBase {
           'id' => $agent_id,
           'type' => 'agent',
           'name' => $event->getAgentName(),
-          'description' => $this->getAgentDescription($agent_id, $event->getAgentName() ?? 'Agent'),
+          'description' => $this->getAgentDescription($agent_id, $event->getAgentName() ?? 'Agent', $main_agent_id),
           'status' => 'running',
           'generated_text' => '',
           'agent_runner_id' => $agent_runner_id,
         ];
-      }
-      elseif ($event_type == AiAgentStatusItemTypes::Finished) {
-        if (isset($items[$agent_id])) {
-          $items[$agent_id]['status'] = 'completed';
-          if ($agent_id == 'canvas_ai_orchestrator') {
-            $is_finished = TRUE;
-            break;
-          }
-        }
       }
       elseif ($event_type == AiAgentStatusItemTypes::TextGenerated) {
         if ($event instanceof TextGenerated) {
@@ -381,24 +429,27 @@ final class CanvasBuilder extends ControllerBase {
       }
     }
 
-    if ($is_finished) {
-      foreach ($items as $key => $item) {
-        if ($item['status'] !== 'completed') {
-          $items[$key]['status'] = 'completed';
-        }
+    // Items start 'running' (Started event) and stay so while the turn
+    // continues; the agent's own completion (should_continue in render()) is
+    // the single source of truth, so the final hop marks every item completed.
+    if (!$should_continue) {
+      foreach (\array_keys($items) as $key) {
+        $items[$key]['status'] = 'completed';
       }
     }
 
-    // If there is only one item, and it's the orchestrator, remove its
-    // generated_text to avoid duplicating the final response.
-    if (count($items) === 1 && isset($items['canvas_ai_orchestrator'])) {
-      unset($items['canvas_ai_orchestrator']['generated_text']);
+    // The orchestrator's narration accumulates its final answer as the trailing
+    // chunk. Drop it here so the answer (returned separately as `message`) is
+    // not rendered twice.
+    if ($final_message !== NULL && isset($items[$main_agent_id])) {
+      $text = $items[$main_agent_id]['generated_text'];
+      $pos = strrpos($text, $final_message);
+      if ($pos !== FALSE) {
+        $items[$main_agent_id]['generated_text'] = rtrim(substr($text, 0, $pos));
+      }
     }
 
-    return new JsonResponse([
-      'is_finished' => $is_finished,
-      'items' => array_values($items),
-    ]);
+    return array_values($items);
   }
 
   /**
@@ -408,17 +459,20 @@ final class CanvasBuilder extends ControllerBase {
    *   The agent ID.
    * @param string $agent_name
    *   The agent name.
+   * @param string $main_agent_id
+   *   The configured main agent id, shown as "Thinking".
    *
    * @return string
    *   The agent description.
    */
-  private function getAgentDescription(string $agent_id, string $agent_name): string {
+  private function getAgentDescription(string $agent_id, string $agent_name, string $main_agent_id): string {
+    if ($agent_id === $main_agent_id) {
+      return $this->t('Thinking');
+    }
     $descriptions = [
-      'canvas_ai_orchestrator' => $this->t('Thinking'),
       'canvas_title_generation_agent' => $this->t('Generate a title'),
       'canvas_component_agent' => $this->t('Generate a component'),
       'canvas_metadata_generation_agent' => $this->t('Generate metadata'),
-      'canvas_page_builder_agent' => $this->t('Finding components to place'),
       'canvas_template_builder_agent' => $this->t('Designing the page'),
     ];
     return $descriptions[$agent_id] ?? $this->t('@agentName working', ['@agentName' => $agent_name]);
