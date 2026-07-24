@@ -767,7 +767,7 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
   public function testFieldsEndpointWithholdsNestedMultiBundleDescent(): void {
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'view media']);
 
-    // Top level: field_media (multi-bundle) is descendable into both bundles.
+    // Top level: field_media (multi-bundle) can be browsed into both bundles.
     $response = $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'article')));
     self::assertSame(Response::HTTP_OK, $response->getStatusCode());
     $by_name = \array_column(self::decodeResponse($response)['data'], NULL, 'name');
