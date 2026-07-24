@@ -280,6 +280,11 @@ canvas.js_component.*:
               # reject selections that would coalesce into one.
               # @todo Remove once nested branching is supported, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
               EntityFieldExpressionsMustNotNestBranches: ~
+              # Reading multiple/differing fields per bundle across bundles
+              # coalesces into an object that mixes bundle-specific picks, which
+              # is unrenderable; reject it until it coalesces into a branch.
+              # @todo Remove once such selections coalesce into a branch, in https://git.drupalcode.org/project/canvas/-/work_items/3591873
+              EntityFieldExpressionsMustNotMixBundlesInObject: ~
             sequence:
               type: string
               label: 'Entity field prop expression'

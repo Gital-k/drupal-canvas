@@ -290,13 +290,15 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
    * The client sends two picks on one target bundle (which combine into an
    * object) plus a pick on another bundle. All three are on the same reference
    * field, so they must coalesce into a single branch expression. Today they do
-   * not: the object-combined bundle bypasses branch coalescing, leaving two
-   * entries on the field, which the same-field coalescing constraint rejects.
+   * not: they coalesce into one FieldObjectPropsExpression that mixes
+   * bundle-specific properties, which is unrenderable (it would fatal against
+   * the non-matching bundle) and is rejected at save time by
+   * EntityFieldExpressionsMustNotMixBundlesInObject.
    *
-   * @todo Passes once the coalescer groups multi-bundle picks by field then by bundle — https://git.drupalcode.org/project/canvas/-/work_items/3591829
+   * @todo Passes once these picks coalesce into a branch of per-bundle objects — https://git.drupalcode.org/project/canvas/-/work_items/3591873
    */
   public function testMultiBundleBranchReferenceWithMultipleFieldsPerBundle(): void {
-    $this->markTestSkipped('Multiple fields per bundle do not yet coalesce into a branch — https://git.drupalcode.org/project/canvas/-/work_items/3591829');
+    $this->markTestSkipped('Multiple fields per bundle do not yet coalesce into a branch — https://git.drupalcode.org/project/canvas/-/work_items/3591873');
 
     // @phpstan-ignore deadCode.unreachable
     self::installMultiBundleReferenceFixtures();
@@ -315,6 +317,34 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
 
     // … so nothing is left for the same-field coalescing constraint to flag.
     self::assertSame([], self::entityFieldViolations($component));
+  }
+
+  /**
+   * Reading multiple/differing fields per bundle is rejected at save time.
+   *
+   * These picks coalesce into one FieldObjectPropsExpression that mixes
+   * bundle-specific properties (an image field and a video field on the same
+   * object). That object is unrenderable: at render each property is evaluated
+   * against the one resolved entity, and a single-bundle property throws for
+   * every other bundle. Until it coalesces into a branch of per-bundle objects
+   * (see the skipped test above), EntityFieldExpressionsMustNotMixBundlesInObject
+   * rejects it so it cannot be persisted.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustNotMixBundlesInObjectConstraintValidator
+   */
+  public function testMultiBundleObjectMixingBundlesIsRejected(): void {
+    self::installMultiBundleReferenceFixtures();
+    $component = self::createComponentWithEntityFields([
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
+    ]);
+    self::assertSame(
+      [
+        'dataDependencies.entityFields.article_ref' => "The expressions on field 'entity:node:article.field_media' read multiple fields per bundle across bundles, which coalesces into an unrenderable object; this is not yet supported.",
+      ],
+      self::entityFieldViolations($component),
+    );
   }
 
   /**
