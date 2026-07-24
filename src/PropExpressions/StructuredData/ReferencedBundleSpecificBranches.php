@@ -224,6 +224,24 @@ final class ReferencedBundleSpecificBranches {
     return $this->bundleSpecificReferencedExpressions[$data_type_id];
   }
 
+  /**
+   * Returns the branch matching an entity's type + bundle, or NULL if none.
+   *
+   * This value object owns the branch-key format, so callers that resolve a
+   * concrete referenced entity to its branch (for example the render path in
+   * JsComponent::buildReferencePayload()) need not hand-build the key nor
+   * presence-check before looking it up.
+   *
+   * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
+   *   The resolved referenced entity to select a branch for.
+   *
+   * @return \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface|null
+   *   The matching branch, or NULL when no branch targets the entity's bundle.
+   */
+  public function getBranchForEntityOrNull(FieldableEntityInterface $entity): ?EntityFieldBasedPropExpressionInterface {
+    return $this->bundleSpecificReferencedExpressions["entity:{$entity->getEntityTypeId()}:{$entity->bundle()}"] ?? NULL;
+  }
+
   public function calculateDependencies(FieldableEntityInterface|null $host_entity = NULL): array {
     // If a host entity is given, also include content dependencies for the
     // specific branch that is for that entity.

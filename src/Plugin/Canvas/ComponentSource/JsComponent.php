@@ -366,12 +366,12 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
         $referenced_entity = $referenced->value;
         foreach ($group['targets'] as $target) {
           if ($target instanceof ReferencedBundleSpecificBranches) {
-            // Select the branch keyed by the resolved entity's entity-type +
-            // bundle, mirroring
+            // Select the branch matching the resolved entity, if any; the value
+            // object owns the entity-type + bundle key format, mirroring
             // ReferenceFieldPropExpression::getTargetExpression().
-            $branch_key = "entity:{$referenced_entity->getEntityTypeId()}:{$referenced_entity->bundle()}";
-            if ($target->hasBranch($branch_key)) {
-              $resolved_targets[] = $target->getBranch($referenced_entity->getEntityTypeId(), $referenced_entity->bundle());
+            $branch = $target->getBranchForEntityOrNull($referenced_entity);
+            if ($branch !== NULL) {
+              $resolved_targets[] = $branch;
             }
             continue;
           }
