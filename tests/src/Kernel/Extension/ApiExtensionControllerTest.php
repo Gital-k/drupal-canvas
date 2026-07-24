@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Extension;
 
+use Drupal\canvas\Controller\ApiExtensionControllers;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Extension\CanvasExtensionTypeEnum;
 use Drupal\Core\Cache\Cache;
@@ -16,13 +17,13 @@ use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
-use PHPUnit\Framework\Attributes\CoversFunction;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 #[Group('canvas')]
-#[CoversFunction('ApiExtensionControllers::list')]
+#[CoversMethod(ApiExtensionControllers::class, 'list')]
 #[RunTestsInSeparateProcesses]
 class ApiExtensionControllerTest extends CanvasKernelTestBase {
 
