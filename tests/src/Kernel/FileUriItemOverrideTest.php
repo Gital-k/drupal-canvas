@@ -91,7 +91,7 @@ final class FileUriItemOverrideTest extends CanvasKernelTestBase {
       'status' => FileInterface::STATUS_PERMANENT,
     ]);
     // Validate the whole entity (as default_content and REST do on import)…
-    self::assertSame([], self::violationsToArray($file->validate()));
+    self::assertEntityIsValid($file);
     // …and the `uri` field specifically, where the scheme constraint lives.
     self::assertSame([], self::violationsToArray($file->get('uri')->validate()));
   }
