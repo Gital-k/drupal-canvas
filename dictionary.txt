@@ -272,3 +272,9 @@ wrappable
 xclip
 xsel
 zencoder
+affordances
+editability
+rerooted
+disambiguator
+unaddressable
+unrenderable
