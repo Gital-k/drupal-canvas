@@ -245,6 +245,87 @@ export function areConsecutiveSiblings(
 }
 
 /**
+ * Sorts component UUIDs into document order: the order the components appear
+ * in the layout tree when read region by region, depth first. Batch
+ * operations (copy, duplicate, paste) rely on this so their result reflects
+ * what the user sees on the page rather than the order they clicked.
+ * @param roots - The root region nodes to search in
+ * @param uuids - Component UUIDs to sort
+ * @returns A new array with the found UUIDs in document order. UUIDs not
+ *   present in the layout are omitted.
+ */
+export function sortUuidsByDocumentOrder(
+  roots: Array<RegionNode>,
+  uuids: string[],
+): string[] {
+  return uuids
+    .map((uuid) => ({ uuid, path: findNodePathByUuid(roots, uuid) }))
+    .filter(
+      (entry): entry is { uuid: string; path: number[] } => entry.path !== null,
+    )
+    .sort((a, b) => {
+      // Lexicographic comparison of tree paths equals document order.
+      const length = Math.min(a.path.length, b.path.length);
+      for (let i = 0; i < length; i++) {
+        if (a.path[i] !== b.path[i]) {
+          return a.path[i] - b.path[i];
+        }
+      }
+      return a.path.length - b.path.length;
+    })
+    .map((entry) => entry.uuid);
+}
+
+/**
+ * Filters out any components that are parents or children of components in the selection
+ * @param layout - The entire layout tree
+ * @param currentSelection - Current selection array
+ * @param newComponentUuid - UUID of the component (potentially) being added to selection
+ * @returns An array of component UUIDs with no parent-child relationships
+ */
+export function filterParentChildRelationships(
+  layout: RegionNode[],
+  currentSelection: string[],
+  newComponentUuid: string,
+): string[] {
+  // If we're adding to an empty selection, no filtering needed
+  if (currentSelection.length === 0) {
+    return [newComponentUuid];
+  }
+
+  // First check if the new component is a parent of any currently selected components
+  const newComponent = findComponentByUuid(layout, newComponentUuid);
+  if (!newComponent) {
+    return currentSelection; // Component not found, return current selection
+  }
+
+  // Check if the new component is a parent of any selected components
+  // If so, we need to remove those child components from the selection
+  const childrenToRemove = currentSelection.filter((selectedUuid) =>
+    isParentOf(newComponent, selectedUuid),
+  );
+
+  // Check if the new component is a child of any selected components
+  // If so, we need to remove those parent components from the selection
+  const parentsToRemove = currentSelection.filter((selectedUuid) => {
+    const possibleParent = findComponentByUuid(layout, selectedUuid);
+    return possibleParent && isParentOf(possibleParent, newComponentUuid);
+  });
+
+  // Create a new selection with:
+  // 1. All items from current selection
+  // 2. Minus any children of the new component
+  // 3. Minus any parents of the new component
+  // 4. Plus the new component
+  const itemsToRemove = new Set([...childrenToRemove, ...parentsToRemove]);
+  const filteredSelection = currentSelection.filter(
+    (uuid) => !itemsToRemove.has(uuid),
+  );
+
+  return [...filteredSelection, newComponentUuid];
+}
+
+/**
  * Find a Component by its UUID.
  * @param roots - The starting node to search from.
  * @param uuid - The uuid of the component to find.
@@ -408,28 +489,65 @@ export function moveNodeToPath(
   uuid: string,
   path: number[],
 ): Array<RegionNode> {
-  const child = findComponentByUuid(rootNodes, uuid);
-  if (!child) {
-    throw new Error(`Node with UUID ${uuid} not found.`);
-  }
-  // Make a clone of the node that is being moved.
-  const clone = JSON.parse(JSON.stringify(child));
-  // flag the original node for deletion
-  child.uuid = child.uuid + '_remove';
+  return moveNodesToPath(rootNodes, [uuid], path);
+}
 
-  // Insert the clone at toPath
+/**
+ * Move an ordered group of nodes to a new path as one mutation.
+ *
+ * The nodes are inserted contiguously at `path`, in the order given, and then
+ * removed from their original positions. Inserting before removing means the
+ * path can be interpreted against the current layout, and flagging the
+ * originals by UUID makes their removal independent of index shifts. The
+ * group does not need to be consecutive or share a parent.
+ *
+ * @param rootNodes - The root nodes of the layout.
+ * @param uuids - UUIDs of the components to move, in the desired result order.
+ * @param path - The path the first moved node should end up at.
+ * @returns A deep clone of `rootNodes` with the nodes moved to the `path`.
+ */
+export function moveNodesToPath(
+  rootNodes: Array<RegionNode>,
+  uuids: string[],
+  path: number[],
+): Array<RegionNode> {
+  // Validate the whole group before mutating anything, so a missing UUID
+  // cannot leave the layout half-moved.
+  const children: ComponentNode[] = uuids.map((uuid) => {
+    const child = findComponentByUuid(rootNodes, uuid);
+    if (!child) {
+      throw new Error(`Node with UUID ${uuid} not found.`);
+    }
+    return child;
+  });
+
+  // Make clones of the nodes being moved and flag the originals for deletion.
+  const clones: ComponentNode[] = children.map((child) => {
+    const clone = JSON.parse(JSON.stringify(child));
+    child.uuid = child.uuid + '_remove';
+    return clone;
+  });
+
   const rootIndex = path.shift();
   if (rootIndex === undefined) {
     throw new Error(
       'Path should be at least two items long, starting from the root region',
     );
   }
-  const root = rootNodes[rootIndex];
-  const newState = rootNodes;
-  newState[rootIndex] = insertNodeAtPath(root, path, clone);
+  // Insert the clones in reverse order at the same path so they keep the
+  // given order.
+  let root = rootNodes[rootIndex];
+  for (let i = clones.length - 1; i >= 0; i--) {
+    root = insertNodeAtPath(root, path, clones[i]);
+  }
+  let newState = rootNodes;
+  newState[rootIndex] = root;
 
-  // Remove the original node by finding it by uuid (which is now `${child.uuid}_remove`)
-  return removeComponentByUuid(newState, child.uuid);
+  // Remove the original nodes by their flagged UUIDs.
+  for (const uuid of uuids) {
+    newState = removeComponentByUuid(newState, uuid + '_remove');
+  }
+  return newState;
 }
 
 /**
@@ -781,6 +899,7 @@ const layoutUtils = {
   findNodeParents,
   insertNodeAtPath,
   moveNodeToPath,
+  moveNodesToPath,
   isChildNode,
   getNodeDepth,
   replaceUUIDsAndUpdateModel,
@@ -789,6 +908,8 @@ const layoutUtils = {
   isParentOf,
   findParentInfo,
   areConsecutiveSiblings,
+  sortUuidsByDocumentOrder,
+  filterParentChildRelationships,
   findParent,
   findSiblings,
 };
