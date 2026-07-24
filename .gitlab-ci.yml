@@ -851,33 +851,23 @@ version packages:
   interruptible: false
   needs: []
   # Serialize with other pipelines' runs of this job so concurrent pipelines
-  # cannot force-push the version branch simultaneously. Note that resource
-  # group process modes cannot replace the tip-of-branch check in the script
-  # below: even with `newest_first`, jobs from older pipelines still run
-  # after the newest one and would force-push stale content again.
-  # @see https://docs.gitlab.com/ci/resource_groups/#change-the-process-mode
-  # GitLab's "prevent outdated deployment jobs" setting could fail the stale
-  # runs instead, but it requires declaring this job as an `environment:`
-  # deployment and enabling a project setting that lives outside the
-  # repository; the in-script check keeps the behavior versioned here and
-  # exits green.
-  # @see https://docs.gitlab.com/ci/environments/deployment_safety/#prevent-outdated-deployment-jobs
+  # cannot force-push the version branch simultaneously.
   resource_group: version-packages
   variables:
     GIT_DEPTH: "50"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
   script:
-    - |
-      # When commits merge in quick succession, their pipelines can run this
-      # job in any order. Only the pipeline of the branch's current tip may
-      # update the version merge request; an older pipeline running late
-      # would force-push stale content over it.
-      LATEST=$(git ls-remote origin "refs/heads/${CI_DEFAULT_BRANCH}" | cut -f1)
-      if [ "$LATEST" != "$CI_COMMIT_SHA" ]; then
-        echo "${CI_DEFAULT_BRANCH} has moved on to ${LATEST}; that commit's pipeline maintains the version merge request."
-        exit 0
-      fi
+    # Set the resource group to process jobs oldest-first. When commits merge
+    # to 1.x in quick succession, their pipelines each run this job; with the
+    # default unordered mode an older pipeline's run can execute last and
+    # force-push stale content over the version merge request. Oldest-first
+    # ordering guarantees the newest pipeline writes last. The process mode
+    # can only be set through the API, not in the YAML, so every run applies
+    # it; `--fail` makes a rejected request fail the job loudly instead of
+    # silently running unordered.
+    # @see https://docs.gitlab.com/ci/resource_groups/#change-the-process-mode
+    - 'curl --fail --silent --request PUT --header "PRIVATE-TOKEN: ${GITLAB_CI_RELEASE_TOKEN}" --data "process_mode=oldest_first" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/resource_groups/version-packages" > /dev/null'
     - |
       if ! find .changeset -name '*.md' ! -name 'README.md' | grep -q .; then
         echo "No pending changesets; nothing to version."
