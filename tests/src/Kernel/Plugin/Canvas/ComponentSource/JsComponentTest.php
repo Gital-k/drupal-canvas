@@ -3609,7 +3609,7 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
    * and the news_item `title` pick is skipped.
    *
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
-   * @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::coalesceBranches()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::coalesceReferencerFieldGroup()
    */
   public function testMultiTargetBundleReferenceUnCoalescedCrossBundlePicks(): void {
     $fixtures = $this->setUpContentEntityReferenceFixtures();
