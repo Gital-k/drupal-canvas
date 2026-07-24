@@ -3581,6 +3581,12 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
    * evaluated; the other is skipped instead of evaluating a bundle-A expression
    * against a bundle-B entity (which would fatal on a field it lacks).
    *
+   * The blog_post pick targets `field_blog_subtitle`, a field only blog_post
+   * has: evaluating it against a news_item would fatal, so branch A genuinely
+   * exercises the skip (not just filtering). Branch B re-points the reference at
+   * a blog_post and asserts the symmetric outcome — the blog_post pick surfaces
+   * and the news_item `title` pick is skipped.
+   *
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
    * @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::coalesceBranches()
    */
@@ -3590,16 +3596,31 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
     self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
 
+    // A field only blog_post has: picking it against a news_item would fatal,
+    // which is exactly the mis-evaluation the host-bundle skip prevents.
+    FieldStorageConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'type' => 'string',
+      'entity_type' => 'node',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'entity_type' => 'node',
+      'bundle' => 'blog_post',
+      'label' => 'Subtitle',
+    ])->save();
+
     // Two single-bundle references through the same `field_related_news`, each
-    // picking a different final field (`title` vs `created`) so their leaf
-    // shapes differ and the Coalescer leaves them un-combined. The coalescing
-    // constraint would flag two references on one field, so these are written
-    // straight to config storage — the render path must handle this input.
+    // picking a bundle-specific final field (`title` on news_item vs the
+    // blog_post-only `field_blog_subtitle`) so their leaf shapes differ and the
+    // Coalescer leaves them un-combined. The coalescing constraint would flag
+    // two references on one field, so these are written straight to config
+    // storage — the render path must handle this input.
     $config_name = 'canvas.js_component.content_entity_reference_test_component';
     $data = $this->config($config_name)->getRawData();
     $data['dataDependencies']['entityFields']['news_item_reference'] = [
       'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜␜entity:node:news_item␝title␞␟value',
-      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜␜entity:node:blog_post␝created␞␟value',
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜␜entity:node:blog_post␝field_blog_subtitle␞␟value',
     ];
     $this->container->get('config.storage')->write($config_name, $data);
     $this->container->get('config.factory')->reset($config_name);
@@ -3607,9 +3628,10 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
       ->getStorage(JavaScriptComponent::ENTITY_TYPE_ID)
       ->resetCache(['content_entity_reference_test_component']);
 
-    // `field_related_news` resolves to a news_item: only the news_item pick may
-    // be evaluated; the blog_post pick (on `created`) must be skipped, not
-    // evaluated against the news_item.
+    // Branch A: `field_related_news` resolves to a news_item — only the
+    // news_item pick may be evaluated. The blog_post pick is skipped, not
+    // evaluated against the news_item: doing so would fatal, because news_item
+    // has no `field_blog_subtitle`.
     $branch_news = Node::create([
       'type' => 'news_item',
       'title' => 'Only-this-branch news item',
@@ -3626,6 +3648,31 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
         'field_related_news' => [
           '__type' => 'news_item',
           'label' => 'Only-this-branch news item',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+
+    // Branch B: re-point `field_related_news` at a blog_post — now only the
+    // blog_post pick may be evaluated (its `field_blog_subtitle` surfaces), and
+    // the news_item `title` pick is skipped.
+    $branch_blog = Node::create([
+      'type' => 'blog_post',
+      'title' => 'A blog post',
+      'field_blog_subtitle' => 'Only-this-branch subtitle',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_blog);
+    $branch_blog->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_blog->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'blog_post',
+          'field_blog_subtitle' => 'Only-this-branch subtitle',
         ],
       ],
       $this->resolveNewsItemReference($fixtures)->value,
