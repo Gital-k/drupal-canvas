@@ -154,16 +154,6 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
   }
 
   /**
-   * The ∅ sentinel used by ComponentInputsTranslatablesExtractor.
-   *
-   * Empty optional inputs in the source language are represented as this
-   * placeholder so that TMGMT does not silently drop them from the review UI.
-   *
-   * @see \Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor::extractTranslatablesOptionallyIncludingEmpty()
-   */
-  private const string EMPTY_SENTINEL = '∅';
-
-  /**
    * Writes TMGMT translations back into a nested component input value.
    *
    * Unlike the SDC/JS path (where each prop maps 1:1 to a field item and
@@ -198,7 +188,7 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
       $text = $tmgmt_data['#translation']['#text'];
       // Returning NULL causes setInput's array_filter to omit the key, so
       // Drupal's standard translation fallback applies at render time.
-      if ($text === self::EMPTY_SENTINEL || $text === '') {
+      if ($text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL || $text === '') {
         return NULL;
       }
       return $text;
