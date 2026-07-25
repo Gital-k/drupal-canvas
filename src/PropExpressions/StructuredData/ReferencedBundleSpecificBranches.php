@@ -126,10 +126,8 @@ final class ReferencedBundleSpecificBranches {
       // as an invalid branch set here — before the assert below fires — so
       // callers (like the Coalescer) can bail cleanly.
       // @todo Remove this guard once nested branching is supported, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
-      for ($branch_cursor = $expr; $branch_cursor instanceof ReferenceFieldPropExpression; $branch_cursor = $branch_cursor->referenced) {
-        if ($branch_cursor->targetsMultipleBundles()) {
-          throw new NestedBranchNotSupportedException(\sprintf('`%s` is a nested branch: descending through a multi-bundle reference within a branch is not yet supported.', (string) $expr));
-        }
+      if (self::descendsThroughMultiBundleReference($expr)) {
+        throw new NestedBranchNotSupportedException(\sprintf('`%s` is a nested branch: descending through a multi-bundle reference within a branch is not yet supported.', (string) $expr));
       }
 
       // Gather information for cross-branch validation.
@@ -189,6 +187,36 @@ final class ReferencedBundleSpecificBranches {
     if (count(array_unique($leaf_expression_has_deltas)) > 1) {
       throw new \InvalidArgumentException('Bundle-specific expressions have inconsistent leaf expressions: either all or none must specify a field delta.');
     }
+  }
+
+  /**
+   * Whether a branch descends through a multi-bundle reference at any depth.
+   *
+   * A reference branch is walked down its own chain. An entity-rooted object
+   * branch is not a reference itself, so its properties are walked in turn:
+   * each reads its own field and may descend through a multi-bundle reference,
+   * which would nest a branch inside this one.
+   *
+   * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $expr
+   *   The branch expression to inspect.
+   *
+   * @todo Remove alongside the guard that calls this, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
+   */
+  private static function descendsThroughMultiBundleReference(EntityFieldBasedPropExpressionInterface $expr): bool {
+    if ($expr instanceof EntityObjectPropsExpression) {
+      foreach ($expr->getObjectExpressions() as $property) {
+        if (self::descendsThroughMultiBundleReference($property)) {
+          return TRUE;
+        }
+      }
+      return FALSE;
+    }
+    for ($branch_cursor = $expr; $branch_cursor instanceof ReferenceFieldPropExpression; $branch_cursor = $branch_cursor->referenced) {
+      if ($branch_cursor->targetsMultipleBundles()) {
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
   public function __toString(): string {

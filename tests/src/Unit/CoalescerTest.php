@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Unit;
 use Drupal\canvas\PropExpressions\StructuredData\Coalescer;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\NestedBranchNotSupportedException;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
@@ -421,6 +422,40 @@ final class CoalescerTest extends UnitTestCase {
     \sort($once);
     \sort($twice);
     self::assertSame($once, $twice);
+  }
+
+  /**
+   * A branch of per-bundle objects must not hide a nested branch.
+   *
+   * A bundle's picks are coalesced before they become that bundle's object, so
+   * one of its properties can itself be a multi-bundle reference — a branch
+   * inside a branch, which the string representation cannot express. The branch
+   * set rejects it, and because that is not an `\InvalidArgumentException` it
+   * surfaces past the Coalescer for the validation layer to report precisely,
+   * instead of producing a string that can no longer be parsed back.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustNotNestBranchesConstraintValidator
+   */
+  public function testBranchOfPerBundleObjectsRejectsNestedBranch(): void {
+    // `field_media` targets image + video. The image bundle reads `name` AND
+    // descends through its own `field_related`, which targets two node bundles.
+    $entries = \array_map(
+      static function (string $representation): EntityFieldBasedPropExpressionInterface {
+        $expression = StructuredDataPropExpression::fromString($representation);
+        \assert($expression instanceof EntityFieldBasedPropExpressionInterface);
+        return $expression;
+      },
+      [
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_related␞␟entity␜␜entity:node:news_item␝title␞␟value',
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_related␞␟entity␜␜entity:node:blog_post␝title␞␟value',
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝name␞␟value',
+      ],
+    );
+
+    $this->expectException(NestedBranchNotSupportedException::class);
+    Coalescer::coalesce($entries);
   }
 
 }
