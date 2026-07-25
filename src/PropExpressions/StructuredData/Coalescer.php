@@ -271,8 +271,8 @@ final class Coalescer {
    * ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝name␞␟value][␜entity:media:video␝name␞␟value]
    * @endcode
    * When a bundle reads more than one field, a single branch member cannot
-   * represent it. Each bundle's picks then become one EntityObjectPropsExpression
-   * (one property per field, keyed by its developer-facing name), gathered in a
+   * represent it. Each bundle's picks then become one entity-rooted object (one
+   * property per field, keyed by its developer-facing name), gathered in a
    * branch that selects the matching object at render — so no property is ever
    * evaluated against an entity of a different bundle:
    * @code
@@ -334,8 +334,8 @@ final class Coalescer {
     }
 
     // Fallback (single bundle, or a bundle reading multiple properties of one
-    // field that the branch-of-objects path above cannot take): combine into one
-    // object on the reference field, grouping per-property entries by
+    // field that the branch-of-objects path above cannot take): combine into
+    // one object on the reference field, grouping per-property entries by
     // developer-facing key — a key read from several bundles becomes a branch
     // prop, a key in one bundle a plain ref. For a single bundle this is
     // renderable; a cross-bundle mix is caught by the save-time guard.
