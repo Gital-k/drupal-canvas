@@ -3402,7 +3402,9 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     );
 
     // Neither pick is lost: the descended `title` (as `label`) and the loose
-    // `target_id` both surface, inline as one object leaf (no `__type`).
+    // `target_id` both surface, inline as one object leaf. There is no `__type`
+    // here because nothing in this object is an entity object: `label` is a
+    // scalar read through the reference, not the referenced entity itself.
     self::assertEquals(
       [
         '__type' => 'news_item',
@@ -3800,6 +3802,146 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
       ],
       $this->resolveNewsItemReference($fixtures)->value,
     );
+  }
+
+  /**
+   * A branch of per-bundle objects renders alongside a loose pick on the field.
+   *
+   * When the multi-bundle reference field ALSO has a leaf pick of its own
+   * (`target_id`), the branch of per-bundle objects folds next to it into one
+   * object on the referencer field. That is the one shape that reaches
+   * `Evaluator`'s entity-rooted object arm: `buildReferencePayload()` treats a
+   * mixed object as a flat leaf and hands the whole thing to the Evaluator,
+   * rather than spreading the object's properties itself. So the payload is
+   * shaped differently from the same picks without the loose leaf — nested
+   * under the referencer key, and with no `__type` for the referenced entity.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+   */
+  public function testMultiTargetBundleReferenceWithMultipleFieldsPerBundleAlongsideLoosePick(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
+    self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
+
+    FieldStorageConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'type' => 'string',
+      'entity_type' => 'node',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'entity_type' => 'node',
+      'bundle' => 'blog_post',
+      'label' => 'Subtitle',
+    ])->save();
+
+    // The branch of per-bundle objects, folded next to the loose `target_id`
+    // pick as one object on `field_related_news`.
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟{field_related_news↝entity␜[␜entity:node:blog_post␟{field_blog_subtitle↠field_blog_subtitle␞␟value,label↠title␞␟value}][␜entity:node:news_item␟{label↠title␞␟value}],target_id↠target_id}',
+    ];
+    $js_component->set('dataDependencies', $data_dependencies);
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    $branch_blog = Node::create([
+      'type' => 'blog_post',
+      'title' => 'A related blog post',
+      'field_blog_subtitle' => 'A catchy subtitle',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_blog);
+    $branch_blog->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_blog->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          // The branch object is the referenced ENTITY, not a property of
+          // `field_related_news`, so it takes the reserved `__entity` name
+          // rather than repeating the key it already sits under. It carries the
+          // bundle it resolved to, without which a component could not tell why
+          // `field_blog_subtitle` is present here but absent for a news_item.
+          '__entity' => [
+            '__type' => 'blog_post',
+            'field_blog_subtitle' => 'A catchy subtitle',
+            'label' => 'A related blog post',
+          ],
+          'target_id' => (int) $branch_blog->id(),
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+  }
+
+  /**
+   * Two fields each folding into a mixed object keep their leaves separate.
+   *
+   * A mixed object's leaves are keyed by their object property name, which is a
+   * FIELD PROPERTY name (`target_id`) and therefore not unique across fields.
+   * They stay namespaced under the field they read, so two reference fields
+   * both picking `target_id` alongside a descent cannot clobber each other.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
+   */
+  public function testMixedObjectsOnTwoFieldsDoNotClobberEachOther(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    $deep_news = Node::create([
+      'type' => 'news_item',
+      'title' => 'The deeply referenced news item',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($deep_news);
+    $deep_news->save();
+    $fixtures['referenced_news']->set('field_related_news', $deep_news->id());
+    $fixtures['referenced_news']->save();
+
+    // `field_related_news` and `uid` each get a loose leaf pick plus a descent,
+    // so each folds into its own mixed object — and BOTH leaves are named
+    // `target_id`.
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟target_id',
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜␜entity:node:news_item␝title␞␟value',
+      'ℹ︎␜entity:node:news_item␝uid␞␟target_id',
+      'ℹ︎␜entity:node:news_item␝uid␞␟entity␜␜entity:user␝name␞␟value',
+    ];
+    // Coalesce them the way the client would: two mixed objects, one per field.
+    $js_component->updateFromClientSide(['dataDependencies' => $data_dependencies]);
+    self::assertSame(
+      [
+        'ℹ︎␜entity:node:news_item␝field_related_news␞␟{label↝entity␜␜entity:node:news_item␝title␞␟value,target_id↠target_id}',
+        'ℹ︎␜entity:node:news_item␝uid␞␟{name↝entity␜␜entity:user␝name␞␟value,target_id↠target_id}',
+      ],
+      $js_component->get('dataDependencies')['entityFields']['news_item_reference'],
+    );
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    $payload = $this->resolveNewsItemReference($fixtures)->value;
+    self::assertIsArray($payload);
+    // Four picks in, four values out: neither `target_id` overwrote the other.
+    self::assertSame(
+      ['label' => 'The deeply referenced news item', 'target_id' => (int) $deep_news->id()],
+      $payload['field_related_news'],
+    );
+    // `uid` surfaces as `owner`, node's entity key for it — the same mapping
+    // that names `title` as `label`.
+    self::assertSame(['__type', 'field_related_news', 'owner'], \array_keys($payload));
+    // Each object kept BOTH of its own entries. Were the leaves hoisted to the
+    // payload root, the two `target_id`s would share one key and one would win.
+    self::assertIsArray($payload['owner']);
+    self::assertSame(['name', 'target_id'], \array_keys($payload['owner']));
   }
 
   /**

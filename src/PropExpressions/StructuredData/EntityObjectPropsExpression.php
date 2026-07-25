@@ -46,6 +46,34 @@ final class EntityObjectPropsExpression implements EntityFieldBasedPropExpressio
   use CompoundExpressionTrait;
 
   /**
+   * The reserved key naming the bundle of an entity object in a built payload.
+   *
+   * Every entity object a consumer builds carries it, so that code reading the
+   * payload can tell which bundle it got — which, for an entity-rooted object,
+   * also decides which other keys are present.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
+   */
+  public const string PAYLOAD_TYPE_KEY = '__type';
+
+  /**
+   * The key naming an entity-rooted object inside a built payload.
+   *
+   * Expression-side, such an object is named after the referencer it descends
+   * through: it reads several fields, so it has no field name of its own. That
+   * is the same key the enclosing object uses for that field, which would read
+   * as `x` nested inside `x`. Payload-side it takes this reserved name instead.
+   *
+   * It shares the `__` prefix of PAYLOAD_TYPE_KEY to mark it synthesized rather
+   * than field-derived, so a field genuinely called `entity` cannot shadow it.
+   * Both keys exist only in built payloads, never in an expression string.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::namesAnEntityObject()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::branchDeveloperFacingKey()
+   */
+  public const string PAYLOAD_ENTITY_KEY = '__entity';
+
+  /**
    * @param non-empty-array<string, (ScalarPropExpressionInterface&EntityFieldBasedPropExpressionInterface)|(ReferencePropExpressionInterface&EntityFieldBasedPropExpressionInterface)> $objectPropsToFieldProps
    *   A mapping of prop names to entity field-based expressions that read a
    *   single field of this entity (a scalar leaf or a reference), each on its
