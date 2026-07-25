@@ -163,37 +163,6 @@ final class FieldObjectPropsExpression implements EntityFieldBasedPropExpression
     );
   }
 
-  /**
-   * Splits an object mapping on commas, ignoring those in nested expressions.
-   *
-   * A follow-reference (`↝`) entry's referenced expression may itself be a
-   * FieldObjectPropsExpression or contain bundle-specific branches, both of
-   * which use commas internally — only top-level commas separate entries.
-   *
-   * @return non-empty-list<string>
-   *   The individual `name↠prop` / `name↝reference` entry strings.
-   */
-  private static function splitObjectMapping(string $object_mapping): array {
-    $entries = [];
-    $depth = 0;
-    $current = '';
-    foreach (\mb_str_split($object_mapping) as $char) {
-      if ($char === ',' && $depth === 0) {
-        $entries[] = $current;
-        $current = '';
-        continue;
-      }
-      $depth += match ($char) {
-        self::PREFIX_OBJECT, self::PREFIX_BRANCH => 1,
-        self::SUFFIX_OBJECT, self::SUFFIX_BRANCH => -1,
-        default => 0,
-      };
-      $current .= $char;
-    }
-    $entries[] = $current;
-    return $entries;
-  }
-
   public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $entity): void {
     \assert($entity instanceof EntityInterface);
     $expected_entity_type_id = $this->entityType->getEntityTypeId();

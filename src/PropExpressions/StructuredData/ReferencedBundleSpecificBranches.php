@@ -150,6 +150,10 @@ final class ReferencedBundleSpecificBranches {
       $leaf_entity_type_id = $leaf_host_entity_data_definition->getEntityTypeId();
       if (
         $leaf_entity_type_id !== NULL
+        // An entity-rooted object spans multiple fields, so it has no single
+        // field whose cardinality to check; it always evaluates to one object
+        // per entity, and same-class already guarantees a consistent shape.
+        && !$leaf instanceof EntityObjectPropsExpression
         // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
         && \Drupal::getContainer()->has('entity_type.manager')
         // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection

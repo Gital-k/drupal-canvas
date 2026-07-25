@@ -160,33 +160,33 @@ final class CoalescerTest extends UnitTestCase {
     $multi_bundle = ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝name␞␟value][␜entity:media:video␝name␞␟value]'];
     yield 'already-combined multi-bundle reference → unchanged' => [$multi_bundle, $multi_bundle];
 
-    // A multi-bundle reference field whose per-bundle field selections DIFFER
+    // A multi-bundle reference field where a bundle reads MORE THAN ONE field
     // cannot be one field-level branch (a branch member is a single field). It
-    // coalesces into one object on the reference field: the common field
-    // (`title`, keyed `label`) becomes a bundle-specific branch prop, while the
-    // bundle-specific field (`body`, on news_item only) stays a plain reference.
-    yield 'reference chain, different fields per bundle → object with a branch prop' => [
+    // coalesces into a branch of per-bundle objects: each bundle's picks become
+    // one entity-rooted object (news_item reads `body` + `title`, blog_post
+    // reads only `title`), and a branch selects the matching object at render.
+    yield 'reference chain, different fields per bundle → branch of per-bundle objects' => [
       [
         'ℹ︎␜entity:node:news_item␝field_related␞␟entity␜␜entity:node:news_item␝body␞␟value',
         'ℹ︎␜entity:node:news_item␝field_related␞␟entity␜␜entity:node:news_item␝title␞␟value',
         'ℹ︎␜entity:node:news_item␝field_related␞␟entity␜␜entity:node:blog_post␝title␞␟value',
       ],
-      ['ℹ︎␜entity:node:news_item␝field_related␞␟{body↝entity␜␜entity:node:news_item␝body␞␟value,label↝entity␜[␜entity:node:blog_post␝title␞␟value][␜entity:node:news_item␝title␞␟value]}'],
+      ['ℹ︎␜entity:node:news_item␝field_related␞␟entity␜[␜entity:node:blog_post␟{label↠title␞␟value}][␜entity:node:news_item␟{body↠body␞␟value,label↠title␞␟value}]'],
     ];
 
     // Same as above, but the multi-target-bundle reference field ALSO has a
-    // loose leaf pick (`target_id`) on the field itself. The leaf pick and the
-    // per-bundle branch picks all coalesce into one object on the field: the
-    // cross-bundle `title` picks (keyed `label`) still merge into a
-    // bundle-specific branch, and the loose `target_id` becomes a `↠` entry.
-    yield 'reference chain across bundles alongside a loose pick on the same field → one object with a branch prop' => [
+    // loose leaf pick (`target_id`) on the field itself. The per-bundle branch
+    // of objects folds next to the loose pick as one object on the field: the
+    // whole reference becomes one `↝` entry (named `field_related`, its
+    // referencer field), and the loose `target_id` becomes a `↠` entry.
+    yield 'reference chain across bundles alongside a loose pick on the same field → object with a branch-of-objects prop' => [
       [
         'ℹ︎␜entity:node:news_item␝field_related␞␟target_id',
         'ℹ︎␜entity:node:news_item␝field_related␞␟entity␜␜entity:node:news_item␝body␞␟value',
         'ℹ︎␜entity:node:news_item␝field_related␞␟entity␜␜entity:node:news_item␝title␞␟value',
         'ℹ︎␜entity:node:news_item␝field_related␞␟entity␜␜entity:node:blog_post␝title␞␟value',
       ],
-      ['ℹ︎␜entity:node:news_item␝field_related␞␟{body↝entity␜␜entity:node:news_item␝body␞␟value,label↝entity␜[␜entity:node:blog_post␝title␞␟value][␜entity:node:news_item␝title␞␟value],target_id↠target_id}'],
+      ['ℹ︎␜entity:node:news_item␝field_related␞␟{field_related↝entity␜[␜entity:node:blog_post␟{label↠title␞␟value}][␜entity:node:news_item␟{body↠body␞␟value,label↠title␞␟value}],target_id↠target_id}'],
     ];
 
     // Same, but every bundle reads a single (same-key) field, so the reference
@@ -199,6 +199,19 @@ final class CoalescerTest extends UnitTestCase {
         'ℹ︎␜entity:node:news_item␝field_related␞␟entity␜␜entity:node:blog_post␝title␞␟value',
       ],
       ['ℹ︎␜entity:node:news_item␝field_related␞␟{label↝entity␜[␜entity:node:blog_post␝title␞␟value][␜entity:node:news_item␝title␞␟value],target_id↠target_id}'],
+    ];
+
+    // The #3591873 reproducer: a media reference targeting image + video, where
+    // the image bundle reads TWO fields (`name` → `label`, `field_media_image`)
+    // and video reads one. A single field-level branch cannot hold two fields,
+    // so each bundle becomes an entity-rooted object gathered in a branch.
+    yield 'multi-bundle reference, multiple fields per bundle → branch of per-bundle objects' => [
+      [
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
+      ],
+      ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␟{field_media_image↠field_media_image␞␟alt,label↠name␞␟value}][␜entity:media:video␟{field_media_video_file↠field_media_video_file␞␟target_id}]'],
     ];
 
     $empty = [];
@@ -305,6 +318,17 @@ final class CoalescerTest extends UnitTestCase {
       [
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝name␞␟value',
+      ],
+    ];
+
+    // A branch of per-bundle objects expands back to one atomic pick per field
+    // read, in each bundle's own context.
+    yield 'branch of per-bundle objects → atomic per-bundle picks' => [
+      ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␟{field_media_image↠field_media_image␞␟alt,label↠name␞␟value}][␜entity:media:video␟{field_media_video_file↠field_media_video_file␞␟target_id}]'],
+      [
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
+        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
       ],
     ];
 
