@@ -3711,8 +3711,8 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
    * `buildReferencePayload()` selects the matching object and spreads its
    * properties, so the component receives exactly that bundle's fields, and no
    * property is ever evaluated against an entity of a different bundle (which
-   * would fatal). Here news_item reads two fields (`title` + a news-only field)
-   * and blog_post reads one; each surfaces its own shape.
+   * would fatal). Here blog_post reads two fields (`title` + a blog-only field)
+   * and news_item reads one; each surfaces its own shape.
    *
    * The branch expression is saved through the component's NORMAL save, proving
    * it validates end to end.

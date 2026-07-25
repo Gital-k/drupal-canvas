@@ -337,7 +337,7 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
     ]);
     self::assertSame(
       [
-        'dataDependencies.entityFields.article_ref' => "The expressions on field 'entity:node:article.field_media' read multiple properties of one field per bundle across bundles, which coalesces into an unrenderable object; this is not yet supported.",
+        'dataDependencies.entityFields.article_ref' => "The expressions on field 'entity:node:article.field_media' coalesce into an object that mixes picks from more than one bundle, which cannot be rendered; this is not yet supported. Reading several fields per bundle is supported, but one of them being read for multiple properties is not.",
       ],
       self::entityFieldViolations($component),
     );

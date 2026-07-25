@@ -20,6 +20,16 @@ trait CompoundExpressionTrait {
   const SUFFIX_BRANCH = StructuredDataPropExpressionInterface::SUFFIX_BRANCH;
 
   /**
+   * Alias to improve code readability in this trait.
+   */
+  const PREFIX_OBJECT = StructuredDataPropExpressionInterface::PREFIX_OBJECT;
+
+  /**
+   * Alias to improve code readability in this trait.
+   */
+  const SUFFIX_OBJECT = StructuredDataPropExpressionInterface::SUFFIX_OBJECT;
+
+  /**
    * Strips the structured data prop expression type prefix `ℹ`.
    *
    * @param string $representation
@@ -230,8 +240,8 @@ trait CompoundExpressionTrait {
         continue;
       }
       $depth += match ($char) {
-        StructuredDataPropExpressionInterface::PREFIX_OBJECT, self::PREFIX_BRANCH => 1,
-        StructuredDataPropExpressionInterface::SUFFIX_OBJECT, self::SUFFIX_BRANCH => -1,
+        self::PREFIX_OBJECT, self::PREFIX_BRANCH => 1,
+        self::SUFFIX_OBJECT, self::SUFFIX_BRANCH => -1,
         default => 0,
       };
       $current .= $char;
