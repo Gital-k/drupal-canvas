@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit;
 
+use Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
@@ -37,6 +38,7 @@ use Prophecy\Prophet;
 #[CoversClass(FieldPropExpression::class)]
 #[CoversClass(ReferenceFieldPropExpression::class)]
 #[CoversClass(FieldObjectPropsExpression::class)]
+#[CoversClass(EntityObjectPropsExpression::class)]
 #[CoversClass(FieldTypePropExpression::class)]
 #[CoversClass(ReferenceFieldTypePropExpression::class)]
 #[CoversClass(FieldTypeObjectPropsExpression::class)]
@@ -189,6 +191,74 @@ class PropExpressionTest extends UnitTestCase {
     self::assertSame($string_representation, (string) $expression);
     self::assertEquals($expression, FieldObjectPropsExpression::fromString($string_representation));
     self::assertEquals($expression, StructuredDataPropExpression::fromString($string_representation));
+  }
+
+  /**
+   * An entity-rooted object round trips, with both leaf and reference props.
+   *
+   * Unlike a FieldObjectPropsExpression, this carries no field header of its
+   * own: each property carries its own field, so parsing has to tell the two
+   * apart by whether the property prefix precedes the field prefix.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+   */
+  public function testEntityObjectPropsExpressionRoundTrips(): void {
+    $image = BetterEntityDataDefinition::create('media', 'image');
+    $file = BetterEntityDataDefinition::create('file');
+    $expression = new EntityObjectPropsExpression($image, [
+      // A `↝` property: descends into another entity.
+      'field_media_image' => new ReferenceFieldPropExpression(
+        referencer: new FieldPropExpression($image, 'field_media_image', NULL, 'entity'),
+        referenced: new FieldPropExpression($file, 'uri', NULL, 'url'),
+      ),
+      // A `↠` property: a plain leaf on a second field of the same entity.
+      'label' => new FieldPropExpression($image, 'name', NULL, 'value'),
+    ]);
+    $string_representation = 'ℹ︎␜entity:media:image␟{field_media_image↝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,label↠name␞␟value}';
+    self::assertSame($string_representation, (string) $expression);
+    self::assertEquals($expression, EntityObjectPropsExpression::fromString($string_representation));
+    // The shared parser must route this to EntityObjectPropsExpression, not to
+    // FieldObjectPropsExpression: it has no field header.
+    self::assertEquals($expression, StructuredDataPropExpression::fromString($string_representation));
+  }
+
+  /**
+   * Every property of an entity-rooted object must read the same entity.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression::__construct()
+   */
+  public function testEntityObjectPropsExpressionRejectsMismatchedBundle(): void {
+    $image = BetterEntityDataDefinition::create('media', 'image');
+    $video = BetterEntityDataDefinition::create('media', 'video');
+    $this->expectException(\InvalidArgumentException::class);
+    $this->expectExceptionMessage('reads from `entity:media:video`, but this object is rooted at `entity:media:image`');
+    new EntityObjectPropsExpression($image, [
+      'label' => new FieldPropExpression($video, 'name', NULL, 'value'),
+    ]);
+  }
+
+  /**
+   * An entity-rooted object cannot hold a nested object property.
+   *
+   * A bundle reading multiple properties of one field coalesces into a field
+   * object, which is exactly what this cannot carry — hence the constraint that
+   * still rejects those selections.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustNotMixBundlesInObjectConstraint
+   */
+  public function testEntityObjectPropsExpressionRejectsNestedObjectProp(): void {
+    $image = BetterEntityDataDefinition::create('media', 'image');
+    $this->expectException(\InvalidArgumentException::class);
+    $this->expectExceptionMessage('is not a valid entity-rooted object property: only a field or reference expression is allowed.');
+    // Deliberately an unsupported property type: this asserts the runtime
+    // guard, which is what protects against hand-authored config.
+    // @phpstan-ignore argument.type
+    new EntityObjectPropsExpression($image, [
+      'field_media_image' => new FieldObjectPropsExpression($image, 'field_media_image', NULL, [
+        'alt' => new FieldPropExpression($image, 'field_media_image', NULL, 'alt'),
+        'width' => new FieldPropExpression($image, 'field_media_image', NULL, 'width'),
+      ]),
+    ]);
   }
 
   /**
