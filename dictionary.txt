@@ -271,4 +271,6 @@ trae
 unwindowed
 videomedia
 wrappable
+xclip
+xsel
 zencoder
