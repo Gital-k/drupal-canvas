@@ -215,6 +215,17 @@ final class CoalescerTest extends UnitTestCase {
       ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␟{field_media_image↠field_media_image␞␟alt,label↠name␞␟value}][␜entity:media:video␟{field_media_video_file↠field_media_video_file␞␟target_id}]'],
     ];
 
+    // Two picks on one bundle can derive the same developer-facing key, which
+    // is taken from the field name alone — here the same field at two deltas.
+    // Only one of them could survive in the per-bundle object, so the whole
+    // group is left alone for the validation layer to reject as a duplicate.
+    $delta_collision = [
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_tags␞0␟target_id',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_tags␞1␟target_id',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝name␞␟value',
+    ];
+    yield 'two deltas of one field on one bundle → left unchanged' => [$delta_collision, $delta_collision];
+
     $empty = [];
     yield 'empty list → empty list' => [$empty, $empty];
 

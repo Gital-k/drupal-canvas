@@ -343,7 +343,16 @@ final class Coalescer {
     $by_key = [];
     foreach ($per_bundle as $bundle => $list) {
       foreach ($list as $referenced) {
-        $by_key[$referenced->getDeveloperFacingKey()][$bundle] = $referenced;
+        $key = $referenced->getDeveloperFacingKey();
+        // Two of this bundle's picks collapsing onto one key (the same field at
+        // two deltas, say) cannot both live in the object. Leave the group
+        // un-coalesced for the validation layer to flag, rather than silently
+        // keeping only the last one. (Different bundles sharing a key is the
+        // normal case: that is what becomes a branch.)
+        if (\array_key_exists($bundle, $by_key[$key] ?? [])) {
+          return $refs;
+        }
+        $by_key[$key][$bundle] = $referenced;
       }
     }
     $props = [];
@@ -430,8 +439,9 @@ final class Coalescer {
    *   leaf or reference (guaranteed by everyEntryIsBranchable()).
    *
    * @return \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression|null
-   *   The branch reference, or NULL when the per-bundle objects cannot share a
-   *   shape (left for the validation layer to flag).
+   *   The branch reference, or NULL when two of a bundle's picks collapse onto
+   *   one developer-facing key, or the per-bundle objects cannot share a shape
+   *   (both left for the validation layer to flag).
    */
   private static function branchOfPerBundleObjects(FieldPropExpression $referencer, array $per_bundle): ?ReferenceFieldPropExpression {
     $branches = [];
@@ -440,7 +450,15 @@ final class Coalescer {
       $props = [];
       foreach ($list as $referenced) {
         \assert($referenced instanceof FieldPropExpression || $referenced instanceof ReferenceFieldPropExpression);
-        $props[$referenced->getDeveloperFacingKey()] = $referenced;
+        // The developer-facing key is derived from the field name alone, so two
+        // picks on this bundle can collapse onto one key (the same field at two
+        // deltas, say). Bail rather than silently drop one, like
+        // ::coalesceSameFieldGroup() does for the same collision.
+        $key = $referenced->getDeveloperFacingKey();
+        if (\array_key_exists($key, $props)) {
+          return NULL;
+        }
+        $props[$key] = $referenced;
       }
       \ksort($props);
       $branches[$data_type] = new EntityObjectPropsExpression($list[0]->getHostEntityDataDefinition(), $props);
