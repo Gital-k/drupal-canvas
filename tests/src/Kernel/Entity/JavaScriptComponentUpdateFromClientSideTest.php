@@ -344,6 +344,31 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
   }
 
   /**
+   * An entity-rooted object sent as a top-level pick is a violation, not a 500.
+   *
+   * It only ever exists as a bundle-specific branch value, so it answers
+   * neither `getFieldName()` nor `getStartingPointKey()` — but the parser can
+   * now return one for a client-supplied string. The validators must not call
+   * those methods on it: config schema already restricts entityFields to the
+   * three allowed classes, so this is reported as a plain violation.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\ValidStructuredDataPropExpressionConstraint
+   */
+  public function testEntityRootedObjectAsTopLevelPickIsRejected(): void {
+    self::installMultiBundleReferenceFixtures();
+    $component = self::createComponentWithEntityFields([
+      'ℹ︎␜entity:media:image␟{label↠name␞␟value}',
+    ]);
+    self::assertSame(
+      [
+        'dataDependencies.entityFields.article_ref.0' => 'The expression is valid, but not one of the allowed types: <em class="placeholder">&quot;FieldPropExpression&quot;, &quot;FieldObjectPropsExpression&quot;, &quot;ReferenceFieldPropExpression&quot;</em>.',
+      ],
+      self::entityFieldViolations($component),
+    );
+  }
+
+  /**
    * Installs a node + two media types + a multi-bundle reference field.
    *
    * `field_media` on `article` targets both the `image` and `video` media
