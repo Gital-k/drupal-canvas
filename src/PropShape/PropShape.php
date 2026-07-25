@@ -133,12 +133,16 @@ final class PropShape {
 
     // Title, description, examples and meta:enum (and its associated optional
     // x-translation-context) do not affect which field type + widget should be
-    // used.
+    // used. Neither do x-group and x-group-open: they only control how props
+    // are visually grouped into (collapsible) fieldsets in the Canvas UI's
+    // props form.
     unset($normalized_prop_schema['title']);
     unset($normalized_prop_schema['description']);
     unset($normalized_prop_schema['examples']);
     unset($normalized_prop_schema['meta:enum']);
     unset($normalized_prop_schema['x-translation-context']);
+    unset($normalized_prop_schema['x-group']);
+    unset($normalized_prop_schema['x-group-open']);
     // @todo Add support to `SDC` for `default` in https://www.drupal.org/project/canvas/issues/3462705?
     // @see https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-00#rfc.section.9.2
     unset($normalized_prop_schema['default']);

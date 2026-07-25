@@ -1,0 +1,41 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Props x-group
+description: 'Test SDC: props sharing `x-group` (one implicitly open, one explicitly collapsed), one ungrouped.'
+props:
+  type: object
+  required:
+    - ungrouped
+  properties:
+    grouped_one:
+      type: string
+      title: 'Grouped one'
+      x-group: 'Bar 1'
+      examples:
+        - First
+    grouped_two:
+      type: string
+      title: 'Grouped two'
+      x-group: 'Bar 1'
+      examples:
+        - Second
+    collapsed_one:
+      type: string
+      title: 'Collapsed one'
+      x-group: 'Bar 2'
+      examples:
+        - Third
+    collapsed_two:
+      type: string
+      title: 'Collapsed two'
+      # Declared on the second prop of the group, not the first: the
+      # resulting details element must still start collapsed regardless of
+      # which member of the group declares `x-group-open`.
+      x-group: 'Bar 2'
+      x-group-open: false
+      examples:
+        - Fourth
+    ungrouped:
+      type: string
+      title: 'Ungrouped'
+      examples:
+        - Fifth

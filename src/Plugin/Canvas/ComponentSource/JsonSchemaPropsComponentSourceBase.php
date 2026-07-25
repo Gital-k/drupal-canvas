@@ -890,6 +890,17 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       ));
     }
 
+    // Determine each `x-group`'s open/collapsed state upfront, from the full
+    // schema, rather than only the first-encountered prop of that group: a
+    // group's props may declare `x-group-open` in any order (or not at all).
+    // @see ::buildComponentInstanceForm()
+    $group_open_by_title = [];
+    foreach ($component_schema['properties'] ?? [] as $prop_schema_for_group) {
+      if (isset($prop_schema_for_group['x-group']) && \array_key_exists('x-group-open', $prop_schema_for_group)) {
+        $group_open_by_title[$prop_schema_for_group['x-group']] = $prop_schema_for_group['x-group-open'];
+      }
+    }
+
     foreach ($prop_field_definitions as $sdc_prop_name => $static_prop_source_field_definition) {
       // Uncollapse if set; otherwise fall back to the default static prop
       // source, but *made empty* instead of the default value.
@@ -947,6 +958,29 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       }
       $form[$sdc_prop_name] = $source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, $sdc_prop_name, $is_required, $entity_object_for_field_widget, $form, $form_state);
       $form[$sdc_prop_name]['#disabled'] = $disabled;
+
+      // Props whose schema shares the same `x-group` value are visually
+      // grouped into a single collapsible details element. This is purely
+      // presentational: the grouped elements remain top-level siblings in
+      // $form, so their `#parents` (and hence the submitted/stored values)
+      // are unaffected. Uses Form API's built-in `#group` mechanism (the same
+      // one vertical_tabs panes use) to move the rendered elements into the
+      // details element without moving them in the form tree.
+      // @see \Drupal\Core\Render\Element\RenderElementBase::processGroup()
+      // @see \Drupal\Core\Render\Element\RenderElementBase::preRenderGroup()
+      $group_title = $prop_schema['x-group'] ?? NULL;
+      if (\is_string($group_title) && $group_title !== '') {
+        $group_key = 'group__' . \hash('xxh64', $group_title);
+        if (!isset($form[$group_key])) {
+          $form[$group_key] = [
+            '#type' => 'details',
+            '#title' => $group_title,
+            // Open by default, unless the schema explicitly says otherwise.
+            '#open' => $group_open_by_title[$group_title] ?? TRUE,
+          ];
+        }
+        $form[$sdc_prop_name]['#group'] = \implode('][', [...$form['#parents'], $group_key]);
+      }
 
       if ($entity instanceof ContentTemplate) {
         $could_use_dynamic_prop_source = !empty($suggestions[$sdc_prop_name]);

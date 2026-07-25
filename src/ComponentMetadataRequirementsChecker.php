@@ -167,6 +167,45 @@ final class ComponentMetadataRequirementsChecker {
       if (!isset($prop['title'])) {
         $messages[] = \sprintf('Prop "%s" must have title', $prop_name);
       }
+
+      // `x-group` (if present) must be a non-empty string: it becomes the
+      // fieldset's title, and props sharing the same value are grouped into
+      // the same fieldset in the Canvas UI's props form.
+      if (\array_key_exists('x-group', $prop) && (!\is_string($prop['x-group']) || $prop['x-group'] === '')) {
+        $messages[] = \sprintf('Prop "%s" has an invalid "x-group": it must be a non-empty string.', $prop_name);
+      }
+
+      // `x-group-open` (if present) must be a boolean, and only makes sense
+      // alongside `x-group`: it controls whether that fieldset is expanded
+      // (`TRUE`, the default) or collapsed (`FALSE`) by default.
+      if (\array_key_exists('x-group-open', $prop)) {
+        if (!\is_bool($prop['x-group-open'])) {
+          $messages[] = \sprintf('Prop "%s" has an invalid "x-group-open": it must be a boolean.', $prop_name);
+        }
+        if (!\array_key_exists('x-group', $prop)) {
+          $messages[] = \sprintf('Prop "%s" has "x-group-open", but no "x-group".', $prop_name);
+        }
+      }
+    }
+
+    // All props sharing an `x-group` render into the same details element, so
+    // they must agree on whether it starts open or collapsed: only one of
+    // them needs to declare `x-group-open`, but if more than one does, they
+    // must not disagree.
+    $group_open_values = [];
+    foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
+      if (isset($prop['x-group']) && \array_key_exists('x-group-open', $prop) && \is_bool($prop['x-group-open'])) {
+        $group_open_values[$prop['x-group']][$prop_name] = $prop['x-group-open'];
+      }
+    }
+    foreach ($group_open_values as $group_title => $open_values_by_prop) {
+      if (\count(\array_unique($open_values_by_prop)) > 1) {
+        $messages[] = \sprintf('Props sharing "x-group: %s" declare conflicting "x-group-open" values: %s.', $group_title, \implode(', ', \array_map(
+          static fn (string $prop_name, bool $open): string => \sprintf('"%s" => %s', $prop_name, $open ? 'true' : 'false'),
+          \array_keys($open_values_by_prop),
+          $open_values_by_prop,
+        )));
+      }
     }
 
     // Do not try computing any StorablePropShape if one or more fundamentals
