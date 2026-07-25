@@ -16,6 +16,7 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\GlobalImports;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
@@ -315,6 +316,19 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     // keep the render invalidated when that entity changes.
     $payload_cacheability = CacheableMetadata::createFromObject($resolved_entity)
       ->addCacheableDependency($entity);
+
+    // An entity-rooted object is a bundle-specific branch selected for this
+    // resolved entity: spread its per-field properties so each is placed into
+    // this entity's payload exactly like a top-level pick would be.
+    $flattened = [];
+    foreach ($expressions as $expression) {
+      if ($expression instanceof EntityObjectPropsExpression) {
+        \array_push($flattened, ...\array_values($expression->getObjectExpressions()));
+        continue;
+      }
+      $flattened[] = $expression;
+    }
+    $expressions = $flattened;
 
     // References sharing a referencer field are descended into once, with
     // their target sub-expressions merged into a single nested object.

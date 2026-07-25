@@ -245,6 +245,18 @@ final class Evaluator {
       // @todo support non-fieldable entities?
       \assert($entity instanceof FieldableEntityInterface);
       $entity_access = self::validateAccess($entity, $expr);
+      // An entity-rooted object spans multiple fields, so there is no single
+      // field to fetch; evaluate each property against the entity on its own
+      // (each property validates its own field access in turn).
+      if ($expr instanceof EntityObjectPropsExpression) {
+        return new EvaluationResult(
+          \array_map(
+            fn ((ScalarPropExpressionInterface&EntityFieldBasedPropExpressionInterface)|(ReferencePropExpressionInterface&EntityFieldBasedPropExpressionInterface) $sub_expr): EvaluationResult => self::evaluate($entity, $sub_expr, $is_required, $language),
+            $expr->getObjectExpressions(),
+          ),
+          CacheableMetadata::createFromObject($entity_access),
+        );
+      }
       $field_item_list = $entity->get($expr->getFieldName());
       \assert($field_item_list instanceof FieldItemListInterface);
 

@@ -3701,6 +3701,108 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
   }
 
   /**
+   * A branch of per-bundle objects resolves each bundle's fields at render.
+   *
+   * When a bundle reads MORE THAN ONE field from a multi-bundle reference, the
+   * picks coalesce into a branch whose members are entity-rooted objects — one
+   * per bundle, each reading that bundle's own fields. At render
+   * `buildReferencePayload()` selects the matching object and spreads its
+   * properties, so the component receives exactly that bundle's fields, and no
+   * property is ever evaluated against an entity of a different bundle (which
+   * would fatal). Here news_item reads two fields (`title` + a news-only field)
+   * and blog_post reads one; each surfaces its own shape.
+   *
+   * The branch expression is saved through the component's NORMAL save, proving
+   * it validates end to end.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+   */
+  public function testMultiTargetBundleReferenceWithMultipleFieldsPerBundleResolvesPerBundle(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
+    self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
+
+    // A blog_post-only field, so the blog_post branch reads two fields (`title`
+    // + `field_blog_subtitle`) — what a single branch member cannot hold, and
+    // hence what the entity-rooted branch object exists for. news_item reads
+    // only `title`.
+    FieldStorageConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'type' => 'string',
+      'entity_type' => 'node',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'entity_type' => 'node',
+      'bundle' => 'blog_post',
+      'label' => 'Subtitle',
+    ])->save();
+
+    // Save the coalesced branch of per-bundle objects normally: blog_post reads
+    // `field_blog_subtitle` + `title` (keyed `label`); news_item reads `title`.
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜[␜entity:node:blog_post␟{field_blog_subtitle↠field_blog_subtitle␞␟value,label↠title␞␟value}][␜entity:node:news_item␟{label↠title␞␟value}]',
+    ];
+    $js_component->set('dataDependencies', $data_dependencies);
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    // Branch A: `field_related_news` resolves to a news_item — its object reads
+    // only `title`, so only `label` surfaces; the blog-only `field_blog_subtitle`
+    // is never evaluated against the news_item (which lacks it).
+    $branch_news = Node::create([
+      'type' => 'news_item',
+      'title' => 'A related news item',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_news);
+    $branch_news->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_news->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'news_item',
+          'label' => 'A related news item',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+
+    // Branch B: re-point at a blog_post — its object reads both fields, so both
+    // `field_blog_subtitle` and `label` surface.
+    $branch_blog = Node::create([
+      'type' => 'blog_post',
+      'title' => 'A related blog post',
+      'field_blog_subtitle' => 'A catchy subtitle',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_blog);
+    $branch_blog->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_blog->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'blog_post',
+          'field_blog_subtitle' => 'A catchy subtitle',
+          'label' => 'A related blog post',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+  }
+
+  /**
    * Widens the self-referencing `field_related_news` to target several bundles.
    *
    * @param list<string> $bundles
