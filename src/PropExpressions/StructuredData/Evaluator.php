@@ -280,9 +280,19 @@ final class Evaluator {
       // An entity-rooted object spans multiple fields, so there is no single
       // field to fetch; evaluate each property against the entity on its own
       // (each property validates its own field access in turn).
+      //
+      // This object IS an entity, and which bundle it is decides which
+      // properties it has — a consumer cannot read the result without knowing
+      // that. So it carries its bundle under the same reserved key every other
+      // entity object in a built payload carries. The key is set here because
+      // this is the only entity object a consumer receives whole rather than
+      // building itself, so there is nowhere else it could be added.
+      //
+      // @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression::PAYLOAD_TYPE_KEY
+      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
       if ($expr instanceof EntityObjectPropsExpression) {
         return new EvaluationResult(
-          \array_map(
+          [EntityObjectPropsExpression::PAYLOAD_TYPE_KEY => $entity->bundle()] + \array_map(
             fn ((ScalarPropExpressionInterface&EntityFieldBasedPropExpressionInterface)|(ReferencePropExpressionInterface&EntityFieldBasedPropExpressionInterface) $sub_expr): EvaluationResult => self::evaluate($entity, $sub_expr, $is_required, $language),
             $expr->getObjectExpressions(),
           ),
@@ -451,10 +461,23 @@ final class Evaluator {
           }
           return new EvaluationResult($evaluated_references, $referencer_result);
         })(),
-        FieldObjectPropsExpression::class => \array_map(
-          fn((ScalarPropExpressionInterface&EntityFieldBasedPropExpressionInterface)|(ReferencePropExpressionInterface&EntityFieldBasedPropExpressionInterface) $sub_expr): EvaluationResult => self::evaluate($entity_or_field, $sub_expr, $is_required, $language),
-          $expr->getObjectExpressions(),
-        ),
+        FieldObjectPropsExpression::class => (function () use ($entity_or_field, $expr, $is_required, $language): array {
+          $evaluated = [];
+          foreach ($expr->getObjectExpressions() as $obj_prop_name => $sub_expr) {
+            // An entry resolving to an entity-rooted object IS the referenced
+            // entity, not one of this field's properties. In the expression it
+            // is named after the referencer (reading several fields per bundle,
+            // it has no field name of its own) — which is the very key this
+            // enclosing object already uses for that same field. Give it the
+            // reserved name in the payload, so what a consumer receives does
+            // not repeat one key inside itself.
+            $key = self::namesAnEntityObject($sub_expr)
+              ? EntityObjectPropsExpression::PAYLOAD_ENTITY_KEY
+              : $obj_prop_name;
+            $evaluated[$key] = self::evaluate($entity_or_field, $sub_expr, $is_required, $language);
+          }
+          return $evaluated;
+        })(),
         default => throw new \LogicException('Unhandled expression type.'),
       };
       return new EvaluationResult(
@@ -463,6 +486,30 @@ final class Evaluator {
           ->addCacheableDependency($field_access)
       );
     }
+  }
+
+  /**
+   * Whether an object entry evaluates to an entity-rooted object.
+   *
+   * Such an entry yields the referenced entity as an object of its bundle's
+   * fields, rather than a value read out of this field — so in a built payload
+   * it takes the reserved entity name instead of its expression entry name.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression::PAYLOAD_ENTITY_KEY
+   */
+  private static function namesAnEntityObject(StructuredDataPropExpressionInterface $expr): bool {
+    if (!$expr instanceof ReferenceFieldPropExpression) {
+      return FALSE;
+    }
+    $referenced = $expr->referenced;
+    if ($referenced instanceof ReferencedBundleSpecificBranches) {
+      // Every branch is the same class, so the first answers for all. Copy the
+      // array out first: reset() takes it by reference, which a readonly
+      // property refuses.
+      $branches = $referenced->bundleSpecificReferencedExpressions;
+      return \reset($branches) instanceof EntityObjectPropsExpression;
+    }
+    return $referenced instanceof EntityObjectPropsExpression;
   }
 
   /**

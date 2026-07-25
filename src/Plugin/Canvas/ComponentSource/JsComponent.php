@@ -321,7 +321,7 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     // are read in the negotiated language rather than the entity's own default.
     $entity = Evaluator::resolveTranslationForReference($entity, $language);
 
-    $payload = ['__type' => $entity->bundle()];
+    $payload = [EntityObjectPropsExpression::PAYLOAD_TYPE_KEY => $entity->bundle()];
     // The resulting payload must still describe the cacheability of how
     // $resolved_entity was loaded, the negotiated language it was resolved to,
     // plus the traversed entity itself: a `__type`-only payload (a bundle with
@@ -334,7 +334,17 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
 
     // An entity-rooted object is a bundle-specific branch selected for this
     // resolved entity: spread its per-field properties so each is placed into
-    // this entity's payload exactly like a top-level pick would be.
+    // this entity's payload exactly like a top-level pick would be. The
+    // object's own property names are dropped because each property must still
+    // go through the reference grouping below, which derives its payload key
+    // from the property itself. The two agree for anything storable: the
+    // Coalescer keys each property by exactly that developer-facing key, and an
+    // object keyed otherwise cannot survive the expand → coalesce round trip
+    // that EntityFieldExpressionsMustBeIdempotent enforces at save time.
+    // This payload already carries `__type` for this entity, so the spread
+    // properties need none of their own.
+    // @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::branchOfPerBundleObjects()
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustBeIdempotentConstraint
     $flattened = [];
     foreach ($expressions as $expression) {
       if ($expression instanceof EntityObjectPropsExpression) {
