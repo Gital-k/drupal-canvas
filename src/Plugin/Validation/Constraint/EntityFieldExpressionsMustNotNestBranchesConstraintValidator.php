@@ -41,13 +41,16 @@ final class EntityFieldExpressionsMustNotNestBranchesConstraintValidator extends
       }
       try {
         $parsed = StructuredDataPropExpression::fromString($expression_string);
+        if ($parsed instanceof EntityFieldBasedPropExpressionInterface) {
+          $buckets[$parsed->getStartingPointKey()][] = $parsed;
+        }
       }
       catch (\Throwable) {
         // Invalid expressions are handled by ValidStructuredDataPropExpression.
+        // Bucketing is inside the `try` because an expression class that is not
+        // allowed at the top level may have no starting point to be keyed by:
+        // an entity-rooted object spans multiple fields and throws.
         continue;
-      }
-      if ($parsed instanceof EntityFieldBasedPropExpressionInterface) {
-        $buckets[$parsed->getStartingPointKey()][] = $parsed;
       }
     }
 
