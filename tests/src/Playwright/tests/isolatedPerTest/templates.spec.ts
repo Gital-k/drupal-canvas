@@ -387,6 +387,7 @@ test.describe('Templates - General', () => {
     await expect(
       page.locator('iframe[title="Page preview"]'),
     ).not.toBeAttached();
+    await canvas.waitForEditorFrame();
 
     await canvas.publishAllChanges();
 
