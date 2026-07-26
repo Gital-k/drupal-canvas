@@ -88,7 +88,11 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     self::assertCount(0, $node->validate());
     $node->save();
 
-    $component_id = 'sdc.canvas_test_sdc.props-x-group';
+    // `banner`'s `heading` and `text` props share `x-group: 'Heading &
+    // content'`; `text` (the second prop of the group, not the first)
+    // declares `x-group-open: false`. `image` has no `x-group`.
+    // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\SingleDirectoryComponentTest::testDiscovery()
+    $component_id = 'sdc.canvas_test_sdc.banner';
     $form_canvas_props = $this->getFormCanvasPropsForComponent($component_id);
     $component_entity = Component::load($component_id);
     \assert($component_entity instanceof ComponentInterface);
@@ -99,25 +103,15 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     );
 
     $details_elements = $crawler->filter('details');
-    self::assertCount(2, $details_elements, 'One `<details>` per distinct `x-group` value: "Bar 1" and "Bar 2".');
+    self::assertCount(1, $details_elements, 'One `<details>` for the single `x-group` value shared by `heading` and `text`.');
+    $details_html = $details_elements->outerHtml();
+    self::assertStringContainsString('Heading &amp; content', $details_html, 'The details element legend must show the `x-group` value.');
+    self::assertStringContainsString('My banner title', $details_html, "The heading prop's widget must be rendered inside the details element.");
+    self::assertStringContainsString('Content', $details_html, "The text prop's own title must be rendered inside the details element.");
+    self::assertStringNotContainsString('open="open"', $details_html, '`x-group-open: false` (declared on the second prop of the group) must render collapsed.');
 
-    $bar_1 = $details_elements->reduce(fn (Crawler $node): bool => \str_contains($node->text(), 'Bar 1'));
-    self::assertCount(1, $bar_1);
-    $bar_1_html = $bar_1->outerHtml();
-    self::assertStringContainsString('Grouped one', $bar_1_html);
-    self::assertStringContainsString('Grouped two', $bar_1_html);
-    self::assertStringContainsString('open="open"', $bar_1_html, '`x-group-open` defaults to open (expanded).');
-
-    $bar_2 = $details_elements->reduce(fn (Crawler $node): bool => \str_contains($node->text(), 'Bar 2'));
-    self::assertCount(1, $bar_2);
-    $bar_2_html = $bar_2->outerHtml();
-    self::assertStringContainsString('Collapsed one', $bar_2_html);
-    self::assertStringContainsString('Collapsed two', $bar_2_html);
-    self::assertStringNotContainsString('open="open"', $bar_2_html, '`x-group-open: false` must render collapsed.');
-
-    self::assertStringNotContainsString('Ungrouped', $bar_1_html, 'The prop without `x-group` must not be inside a details element.');
-    self::assertStringNotContainsString('Ungrouped', $bar_2_html, 'The prop without `x-group` must not be inside a details element.');
-    self::assertStringContainsString('Ungrouped', $crawler->text(), 'The prop without `x-group` must still be rendered, just outside any details element.');
+    self::assertStringNotContainsString('Image', $details_html, 'The prop without `x-group` must not be inside the details element.');
+    self::assertStringContainsString('Image', $crawler->text(), 'The prop without `x-group` must still be rendered, just outside the details element.');
   }
 
   #[DataProvider('providerOptionalImages')]

@@ -10,6 +10,7 @@ props:
       type: string
       title: Heading
       description: The heading text.
+      x-group: 'Heading & content'
       examples:
         - 'My banner title'
     text:
@@ -18,6 +19,11 @@ props:
       description: The main text.
       contentMediaType: text/html
       x-formatting-context: block
+      # Declared on the second prop of the group, not the first: also tests
+      # that the resulting details element still starts collapsed regardless
+      # of which member of the group declares `x-group-open`.
+      x-group: 'Heading & content'
+      x-group-open: false
       examples:
         - '<p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p>'
     image:
