@@ -47,6 +47,7 @@ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
 use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\Render\Element;
+use Drupal\Core\Render\Element\RenderElementBase;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Theme\Component\ComponentValidator;
@@ -890,14 +891,41 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       ));
     }
 
-    // Determine each `x-group`'s open/collapsed state upfront, from the full
-    // schema, rather than only the first-encountered prop of that group: a
-    // group's props may declare `x-group-open` in any order (or not at all).
+    // Create every `x-group`'s details element upfront, before any prop's own
+    // element exists in $form. This must happen first for two reasons:
+    // - a group's props may declare `x-group-open` in any order (or not at
+    //   all), so the open/collapsed state must be resolved from the full
+    //   schema, not just the first-encountered prop of that group;
+    // - Form API's `#group` mechanism (see below) relies on each member
+    //   rendering, hiding itself at its original position, and a *fresh, not
+    //   yet hidden* copy being injected into the group's details element.
+    //   Because `#printed` is set by mutating a shared array reference, if a
+    //   member happened to render (and hence set `#printed`) before the
+    //   details element existed and had a chance to inject copies, its own
+    //   injected copy would inherit that already-`#printed` state and
+    //   silently fail to render. Creating (and therefore rendering) every
+    //   details element before any member avoids this entirely.
     // @see ::buildComponentInstanceForm()
+    // @see \Drupal\Core\Render\Element\RenderElementBase::processGroup()
+    // @see \Drupal\Core\Render\Element\RenderElementBase::preRenderGroup()
     $group_open_by_title = [];
+    $group_key_by_title = [];
     foreach ($component_schema['properties'] ?? [] as $prop_schema_for_group) {
       if (isset($prop_schema_for_group['x-group']) && \array_key_exists('x-group-open', $prop_schema_for_group)) {
         $group_open_by_title[$prop_schema_for_group['x-group']] = $prop_schema_for_group['x-group-open'];
+      }
+    }
+    foreach ($component_schema['properties'] ?? [] as $prop_schema_for_group) {
+      $group_title = $prop_schema_for_group['x-group'] ?? NULL;
+      if (\is_string($group_title) && $group_title !== '' && !isset($group_key_by_title[$group_title])) {
+        $group_key = 'group__' . \hash('xxh64', $group_title);
+        $group_key_by_title[$group_title] = $group_key;
+        $form[$group_key] = [
+          '#type' => 'details',
+          '#title' => $group_title,
+          // Open by default, unless the schema explicitly says otherwise.
+          '#open' => $group_open_by_title[$group_title] ?? TRUE,
+        ];
       }
     }
 
@@ -966,20 +994,17 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       // are unaffected. Uses Form API's built-in `#group` mechanism (the same
       // one vertical_tabs panes use) to move the rendered elements into the
       // details element without moving them in the form tree.
+      // `#group` alone only takes effect for elements that also run the
+      // `processGroup`/`preRenderGroup` callbacks; `details`/`fieldset`
+      // elements get those for free, but arbitrary field widgets do not, so
+      // they must be attached explicitly here.
       // @see \Drupal\Core\Render\Element\RenderElementBase::processGroup()
       // @see \Drupal\Core\Render\Element\RenderElementBase::preRenderGroup()
       $group_title = $prop_schema['x-group'] ?? NULL;
       if (\is_string($group_title) && $group_title !== '') {
-        $group_key = 'group__' . \hash('xxh64', $group_title);
-        if (!isset($form[$group_key])) {
-          $form[$group_key] = [
-            '#type' => 'details',
-            '#title' => $group_title,
-            // Open by default, unless the schema explicitly says otherwise.
-            '#open' => $group_open_by_title[$group_title] ?? TRUE,
-          ];
-        }
-        $form[$sdc_prop_name]['#group'] = \implode('][', [...$form['#parents'], $group_key]);
+        $form[$sdc_prop_name]['#group'] = \implode('][', [...$form['#parents'], $group_key_by_title[$group_title]]);
+        $form[$sdc_prop_name]['#process'][] = [RenderElementBase::class, 'processGroup'];
+        $form[$sdc_prop_name]['#pre_render'][] = [RenderElementBase::class, 'preRenderGroup'];
       }
 
       if ($entity instanceof ContentTemplate) {
