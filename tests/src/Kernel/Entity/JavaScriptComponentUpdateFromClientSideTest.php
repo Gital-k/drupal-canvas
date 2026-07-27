@@ -10,6 +10,11 @@ use Drupal\canvas\PropExpressions\StructuredData\Coalescer;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\Component\Assertion\Inspector;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\field\FieldStorageConfigInterface;
+use Drupal\media\Entity\MediaType;
+use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
@@ -34,6 +39,10 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  *   for validation to flag or reject.
  * - ::providerNormalizeExpands — stored entries expand back to the atomic picks
  *   the client sent.
+ *
+ * ::testMultiBundleBranchReferenceValidates installs real entity types to prove
+ * a coalesced multi-bundle branch reference (a prop from each target bundle) is
+ * accepted, not rejected.
  *
  * @legacy-covers \Drupal\canvas\Entity\JavaScriptComponent::updateFromClientSide
  * @legacy-covers \Drupal\canvas\Entity\JavaScriptComponent::normalizeForClientSide
@@ -220,13 +229,12 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
     ];
 
     // Branch coalescing leaves bundles whose leaf shapes differ (object vs
-    // scalar) un-combined; no shape-match constraint is forced.
-    // @todo This situation was tested before, but cannot occur: the UI does not offer it, the back end does not accept it; support will be added in https://git.drupalcode.org/project/canvas/-/work_items/3591656
-    // @see \Drupal\Tests\canvas\Kernel\Controller\ApiUiContentEntityReferenceControllersTest::testFieldsEndpointMultiTargetBundleReferenceField
-    // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\JsComponentTest::testMultiTargetBundleReferenceThrows
-    // @phpcs:disable
-    /*
-    yield 'shape mismatch across bundles is not rejected' => [
+    // scalar) un-combined: the image picks combine into one object reference,
+    // the video pick stays a separate scalar reference. No multi-bundle-specific
+    // constraint rejects them; both are left un-combined on the same field, so
+    // the general same-field coalescing constraint still flags that pair (they
+    // must become a single branch to be storable).
+    yield 'shape mismatch across bundles stays un-combined' => [
       [
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝thumbnail␞␟alt',
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝thumbnail␞␟width',
@@ -236,21 +244,196 @@ final class JavaScriptComponentUpdateFromClientSideTest extends CanvasKernelTest
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝thumbnail␞␟{alt↠alt,width↠width}',
         'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝thumbnail␞␟target_id',
       ],
-      // No coalescing violation: the differing leaf shapes are left un-combined.
-      ['dataDependencies.entityFields.article_ref' => NULL],
+      ['dataDependencies.entityFields.article_ref' => "Multiple expressions on the same field 'entity:node:article.field_media' must be coalesced into a single FieldObjectPropsExpression."],
     ];
-    */
-    // @phpcs:enable
 
-    // A coalesced multi-bundle branch reference is rejected at render time.
-    yield 'multi-bundle branch reference is rejected' => [
+    // Acceptance of a coalesced multi-bundle branch reference (the former
+    // save-time rejection is gone) needs the referenced entity types to exist,
+    // so it is proven with real fixtures in
+    // ::testMultiBundleBranchReferenceValidates() rather than here.
+  }
+
+  /**
+   * A coalesced multi-bundle branch reference validates: it is accepted.
+   *
+   * The client sends two single-bundle picks on the same reference field but
+   * different bundles — one prop from the image branch, one from the video
+   * branch. They coalesce into a single `ReferencedBundleSpecificBranches`
+   * reference. With the multi-target-bundle save-time rejection removed, that
+   * stored branch reference now validates instead of being rejected. Real
+   * entity types are installed here (unlike ::providerCoalesceValidation) so
+   * the branch is validated for real, not masked by "entity type does not
+   * exist".
+   */
+  public function testMultiBundleBranchReferenceValidates(): void {
+    self::installMultiBundleReferenceFixtures();
+
+    // Two props from different branches: an image field and a video field.
+    $component = self::createComponentWithEntityFields([
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
+    ]);
+
+    // The two picks coalesced into one branch reference.
+    self::assertSame(
+      ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_image␞␟alt][␜entity:media:video␝field_media_video_file␞␟target_id]'],
+      $component->get('dataDependencies')['entityFields'][self::PROP_NAME],
+    );
+
+    // The branch reference is accepted: no violation anywhere in entityFields.
+    self::assertSame([], self::entityFieldViolations($component));
+  }
+
+  /**
+   * Multiple fields per bundle across bundles coalesce into one branch.
+   *
+   * The client sends two picks on one target bundle (`name` + an image field)
+   * plus a pick on another bundle (a video field). All three are on the same
+   * reference field, so they coalesce into a single branch expression: each
+   * bundle's picks become one entity-rooted object, gathered in a branch that
+   * is bundle-matched at render.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+   */
+  public function testMultiBundleBranchReferenceWithMultipleFieldsPerBundle(): void {
+    self::installMultiBundleReferenceFixtures();
+
+    // Two picks on the image bundle (two fields) + one on video.
+    $component = self::createComponentWithEntityFields([
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
+    ]);
+
+    // All picks on field_media coalesce into ONE branch of per-bundle objects.
+    self::assertSame(
+      ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␟{field_media_image↠field_media_image␞␟alt,label↠name␞␟value}][␜entity:media:video␟{field_media_video_file↠field_media_video_file␞␟target_id}]'],
+      $component->get('dataDependencies')['entityFields'][self::PROP_NAME],
+    );
+
+    // … and it is accepted: no violation anywhere in entityFields.
+    self::assertSame([], self::entityFieldViolations($component));
+  }
+
+  /**
+   * Reading multiple PROPERTIES of one field per bundle is rejected at save.
+   *
+   * A branch member reads one field, and an entity-rooted branch object holds
+   * one property per field — neither can carry a field read for several of its
+   * properties (here the image field's `alt` + `width`). Those picks still
+   * coalesce into one FieldObjectPropsExpression that mixes bundle-specific
+   * properties, which is unrenderable, so EntityFieldExpressionsMustNotMixBundlesInObject
+   * rejects it. Supporting it needs a nested-object branch (a follow-up).
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustNotMixBundlesInObjectConstraintValidator
+   */
+  public function testMultiBundleObjectMixingBundlesIsRejected(): void {
+    self::installMultiBundleReferenceFixtures();
+    $component = self::createComponentWithEntityFields([
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_image␞␟width',
+      'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝field_media_video_file␞␟target_id',
+    ]);
+    self::assertSame(
       [
-        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value',
-        'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝name␞␟value',
+        'dataDependencies.entityFields.article_ref' => "The expressions on field 'entity:node:article.field_media' coalesce into an object that mixes picks from more than one bundle, which cannot be rendered; this is not yet supported. Reading several fields per bundle is supported, but one of them being read for multiple properties is not.",
       ],
-      ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝name␞␟value][␜entity:media:video␝name␞␟value]'],
-      ['dataDependencies.entityFields.article_ref.0' => "The reference field 'entity:node:article.field_media' targets multiple bundles, which is not yet supported."],
-    ];
+      self::entityFieldViolations($component),
+    );
+  }
+
+  /**
+   * An entity-rooted object sent as a top-level pick is a violation, not a 500.
+   *
+   * It only ever exists as a bundle-specific branch value, so it answers
+   * neither `getFieldName()` nor `getStartingPointKey()` — but the parser can
+   * now return one for a client-supplied string. The validators must not call
+   * those methods on it: config schema already restricts entityFields to the
+   * three allowed classes, so this is reported as a plain violation.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\ValidStructuredDataPropExpressionConstraint
+   */
+  public function testEntityRootedObjectAsTopLevelPickIsRejected(): void {
+    self::installMultiBundleReferenceFixtures();
+    $component = self::createComponentWithEntityFields([
+      'ℹ︎␜entity:media:image␟{label↠name␞␟value}',
+    ]);
+    self::assertSame(
+      [
+        'dataDependencies.entityFields.article_ref.0' => 'The expression is valid, but not one of the allowed types: <em class="placeholder">&quot;FieldPropExpression&quot;, &quot;FieldObjectPropsExpression&quot;, &quot;ReferenceFieldPropExpression&quot;</em>.',
+      ],
+      self::entityFieldViolations($component),
+    );
+  }
+
+  /**
+   * Installs a node + two media types + a multi-bundle reference field.
+   *
+   * `field_media` on `article` targets both the `image` and `video` media
+   * bundles, so a code component can pick fields from each branch.
+   */
+  private function installMultiBundleReferenceFixtures(): void {
+    // Enabled only here (each test runs in a separate process): enabling `node`
+    // globally would make the Coalescer stop combining different-bundle picks
+    // in the fixture-free coalescing providers.
+    $this->enableModules(['field', 'node']);
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('media');
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+
+    // Two media types so one reference field can target multiple bundles.
+    self::createMediaType('image', 'image');
+    self::createMediaType('video', 'video_file');
+
+    // A multi-bundle reference field: field_media on article → image + video.
+    FieldStorageConfig::create([
+      'field_name' => 'field_media',
+      'entity_type' => 'node',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'media'],
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_media',
+      'entity_type' => 'node',
+      'bundle' => 'article',
+      'label' => 'Media',
+      'settings' => ['handler_settings' => ['target_bundles' => ['image' => 'image', 'video' => 'video']]],
+    ])->save();
+  }
+
+  /**
+   * Returns validation messages keyed by property path under entityFields.
+   *
+   * @return array<string, string>
+   */
+  private static function entityFieldViolations(JavaScriptComponent $component): array {
+    $violations = [];
+    foreach ($component->getTypedData()->validate() as $violation) {
+      $violations[$violation->getPropertyPath()] = (string) $violation->getMessage();
+    }
+    return \array_filter(
+      $violations,
+      static fn (string $path): bool => \str_starts_with($path, 'dataDependencies.entityFields'),
+      \ARRAY_FILTER_USE_KEY,
+    );
+  }
+
+  /**
+   * Creates a media type with its source field, for reference-field fixtures.
+   */
+  private static function createMediaType(string $id, string $source): void {
+    $media_type = MediaType::create(['id' => $id, 'label' => \ucfirst($id), 'source' => $source]);
+    $media_type->save();
+    $source_field = $media_type->getSource()->createSourceField($media_type);
+    $source_field_storage = $source_field->getFieldStorageDefinition();
+    \assert($source_field_storage instanceof FieldStorageConfigInterface);
+    if (!FieldStorageConfig::loadByName('media', $source_field->getName())) {
+      $source_field_storage->save();
+    }
+    $source_field->save();
+    $media_type->set('source_configuration', ['source_field' => $source_field->getName()])->save();
   }
 
   /**

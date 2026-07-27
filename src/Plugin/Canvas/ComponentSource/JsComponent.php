@@ -16,11 +16,13 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\GlobalImports;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
+use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
@@ -272,6 +274,12 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
    * - reference expressions — and reference-only objects, the coalesced form of
    *   several references through one field — descend into the referenced
    *   entity, producing a nested object (those sharing a referencer merge);
+   *   target selection is deferred until the referencer resolves to a concrete
+   *   entity, because a multi-target-bundle reference (a
+   *   `ReferencedBundleSpecificBranches` target) selects the branch matching
+   *   the resolved entity's entity-type + bundle, which is only known at
+   *   runtime — a resolved entity whose bundle has no matching branch (nor
+   *   matching single-bundle target) yields a `__type`-only nested object;
    * - every entity object carries a `__type` set to the resolved entity's
    *   bundle, so code components can branch on it (including for
    *   multi-target-bundle references, where the bundle is only known at
@@ -313,12 +321,39 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     // are read in the negotiated language rather than the entity's own default.
     $entity = Evaluator::resolveTranslationForReference($entity, $language);
 
-    $payload = ['__type' => $entity->bundle()];
+    $payload = [EntityObjectPropsExpression::PAYLOAD_TYPE_KEY => $entity->bundle()];
     // The resulting payload must still describe the cacheability of how
-    // $resolved_entity was loaded, plus the negotiated language it was resolved
-    // to.
+    // $resolved_entity was loaded, the traversed entity itself, and the
+    // negotiated language it was resolved to: a `__type`-only payload (a bundle
+    // with no matching branch or target) has no leaf pick to attach the
+    // entity's own cache tags, so merge them here to keep the render
+    // invalidated when that entity changes.
     $payload_cacheability = CacheableMetadata::createFromObject($resolved_entity)
+      ->addCacheableDependency($entity)
       ->addCacheableDependency($language);
+
+    // An entity-rooted object is a bundle-specific branch selected for this
+    // resolved entity: spread its per-field properties so each is placed into
+    // this entity's payload exactly like a top-level pick would be. The
+    // object's own property names are dropped because each property must still
+    // go through the reference grouping below, which derives its payload key
+    // from the property itself. The two agree for anything storable: the
+    // Coalescer keys each property by exactly that developer-facing key, and an
+    // object keyed otherwise cannot survive the expand → coalesce round trip
+    // that EntityFieldExpressionsMustBeIdempotent enforces at save time.
+    // This payload already carries `__type` for this entity, so the spread
+    // properties need none of their own.
+    // @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::branchOfPerBundleObjects()
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustBeIdempotentConstraint
+    $flattened = [];
+    foreach ($expressions as $expression) {
+      if ($expression instanceof EntityObjectPropsExpression) {
+        \array_push($flattened, ...\array_values($expression->getObjectExpressions()));
+        continue;
+      }
+      $flattened[] = $expression;
+    }
+    $expressions = $flattened;
 
     // References sharing a referencer field are descended into once, with
     // their target sub-expressions merged into a single nested object.
@@ -338,10 +373,10 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
       if ($reference_entries !== NULL) {
         foreach ($reference_entries as $reference) {
           \assert($reference instanceof ReferenceFieldPropExpression);
-          // @todo Multi-target-bundle references (a `ReferencedBundleSpecificBranches` target) are deferred; add support in https://git.drupalcode.org/project/canvas/-/work_items/3591656.
-          if (!$reference->referenced instanceof EntityFieldBasedPropExpressionInterface) {
-            throw new \LogicException(\sprintf('Multi-target-bundle content entity references are not yet supported, but the expression `%s` targets bundle-specific branches.', (string) $reference));
-          }
+          // The target may be a `ReferencedBundleSpecificBranches`; it is kept
+          // as-is because the concrete branch (or, for un-coalesced
+          // cross-bundle picks, the matching single-bundle target) can only be
+          // selected once the referencer resolves to a concrete entity below.
           $key = $reference->referencer->getDeveloperFacingKey();
           $reference_groups[$key]['referencer'] ??= $reference->referencer;
           $reference_groups[$key]['targets'][] = $reference->referenced;
@@ -356,13 +391,48 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
       );
     }
 
-    // Call recursively for each expression that follows a reference.
+    // Call recursively for each expression that follows a reference. Target
+    // selection is deferred to here: only once the referencer resolves to a
+    // concrete entity is its entity-type + bundle known, and one uniform
+    // host-bundle matching rule then picks the concrete targets.
     foreach ($reference_groups as $key => $group) {
       $referenced = Evaluator::evaluate($entity, $group['referencer'],
         is_required: FALSE,
         language: $language,
       );
-      $payload[$key] = self::buildReferencePayload($referenced, $group['targets'], $language);
+      $resolved_targets = [];
+      if ($referenced->value instanceof FieldableEntityInterface) {
+        $referenced_entity = $referenced->value;
+        foreach ($group['targets'] as $target) {
+          if ($target instanceof ReferencedBundleSpecificBranches) {
+            // Select the branch matching the resolved entity, if any; the value
+            // object owns the entity-type + bundle key format, mirroring
+            // ReferenceFieldPropExpression::getTargetExpression().
+            $branch = $target->getBranchForEntityOrNull($referenced_entity);
+            if ($branch !== NULL) {
+              $resolved_targets[] = $branch;
+            }
+            continue;
+          }
+          // A plain single-bundle target reached through a multi-bundle
+          // referencer (un-coalesced cross-bundle picks) contributes only when
+          // its host entity-type + bundle matches the resolved entity; a
+          // bundle-less host definition matches on entity type alone. This
+          // never evaluates a bundle-A expression against a bundle-B entity.
+          // Through a single-bundle referencer targets match by construction.
+          $host_definition = $target->getHostEntityDataDefinition();
+          $host_bundles = $host_definition->getBundles();
+          if ($host_definition->getEntityTypeId() === $referenced_entity->getEntityTypeId()
+            && ($host_bundles === NULL || \in_array($referenced_entity->bundle(), $host_bundles, TRUE))) {
+            $resolved_targets[] = $target;
+          }
+        }
+      }
+      // An empty resolved target list is the unmatched-bundle case: the
+      // recursion returns a `__type`-only payload with the correct
+      // cacheability. A NULL resolved entity likewise yields a NULL payload
+      // (the target list is unused).
+      $payload[$key] = self::buildReferencePayload($referenced, $resolved_targets, $language);
     }
 
     return new EvaluationResult($payload, $payload_cacheability);
