@@ -370,10 +370,9 @@ describe('ReviewChangesPage', () => {
       screen.getByRole('button', { name: 'Select old version' }),
     );
 
-    expect(screen.getByRole('switch', { name: /Selected/ })).toHaveAttribute(
-      'aria-checked',
-      'false',
-    );
+    expect(
+      screen.getByRole('switch', { name: 'Not selected for publishing' }),
+    ).toHaveAttribute('aria-checked', 'false');
 
     await user.click(screen.getByRole('button', { name: 'Discard changes' }));
 

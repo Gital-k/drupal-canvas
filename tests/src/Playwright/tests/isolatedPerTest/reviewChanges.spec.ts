@@ -129,7 +129,7 @@ test.describe('Review selected changes', () => {
     );
     await page.getByRole('button', { name: 'Select Old version' }).click();
     await expect(
-      page.getByRole('switch', { name: /Selected for publishing/ }),
+      page.getByRole('switch', { name: 'Not selected for publishing' }),
     ).toHaveAttribute('aria-checked', 'false');
     await page.getByRole('button', { name: 'Discard changes' }).click();
     await discardRequestPromise;
