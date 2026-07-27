@@ -110,10 +110,10 @@ enum JsonSchemaStringFormat: string {
       static::Uuid => new DataTypeShapeRequirement('Uuid', []),
       // TRICKY: Drupal core does not support RFC3987 aka IRIs, but it's a superset of RFC3986.
       static::UriReference, static::Uri, static::IriReference, static::Iri => match (TRUE) {
-        // Custom: the targeted resource has `contentMediaType: image/*` or
-        // `contentMediaType: video/*`.
+        // Custom: the targeted resource has a wildcard `contentMediaType`,
+        // such as `image/*`, `video/*` or `application/*`.
         // @see https://github.com/json-schema-org/json-schema-spec/issues/1557
-        \array_key_exists('contentMediaType', $schema) && \in_array($schema['contentMediaType'], ['image/*', 'video/*'], TRUE) => new DataTypeShapeRequirements([
+        \array_key_exists('contentMediaType', $schema) && UriTargetMediaTypeConstraint::isValidWildCard($schema['contentMediaType']) => new DataTypeShapeRequirements([
           new DataTypeShapeRequirement(UriTargetMediaTypeConstraint::PLUGIN_ID, ['mimeType' => $schema['contentMediaType']]),
           new DataTypeShapeRequirement(UriConstraint::PLUGIN_ID, [
             'allowReferences' => $this === static::IriReference || $this === static::UriReference,
