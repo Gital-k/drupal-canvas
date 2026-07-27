@@ -4088,6 +4088,101 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
   }
 
   /**
+   * A per-bundle branch object reads its own fields in the negotiated language.
+   *
+   * #3591846 threads the negotiated language through the reference recursion,
+   * but its coverage is all single-bundle: a branch member reads one field, so
+   * nothing proved that a bundle's SEVERAL fields — the ones only an
+   * entity-rooted object can carry — are read in that language too. They are,
+   * because buildReferencePayload() spreads the object's properties into the
+   * same loop that evaluates top-level picks with $language. This locks that,
+   * so the flattening cannot later be rerouted around the language.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
+   */
+  public function testMultiTargetBundleReferenceWithMultipleFieldsPerBundleResolvesInHostLanguage(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures(translatable: TRUE);
+
+    NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
+    \Drupal::service('content_translation.manager')->setEnabled('node', 'blog_post', TRUE);
+    $this->container->get('entity_field.manager')->clearCachedFieldDefinitions();
+    self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
+
+    // The blog-only second field, so the blog_post branch is an entity-rooted
+    // object rather than a plain branch member.
+    FieldStorageConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'type' => 'string',
+      'entity_type' => 'node',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'entity_type' => 'node',
+      'bundle' => 'blog_post',
+      'label' => 'Subtitle',
+      'translatable' => TRUE,
+    ])->save();
+
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜[␜entity:node:blog_post␟{field_blog_subtitle↠field_blog_subtitle␞␟value,label↠title␞␟value}][␜entity:node:news_item␟{label↠title␞␟value}]',
+    ];
+    $js_component->set('dataDependencies', $data_dependencies);
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    $branch_blog = Node::create([
+      'type' => 'blog_post',
+      'title' => 'A related blog post',
+      'field_blog_subtitle' => 'A catchy subtitle',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_blog);
+    $branch_blog->save();
+    $branch_blog->addTranslation('es', [
+      'title' => 'A related blog post in Spanish',
+      'field_blog_subtitle' => 'A catchy subtitle in Spanish',
+      'status' => 1,
+    ])->save();
+
+    // Point BOTH translations of the referenced news item at the blog post, so
+    // the reading language decides the translation, not which one carries it.
+    $referenced_news = $fixtures['referenced_news'];
+    $referenced_news->set('field_related_news', $branch_blog->id());
+    $referenced_news->getTranslation('es')->set('field_related_news', $branch_blog->id());
+    $referenced_news->save();
+
+    // Both of the blog_post object's own fields come back in the host language.
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'blog_post',
+          'field_blog_subtitle' => 'A catchy subtitle in Spanish',
+          'label' => 'A related blog post in Spanish',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures, 'es')->value,
+    );
+
+    // …and in English for an English host, so the assertion above is the
+    // language taking effect rather than the only translation there is.
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'blog_post',
+          'field_blog_subtitle' => 'A catchy subtitle',
+          'label' => 'A related blog post',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures, 'en')->value,
+    );
+  }
+
+  /**
    * Two fields each folding into a mixed object keep their leaves separate.
    *
    * A mixed object's leaves are keyed by their object property name, which is a
@@ -4174,17 +4269,24 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
    *
    * @param array{host_news: \Drupal\node\NodeInterface, component_id: string, source: \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent} $fixtures
    *   The fixtures from ::setUpContentEntityReferenceFixtures().
+   * @param string|null $host_langcode
+   *   The host translation to resolve against, which is what the reading
+   *   language is negotiated from; NULL for the host's default language.
    *
    * @return \Drupal\canvas\PropExpressions\StructuredData\EvaluationResult
    *   The resolved `news_item_reference` payload.
    */
-  private function resolveNewsItemReference(array $fixtures): EvaluationResult {
+  private function resolveNewsItemReference(array $fixtures, ?string $host_langcode = NULL): EvaluationResult {
     $node_storage = $this->container->get('entity_type.manager')->getStorage('node');
     $node_storage->resetCache();
     $host_id = $fixtures['host_news']->id();
     self::assertNotNull($host_id);
     $host = $node_storage->load($host_id);
     self::assertInstanceOf(NodeInterface::class, $host);
+    if ($host_langcode !== NULL) {
+      $host = $host->getTranslation($host_langcode);
+      self::assertInstanceOf(NodeInterface::class, $host);
+    }
     $rooted_item = $this->buildComponentTreeItem(
       $fixtures['component_id'],
       [
