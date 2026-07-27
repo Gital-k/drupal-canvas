@@ -81,6 +81,23 @@ examples:
     poster: https://example.com/600x400.png
 ```
 
+### Document
+
+Reference to a document object with metadata like filename, file size, and MIME
+type. Only the file URL is required to exist; all other metadata is always
+optional.
+
+```yaml
+type: object
+$ref: json-schema-definitions://canvas.module/document
+examples:
+  - src: https://example.com/annual-report.pdf
+    title: Annual report
+    filename: annual-report.pdf
+    filesize: 25600
+    mimetype: application/pdf
+```
+
 ### Boolean
 
 True or false value.
