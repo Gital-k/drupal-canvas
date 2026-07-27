@@ -43,6 +43,7 @@ use Drupal\editor\EditorInterface;
 use Drupal\filter\FilterFormatInterface;
 use Drupal\media\Entity\MediaType;
 use Drupal\media\MediaTypeInterface;
+use Drupal\media\Plugin\media\Source\File;
 use Drupal\media\Plugin\media\Source\Image;
 use Drupal\media\Plugin\media\Source\VideoFile;
 use Symfony\Component\Validator\Constraints\Hostname;
@@ -62,6 +63,8 @@ class ShapeMatchingHooks {
     JsonSchemaObjectRef::Image->value => Image::class,
     // @see \Drupal\media\Plugin\media\Source\VideoFile
     JsonSchemaObjectRef::Video->value => VideoFile::class,
+    // @see \Drupal\media\Plugin\media\Source\File
+    JsonSchemaObjectRef::Document->value => File::class,
   ];
 
   /**
@@ -407,10 +410,14 @@ class ShapeMatchingHooks {
    */
   private static function getMediaTypesForSource(string $media_source_class) : array {
     // Allow all MediaTypes that use the "image" MediaSource, for example.
+    // A MediaType whose source matches a more specific entry in
+    // SCHEMA_TO_MEDIA_SOURCE only matches that entry: VideoFile extends File,
+    // so video MediaTypes must not match the document shape.
     // @see \Drupal\media\Plugin\media\Source\Image
     $media_types = array_filter(
       MediaType::loadMultiple(),
       fn (MediaTypeInterface $type): bool => is_a($type->getSource(), $media_source_class)
+        && !self::hasMoreSpecificMediaSourceMapping($type, $media_source_class)
     );
     ksort($media_types);
     $media_type_ids = \array_map(
@@ -419,6 +426,27 @@ class ShapeMatchingHooks {
       $media_types
     );
     return array_combine($media_type_ids, $media_types);
+  }
+
+  /**
+   * Whether a MediaType's source maps to a subclass of the given source class.
+   *
+   * @param \Drupal\media\MediaTypeInterface $type
+   *   A media type.
+   * @param class-string $media_source_class
+   *   The MediaSource plugin class being matched.
+   *
+   * @return bool
+   */
+  private static function hasMoreSpecificMediaSourceMapping(MediaTypeInterface $type, string $media_source_class): bool {
+    foreach (self::SCHEMA_TO_MEDIA_SOURCE as $other_source_class) {
+      if ($other_source_class !== $media_source_class
+        && is_subclass_of($other_source_class, $media_source_class)
+        && is_a($type->getSource(), $other_source_class)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
   /**
@@ -448,6 +476,24 @@ class ShapeMatchingHooks {
         'src' => new ReferenceFieldPropExpression(
           new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
           new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
+        ),
+      ],
+      File::class => [
+        'src' => new ReferenceFieldPropExpression(
+          new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
+        ),
+        'filename' => new ReferenceFieldPropExpression(
+          new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', \NULL, 'value')
+        ),
+        'filesize' => new ReferenceFieldPropExpression(
+          new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filesize', \NULL, 'value')
+        ),
+        'mimetype' => new ReferenceFieldPropExpression(
+          new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', \NULL, 'value')
         ),
       ],
       default => throw new \InvalidArgumentException(\sprintf('%s is not a supported Media Source class for shape matching.', $media_source_class)),
