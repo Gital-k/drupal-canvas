@@ -164,11 +164,12 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
    * raw $inputs array at the exact nested position they were extracted from.
    *
    * Recursively walks the TMGMT data tree: at translatable leaves (#translate
-   * TRUE), returns NULL if the translation is empty or the ∅ sentinel (so
-   * setInput omits the key and Drupal falls back to the source), the
-   * translated string otherwise; at intermediate nodes, merges translated
-   * children back into the existing input array, preserving non-translated
-   * sibling keys.
+   * TRUE), returns NULL if the translation is the ∅ sentinel (so setInput
+   * omits the key and the default translation's value is rendered), the
+   * translated string otherwise — including the empty string, which is a
+   * valid, explicitly empty translation; at intermediate nodes, merges
+   * translated children back into the existing input array, preserving
+   * non-translated sibling keys.
    *
    * @param array $tmgmt_data
    *   TMGMT data node, e.g. ['#text' => ..., '#translation' => [...], ...].
@@ -186,9 +187,10 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
       \assert(\array_key_exists('#text', $tmgmt_data['#translation']));
       $found = TRUE;
       $text = $tmgmt_data['#translation']['#text'];
-      // Returning NULL causes setInput's array_filter to omit the key, so
-      // Drupal's standard translation fallback applies at render time.
-      if ($text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL || $text === '') {
+      // The sentinel means "fall back to the default translation": returning
+      // NULL causes setInput's array_filter to omit the key. An empty string
+      // is a valid, explicitly empty translation and is stored as-is.
+      if ($text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL) {
         return NULL;
       }
       return $text;
@@ -207,7 +209,7 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
         }
       }
     }
-    // If every translatable leaf in this subtree resolved to NULL (empty or
+    // If every translatable leaf in this subtree resolved to NULL (the ∅
     // sentinel), return NULL for the whole composite input so setInput's
     // array_filter omits the key entirely and the default value shows instead.
     // This handles compound inputs such as text_format (value + format).

@@ -266,16 +266,21 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
   }
 
   /**
-   * Tests the ∅-placeholder acceptance criteria for content translation.
+   * Tests empty-field translation semantics on the TMGMT review form.
    *
-   * AC1: Source has value "Welcome", translation cleared → field falls back to
-   *      the source value ("Welcome") at render time; ∅ must never be stored.
-   * AC2: Source has value, real translation provided → translated value stored.
-   * AC3: Source is empty (∅ placeholder shown), translator leaves/clears it →
-   *      field must render the source value (also empty); ∅ must never be
-   *      stored in the translation inputs.
-   * AC4: Source is empty (∅ placeholder shown), translator provides "Bonjour"
-   *      → "Bonjour" is stored and renders; source field remains empty.
+   * The ∅ sentinel is internal only and must never be visible to translators.
+   * Each component_tree row gets a "Fallback to default translation" checkbox:
+   *
+   * AC1: Source has value "Welcome", fallback checked → the default
+   *      translation's value ("Welcome") is rendered; ∅ must never be stored.
+   * AC2: Source has value, real translation provided → translated value
+   *      stored.
+   * AC3: Source is empty, fallback checked → field renders the source value
+   *      (also empty); ∅ must never be stored in the translation inputs.
+   * AC4: Source is empty, translator provides "Bonjour" → "Bonjour" is stored
+   *      and renders; source field remains empty.
+   * AC5: Source has value "Sub", fallback unchecked, translation left blank →
+   *      an explicitly empty string is stored (NOT the source value).
    */
   public function testEmptySetPlaceholderBehavior(): void {
     $module_installer = $this->container->get(ModuleInstallerInterface::class);
@@ -296,9 +301,10 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
           'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'heading' => 'Welcome',
+            // AC5: non-empty source that will be explicitly emptied in French.
+            'subheading' => 'Sub',
             'cta1href' => ['uri' => 'https://example.com', 'options' => []],
             'cta2' => 'Learn more',
-            // Subheading intentionally absent → ∅ placeholder in TMGMT form.
           ],
         ],
         [
@@ -334,33 +340,56 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     $assert = $this->assertSession();
     $assert->statusCodeEquals(200);
 
-    // The ∅ placeholder must be visible in the TMGMT source column for empty
-    // source inputs (label, name, subheading), confirming they are offered
-    // for translation.
-    $assert->pageTextContains('∅');
-
     $hero_delta = 0;
     $block_delta = 1;
 
+    // The ∅ sentinel must never be visible in the source column. Empty source
+    // inputs (label, name) show an explanatory message instead of a textarea,
+    // confirming they are still offered for translation.
+    // (The translation column may contain ∅ here because tmgmt_test's dummy
+    // translator prefixes the raw source text; real stored sentinels are
+    // blanked by tmgmtDataItemTextOutputAlter and never shown.)
+    $page = $this->getSession()->getPage();
+    $source_cells = $page->findAll('css', 'td.tmgmt-ui-data-item-source');
+    self::assertNotEmpty($source_cells);
+    foreach ($source_cells as $source_cell) {
+      self::assertStringNotContainsString('∅', $source_cell->getText());
+    }
+    $assert->pageTextContains('This field is empty in the source language.');
+
+    // Every component_tree row has a fallback checkbox.
+    $assert->fieldExists("components|{$hero_delta}|heading[below][canvas_fallback]");
+    $assert->fieldExists("components|{$block_delta}|label[below][canvas_fallback]");
+
     $translations = [
-      // AC1: clear heading — no translation provided; must fall back to source.
+      // AC1: fallback checked — the default translation's value is rendered.
+      "components|{$hero_delta}|heading[below][canvas_fallback]" => TRUE,
       "components|{$hero_delta}|heading[translation]" => '',
       // AC2: real French translation for a non-empty source field.
       "components|{$hero_delta}|cta2[translation]" => 'En savoir plus',
-      // Subheading is optional and absent in source (shown as ∅); clear it.
+      // AC5: fallback unchecked, blank — an explicitly empty translation.
+      "components|{$hero_delta}|subheading[below][canvas_fallback]" => FALSE,
       "components|{$hero_delta}|subheading[translation]" => '',
       // Override auto-prefixed URI to keep it valid.
       "components|{$hero_delta}|cta1href|uri[translation]" => 'https://fr.example.com',
-      // AC3: label source is empty (∅); re-submit ∅ — must not be stored.
-      "components|{$block_delta}|label[translation]" => '∅',
-      // AC4: name source is empty (∅); provide a real French value.
+      // AC3: label source is empty; fallback checked — must stay empty and ∅
+      // must never be stored.
+      "components|{$block_delta}|label[below][canvas_fallback]" => TRUE,
+      "components|{$block_delta}|label[translation]" => '',
+      // AC4: name source is empty; provide a real French value.
+      "components|{$block_delta}|name[below][canvas_fallback]" => FALSE,
       "components|{$block_delta}|name[translation]" => 'Bonjour',
     ];
 
     // Validate must behave consistently with "Save as completed": no
-    // component_tree empty-field error for intentional fallback semantics.
+    // component_tree empty-field error for blank (explicitly empty) or
+    // fallback rows.
     $this->submitForm($translations, 'Validate');
     $assert->pageTextNotContains('The field is empty.');
+    $assert->pageTextContains('Validation completed successfully.');
+    // The masking of empty translations for TMGMT's validation must never
+    // leak the sentinel into the re-rendered textareas.
+    $assert->fieldValueEquals("components|{$hero_delta}|subheading[translation]", '');
 
     $this->submitForm($translations, 'Save as completed');
     $assert->pageTextContains(\sprintf('The translation for %s has been accepted', $canvas_page->label()));
@@ -374,10 +403,10 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     self::assertNotNull($hero_item);
     $hero_inputs = $hero_item->getInputs();
 
-    // AC1: heading translation was cleared → synchronizer falls back to the
-    // source value, so "Welcome" is present in the rendered translation.
+    // AC1: fallback checked → the input key was dropped and refilled from the
+    // default translation, so "Welcome" is rendered in French.
     self::assertSame('Welcome', $hero_inputs['heading'] ?? NULL,
-      'AC1: Cleared translation must fall back to the source value.'
+      'AC1: Fallback must render the default translation value.'
     );
 
     // AC2: real translation stored verbatim.
@@ -385,20 +414,26 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
       'AC2: Provided translation must be stored verbatim.'
     );
 
+    // AC5: fallback unchecked, blank translation → explicitly empty string is
+    // stored, NOT the source value ("Sub").
+    self::assertSame('', $hero_inputs['subheading'] ?? NULL,
+      'AC5: A blank non-fallback translation must be stored as an explicitly empty string.'
+    );
+
     $block_item = $fr_tree->getComponentTreeItemByUuid($uuid_block);
     self::assertNotNull($block_item);
     $block_inputs = $block_item->getInputs();
 
-    // AC3: label source was empty (∅); translator submitted ∅ unchanged →
-    // synchronizer falls back to source value (empty string); ∅ never stored.
+    // AC3: label source was empty and fallback was checked → falls back to
+    // the source value (empty string); ∅ never stored.
     self::assertSame('', $block_inputs['label'] ?? NULL,
-      'AC3: Empty-source field with no translation must render the source value (empty string).'
+      'AC3: Empty-source field with fallback checked must render the source value (empty string).'
     );
-    foreach ($block_inputs as $key => $value) {
+    foreach ($hero_inputs + $block_inputs as $key => $value) {
       self::assertNotSame(
         '∅',
         $value,
-        "AC3/AC4: The ∅ sentinel must never appear as a stored input value (key: $key)."
+        "The ∅ sentinel must never appear as a stored input value (key: $key)."
       );
     }
 

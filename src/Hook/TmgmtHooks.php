@@ -9,11 +9,13 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Tmgmt\ComponentInputsConfigProcessor;
 use Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor;
 use Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor;
+use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityFormInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\Render\Element;
 use Drupal\tmgmt\JobItemInterface;
 
 /**
@@ -63,41 +65,29 @@ final readonly class TmgmtHooks {
   /**
    * Implements hook_tmgmt_data_item_text_output_alter().
    *
-   * The source column intentionally retains ∅ so translators can see that the
-   * original field was empty and they may optionally provide a translation.
+   * Blanks the ∅ sentinel out of both review form columns. The sentinel is an
+   * internal marker only (TMGMT's Data::flatten() strips empty strings, so
+   * extraction must produce a non-empty #text for empty source inputs); it
+   * must never be shown to translators. With an empty $source_text, TMGMT
+   * builds no source textarea at all, and formTmgmtJobItemEditFormAlter()
+   * replaces it with an explanatory message.
    *
    * @param string $source_text
-   *   The source text to display, passed by reference (left unchanged).
+   *   The source text to display, passed by reference.
    * @param string $translation_text
    *   The translation text to display, passed by reference.
    * @param array<string, mixed> $context
    *   Context including 'data_item' and 'job_item'.
+   *
+   * @see \Drupal\tmgmt\Form\JobItemForm::buildSource()
    */
   #[Hook('tmgmt_data_item_text_output_alter')]
   public static function tmgmtDataItemTextOutputAlter(string &$source_text, string &$translation_text, array $context): void {
     if (!self::isCanvasPageJobItemContext($context)) {
       return;
     }
-    if ($translation_text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL) {
-      $translation_text = '';
-    }
-  }
-
-  /**
-   * Implements hook_tmgmt_data_item_text_input_alter().
-   *
-   * Converts the ∅ sentinel back to an empty string before TMGMT stores it
-   * as #translation['#text'] in the job item data.
-   *
-   * @param string $translation_text
-   *   The translation text submitted from the form, passed by reference.
-   * @param array<string, mixed> $context
-   *   Context including 'data_item' (the TMGMT data item) and 'job_item'.
-   */
-  #[Hook('tmgmt_data_item_text_input_alter')]
-  public static function tmgmtDataItemTextInputAlter(string &$translation_text, array $context): void {
-    if (!self::isCanvasPageJobItemContext($context)) {
-      return;
+    if ($source_text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL) {
+      $source_text = '';
     }
     if ($translation_text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL) {
       $translation_text = '';
@@ -122,125 +112,257 @@ final readonly class TmgmtHooks {
   /**
    * Implements hook_form_tmgmt_job_item_edit_form_alter().
    *
-   * Appends a validator to TMGMT validation actions that clears empty
-   * component_tree translation errors.
-   *
-   * This is scoped strictly to component_tree fields to avoid suppressing
-   * legitimate "field is empty" errors on required non-canvas fields (e.g.
-   * node title).
+   * For every component_tree row on the TMGMT review form:
+   * - Adds a "Fallback to default translation" checkbox. Checked, the row's
+   *   input key is dropped from the translation, so the default translation's
+   *   value is rendered. Unchecked, an empty textarea stores an explicitly
+   *   empty string and any other text is stored verbatim.
+   * - Replaces the (absent) source textarea of inputs that are empty in the
+   *   source language with an explanatory message.
+   * - Wires validation handlers that convert the checkbox to the internal ∅
+   *   sentinel and temporarily mask empty translations so TMGMT's
+   *   "The field is empty." validation never fires for component_tree rows.
    *
    * @param array<string, mixed> $form
    *   The form array.
    * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The form state.
+   *
+   * @see \Drupal\tmgmt\Form\JobItemForm::validateJobItem()
+   * @see \Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor::setTranslations()
    */
   #[Hook('form_tmgmt_job_item_edit_form_alter')]
   public static function formTmgmtJobItemEditFormAlter(array &$form, FormStateInterface $form_state): void {
-    if (isset($form['actions']['accept'])) {
-      $form['actions']['accept']['#validate'][] = [self::class, 'clearEmptyComponentTreeTranslationErrors'];
-    }
-    if (isset($form['actions']['validate'])) {
-      $form['actions']['validate']['#validate'][] = [self::class, 'clearEmptyComponentTreeTranslationErrors'];
-    }
-  }
-
-  /**
-   * Form validate callback: clears empty-translation errors for component_tree.
-   *
-   * Runs after TMGMT's ::validateJobItem and clears empty-translation errors
-   * that belong to component_tree field translations where an empty value is
-   * intentional. Errors on other field types (e.g. node title, body) are
-   * preserved unchanged.
-   *
-   * @param array<string, mixed> $form
-   *   The form array.
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The form state.
-   */
-  public static function clearEmptyComponentTreeTranslationErrors(array &$form, FormStateInterface $form_state): void {
-    if (!$form_state->hasAnyErrors()) {
-      return;
-    }
-
     $form_object = $form_state->getFormObject();
     if (!$form_object instanceof EntityFormInterface) {
       return;
     }
-
-    /** @var \Drupal\tmgmt\JobItemInterface $item */
     $item = $form_object->getEntity();
-
-    // Collect the names of all component_tree fields on the source entity so
-    // we can limit error clearing strictly to those fields.
-    $component_tree_field_names = [];
-    if ($item->getPlugin() === 'content') {
-      $entity_type_id = $item->getItemType();
-      $entity = \Drupal::entityTypeManager()
-        ->getStorage($entity_type_id)
-        ->load($item->getItemId());
-      if ($entity instanceof FieldableEntityInterface) {
-        foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
-          if ($definition->getType() === ComponentTreeItem::PLUGIN_ID) {
-            $component_tree_field_names[] = $field_name;
-          }
-        }
-      }
+    if (!$item instanceof JobItemInterface) {
+      return;
     }
-
-    if (empty($component_tree_field_names)) {
+    $component_tree_field_names = self::getComponentTreeFieldNames($item);
+    if ($component_tree_field_names === []) {
       return;
     }
 
-    $errors = $form_state->getErrors();
-    $form_state->clearErrors();
+    $row_paths = self::getComponentTreeRowPaths($form, $component_tree_field_names);
+    if ($row_paths === []) {
+      return;
+    }
+    // Persisted for the validate callbacks below; recomputed on every (re)build
+    // of the form.
+    $form_state->set('canvas_component_tree_row_paths', $row_paths);
 
-    foreach ($errors as $element_path => $message) {
-      // Error paths from validateJobItem look like:
-      // "components|0|heading][translation"
-      // Strip "][translation" to get the form values key.
-      $field_key = (string) preg_replace('/\]\[translation$/', '', $element_path);
+    /** @var \Drupal\tmgmt\Data $data_service */
+    $data_service = \Drupal::service('tmgmt.data');
+    foreach ($row_paths as [$group_key, $parent_key, $field_key]) {
+      $row = &$form['review'][$group_key][$parent_key][$field_key];
+      $data_item = $item->getData($data_service->ensureArrayKey($field_key));
 
-      if (!self::isTmgmtEmptyTranslationErrorPath($field_key, $form_state)) {
-        $form_state->setErrorByName($element_path, $message);
-        continue;
+      // tmgmtDataItemTextOutputAlter() blanked the sentinel, so TMGMT built no
+      // source element for this row; show why instead of an empty cell.
+      // @see \Drupal\tmgmt\Form\JobItemForm::buildSource()
+      if (($data_item['#text'] ?? '') === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL && !isset($row['source'])) {
+        $row['source'] = [
+          '#type' => 'item',
+          '#markup' => t('This field is empty in the source language.'),
+        ];
       }
 
-      // Check the key belongs to a component_tree field by matching its prefix
-      // against the known component_tree field names on this entity.
-      $is_component_tree_field = FALSE;
-      foreach ($component_tree_field_names as $field_name) {
-        if ($field_key === $field_name || str_starts_with($field_key, $field_name . '|')) {
-          $is_component_tree_field = TRUE;
-          break;
-        }
+      // Default to fallback when no real translation is stored yet.
+      $stored_translation = $data_item['#translation']['#text'] ?? '';
+      // The 'below' container renders in a second table row spanning the
+      // source and translation columns.
+      // @see tmgmt-data-items-form.html.twig
+      $row['below']['canvas_fallback'] = [
+        '#type' => 'checkbox',
+        '#title' => t('Fallback to default translation'),
+        '#default_value' => $stored_translation === '' || $stored_translation === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL,
+      ];
+      if (isset($row['translation'])) {
+        $row['translation']['#description'] = t('Leave empty to store an empty translation.');
+        $row['translation']['#states']['disabled'] = [
+          ':input[name="' . $field_key . '[below][canvas_fallback]"]' => ['checked' => TRUE],
+        ];
       }
+      unset($row);
+    }
 
-      if (!$is_component_tree_field) {
-        $form_state->setErrorByName($element_path, $message);
+    // The accept ("Save as completed") and validate buttons run TMGMT's
+    // ::validateJobItem, which errors on empty translations. Mask empty
+    // component_tree translations with the sentinel before it runs and unmask
+    // afterwards (so a validation error elsewhere on the form never re-renders
+    // the sentinel in a textarea). ::validateJobItem reads #value from $form
+    // while ::save() reads $form_state values, so the mask is invisible to
+    // what gets saved.
+    // @see \Drupal\tmgmt\Form\JobItemForm::actions()
+    foreach (['accept', 'validate'] as $button) {
+      if (isset($form['actions'][$button]['#validate'])) {
+        \array_unshift(
+          $form['actions'][$button]['#validate'],
+          [self::class, 'convertFallbackToSentinel'],
+          [self::class, 'maskEmptyComponentTreeTranslations'],
+        );
+        $form['actions'][$button]['#validate'][] = [self::class, 'unmaskEmptyComponentTreeTranslations'];
+      }
+    }
+    // Buttons without their own #validate (e.g. "Save", the per-row review
+    // toggles) run the form-level handlers instead; the checkbox must be
+    // honored on those paths too.
+    $form['#validate'][] = [self::class, 'convertFallbackToSentinel'];
+  }
+
+  /**
+   * Form validate callback: converts checked fallback checkboxes to ∅.
+   *
+   * Overwrites the submitted translation value with the internal sentinel for
+   * every component_tree row whose "Fallback to default translation" checkbox
+   * is checked. TMGMT then stores the sentinel in the job item data, and
+   * ComponentTreeFieldProcessor::setTranslations() drops the input key so the
+   * default translation's value is rendered.
+   *
+   * @param array<string, mixed> $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   */
+  public static function convertFallbackToSentinel(array &$form, FormStateInterface $form_state): void {
+    foreach ($form_state->get('canvas_component_tree_row_paths') ?? [] as [, , $field_key]) {
+      if (!$form_state->getValue([$field_key, 'below', 'canvas_fallback'])) {
         continue;
+      }
+      $value = $form_state->getValue([$field_key, 'translation']);
+      if (\is_array($value) && \array_key_exists('value', $value)) {
+        // Rich text (text_format): the text lives in translation[value].
+        $form_state->setValue([$field_key, 'translation', 'value'], ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL);
+      }
+      elseif (!\is_array($value)) {
+        $form_state->setValue([$field_key, 'translation'], ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL);
       }
     }
   }
 
   /**
-   * Checks whether the form path currently resolves to an empty translation.
+   * Form validate callback: masks empty component_tree translations with ∅.
    *
-   * Mirrors TMGMT's validateJobItem() empty check.
+   * Runs before TMGMT's ::validateJobItem, which reads the translation from
+   * $form[...]['translation']['#value'] and errors on empty values. Empty
+   * component_tree translations are valid (explicitly empty, or fallback via
+   * the checkbox), so they are temporarily set to the non-empty sentinel.
+   * ::save() reads $form_state values, never these #value keys, so the mask
+   * cannot leak into saved data.
+   *
+   * @param array<string, mixed> $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
    */
-  private static function isTmgmtEmptyTranslationErrorPath(string $field_key, FormStateInterface $form_state): bool {
-    $value = $form_state->getValue($field_key);
-    if (!\is_array($value)) {
-      $data_key = \Drupal::service('tmgmt.data')->ensureArrayKey($field_key);
-      $value = $form_state->getValue($data_key);
+  public static function maskEmptyComponentTreeTranslations(array &$form, FormStateInterface $form_state): void {
+    $masked = [];
+    foreach ($form_state->get('canvas_component_tree_row_paths') ?? [] as [$group_key, $parent_key, $field_key]) {
+      $translation = &$form['review'][$group_key][$parent_key][$field_key]['translation'];
+      // Rich text (text_format) is expanded to translation[value] during form
+      // processing; plain text is the textarea itself.
+      $value_path = isset($translation['value']) && \is_array($translation['value'])
+        ? ['value', '#value']
+        : ['#value'];
+      $value = NestedArray::getValue($translation, $value_path);
+      if ($value === '' || $value === NULL) {
+        NestedArray::setValue($translation, $value_path, ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL);
+        $masked[] = [$group_key, $parent_key, $field_key, 'translation', ...$value_path];
+      }
+      unset($translation);
     }
-    if (!\is_array($value) || !\array_key_exists('translation', $value)) {
-      return FALSE;
-    }
+    $form_state->set('canvas_tmgmt_masked_paths', $masked);
+  }
 
-    // Rich text uses translation[value], plain text uses translation directly.
-    $translation = $value['translation'];
-    $text = \is_array($translation) ? ($translation['value'] ?? NULL) : $translation;
-    return empty($text);
+  /**
+   * Form validate callback: restores masked empty translations.
+   *
+   * Runs after TMGMT's ::validateJobItem. Without this, a validation error
+   * elsewhere on the form (e.g. an empty required field of another type) would
+   * re-render the form with the sentinel visible in the masked textareas.
+   *
+   * @param array<string, mixed> $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   */
+  public static function unmaskEmptyComponentTreeTranslations(array &$form, FormStateInterface $form_state): void {
+    foreach ($form_state->get('canvas_tmgmt_masked_paths') ?? [] as $path) {
+      NestedArray::setValue($form['review'], $path, '');
+    }
+    $form_state->set('canvas_tmgmt_masked_paths', []);
+  }
+
+  /**
+   * Gets the component_tree field names on a content job item's source entity.
+   *
+   * @param \Drupal\tmgmt\JobItemInterface $item
+   *   The TMGMT job item.
+   *
+   * @return list<string>
+   *   The component_tree field names; empty if the job item is not a content
+   *   job item or its entity has no component_tree fields.
+   */
+  private static function getComponentTreeFieldNames(JobItemInterface $item): array {
+    if ($item->getPlugin() !== 'content') {
+      return [];
+    }
+    $entity_type_manager = \Drupal::entityTypeManager();
+    if (!$entity_type_manager->hasDefinition($item->getItemType())) {
+      return [];
+    }
+    $entity = $entity_type_manager->getStorage($item->getItemType())->load($item->getItemId());
+    if (!$entity instanceof FieldableEntityInterface) {
+      return [];
+    }
+    $field_names = [];
+    foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
+      if ($definition->getType() === ComponentTreeItem::PLUGIN_ID) {
+        $field_names[] = $field_name;
+      }
+    }
+    return $field_names;
+  }
+
+  /**
+   * Finds the review form rows that belong to component_tree fields.
+   *
+   * @param array<string, mixed> $form
+   *   The form array.
+   * @param list<string> $component_tree_field_names
+   *   The component_tree field names on the source entity.
+   *
+   * @return list<array{string, string, string}>
+   *   [group key, parent key, field key] paths under $form['review'], where
+   *   the field key is the '|'-joined flattened TMGMT data key (e.g.
+   *   "components|0|heading").
+   *
+   * @see \Drupal\tmgmt\Form\JobItemForm::reviewFormElement()
+   */
+  private static function getComponentTreeRowPaths(array $form, array $component_tree_field_names): array {
+    $paths = [];
+    if (!isset($form['review'])) {
+      return [];
+    }
+    foreach (Element::children($form['review']) as $group_key) {
+      foreach (Element::children($form['review'][$group_key]) as $parent_key) {
+        foreach (Element::children($form['review'][$group_key][$parent_key]) as $field_key) {
+          if (!isset($form['review'][$group_key][$parent_key][$field_key]['translation'])) {
+            continue;
+          }
+          foreach ($component_tree_field_names as $field_name) {
+            if ($field_key === $field_name || \str_starts_with((string) $field_key, $field_name . '|')) {
+              $paths[] = [(string) $group_key, (string) $parent_key, (string) $field_key];
+              break;
+            }
+          }
+        }
+      }
+    }
+    return $paths;
   }
 
 }
