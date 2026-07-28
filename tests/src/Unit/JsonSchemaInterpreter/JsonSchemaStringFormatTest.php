@@ -47,15 +47,16 @@ final class JsonSchemaStringFormatTest extends UnitTestCase {
         'PrimitiveType',
       ],
     ];
-    yield 'wildcard contentMediaType without x-allowed-schemes falls through to the default branch' => [
+    yield 'wildcard contentMediaType without x-allowed-schemes keeps the media type requirement' => [
       [
         'type' => 'string',
         'format' => 'uri',
         'contentMediaType' => 'image/*',
       ],
       [
-        'PrimitiveType',
+        UriTargetMediaTypeConstraint::PLUGIN_ID,
         UriConstraint::PLUGIN_ID,
+        'PrimitiveType',
       ],
     ];
     yield 'non-wildcard contentMediaType uses the default branch' => [
