@@ -170,20 +170,24 @@ final readonly class TmgmtHooks {
         ];
       }
 
-      // Default to fallback when no real translation is stored yet.
-      $stored_translation = $data_item['#translation']['#text'] ?? '';
-      // The 'below' container renders in a second table row spanning the
-      // source and translation columns.
+      // Wrap the plain translation textarea so the checkbox renders directly
+      // below it, inside the translation column (the row template renders a
+      // fixed set of keys, so a sibling key would not be shown). The resulting
+      // translation[value] structure matches TMGMT's text_format shape, which
+      // ::validateJobItem() and ::save() already handle.
       // @see tmgmt-data-items-form.html.twig
-      $row['below']['canvas_fallback'] = [
-        '#type' => 'checkbox',
-        '#title' => t('Fallback to default translation'),
-        '#default_value' => $stored_translation === '' || $stored_translation === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL,
-      ];
-      if (isset($row['translation'])) {
-        $row['translation']['#description'] = t('Leave empty to store an empty translation.');
-        $row['translation']['#states']['disabled'] = [
-          ':input[name="' . $field_key . '[below][canvas_fallback]"]' => ['checked' => TRUE],
+      // @see \Drupal\tmgmt\Form\JobItemForm::buildTranslation()
+      if (($row['translation']['#type'] ?? '') === 'textarea') {
+        $textarea = $row['translation'];
+        $textarea['#states']['disabled'] = [
+          ':input[name="' . $field_key . '[translation][canvas_fallback]"]' => ['checked' => TRUE],
+        ];
+        $row['translation'] = [
+          'value' => $textarea,
+          'canvas_fallback' => [
+            '#type' => 'checkbox',
+            '#title' => t('Fallback to default translation'),
+          ],
         ];
       }
       unset($row);
@@ -229,17 +233,10 @@ final readonly class TmgmtHooks {
    */
   public static function convertFallbackToSentinel(array &$form, FormStateInterface $form_state): void {
     foreach ($form_state->get('canvas_component_tree_row_paths') ?? [] as [, , $field_key]) {
-      if (!$form_state->getValue([$field_key, 'below', 'canvas_fallback'])) {
+      if (!$form_state->getValue([$field_key, 'translation', 'canvas_fallback'])) {
         continue;
       }
-      $value = $form_state->getValue([$field_key, 'translation']);
-      if (\is_array($value) && \array_key_exists('value', $value)) {
-        // Rich text (text_format): the text lives in translation[value].
-        $form_state->setValue([$field_key, 'translation', 'value'], ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL);
-      }
-      elseif (!\is_array($value)) {
-        $form_state->setValue([$field_key, 'translation'], ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL);
-      }
+      $form_state->setValue([$field_key, 'translation', 'value'], ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL);
     }
   }
 
