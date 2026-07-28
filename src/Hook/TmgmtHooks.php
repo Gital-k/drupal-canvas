@@ -218,26 +218,6 @@ final readonly class TmgmtHooks {
         $form_state->setErrorByName($element_path, $message);
         continue;
       }
-
-      // Within component_tree fields, only drop the error when:
-      // - Source is the ∅ sentinel: empty optional input; translator
-      //   did not provide a value — field stays absent in the translation.
-      // - Source has a real non-empty value: translator cleared the
-      //   translation — field stays absent so Drupal falls back to source.
-      $data_key = \Drupal::service('tmgmt.data')->ensureArrayKey($field_key);
-      $data_item = $item->getData($data_key);
-
-      if (!isset($data_item['#text'])) {
-        $form_state->setErrorByName($element_path, $message);
-        continue;
-      }
-
-      $source_text = $data_item['#text'];
-      if ($source_text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL || $source_text !== '') {
-        continue;
-      }
-
-      $form_state->setErrorByName($element_path, $message);
     }
   }
 
