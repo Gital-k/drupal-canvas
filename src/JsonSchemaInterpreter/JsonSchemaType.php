@@ -479,11 +479,13 @@ enum JsonSchemaType: string {
                 new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', NULL, 'value'),
               ),
             ]),
-            // This extension list intentionally differs from the one in core's
-            // `media.type.document` source field: it targets common document
-            // formats rather than every text-like format.
+            // Core's `media.type.document` source field extension list, minus
+            // `txt`: every retained extension maps to the `application` MIME
+            // media type, while `txt` maps to `text/plain`, and shape matching
+            // requires a single media type per field. Modules can widen this
+            // list via hook_canvas_storable_prop_shape_alter().
             // @see https://git.drupalcode.org/project/canvas/-/work_items/3524130#note_1678367
-            fieldInstanceSettings: ['file_extensions' => 'pdf doc docx xls xlsx ppt pptm pptx key ai indd'],
+            fieldInstanceSettings: ['file_extensions' => 'rtf doc docx ppt pptx xls xlsx pdf odf odg odp ods odt fodt fods fodp fodg key numbers pages'],
           ),
           default => NULL,
         },

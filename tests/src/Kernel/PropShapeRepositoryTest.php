@@ -406,7 +406,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
             new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', NULL, 'value'),
           ),
         ]),
-        fieldInstanceSettings: ['file_extensions' => 'pdf doc docx xls xlsx ppt pptm pptx key ai indd'],
+        fieldInstanceSettings: ['file_extensions' => 'rtf doc docx ppt pptx xls xlsx pdf odf odg odp ods odt fodt fods fodp fodg key numbers pages'],
         fieldWidget: 'file_generic',
       ),
       'type=string&$ref=json-schema-definitions://canvas.module/heading-element' => new StorablePropShape(
