@@ -144,12 +144,12 @@ final readonly class TmgmtHooks {
   }
 
   /**
-   * Form validate callback: clears "field is empty" errors for component_tree.
+   * Form validate callback: clears empty-translation errors for component_tree.
    *
-   * Runs after TMGMT's ::validateJobItem and clears "The field is empty."
-   * errors that belong to component_tree field translations where an empty
-   * value is intentional. Errors on other field types (e.g.
-   * node title, body) are preserved unchanged.
+   * Runs after TMGMT's ::validateJobItem and clears empty-translation errors
+   * that belong to component_tree field translations where an empty value is
+   * intentional. Errors on other field types (e.g. node title, body) are
+   * preserved unchanged.
    *
    * @param array<string, mixed> $form
    *   The form array.
@@ -194,15 +194,15 @@ final readonly class TmgmtHooks {
     $form_state->clearErrors();
 
     foreach ($errors as $element_path => $message) {
-      if ((string) $message !== (string) t('The field is empty.')) {
-        $form_state->setErrorByName($element_path, $message);
-        continue;
-      }
-
       // Error paths from validateJobItem look like:
       // "components|0|heading][translation"
       // Strip "][translation" to get the form values key.
       $field_key = (string) preg_replace('/\]\[translation$/', '', $element_path);
+
+      if (!self::isTmgmtEmptyTranslationErrorPath($field_key, $form_state)) {
+        $form_state->setErrorByName($element_path, $message);
+        continue;
+      }
 
       // Check the key belongs to a component_tree field by matching its prefix
       // against the known component_tree field names on this entity.
@@ -239,6 +239,27 @@ final readonly class TmgmtHooks {
 
       $form_state->setErrorByName($element_path, $message);
     }
+  }
+
+  /**
+   * Checks whether the form path currently resolves to an empty translation.
+   *
+   * Mirrors TMGMT's validateJobItem() empty check.
+   */
+  private static function isTmgmtEmptyTranslationErrorPath(string $field_key, FormStateInterface $form_state): bool {
+    $value = $form_state->getValue($field_key);
+    if (!\is_array($value)) {
+      $data_key = \Drupal::service('tmgmt.data')->ensureArrayKey($field_key);
+      $value = $form_state->getValue($data_key);
+    }
+    if (!\is_array($value) || !\array_key_exists('translation', $value)) {
+      return FALSE;
+    }
+
+    // Rich text uses translation[value], plain text uses translation directly.
+    $translation = $value['translation'];
+    $text = \is_array($translation) ? ($translation['value'] ?? NULL) : $translation;
+    return empty($text);
   }
 
 }
