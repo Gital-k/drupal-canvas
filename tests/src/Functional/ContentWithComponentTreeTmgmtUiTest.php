@@ -342,7 +342,7 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     $hero_delta = 0;
     $block_delta = 1;
 
-    $this->submitForm([
+    $translations = [
       // AC1: clear heading — no translation provided; must fall back to source.
       "components|{$hero_delta}|heading[translation]" => '',
       // AC2: real French translation for a non-empty source field.
@@ -355,7 +355,14 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
       "components|{$block_delta}|label[translation]" => '∅',
       // AC4: name source is empty (∅); provide a real French value.
       "components|{$block_delta}|name[translation]" => 'Bonjour',
-    ], 'Save as completed');
+    ];
+
+    // Validate must behave consistently with "Save as completed": no
+    // component_tree empty-field error for intentional fallback semantics.
+    $this->submitForm($translations, 'Validate');
+    $assert->pageTextNotContains('The field is empty.');
+
+    $this->submitForm($translations, 'Save as completed');
     $assert->pageTextContains(\sprintf('The translation for %s has been accepted', $canvas_page->label()));
 
     $canvas_page = Page::load($page_id);
