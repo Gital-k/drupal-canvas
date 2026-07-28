@@ -405,6 +405,18 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
       "components|{$block_delta}|name[translation][value]" => 'Bonjour',
     ];
 
+    // The fallback choice must survive a plain "Save" and a fresh page load:
+    // checked rows store the internal sentinel, and the checkbox re-checks
+    // from it; unchecked rows must stay unchecked.
+    $this->submitForm($translations, 'Save');
+    $this->drupalGet('admin/tmgmt/items/' . $job_item->id());
+    $assert->checkboxChecked("components|{$hero_delta}|heading[translation][canvas_fallback]");
+    $assert->checkboxChecked("components|{$block_delta}|label[translation][canvas_fallback]");
+    $assert->checkboxNotChecked("components|{$hero_delta}|subheading[translation][canvas_fallback]");
+    $assert->checkboxNotChecked("components|{$block_delta}|name[translation][canvas_fallback]");
+    // The sentinel stored by the fallback conversion is never rendered.
+    $assert->fieldValueEquals("components|{$hero_delta}|heading[translation][value]", '');
+
     // Validate must behave consistently with "Save as completed": no
     // component_tree empty-field error for blank (explicitly empty) or
     // fallback rows.

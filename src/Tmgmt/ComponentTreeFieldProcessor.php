@@ -8,6 +8,7 @@ use Drupal\canvas\Config\Schema\ComponentInputsMapping;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Render\Element;
 use Drupal\tmgmt_content\DefaultFieldProcessor;
@@ -114,8 +115,7 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
       $item = $field->offsetGet($delta);
       \assert($item instanceof ComponentTreeItem);
 
-      $source_inputs = $item->getInputs() ?? [];
-      $inputs = $source_inputs;
+      $inputs = $item->getInputs() ?? [];
 
       $changed = FALSE;
       foreach (Element::children($item_data) as $prop_key) {
@@ -138,19 +138,49 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
           // $inputs filtered to schema keys only.
           \array_intersect_key($inputs, \array_flip($config_schema_order)),
         );
-        // For keys where the translation was cleared (NULL) but the source
-        // had a value, restore the source value.
-        // Optional props absent in both source and translation remain NULL
+        // Keys resolved to NULL (the ∅ fallback sentinel) are refilled from
+        // the default translation — NOT from this translation's previous
+        // inputs, so checking fallback on a previously translated prop shows
+        // the default value. This must happen here rather than at save time:
+        // FieldItemList::preSave() enforces required props before
+        // content_translation's synchronizer could refill a dropped key.
+        // Optional props absent in the default translation too remain NULL
         // and are filtered out below.
+        $default_inputs = self::defaultTranslationInputs($field, $delta);
         foreach ($inputs_in_schema_order as $key => $value) {
-          if ($value === NULL && isset($source_inputs[$key])) {
-            $inputs_in_schema_order[$key] = $source_inputs[$key];
+          if ($value === NULL && isset($default_inputs[$key])) {
+            $inputs_in_schema_order[$key] = $default_inputs[$key];
           }
         }
         // Write only non-NULL (preserve FALSE, 0, '', []).
         $item->setInput(\array_filter($inputs_in_schema_order, static fn($v) => $v !== NULL));
       }
     }
+  }
+
+  /**
+   * Gets the default translation's inputs for the item at a given delta.
+   *
+   * @param \Drupal\Core\Field\FieldItemListInterface $field
+   *   The (translated) component tree field being written to.
+   * @param int $delta
+   *   The item delta.
+   *
+   * @return array
+   *   The default translation's inputs for that delta; empty if none.
+   */
+  private static function defaultTranslationInputs(FieldItemListInterface $field, int $delta): array {
+    $entity = $field->getEntity();
+    if (!$entity instanceof ContentEntityInterface) {
+      return [];
+    }
+    $default_field = $entity->getUntranslated()->get($field->getName());
+    if (!$default_field->offsetExists($delta)) {
+      return [];
+    }
+    $default_item = $default_field->offsetGet($delta);
+    \assert($default_item instanceof ComponentTreeItem);
+    return $default_item->getInputs() ?? [];
   }
 
   /**

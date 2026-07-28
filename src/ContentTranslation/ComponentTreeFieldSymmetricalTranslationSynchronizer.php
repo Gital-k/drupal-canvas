@@ -81,17 +81,11 @@ final class ComponentTreeFieldSymmetricalTranslationSynchronizer implements Fiel
         $translatable_keys = \array_flip($inputs_typed_data->getTranslatableInputKeys());
         $non_translatable_inputs = \array_diff_key($default_inputs, $translatable_keys);
 
-        // Merge inputs in priority order:
-        // 1. Default inputs provide fallback values for untranslated keys.
-        // 2. Target translation inputs override translated keys.
-        // 3. Non-translatable inputs always take precedence to prevent
-        // override.
-        // Use the union operator (target + default) so that keys present only
-        // in $target_inputs (e.g. optional props translated but absent in
-        // source) retain their schema-defined position.
+        // Non-translatable from default, translatable from target (or
+        // default for newly added instances with no prior translation).
         $target_item->setInput(\array_merge(
           !\in_array($target_item->getUuid(), $net_new, TRUE)
-            ? $target_inputs + $default_inputs
+            ? $target_inputs
             // Core's createMergedItem() merges by delta position; after a
             // prepend/reorder, target_item may carry inputs from a different
             // instance.

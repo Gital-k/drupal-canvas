@@ -190,6 +190,10 @@ final readonly class TmgmtHooks {
           'canvas_fallback' => [
             '#type' => 'checkbox',
             '#title' => t('Fallback to default translation'),
+            // Checked iff fallback was previously saved for this row (the
+            // sentinel is stored). An unset or explicitly empty ('') stored
+            // translation leaves it unchecked.
+            '#default_value' => ($data_item['#translation']['#text'] ?? '') === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL,
           ],
         ];
       }
