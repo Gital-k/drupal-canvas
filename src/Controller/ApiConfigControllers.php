@@ -403,7 +403,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     // If problematic cache contexts are present or if the markup is empty,
     // attempt to re-render in a way that the Component preview is strongly
     // cacheable while still sufficiently accurate.
-    if (!empty($problematic_cache_contexts) || empty($representation->values['default_markup'])) {
+    if (!empty($problematic_cache_contexts) || (array_key_exists('default_markup', $representation->values) && empty($representation->values['default_markup']))) {
       $ignorable_cache_contexts = ['session', 'user'];
 
       if (array_diff($problematic_cache_contexts, $ignorable_cache_contexts)) {
