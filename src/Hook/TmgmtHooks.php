@@ -122,9 +122,8 @@ final readonly class TmgmtHooks {
   /**
    * Implements hook_form_tmgmt_job_item_edit_form_alter().
    *
-   * Appends a validator to the "Publish Translation" (accept) button that
-   * clears TMGMT's "The field is empty." errors for component_tree field
-   * translations that are intentionally empty.
+   * Appends a validator to TMGMT validation actions that clears empty
+   * component_tree translation errors.
    *
    * This is scoped strictly to component_tree fields to avoid suppressing
    * legitimate "field is empty" errors on required non-canvas fields (e.g.
@@ -137,10 +136,12 @@ final readonly class TmgmtHooks {
    */
   #[Hook('form_tmgmt_job_item_edit_form_alter')]
   public static function formTmgmtJobItemEditFormAlter(array &$form, FormStateInterface $form_state): void {
-    if (!isset($form['actions']['accept'])) {
-      return;
+    if (isset($form['actions']['accept'])) {
+      $form['actions']['accept']['#validate'][] = [self::class, 'clearEmptyComponentTreeTranslationErrors'];
     }
-    $form['actions']['accept']['#validate'][] = [self::class, 'clearEmptyComponentTreeTranslationErrors'];
+    if (isset($form['actions']['validate'])) {
+      $form['actions']['validate']['#validate'][] = [self::class, 'clearEmptyComponentTreeTranslationErrors'];
+    }
   }
 
   /**
