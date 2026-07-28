@@ -479,6 +479,10 @@ enum JsonSchemaType: string {
                 new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', NULL, 'value'),
               ),
             ]),
+            // This extension list intentionally differs from the one in core's
+            // `media.type.document` source field: it targets common document
+            // formats rather than every text-like format.
+            // @see https://git.drupalcode.org/project/canvas/-/work_items/3524130#note_1678367
             fieldInstanceSettings: ['file_extensions' => 'pdf doc docx xls xlsx ppt pptm pptx key ai indd'],
           ),
           default => NULL,
