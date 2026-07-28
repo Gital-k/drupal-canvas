@@ -179,7 +179,10 @@ final readonly class TmgmtHooks {
       // @see \Drupal\tmgmt\Form\JobItemForm::buildTranslation()
       if (($row['translation']['#type'] ?? '') === 'textarea') {
         $textarea = $row['translation'];
-        $textarea['#states']['disabled'] = [
+        // Hide (not disable) the textarea when fallback is checked: a visible
+        // but disabled value would suggest it still gets used. The typed text
+        // is preserved and reappears when the checkbox is unchecked.
+        $textarea['#states']['invisible'] = [
           ':input[name="' . $field_key . '[translation][canvas_fallback]"]' => ['checked' => TRUE],
         ];
         $row['translation'] = [
