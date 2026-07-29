@@ -27,17 +27,16 @@ use Drupal\Core\TypedData\DataDefinitionInterface;
 final class ComponentInputsTranslatablesExtractor {
 
   /**
-   * Internal sentinel for empty and fallback component input translations.
+   * Internal placeholder for component inputs that are empty in the source.
    *
-   * Used as the extracted #text for optional component inputs that are empty
-   * in the source language (TMGMT's Data::flatten() strips empty strings, so
-   * the extracted value must be non-empty), and as the stored translation
-   * value meaning "fall back to the default translation". It is never shown
-   * to translators: the review form blanks it on output and a checkbox
-   * writes it on input.
+   * TMGMT's Data::flatten() strips empty strings, so the extracted #text for
+   * an empty optional input must be non-empty for the input to be offered for
+   * translation at all. The sentinel is never shown to translators: the
+   * review form blanks it on output, and if a translator plugin passes it
+   * through as a "translation", the field processor discards it instead of
+   * storing it.
    *
    * @see \Drupal\canvas\Hook\TmgmtHooks::tmgmtDataItemTextOutputAlter()
-   * @see \Drupal\canvas\Hook\TmgmtHooks::convertFallbackToSentinel()
    * @see \Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor::setTranslations()
    */
   public const string EMPTY_SENTINEL = '∅';

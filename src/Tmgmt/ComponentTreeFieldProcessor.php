@@ -138,14 +138,11 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
           // $inputs filtered to schema keys only.
           \array_intersect_key($inputs, \array_flip($config_schema_order)),
         );
-        // Keys resolved to NULL (the ∅ fallback sentinel) are refilled from
-        // the default translation — NOT from this translation's previous
-        // inputs, so checking fallback on a previously translated prop shows
-        // the default value. This must happen here rather than at save time:
-        // FieldItemList::preSave() enforces required props before
-        // content_translation's synchronizer could refill a dropped key.
-        // Optional props absent in the default translation too remain NULL
-        // and are filtered out below.
+        // Keys resolved to NULL (a discarded ∅ sentinel "translation") are
+        // refilled from the default translation, because the entity cannot be
+        // saved with a required prop absent: FieldItemList::preSave()
+        // enforces required props. Optional props absent in the default
+        // translation too remain NULL and are filtered out below.
         $default_inputs = self::defaultTranslationInputs($field, $delta);
         foreach ($inputs_in_schema_order as $key => $value) {
           if ($value === NULL && isset($default_inputs[$key])) {
@@ -194,12 +191,12 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
    * raw $inputs array at the exact nested position they were extracted from.
    *
    * Recursively walks the TMGMT data tree: at translatable leaves (#translate
-   * TRUE), returns NULL if the translation is the ∅ sentinel (so setInput
-   * omits the key and the default translation's value is rendered), the
-   * translated string otherwise — including the empty string, which is a
-   * valid, explicitly empty translation; at intermediate nodes, merges
-   * translated children back into the existing input array, preserving
-   * non-translated sibling keys.
+   * TRUE), returns NULL if the "translation" is the ∅ sentinel (not a real
+   * translation — it is discarded and the key is refilled from the default
+   * translation), the translated string otherwise — including the empty
+   * string, which is a valid, explicitly empty translation; at intermediate
+   * nodes, merges translated children back into the existing input array,
+   * preserving non-translated sibling keys.
    *
    * @param array $tmgmt_data
    *   TMGMT data node, e.g. ['#text' => ..., '#translation' => [...], ...].
@@ -217,9 +214,10 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
       \assert(\array_key_exists('#text', $tmgmt_data['#translation']));
       $found = TRUE;
       $text = $tmgmt_data['#translation']['#text'];
-      // The sentinel means "fall back to the default translation": returning
-      // NULL causes setInput's array_filter to omit the key. An empty string
-      // is a valid, explicitly empty translation and is stored as-is.
+      // The sentinel is not a translation (a translator plugin echoed the
+      // empty-source placeholder back): returning NULL discards it, and
+      // setTranslations() refills the key from the default translation. An
+      // empty string is a valid, explicitly empty translation, stored as-is.
       if ($text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL) {
         return NULL;
       }
@@ -240,9 +238,9 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
       }
     }
     // If every translatable leaf in this subtree resolved to NULL (the ∅
-    // sentinel), return NULL for the whole composite input so setInput's
-    // array_filter omits the key entirely and the default value shows instead.
-    // This handles compound inputs such as text_format (value + format).
+    // sentinel), return NULL for the whole composite input so it is refilled
+    // from the default translation as one consistent value. This handles
+    // compound inputs such as text_format (value + format).
     if ($any_translated && $all_translated_null) {
       return NULL;
     }

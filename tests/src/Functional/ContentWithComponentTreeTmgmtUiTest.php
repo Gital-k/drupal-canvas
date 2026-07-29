@@ -165,47 +165,31 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     // to prove the generated UI matches expectations.
     self::assertSame([
       self::UUID_TAGS => [
-        'components|0|tags|0[translation][value]',
-        'components|0|tags|0[translation][canvas_fallback]',
-        'components|0|tags|1[translation][value]',
-        'components|0|tags|1[translation][canvas_fallback]',
-        'components|0|tags|2[translation][value]',
-        'components|0|tags|2[translation][canvas_fallback]',
+        'components|0|tags|0[translation]',
+        'components|0|tags|1[translation]',
+        'components|0|tags|2[translation]',
       ],
       // @todo Consider respecting the defined order of props; the config_translation UI does support that.
       self::UUID_MY_HERO => [
-        // SDC props populated by StaticPropSources are translatable. Each
-        // plain-text row also carries a "Fallback to default translation"
-        // checkbox.
-        // @see \Drupal\canvas\Hook\TmgmtHooks::formTmgmtJobItemEditFormAlter()
-        'components|1|heading[translation][value]',
-        'components|1|heading[translation][canvas_fallback]',
-        'components|1|cta1[translation][value]',
-        'components|1|cta1[translation][canvas_fallback]',
-        'components|1|cta2[translation][value]',
-        'components|1|cta2[translation][canvas_fallback]',
+        // SDC props populated by StaticPropSources are translatable.
+        'components|1|heading[translation]',
+        'components|1|cta1[translation]',
+        'components|1|cta2[translation]',
 
         // Optional prop NOT populated in default is translatable: a translation
         // may opt to populate it even when the default translation leaves it
         // empty.
         // @see \Drupal\canvas\Tmgmt\ComponentInputsConfigProcessor::extractTranslatablesIncludingEmpty()
-        'components|1|subheading[translation][value]',
-        'components|1|subheading[translation][canvas_fallback]',
+        'components|1|subheading[translation]',
 
-        'components|1|cta1href|uri[translation][value]',
-        'components|1|cta1href|uri[translation][canvas_fallback]',
+        'components|1|cta1href|uri[translation]',
       ],
       self::UUID_MY_CTA => [
-        'components|2|text[translation][value]',
-        'components|2|text[translation][canvas_fallback]',
-        'components|2|href|uri[translation][value]',
-        'components|2|href|uri[translation][canvas_fallback]',
+        'components|2|text[translation]',
+        'components|2|href|uri[translation]',
       ],
       self::UUID_BANNER => [
-        'components|3|heading[translation][value]',
-        'components|3|heading[translation][canvas_fallback]',
-        // Rich text (text_format) rows keep TMGMT's structure and have no
-        // fallback checkbox (yet).
+        'components|3|heading[translation]',
         'components|3|text|value[translation][value]',
         // Text format is present to load CKEditor 5, but is immutable because
         // it is an `input[type=hidden]`. See the next assertion.
@@ -213,25 +197,20 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
       ],
       // Branding block: only `label` is translatable.
       self::UUID_BRANDING => [
-        'components|4|label[translation][value]',
-        'components|4|label[translation][canvas_fallback]',
+        'components|4|label[translation]',
       ],
       // Translatability test block: only `label` and the deeply nested `bar`
       // are translatable.
       self::UUID_BLOCK_DEEP_TRANSLATABLE => [
-        'components|5|label[translation][value]',
-        'components|5|label[translation][canvas_fallback]',
-        'components|5|deeply_nested_translatable|0|bar[translation][value]',
-        'components|5|deeply_nested_translatable|0|bar[translation][canvas_fallback]',
+        'components|5|label[translation]',
+        'components|5|deeply_nested_translatable|0|bar[translation]',
       ],
       // Block whose translatable `name` is empty in the source language: it is
       // still offered for translation (its source column shows a message),
       // alongside the populated `label`.
       self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT => [
-        'components|6|label[translation][value]',
-        'components|6|label[translation][canvas_fallback]',
-        'components|6|name[translation][value]',
-        'components|6|name[translation][canvas_fallback]',
+        'components|6|label[translation]',
+        'components|6|name[translation]',
       ],
       // untranslatable-prop-shapes component: no prop shape is translatable, so
       // none is offered for translation. `date` (datetime field, date-only),
@@ -252,19 +231,19 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     $deltaDeepBlock = self::COMPONENT_DELTA[self::UUID_BLOCK_DEEP_TRANSLATABLE];
     $deltaEmptyBlock = self::COMPONENT_DELTA[self::UUID_BLOCK_EMPTY_TRANSLATABLE_INPUT];
     $this->submitForm([
-      "components|$deltaHero|subheading[translation][value]" => 'Découvrez Canvas',
-      "components|$deltaHero|heading[translation][value]" => 'Bienvenue à Canvas',
-      "components|$deltaHero|cta2[translation][value]" => 'En savoir plus',
+      "components|$deltaHero|subheading[translation]" => 'Découvrez Canvas',
+      "components|$deltaHero|heading[translation]" => 'Bienvenue à Canvas',
+      "components|$deltaHero|cta2[translation]" => 'En savoir plus',
       // Override auto-prefixed URI values to keep them valid.
-      "components|$deltaHero|cta1href|uri[translation][value]" => 'https://fr.example.com',
-      "components|$deltaCta|href|uri[translation][value]" => 'https://fr.drupal.org',
+      "components|$deltaHero|cta1href|uri[translation]" => 'https://fr.example.com',
+      "components|$deltaCta|href|uri[translation]" => 'https://fr.drupal.org',
       // Each block's `label` is empty in the source language; translate it
       // explicitly so the test translator does not map `∅` to `fr: ∅`.
-      "components|$deltaBranding|label[translation][value]" => 'Identité visuelle',
-      "components|$deltaDeepBlock|label[translation][value]" => 'fr: Canvas Test Block for testing input translatability',
-      "components|$deltaEmptyBlock|label[translation][value]" => 'fr: Test block with settings',
+      "components|$deltaBranding|label[translation]" => 'Identité visuelle',
+      "components|$deltaDeepBlock|label[translation]" => 'fr: Canvas Test Block for testing input translatability',
+      "components|$deltaEmptyBlock|label[translation]" => 'fr: Test block with settings',
       // The block's `name` is also empty in the source language.
-      "components|$deltaEmptyBlock|name[translation][value]" => 'Charte graphique',
+      "components|$deltaEmptyBlock|name[translation]" => 'Charte graphique',
     ], 'Save as completed');
     $assert->pageTextContains(\sprintf('The translation for %s has been accepted', $canvas_page->label()));
 
@@ -289,19 +268,25 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
   /**
    * Tests empty-field translation semantics on the TMGMT review form.
    *
-   * The ∅ sentinel is internal only and must never be visible to translators.
-   * Each component_tree row gets a "Fallback to default translation" checkbox:
+   * The ∅ sentinel is internal only and must never be visible to translators
+   * nor stored. A blank translation is valid — no "The field is empty." error
+   * — and is stored as an explicitly empty string:
    *
-   * AC1: Source has value "Welcome", fallback checked → the default
-   *      translation's value ("Welcome") is rendered; ∅ must never be stored.
+   * AC1: REQUIRED prop ("heading") left blank → TMGMT's "The field is empty."
+   *      error remains: Canvas rejects an empty required prop in any language,
+   *      so the translator must provide a value.
    * AC2: Source has value, real translation provided → translated value
    *      stored.
-   * AC3: Source is empty, fallback checked → field renders the source value
-   *      (also empty); ∅ must never be stored in the translation inputs.
-   * AC4: Source is empty, translator provides "Bonjour" → "Bonjour" is stored
-   *      and renders; source field remains empty.
-   * AC5: Source has value "Sub", fallback unchecked, translation left blank →
-   *      an explicitly empty string is stored (NOT the source value).
+   * AC3: Source is empty (message shown instead of a source textarea),
+   *      translation left blank → stays empty; ∅ never stored.
+   * AC4: Source is empty, translator provides "Bonjour" → "Bonjour" is stored;
+   *      source field remains empty.
+   * AC5: OPTIONAL prop with source value "Sub" left blank → an explicitly
+   *      empty string is stored (NOT the source value, NOT ∅), with no
+   *      validation error.
+   *
+   * Falling back to the default translation's value is intentionally NOT
+   * supported here; that is a separate design discussion.
    */
   public function testEmptySetPlaceholderBehavior(): void {
     $module_installer = $this->container->get(ModuleInstallerInterface::class);
@@ -378,54 +363,47 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     }
     $assert->pageTextContains('This field is empty in the source language.');
 
-    // Every component_tree row has a fallback checkbox inside the translation
-    // column, defaulting to unchecked.
-    $assert->fieldExists("components|{$hero_delta}|heading[translation][canvas_fallback]");
-    $assert->checkboxNotChecked("components|{$hero_delta}|heading[translation][canvas_fallback]");
-    $assert->fieldExists("components|{$block_delta}|label[translation][canvas_fallback]");
-    $assert->checkboxNotChecked("components|{$block_delta}|label[translation][canvas_fallback]");
-
     $translations = [
-      // AC1: fallback checked — the default translation's value is rendered.
-      "components|{$hero_delta}|heading[translation][canvas_fallback]" => TRUE,
-      "components|{$hero_delta}|heading[translation][value]" => '',
+      // AC1: required prop left blank — must keep TMGMT's error.
+      "components|{$hero_delta}|heading[translation]" => '',
       // AC2: real French translation for a non-empty source field.
-      "components|{$hero_delta}|cta2[translation][value]" => 'En savoir plus',
-      // AC5: fallback unchecked, blank — an explicitly empty translation.
-      "components|{$hero_delta}|subheading[translation][canvas_fallback]" => FALSE,
-      "components|{$hero_delta}|subheading[translation][value]" => '',
-      // Override auto-prefixed URI to keep it valid.
-      "components|{$hero_delta}|cta1href|uri[translation][value]" => 'https://fr.example.com',
-      // AC3: label source is empty; fallback checked — must stay empty and ∅
-      // must never be stored.
-      "components|{$block_delta}|label[translation][canvas_fallback]" => TRUE,
-      "components|{$block_delta}|label[translation][value]" => '',
+      "components|{$hero_delta}|cta2[translation]" => 'En savoir plus',
+      // AC5: optional prop with a non-empty source left blank — explicitly
+      // empty, no error.
+      "components|{$hero_delta}|subheading[translation]" => '',
+      // Override auto-prefixed URI to keep it valid (cta1href is required).
+      "components|{$hero_delta}|cta1href|uri[translation]" => 'https://fr.example.com',
+      // AC3: label source is empty; left blank — stays empty, ∅ never stored.
+      "components|{$block_delta}|label[translation]" => '',
       // AC4: name source is empty; provide a real French value.
-      "components|{$block_delta}|name[translation][canvas_fallback]" => FALSE,
-      "components|{$block_delta}|name[translation][value]" => 'Bonjour',
+      "components|{$block_delta}|name[translation]" => 'Bonjour',
     ];
 
-    // The fallback choice must survive a plain "Save" and a fresh page load:
-    // checked rows store the internal sentinel, and the checkbox re-checks
-    // from it; unchecked rows must stay unchecked.
+    // Blank translations must survive a plain "Save" and a fresh page load
+    // without turning into the sentinel or an error ("Save" does not run
+    // TMGMT's per-row validation).
     $this->submitForm($translations, 'Save');
     $this->drupalGet('admin/tmgmt/items/' . $job_item->id());
-    $assert->checkboxChecked("components|{$hero_delta}|heading[translation][canvas_fallback]");
-    $assert->checkboxChecked("components|{$block_delta}|label[translation][canvas_fallback]");
-    $assert->checkboxNotChecked("components|{$hero_delta}|subheading[translation][canvas_fallback]");
-    $assert->checkboxNotChecked("components|{$block_delta}|name[translation][canvas_fallback]");
-    // The sentinel stored by the fallback conversion is never rendered.
-    $assert->fieldValueEquals("components|{$hero_delta}|heading[translation][value]", '');
+    $assert->fieldValueEquals("components|{$hero_delta}|heading[translation]", '');
+    $assert->fieldValueEquals("components|{$block_delta}|label[translation]", '');
 
-    // Validate must behave consistently with "Save as completed": no
-    // component_tree empty-field error for blank (explicitly empty) or
-    // fallback rows.
+    // AC1: Validate errors on the blank REQUIRED prop only. Blank optional
+    // props are valid.
+    $this->submitForm($translations, 'Validate');
+    $assert->pageTextContains('The field is empty.');
+    $assert->elementExists('css', "textarea[name='components|{$hero_delta}|heading[translation]'].error");
+    $assert->elementNotExists('css', "textarea[name='components|{$hero_delta}|subheading[translation]'].error");
+    $assert->elementNotExists('css', "textarea[name='components|{$block_delta}|label[translation]'].error");
+    // The masking of empty translations for TMGMT's validation must never
+    // leak the sentinel into the re-rendered textareas.
+    $assert->fieldValueEquals("components|{$hero_delta}|subheading[translation]", '');
+
+    // With the required prop translated, validation passes: no error for the
+    // blank (explicitly empty) optional rows.
+    $translations["components|{$hero_delta}|heading[translation]"] = 'Bienvenue';
     $this->submitForm($translations, 'Validate');
     $assert->pageTextNotContains('The field is empty.');
     $assert->pageTextContains('Validation completed successfully.');
-    // The masking of empty translations for TMGMT's validation must never
-    // leak the sentinel into the re-rendered textareas.
-    $assert->fieldValueEquals("components|{$hero_delta}|subheading[translation][value]", '');
 
     $this->submitForm($translations, 'Save as completed');
     $assert->pageTextContains(\sprintf('The translation for %s has been accepted', $canvas_page->label()));
@@ -439,10 +417,9 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     self::assertNotNull($hero_item);
     $hero_inputs = $hero_item->getInputs();
 
-    // AC1: fallback checked → the input key was dropped and refilled from the
-    // default translation, so "Welcome" is rendered in French.
-    self::assertSame('Welcome', $hero_inputs['heading'] ?? NULL,
-      'AC1: Fallback must render the default translation value.'
+    // AC1: the required prop had to be translated to pass validation.
+    self::assertSame('Bienvenue', $hero_inputs['heading'] ?? NULL,
+      'AC1: A required prop must carry the provided translation.'
     );
 
     // AC2: real translation stored verbatim.
@@ -450,20 +427,20 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
       'AC2: Provided translation must be stored verbatim.'
     );
 
-    // AC5: fallback unchecked, blank translation → explicitly empty string is
-    // stored, NOT the source value ("Sub").
+    // AC5: blank translation for another non-empty source ("Sub") — also an
+    // explicitly empty string.
     self::assertSame('', $hero_inputs['subheading'] ?? NULL,
-      'AC5: A blank non-fallback translation must be stored as an explicitly empty string.'
+      'AC5: A blank translation must be stored as an explicitly empty string.'
     );
 
     $block_item = $fr_tree->getComponentTreeItemByUuid($uuid_block);
     self::assertNotNull($block_item);
     $block_inputs = $block_item->getInputs();
 
-    // AC3: label source was empty and fallback was checked → falls back to
-    // the source value (empty string); ∅ never stored.
+    // AC3: label source was empty and the translation was left blank → stays
+    // empty; ∅ never stored.
     self::assertSame('', $block_inputs['label'] ?? NULL,
-      'AC3: Empty-source field with fallback checked must render the source value (empty string).'
+      'AC3: An empty-source field left blank must stay empty.'
     );
     foreach ($hero_inputs + $block_inputs as $key => $value) {
       self::assertNotSame(

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Tmgmt\ComponentInputsConfigProcessor;
 use Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor;
@@ -113,15 +114,13 @@ final readonly class TmgmtHooks {
    * Implements hook_form_tmgmt_job_item_edit_form_alter().
    *
    * For every component_tree row on the TMGMT review form:
-   * - Adds a "Fallback to default translation" checkbox. Checked, the row's
-   *   input key is dropped from the translation, so the default translation's
-   *   value is rendered. Unchecked, an empty textarea stores an explicitly
-   *   empty string and any other text is stored verbatim.
    * - Replaces the (absent) source textarea of inputs that are empty in the
    *   source language with an explanatory message.
-   * - Wires validation handlers that convert the checkbox to the internal ∅
-   *   sentinel and temporarily mask empty translations so TMGMT's
-   *   "The field is empty." validation never fires for component_tree rows.
+   * - Wires validation handlers that temporarily mask empty translations of
+   *   OPTIONAL component inputs so TMGMT's "The field is empty." validation
+   *   does not fire for them: an empty translation of an optional input is
+   *   valid and is stored as an explicitly empty string. Required inputs keep
+   *   TMGMT's error — Canvas rejects an empty required prop in any language.
    *
    * @param array<string, mixed> $form
    *   The form array.
@@ -130,6 +129,7 @@ final readonly class TmgmtHooks {
    *
    * @see \Drupal\tmgmt\Form\JobItemForm::validateJobItem()
    * @see \Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor::setTranslations()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::validateComponentInput()
    */
   #[Hook('form_tmgmt_job_item_edit_form_alter')]
   public static function formTmgmtJobItemEditFormAlter(array &$form, FormStateInterface $form_state): void {
@@ -141,7 +141,16 @@ final readonly class TmgmtHooks {
     if (!$item instanceof JobItemInterface) {
       return;
     }
-    $component_tree_field_names = self::getComponentTreeFieldNames($item);
+    $entity = self::getContentJobItemEntity($item);
+    if ($entity === NULL) {
+      return;
+    }
+    $component_tree_field_names = [];
+    foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
+      if ($definition->getType() === ComponentTreeItem::PLUGIN_ID) {
+        $component_tree_field_names[] = $field_name;
+      }
+    }
     if ($component_tree_field_names === []) {
       return;
     }
@@ -150,12 +159,10 @@ final readonly class TmgmtHooks {
     if ($row_paths === []) {
       return;
     }
-    // Persisted for the validate callbacks below; recomputed on every (re)build
-    // of the form.
-    $form_state->set('canvas_component_tree_row_paths', $row_paths);
 
     /** @var \Drupal\tmgmt\Data $data_service */
     $data_service = \Drupal::service('tmgmt.data');
+    $maskable_row_paths = [];
     foreach ($row_paths as [$group_key, $parent_key, $field_key]) {
       $row = &$form['review'][$group_key][$parent_key][$field_key];
       $data_item = $item->getData($data_service->ensureArrayKey($field_key));
@@ -170,35 +177,14 @@ final readonly class TmgmtHooks {
         ];
       }
 
-      // Wrap the plain translation textarea so the checkbox renders directly
-      // below it, inside the translation column (the row template renders a
-      // fixed set of keys, so a sibling key would not be shown). The resulting
-      // translation[value] structure matches TMGMT's text_format shape, which
-      // ::validateJobItem() and ::save() already handle.
-      // @see tmgmt-data-items-form.html.twig
-      // @see \Drupal\tmgmt\Form\JobItemForm::buildTranslation()
-      if (($row['translation']['#type'] ?? '') === 'textarea') {
-        $textarea = $row['translation'];
-        // Hide (not disable) the textarea when fallback is checked: a visible
-        // but disabled value would suggest it still gets used. The typed text
-        // is preserved and reappears when the checkbox is unchecked.
-        $textarea['#states']['invisible'] = [
-          ':input[name="' . $field_key . '[translation][canvas_fallback]"]' => ['checked' => TRUE],
-        ];
-        $row['translation'] = [
-          'value' => $textarea,
-          'canvas_fallback' => [
-            '#type' => 'checkbox',
-            '#title' => t('Fallback to default translation'),
-            // Checked iff fallback was previously saved for this row (the
-            // sentinel is stored). An unset or explicitly empty ('') stored
-            // translation leaves it unchecked.
-            '#default_value' => ($data_item['#translation']['#text'] ?? '') === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL,
-          ],
-        ];
+      if (!self::rowIsRequiredProp($entity, $component_tree_field_names, $field_key)) {
+        $maskable_row_paths[] = [$group_key, $parent_key, $field_key];
       }
       unset($row);
     }
+    // Persisted for the validate callbacks below; recomputed on every
+    // (re)build of the form.
+    $form_state->set('canvas_component_tree_maskable_row_paths', $maskable_row_paths);
 
     // The accept ("Save as completed") and validate buttons run TMGMT's
     // ::validateJobItem, which errors on empty translations. Mask empty
@@ -212,38 +198,10 @@ final readonly class TmgmtHooks {
       if (isset($form['actions'][$button]['#validate'])) {
         \array_unshift(
           $form['actions'][$button]['#validate'],
-          [self::class, 'convertFallbackToSentinel'],
           [self::class, 'maskEmptyComponentTreeTranslations'],
         );
         $form['actions'][$button]['#validate'][] = [self::class, 'unmaskEmptyComponentTreeTranslations'];
       }
-    }
-    // Buttons without their own #validate (e.g. "Save", the per-row review
-    // toggles) run the form-level handlers instead; the checkbox must be
-    // honored on those paths too.
-    $form['#validate'][] = [self::class, 'convertFallbackToSentinel'];
-  }
-
-  /**
-   * Form validate callback: converts checked fallback checkboxes to ∅.
-   *
-   * Overwrites the submitted translation value with the internal sentinel for
-   * every component_tree row whose "Fallback to default translation" checkbox
-   * is checked. TMGMT then stores the sentinel in the job item data, and
-   * ComponentTreeFieldProcessor::setTranslations() drops the input key so the
-   * default translation's value is rendered.
-   *
-   * @param array<string, mixed> $form
-   *   The form array.
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The form state.
-   */
-  public static function convertFallbackToSentinel(array &$form, FormStateInterface $form_state): void {
-    foreach ($form_state->get('canvas_component_tree_row_paths') ?? [] as [, , $field_key]) {
-      if (!$form_state->getValue([$field_key, 'translation', 'canvas_fallback'])) {
-        continue;
-      }
-      $form_state->setValue([$field_key, 'translation', 'value'], ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL);
     }
   }
 
@@ -251,11 +209,12 @@ final readonly class TmgmtHooks {
    * Form validate callback: masks empty component_tree translations with ∅.
    *
    * Runs before TMGMT's ::validateJobItem, which reads the translation from
-   * $form[...]['translation']['#value'] and errors on empty values. Empty
-   * component_tree translations are valid (explicitly empty, or fallback via
-   * the checkbox), so they are temporarily set to the non-empty sentinel.
-   * ::save() reads $form_state values, never these #value keys, so the mask
-   * cannot leak into saved data.
+   * $form[...]['translation']['#value'] and errors on empty values. An empty
+   * translation of an OPTIONAL component input is valid (it is stored as an
+   * explicitly empty string), so it is temporarily set to the non-empty
+   * sentinel. Required inputs are not masked, so TMGMT's error still fires
+   * for them. ::save() reads $form_state values, never these #value keys, so
+   * the mask cannot leak into saved data.
    *
    * @param array<string, mixed> $form
    *   The form array.
@@ -264,7 +223,7 @@ final readonly class TmgmtHooks {
    */
   public static function maskEmptyComponentTreeTranslations(array &$form, FormStateInterface $form_state): void {
     $masked = [];
-    foreach ($form_state->get('canvas_component_tree_row_paths') ?? [] as [$group_key, $parent_key, $field_key]) {
+    foreach ($form_state->get('canvas_component_tree_maskable_row_paths') ?? [] as [$group_key, $parent_key, $field_key]) {
       $translation = &$form['review'][$group_key][$parent_key][$field_key]['translation'];
       // Rich text (text_format) is expanded to translation[value] during form
       // processing; plain text is the textarea itself.
@@ -301,34 +260,70 @@ final readonly class TmgmtHooks {
   }
 
   /**
-   * Gets the component_tree field names on a content job item's source entity.
+   * Loads the source entity of a content job item.
    *
    * @param \Drupal\tmgmt\JobItemInterface $item
    *   The TMGMT job item.
    *
-   * @return list<string>
-   *   The component_tree field names; empty if the job item is not a content
-   *   job item or its entity has no component_tree fields.
+   * @return \Drupal\Core\Entity\FieldableEntityInterface|null
+   *   The source entity, or NULL if the job item is not a content job item or
+   *   its entity cannot be loaded.
    */
-  private static function getComponentTreeFieldNames(JobItemInterface $item): array {
+  private static function getContentJobItemEntity(JobItemInterface $item): ?FieldableEntityInterface {
     if ($item->getPlugin() !== 'content') {
-      return [];
+      return NULL;
     }
     $entity_type_manager = \Drupal::entityTypeManager();
     if (!$entity_type_manager->hasDefinition($item->getItemType())) {
-      return [];
+      return NULL;
     }
     $entity = $entity_type_manager->getStorage($item->getItemType())->load($item->getItemId());
-    if (!$entity instanceof FieldableEntityInterface) {
-      return [];
-    }
-    $field_names = [];
-    foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
-      if ($definition->getType() === ComponentTreeItem::PLUGIN_ID) {
-        $field_names[] = $field_name;
+    return $entity instanceof FieldableEntityInterface ? $entity : NULL;
+  }
+
+  /**
+   * Determines whether a review form row belongs to a required prop.
+   *
+   * Canvas rejects an empty value for a required prop in any language
+   * (an empty StaticPropSource counts as unset), so such rows must keep
+   * TMGMT's "The field is empty." validation.
+   *
+   * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
+   *   The source entity.
+   * @param list<string> $component_tree_field_names
+   *   The component_tree field names on the source entity.
+   * @param string $field_key
+   *   The '|'-joined flattened TMGMT data key, e.g. "components|0|heading" or
+   *   "components|0|cta1href|uri".
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::validateComponentInput()
+   */
+  private static function rowIsRequiredProp(FieldableEntityInterface $entity, array $component_tree_field_names, string $field_key): bool {
+    foreach ($component_tree_field_names as $field_name) {
+      if (!\str_starts_with($field_key, $field_name . '|')) {
+        continue;
       }
+      // "<field_name>|<delta>|<prop>[|<nested…>]".
+      $segments = \explode('|', \substr($field_key, \strlen($field_name) + 1));
+      if (\count($segments) < 2) {
+        return FALSE;
+      }
+      [$delta, $prop_name] = $segments;
+      $field = $entity->get($field_name);
+      if (!$field->offsetExists((int) $delta)) {
+        return FALSE;
+      }
+      $item = $field->offsetGet((int) $delta);
+      \assert($item instanceof ComponentTreeItem);
+      $source = $item->getComponent()?->getComponentSource();
+      // Only JSON-schema-based component sources declare required props.
+      if (!$source instanceof JsonSchemaPropsComponentSourceBase) {
+        return FALSE;
+      }
+      $prop_field_definitions = $source->getConfiguration()['prop_field_definitions'] ?? [];
+      return (bool) ($prop_field_definitions[$prop_name]['required'] ?? FALSE);
     }
-    return $field_names;
+    return FALSE;
   }
 
   /**
