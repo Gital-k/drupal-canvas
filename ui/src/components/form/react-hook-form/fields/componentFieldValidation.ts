@@ -143,7 +143,7 @@ export const shouldSkipPropValidation = (
 
   // An empty string on an optional field can skip validation. For example, an
   // empty + optional URI field should not check for URI validity.
-  if (newValue === '' && !target.required) {
+  if ((newValue === '' || newValue === null || newValue === undefined) && !target.required) {
     return true;
   }
 
