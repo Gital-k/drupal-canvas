@@ -130,6 +130,7 @@ Postel
 preflight
 preflights
 replayable
+sindresorhus
 slugified
 slugifies
 Slugifies
@@ -208,6 +209,7 @@ unloadable
 unmixable
 unmodeled
 unparseable
+unrenderable
 unpartitioned
 unrooted
 unstorable

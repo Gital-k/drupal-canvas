@@ -16,6 +16,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -58,7 +59,7 @@ final class FieldUiHooksTest extends CanvasKernelTestBase {
     // with access tests.
     // @todo Remove in https://www.drupal.org/node/540008.
     $this->createUser();
-    $this->entityTypeManager = $this->container->get('entity_type.manager');
+    $this->entityTypeManager = $this->container->get(EntityTypeManagerInterface::class);
   }
 
   /**
@@ -146,8 +147,8 @@ final class FieldUiHooksTest extends CanvasKernelTestBase {
     $field_ui_hooks = new FieldUiHooks(
       $route_match,
       $messenger,
-      $this->container->get('entity_type.manager'),
-      $this->container->get('string_translation'),
+      $this->container->get(EntityTypeManagerInterface::class),
+      $this->container->get(TranslationInterface::class),
       $this->container->get(ContentTemplateRepository::class),
     );
     $field_ui_hooks->formEntityViewDisplayEditFormAlter($form, $form_state);
