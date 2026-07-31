@@ -322,7 +322,6 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
         ])),
         'uuid' => $block->uuid(),
       ];
-      
       $candidate_region = static::create([
         'theme' => $theme,
         'region' => $region_name,
