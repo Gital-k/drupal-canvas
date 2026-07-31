@@ -300,7 +300,8 @@ export function authoredElementMapToComponentTree(
     components.push({
       uuid: keyToUuid.get(key)!,
       component_id: element.type,
-      component_version: componentVersions?.get(element.type) ?? '',
+      // Null lets the server default to the component's active version.
+      component_version: componentVersions?.get(element.type) ?? null,
       inputs: isRecord(element.props)
         ? (element.props as Record<string, unknown>)
         : {},
