@@ -311,7 +311,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
         // Use the original region.
         default => $block->getRegion(),
       };
-      $regions[$region_name][] = [
+      $item = [
         'component_id' => $component_id,
         'component_version' => Component::load($component_id)->getActiveVersion(),
         'inputs' => \array_diff_key($block->get('settings'), \array_flip([
@@ -322,6 +322,18 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
         ])),
         'uuid' => $block->uuid(),
       ];
+      
+      $candidate_region = static::create([
+        'theme' => $theme,
+        'region' => $region_name,
+        'component_tree' => [$item],
+      ]);
+      $violations = iterator_to_array($candidate_region->getTypedData()->validate());
+      if (!empty($violations)) {
+        continue;
+      }
+
+      $regions[$region_name][] = $item;
     }
 
     $region_instances = [];
