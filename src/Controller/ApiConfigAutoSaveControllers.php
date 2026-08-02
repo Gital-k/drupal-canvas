@@ -68,13 +68,58 @@ final class ApiConfigAutoSaveControllers extends ApiControllerBase {
       \assert($auto_save->entity instanceof CanvasAssetInterface);
       $canvas_config_entity = $auto_save->entity;
     }
-    $response = new Response($canvas_config_entity->getJs(), Response::HTTP_OK, [
+    $js = $canvas_config_entity->getJs();
+    if (trim((string) $js) === '') {
+      // Compile-on-empty fallback: AI-created/edited code components and their
+      // auto-save drafts can carry an empty compiledJs, which the canvas-island
+      // renders as "[object Object]". Compile the JSX source on the fly with the
+      // standalone esbuild binary (works under php-fpm, no Node on PATH needed).
+      $field = $canvas_config_entity->get('js');
+      $source = is_array($field) ? (string) ($field['original'] ?? '') : '';
+      $js = self::compileSourceJsFallback($source);
+    }
+    $response = new Response($js, Response::HTTP_OK, [
       'Content-Type' => 'text/javascript; charset=utf-8',
     ]);
     $response->setPrivate();
     $response->headers->addCacheControlDirective('no-store');
 
     return $response;
+  }
+
+  /**
+   * Compiles JSX to JS with the standalone esbuild binary (empty on failure).
+   */
+  protected static function compileSourceJsFallback(string $source): string {
+    if (trim($source) === '') {
+      return '';
+    }
+    $candidates = [];
+    foreach (['/../node_modules', '/node_modules', '/core/node_modules'] as $base) {
+      $candidates = array_merge($candidates, glob(\Drupal::root() . $base . '/@esbuild/*/bin/esbuild') ?: []);
+      $candidates[] = \Drupal::root() . $base . '/.bin/esbuild';
+    }
+    $bin = '';
+    foreach ($candidates as $candidate) {
+      if (@is_executable($candidate)) {
+        $bin = $candidate;
+        break;
+      }
+    }
+    if ($bin === '') {
+      return '';
+    }
+    $process = @proc_open(escapeshellarg($bin) . ' --loader=jsx --jsx=automatic --format=esm', [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
+    if (!is_resource($process)) {
+      return '';
+    }
+    fwrite($pipes[0], $source);
+    fclose($pipes[0]);
+    $compiled = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $code = proc_close($process);
+    return ($code === 0 && is_string($compiled)) ? $compiled : '';
   }
 
   public function patch(Request $request, CanvasHttpApiEligibleConfigEntityInterface $canvas_config_entity): JsonResponse {
