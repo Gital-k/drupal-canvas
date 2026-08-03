@@ -14,6 +14,7 @@ import { addDataFetch } from '@/features/code-editor/codeEditorSlice';
 import DataFetch from '@/features/code-editor/component-data/DataFetch';
 import Props from '@/features/code-editor/component-data/Props';
 import Slots from '@/features/code-editor/component-data/Slots';
+import { getDocDir } from '@/utils/function-utils';
 
 import styles from './ComponentData.module.css';
 
@@ -62,7 +63,12 @@ export default function ComponentData({
       <Heading as="h5" size="2" weight="medium">
         Component data
       </Heading>
-      <Tabs.Root defaultValue="props" className={styles.tabRoot} asChild>
+      <Tabs.Root
+        defaultValue="props"
+        className={styles.tabRoot}
+        asChild
+        dir={getDocDir()}
+      >
         <Flex height="calc(100% - 34px)" direction="column" pt="4">
           <Box>
             <Tabs.List size="1">
@@ -72,7 +78,7 @@ export default function ComponentData({
             </Tabs.List>
           </Box>
           <Flex direction="column" flexGrow="1" height="calc(100% - 32px)">
-            <ScrollArea>
+            <ScrollArea dir={getDocDir()}>
               <Box px="4">
                 <Tabs.Content value="props">
                   <ErrorBoundary title="An unexpected error has occurred while displaying props.">

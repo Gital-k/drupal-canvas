@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import * as ReactRedux from 'react-redux';
+import { DirectionProvider } from '@radix-ui/react-direction';
 import { Theme } from '@radix-ui/themes';
 import * as ReduxToolkit from '@reduxjs/toolkit';
 
@@ -134,6 +135,13 @@ if (container) {
   // Make the store available to extensions.
   canvasSettings.store = store;
 
+  const docDir =
+    (typeof document !== 'undefined' &&
+      ((document.documentElement.getAttribute('dir') || document.dir) as
+        | 'ltr'
+        | 'rtl')) ||
+    'ltr';
+
   root.render(
     <React.StrictMode>
       <Theme
@@ -142,11 +150,13 @@ if (container) {
         panelBackground="solid"
         appearance="light"
       >
-        <ErrorBoundary variant="page">
-          <Provider store={store}>
-            <AppRoutes basePath={routerRoot} />
-          </Provider>
-        </ErrorBoundary>
+        <DirectionProvider dir={docDir}>
+          <ErrorBoundary variant="page">
+            <Provider store={store}>
+              <AppRoutes basePath={routerRoot} />
+            </Provider>
+          </ErrorBoundary>
+        </DirectionProvider>
       </Theme>
     </React.StrictMode>,
   );
@@ -203,19 +213,21 @@ if (container) {
       // Wrap the newly rendered content in the Redux provider so it has access
       // to the existing store.
       root.render(
-        <Theme
-          asChild
-          accentColor="blue"
-          hasBackground={false}
-          panelBackground="solid"
-          appearance="light"
-        >
-          {React.createElement<ProviderComponentProps>(
-            Provider as FC,
-            { store },
-            Application as ReactHTMLElement<any>,
-          )}
-        </Theme>,
+        <DirectionProvider dir={docDir}>
+          <Theme
+            asChild
+            accentColor="blue"
+            hasBackground={false}
+            panelBackground="solid"
+            appearance="light"
+          >
+            {React.createElement<ProviderComponentProps>(
+              Provider as FC,
+              { store },
+              Application as ReactHTMLElement<any>,
+            )}
+          </Theme>
+        </DirectionProvider>,
       );
       // If the render root already has content, we know it is rendered and can
       // return it.

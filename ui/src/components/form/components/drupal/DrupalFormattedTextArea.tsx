@@ -4,7 +4,6 @@ import { CKEditor } from '@ckeditor/ckeditor5-react';
 import { useFieldContext } from '@/components/form/contexts/FieldContext';
 import { a2p } from '@/local_packages/utils.js';
 
-import type { Editor } from '@ckeditor/ckeditor5-core';
 import type { Attributes } from '@/types/DrupalAttribute';
 
 // Type definitions for CKEditor
@@ -22,8 +21,9 @@ interface FuncConfig {
   };
 }
 
-interface EditorInstance extends Editor {
+interface EditorInstance {
   getData: () => string;
+  [key: string]: any;
 }
 
 interface DrupalFormattedTextAreaProps {

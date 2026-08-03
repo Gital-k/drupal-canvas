@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { Outlet } from 'react-router-dom';
+import { DirectionProvider } from '@radix-ui/react-direction';
 import { InfoCircledIcon } from '@radix-ui/react-icons';
 import {
   Box,
@@ -24,6 +25,7 @@ import {
   selectSelection,
 } from '@/features/ui/uiSlice';
 import useHidePanelClasses from '@/hooks/useHidePanelClasses';
+import { getDocDir } from '@/utils/function-utils';
 
 import type React from 'react';
 
@@ -87,99 +89,115 @@ const ContextualPanel: React.FC = () => {
             defaultValue={'pageData'}
             onValueChange={setActivePanel}
             value={activePanel}
-            className={clsx(styles.tabRoot)}
+            className={styles.tabRoot}
+            dir={getDocDir()}
           >
-            <Tabs.List justify="start" mx="4" size="1">
-              {!isTemplateContext && (
-                <Tabs.Trigger
-                  value="pageData"
-                  data-testid="canvas-contextual-panel--page-data"
-                >
-                  {mainTabText}
-                </Tabs.Trigger>
-              )}
-              {(selectedComponent || isMultiSelect) && (
-                <Tabs.Trigger
-                  value="settings"
-                  data-testid="canvas-contextual-panel--settings"
-                >
-                  Settings
-                </Tabs.Trigger>
-              )}
-            </Tabs.List>
-            <ScrollArea scrollbars="vertical" className={styles.scrollArea}>
-              <Box px="4" width="100%">
-                <Tabs.Content value={'settings'}>
-                  {isMultiSelect && (
-                    <Box my="2">
-                      <Flex direction="column" gap="2">
-                        <Text align="center" color="gray" my="3" size="1">
-                          {selection.items.length} items selected
-                        </Text>
-
-                        <Flex gap="1" justify="center" align="center">
-                          <Button
-                            size="1"
-                            disabled={!selection.consecutive}
-                            onClick={() =>
-                              alert(
-                                'Copy functionality will be implemented later',
-                              )
-                            }
-                            className="canvas-button"
-                          >
-                            Copy
-                          </Button>
-                          <Text size="1" color="gray">
-                            or
-                          </Text>
-                          <Button
-                            size="1"
-                            disabled={!selection.consecutive}
-                            onClick={() =>
-                              alert(
-                                'Save as Pattern functionality will be implemented later',
-                              )
-                            }
-                            className="canvas-button"
-                          >
-                            Save as Pattern
-                          </Button>
-                        </Flex>
-                        {!selection.consecutive && (
-                          <Callout.Root
-                            size="1"
-                            color="blue"
-                            variant="surface"
-                            mt="4"
-                          >
-                            <Callout.Icon>
-                              <InfoCircledIcon />
-                            </Callout.Icon>
-                            <Callout.Text>
-                              Actions are only available when selecting adjacent
-                              items in the layout
-                            </Callout.Text>
-                          </Callout.Root>
-                        )}
-                      </Flex>
-                    </Box>
-                  )}
-                  <ErrorBoundary title="An unexpected error has occurred while rendering the component's form.">
-                    <Outlet />
-                  </ErrorBoundary>
-                </Tabs.Content>
+            <Box px="4" pt="4" pb="0">
+              <Tabs.List className={styles.tabList}>
                 {!isTemplateContext && (
-                  <Tabs.Content
-                    value={'pageData'}
-                    forceMount={true}
-                    hidden={activePanel !== 'pageData'}
+                  <Tabs.Trigger
+                    value="pageData"
+                    data-testid="canvas-contextual-panel--page-data"
+                    className={styles.tabTrigger}
                   >
-                    {editorFrameContext === 'entity' && <PageDataForm />}
-                  </Tabs.Content>
+                    {mainTabText}
+                  </Tabs.Trigger>
                 )}
-              </Box>
-            </ScrollArea>
+                {(selectedComponent || isMultiSelect) && (
+                  <Tabs.Trigger
+                    value="settings"
+                    data-testid="canvas-contextual-panel--settings"
+                    className={styles.tabTrigger}
+                  >
+                    Settings
+                  </Tabs.Trigger>
+                )}
+                {isMultiSelect && (
+                  <Tabs.Trigger value="layers" className={styles.tabTrigger}>
+                    Components ({selection.items.length})
+                  </Tabs.Trigger>
+                )}
+              </Tabs.List>
+            </Box>
+            <DirectionProvider dir={getDocDir()}>
+              <ScrollArea
+                scrollbars="vertical"
+                className={styles.scrollArea}
+                dir={getDocDir()}
+              >
+                <Box px="4" width="100%">
+                  <Tabs.Content value={'settings'}>
+                    {isMultiSelect && (
+                      <Box my="2">
+                        <Flex direction="column" gap="2">
+                          <Text align="center" color="gray" my="3" size="1">
+                            {selection.items.length} items selected
+                          </Text>
+
+                          <Flex gap="1" justify="center" align="center">
+                            <Button
+                              size="1"
+                              disabled={!selection.consecutive}
+                              onClick={() =>
+                                alert(
+                                  'Copy functionality will be implemented later',
+                                )
+                              }
+                              className="canvas-button"
+                            >
+                              Copy
+                            </Button>
+                            <Text size="1" color="gray">
+                              or
+                            </Text>
+                            <Button
+                              size="1"
+                              disabled={!selection.consecutive}
+                              onClick={() =>
+                                alert(
+                                  'Save as Pattern functionality will be implemented later',
+                                )
+                              }
+                              className="canvas-button"
+                            >
+                              Save as Pattern
+                            </Button>
+                          </Flex>
+                          {!selection.consecutive && (
+                            <Callout.Root
+                              size="1"
+                              color="blue"
+                              variant="surface"
+                              mt="4"
+                            >
+                              <Callout.Icon>
+                                <InfoCircledIcon />
+                              </Callout.Icon>
+                              <Callout.Text>
+                                Actions are only available when selecting
+                                adjacent items in the layout
+                              </Callout.Text>
+                            </Callout.Root>
+                          )}
+                        </Flex>
+                      </Box>
+                    )}
+                    <ErrorBoundary title="An unexpected error has occurred while rendering the component's form.">
+                      <Outlet />
+                    </ErrorBoundary>
+                  </Tabs.Content>
+                  {!isTemplateContext && (
+                    <Tabs.Content
+                      value={'pageData'}
+                      forceMount={true}
+                      hidden={activePanel !== 'pageData'}
+                    >
+                      {editorFrameContext === 'entity' && <PageDataForm />}
+                    </Tabs.Content>
+                  )}
+                </Box>
+              </ScrollArea>
+            </DirectionProvider>
           </Tabs.Root>
         </ErrorBoundary>
       </Flex>

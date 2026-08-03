@@ -178,7 +178,9 @@ const LibraryToolbar = ({
             value={searchTerm}
             onChange={(e) => onSearch(e.target.value)}
           >
-            <TextField.Slot>
+            <TextField.Slot
+              side={document.documentElement.dir === 'rtl' ? 'right' : 'left'}
+            >
               <MagnifyingGlassIcon height="16" width="16" />
             </TextField.Slot>
           </TextField.Root>
