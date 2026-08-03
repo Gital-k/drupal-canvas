@@ -16,7 +16,7 @@
 }
 
 .row {
-  padding-right: 4px;
+  padding-inline-end: 4px;
   border-radius: 4px;
 }
 
@@ -52,7 +52,7 @@
   width: 100%;
   padding: 8px 10px;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   color: var(--gray-12);
   border: none;
   border-radius: 4px;
@@ -140,7 +140,7 @@
   align-items: center;
   padding: 8px 10px;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   color: var(--gray-12);
   border: none;
   border-radius: 4px;

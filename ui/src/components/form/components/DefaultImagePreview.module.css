@@ -38,7 +38,7 @@
   position: absolute;
   z-index: 1;
   top: 28px;
-  right: 4px;
+  inset-inline-end: 4px;
   overflow: hidden;
   width: 16px;
   height: 16px;
@@ -60,7 +60,7 @@
 }
 
 .defaultImageLabel {
-  margin-right: 20px;
+  margin-inline-end: 20px;
   overflow-wrap: break-word;
   color: var(--slate-11);
   font-size: 13px;

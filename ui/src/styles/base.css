@@ -44,3 +44,10 @@ drupal-html-fragment, element-prop {
   display: flex;
   align-items: center;
 }
+
+html[dir="rtl"] .rt-ScrollAreaRoot,
+html[dir="rtl"] .rt-ScrollAreaViewport,
+html[dir="rtl"] [data-testid="canvas-primary-panel"],
+html[dir="rtl"] [data-testid="canvas-contextual-panel"] {
+  direction: rtl !important;
+}

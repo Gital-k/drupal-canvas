@@ -41,7 +41,7 @@
 
 .verticalDivider {
   height: var(--space-5);
-  margin-left: -1px;
-  border-right: 1px solid var(--gray-5);
+  margin-inline-start: -1px;
+  border-inline-end: 1px solid var(--gray-5);
 }
 

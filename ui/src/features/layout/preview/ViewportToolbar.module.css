@@ -1,14 +1,13 @@
 .toolbar {
   position: absolute;
   top: 8px;
-  right: 16px;
-  left: 16px;
+  inset-inline: 16px;
   display: flex;
   align-items: center;
   pointer-events: none;
   color: var(--gray-9);
-  > button {
-    pointer-events: all;
+  * {
+    pointer-events: auto;
   }
   .toolbarButton {
     box-shadow: 0 5px 10px 2px rgb(0, 0, 0, 0.1);
@@ -17,7 +16,7 @@
     }
   }
   .viewportSelect {
-    margin-right: auto;
+    margin-inline-end: auto;
   }
 }
 

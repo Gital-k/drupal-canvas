@@ -160,7 +160,10 @@ const ComponentLayer: React.FC<ComponentLayerProps> = ({
             indent={indent}
             leadingContent={
               <Flex>
-                <Box width="var(--space-4)" mr="1">
+                <Box
+                  width="var(--space-4)"
+                  style={{ marginInlineEnd: 'var(--space-1)' }}
+                >
                   {component.slots.length > 0 ? (
                     <Collapsible.Trigger
                       asChild={true}
