@@ -29,3 +29,30 @@
 :global(.canvas-linked-prop-label-wrapper) {
   display: flex;
 }
+
+
+
+:global(html[dir="rtl"] .rt-DropdownMenuSubTrigger),
+:global(html[dir="rtl"] [class*="DropdownMenuSubTrigger"]) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  direction: rtl !important;
+}
+
+:global(html[dir="rtl"] .rt-BaseMenuShortcut),
+:global(html[dir="rtl"] .rt-DropdownMenuShortcut) {
+  margin-right: auto !important;
+  margin-left: 0 !important;
+  margin-inline-start: auto !important;
+  padding-left: 0 !important;
+}
+
+:global(html[dir="rtl"] .rt-BaseMenuSubTriggerIcon),
+:global(html[dir="rtl"] [class*="DropdownMenuSubTriggerIcon"]),
+:global(html[dir="rtl"] .rt-DropdownMenuSubTrigger svg),
+:global(html[dir="rtl"] [class*="DropdownMenuSubTrigger"] svg) {
+  margin-left: 0 !important;
+  transform: scaleX(-1) !important;
+}

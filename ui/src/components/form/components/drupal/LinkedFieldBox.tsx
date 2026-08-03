@@ -32,8 +32,8 @@ const LinkedFieldBox = ({
   // Convert arrows to slashes for the full label display
   const fullLabel = title.replaceAll(ARROW_SEPARATOR, SLASH_SEPARATOR);
   // Extract just the last segment for the short title
-  const parts = fullLabel.split(SLASH_SEPARATOR);
-  const shortTitle = parts[parts.length - 1];
+  const parts = title.split(/\s*[→/•·●]\s*/);
+  const shortTitle = (parts.pop() || title).trim();
 
   const inputUIData = useInputUIData();
   const { components, selectedComponentType } = inputUIData;
