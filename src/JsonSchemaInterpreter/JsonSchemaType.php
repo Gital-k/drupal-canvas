@@ -451,6 +451,37 @@ enum JsonSchemaType: string {
             ]),
             fieldInstanceSettings: ['file_extensions' => 'mp4'],
           ),
+          // @see \Drupal\file\Plugin\Field\FieldType\FileItem
+          // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+          JsonSchemaObjectRef::Document => new StorablePropShape(
+            shape: $shape,
+            fieldWidget: 'file_generic',
+            fieldTypeProp: new FieldTypeObjectPropsExpression('file', [
+              'src' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
+              ),
+              'filename' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', NULL, 'value'),
+              ),
+              'filesize' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filesize', NULL, 'value'),
+              ),
+              'mimetype' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', NULL, 'value'),
+              ),
+            ]),
+            // Core's `media.type.document` source field extension list, minus
+            // `txt`: every retained extension maps to the `application` MIME
+            // media type, while `txt` maps to `text/plain`, and shape matching
+            // requires a single media type per field. Modules can widen this
+            // list via hook_canvas_storable_prop_shape_alter().
+            // @see https://git.drupalcode.org/project/canvas/-/work_items/3524130#note_1678367
+            fieldInstanceSettings: ['file_extensions' => 'rtf doc docx ppt pptx xls xlsx pdf odf odg odp ods odt fodt fods fodp fodg key numbers pages'],
+          ),
           default => NULL,
         },
         default => NULL,
