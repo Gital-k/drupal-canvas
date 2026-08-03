@@ -523,10 +523,35 @@ final class StaticPropSource extends PropSourceBase {
     \assert($field_definition instanceof FieldStorageDefinition);
     $field_definition->setRequired($is_required);
 
+    $triggering_element = $form_state->getTriggeringElement();
+    $ajax = $triggering_element['#ajax'] ?? NULL;
+    $is_remove = \is_array($ajax) && isset($ajax['callback']) && \is_array($ajax['callback']) && \in_array('deleteAjax', $ajax['callback'], TRUE);
+
     // A field widget needs a FieldItemListInterface object. Use cloning to
     // prevent the field widget plugin from being able to modify this
     // StaticPropSource's field item list by reference.
     $field = clone $this->fieldItemList;
+
+    // Special handling for remove operations.
+    //
+    // Why: WidgetBase::formMultipleElements() uses `isset($items[$delta])` to
+    // decide whether to populate a delta from the field item list or append a
+    // new empty item. Without this, the removed delta remains occupied, so the
+    // next "Add" shows the old value instead of an empty one.
+    //
+    // Core avoids this via WidgetBase::deleteSubmit() + EntityFormDisplay::
+    // extractFormValues(), which update the entity's field item list from user
+    // input between AJAX requests. Canvas cannot use this: fieldItemList is
+    // conjured without entity context (see conjureFieldItemList()), so nothing
+    // updates it between requests until the prop is saved.
+    if ($is_remove &&
+      isset($triggering_element['#delta'])) {
+      $delta = $triggering_element['#delta'];
+      $values = $field->getValue();
+      unset($values[$delta]);
+      $field->setValue(array_values($values));
+    }
+
     // Remove empty or invalid items.
     $field->filterEmptyItems();
     // Widgets assume there is at least one field item present for editing.
