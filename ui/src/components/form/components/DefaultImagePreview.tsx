@@ -31,26 +31,6 @@ interface DefaultImagePreviewProps {
   propName: string;
 }
 
-/**
- * Checks if a value is considered empty (null, undefined, empty array, or empty object).
- * Used to determine if a prop source value has been explicitly set by the user.
- *
- * For image props showing defaults, the source value can be:
- * - undefined: Component freshly instantiated, no user action taken yet
- * - null: Backend normalized an explicitly removed value
- * - []: User just removed the value via the "Remove" button
- * - {}: Edge case where an empty object might be returned
- *
- * All of these indicate "no explicit user-provided value", meaning we should
- * show the default image preview.
- */
-const isEmptyValue = (value: unknown): boolean => {
-  if (value === null || value === undefined) return true;
-  if (Array.isArray(value) && value.length === 0) return true;
-  if (typeof value === 'object' && Object.keys(value).length === 0) return true;
-  return false;
-};
-
 const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
   const inputUIData = useInputUIData();
   const {
@@ -64,6 +44,7 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
   const patchProp = usePatchProp();
 
   const [hasMediaInWidget, setHasMediaInWidget] = useState(false);
+  const [removed, setRemoved] = useState(false);
   const fieldsetRef = useRef<Element | null>(null);
 
   const componentRefCallback = useCallback((node: HTMLDivElement | null) => {
@@ -113,30 +94,15 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
     | CodeComponentPropImageExample
     | undefined;
 
-  const sourceValue = selectedModel.source?.[propName]?.value;
-  const resolvedValue = selectedModel.resolved?.[propName] as
-    | CodeComponentPropImageExample
-    | undefined;
-
   const hasDefaultImage = !!defaultImageValue?.src;
-
-  const sourceIsEmpty = isEmptyValue(sourceValue);
-  const resolvedMatchesDefault =
-    hasDefaultImage && resolvedValue?.src === defaultImageValue?.src;
 
   // Determine if we should show the default image preview with remove button.
   // This is true when:
   // 1. The component prop has a default/example image defined (hasDefaultImage)
-  // 2. The user hasn't explicitly set a value - the source is empty (sourceIsEmpty)
-  // 3. The currently displayed (resolved) value matches the default (resolvedMatchesDefault)
-  // 4. No media has been selected in the media library widget (!hasMediaInWidget)
+  // 2. No media has been selected in the media library widget (!hasMediaInWidget)
   // This combination indicates the component is displaying its default image and
   // the user hasn't taken any action yet (no explicit value set, no media selected).
-  const isShowingDefaultImage =
-    hasDefaultImage &&
-    sourceIsEmpty &&
-    resolvedMatchesDefault &&
-    !hasMediaInWidget;
+  const isShowingDefaultImage = hasDefaultImage && !hasMediaInWidget;
 
   /**
    * Removes the default image by setting the prop value to an empty array.
@@ -144,6 +110,7 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
    * preventing it from reappearing after save/publish operations.
    */
   const handleRemoveDefault = () => {
+    setRemoved(true);
     if (
       !propData ||
       !editorFrameContext ||
@@ -151,11 +118,10 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
     ) {
       return;
     }
-
     patchProp(inputUIData, propName, { ...propData, value: [] }, []);
   };
 
-  if (!isShowingDefaultImage || !defaultImageValue) {
+  if (!isShowingDefaultImage || !defaultImageValue || removed) {
     return null;
   }
 
@@ -178,6 +144,11 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
             className={styles.removeDefaultButton}
             aria-label="Remove default"
             title="Remove default"
+            disabled={
+              !propData ||
+              !editorFrameContext ||
+              editorFrameContext === EditorFrameContext.NONE
+            }
           />
         )}
         <span className={styles.defaultImageLabel}>{imageAlt}</span>
