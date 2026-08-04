@@ -190,7 +190,9 @@ final class ApiConfigControllers extends ApiControllerBase {
       $bundle_info = $this->bundleInfo->getBundleInfo($entity_type_id);
       $bundles = [];
       foreach ($bundle_info as $bundle_key => $info) {
-        $bundle_route_params = $bundle_entity_type_id !== NULL ? [$bundle_entity_type_id => $bundle_key] : [];
+        // Plugin-based-bundle entity types (e.g. commerce_license) have no
+        // bundle entity type but still expect a `bundle` route parameter.
+        $bundle_route_params = [($bundle_entity_type_id ?? 'bundle') => $bundle_key];
 
         /** @var \Drupal\Core\Access\AccessResultInterface $edit_fields_access_check */
         $edit_fields_access_check = $this->accessManager->checkNamedRoute("entity.$entity_type_id.field_ui_fields", $bundle_route_params, $this->currentUser, TRUE);
