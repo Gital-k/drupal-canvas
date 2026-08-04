@@ -6,11 +6,13 @@ import React, {
   useState,
 } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
-import { Spinner, Text } from '@radix-ui/themes';
+import { Box, Link, Spinner } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { getPropsValues } from '@/components/form/react-hook-form/fields/componentFormData';
 import twigToJSXComponentMap from '@/components/form/twig-to-jsx-component-map';
+import EmptyStateCallout from '@/components/EmptyStateCallout';
+import PermissionCheck from '@/components/PermissionCheck';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
   clearFieldValues,
@@ -27,6 +29,7 @@ import {
   selectLatestUndoRedoActionId,
   selectSelectedComponentUuid,
 } from '@/features/ui/uiSlice';
+import { useEditorNavigation } from '@/hooks/useEditorNavigation';
 import { useDrupalBehaviors } from '@/hooks/useDrupalBehaviors';
 import useInputUIData from '@/hooks/useInputUIData';
 import hyperscriptify from '@/local_packages/hyperscriptify';
@@ -289,9 +292,11 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   const [formQueryString, setFormQueryString] = useState('');
   const [emptyProp, setEmptyProp] = useState(false);
   const [componentSource, setComponentSource] = useState('');
+  const [selectedComponentType, setSelectedComponentType] = useState('');
   const [renderComponentId, setRenderComponentId] = useState<string | null>(
     null,
   );
+  const { navigateToCodeEditor } = useEditorNavigation();
   const previousModelRef = useRef<EvaluatedComponentModel | null>(null);
   const previousSelectedComponentRef = useRef<string | null>(null);
   const previousLatestUndoRedoActionIdRef = useRef<string | null>(null);
@@ -344,11 +349,12 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     if (!node) {
       return;
     }
-    const [selectedComponentType] = node.type.split('@');
+    const [componentTypeFromNode] = node.type.split('@');
+    setSelectedComponentType(componentTypeFromNode);
 
     // This is metadata about the props of the SDC being edited. This is specific
     // to the SDC *type* but unconcerned with this SDC *instance*.
-    const component = components[selectedComponentType];
+    const component = components[componentTypeFromNode];
     const selectedComponentFieldData: FieldData = isPropSourceComponent(
       component,
     )
@@ -420,7 +426,7 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     previousSelectedComponentRef.current = selectedComponent;
     previousLatestUndoRedoActionIdRef.current = latestUndoRedoActionId;
 
-    setComponentSource(components?.[selectedComponentType]?.source || '');
+    setComponentSource(components?.[componentTypeFromNode]?.source || '');
   }, [
     components,
     error,
@@ -430,15 +436,35 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     layout,
     model,
   ]);
+  const isCodeComponent = componentSource === 'Code component';
+  const codeComponentMachineName = selectedComponentType.replace(/^js\./, '');
+
   return (
     formQueryString &&
     renderComponentId === selectedComponent && (
       <>
         <ComponentInstanceFormRenderer queryString={formQueryString} />
-        {componentSource === 'Module component' && emptyProp ? (
-          <Text size="4">This component has no props.</Text>
-        ) : (
-          ''
+        {emptyProp && (
+          <Box mt="3">
+            <EmptyStateCallout
+              title="This component has no props."
+              description={
+                isCodeComponent ? (
+                  <PermissionCheck hasPermission="codeComponents">
+                    <Link
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigateToCodeEditor(codeComponentMachineName);
+                      }}
+                    >
+                      Add props in the code editor
+                    </Link>
+                  </PermissionCheck>
+                ) : undefined
+              }
+            />
+          </Box>
         )}
       </>
     )
