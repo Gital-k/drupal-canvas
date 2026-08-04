@@ -17,6 +17,11 @@ import ErrorBoundary from '@/components/error/ErrorBoundary';
 import PageDataForm from '@/components/PageDataForm';
 import { setCurrentComponent } from '@/features/form/formStateSlice';
 import {
+  selectLayout,
+  selectModel,
+} from '@/features/layout/layoutModelSlice';
+import { findComponentByUuid } from '@/features/layout/layoutUtils';
+import {
   EditorFrameContext,
   selectEditorFrameContext,
   selectIsMultiSelect,
@@ -24,6 +29,7 @@ import {
   selectSelection,
 } from '@/features/ui/uiSlice';
 import useHidePanelClasses from '@/hooks/useHidePanelClasses';
+import { useGetComponentsQuery } from '@/services/componentAndLayout';
 
 import type React from 'react';
 
@@ -37,6 +43,22 @@ const ContextualPanel: React.FC = () => {
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const isTemplateContext = editorFrameContext === EditorFrameContext.TEMPLATE;
   const mainTabText = isTemplateContext ? 'Template data' : 'Page data';
+  const layout = useAppSelector(selectLayout);
+  const { data: components } = useGetComponentsQuery();
+
+  // Get the selected component's name for the tab title
+  let componentName = '';
+  if (selectedComponent && !isMultiSelect) {
+    const node = findComponentByUuid(layout, selectedComponent);
+    if (node && components) {
+      const component = components[node.type];
+      componentName = component?.name || node.type;
+    }
+  }
+
+  const settingsTabText = componentName
+    ? `Component: ${componentName}`
+    : 'Settings';
 
   const [activePanel, setActivePanel] = useState('pageData');
   const offRightClasses = useHidePanelClasses('right');
@@ -90,20 +112,20 @@ const ContextualPanel: React.FC = () => {
             className={clsx(styles.tabRoot)}
           >
             <Tabs.List justify="start" mx="4" size="1">
+              {(selectedComponent || isMultiSelect) && (
+                <Tabs.Trigger
+                  value="settings"
+                  data-testid="canvas-contextual-panel--settings"
+                >
+                  {settingsTabText}
+                </Tabs.Trigger>
+              )}
               {!isTemplateContext && (
                 <Tabs.Trigger
                   value="pageData"
                   data-testid="canvas-contextual-panel--page-data"
                 >
                   {mainTabText}
-                </Tabs.Trigger>
-              )}
-              {(selectedComponent || isMultiSelect) && (
-                <Tabs.Trigger
-                  value="settings"
-                  data-testid="canvas-contextual-panel--settings"
-                >
-                  Settings
                 </Tabs.Trigger>
               )}
             </Tabs.List>

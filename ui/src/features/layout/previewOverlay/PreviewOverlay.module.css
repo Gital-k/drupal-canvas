@@ -78,7 +78,7 @@
   }
 
   &.selected {
-    outline: 1px dashed var(--color-outline-component);
+    outline: 3px dashed var(--color-outline-component);
   }
 
   &.hovered {
