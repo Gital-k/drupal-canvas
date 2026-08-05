@@ -161,7 +161,6 @@ final class ApiConfigControllers extends ApiControllerBase {
     // @phpstan-ignore-next-line argument.type
     $flat_json = json_decode($response->getContent(), TRUE);
 
-    $supported_entity_type_ids = $this->contentTemplateRepository->getSupportedEntityTypeIds();
     $individual_bundle_entity_cache_tag_prefixes_to_ignore = [];
 
     // 1. Create the hierarchy:
@@ -176,7 +175,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     // hook_entity_bundle_info()  or via a bundle entity type.
     // @see \Drupal\Core\Entity\EntityTypeBundleInfo::getAllBundleInfo()
     $additional_cacheability->addCacheTags(['entity_bundles']);
-    foreach ($supported_entity_type_ids as $entity_type_id) {
+    foreach ($this->contentTemplateRepository->getSupportedEntityTypeIds() as $entity_type_id) {
       $entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
       \assert($entity_type instanceof EntityTypeInterface);
       $bundle_entity_type_id = $entity_type->getBundleEntityType();
