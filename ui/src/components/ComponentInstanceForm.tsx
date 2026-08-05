@@ -267,11 +267,12 @@ const ComponentInstanceFormRenderer: React.FC<
         }}
         ref={formRef}
       >
-        {persistentTransforms.current && (
-          <TransformsContext.Provider value={persistentTransforms.current}>
-            {jsxFormContent}
-          </TransformsContext.Provider>
-        )}
+        {persistentTransforms.current &&
+          currentComponentId === selectedComponent && (
+            <TransformsContext.Provider value={persistentTransforms.current}>
+              {jsxFormContent}
+            </TransformsContext.Provider>
+          )}
       </div>
     </Spinner>
   );
