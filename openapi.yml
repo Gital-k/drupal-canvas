@@ -3445,57 +3445,62 @@ paths:
                 additionalProperties:
                   title: List of Entity Bundles
                   type: object
-                  properties:
-                    label:
-                      type: string
-                    bundles:
+                  minProperties: 0
+                  additionalProperties:
+                    title: List of Entity View Displays
+                    type: object
+                    minProperties: 0
+                    additionalProperties:
+                      title: Entity View Display
                       type: object
-                      minProperties: 0
-                      additionalProperties:
-                        title: List of Entity View Displays
-                        type: object
-                        properties:
-                          id:
-                            type: string
-                            description: Entity View Display Id
-                          hasTemplate:
-                            type: boolean
-                            description: Boolean flag indicating if ContentTemplate for this Entity View Display exists
+                      properties:
+                        label:
+                          type: string
+                          description: Entity View Display label
+                        hasTemplate:
+                          type: boolean
+                          description: Boolean flag indicating if ContentTemplate for this Entity View Display exists
               examples:
-                node:
+                view modes per content entity type:
                   value:
-                    article:
-                      rss:
-                        label: RSS
-                        hasTemplate: false
-                      search_index:
-                        label: Search index
-                        hasTemplate: false
-                      search_result:
-                        label: Search result highlighting input
-                        hasTemplate: false
-                      full:
-                        label: Full content
-                        hasTemplate: true
-                      teaser:
-                        label: Teaser
-                        hasTemplate: false
-                    page:
-                      rss:
-                        label: RSS
-                        hasTemplate: false
-                      search_index:
-                        label: Search index
-                        hasTemplate: false
-                      search_result:
-                        label: Search result highlighting input
-                        hasTemplate: false
-                      full:
-                        label: Full content
-                        hasTemplate: true
-                      teaser:
-                        label: Teaser
-                        hasTemplate: true
+                    node:
+                      article:
+                        rss:
+                          label: RSS
+                          hasTemplate: false
+                        search_index:
+                          label: Search index
+                          hasTemplate: false
+                        search_result:
+                          label: Search result highlighting input
+                          hasTemplate: false
+                        full:
+                          label: Full content
+                          hasTemplate: true
+                        teaser:
+                          label: Teaser
+                          hasTemplate: false
+                      page:
+                        rss:
+                          label: RSS
+                          hasTemplate: false
+                        search_index:
+                          label: Search index
+                          hasTemplate: false
+                        search_result:
+                          label: Search result highlighting input
+                          hasTemplate: false
+                        full:
+                          label: Full content
+                          hasTemplate: true
+                        teaser:
+                          label: Teaser
+                          hasTemplate: true
+                    taxonomy_term:
+                      tags:
+                        full:
+                          label: Full content
+                          hasTemplate: false
   /canvas/api/v0/usage/component:
     get:
       summary: Get all components to see if they are in use.
