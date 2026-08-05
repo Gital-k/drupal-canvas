@@ -110,22 +110,22 @@ enum JsonSchemaStringFormat: string {
       static::Uuid => new DataTypeShapeRequirement('Uuid', []),
       // TRICKY: Drupal core does not support RFC3987 aka IRIs, but it's a superset of RFC3986.
       static::UriReference, static::Uri, static::IriReference, static::Iri => match (TRUE) {
-        // Custom: the targeted resource has `contentMediaType: image/*` or
-        // `contentMediaType: video/*`.
+        // Custom: the targeted resource has a wildcard `contentMediaType`,
+        // such as `image/*`, `video/*` or `application/*`.
         // @see https://github.com/json-schema-org/json-schema-spec/issues/1557
-        \array_key_exists('contentMediaType', $schema) && \in_array($schema['contentMediaType'], ['image/*', 'video/*'], TRUE) => new DataTypeShapeRequirements([
-          new DataTypeShapeRequirement(UriTargetMediaTypeConstraint::PLUGIN_ID, ['mimeType' => $schema['contentMediaType']]),
-          new DataTypeShapeRequirement(UriConstraint::PLUGIN_ID, [
-            'allowReferences' => $this === static::IriReference || $this === static::UriReference,
+        \array_key_exists('contentMediaType', $schema)
+          && UriTargetMediaTypeConstraint::isValidWildCard($schema['contentMediaType']) => new DataTypeShapeRequirements([
+            new DataTypeShapeRequirement(UriTargetMediaTypeConstraint::PLUGIN_ID, ['mimeType' => $schema['contentMediaType']]),
+            new DataTypeShapeRequirement(UriConstraint::PLUGIN_ID, [
+              'allowReferences' => $this === static::IriReference || $this === static::UriReference,
+            ]),
+            // Allow `x-allowed-schemes`, mirroring the default branch: field
+            // properties storing Drupal-specific URI schemes must not match.
+            ...!\array_key_exists('x-allowed-schemes', $schema)
+              ? []
+              : [new DataTypeShapeRequirement(UriSchemeConstraint::PLUGIN_ID, ['allowedSchemes' => $schema['x-allowed-schemes']])],
+            new DataTypeShapeRequirement('PrimitiveType', [], UriInterface::class),
           ]),
-          // Require `x-allowed-schemes`, because no SDC prop ever blindly
-          // accepts any URI scheme: it's always either a stream wrapper URI or
-          // a browser-accessible URI.
-          new DataTypeShapeRequirement(UriSchemeConstraint::PLUGIN_ID, [
-            'allowedSchemes' => $schema['x-allowed-schemes'],
-          ]),
-          new DataTypeShapeRequirement('PrimitiveType', [], UriInterface::class),
-        ]),
         default => new DataTypeShapeRequirements([
           new DataTypeShapeRequirement('PrimitiveType', [], UriInterface::class),
           new DataTypeShapeRequirement(UriConstraint::PLUGIN_ID, [
