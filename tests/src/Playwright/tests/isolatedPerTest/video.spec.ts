@@ -122,7 +122,11 @@ test.describe('Video Component', () => {
     );
   });
 
-  test('Can use media to populate a video prop', async ({ drupal, canvas }) => {
+  test('Can use media to populate a video prop', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
     await drupal.loginAsAdmin();
     await drupal.applyRecipe('core/recipes/local_video_media_type');
     await drupal.addPermissions({
@@ -153,6 +157,20 @@ test.describe('Video Component', () => {
     ]);
     await canvas.saveCodeComponent('js.videomedia');
     await canvas.addComponent({ id: 'js.videomedia' });
+
+    // The default preview thumbnail must show the poster image, not the
+    // video source, which cannot render in an img tag.
+    const videoFieldset = page.locator(
+      '[class*="contextualPanel"] fieldset[data-form-id="component_instance_form"][data-canvas-media-library-fieldset="true"]',
+    );
+    const defaultImagePreview = videoFieldset.locator(
+      '[class*="defaultImagePreview"]',
+    );
+    await expect(defaultImagePreview).toBeVisible({ timeout: 15000 });
+    await expect(defaultImagePreview.locator('img')).toHaveAttribute(
+      'src',
+      /placehold\.co/,
+    );
 
     await canvas.addMediaFile('../../../../../fixtures/videos/four-colors.mp4');
     const previewFrame = await canvas.getActivePreviewFrame();
