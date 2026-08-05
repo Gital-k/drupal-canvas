@@ -102,11 +102,11 @@ final class ContentTemplateHooks {
   public function menuLocalTasksAlter(array &$data, string $route_name, RefinableCacheableDependencyInterface &$cacheability): void {
     // Add content template cacheability on Field UI's entity view display
     // routes. Field UI only generates these routes for entity types with
-    // field_ui_base_route, which is the same criterion Canvas uses, so any
-    // entity.entity_view_display.* route is a supported entity type. This
-    // covers both the "Manage display" page (`entity.entity_view_display.*`)
-    // on Drupal < 11.4, and the display-mode overview
-    // (`entity.entity_view_display_overview.*`) as of Drupal 11.4.
+    // field_ui_base_route, which is a superset of the entity types Canvas
+    // supports, so this may add cacheability on a route Canvas has no template
+    // for. This covers both the "Manage display" page
+    // (`entity.entity_view_display.*`) on Drupal < 11.4, and the display-mode
+    // overview (`entity.entity_view_display_overview.*`) as of Drupal 11.4.
     // @see https://www.drupal.org/node/3574383
     if (\str_starts_with($route_name, 'entity.entity_view_display.') || \str_starts_with($route_name, 'entity.entity_view_display_overview.')) {
       // Add list cache tags to invalidate when entity ContentTemplate is
@@ -152,12 +152,9 @@ final class ContentTemplateHooks {
     // routes carry no bundle route parameter.
     $bundle = $bundle_entity_type !== NULL ? $route_parameters[$bundle_entity_type] : $entity_type_id;
     $view_mode_id = $route_parameters['view_mode_name'] ?? 'default';
-    $template_id = "$entity_type_id.$bundle.$view_mode_id";
 
     // Check if a Canvas template exists.
-    $template = $this->entityTypeManager
-      ->getStorage(ContentTemplate::ENTITY_TYPE_ID)
-      ->load($template_id);
+    $template = ContentTemplate::loadFor($entity_type_id, $bundle, $view_mode_id);
 
     // Only modify the link if the template exists and is enabled.
     if (!$template instanceof ConfigEntityInterface || !$template->status()) {

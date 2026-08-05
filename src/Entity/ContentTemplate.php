@@ -119,6 +119,43 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   protected $status = FALSE;
 
   /**
+   * Builds the ID of the template for an entity type, bundle and view mode.
+   *
+   * @param string $entity_type_id
+   *   A content entity type ID.
+   * @param string $bundle
+   *   A bundle of that entity type. For entity types without bundles, this is
+   *   the entity type ID.
+   * @param string $view_mode
+   *   A view mode machine name.
+   *
+   * @return string
+   *   The corresponding template ID, whether or not such a template exists.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\StringPartsConstraint
+   */
+  public static function createId(string $entity_type_id, string $bundle, string $view_mode): string {
+    return \implode('.', [$entity_type_id, $bundle, $view_mode]);
+  }
+
+  /**
+   * Tries to load the template for an entity type, bundle and view mode.
+   *
+   * @param string $entity_type_id
+   *   A content entity type ID.
+   * @param string $bundle
+   *   A bundle of that entity type.
+   * @param string $view_mode
+   *   A view mode machine name.
+   *
+   * @return self|null
+   *   The template, or NULL if none exists.
+   */
+  public static function loadFor(string $entity_type_id, string $bundle, string $view_mode): ?self {
+    return self::load(self::createId($entity_type_id, $bundle, $view_mode));
+  }
+
+  /**
    * Tries to load a template for a particular entity, in a specific view mode.
    *
    * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
@@ -131,19 +168,19 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
    *   does not exist.
    */
   public static function loadForEntity(FieldableEntityInterface $entity, string $view_mode): ?self {
-    $id = implode('.', [
-      $entity->getEntityTypeId(),
-      $entity->bundle(),
-      $view_mode,
-    ]);
-    return self::load($id);
+    // Entity types without bundles return their entity type ID from ::bundle().
+    return self::loadFor($entity->getEntityTypeId(), $entity->bundle(), $view_mode);
   }
 
   /**
    * {@inheritdoc}
    */
   public function id(): string {
-    return $this->content_entity_type_id . '.' . $this->content_entity_type_bundle . '.' . $this->content_entity_type_view_mode;
+    return self::createId(
+      (string) $this->content_entity_type_id,
+      (string) $this->content_entity_type_bundle,
+      (string) $this->content_entity_type_view_mode,
+    );
   }
 
   /**
@@ -477,7 +514,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   public static function createFromClientSide(array $data): static {
     ['entityType' => $entity_type, 'bundle' => $bundle, 'viewMode' => $view_mode] = $data;
     return self::create([
-      'id' => "$entity_type.$bundle.$view_mode",
+      'id' => self::createId($entity_type, $bundle, $view_mode),
       'content_entity_type_id' => $entity_type,
       'content_entity_type_bundle' => $bundle,
       'content_entity_type_view_mode' => $view_mode,

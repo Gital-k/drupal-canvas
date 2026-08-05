@@ -75,12 +75,19 @@ class ViewModeAccessCheck implements AccessInterface {
     }
 
     if (empty($bundle)) {
-      $entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
-      if ($bundle_entity_type = $entity_type->getBundleEntityType()) {
-        $bundle = $route_match->getRawParameter($bundle_entity_type);
-      }
+      $bundle_entity_type = $this->entityTypeManager
+        ->getDefinition($entity_type_id)
+        ->getBundleEntityType();
+      // Entity types without a bundle entity type have a single implicit bundle
+      // equal to the entity type ID.
+      $bundle = $bundle_entity_type === NULL
+        ? $entity_type_id
+        : $route_match->getRawParameter($bundle_entity_type);
     }
-    return ContentTemplate::load("$entity_type_id.$bundle.$view_mode");
+    if (!\is_string($bundle) || $bundle === '') {
+      return NULL;
+    }
+    return ContentTemplate::loadFor($entity_type_id, $bundle, $view_mode);
   }
 
 }

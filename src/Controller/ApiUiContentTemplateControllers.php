@@ -157,7 +157,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
 
       foreach ($entity_view_modes as $view_mode => $view_mode_label) {
         foreach (\array_keys($bundle_info) as $bundle) {
-          $template_id = "$entity_type_id.$bundle.$view_mode";
+          $template_id = ContentTemplate::createId($entity_type_id, $bundle, $view_mode);
           $data[$entity_type_id][$bundle][$view_mode] = [
             'label' => $view_mode_label,
             'hasTemplate' => \in_array($template_id, $template_keys, TRUE),
