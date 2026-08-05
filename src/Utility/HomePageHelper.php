@@ -7,6 +7,9 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 
+/**
+ * @internal
+ */
 final class HomePageHelper {
 
   public function __construct(private ConfigFactoryInterface $configFactory, private EntityTypeManagerInterface $entityTypeManager) {}

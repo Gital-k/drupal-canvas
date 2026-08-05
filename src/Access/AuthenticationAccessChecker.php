@@ -15,6 +15,9 @@ use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
+/**
+ * Access checker to inform a Canvas user of an expired session.
+ */
 class AuthenticationAccessChecker implements AccessInterface {
 
   public function __construct(

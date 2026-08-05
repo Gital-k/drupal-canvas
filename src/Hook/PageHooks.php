@@ -21,7 +21,6 @@ use Drupal\pathauto\PathautoItem;
 use Drupal\pathauto\PathautoState;
 
 /**
- * @file
  * Hook implementations that makes Canvas's Page content entity type work.
  *
  * @see https://www.drupal.org/project/issues/canvas?component=Page

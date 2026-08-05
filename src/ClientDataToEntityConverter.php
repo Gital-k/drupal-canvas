@@ -32,6 +32,13 @@ use GuzzleHttp\Psr7\Query;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Validator\ConstraintViolation;
 
+/**
+ * The service that converts from client-side to server-side representation.
+ *
+ * @see docs/adr/0005-Keep-the-front-end-simple.md
+ * @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::getClientSideRepresentation()
+ * @internal
+ */
 class ClientDataToEntityConverter {
 
   use ClientServerConversionTrait;

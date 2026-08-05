@@ -23,7 +23,6 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Route;
 
 /**
- * @file
  * Hook implementations that make Component Sources work.
  *
  * @see https://www.drupal.org/project/issues/canvas?component=Component+sources

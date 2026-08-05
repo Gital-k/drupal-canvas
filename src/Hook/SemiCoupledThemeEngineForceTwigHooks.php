@@ -9,7 +9,6 @@ use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Render\Element;
 
 /**
- * @file
  * Hook implementations informing the Semi-Coupled theme engine to Twig-render.
  *
  * Identifies templates that should be Twig rendered.

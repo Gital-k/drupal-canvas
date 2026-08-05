@@ -24,25 +24,38 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
     <exclude name="Drupal.Commenting.FunctionComment.ParamMissingDefinition"/>
     <exclude name="Drupal.Commenting.FunctionComment.MissingReturnComment"/>
     <exclude name="Drupal.Commenting.FileComment.Missing"/>
-    <exclude name="Drupal.Commenting.FunctionComment.Missing">
-      <exclude-pattern>*/Functional/*</exclude-pattern>
-      <exclude-pattern>*/tests/modules/*</exclude-pattern>
-    </exclude>
+    <exclude name="Drupal.Commenting.FunctionComment.Missing"/>
     <exclude name="Drupal.Commenting.VariableComment.Missing"/>
-    <exclude name="Drupal.Commenting.ClassComment.Missing">
-      <include-pattern>*/Functional/*</include-pattern>
-      <include-pattern>*/tests/modules/*</include-pattern>
-    </exclude>
   </rule>
   <!-- … allow long-line array declarations where they are useful: in test expectations. -->
   <rule ref="Drupal.Arrays.Array.LongLineDeclaration">
+    <!-- upstream: neither includes nor excludes ⇒ Canvas can specify them -->
     <exclude-pattern>*/tests/*</exclude-pattern>
   </rule>
+  <rule ref="Drupal.Commenting.ClassComment.Missing">
+    <!-- upstream: neither includes nor excludes ⇒ Canvas can specify them -->
+    <!-- Exclude code style enforcement, tests and experimental functionality -->
+    <exclude-pattern>*/phpstan_rules/*</exclude-pattern>
+    <exclude-pattern>*/src/Extension/*</exclude-pattern>
+    <exclude-pattern>*/tests/*</exclude-pattern>
+    <exclude-pattern>*/modules/canvas_dev_mode/*</exclude-pattern>
+    <exclude-pattern>*/modules/canvas_personalization/*</exclude-pattern>
+    <!-- Exclude plugins whose attributes already provide ample documentation. -->
+    <exclude-pattern>*/src/Plugin/*</exclude-pattern>
+    <exclude-pattern>*/src/Element/*</exclude-pattern>
+    <exclude-pattern>*/src/Entity/*</exclude-pattern>
+    <!-- Exclude entity handlers; the docs for the entity type should provide the necessary documentation. -->
+    <exclude-pattern>*/src/EntityHandlers/*</exclude-pattern>
+    <!-- Exclude controllers whose route definition plus OpenAPI specs already provides ample documentation. -->
+    <exclude-pattern>*/src/Controller/*</exclude-pattern>
+  </rule>
   <rule ref="Drupal.Files.EndFileNewline">
+    <!-- upstream: neither includes nor excludes ⇒ Canvas can specify them -->
     <exclude-pattern>*/config/install/*\.yml$</exclude-pattern>
   </rule>
   <!-- @todo eventually apply stricter rules to canvas_ai, too. -->
   <rule ref="Drupal.Files.LineLength.TooLong">
+    <!-- upstream: excludes ⇒ Canvas can add more excludes -->
     <exclude-pattern>*/canvas_ai/*</exclude-pattern>
   </rule>
 

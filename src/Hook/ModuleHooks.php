@@ -24,6 +24,9 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Validator\Constraints\NotEqualTo;
 use Symfony\Component\Validator\Constraints\Unique;
 
+/**
+ * General Canvas module hook implementations.
+ */
 class ModuleHooks {
 
   use StringTranslationTrait;

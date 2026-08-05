@@ -9,6 +9,9 @@ use Drupal\Core\Routing\RouteSubscriberBase;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Routing\RouteCollection;
 
+/**
+ * Alters Canvas' routes marked "external API" to use `canvas_oauth`.
+ */
 class CanvasOauthRouteSubscriber extends RouteSubscriberBase {
 
   /**

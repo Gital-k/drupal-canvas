@@ -24,6 +24,9 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Validator\Constraints\RegexValidator;
 
+/**
+ * Complements canvas.services.yml: alterations or conditionally registered.
+ */
 class CanvasServiceProvider extends ServiceProviderBase {
 
   /**

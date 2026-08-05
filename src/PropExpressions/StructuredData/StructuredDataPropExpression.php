@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropExpressions\StructuredData;
 
+/**
+ * Utility for parsing any structured data prop expression from a string.
+ *
+ * Specifically: any
+ * - EntityFieldBasedPropExpressionInterface
+ * - FieldTypeBasedPropExpressionInterface
+ */
 final class StructuredDataPropExpression {
 
   use CompoundExpressionTrait;

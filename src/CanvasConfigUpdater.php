@@ -30,6 +30,9 @@ use Drupal\canvas\Utility\ComponentMetadataHelper;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\field\Entity\FieldConfig;
 
+/**
+ * Update paths for Canvas' config.
+ */
 class CanvasConfigUpdater {
 
   use ComponentTreeItemListInstantiatorTrait;
