@@ -163,6 +163,11 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟width'],
       ],
       'type=object&$ref=json-schema-definitions://canvas.module/date-range' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_event_duration␞␟{from↠value,to↠end_value}'],
+      // Matched by media source class, not by the source field's extension
+      // list: press_releases allows `txt`, whose extension-derived matching
+      // would target `text/*` and `application/*` at once.
+      // @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::matchMediaSourceObjectShape()
+      'type=object&$ref=' . JsonSchemaObjectRef::Document->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media:press_releases␝field_media_file␞␟{src↝entity␜␜entity:file␝uri␞␟url,filename↝entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:file␝filemime␞␟value}'],
       'type=object&$ref=' . JsonSchemaObjectRef::Image->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
       'type=object&$ref=' . JsonSchemaObjectRef::Image->value . '!optional' => [
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟{src↠src_with_alternate_widths,width↝entity␜␜entity:file␝filesize␞␟value}'],
@@ -462,6 +467,10 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value'],
       ],
+      // The host media entity's own source field provides the document object
+      // props directly.
+      // @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::matchMediaSourceObjectShape()
+      'type=object&$ref=' . JsonSchemaObjectRef::Document->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝field_media_file␞␟{src↝entity␜␜entity:file␝uri␞␟url,filename↝entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:file␝filemime␞␟value}'],
       'type=object&$ref=' . JsonSchemaObjectRef::Image->value . '!optional' => [
         'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:media:press_releases␝thumbnail␞␟{src↠src_with_alternate_widths,alt↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:file␝filesize␞␟value}',
