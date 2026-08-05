@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
+use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -30,7 +31,9 @@ final readonly class ContentTemplateRepository {
    *   configurable fields via Field UI). Follow-up issue needed.
    */
   public static function isSupportedEntityType(EntityTypeInterface $entity_type): bool {
-    return $entity_type instanceof ContentEntityTypeInterface && (bool) $entity_type->get('field_ui_base_route');
+    return $entity_type instanceof ContentEntityTypeInterface
+      && !$entity_type->entityClassImplements(ComponentTreeEntityInterface::class)
+      && (bool) $entity_type->get('field_ui_base_route');
   }
 
   /**

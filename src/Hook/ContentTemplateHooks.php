@@ -6,7 +6,6 @@ namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\ContentTemplateRepository;
 use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\Entity\Page;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
@@ -72,17 +71,6 @@ final class ContentTemplateHooks {
   public function entityTypeAlter(array $definitions): void {
     /** @var \Drupal\Core\Entity\EntityTypeInterface $entity_type */
     foreach ($definitions as $entity_type) {
-      // Canvas pages don't have any structured data, and therefore don't
-      // support content templates (which require structured data anyway – that
-      // is, they need to be using at least one entity field prop source).
-      // @see docs/adr/0004-page-entity-type.md
-      if ($entity_type->id() === Page::ENTITY_TYPE_ID) {
-        continue;
-      }
-      // Canvas can only render fieldable content entities. Any content entity
-      // types with structured data (all of them except Canvas' own `Page`)
-      // must be assumed to use ContentTemplates, and hence should use that view
-      // builder.
       // Note: as soon as a ContentTemplate exists for a certain content entity
       // type + view mode, the original template will NOT be used anymore:
       // - not the view mode-specific one, such as `node--teaser.html.twig`
