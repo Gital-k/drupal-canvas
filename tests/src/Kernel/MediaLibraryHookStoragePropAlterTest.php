@@ -57,6 +57,14 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     // @see \Drupal\media\Plugin\media\Source\VideoFile
     $this->createMediaType('video_file', ['id' => 'baby_videos']);
     $this->createMediaType('video_file', ['id' => 'vacation_videos']);
+    // @see \Drupal\media\Plugin\media\Source\File
+    $this->createMediaType('file', ['id' => 'baby_documents']);
+    $this->createMediaType('file', ['id' => 'vacation_documents']);
+    // AudioFile extends File, but audio media types must not match the
+    // document shape: this media type must not appear in any expectation.
+    // @see \Drupal\media\Plugin\media\Source\AudioFile
+    // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES
+    $this->createMediaType('audio_file', ['id' => 'podcasts']);
 
     // A sample value is generated during the test, which needs this table.
     $this->installSchema('file', ['file_usage']);
@@ -122,6 +130,25 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
           'target_bundles' => [
             'baby_videos' => 'baby_videos',
             'vacation_videos' => 'vacation_videos',
+          ],
+        ],
+      ],
+    );
+
+    $storable_prop_shapes['type=object&$ref=' . JsonSchemaObjectRef::Document->value] = new StorablePropShape(
+      shape: JsonSchemaObjectRef::Document->asPropShape(),
+      // @phpstan-ignore-next-line
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟entity␜[␜entity:media:baby_documents␝field_media_file␞␟{src↝entity␜␜entity:file␝uri␞␟url,filename↝entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:file␝filemime␞␟value}][␜entity:media:vacation_documents␝field_media_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url,filename↝entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:file␝filemime␞␟value}]'),
+      fieldWidget: 'media_library_widget',
+      fieldStorageSettings: [
+        'target_type' => 'media',
+      ],
+      fieldInstanceSettings: [
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => [
+            'baby_documents' => 'baby_documents',
+            'vacation_documents' => 'vacation_documents',
           ],
         ],
       ],
