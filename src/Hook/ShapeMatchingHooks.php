@@ -43,6 +43,7 @@ use Drupal\editor\EditorInterface;
 use Drupal\filter\FilterFormatInterface;
 use Drupal\media\Entity\MediaType;
 use Drupal\media\MediaTypeInterface;
+use Drupal\media\Plugin\media\Source\AudioFile;
 use Drupal\media\Plugin\media\Source\File;
 use Drupal\media\Plugin\media\Source\Image;
 use Drupal\media\Plugin\media\Source\VideoFile;
@@ -65,6 +66,18 @@ class ShapeMatchingHooks {
     JsonSchemaObjectRef::Video->value => VideoFile::class,
     // @see \Drupal\media\Plugin\media\Source\File
     JsonSchemaObjectRef::Document->value => File::class,
+  ];
+
+  /**
+   * Media source classes that extend a mapped source but match no schema.
+   *
+   * AudioFile extends File, but audio files are not documents. Without this
+   * list, media types using these sources would match the schema mapped to
+   * their parent class in SCHEMA_TO_MEDIA_SOURCE.
+   */
+  const UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES = [
+    // @see \Drupal\media\Plugin\media\Source\AudioFile
+    AudioFile::class,
   ];
 
   /**
@@ -410,9 +423,9 @@ class ShapeMatchingHooks {
    */
   private static function getMediaTypesForSource(string $media_source_class) : array {
     // Allow all MediaTypes that use the "image" MediaSource, for example.
-    // A MediaType whose source matches a more specific entry in
-    // SCHEMA_TO_MEDIA_SOURCE only matches that entry: VideoFile extends File,
-    // so video MediaTypes must not match the document shape.
+    // A MediaType whose source is a more specific subclass never matches its
+    // parent class's schema: VideoFile and AudioFile both extend File, so
+    // video and audio MediaTypes must not match the document shape.
     // @see \Drupal\media\Plugin\media\Source\Image
     $media_types = array_filter(
       MediaType::loadMultiple(),
@@ -429,7 +442,12 @@ class ShapeMatchingHooks {
   }
 
   /**
-   * Whether a MediaType's source maps to a subclass of the given source class.
+   * Whether a MediaType's source is a more specific subclass of a source.
+   *
+   * A source class can be more specific because it maps to another schema
+   * (VideoFile) or because it matches no schema at all (AudioFile). Either
+   * way, its media types must not match the schema mapped to the given
+   * (parent) source class.
    *
    * @param \Drupal\media\MediaTypeInterface $type
    *   A media type.
@@ -439,7 +457,11 @@ class ShapeMatchingHooks {
    * @return bool
    */
   private static function hasMoreSpecificMediaSourceMapping(MediaTypeInterface $type, string $media_source_class): bool {
-    foreach (self::SCHEMA_TO_MEDIA_SOURCE as $other_source_class) {
+    $more_specific_source_classes = [
+      ...\array_values(self::SCHEMA_TO_MEDIA_SOURCE),
+      ...self::UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES,
+    ];
+    foreach ($more_specific_source_classes as $other_source_class) {
       if ($other_source_class !== $media_source_class
         && is_subclass_of($other_source_class, $media_source_class)
         && is_a($type->getSource(), $other_source_class)) {
