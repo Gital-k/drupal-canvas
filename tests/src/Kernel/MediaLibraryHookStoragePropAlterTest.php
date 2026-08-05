@@ -60,7 +60,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     // AudioFile extends File, but audio media types must not match the
     // document shape: this media type must not appear in any expectation.
     // @see \Drupal\media\Plugin\media\Source\AudioFile
-    // @see \Drupal\canvas\Hook\ShapeMatchingHooks::UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES
+    // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES
     $this->createMediaType('audio_file', ['id' => 'podcasts']);
 
     // A sample value is generated during the test, which needs this table.

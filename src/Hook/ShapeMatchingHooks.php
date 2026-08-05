@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
-use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\DateRangeItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\DateTimeItemOverride;
@@ -32,6 +31,7 @@ use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranche
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropShape\CandidateStorablePropShape;
+use Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityInterface;
@@ -41,12 +41,8 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\editor\EditorInterface;
 use Drupal\filter\FilterFormatInterface;
-use Drupal\media\Entity\MediaType;
 use Drupal\media\MediaTypeInterface;
-use Drupal\media\Plugin\media\Source\AudioFile;
-use Drupal\media\Plugin\media\Source\File;
 use Drupal\media\Plugin\media\Source\Image;
-use Drupal\media\Plugin\media\Source\VideoFile;
 use Symfony\Component\Validator\Constraints\Hostname;
 use Symfony\Component\Validator\Constraints\Ip;
 
@@ -58,27 +54,6 @@ use Symfony\Component\Validator\Constraints\Ip;
  * @see docs/shape-matching-into-field-types.md, section 3.1.2.b
  */
 class ShapeMatchingHooks {
-
-  const SCHEMA_TO_MEDIA_SOURCE = [
-    // @see \Drupal\media\Plugin\media\Source\Image
-    JsonSchemaObjectRef::Image->value => Image::class,
-    // @see \Drupal\media\Plugin\media\Source\VideoFile
-    JsonSchemaObjectRef::Video->value => VideoFile::class,
-    // @see \Drupal\media\Plugin\media\Source\File
-    JsonSchemaObjectRef::Document->value => File::class,
-  ];
-
-  /**
-   * Media source classes that extend a mapped source but match no schema.
-   *
-   * AudioFile extends File, but audio files are not documents. Without this
-   * list, media types using these sources would match the schema mapped to
-   * their parent class in SCHEMA_TO_MEDIA_SOURCE.
-   */
-  const UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES = [
-    // @see \Drupal\media\Plugin\media\Source\AudioFile
-    AudioFile::class,
-  ];
 
   /**
    * Implements hook_validation_constraint_alter().
@@ -303,7 +278,7 @@ class ShapeMatchingHooks {
       // changes, this hook should be called again (for this shape).
       $storable_prop_shape->addCacheTags(['config:media_type_list']);
 
-      $media_types = self::getMediaTypesForSource(Image::class);
+      $media_types = MediaSourceObjectShapes::getMediaTypesForSource(Image::class);
       if (!empty($media_types)) {
         $source_field_names = \array_map(
           // @phpstan-ignore method.nonObject
@@ -335,15 +310,15 @@ class ShapeMatchingHooks {
 
     if ($storable_prop_shape->shape->schema['type'] === 'object' &&
       isset($storable_prop_shape->shape->schema['$ref']) &&
-      \array_key_exists($storable_prop_shape->shape->schema['$ref'], self::SCHEMA_TO_MEDIA_SOURCE)
+      \array_key_exists($storable_prop_shape->shape->schema['$ref'], MediaSourceObjectShapes::SCHEMA_TO_MEDIA_SOURCE)
     ) {
       // This alter hook won't have any effect unless MediaTypes exist that use
       // a particular MediaSource plugin. So, whenever the list of MediaTypes
       // changes, this hook should be called again (for this shape).
       $storable_prop_shape->addCacheTags(['config:media_type_list']);
 
-      $media_source_class = self::SCHEMA_TO_MEDIA_SOURCE[$storable_prop_shape->shape->schema['$ref']];
-      $media_types = self::getMediaTypesForSource($media_source_class);
+      $media_source_class = MediaSourceObjectShapes::SCHEMA_TO_MEDIA_SOURCE[$storable_prop_shape->shape->schema['$ref']];
+      $media_types = MediaSourceObjectShapes::getMediaTypesForSource($media_source_class);
 
       // For each media type (i.e. bundle), create a "branch" of this prop
       // expression that specifically targets the source field of the media
@@ -359,7 +334,7 @@ class ShapeMatchingHooks {
             entityType: $media_entity_type_and_bundle,
             fieldName: $source_field_name,
             delta: NULL,
-            objectPropsToFieldProps: self::getObjectProps($media_source_class, $media_entity_type_and_bundle, $source_field_name),
+            objectPropsToFieldProps: MediaSourceObjectShapes::getObjectProps($media_source_class, $media_entity_type_and_bundle, $source_field_name),
           );
         }
         // Comply with the order requirements of
@@ -414,112 +389,6 @@ class ShapeMatchingHooks {
       $storable_prop_shape->fieldStorageSettings = ['datetime_type' => DateTimeItem::DATETIME_TYPE_DATE];
       $storable_prop_shape->fieldWidget = 'daterange_default';
     }
-  }
-
-  /**
-   * @param class-string $media_source_class
-   *
-   * @return array
-   */
-  private static function getMediaTypesForSource(string $media_source_class) : array {
-    // Allow all MediaTypes that use the "image" MediaSource, for example.
-    // A MediaType whose source is a more specific subclass never matches its
-    // parent class's schema: VideoFile and AudioFile both extend File, so
-    // video and audio MediaTypes must not match the document shape.
-    // @see \Drupal\media\Plugin\media\Source\Image
-    $media_types = array_filter(
-      MediaType::loadMultiple(),
-      fn (MediaTypeInterface $type): bool => is_a($type->getSource(), $media_source_class)
-        && !self::hasMoreSpecificMediaSourceMapping($type, $media_source_class)
-    );
-    ksort($media_types);
-    $media_type_ids = \array_map(
-    // @phpstan-ignore-next-line
-      fn (MediaTypeInterface $type): string => $type->id(),
-      $media_types
-    );
-    return array_combine($media_type_ids, $media_types);
-  }
-
-  /**
-   * Whether a MediaType's source is a more specific subclass of a source.
-   *
-   * A source class can be more specific because it maps to another schema
-   * (VideoFile) or because it matches no schema at all (AudioFile). Either
-   * way, its media types must not match the schema mapped to the given
-   * (parent) source class.
-   *
-   * @param \Drupal\media\MediaTypeInterface $type
-   *   A media type.
-   * @param class-string $media_source_class
-   *   The MediaSource plugin class being matched.
-   *
-   * @return bool
-   */
-  private static function hasMoreSpecificMediaSourceMapping(MediaTypeInterface $type, string $media_source_class): bool {
-    $more_specific_source_classes = [
-      ...\array_values(self::SCHEMA_TO_MEDIA_SOURCE),
-      ...self::UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES,
-    ];
-    foreach ($more_specific_source_classes as $other_source_class) {
-      if ($other_source_class !== $media_source_class
-        && is_subclass_of($other_source_class, $media_source_class)
-        && is_a($type->getSource(), $other_source_class)) {
-        return TRUE;
-      }
-    }
-    return FALSE;
-  }
-
-  /**
-   * Returns FieldObjectProp for the given MediaSource.
-   *
-   * @param class-string $media_source_class
-   *   A MediaSource plugin class.
-   * @param \Drupal\canvas\TypedData\BetterEntityDataDefinition $media_entity_type_and_bundle
-   * @param string $source_field_name
-   *
-   * @return non-empty-array<string, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression>
-   */
-  protected static function getObjectProps(string $media_source_class, BetterEntityDataDefinition $media_entity_type_and_bundle, string $source_field_name): array {
-    return match ($media_source_class) {
-      Image::class => [
-        // TRICKY: Additional computed property on image fields added by
-        // Drupal Canvas.
-        // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride
-        // @phpcs:disable Drupal.Files.LineLength.TooLong
-        'src' => new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'src_with_alternate_widths'),
-        // @phpcs:enable
-        'alt' => new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'alt'),
-        'width' => new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'width'),
-        'height' => new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'height'),
-      ],
-      VideoFile::class => [
-        'src' => new ReferenceFieldPropExpression(
-          new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
-          new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
-        ),
-      ],
-      File::class => [
-        'src' => new ReferenceFieldPropExpression(
-          new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
-          new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
-        ),
-        'filename' => new ReferenceFieldPropExpression(
-          new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
-          new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', \NULL, 'value')
-        ),
-        'filesize' => new ReferenceFieldPropExpression(
-          new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
-          new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filesize', \NULL, 'value')
-        ),
-        'mimetype' => new ReferenceFieldPropExpression(
-          new FieldPropExpression($media_entity_type_and_bundle, $source_field_name, \NULL, 'entity'),
-          new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', \NULL, 'value')
-        ),
-      ],
-      default => throw new \InvalidArgumentException(\sprintf('%s is not a supported Media Source class for shape matching.', $media_source_class)),
-    };
   }
 
 }
