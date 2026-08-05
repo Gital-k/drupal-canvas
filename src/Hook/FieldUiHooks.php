@@ -11,7 +11,6 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Messenger\MessengerInterface;
-use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\Core\Url;
@@ -24,7 +23,6 @@ final class FieldUiHooks {
   use StringTranslationTrait;
 
   public function __construct(
-    private readonly RouteMatchInterface $routeMatch,
     private readonly MessengerInterface $messenger,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     TranslationInterface $string_translation,
@@ -42,8 +40,8 @@ final class FieldUiHooks {
    * instead of the standard "Manage display" table.
    *
    * The CTA is only displayed when:
-   * - The current route is an entity view display edit form for a supported
-   *   entity type
+   * - The display being edited targets an entity type that supports content
+   *   templates
    * - No content templates exist for the bundle
    * - The user has permission to create a content template
    *
@@ -58,20 +56,6 @@ final class FieldUiHooks {
       return;
     }
 
-    // Show the CTA on entity_view_display routes for any entity type that
-    // supports Canvas content templates (i.e. has a field_ui_base_route).
-    $route_name = $this->routeMatch->getRouteName();
-    if ($route_name === NULL) {
-      return;
-    }
-    $is_supported_route = \array_any(
-      $this->contentTemplateRepository->getSupportedEntityTypeIds(),
-      fn (string $entity_type_id): bool => \str_starts_with($route_name, "entity.entity_view_display.$entity_type_id."),
-    );
-    if (!$is_supported_route) {
-      return;
-    }
-
     /** @var \Drupal\Core\Entity\EntityFormInterface $form_object */
     $form_object = $form_state->getFormObject();
     $display = $form_object->getEntity();
@@ -81,6 +65,11 @@ final class FieldUiHooks {
 
     $entity_type_id = $display->getTargetEntityTypeId();
     $bundle = $display->getTargetBundle();
+
+    $target_entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
+    if (!$this->contentTemplateRepository->isSupportedEntityType($target_entity_type)) {
+      return;
+    }
 
     // Check if any content templates exist for this bundle.
     $storage = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID);
