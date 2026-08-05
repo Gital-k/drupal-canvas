@@ -14,6 +14,7 @@ use Drupal\canvas\Form\ClientFormSubmissionHelper;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Component\Render\PlainTextOutput;
+use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\content_translation\FieldTranslationSynchronizerInterface;
@@ -276,7 +277,9 @@ class ClientDataToEntityConverter {
     ));
     // Load the persisted entity so we can restore fields after form processing.
     // The entity passed in may already carry a previous auto-save's values.
-    $db_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
+    $entity_id = $entity->id();
+    \assert($entity_id !== NULL);
+    $db_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity_id);
     // Snapshot fields not being submitted; buildForm/submitForm runs
     // extractFormValues() on all widgets and may overwrite them with defaults.
     $preserved_field_values = [];
@@ -452,7 +455,7 @@ class ClientDataToEntityConverter {
     // Must run AFTER the $fields_to_update loop so it is not overwritten by
     // the entity-clone copy.
     if (\function_exists('metatag_get_default_tags')) {
-      $default_tags = \metatag_get_default_tags($entity) ?: [];
+      $default_tags = \metatag_get_default_tags($entity) ?? [];
       foreach ($client_field_names as $field_name) {
         if (!$entity->hasField($field_name)) {
           continue;
@@ -472,7 +475,7 @@ class ClientDataToEntityConverter {
         $has_custom_value = FALSE;
         $stored_tags = [];
         foreach ($field->getValue() as $item) {
-          $stored_tags = \Drupal\Component\Serialization\Json::decode($item['value'] ?? '[]') ?: [];
+          $stored_tags = Json::decode($item['value'] ?? '[]') ?? [];
           foreach ($stored_tags as $tag_id => $tag_value) {
             if (!\array_key_exists($tag_id, $default_tags) || $default_tags[$tag_id] !== $tag_value) {
               $has_custom_value = TRUE;
@@ -480,7 +483,7 @@ class ClientDataToEntityConverter {
             }
           }
         }
-        if (!$has_custom_value && $db_entity instanceof \Drupal\Core\Entity\FieldableEntityInterface && $db_entity->hasField($field_name)) {
+        if (!$has_custom_value && $db_entity instanceof FieldableEntityInterface && $db_entity->hasField($field_name)) {
           $entity->set($field_name, $db_entity->get($field_name)->getValue());
         }
       }
