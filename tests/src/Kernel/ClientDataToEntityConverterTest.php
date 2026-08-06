@@ -675,8 +675,9 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     ]);
     $page->save();
 
-    // Capture the DB-stored value.
-    $db_metatags_value = $page->get('metatags')->getValue();
+    // Capture the DB-stored tags as a decoded map so key-order differences in
+    // the JSON serialization do not cause spurious assertion failures.
+    $db_metatags_decoded = Json::decode($page->get('metatags')->getValue()[0]['value'] ?? '{}') ?? [];
 
     // Get entity_form_fields as the API would return them. When metatag is
     // installed, these include the resolved token values for each tag (not the
@@ -710,9 +711,10 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     // created because the resolved values differ from the stored token strings.
     $converter->convert($api_json, $page);
 
+    $after_convert_decoded = Json::decode($page->get('metatags')->getValue()[0]['value'] ?? '{}') ?? [];
     self::assertEquals(
-      $db_metatags_value,
-      $page->get('metatags')->getValue(),
+      $db_metatags_decoded,
+      $after_convert_decoded,
       'After convert() with default metatag token values, the metatags field must be restored to the DB value (token strings) to prevent a phantom auto-save.'
     );
 
