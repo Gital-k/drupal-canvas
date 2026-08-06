@@ -26,7 +26,9 @@ use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\Utility\ComponentMetadataHelper;
+use Drupal\Component\Utility\SortArray;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\field\Entity\FieldConfig;
 
@@ -314,6 +316,141 @@ class CanvasConfigUpdater {
     // Write the mutated tree back. setComponentTree() re-normalizes inputs to
     // arrays; FieldConfig needs the explicit conversion, mirroring
     // ::updateConfigEntityWithComponentTreeInputsAsArrays().
+    if ($entity instanceof ComponentTreeEntityInterface) {
+      $entity->setComponentTree($tree->getValue());
+    }
+    else {
+      $entity->set('default_value', ComponentTreeConfigEntityBase::componentTreeInstancesInputsMustBeArrays($tree->getValue()));
+    }
+    return TRUE;
+  }
+
+  /**
+   * Returns the cleaned-up schema for a default-relative-url value, or NULL.
+   *
+   * A default-relative-url value stores a copy of its JSON Schema. Old copies
+   * still have the extra `$id` entries the resolver added. This returns the
+   * cleaned schema when $prop_source is such a value and its stored schema is
+   * not already clean; it returns NULL when the value is a different kind of
+   * source, or is already clean. Key order is ignored, just like parse().
+   *
+   * @see \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource::parse()
+   */
+  private static function staleDefaultRelativeUrlSchema(mixed $prop_source): ?array {
+    if (!\is_array($prop_source)
+      || ($prop_source['sourceType'] ?? NULL) !== PropSource::DefaultRelativeUrl->value
+      || !\is_array($prop_source['jsonSchema'] ?? NULL)
+    ) {
+      return NULL;
+    }
+    $stored = $prop_source['jsonSchema'];
+    $minimal = PropShape::normalize(
+      PropShape::normalize($stored)->resolvedSchema
+    )->schema;
+    $sorted_stored = $stored;
+    $sorted_minimal = $minimal;
+    SortArray::sortByKeyRecursive($sorted_stored);
+    SortArray::sortByKeyRecursive($sorted_minimal);
+    return $sorted_stored === $sorted_minimal ? NULL : $minimal;
+  }
+
+  /**
+   * Cleans up any default-relative-url schemas inside a component's inputs.
+   *
+   * $inputs is one component instance's props, keyed by prop name. It is
+   * changed in place, and this returns TRUE if anything changed. The content,
+   * config and auto-save updates all call this, so the cleanup lives in one
+   * place.
+   *
+   * @see ::normalizeDefaultRelativeUrlSchema()
+   * @see \_canvas_normalize_default_relative_url_schema_in_raw()
+   */
+  public static function normalizeDefaultRelativeUrlSchemaInInputs(array &$inputs): bool {
+    $changed = FALSE;
+    foreach ($inputs as $prop_name => $prop_source) {
+      $minimal = self::staleDefaultRelativeUrlSchema($prop_source);
+      if ($minimal !== NULL) {
+        $inputs[$prop_name]['jsonSchema'] = $minimal;
+        $changed = TRUE;
+      }
+    }
+    return $changed;
+  }
+
+  /**
+   * Cleans up any default-relative-url schemas in one component tree item.
+   *
+   * Rewrites each affected prop's stored schema to its clean form. Returns TRUE
+   * if it changed the item.
+   *
+   * @see ::normalizeDefaultRelativeUrlSchemaInInputs()
+   * @see ::staleDefaultRelativeUrlSchema()
+   */
+  public static function normalizeDefaultRelativeUrlSchema(ComponentTreeItem $item): bool {
+    $inputs = $item->getInputs();
+    if (!\is_array($inputs)) {
+      return FALSE;
+    }
+    if (self::normalizeDefaultRelativeUrlSchemaInInputs($inputs)) {
+      $item->setInput($inputs);
+      return TRUE;
+    }
+    return FALSE;
+  }
+
+  /**
+   * Whether a config entity's tree still has a schema left to clean.
+   *
+   * This only checks; it never changes anything. The actual fix happens in
+   * preSave (see ::updateConfigEntityDefaultRelativeUrlSchema()), so the site
+   * health report can safely call this, and it returns FALSE once the schema is
+   * clean. The health report finds it on its own because its name starts with
+   * `needs`.
+   *
+   * @see ::updateConfigEntityDefaultRelativeUrlSchema()
+   * @see \Drupal\canvas\Health\Doctor::runUpdatesEscapedConfigCheck()
+   */
+  public static function needsDefaultRelativeUrlSchemaNormalization((ComponentTreeEntityInterface&ConfigEntityInterface)|FieldConfig $entity): bool {
+    if ($entity instanceof FieldConfig && $entity->getType() !== ComponentTreeItem::PLUGIN_ID) {
+      return FALSE;
+    }
+    foreach (self::getComponentTreeForEntity($entity) as $item) {
+      \assert($item instanceof ComponentTreeItem);
+      $inputs = $item->getInputs();
+      if (!\is_array($inputs)) {
+        continue;
+      }
+      foreach ($inputs as $prop_source) {
+        if (self::staleDefaultRelativeUrlSchema($prop_source) !== NULL) {
+          return TRUE;
+        }
+      }
+    }
+    return FALSE;
+  }
+
+  /**
+   * Cleans up default-relative-url schemas in a config entity's tree.
+   *
+   * Runs while the config entity is being saved (in preSave), next to its
+   * check-only partner ::needsDefaultRelativeUrlSchemaNormalization(). Built
+   * the same way as ::updateConfigEntityBlockLabelDisplay(). Returns TRUE if it
+   * changed the entity.
+   *
+   * @todo Add #[ComponentPreSaveUpdate] once #3591619 generalizes the preSave-wiring PHPStan enforcement to component-tree config entities and FieldConfig.
+   *
+   * @see ::needsDefaultRelativeUrlSchemaNormalization()
+   * @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::preSave()
+   */
+  public static function updateConfigEntityDefaultRelativeUrlSchema((ComponentTreeEntityInterface&ConfigEntityInterface)|FieldConfig $entity): bool {
+    if (!self::needsDefaultRelativeUrlSchemaNormalization($entity)) {
+      return FALSE;
+    }
+    $tree = self::getComponentTreeForEntity($entity);
+    foreach ($tree as $item) {
+      \assert($item instanceof ComponentTreeItem);
+      self::normalizeDefaultRelativeUrlSchema($item);
+    }
     if ($entity instanceof ComponentTreeEntityInterface) {
       $entity->setComponentTree($tree->getValue());
     }
