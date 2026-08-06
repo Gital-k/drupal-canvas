@@ -666,9 +666,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     \assert($account instanceof User);
     $this->setCurrentUser($account);
 
-    // Use a Canvas Page entity — metatag integration is guaranteed via
-    // PageHooks::entityBaseFieldInfo(), unlike for node bundles which require
-    // additional metatag configuration to get the field attached.
+    // Create Phantom auto-save test page.
     $page = Page::create([
       'title' => 'Phantom auto-save test page',
       'description' => 'A page for testing metatag phantom auto-save prevention.',
@@ -677,14 +675,12 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     ]);
     $page->save();
 
-    // A freshly-saved page has no custom metatag values stored.
-    self::assertTrue(
-      $page->get('metatags')->isEmpty(),
-      'A freshly created canvas page has no custom metatag values in the DB.'
-    );
+    // Capture the DB-stored value.
+    $db_metatags_value = $page->get('metatags')->getValue();
 
     // Get entity_form_fields as the API would return them. When metatag is
-    // installed, these include the default token values for each tag.
+    // installed, these include the resolved token values for each tag (not the
+    // raw token strings), which differ from what is stored in the DB.
     $request = Request::create('/canvas/api/v0/layout/canvas_page/' . $page->id());
     $result = \Drupal::classResolver(ApiLayoutController::class)->get(request: $request, entity: $page);
     \assert($result instanceof PreviewEnvelope);
@@ -703,13 +699,15 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     $converter = $this->container->get(ClientDataToEntityConverter::class);
 
     // Submitting the API-returned entity_form_fields (containing only default
-    // token values) should restore the field to its DB value (empty/null).
-    // This prevents a phantom auto-save entry caused by default token inflation.
+    // token values) should restore the field to its DB value (the raw token
+    // strings). Without this restoration a phantom auto-save entry would be
+    // created because the resolved values differ from the stored token strings.
     $converter->convert($api_json, $page);
 
-    self::assertTrue(
-      $page->get('metatags')->isEmpty(),
-      'After convert() with default metatag token values, the metatags field must be restored to the DB value (empty) to prevent a phantom auto-save.'
+    self::assertEquals(
+      $db_metatags_value,
+      $page->get('metatags')->getValue(),
+      'After convert() with default metatag token values, the metatags field must be restored to the DB value (token strings) to prevent a phantom auto-save.'
     );
 
     // Submitting a custom metatag title (one that does not match the entity
@@ -730,12 +728,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
 
     $converter->convert($custom_json, $page);
 
-    self::assertFalse(
-      $page->get('metatags')->isEmpty(),
-      'After convert() with a custom metatag title, the metatags field must retain the custom value.'
-    );
-
-    // Verify the custom title is what was stored.
+    // Verify the custom title overrides the DB value.
     $raw_value = $page->get('metatags')->getValue();
     $decoded = Json::decode($raw_value[0]['value'] ?? '{}');
     self::assertSame($custom_title, ($decoded ?? [])['title'] ?? NULL);
