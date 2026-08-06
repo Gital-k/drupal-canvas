@@ -662,6 +662,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
 
     $account = $this->createUser(['edit any article content']);
+    \assert($account instanceof User);
     $this->setCurrentUser($account);
 
     $node = $this->createTestNode();
