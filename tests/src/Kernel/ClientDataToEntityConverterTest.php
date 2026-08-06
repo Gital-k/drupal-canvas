@@ -685,6 +685,9 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     $result = \Drupal::classResolver(ApiLayoutController::class)->get(request: $request, entity: $page);
     \assert($result instanceof PreviewEnvelope);
     $api_json = \array_intersect_key($result->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
+    // additionalData values may be stdClass; round-trip through JSON to get plain arrays,
+    // matching what the real HTTP client sends and what convert() expects.
+    $api_json = Json::decode(Json::encode($api_json));
     // convert() expects a single 'content' region — filter as getValidClientJson() does for nodes.
     $content_region = \array_values(\array_filter($api_json['layout'], static fn(array $r): bool => $r['id'] === 'content'));
     $api_json['layout'] = reset($content_region);
