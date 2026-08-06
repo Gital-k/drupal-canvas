@@ -17,6 +17,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\canvas_test_article_fields\Hook\CanvasTestArticleFieldsHooks;
 use Drupal\Component\Datetime\Time;
+use Drupal\Component\Serialization\Json;
 use Drupal\content_moderation\Permissions;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
@@ -32,6 +33,7 @@ use Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\metatag\MetatagManager;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
@@ -46,6 +48,7 @@ use Drupal\user\Entity\User;
 use Drupal\user\RoleInterface;
 use GuzzleHttp\Psr7\Query;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RequiresMethod;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\HttpFoundation\Request;
@@ -641,6 +644,90 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     self::assertSame([], self::violationsToArray($node->validate()));
     $this->assertSame(SAVED_NEW, $node->save());
     return $node;
+  }
+
+  /**
+   * Tests metatag phantom auto-save prevention.
+   *
+   * When submitted metatag values all match the entity's default token values,
+   * setEntityFields() should restore the DB field value to prevent a spurious
+   * hash difference from creating a phantom auto-save entry.
+   *
+   * When submitted values differ from defaults, the custom value is kept.
+   *
+   * @see \Drupal\canvas\ClientDataToEntityConverter::setEntityFields()
+   */
+  #[RequiresMethod(MetatagManager::class, 'tagsFromEntity')]
+  public function testMetatagPhantomAutoSavePrevention(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
+
+    $account = $this->createUser(['edit any article content']);
+    $this->setCurrentUser($account);
+
+    $node = $this->createTestNode();
+
+    // A freshly-saved node has no custom metatag values stored.
+    self::assertTrue(
+      $node->get('metatags')->isEmpty(),
+      'A freshly created node has no custom metatag values in the DB.'
+    );
+
+    // Get entity_form_fields as the API would return them. When metatag is
+    // installed, these include the default token values for each tag.
+    $request = Request::create('/canvas/api/v0/layout/node/' . $node->id());
+    $result = \Drupal::classResolver(ApiLayoutController::class)->get(request: $request, entity: $node);
+    \assert($result instanceof PreviewEnvelope);
+    $api_json = \array_intersect_key($result->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
+
+    // Confirm there are metatag form fields in the API response.
+    $metatag_form_keys = \array_keys(\array_filter(
+      $api_json['entity_form_fields'],
+      static fn (string $key): bool => \str_starts_with($key, 'metatags'),
+      ARRAY_FILTER_USE_KEY,
+    ));
+    if (empty($metatag_form_keys)) {
+      self::markTestSkipped('No metatag form fields returned by the API. Metatag defaults may not be configured for article nodes.');
+    }
+
+    $converter = $this->container->get(ClientDataToEntityConverter::class);
+
+    // Submitting the API-returned entity_form_fields (containing only default
+    // token values) should restore the field to its DB value (empty/null).
+    // This prevents a phantom auto-save entry caused by default token inflation.
+    $converter->convert($api_json, $node);
+
+    self::assertTrue(
+      $node->get('metatags')->isEmpty(),
+      'After convert() with default metatag token values, the metatags field must be restored to the DB value (empty) to prevent a phantom auto-save.'
+    );
+
+    // Submitting a custom metatag title (one that does not match the entity
+    // default) must preserve the custom value on the entity.
+    $metatag_title_keys = \array_filter(
+      $metatag_form_keys,
+      static fn (string $key): bool => \str_contains($key, '[title]'),
+    );
+    if (empty($metatag_title_keys)) {
+      self::markTestSkipped('No metatag title form field found; cannot verify custom-value preservation.');
+    }
+
+    $custom_json = $api_json;
+    $custom_title = 'A custom SEO title that is not a default token';
+    foreach ($metatag_title_keys as $key) {
+      $custom_json['entity_form_fields'][$key] = $custom_title;
+    }
+
+    $converter->convert($custom_json, $node);
+
+    self::assertFalse(
+      $node->get('metatags')->isEmpty(),
+      'After convert() with a custom metatag title, the metatags field must retain the custom value.'
+    );
+
+    // Verify the custom title is what was stored.
+    $raw_value = $node->get('metatags')->getValue();
+    $decoded = Json::decode($raw_value[0]['value'] ?? '{}');
+    self::assertSame($custom_title, ($decoded ?? [])['title'] ?? NULL);
   }
 
   public function testBooleanCheckboxesNotForBooleanField(): void {
