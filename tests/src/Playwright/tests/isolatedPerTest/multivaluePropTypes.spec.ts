@@ -757,6 +757,177 @@ test.describe('Multivalue Prop Types', () => {
 
     // Can still edit values.
     await canvas.editMultiValueDateProp('Date (Limited)', '2026-06-15', 0);
+
+    // ===== PERSISTENCE AFTER RELOAD =====
+    // Snapshot label text AND raw input values from the browser before reload.
+    // Labels are compared to catch display regressions; raw input values isolate
+    // whether any drift is in storage/retrieval or only in label formatting.
+    // All snapshots are taken from the browser so timezone differences between
+    // Node and the browser never affect the comparison.
+
+    // Helper: reads all [date, time?] input values for every row in a field.
+    // The popovers are forceMount-ed so their inputs are always in the DOM.
+    const snapshotInputValues = async (
+      fieldLocator: ReturnType<typeof page.locator>,
+    ): Promise<{ date: string; time: string | null }[]> => {
+      const rows = fieldLocator.locator('tr.draggable');
+      const count = await rows.count();
+      const result: { date: string; time: string | null }[] = [];
+      for (let i = 0; i < count; i++) {
+        const row = rows.nth(i);
+        const dateVal = await row.locator('input[type="date"]').inputValue();
+        const timeInput = row.locator('input[type="time"]');
+        const timeVal =
+          (await timeInput.count()) > 0 ? await timeInput.inputValue() : null;
+        result.push({ date: dateVal, time: timeVal });
+      }
+      return result;
+    };
+
+    const snapshotDtUnlimitedField = page
+      .locator('.field--type-datetime')
+      .filter({
+        has: page.getByRole('heading', {
+          name: 'DateTime (Unlimited)',
+          exact: true,
+        }),
+      });
+    const dtUnlimitedTexts = await snapshotDtUnlimitedField
+      .locator('[data-canvas-multivalue-label]')
+      .allTextContents();
+    const dtUnlimitedInputsBefore = await snapshotInputValues(
+      snapshotDtUnlimitedField,
+    );
+
+    const snapshotDtLimitedField = page
+      .locator('.field--type-datetime')
+      .filter({
+        has: page.getByRole('heading', {
+          name: 'DateTime (Limited)',
+          exact: true,
+        }),
+      });
+    const dtLimitedTexts = await snapshotDtLimitedField
+      .locator('[data-canvas-multivalue-label]')
+      .allTextContents();
+    const dtLimitedInputsBefore = await snapshotInputValues(
+      snapshotDtLimitedField,
+    );
+
+    const snapshotDateUnlimitedField = page
+      .locator('.field--type-datetime')
+      .filter({
+        has: page.getByRole('heading', {
+          name: 'Date (Unlimited)',
+          exact: true,
+        }),
+      });
+    const dateUnlimitedTexts = await snapshotDateUnlimitedField
+      .locator('[data-canvas-multivalue-label]')
+      .allTextContents();
+    const dateUnlimitedInputsBefore = await snapshotInputValues(
+      snapshotDateUnlimitedField,
+    );
+
+    const snapshotDateLimitedField = page
+      .locator('.field--type-datetime')
+      .filter({
+        has: page.getByRole('heading', { name: 'Date (Limited)', exact: true }),
+      });
+    const dateLimitedTexts = await snapshotDateLimitedField
+      .locator('[data-canvas-multivalue-label]')
+      .allTextContents();
+    const dateLimitedInputsBefore = await snapshotInputValues(
+      snapshotDateLimitedField,
+    );
+
+    // Provide a fixed wait to ensure changes are saved.
+    // It's highly preferable to use something non-arbitrary that confirms a
+    // save has occurred. This should be considered a temporary hack to ensure
+    // the tests run reliably.
+    // eslint-disable-next-line playwright/no-wait-for-timeout
+    await page.waitForTimeout(10000);
+    await page.reload();
+    await canvas.waitForEditorUi();
+
+    // DateTime (Unlimited): 1 row — 2025-12-26 10:00:00
+    const dtUnlimitedAfterReload = page
+      .locator('.field--type-datetime')
+      .filter({
+        has: page.getByRole('heading', {
+          name: 'DateTime (Unlimited)',
+          exact: true,
+        }),
+      });
+    const dtUnlimitedLabels = dtUnlimitedAfterReload.locator(
+      '[data-canvas-multivalue-label]',
+    );
+    const dtUnlimitedInputsAfter = await snapshotInputValues(
+      dtUnlimitedAfterReload,
+    );
+    expect(dtUnlimitedInputsAfter).toEqual(dtUnlimitedInputsBefore);
+    await expect(dtUnlimitedLabels).toHaveCount(dtUnlimitedTexts.length);
+    await expect(dtUnlimitedLabels).toHaveText(dtUnlimitedTexts);
+    await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
+      await expect(items).toHaveCount(1);
+      await expect(items.nth(0)).toContainText('2025-12-26');
+    });
+
+    // DateTime (Limited): 1 row — 2025-11-15 16:45:00
+    const dtLimitedAfterReload = page.locator('.field--type-datetime').filter({
+      has: page.getByRole('heading', {
+        name: 'DateTime (Limited)',
+        exact: true,
+      }),
+    });
+    const dtLimitedLabels = dtLimitedAfterReload.locator(
+      '[data-canvas-multivalue-label]',
+    );
+    const dtLimitedInputsAfter =
+      await snapshotInputValues(dtLimitedAfterReload);
+    expect(dtLimitedInputsAfter).toEqual(dtLimitedInputsBefore);
+    await expect(dtLimitedLabels).toHaveCount(dtLimitedTexts.length);
+    await expect(dtLimitedLabels).toHaveText(dtLimitedTexts);
+
+    // Date (Unlimited): 2 rows — 2026-05-01, 2026-04-28
+    const dateUnlimitedAfterReload = page
+      .locator('.field--type-datetime')
+      .filter({
+        has: page.getByRole('heading', {
+          name: 'Date (Unlimited)',
+          exact: true,
+        }),
+      });
+    const dateUnlimitedLabels = dateUnlimitedAfterReload.locator(
+      '[data-canvas-multivalue-label]',
+    );
+    const dateUnlimitedInputsAfter = await snapshotInputValues(
+      dateUnlimitedAfterReload,
+    );
+    expect(dateUnlimitedInputsAfter).toEqual(dateUnlimitedInputsBefore);
+    await expect(dateUnlimitedLabels).toHaveCount(dateUnlimitedTexts.length);
+    await expect(dateUnlimitedLabels).toHaveText(dateUnlimitedTexts);
+    await canvas.testInPreviewFrame('#date-list li', async (items) => {
+      await expect(items).toHaveCount(2);
+      await expect(items.nth(0)).toContainText('2026-05-01');
+      await expect(items.nth(1)).toContainText('2026-04-28');
+    });
+
+    // Date (Limited): 1 row — 2026-06-15
+    const dateLimitedAfterReload = page
+      .locator('.field--type-datetime')
+      .filter({
+        has: page.getByRole('heading', { name: 'Date (Limited)', exact: true }),
+      });
+    const dateLimitedLabels = dateLimitedAfterReload.locator(
+      '[data-canvas-multivalue-label]',
+    );
+    const dateLimitedInputsAfter = await snapshotInputValues(
+      dateLimitedAfterReload,
+    );
+    expect(dateLimitedInputsAfter).toEqual(dateLimitedInputsBefore);
+    await expect(dateLimitedLabels).toHaveCount(dateLimitedTexts.length);
+    await expect(dateLimitedLabels).toHaveText(dateLimitedTexts);
   });
 
   test('List text', async ({ page, canvas }) => {
