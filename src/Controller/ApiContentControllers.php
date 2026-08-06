@@ -29,6 +29,7 @@ use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
@@ -72,6 +73,7 @@ final class ApiContentControllers extends ApiControllerBase {
     #[Autowire(service: 'transliteration')]
     private readonly TransliterationInterface $transliteration,
     private readonly HomePageHelper $homePageHelper,
+    private readonly ModuleHandlerInterface $moduleHandler,
   ) {}
 
   /**
@@ -104,6 +106,19 @@ final class ApiContentControllers extends ApiControllerBase {
    */
   public function getValuesAsText(Request $request, Page $canvas_page): CacheableJsonResponse {
     $cacheability = new CacheableMetadata();
+
+    // @todo Remove in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+    $conflict_resolution_dev_mode = $this->moduleHandler->moduleExists('canvas_dev_cd');
+    if (!$conflict_resolution_dev_mode) {
+      $error = [
+        'detail' => 'Feature flag module `canvas_dev_cd` is disabled.',
+        'source' => [
+          'pointer' => AutoSaveManager::getAutoSaveKey($canvas_page),
+        ],
+      ];
+      return new CacheableJsonResponse(data: ['errors' => [$error]], status: Response::HTTP_NOT_FOUND);
+    }
+
     $cacheability->addCacheableDependency($canvas_page)
       ->addCacheContexts(['url.query_args:autoSaved']);
 
