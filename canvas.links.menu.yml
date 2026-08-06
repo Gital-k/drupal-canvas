@@ -7,3 +7,9 @@ navigation.pages:
     icon:
       pack_id: navigation
       icon_id: file
+
+canvas_page.structure:
+  title: "Canvas page"
+  description: "Manage fields, form display, and view display for Canvas pages."
+  route_name: entity.canvas_page.field_ui_settings
+  parent: system.admin_structure
