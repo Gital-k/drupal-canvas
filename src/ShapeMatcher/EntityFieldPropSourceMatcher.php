@@ -475,7 +475,6 @@ final class EntityFieldPropSourceMatcher {
     // against the resolved canonical shape instead — loosely, because key
     // order may differ.
     // @see \Drupal\canvas\Plugin\ComponentPluginManager::resolveJsonSchemaReferences()
-    // @phpstan-ignore function.strict
     if ($schema != JsonSchemaObjectRef::Document->asPropShape()->resolvedSchema) {
       return [];
     }

@@ -328,7 +328,10 @@ class ShapeMatchingHooks {
       if (!empty($media_types)) {
         $branches = [];
         foreach ($media_types as $media_type_id => $media_type) {
-          $source_field_name = $media_type->getSource()->getSourceFieldDefinition($media_type)->getName();
+          $source_field_definition = $media_type->getSource()->getSourceFieldDefinition($media_type);
+          // Loaded media types always have a configured source field.
+          \assert($source_field_definition !== NULL);
+          $source_field_name = $source_field_definition->getName();
           $media_entity_type_and_bundle = BetterEntityDataDefinition::create('media', $media_type_id);
           $branches["entity:media:$media_type_id"] = new FieldObjectPropsExpression(
             entityType: $media_entity_type_and_bundle,
