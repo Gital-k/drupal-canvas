@@ -86,19 +86,50 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
       PropShape::normalize($sdc_prop_source['jsonSchema'])->resolvedSchema
     )->schema;
 
-    $sdc_prop_source_json_schema = $sdc_prop_source['jsonSchema'];
-    SortArray::sortByKeyRecursive($sdc_prop_source_json_schema);
+    // Data saved before Canvas 1.5.1 kept some extra `$id` entries that the
+    // JSON Schema resolver adds. Newer code removes them when saving, so
+    // `$minimal` (what we expect) never has them. Remove them here too;
+    // otherwise every one of those old values would be rejected below even
+    // though it is really fine. Anything else unexpected is still caught below.
+    $healed_json_schema = self::stripResolverInjectedIds($sdc_prop_source['jsonSchema']);
+
+    $sorted_healed = $healed_json_schema;
+    SortArray::sortByKeyRecursive($sorted_healed);
     SortArray::sortByKeyRecursive($minimal);
 
-    if ($sdc_prop_source_json_schema !== $minimal) {
-      throw new \LogicException(\sprintf('Extraneous JSON Schema information detected: %s should have been just %s.', json_encode($sdc_prop_source_json_schema, JSON_PRETTY_PRINT), json_encode($minimal, JSON_PRETTY_PRINT)));
+    if ($sorted_healed !== $minimal) {
+      throw new \LogicException(\sprintf('Extraneous JSON Schema information detected: %s should have been just %s.', json_encode($sorted_healed, JSON_PRETTY_PRINT), json_encode($minimal, JSON_PRETTY_PRINT)));
     }
 
     return new self(
       $sdc_prop_source['value'],
-      $sdc_prop_source['jsonSchema'],
+      $healed_json_schema,
       $sdc_prop_source['componentId'],
     );
+  }
+
+  /**
+   * Removes the extra `$id` (and older `id`) entries the resolver adds.
+   *
+   * Works at every level of the schema. Those entries always have a text value
+   * (a URI). A real prop that happens to be named `id` instead holds a nested
+   * schema (an array), so only removing entries whose value is text leaves such
+   * a prop untouched.
+   *
+   * @see \Drupal\canvas\PropShape\PropShape::normalizePropSchema()
+   */
+  private static function stripResolverInjectedIds(array $json_schema): array {
+    foreach (['$id', 'id'] as $keyword) {
+      if (isset($json_schema[$keyword]) && \is_string($json_schema[$keyword])) {
+        unset($json_schema[$keyword]);
+      }
+    }
+    foreach ($json_schema as $key => $value) {
+      if (\is_array($value)) {
+        $json_schema[$key] = self::stripResolverInjectedIds($value);
+      }
+    }
+    return $json_schema;
   }
 
   /**

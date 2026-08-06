@@ -128,4 +128,57 @@ class DefaultRelativeUrlPropSourceTest extends PropSourceTestBase {
     $source->asChoice();
   }
 
+  /**
+   * Accepts old data with extra `$id` on parse, but rejects real extras.
+   *
+   * Data saved before Canvas 1.5.1 (#3591904) kept the extra `$id` entries the
+   * resolver adds. Newer code removes them when saving, so a strict match would
+   * reject every such old value. parse() must accept it (removing the `$id`)
+   * but still reject any schema entry that really should not be there.
+   */
+  public function testParseSelfHealsResolverInjectedIds(): void {
+    $this->enableModules(['canvas_test_sdc', 'link', 'image', 'options', 'text']);
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $component_id = 'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop';
+
+    // The normal, clean schema plus the extra `$id` entries the resolver adds.
+    $stale = [
+      'sourceType' => 'default-relative-url',
+      'value' => ['src' => 'gracie.jpg', 'alt' => 'A good dog', 'width' => 601, 'height' => 402],
+      'jsonSchema' => [
+        '$id' => 'json-schema-definitions://canvas.module/image',
+        'type' => 'object',
+        'properties' => [
+          'src' => [
+            '$id' => 'json-schema-definitions://canvas.module/image-uri',
+            'type' => 'string',
+            'contentMediaType' => 'image/*',
+            'format' => 'uri-reference',
+            'x-allowed-schemes' => ['http', 'https'],
+          ],
+          'alt' => ['type' => 'string'],
+          'width' => ['type' => 'integer'],
+          'height' => ['type' => 'integer'],
+        ],
+        'required' => ['src'],
+      ],
+      'componentId' => $component_id,
+    ];
+
+    $source = PropSource::parse($stale);
+    self::assertInstanceOf(DefaultRelativeUrlPropSource::class, $source);
+    // Turning it back into a string drops every `$id` and matches a clean save.
+    $json = (string) $source;
+    self::assertStringNotContainsString('json-schema-definitions', $json);
+    self::assertStringNotContainsString('"$id"', $json);
+    self::assertSame('{"sourceType":"default-relative-url","value":{"src":"gracie.jpg","alt":"A good dog","width":601,"height":402},"jsonSchema":{"type":"object","properties":{"src":{"type":"string","contentMediaType":"image\/*","format":"uri-reference","x-allowed-schemes":["http","https"]},"alt":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"}},"required":["src"]},"componentId":"sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop"}', $json);
+
+    // Something that really should not be there (a `title` here) is still
+    // rejected — only the resolver's `$id` is quietly removed.
+    $extraneous = $stale;
+    $extraneous['jsonSchema']['title'] = 'Extraneous';
+    $this->expectException(\LogicException::class);
+    PropSource::parse($extraneous);
+  }
+
 }
