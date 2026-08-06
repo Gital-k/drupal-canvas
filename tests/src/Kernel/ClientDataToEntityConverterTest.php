@@ -10,6 +10,7 @@ use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Controller\EntityFormTrait;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\EntityConstraintViolationList;
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\VersionedConfigEntityInterface;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -661,22 +662,31 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
   public function testMetatagPhantomAutoSavePrevention(): void {
     $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
 
-    $account = $this->createUser(['edit any article content']);
+    $account = $this->createUser([Page::EDIT_PERMISSION]);
     \assert($account instanceof User);
     $this->setCurrentUser($account);
 
-    $node = $this->createTestNode();
+    // Use a Canvas Page entity — metatag integration is guaranteed via
+    // PageHooks::entityBaseFieldInfo(), unlike for node bundles which require
+    // additional metatag configuration to get the field attached.
+    $page = Page::create([
+      'title' => 'Phantom auto-save test page',
+      'description' => 'A page for testing metatag phantom auto-save prevention.',
+      'path' => ['alias' => '/metatag-test'],
+      'components' => [],
+    ]);
+    $page->save();
 
-    // A freshly-saved node has no custom metatag values stored.
+    // A freshly-saved page has no custom metatag values stored.
     self::assertTrue(
-      $node->get('metatags')->isEmpty(),
-      'A freshly created node has no custom metatag values in the DB.'
+      $page->get('metatags')->isEmpty(),
+      'A freshly created canvas page has no custom metatag values in the DB.'
     );
 
     // Get entity_form_fields as the API would return them. When metatag is
     // installed, these include the default token values for each tag.
-    $request = Request::create('/canvas/api/v0/layout/node/' . $node->id());
-    $result = \Drupal::classResolver(ApiLayoutController::class)->get(request: $request, entity: $node);
+    $request = Request::create('/canvas/api/v0/layout/canvas_page/' . $page->id());
+    $result = \Drupal::classResolver(ApiLayoutController::class)->get(request: $request, entity: $page);
     \assert($result instanceof PreviewEnvelope);
     $api_json = \array_intersect_key($result->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
 
@@ -687,7 +697,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       ARRAY_FILTER_USE_KEY,
     ));
     if (empty($metatag_form_keys)) {
-      self::markTestSkipped('No metatag form fields returned by the API. Metatag defaults may not be configured for article nodes.');
+      self::markTestSkipped('No metatag form fields returned by the API. Metatag defaults may not be configured for canvas pages.');
     }
 
     $converter = $this->container->get(ClientDataToEntityConverter::class);
@@ -695,10 +705,10 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     // Submitting the API-returned entity_form_fields (containing only default
     // token values) should restore the field to its DB value (empty/null).
     // This prevents a phantom auto-save entry caused by default token inflation.
-    $converter->convert($api_json, $node);
+    $converter->convert($api_json, $page);
 
     self::assertTrue(
-      $node->get('metatags')->isEmpty(),
+      $page->get('metatags')->isEmpty(),
       'After convert() with default metatag token values, the metatags field must be restored to the DB value (empty) to prevent a phantom auto-save.'
     );
 
@@ -718,15 +728,15 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       $custom_json['entity_form_fields'][$key] = $custom_title;
     }
 
-    $converter->convert($custom_json, $node);
+    $converter->convert($custom_json, $page);
 
     self::assertFalse(
-      $node->get('metatags')->isEmpty(),
+      $page->get('metatags')->isEmpty(),
       'After convert() with a custom metatag title, the metatags field must retain the custom value.'
     );
 
     // Verify the custom title is what was stored.
-    $raw_value = $node->get('metatags')->getValue();
+    $raw_value = $page->get('metatags')->getValue();
     $decoded = Json::decode($raw_value[0]['value'] ?? '{}');
     self::assertSame($custom_title, ($decoded ?? [])['title'] ?? NULL);
   }
