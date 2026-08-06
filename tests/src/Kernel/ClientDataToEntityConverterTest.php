@@ -685,6 +685,9 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     $result = \Drupal::classResolver(ApiLayoutController::class)->get(request: $request, entity: $page);
     \assert($result instanceof PreviewEnvelope);
     $api_json = \array_intersect_key($result->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
+    // convert() expects a single 'content' region — filter as getValidClientJson() does for nodes.
+    $content_region = \array_values(\array_filter($api_json['layout'], static fn(array $r): bool => $r['id'] === 'content'));
+    $api_json['layout'] = reset($content_region);
 
     // Confirm there are metatag form fields in the API response.
     $metatag_form_keys = \array_keys(\array_filter(
