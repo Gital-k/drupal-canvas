@@ -223,7 +223,7 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
         // and required means ">=1 value". There's no (native) ability to
         // configure a minimum number of values for a field.
         // @see https://www.drupal.org/project/unlimited_field_settings
-        'Drupal Canvas does not know of a field type/widget to allow populating the <code>data</code> prop, with the shape <code>{"type":"array","items":{"type":"integer","minimum":-100,"maximum":100},"maxItems":100,"minItems":2}</code>.',
+        'Drupal Canvas does not know of a field type/widget to allow populating the <code>data</code> prop, with the shape <code>{"type":"array","items":{"type":"integer","maximum":100,"minimum":-100},"maxItems":100,"minItems":2}</code>.',
       ],
       'sdc.canvas_test_sdc.sparkline_no_min' => [
         'Multiple-cardinality prop "data" is required, but does not specify `minItems: 1`.',
@@ -6858,8 +6858,8 @@ HTML
               'type' => 'array',
               'items' => [
                 'type' => 'integer',
-                'minimum' => -100,
                 'maximum' => 100,
+                'minimum' => -100,
               ],
               'maxItems' => 100,
               'minItems' => 1,
