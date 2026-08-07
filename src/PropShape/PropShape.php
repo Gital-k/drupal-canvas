@@ -167,6 +167,14 @@ final class PropShape {
       );
     }
 
+    // Likewise, a `type: array` describes its entries in `items`, which is a
+    // prop schema in its own right. Normalize it too, otherwise leftovers such
+    // as the resolver's injected `$id` (stripped just below) would leak into
+    // the shape for every array-of-object prop.
+    if ($normalized_prop_schema['type'] === JsonSchemaType::Array->value && \array_key_exists('items', $normalized_prop_schema)) {
+      $normalized_prop_schema['items'] = self::normalizePropSchema($normalized_prop_schema['items']);
+    }
+
     // Omit the resolved $ref URI that schema resolution injects. Canvas uses
     // the JSON-Schema Draft-07 dialect, whose id keyword is `$id` (not
     // Draft-04's `id`). justinrainbow/json-schema only emits `$id` as of 6.9.0;

@@ -151,8 +151,6 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
 
     $unique_prop_shapes = array_values($ephemeral_prop_shape_repository->getUniquePropShapes());
     $this->assertEquals([
-      new PropShape(['type' => 'array', 'items' => JsonSchemaObjectRef::Image->asPropShapeArray(), 'maxItems' => 2]),
-      new PropShape(['type' => 'array', 'items' => JsonSchemaObjectRef::Image->asPropShapeArray(), 'minItems' => 1]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer']]),
       PropShape::normalize(['type' => 'array', 'items' => ['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']]]),
       PropShape::normalize(['type' => 'array', 'items' => ['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']], 'maxItems' => 3]),
@@ -165,6 +163,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'number']]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'number'], 'maxItems' => 3]),
+      new PropShape(['type' => 'array', 'items' => JsonSchemaObjectRef::Image->asPropShapeArray(), 'maxItems' => 2]),
+      new PropShape(['type' => 'array', 'items' => JsonSchemaObjectRef::Image->asPropShapeArray(), 'minItems' => 1]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'string']]),
       PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']]]),
       PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']], 'maxItems' => 3]),
@@ -664,7 +664,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldWidget: 'number',
       ),
-      'type=array&items[type]=integer&items[enum][0]=10&items[enum][1]=20&items[enum][2]=30&items[enum][3]=40&items[meta:enum][10]=Ten&items[meta:enum][20]=Twenty&items[meta:enum][30]=Thirty&items[meta:enum][40]=Forty' => new StorablePropShape(
+      'type=array&items[type]=integer&items[enum][0]=10&items[enum][1]=20&items[enum][2]=30&items[enum][3]=40' => new StorablePropShape(
         shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']]]),
         fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
@@ -673,7 +673,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ],
       ),
-      'type=array&items[type]=integer&items[enum][0]=10&items[enum][1]=20&items[enum][2]=30&items[enum][3]=40&items[meta:enum][10]=Ten&items[meta:enum][20]=Twenty&items[meta:enum][30]=Thirty&items[meta:enum][40]=Forty&maxItems=3' => new StorablePropShape(
+      'type=array&items[type]=integer&items[enum][0]=10&items[enum][1]=20&items[enum][2]=30&items[enum][3]=40&maxItems=3' => new StorablePropShape(
         shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'integer', 'enum' => [10, 20, 30, 40], 'meta:enum' => [10 => 'Ten', 20 => 'Twenty', 30 => 'Thirty', 40 => 'Forty']], 'maxItems' => 3]),
         fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
         cardinality: 3,
@@ -688,7 +688,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: 2,
         fieldWidget: 'number',
       ),
-      'type=array&items[$ref]=' . JsonSchemaObjectRef::Image->value . '&items[type]=object&maxItems=2' => new StorablePropShape(
+      'type=array&items[type]=object&items[$ref]=' . JsonSchemaObjectRef::Image->value . '&maxItems=2' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => JsonSchemaObjectRef::Image->asPropShapeArray(), 'maxItems' => 2]),
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
           'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
@@ -699,7 +699,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: 2,
         fieldWidget: 'image_image',
       ),
-      'type=array&items[$ref]=' . JsonSchemaObjectRef::Image->value . '&items[type]=object&minItems=1' => new StorablePropShape(
+      'type=array&items[type]=object&items[$ref]=' . JsonSchemaObjectRef::Image->value . '&minItems=1' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => JsonSchemaObjectRef::Image->asPropShapeArray(), 'minItems' => 1]),
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
           'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
@@ -710,7 +710,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldWidget: 'image_image',
       ),
-      'type=array&items[type]=integer&items[minimum]=-100&items[maximum]=100&maxItems=100&minItems=1' => new StorablePropShape(
+      'type=array&items[type]=integer&items[maximum]=100&items[minimum]=-100&maxItems=100&minItems=1' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100, 'minItems' => 1]),
         fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
         cardinality: 100,
@@ -727,7 +727,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldWidget: 'string_textfield',
       ),
-      'type=array&items[type]=string&items[enum][0]=option_one&items[enum][1]=option_two&items[enum][2]=option_three&items[enum][3]=option_four&items[meta:enum][option_one]=Option One&items[meta:enum][option_two]=Option Two&items[meta:enum][option_three]=Option Three&items[meta:enum][option_four]=Option Four' => new StorablePropShape(
+      'type=array&items[type]=string&items[enum][0]=option_one&items[enum][1]=option_two&items[enum][2]=option_three&items[enum][3]=option_four' => new StorablePropShape(
         shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']]]),
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
@@ -736,7 +736,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ],
       ),
-      'type=array&items[type]=string&items[enum][0]=option_one&items[enum][1]=option_two&items[enum][2]=option_three&items[enum][3]=option_four&items[meta:enum][option_one]=Option One&items[meta:enum][option_two]=Option Two&items[meta:enum][option_three]=Option Three&items[meta:enum][option_four]=Option Four&maxItems=3' => new StorablePropShape(
+      'type=array&items[type]=string&items[enum][0]=option_one&items[enum][1]=option_two&items[enum][2]=option_three&items[enum][3]=option_four&maxItems=3' => new StorablePropShape(
         shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['option_one', 'option_two', 'option_three', 'option_four'], 'meta:enum' => ['option_one' => 'Option One', 'option_two' => 'Option Two', 'option_three' => 'Option Three', 'option_four' => 'Option Four']], 'maxItems' => 3]),
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         cardinality: 3,
@@ -745,7 +745,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ],
       ),
-      'type=array&items[type]=string&items[enum][0]=red&items[enum][1]=blue&items[enum][2]=green_light&items[enum][3]=yellow&items[meta:enum][red]=Red&items[meta:enum][blue]=Blue&items[meta:enum][green.light]=Light Green&items[meta:enum][yellow]=Yellow' => new StorablePropShape(
+      'type=array&items[type]=string&items[enum][0]=red&items[enum][1]=blue&items[enum][2]=green_light&items[enum][3]=yellow' => new StorablePropShape(
         shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['red', 'blue', 'green_light', 'yellow'], 'meta:enum' => ['red' => 'Red', 'blue' => 'Blue', 'green.light' => 'Light Green', 'yellow' => 'Yellow']]]),
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
@@ -754,7 +754,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ],
       ),
-      'type=array&items[type]=string&items[enum][0]=red&items[enum][1]=green&items[enum][2]=blue&items[enum][3]=yellow&items[meta:enum][red]=Red&items[meta:enum][green]=Green&items[meta:enum][blue]=Blue&items[meta:enum][yellow]=Yellow' => new StorablePropShape(
+      'type=array&items[type]=string&items[enum][0]=red&items[enum][1]=green&items[enum][2]=blue&items[enum][3]=yellow' => new StorablePropShape(
         shape: PropShape::normalize(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['red', 'green', 'blue', 'yellow'], 'meta:enum' => ['red' => 'Red', 'green' => 'Green', 'blue' => 'Blue', 'yellow' => 'Yellow']]]),
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
@@ -978,7 +978,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       // translation, TMGMT).
       // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
       'type=string&minLength=2' => new PropShape(['type' => 'string', 'minLength' => 2]),
-      'type=array&items[type]=integer&items[minimum]=-100&items[maximum]=100&maxItems=100&minItems=2' => new PropShape([
+      'type=array&items[type]=integer&items[maximum]=100&items[minimum]=-100&maxItems=100&minItems=2' => new PropShape([
         'type' => 'array',
         'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100],
         'maxItems' => 100,
