@@ -387,7 +387,17 @@ class CanvasConfigUpdater {
    * @see ::staleDefaultRelativeUrlSchema()
    */
   public static function normalizeDefaultRelativeUrlSchema(ComponentTreeItem $item): bool {
-    $inputs = $item->getInputs();
+    // A tree may point at a component that no longer exists, or hold inputs
+    // out of sync with it. Reading them then throws, and there is nothing to
+    // clean up, so skip the item. Config validation still reports the real
+    // problem afterwards.
+    // @see self::getInputHash()
+    try {
+      $inputs = $item->getInputs();
+    }
+    catch (\UnexpectedValueException | MissingComponentInputsException) {
+      return FALSE;
+    }
     if (!\is_array($inputs)) {
       return FALSE;
     }
@@ -416,7 +426,16 @@ class CanvasConfigUpdater {
     }
     foreach (self::getComponentTreeForEntity($entity) as $item) {
       \assert($item instanceof ComponentTreeItem);
-      $inputs = $item->getInputs();
+      // Skip items whose inputs cannot be read: a missing component, or inputs
+      // out of sync with the tree. There is nothing to clean up, and config
+      // validation still reports the real problem afterwards.
+      // @see self::getInputHash()
+      try {
+        $inputs = $item->getInputs();
+      }
+      catch (\UnexpectedValueException | MissingComponentInputsException) {
+        continue;
+      }
       if (!\is_array($inputs)) {
         continue;
       }
