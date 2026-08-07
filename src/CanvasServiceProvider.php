@@ -10,11 +10,10 @@ use Drupal\canvas\Config\ThemeSettingsDiscovery;
 use Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSynchronizer;
 use Drupal\canvas\CoreBugFix\ConfigEntityQueryFactory;
 use Drupal\canvas\CoreBugFix\TypedConfigManagerWithCachePollutionFix;
-use Drupal\canvas\EventSubscriber\DefaultContentSubscriber;
 use Drupal\canvas\Plugin\ComponentPluginManager;
+use Drupal\canvas\Validation\JitSafeRegexValidator;
 use Drupal\canvas\Validation\JsonSchema\ContentEntityReferenceObjectConstraint;
 use Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint;
-use Drupal\Core\DefaultContent\Exporter;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\DependencyInjection\ServiceProviderBase;
 use Drupal\Core\Theme\Component\ComponentValidator;
@@ -23,6 +22,7 @@ use JsonSchema\DraftIdentifiers;
 use JsonSchema\Validator;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Validator\Constraints\RegexValidator;
 
 class CanvasServiceProvider extends ServiceProviderBase {
 
@@ -38,14 +38,6 @@ class CanvasServiceProvider extends ServiceProviderBase {
         ->addTag('media_library.opener');
     }
 
-    // The ability to export default content was added in Drupal 11.3.
-    if (class_exists(Exporter::class)) {
-      $container->register(DefaultContentSubscriber::class)
-        ->setClass(DefaultContentSubscriber::class)
-        ->setAutowired(TRUE)
-        ->addTag('event_subscriber');
-    }
-
     // Register the theme settings discovery service.
     $container->register(ThemeSettingsDiscovery::class)
       ->setArguments([
@@ -53,6 +45,21 @@ class CanvasServiceProvider extends ServiceProviderBase {
         '%app.root%',
         new Reference('cache.discovery'),
       ]);
+
+    // Override Symfony's Regex validator so the `/(.|\r?\n)*/` pattern is not
+    // evaluated: it matches every string, but on long values it exhausts the
+    // PCRE JIT stack and is then reported as a failed match. Drupal resolves
+    // constraint validators by class name via the class resolver, and
+    // RegexConstraint::validatedBy() returns the class name with a leading
+    // backslash, so the service must be registered under that id — hence the
+    // `'\\' .` prefix that `::class` omits. It must be non-shared, like all
+    // constraint validators.
+    // @see \Drupal\Core\Validation\Plugin\Validation\Constraint\RegexConstraint::validatedBy()
+    // @see \Drupal\Core\Validation\ConstraintValidatorFactory::getInstance()
+    // @see \Drupal\canvas\Validation\JitSafeRegexValidator
+    $container->register('\\' . RegexValidator::class, JitSafeRegexValidator::class)
+      ->setPublic(TRUE)
+      ->setShared(FALSE);
   }
 
   /**

@@ -16,6 +16,7 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Extension\CanvasExtensionPluginManager;
+use Drupal\canvas\Extension\CanvasExtensionTypeEnum;
 use Drupal\canvas\GlobalImports;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Resource\CanvasResourceLink;
@@ -123,7 +124,8 @@ HTML;
 
     $canvas_module_path = $this->moduleHandler->getModule('canvas')->getPath();
     $dev_mode = $this->moduleHandler->moduleExists('canvas_dev_mode');
-    $dev_translation_mode = $this->moduleHandler->moduleExists('canvas_dev_translation');
+    // @todo Remove the use of 'canvas_dev_cd' flag in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+    $dev_conflict_detection = $this->moduleHandler->moduleExists('canvas_dev_cd');
     $content_translation_enabled = $this->moduleHandler->moduleExists('content_translation');
     $config_translation_enabled = $this->moduleHandler->moduleExists('config_translation');
     // ⚠️ This is highly experimental and *will* be refactored.
@@ -146,6 +148,30 @@ HTML;
       }
     }
     $extensions = $this->extensionPluginManager->getDefinitions();
+
+    // Build the page-extensions list: any extension that declares type=page
+    // in its .canvas_extension.yml is automatically promoted to a full-page
+    // Canvas app. Extensions self-promote; no allowlist in core is required.
+    $page_extensions = [];
+    foreach ($extensions as $ext) {
+      /** @var \Drupal\canvas\Extension\CanvasExtensionInterface $ext */
+      if ($ext->getType() === CanvasExtensionTypeEnum::Page) {
+        // Hide page extensions the current user cannot access. The same
+        // permissions are enforced on the canvas.boot.app route.
+        // @see \Drupal\canvas\Access\ExtensionPageAccessCheck
+        $missing_permissions = \array_filter($ext->getPermissions(), fn (string $permission): bool => !$this->currentUser->hasPermission($permission));
+        if ($missing_permissions !== []) {
+          continue;
+        }
+        $page_extensions[] = [
+          'id' => $ext->id(),
+          'name' => (string) $ext->label(),
+          'url' => Url::fromRoute('canvas.boot.app', ['extension_id' => $ext->id()])->toString(),
+          'extension_url' => $ext->getUrl(),
+          'icon' => $ext->getIcon(),
+        ];
+      }
+    }
 
     // Get theme-level Canvas settings from the default theme.
     $theme_config = $this->configFactory->get('system.theme');
@@ -178,11 +204,18 @@ HTML;
     }
     $languages_cacheability = (new CacheableMetadata())->setCacheTags(['config:configurable_language_list']);
 
+    // The absolute base URL of this Drupal site, without a trailing slash. The
+    // UI passes it to commands that need to reach the site from elsewhere,
+    // such as the headless frontend scaffolding command.
+    $site_url = rtrim(Url::fromRoute('<front>')->setAbsolute()->toString(), '/');
+    $site_url_cacheability = (new CacheableMetadata())->setCacheContexts(['url.site']);
+
     return (new HtmlResponse($this->buildHtml()))
       ->addCacheableDependency($extensions)
       ->addCacheableDependency($system_site_config)
       ->addCacheableDependency($all_content_entity_create_links)
       ->addCacheableDependency($languages_cacheability)
+      ->addCacheableDependency($site_url_cacheability)
       ->setAttachments([
         'library' => [
           'canvas/canvas-ui',
@@ -206,11 +239,13 @@ HTML;
             'entityTypeKeys' => $entity_types_with_keys,
             'entityTypeLabels' => $entity_type_labels,
             'devMode' => $dev_mode,
-            'devTranslationMode' => $dev_translation_mode,
+            // @todo Remove the use of 'canvas_dev_cd' flag in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+            'devConflictDetectionMode' => $dev_conflict_detection,
             'contentTranslationEnabled' => $content_translation_enabled,
             'configTranslationEnabled' => $config_translation_enabled,
             'languages' => $languages_data,
             'extensionsAvailable' => count($extensions) > 0,
+            'pageExtensions' => $page_extensions,
             'aiExtensionAvailable' => $ai_extension_available,
             'personalizationExtensionAvailable' => $personalization_extension_available,
           // Allow for perfect component previews, by letting the client side
@@ -234,6 +269,8 @@ HTML;
             ],
             'contentEntityCreateOperations' => $content_entity_create_operations,
             'homepagePath' => $system_site_config->get('page.front'),
+            'siteName' => $system_site_config->get('name'),
+            'siteUrl' => $site_url,
             'loginUrl' => $this->urlGenerator->generateFromRoute('user.login'),
             'viewports' => $theme_settings['viewports'] ?? [],
           ],
@@ -287,7 +324,8 @@ HTML;
    */
   private function buildHtml(): string {
     $theme_config = $this->configFactory->get('system.theme');
-    $admin_theme_name = $theme_config->get('admin') ?: $theme_config->get('default');
+    $admin = (string) $theme_config->get('admin');
+    $admin_theme_name = $admin !== '' ? $admin : $theme_config->get('default');
     $active_admin_theme = $this->themeInitialization->getActiveThemeByName($admin_theme_name);
     $actual_active_theme = $this->themeManager->getActiveTheme();
     $this->themeManager->setActiveTheme($active_admin_theme);

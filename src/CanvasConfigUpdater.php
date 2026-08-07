@@ -12,6 +12,7 @@ use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\ComponentTreeConfigEntityBase;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\Plugin\DataType\ComponentInputs;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -24,6 +25,7 @@ use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\Utility\ComponentMetadataHelper;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\field\Entity\FieldConfig;
@@ -195,7 +197,130 @@ class CanvasConfigUpdater {
         ||
         !empty($inputs->getPropSourcesUsingExpressionClass(ReferenceFieldTypePropExpression::class));
     };
-    return !empty($component_tree->componentTreeItemsIterator($has_reference_expression));
+    // Fast pre-filter: only trees with a reference-typed expression can carry
+    // intermediate component dependencies.
+    if (empty($component_tree->componentTreeItemsIterator($has_reference_expression))) {
+      return FALSE;
+    }
+    // Recompute the dependencies on a clone and compare to the stored set.
+    // calculateDependencies() rewrites the dependency list in place, and this
+    // detector must not mutate the entity it is passed — the data-health audit
+    // runs every detector against one shared, loaded entity, so a mutation
+    // here would leak into the detectors that run after it. The stored and
+    // recomputed sets differ exactly while the intermediate dependencies are
+    // still missing, i.e. while the migration is pending; the migration leaves
+    // the reference expression in place, so a bare presence check could not
+    // tell an already-migrated entity from one that still needs it.
+    // @see \Drupal\canvas\Health\Doctor::runUpdatesEscapedConfigCheck()
+    $probe = clone $entity;
+    $probe->calculateDependencies();
+    return $probe->getDependencies() != $entity->getDependencies();
+  }
+
+  /**
+   * Coerces a block instance's boolean `label_display` input to a string.
+   *
+   * Core 11.3 (#3547808) made `block.settings` `label_display` a string enum
+   * ('0' | 'visible'); data written under 11.2 could hold a boolean, which now
+   * fails validation. Boolean `false` (hidden) => '0', `true` (shown) =>
+   * 'visible'. Returns TRUE when it changed the item.
+   */
+  public static function coerceBlockLabelDisplay(ComponentTreeItem $item): bool {
+    if (self::blockComponentInstanceId($item) === NULL) {
+      return FALSE;
+    }
+    $inputs = $item->getInputs();
+    if (!\is_array($inputs) || !\array_key_exists('label_display', $inputs) || !\is_bool($inputs['label_display'])) {
+      return FALSE;
+    }
+    $inputs['label_display'] = $inputs['label_display'] ? 'visible' : '0';
+    $item->setInput($inputs);
+    return TRUE;
+  }
+
+  /**
+   * Whether a config tree has a block instance with a boolean `label_display`.
+   *
+   * Read-only predicate: the coercion runs in preSave via
+   * ::updateConfigEntityBlockLabelDisplay(), so the escaped-config health check
+   * can reflect this safely, and it reads FALSE once the value is a string.
+   *
+   * @see ::updateConfigEntityBlockLabelDisplay()
+   * @see \Drupal\canvas\Health\Doctor::runUpdatesEscapedConfigCheck()
+   */
+  public static function needsBlockLabelDisplayCast((ComponentTreeEntityInterface&ConfigEntityInterface)|FieldConfig $entity): bool {
+    if ($entity instanceof FieldConfig && $entity->getType() !== ComponentTreeItem::PLUGIN_ID) {
+      return FALSE;
+    }
+    foreach (self::getComponentTreeForEntity($entity) as $item) {
+      \assert($item instanceof ComponentTreeItem);
+      if (self::blockComponentInstanceId($item) === NULL) {
+        continue;
+      }
+      $inputs = $item->getInputs();
+      if (\is_array($inputs) && \array_key_exists('label_display', $inputs) && \is_bool($inputs['label_display'])) {
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
+
+  /**
+   * Returns an item's block component ID, or NULL if it is not a block one.
+   *
+   * The block-label-display methods run in preSave, before schema validation,
+   * so they must tolerate a malformed tree item that has no `component_id` yet
+   * (::getComponentId() would throw): such an item is not a block instance to
+   * coerce, and letting it through lets schema validation report the real
+   * error.
+   *
+   * @see ::coerceBlockLabelDisplay()
+   * @see ::needsBlockLabelDisplayCast()
+   */
+  private static function blockComponentInstanceId(ComponentTreeItem $item): ?string {
+    $component_id = $item->get('component_id')->getValue();
+    if (!\is_string($component_id) || !\str_starts_with($component_id, BlockComponent::SOURCE_PLUGIN_ID . '.')) {
+      return NULL;
+    }
+    return $component_id;
+  }
+
+  /**
+   * Casts boolean block `label_display` inputs to strings in a config tree.
+   *
+   * The mutator, run from every config entity's preSave (paired with the
+   * read-only ::needsBlockLabelDisplayCast() predicate that the 0024 update
+   * paths use to select entities to re-save). Config-defined sibling of
+   * canvas_post_update_0023_block_label_display_boolean_to_string(), which
+   * fixes content-entity component trees. Walks the entity's component tree
+   * (or a FieldConfig's `default_value`), coerces every block instance's
+   * boolean `label_display`, and returns TRUE when anything changed.
+   *
+   * @todo Add #[ComponentPreSaveUpdate] once #3591619 generalizes the preSave-wiring PHPStan enforcement to component-tree config entities and FieldConfig.
+   *
+   * @see ::needsBlockLabelDisplayCast()
+   * @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::preSave()
+   * @see ::coerceBlockLabelDisplay()
+   */
+  public static function updateConfigEntityBlockLabelDisplay((ComponentTreeEntityInterface&ConfigEntityInterface)|FieldConfig $entity): bool {
+    if (!self::needsBlockLabelDisplayCast($entity)) {
+      return FALSE;
+    }
+    $tree = self::getComponentTreeForEntity($entity);
+    foreach ($tree as $item) {
+      \assert($item instanceof ComponentTreeItem);
+      self::coerceBlockLabelDisplay($item);
+    }
+    // Write the mutated tree back. setComponentTree() re-normalizes inputs to
+    // arrays; FieldConfig needs the explicit conversion, mirroring
+    // ::updateConfigEntityWithComponentTreeInputsAsArrays().
+    if ($entity instanceof ComponentTreeEntityInterface) {
+      $entity->setComponentTree($tree->getValue());
+    }
+    else {
+      $entity->set('default_value', ComponentTreeConfigEntityBase::componentTreeInstancesInputsMustBeArrays($tree->getValue()));
+    }
+    return TRUE;
   }
 
   public static function needsTrackingPropsRequiredFlag(Component $component): bool {
@@ -343,6 +468,104 @@ class CanvasConfigUpdater {
     }
 
     return $active_version_updated || $past_version_updated;
+  }
+
+  /**
+   * Whether any version's prop lacks `derived_schema_metadata`.
+   *
+   * (See `type: canvas.json_schema_props`.)
+   */
+  public static function needsPropDerivedSchemaMetadata(Component $component): bool {
+    $component_source = $component->getComponentSource();
+    // @see `type: canvas.json_schema_props`
+    if (!$component_source instanceof JsonSchemaPropsComponentSourceBase) {
+      return FALSE;
+    }
+
+    // Track the originally loaded version to enable avoiding side effects.
+    $originally_loaded_version = $component->getLoadedVersion();
+
+    // All versions of the Component config entity must have
+    // `derived_schema_metadata` for every prop field definition.
+    // Note: start with the oldest version, because it is least likely to have
+    // it.
+    $needs_updating = FALSE;
+    foreach (array_reverse($component->getVersions()) as $version) {
+      $component->loadVersion($version);
+      $settings = $component->getSettings();
+      \assert(\array_key_exists('prop_field_definitions', $settings));
+      foreach ($settings['prop_field_definitions'] as $prop_field_definition) {
+        if (!isset($prop_field_definition['derived_schema_metadata'])) {
+          $needs_updating = TRUE;
+          break 2;
+        }
+      }
+    }
+
+    // Avoid side effects: ensure the given Component still has the same version
+    // loaded. (Not strictly necessary, just a precaution.)
+    $component->loadVersion($originally_loaded_version);
+    return $needs_updating;
+  }
+
+  #[ComponentPreSaveUpdate(postUpdate: 'canvas_post_update_0021_store_prop_derived_schema_metadata')]
+  public static function updatePropFieldDefinitionsWithDerivedSchemaMetadata(Component $component): bool {
+    if (!self::needsPropDerivedSchemaMetadata($component)) {
+      return FALSE;
+    }
+
+    // Compute the translation-relevant string shapes from the live
+    // implementation's JSON Schema. Only the active version is described by the
+    // live implementation.
+    $component_source = $component->getComponentSource();
+    \assert($component_source instanceof JsonSchemaPropsComponentSourceBase);
+    $string_shapes = [];
+    foreach (JsonSchemaPropsComponentSourceBase::getComponentInputsForMetadata($component_source->getSourceSpecificComponentId(), $component_source->getMetadata()) as $cpe_string => $prop_shape) {
+      $prop_name = ComponentPropExpression::fromString($cpe_string)->propName;
+      $string_shapes[$prop_name] = PropShape::getTranslatableStringShape($prop_shape->resolvedSchema);
+    }
+
+    $updated_versions = [];
+    foreach ($component->getVersions() as $version) {
+      $component->loadVersion($version);
+      $is_active = $component->isLoadedVersionActiveVersion();
+      $settings = $component->getSettings();
+      \assert(\array_key_exists('prop_field_definitions', $settings));
+      $version_updated = FALSE;
+      foreach ($settings['prop_field_definitions'] as $prop_name => &$prop_field_definition) {
+        if (isset($prop_field_definition['derived_schema_metadata'])) {
+          continue;
+        }
+        // Only the active version's props are described by the live JSON
+        // Schema. What shape a prop had when a *past* version was created is
+        // unknowable, so its props are treated as not translatable. Component
+        // instances become translatable when they are updated to the active
+        // version, which automatic component instance updating takes care of.
+        $string_shape = $is_active ? $string_shapes[$prop_name] ?? NULL : NULL;
+        $prop_field_definition['derived_schema_metadata'] = $string_shape === NULL
+          ? []
+          : ['string_shape' => $string_shape];
+        $version_updated = TRUE;
+      }
+      unset($prop_field_definition);
+      if ($version_updated) {
+        // `derived_schema_metadata` is excluded from the version hash, so this
+        // does not change the version id: no new version is needed, not even
+        // for the active version.
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::settingsAffectingVersionHash()
+        // Pretend to be syncing; otherwise changing settings of past versions
+        // is forbidden.
+        $component->setSyncing(TRUE)
+          ->setSettings($settings)
+          ->setSyncing(FALSE);
+        $updated_versions[] = $version;
+      }
+    }
+
+    // Typically, the active version is loaded, unless otherwise requested.
+    $component->resetToActiveVersion();
+
+    return $updated_versions !== [];
   }
 
   public static function needsUpdatingPropFieldDefinitionsUsingTextValue(Component $component): bool {

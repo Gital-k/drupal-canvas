@@ -6,7 +6,9 @@ namespace Drupal\Tests\canvas\Traits;
 
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\Component\Utility\SortArray;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
 use Drupal\node\Entity\Node;
@@ -88,7 +90,7 @@ trait CanvasFieldTrait {
     $nid = $node->id();
     \assert(\is_string($nid));
     // Reset the node to ensure we're not getting a cached version.
-    $this->container->get('entity_type.manager')
+    $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage('node')
       ->resetCache([$nid]);
     $node = Node::load($nid);
@@ -107,18 +109,9 @@ trait CanvasFieldTrait {
     //   `\PHPUnit\Framework\Assert::assertEqualsCanonicalizing` in
     //  https://drupal.org/i/3486414. Currently that does not work in all
     //  databases.
-    self::recursiveKsort($inputs);
-    self::recursiveKsort($expected_inputs);
+    SortArray::sortByKeyRecursive($inputs);
+    SortArray::sortByKeyRecursive($expected_inputs);
     $this->assertSame($expected_inputs, $inputs);
-  }
-
-  private static function recursiveKsort(array &$array): void {
-    ksort($array);
-    foreach ($array as &$value) {
-      if (\is_array($value)) {
-        self::recursiveKsort($value);
-      }
-    }
   }
 
   private function getValidClientJson(?EntityInterface $autoSaveEntity, bool $dynamic_image = TRUE): array {

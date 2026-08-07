@@ -9,15 +9,19 @@ use Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\comment\Entity\CommentType;
+use Drupal\content_translation\BundleTranslationSettingsInterface;
 use Drupal\Core\Cache\CacheableJsonResponse;
+use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\file\Entity\File;
+use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
@@ -28,6 +32,8 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -44,6 +50,7 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
 
   private const string URL_TYPES = '/canvas/api/v0/ui/content-entity-reference';
   private const string URL_FIELDS = '/canvas/api/v0/ui/content-entity-reference/%s/%s';
+  private const string URL_PREVIEW = '/canvas/api/v0/ui/content-entity-reference/preview/%s/%s';
 
   /**
    * {@inheritdoc}
@@ -51,13 +58,21 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
   protected static $modules = [
     'node',
     'field',
-    // `comment` has an access handler that dereferences a field
-    // (`commented_entity`) the stub can't populate; including it here keeps
-    // the defensive catch in getBundleViewAccess() honest.
+    // `comment` has an access handler that dereferences the commented (parent)
+    // entity a bundle stub can't populate; including it exercises the
+    // commented-entity stub injection in createBundleStub().
     'comment',
     // Provides `internal_string_field` (a base field marked internal), to assert
     // the picker omits internal fields.
     'entity_test',
+    // Adds `content_translation_source`/`content_translation_outdated` base
+    // fields when a bundle is translatable, to assert the picker omits the
+    // translation/revision metadata base fields.
+    'language',
+    'content_translation',
+    // Provides the `daterange` field type, to assert the picker omits its
+    // computed `start_date`/`end_date` properties.
+    'datetime_range',
   ];
 
   protected function setUp(): void {
@@ -108,6 +123,54 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
       'entity_type' => 'node',
       'bundle' => 'article',
       'label' => 'Link',
+    ])->save();
+
+    // Formatted text fields (one per text field type) — exercise the picker
+    // hiding each type's raw properties in favor of its processed one(s).
+    foreach ([
+      'field_text' => 'text',
+      'field_text_long' => 'text_long',
+      'field_text_with_summary' => 'text_with_summary',
+    ] as $field_name => $field_type) {
+      FieldStorageConfig::create([
+        'field_name' => $field_name,
+        'entity_type' => 'node',
+        'type' => $field_type,
+      ])->save();
+      FieldConfig::create([
+        'field_name' => $field_name,
+        'entity_type' => 'node',
+        'bundle' => 'article',
+        'label' => $field_name,
+      ])->save();
+    }
+
+    // Datetime and date range fields — exercise the picker hiding their
+    // computed DrupalDateTime-object properties (`date`, `start_date`,
+    // `end_date`), which are not evaluable without an adapter.
+    FieldStorageConfig::create([
+      'field_name' => 'field_date',
+      'entity_type' => 'node',
+      'type' => 'datetime',
+      'settings' => ['datetime_type' => 'datetime'],
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_date',
+      'entity_type' => 'node',
+      'bundle' => 'article',
+      'label' => 'Date',
+    ])->save();
+
+    FieldStorageConfig::create([
+      'field_name' => 'field_date_range',
+      'entity_type' => 'node',
+      'type' => 'daterange',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_date_range',
+      'entity_type' => 'node',
+      'bundle' => 'article',
+      'label' => 'Date range',
     ])->save();
 
     // Plain file field — non-image reference whose non-`entity` properties
@@ -180,6 +243,25 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
       'label' => 'Media',
       'settings' => ['handler_settings' => ['target_bundles' => ['video' => 'video', 'image' => 'image']]],
     ])->save();
+
+    // A self-referential multi-target-bundle reference on the media bundles —
+    // exercises withholding a further multi-bundle descent when the parent chain
+    // already descends through one (which would coalesce into a nested branch).
+    FieldStorageConfig::create([
+      'field_name' => 'field_media_related',
+      'entity_type' => 'media',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'media'],
+    ])->save();
+    foreach (['image', 'video'] as $media_bundle) {
+      FieldConfig::create([
+        'field_name' => 'field_media_related',
+        'entity_type' => 'media',
+        'bundle' => $media_bundle,
+        'label' => 'Related media',
+        'settings' => ['handler_settings' => ['target_bundles' => ['image' => 'image', 'video' => 'video']]],
+      ])->save();
+    }
   }
 
   public function testContentEntityTypesEndpoint(): void {
@@ -225,21 +307,20 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Pins the defensive catch in getBundleViewAccess().
+   * Comment is referenceable and can be browsed when permissions allow.
    *
-   * CommentAccessControlHandler dereferences `entity_id` (commented entity)
-   * which an unsaved stub cannot populate, so the stub-based view-access check
-   * throws. The controller catches that and treats the bundle as forbidden so
-   * one misbehaving entity type does not 500 the entire response. The endpoint
-   * must therefore (a) still return 200 and (b) omit the comment bundle even
-   * for a user who holds 'access comments'.
+   * CommentAccessControlHandler ANDs the commented (parent) entity's view
+   * access into the comment's: `$entity->getCommentedEntity()->access('view')`.
+   * A bundle stub has no commented entity, so the controller injects a
+   * normalized stub of the comment type's target entity type. Eligibility is
+   * therefore the conjunction of 'access comments' and coarse view access to
+   * the parent type ('access content' for comment-on-node). With both, comment
+   * appears in the listing and its fields endpoint can be browsed.
+   *
+   * @see \Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers::createBundleStub()
    */
-  public function testContentEntityTypesCatchesStubAccessThrow(): void {
-    CommentType::create([
-      'id' => 'comment',
-      'label' => 'Default comments',
-      'target_entity_type_id' => 'node',
-    ])->save();
+  public function testCommentIsReferenceableWithPermissions(): void {
+    self::createNodeCommentType();
 
     $this->setUpCurrentUser([], [
       JavaScriptComponent::ADMIN_PERMISSION,
@@ -250,7 +331,87 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     $response = $this->request(Request::create(self::URL_TYPES));
     self::assertSame(Response::HTTP_OK, $response->getStatusCode());
     $data = self::decodeResponse($response)['data'];
+
+    self::assertArrayHasKey('comment', $data);
+    self::assertArrayHasKey('comment', $data['comment']['bundles']);
+    self::assertSame('Default comments', $data['comment']['bundles']['comment']['label']);
+    self::assertSame(
+      '/canvas/api/v0/ui/content-entity-reference/comment/comment',
+      $data['comment']['bundles']['comment']['links'][CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER]['href'],
+    );
+
+    // The shared bundle-view-access gate now admits comment, so the fields
+    // endpoint can be browsed (200), not access-denied.
+    $fields_response = $this->request(Request::create(\sprintf(self::URL_FIELDS, 'comment', 'comment')));
+    self::assertSame(Response::HTTP_OK, $fields_response->getStatusCode());
+    $field_names = \array_column(self::decodeResponse($fields_response)['data'], 'name');
+    self::assertSame([
+      'cid',
+      'uuid',
+      'langcode',
+      'comment_type',
+      'status',
+      'uid',
+      'pid',
+      'entity_id',
+      'subject',
+      'name',
+      'created',
+      'changed',
+      'thread',
+      'entity_type',
+      'field_name',
+    ], $field_names);
+  }
+
+  /**
+   * Comment is omitted for a user lacking 'access comments'.
+   */
+  public function testCommentOmittedWithoutAccessCommentsPermission(): void {
+    self::createNodeCommentType();
+
+    $this->setUpCurrentUser([], [
+      JavaScriptComponent::ADMIN_PERMISSION,
+      'access content',
+    ]);
+
+    $response = $this->request(Request::create(self::URL_TYPES));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $data = self::decodeResponse($response)['data'];
     self::assertArrayNotHasKey('comment', $data);
+  }
+
+  /**
+   * Comment is omitted when the parent type is not coarsely viewable.
+   *
+   * Pins the coarse-gate conjunction: holding 'access comments' is not enough
+   * if the commented entity type (node) cannot be viewed at all ('access
+   * content' missing), because the injected parent stub's view access is ANDed
+   * in by CommentAccessControlHandler.
+   */
+  public function testCommentOmittedWithoutParentTypeViewAccess(): void {
+    self::createNodeCommentType();
+
+    $this->setUpCurrentUser([], [
+      JavaScriptComponent::ADMIN_PERMISSION,
+      'access comments',
+    ]);
+
+    $response = $this->request(Request::create(self::URL_TYPES));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $data = self::decodeResponse($response)['data'];
+    self::assertArrayNotHasKey('comment', $data);
+  }
+
+  /**
+   * Creates a default comment type targeting node.
+   */
+  private static function createNodeCommentType(): void {
+    CommentType::create([
+      'id' => 'comment',
+      'label' => 'Default comments',
+      'target_entity_type_id' => 'node',
+    ])->save();
   }
 
   /**
@@ -271,8 +432,6 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
       self::assertNotContains('entity', \array_column($row['properties'], 'name'));
     }
 
-    $article = BetterEntityDataDefinition::create('node', 'article');
-
     // `title` (scalar string field): non-reference, one `value` property.
     self::assertSame(
       [
@@ -283,7 +442,7 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
           [
             'name' => 'value',
             'label' => 'Text value',
-            'expression' => (string) new FieldPropExpression($article, 'title', NULL, 'value'),
+            'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
         ],
       ],
@@ -294,16 +453,13 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     // single entry in targetBundles keyed by the entity type ID.
     // `target_id` surfaces as a pickable leaf — the developer can read the
     // raw user ID without descending into the user entity.
-    $user = BetterEntityDataDefinition::create('user', 'user');
     self::assertTrue($by_name['uid']['hasChildren']);
     self::assertSame('user', $by_name['uid']['targetEntityType']);
     self::assertArrayHasKey('targetBundles', $by_name['uid']);
     self::assertCount(1, $by_name['uid']['targetBundles']);
     self::assertArrayHasKey('user', $by_name['uid']['targetBundles']);
-    $expected_ref_expression = (string) new ReferenceFieldPropExpression(
-      new FieldPropExpression($article, 'uid', NULL, 'entity'),
-      new FieldPropExpression($user, 'name', NULL, 'value'),
-    );
+    // node:article.uid → user.name.value (user/user normalizes to entity:user).
+    $expected_ref_expression = 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝name␞␟value';
     self::assertSame($expected_ref_expression, $by_name['uid']['targetBundles']['user']['labelExpression']);
     self::assertSame(
       '/canvas/api/v0/ui/content-entity-reference/user/user?parent=' . \urlencode($expected_ref_expression),
@@ -312,17 +468,208 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     $uid_props_by_name = \array_column($by_name['uid']['properties'], NULL, 'name');
     self::assertArrayNotHasKey('entity', $uid_props_by_name);
     self::assertSame(
-      (string) new FieldPropExpression($article, 'uid', NULL, 'target_id'),
+      'ℹ︎␜entity:node:article␝uid␞␟target_id',
       $uid_props_by_name['target_id']['expression'],
     );
   }
 
   /**
-   * Image field exposes all non-internal, non-`entity` typed-data properties.
+   * Resolves entityFields expressions against a selected content entity.
+   */
+  public function testPreviewFieldsEndpoint(): void {
+    $account = $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'access user profiles']);
+    $file = File::create([
+      'uri' => 'public://example.jpg',
+      'filename' => 'example.jpg',
+    ]);
+    $file->save();
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Example article',
+      'uid' => $account->id(),
+      'status' => 1,
+      'field_image' => [
+        'target_id' => $file->id(),
+        'alt' => 'Example alt text',
+        'width' => 800,
+        'height' => 600,
+      ],
+    ]);
+    $node->save();
+
+    $article = BetterEntityDataDefinition::create('node', 'article');
+    $user = BetterEntityDataDefinition::create('user', 'user');
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'node', $node->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            (string) new FieldPropExpression($article, 'title', NULL, 'value'),
+            (string) new ReferenceFieldPropExpression(
+              new FieldPropExpression($article, 'uid', NULL, 'entity'),
+              new FieldPropExpression($user, 'name', NULL, 'value'),
+            ),
+            (string) new FieldPropExpression($article, 'field_image', NULL, 'alt'),
+            (string) new FieldPropExpression($article, 'field_image', NULL, 'width'),
+            (string) new FieldPropExpression($article, 'field_image', NULL, 'height'),
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $response = $this->request($request);
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    self::assertSame(
+      [
+        'data' => [
+          'article' => [
+            '__type' => 'article',
+            'label' => 'Example article',
+            'field_image' => [
+              'alt' => 'Example alt text',
+              'height' => 600,
+              'width' => 800,
+            ],
+            'owner' => [
+              '__type' => 'user',
+              'name' => $account->getAccountName(),
+            ],
+          ],
+        ],
+      ],
+      self::decodeResponse($response),
+    );
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertContains('node:' . $node->id(), $response->getCacheableMetadata()->getCacheTags());
+    self::assertContains('user:' . $account->id(), $response->getCacheableMetadata()->getCacheTags());
+  }
+
+  /**
+   * The preview endpoint requires view access to the selected entity.
+   */
+  public function testPreviewFieldsEndpointChecksSelectedEntityAccess(): void {
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Example article',
+      'status' => 1,
+    ]);
+    $node->save();
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION]);
+
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'node', $node->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            (string) new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'title', NULL, 'value'),
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $this->expectException(AccessDeniedHttpException::class);
+    $this->request($request);
+  }
+
+  /**
+   * The selected entity must match the expressions' entity type and bundle.
+   */
+  public function testPreviewFieldsEndpointRejectsMismatchedSelectedEntity(): void {
+    $account = $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access user profiles']);
+
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'user', $account->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            (string) new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'title', NULL, 'value'),
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $this->expectException(BadRequestHttpException::class);
+    $this->expectExceptionMessage('is an expression for entity type `node`, but the provided entity is of type `user`.');
+    $this->request($request);
+  }
+
+  /**
+   * The preview endpoint rejects unparseable expression strings.
+   */
+  public function testPreviewFieldsEndpointRejectsInvalidExpressionString(): void {
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Example article',
+      'status' => 1,
+    ]);
+    $node->save();
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content']);
+
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'node', $node->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            'not-a-valid-expression',
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $this->expectException(BadRequestHttpException::class);
+    $this->expectExceptionMessage("'not-a-valid-expression' is not a valid prop expression.");
+    $this->request($request);
+  }
+
+  /**
+   * The preview endpoint accepts only entity-field-based expressions.
+   */
+  public function testPreviewFieldsEndpointRejectsFieldTypeExpression(): void {
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Example article',
+      'status' => 1,
+    ]);
+    $node->save();
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content']);
+
+    $expression = (string) new FieldTypePropExpression('string', 'value');
+    $request = Request::create(
+      \sprintf(self::URL_PREVIEW, 'node', $node->id()),
+      'POST',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode([
+        'entityFields' => [
+          'article' => [
+            $expression,
+          ],
+        ],
+      ], \JSON_THROW_ON_ERROR),
+    );
+
+    $this->expectException(BadRequestHttpException::class);
+    $this->expectExceptionMessage(\sprintf("'%s' is not a valid content-entity-reference prop expression.", $expression));
+    $this->request($request);
+  }
+
+  /**
+   * Image field exposes `src`, but not its implementation-detail computed twins.
    *
    * Image fields are references (target=file). The response must include
-   * Canvas's computed `src_with_alternate_widths` and
-   * `srcset_candidate_uri_template` (computed-but-not-explicitly-internal).
+   * Canvas's computed `src` (labelled "Image URL") but neither of the other
+   * computed properties Canvas adds: `src_with_alternate_widths` (the property
+   * `src` is cloned from, so listing it would show the same URL twice) and
+   * `srcset_candidate_uri_template` (a raw URI template feeding `src`).
+   *
+   * @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride
    */
   public function testFieldsEndpointImageFieldExposesAllProperties(): void {
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content']);
@@ -341,27 +688,36 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     self::assertArrayHasKey(CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER, $row['targetBundles']['file']['links']);
     self::assertStringStartsWith('/canvas/api/v0/ui/content-entity-reference/file/file', $row['targetBundles']['file']['links'][CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER]['href']);
 
-    $article = BetterEntityDataDefinition::create('node', 'article');
     $props_by_name = \array_column($row['properties'], NULL, 'name');
     // Exact non-`entity` property set: target_id (from EntityReferenceItem),
-    // alt/title/width/height (from ImageItem) plus Canvas's computed
-    // src + src_with_alternate_widths + srcset_candidate_uri_template
-    // (from ImageItemOverride). `display`/`description` are unset by
-    // ImageItem itself.
-    $expected_names = ['target_id', 'alt', 'title', 'width', 'height', 'srcset_candidate_uri_template', 'src_with_alternate_widths', 'src'];
+    // alt/title/width/height (from ImageItem) and Canvas's computed `src`.
+    // Canvas's other computed properties are implementation details and are
+    // hidden: `src_with_alternate_widths` (`src`'s twin) and
+    // `srcset_candidate_uri_template` (a raw URI template feeding `src`).
+    // `display`/`description` are unset by ImageItem itself.
+    $expected_names = ['target_id', 'alt', 'title', 'width', 'height', 'src'];
     \sort($expected_names);
     $actual_names = \array_keys($props_by_name);
     \sort($actual_names);
     self::assertSame($expected_names, $actual_names);
+    self::assertArrayNotHasKey('src_with_alternate_widths', $props_by_name);
+    self::assertArrayNotHasKey('srcset_candidate_uri_template', $props_by_name);
 
     foreach ($expected_names as $property_name) {
-      $expected_expression = (string) new FieldPropExpression($article, 'field_image', NULL, $property_name);
+      $expected_expression = 'ℹ︎␜entity:node:article␝field_image␞␟' . $property_name;
       self::assertSame($expected_expression, $props_by_name[$property_name]['expression']);
     }
+
+    // `src` is surfaced with the developer-facing label, not the
+    // implementation-detail one it was cloned from.
+    self::assertSame('Image URL', $props_by_name['src']['label']);
   }
 
   /**
    * Following an image field's descend link into file/file returns its fields.
+   *
+   * Also covers that the file entity's own `uri` field hides its raw
+   * stream-wrapper value, keeping only the resolvable computed `url`.
    *
    * @see \Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers::createBundleStub()
    */
@@ -382,19 +738,54 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
       self::assertArrayHasKey($expected_file_field, $file_fields);
     }
 
-    // The file fields' expressions descend through the image reference: each is
-    // a ReferenceFieldPropExpression rooted at the article, following
-    // field_image into the file, with the file property as the leaf.
-    $article = BetterEntityDataDefinition::create('node', 'article');
-    $file = BetterEntityDataDefinition::create('file', 'file');
-    $uri_prop = \array_column($file_fields['uri']['properties'], NULL, 'name')['value'];
+    // `uri`'s raw stream-wrapper value (e.g. `public://...`) is not resolvable
+    // to a browser-accessible URL, so it is hidden; the computed `url` is offered
+    // instead. The file fields' expressions descend through the image
+    // reference: each is a reference expression rooted at the article,
+    // following field_image into the file, with the file property as the
+    // leaf.
+    // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\FileUriItemOverride::propertyDefinitions()
+    $uri_props_by_name = \array_column($file_fields['uri']['properties'], NULL, 'name');
+    self::assertArrayNotHasKey('value', $uri_props_by_name);
+    self::assertArrayHasKey('url', $uri_props_by_name);
     self::assertSame(
-      (string) new ReferenceFieldPropExpression(
-        new FieldPropExpression($article, 'field_image', NULL, 'entity'),
-        new FieldPropExpression($file, 'uri', NULL, 'value'),
-      ),
-      $uri_prop['expression'],
+      'ℹ︎␜entity:node:article␝field_image␞␟entity␜␜entity:file␝uri␞␟url',
+      $uri_props_by_name['url']['expression'],
     );
+  }
+
+  /**
+   * A further multi-bundle reference descent is withheld to prevent nesting.
+   *
+   * `field_media` targets two bundles; descending into one and then offering
+   * `field_media_related` (also multi-bundle) would let the developer pick
+   * across bundles at both levels, coalescing into a branch inside a branch —
+   * nested branching, not yet supported. So the second reference's descent is
+   * withheld (no targetBundles, hasChildren = FALSE), though its own leaf
+   * properties still surface.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustNotNestBranchesConstraint
+   */
+  public function testFieldsEndpointWithholdsNestedMultiBundleDescent(): void {
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'view media']);
+
+    // Top level: field_media (multi-bundle) can be browsed into both bundles.
+    $response = $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'article')));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $by_name = \array_column(self::decodeResponse($response)['data'], NULL, 'name');
+    self::assertTrue($by_name['field_media']['hasChildren']);
+    self::assertCount(2, $by_name['field_media']['targetBundles']);
+    $href = $by_name['field_media']['targetBundles']['image']['links'][CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER]['href'];
+
+    // One level in (inside a multi-bundle reference): field_media_related's
+    // descent is withheld, but its leaf properties still surface.
+    $descend = $this->request(Request::create($href));
+    self::assertSame(Response::HTTP_OK, $descend->getStatusCode());
+    $media_fields = \array_column(self::decodeResponse($descend)['data'], NULL, 'name');
+    self::assertArrayHasKey('field_media_related', $media_fields);
+    self::assertFalse($media_fields['field_media_related']['hasChildren']);
+    self::assertArrayNotHasKey('targetBundles', $media_fields['field_media_related']);
+    self::assertNotEmpty($media_fields['field_media_related']['properties']);
   }
 
   /**
@@ -419,12 +810,11 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     self::assertArrayHasKey(CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER, $row['targetBundles']['file']['links']);
     self::assertStringStartsWith('/canvas/api/v0/ui/content-entity-reference/file/file', $row['targetBundles']['file']['links'][CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER]['href']);
 
-    $article = BetterEntityDataDefinition::create('node', 'article');
     $props_by_name = \array_column($row['properties'], NULL, 'name');
     self::assertArrayHasKey('target_id', $props_by_name);
     self::assertArrayNotHasKey('entity', $props_by_name);
     self::assertSame(
-      (string) new FieldPropExpression($article, 'field_file', NULL, 'target_id'),
+      'ℹ︎␜entity:node:article␝field_file␞␟target_id',
       $props_by_name['target_id']['expression'],
     );
   }
@@ -451,25 +841,23 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     self::assertArrayHasKey(CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER, $row['targetBundles']['video']['links']);
     self::assertStringStartsWith('/canvas/api/v0/ui/content-entity-reference/media/video', $row['targetBundles']['video']['links'][CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER]['href']);
 
-    $article = BetterEntityDataDefinition::create('node', 'article');
     $props_by_name = \array_column($row['properties'], NULL, 'name');
     self::assertArrayHasKey('target_id', $props_by_name);
     self::assertArrayNotHasKey('entity', $props_by_name);
     self::assertSame(
-      (string) new FieldPropExpression($article, 'field_video', NULL, 'target_id'),
+      'ℹ︎␜entity:node:article␝field_video␞␟target_id',
       $props_by_name['target_id']['expression'],
     );
   }
 
   /**
-   * Multi-target-bundle reference field is not offered for browsing.
+   * Multi-target-bundle reference field is offered for per-bundle browsing.
    *
-   * A reference field targeting more than one bundle would let the picker
-   * compose a multi-target-bundle expression, which is not yet supported at
-   * render time. So it is not walkable (`hasChildren` is FALSE and there is no
-   * `targetBundles`); only its own leaf properties surface.
-   *
-   * @todo Update in https://git.drupalcode.org/project/canvas/-/work_items/3591656
+   * A reference field targeting more than one bundle is walkable: `hasChildren`
+   * is TRUE and `targetBundles` carries one entry per target bundle, each with
+   * its own label, a single-bundle composed parent expression, and a distinct
+   * browse URL. Per-bundle browsing keeps each parent a single-bundle chain;
+   * the picker's per-bundle picks are merged into a branch expression on save.
    */
   public function testFieldsEndpointMultiTargetBundleReferenceField(): void {
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'view media']);
@@ -479,17 +867,37 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
 
     self::assertArrayHasKey('field_media', $by_name);
     $row = $by_name['field_media'];
-    self::assertFalse($row['hasChildren']);
-    self::assertArrayNotHasKey('targetEntityType', $row);
-    self::assertArrayNotHasKey('targetBundles', $row);
+    self::assertTrue($row['hasChildren']);
+    self::assertSame('media', $row['targetEntityType']);
+    self::assertArrayHasKey('targetBundles', $row);
+    // Both target bundles are offered, keyed by bundle ID in sorted order.
+    self::assertSame(['image', 'video'], \array_keys($row['targetBundles']));
+
+    // Each bundle carries its own label and a single-bundle composed parent
+    // expression, and the two browse URLs are distinct.
+    $image = $row['targetBundles']['image'];
+    $video = $row['targetBundles']['video'];
+    self::assertSame('Image', $image['label']);
+    self::assertSame('Video', $video['label']);
+    $image_parent = 'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝name␞␟value';
+    $video_parent = 'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝name␞␟value';
+    self::assertSame($image_parent, $image['labelExpression']);
+    self::assertSame($video_parent, $video['labelExpression']);
+    self::assertSame(
+      '/canvas/api/v0/ui/content-entity-reference/media/image?parent=' . \urlencode($image_parent),
+      $image['links'][CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER]['href'],
+    );
+    self::assertSame(
+      '/canvas/api/v0/ui/content-entity-reference/media/video?parent=' . \urlencode($video_parent),
+      $video['links'][CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER]['href'],
+    );
 
     // Leaf properties are still present; the `entity` descend path is not.
-    $article = BetterEntityDataDefinition::create('node', 'article');
     $props_by_name = \array_column($row['properties'], NULL, 'name');
     self::assertArrayHasKey('target_id', $props_by_name);
     self::assertArrayNotHasKey('entity', $props_by_name);
     self::assertSame(
-      (string) new FieldPropExpression($article, 'field_media', NULL, 'target_id'),
+      'ℹ︎␜entity:node:article␝field_media␞␟target_id',
       $props_by_name['target_id']['expression'],
     );
   }
@@ -568,12 +976,91 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Link field exposes uri/title/options as separate leaves.
+   * The picker omits translation and revision metadata base fields.
+   *
+   * These base fields are not marked internal, so the internal-field rule does
+   * not catch them, but a Code Component Developer never consumes them as
+   * content: "Default translation", "Revision translation affected",
+   * "Translation source", "Translation outdated" and "Revision log message".
+   *
+   * @see \Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers::isIrrelevantMetadataField()
+   */
+  public function testFieldsEndpointOmitsTranslationAndRevisionMetadataFields(): void {
+    // Make article translatable so content_translation adds its metadata base
+    // fields alongside core's default_langcode / revision_log_message /
+    // revision_translation_affected.
+    \Drupal::service(BundleTranslationSettingsInterface::class)->setEnabled('node', 'article', TRUE);
+    $this->container->get(EntityFieldManagerInterface::class)->clearCachedFieldDefinitions();
+
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content']);
+    $response = $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'article')));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $by_name = \array_column(self::decodeResponse($response)['data'], NULL, 'name');
+
+    // The bookkeeping base fields the picker must hide. Asserting they exist on
+    // the entity guards against a false positive: without it, the omission
+    // assertion below would also pass if these fields were simply never created
+    // (e.g. if enabling translation silently failed). "Default translation"
+    // (default_langcode), "Revision log message" (node's `revision_log`),
+    // "Revision translation affected" (revision_translation_affected),
+    // "Translation source"/"Translation outdated" (content_translation_*).
+    $field_definitions = $this->container->get(EntityFieldManagerInterface::class)->getFieldDefinitions('node', 'article');
+    foreach ([
+      'default_langcode',
+      'revision_log',
+      'revision_translation_affected',
+      'content_translation_source',
+      'content_translation_outdated',
+    ] as $metadata_field) {
+      self::assertArrayHasKey($metadata_field, $field_definitions, "Expected $metadata_field to exist on the article so the picker has something to omit.");
+    }
+
+    // The exact field set offered for a translatable, revisionable article.
+    // None of the bookkeeping fields asserted above appear — even though none
+    // of them is marked internal. The entity's own `langcode` is kept: it is
+    // real content, not bookkeeping.
+    $actual_field_names = \array_keys($by_name);
+    \sort($actual_field_names);
+    self::assertSame([
+      'changed',
+      'created',
+      'field_date',
+      'field_date_range',
+      'field_file',
+      'field_image',
+      'field_link',
+      'field_media',
+      'field_text',
+      'field_text_long',
+      'field_text_with_summary',
+      'field_video',
+      'langcode',
+      'nid',
+      'path',
+      'promote',
+      'revision_timestamp',
+      'revision_uid',
+      'status',
+      'sticky',
+      'title',
+      'type',
+      'uid',
+      'uuid',
+      'vid',
+    ], $actual_field_names);
+  }
+
+  /**
+   * Link field exposes title/options/url as leaves, hiding the raw uri.
    *
    * No object wrapping in the response — combining into a
-   * FieldObjectPropsExpression happens server-side during save.
+   * FieldObjectPropsExpression happens server-side during save. The raw `uri`
+   * is hidden because it lacks a UriSchemeConstraint restricted to
+   * http/https, unlike `url`.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint
    */
-  public function testFieldsEndpointLinkFieldExposesAllProperties(): void {
+  public function testFieldsEndpointLinkFieldHidesRawUri(): void {
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content']);
     $response = $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'article')));
     self::assertSame(Response::HTTP_OK, $response->getStatusCode());
@@ -586,15 +1073,101 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     self::assertArrayNotHasKey('targetBundle', $row);
     self::assertArrayNotHasKey('links', $row);
 
-    $article = BetterEntityDataDefinition::create('node', 'article');
     $props_by_name = \array_column($row['properties'], NULL, 'name');
-    foreach (['uri', 'title', 'options'] as $property_name) {
+    self::assertArrayNotHasKey('uri', $props_by_name);
+    foreach (['title', 'options', 'url'] as $property_name) {
       self::assertArrayHasKey($property_name, $props_by_name);
       self::assertSame(
-        (string) new FieldPropExpression($article, 'field_link', NULL, $property_name),
+        'ℹ︎␜entity:node:article␝field_link␞␟' . $property_name,
         $props_by_name[$property_name]['expression'],
       );
     }
+    self::assertSame('Resolved URL', $props_by_name['url']['label']);
+  }
+
+  /**
+   * Formatted text fields hide their raw input, keeping processed and format.
+   *
+   * `text`/`text_long` hide the raw `value`, keeping `processed`.
+   * `text_with_summary` additionally hides the raw `summary`, keeping
+   * `summary_processed`. `format` is retained in both cases.
+   *
+   * @see \Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers::buildFieldEntry()
+   * @see \Drupal\text\Plugin\Field\FieldType\TextItemBase
+   */
+  public function testFieldsEndpointFormattedTextFieldsHideRawProperties(): void {
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content']);
+    $response = $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'article')));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $by_name = \array_column(self::decodeResponse($response)['data'], NULL, 'name');
+
+    foreach (['field_text', 'field_text_long'] as $field_name) {
+      self::assertArrayHasKey($field_name, $by_name);
+      $props_by_name = \array_column($by_name[$field_name]['properties'], NULL, 'name');
+      self::assertArrayNotHasKey('value', $props_by_name);
+      self::assertArrayHasKey('format', $props_by_name);
+      self::assertSame(
+        'ℹ︎␜entity:node:article␝' . $field_name . '␞␟format',
+        $props_by_name['format']['expression'],
+      );
+      self::assertArrayHasKey('processed', $props_by_name);
+      self::assertSame(
+        'ℹ︎␜entity:node:article␝' . $field_name . '␞␟processed',
+        $props_by_name['processed']['expression'],
+      );
+    }
+
+    self::assertArrayHasKey('field_text_with_summary', $by_name);
+    $props_by_name = \array_column($by_name['field_text_with_summary']['properties'], NULL, 'name');
+    self::assertArrayNotHasKey('value', $props_by_name);
+    self::assertArrayNotHasKey('summary', $props_by_name);
+    self::assertArrayHasKey('format', $props_by_name);
+    self::assertSame(
+      'ℹ︎␜entity:node:article␝field_text_with_summary␞␟format',
+      $props_by_name['format']['expression'],
+    );
+    self::assertArrayHasKey('processed', $props_by_name);
+    self::assertSame(
+      'ℹ︎␜entity:node:article␝field_text_with_summary␞␟processed',
+      $props_by_name['processed']['expression'],
+    );
+    self::assertArrayHasKey('summary_processed', $props_by_name);
+    self::assertSame(
+      'ℹ︎␜entity:node:article␝field_text_with_summary␞␟summary_processed',
+      $props_by_name['summary_processed']['expression'],
+    );
+  }
+
+  /**
+   * Datetime fields hide their computed DrupalDateTime-object properties.
+   *
+   * `date` (`field_date`) and `start_date`/`end_date` (`field_date_range`)
+   * are `DrupalDateTime` objects, not evaluable without an adapter; picking
+   * them previously crashed rendering with a `preg_match()` TypeError.
+   *
+   * @todo Revisit once an adapter for `DrupalDateTime` exists, in https://www.drupal.org/project/canvas/issues/3464003.
+   *
+   * @see \Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers::buildFieldEntry()
+   * @see \Drupal\canvas\Utility\TypedDataHelper::isExplicitlyInternal()
+   * @see \Drupal\datetime\DateTimeComputed
+   */
+  public function testFieldsEndpointDateTimeFieldsHideComputedDateProperties(): void {
+    $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content']);
+    $response = $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'article')));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $by_name = \array_column(self::decodeResponse($response)['data'], NULL, 'name');
+
+    self::assertArrayHasKey('field_date', $by_name);
+    $props_by_name = \array_column($by_name['field_date']['properties'], NULL, 'name');
+    self::assertArrayNotHasKey('date', $props_by_name);
+    self::assertArrayHasKey('value', $props_by_name);
+
+    self::assertArrayHasKey('field_date_range', $by_name);
+    $props_by_name = \array_column($by_name['field_date_range']['properties'], NULL, 'name');
+    self::assertArrayNotHasKey('start_date', $props_by_name);
+    self::assertArrayNotHasKey('end_date', $props_by_name);
+    self::assertArrayHasKey('value', $props_by_name);
+    self::assertArrayHasKey('end_value', $props_by_name);
   }
 
   /**
@@ -604,27 +1177,20 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'access user profiles']);
 
     // Parent: node:article.uid → entity:user.name.value (a complete reference
-    // expression terminating at a FieldPropExpression, as required).
-    $parent = new ReferenceFieldPropExpression(
-      new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'uid', NULL, 'entity'),
-      new FieldPropExpression(BetterEntityDataDefinition::create('user', 'user'), 'name', NULL, 'value'),
-    );
+    // expression terminating at a scalar leaf, as required).
+    $parent = 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝name␞␟value';
 
-    $url = \sprintf(self::URL_FIELDS, 'user', 'user') . '?parent=' . \urlencode((string) $parent);
+    $url = \sprintf(self::URL_FIELDS, 'user', 'user') . '?parent=' . \urlencode($parent);
     $response = $this->request(Request::create($url));
     self::assertSame(Response::HTTP_OK, $response->getStatusCode());
     $by_name = \array_column(self::decodeResponse($response)['data'], NULL, 'name');
 
     // The `name` field's `value` property — composed with the parent — chains
-    // node:article.uid → user:user.name.value.
+    // node:article.uid → user:user.name.value, i.e. the parent expression.
     self::assertArrayHasKey('name', $by_name);
     $name_props_by_name = \array_column($by_name['name']['properties'], NULL, 'name');
     self::assertArrayHasKey('value', $name_props_by_name);
-    $expected = (string) new ReferenceFieldPropExpression(
-      new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'uid', NULL, 'entity'),
-      new FieldPropExpression(BetterEntityDataDefinition::create('user', 'user'), 'name', NULL, 'value'),
-    );
-    self::assertSame($expected, $name_props_by_name['value']['expression']);
+    self::assertSame($parent, $name_props_by_name['value']['expression']);
 
     // The response must vary by `?parent=` so Dynamic Page Cache does not
     // reuse a cached response for a different parent expression.
@@ -640,17 +1206,20 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
    */
   public function testFieldsEndpointParentNotAReferenceExpression(): void {
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'access user profiles']);
-    $parent = new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'title', NULL, 'value');
+    $parent = 'ℹ︎␜entity:node:article␝title␞␟value';
     $this->expectException(NotFoundHttpException::class);
     $this->expectExceptionMessage('Parent expression is not a reference expression.');
-    $this->request(Request::create(\sprintf(self::URL_FIELDS, 'user', 'user') . '?parent=' . \urlencode((string) $parent)));
+    $this->request(Request::create(\sprintf(self::URL_FIELDS, 'user', 'user') . '?parent=' . \urlencode($parent)));
   }
 
   /**
-   * A crafted multi-target-bundle `?parent=` is a 404, not a 500.
+   * Per-bundle browsing round-trips; a crafted multi-bundle `?parent=` is a 404.
    *
-   * The picker never composes such parents (multi-target-bundle references
-   * are not walkable), so one can only arrive hand-crafted — and it must be
+   * Each per-bundle browse URL of a multi-target-bundle reference carries a
+   * single-bundle parent; following it lists that bundle's fields whose
+   * picked leaves compose onto the single-bundle parent chain. Because
+   * per-bundle browsing only ever composes single-bundle parents, a
+   * multi-target-bundle parent can only arrive hand-crafted and must be
    * rejected before reaching
    * ReferenceFieldPropExpression::withFinalTargetReplaced(), which throws.
    *
@@ -658,17 +1227,47 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
    */
   public function testFieldsEndpointParentWithMultiTargetBundleReference(): void {
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'view media']);
-    // `field_media` targets both the `image` and `video` media bundles.
-    $parent = new ReferenceFieldPropExpression(
-      new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'field_media', NULL, 'entity'),
-      new ReferencedBundleSpecificBranches([
-        'entity:media:image' => new FieldPropExpression(BetterEntityDataDefinition::create('media', 'image'), 'name', NULL, 'value'),
-        'entity:media:video' => new FieldPropExpression(BetterEntityDataDefinition::create('media', 'video'), 'name', NULL, 'value'),
-      ]),
-    );
-    $this->expectException(NotFoundHttpException::class);
-    $this->expectExceptionMessage('Multi-target-bundle parent expressions are not supported.');
-    $this->request(Request::create(\sprintf(self::URL_FIELDS, 'media', 'image') . '?parent=' . \urlencode((string) $parent)));
+
+    // `field_media` targets both the `image` and `video` media bundles; read
+    // the per-bundle browse URLs the picker generates for it.
+    $response = $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'article')));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $by_name = \array_column(self::decodeResponse($response)['data'], NULL, 'name');
+    $target_bundles = $by_name['field_media']['targetBundles'];
+
+    // Follow each per-bundle browse URL and confirm it lists that bundle's own
+    // fields, whose picked leaves compose onto the single-bundle parent chain
+    // into the referenced bundle. The `name` (label) leaf round-trips to the
+    // browse URL's parent; a different field re-points that chain's leaf.
+    foreach (['image', 'video'] as $bundle) {
+      $href = $target_bundles[$bundle]['links'][CanvasUriDefinitions::LINK_REL_TYPED_DATA_BROWSER]['href'];
+      $descend = $this->request(Request::create($href));
+      self::assertSame(Response::HTTP_OK, $descend->getStatusCode());
+      $media_fields = \array_column(self::decodeResponse($descend)['data'], NULL, 'name');
+
+      self::assertArrayHasKey('name', $media_fields);
+      self::assertArrayHasKey('created', $media_fields);
+      $name_props = \array_column($media_fields['name']['properties'], NULL, 'name');
+      self::assertSame(
+        "ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:{$bundle}␝name␞␟value",
+        $name_props['value']['expression'],
+      );
+      $created_props = \array_column($media_fields['created']['properties'], NULL, 'name');
+      self::assertSame(
+        "ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:{$bundle}␝created␞␟value",
+        $created_props['value']['expression'],
+      );
+    }
+
+    // A hand-crafted multi-target-bundle `?parent=` is still a 404, not a 500.
+    $multi_bundle_parent = 'ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝name␞␟value][␜entity:media:video␝name␞␟value]';
+    try {
+      $this->request(Request::create(\sprintf(self::URL_FIELDS, 'media', 'image') . '?parent=' . \urlencode($multi_bundle_parent)));
+      self::fail('Expected NotFoundHttpException for a multi-target-bundle parent expression.');
+    }
+    catch (NotFoundHttpException $exception) {
+      self::assertSame('Multi-target-bundle parent expressions are not supported.', $exception->getMessage());
+    }
   }
 
   /**
@@ -681,15 +1280,12 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
   public function testFieldsEndpointParentChainTerminusMismatch(): void {
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access content', 'access user profiles']);
     // The chain terminates at user/user, but node/page fields are requested.
-    $parent = new ReferenceFieldPropExpression(
-      new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'uid', NULL, 'entity'),
-      new FieldPropExpression(BetterEntityDataDefinition::create('user', 'user'), 'name', NULL, 'value'),
-    );
+    $parent = 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝name␞␟value';
     $this->expectException(NotFoundHttpException::class);
     // Bundle-less hosts normalize to `entity:user` (no bundle repeat).
     // @see \Drupal\canvas\TypedData\BetterEntityDataDefinition::getDataType()
     $this->expectExceptionMessage("terminates at 'entity:user', not at the requested 'entity:node:page'");
-    $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'page') . '?parent=' . \urlencode((string) $parent)));
+    $this->request(Request::create(\sprintf(self::URL_FIELDS, 'node', 'page') . '?parent=' . \urlencode($parent)));
   }
 
   public function testFieldsEndpointInvalidEntityType(): void {
@@ -725,11 +1321,8 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
     // and the resulting exception must carry the cacheability accumulated up to
     // the failing entity in the chain.
     $this->setUpCurrentUser([], [JavaScriptComponent::ADMIN_PERMISSION, 'access user profiles']);
-    $parent = new ReferenceFieldPropExpression(
-      new FieldPropExpression(BetterEntityDataDefinition::create('node', 'article'), 'uid', NULL, 'entity'),
-      new FieldPropExpression(BetterEntityDataDefinition::create('user', 'user'), 'name', NULL, 'value'),
-    );
-    $url = \sprintf(self::URL_FIELDS, 'user', 'user') . '?parent=' . \urlencode((string) $parent);
+    $parent = 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝name␞␟value';
+    $url = \sprintf(self::URL_FIELDS, 'user', 'user') . '?parent=' . \urlencode($parent);
     try {
       $this->request(Request::create($url));
       self::fail('Expected CacheableAccessDeniedHttpException.');

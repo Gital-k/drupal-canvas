@@ -13,6 +13,7 @@ import {
   layoutModelReducer,
   setInitialized,
   setInitialLayoutModel,
+  setTranslations,
   setUpdatePreview,
 } from '@/features/layout/layoutModelSlice';
 import { notificationsSlice } from '@/features/notifications/notificationsSlice';
@@ -37,7 +38,10 @@ import { brandKitApi } from '@/services/brandKit';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import { componentInstanceFormApi } from '@/services/componentInstanceForm';
 import { contentApi } from '@/services/content';
+import { contentEntityReferenceApi } from '@/services/contentEntityReferenceApi';
 import { extensionsApi } from '@/services/extensions';
+import { headlessComponentSyncApi } from '@/services/headlessComponentSync';
+import { headlessFrontendsApi } from '@/services/headlessFrontends';
 import { notificationsApi } from '@/services/notificationsApi';
 import { pageDataFormApi } from '@/services/pageDataForm';
 import { patternApi } from '@/services/patterns';
@@ -114,6 +118,7 @@ const rootReducer = combineSlices(
           return (
             Object.keys(present.model).length > 0 &&
             action.type !== setInitialLayoutModel.type &&
+            action.type !== setTranslations.type &&
             action.type !== setUpdatePreview.type
           );
         },
@@ -142,6 +147,8 @@ const rootReducer = combineSlices(
   patternApi,
   assetLibraryApi,
   brandKitApi,
+  headlessComponentSyncApi,
+  headlessFrontendsApi,
   personalizationApi,
   componentAndLayoutApi,
   previewApi,
@@ -160,6 +167,7 @@ const rootReducer = combineSlices(
   pendingChangesApi,
   publishReviewSlice,
   contentApi,
+  contentEntityReferenceApi,
   codeEditorSlice,
   previewSlice,
   queryErrorSlice,
@@ -197,6 +205,7 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
     if (
       type === setUpdatePreview.type ||
       type === setInitialLayoutModel.type ||
+      type === setTranslations.type ||
       type === setInitialPageData.type ||
       type === setInitialized.type
     ) {
@@ -238,6 +247,8 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
         patternApi.middleware,
         assetLibraryApi.middleware,
         brandKitApi.middleware,
+        headlessComponentSyncApi.middleware,
+        headlessFrontendsApi.middleware,
         personalizationApi.middleware,
         componentAndLayoutApi.middleware,
         previewApi.middleware,
@@ -248,6 +259,7 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
         undoRedoActionIdMiddleware,
         pendingChangesApi.middleware,
         contentApi.middleware,
+        contentEntityReferenceApi.middleware,
         rtkQueryErrorHandler, // Add the error handling middleware
       );
     },

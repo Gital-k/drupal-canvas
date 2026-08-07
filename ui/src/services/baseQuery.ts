@@ -1,5 +1,6 @@
 import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
+import { fetchCsrfToken } from '@/utils/csrf';
 import { getCanvasSettings } from '@/utils/drupal-globals';
 
 import type {
@@ -70,6 +71,9 @@ export const extractEntityParams = (url: string) => {
   const matchTemplateEditor = url.match(
     /\/canvas\/template\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)\/?/,
   );
+  // /pattern/:patternId/
+  // /canvas/api/v0/layout-pattern/{entity_id}
+  const matchPatternEditor = url.match(/\/canvas\/pattern\/([^/]+)\/?/);
   if (matchPageEditor) {
     return { entityType: matchPageEditor[2], entityId: matchPageEditor[3] };
   } else if (matchTemplateEditor) {
@@ -79,6 +83,8 @@ export const extractEntityParams = (url: string) => {
       templateViewMode: matchTemplateEditor[3],
       entityId: matchTemplateEditor[4],
     };
+  } else if (matchPatternEditor) {
+    return { entityType: 'pattern', entityId: matchPatternEditor[1] };
   }
   return { entityType: undefined, entityId: undefined };
 };
@@ -140,12 +146,10 @@ const rawBaseQuery = (appConfiguration: AppConfiguration) => {
     baseUrl,
     prepareHeaders: async (headers, api) => {
       if (api.type === 'mutation') {
-        const csrfResponse = await fetch(`${baseUrl}session/token`);
-        if (csrfResponse.ok) {
-          const csrfToken = await csrfResponse.text();
-          headers.set('X-CSRF-Token', csrfToken);
-        } else {
-          console.error('Failed to generate the CSRF token.');
+        try {
+          headers.set('X-CSRF-Token', await fetchCsrfToken(baseUrl));
+        } catch (error) {
+          console.error((error as Error).message);
         }
       }
     },

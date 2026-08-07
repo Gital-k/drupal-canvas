@@ -163,6 +163,14 @@ canvas.js_component.*:
     name:
       type: required_label
       label: 'Name'
+    type:
+      type: string
+      label: 'Code component type'
+      requiredKey: false
+      constraints:
+        Choice:
+          - react
+          - external
     # See core/assets/schemas/v1/metadata-full.schema.json#properties.props.properties.required
     required:
       type: sequence
@@ -195,9 +203,11 @@ canvas.js_component.*:
     js:
       type: canvas.compilable_code
       label: 'JS'
+      requiredKey: false
     css:
       type: canvas.compilable_code
       label: 'CSS'
+      requiredKey: false
     dataDependencies:
       type: mapping
       label: 'Data dependencies'
@@ -266,6 +276,15 @@ canvas.js_component.*:
               # expand → edit → coalesce round trip without losing data.
               # @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::expand()
               EntityFieldExpressionsMustBeIdempotent: ~
+              # A nested branch (a branch inside a branch) is not yet supported;
+              # reject selections that would coalesce into one.
+              # @todo Remove once nested branching is supported, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
+              EntityFieldExpressionsMustNotNestBranches: ~
+              # Reading multiple/differing fields per bundle across bundles
+              # coalesces into an object that mixes bundle-specific picks, which
+              # is unrenderable; reject it until it coalesces into a branch.
+              # @todo Remove once such selections coalesce into a branch, in https://git.drupalcode.org/project/canvas/-/work_items/3591873
+              EntityFieldExpressionsMustNotMixBundlesInObject: ~
             sequence:
               type: string
               label: 'Entity field prop expression'
@@ -281,16 +300,14 @@ canvas.js_component.*:
                   message: 'The expression is valid, but not one of the allowed types: %choices.'
                 # Validate that the expression targets an existing entity type and bundle.
                 ExpressionTargetEntityBundleExists: ~
-                # Reject references targeting multiple bundles: resolving them at
-                # render time is not yet supported.
-                # @todo https://git.drupalcode.org/project/canvas/-/work_items/3591656
-                MultiTargetBundleReferenceNotSupported: ~
                 # Reject expressions on multi-valued fields: resolving them at
                 # render time is not yet supported.
                 # @todo https://git.drupalcode.org/project/canvas/-/work_items/3589536
                 MultiValuedFieldNotSupported: ~
                 # Reject expressions targeting an internal field or field property.
                 EntityFieldExpressionMustNotTargetInternalProperty: ~
+                # Reject expressions targeting a raw, non-resolvable URI property.
+                EntityFieldExpressionMayOnlyTargetResolvableUris: ~
 
 canvas.page_region.*:
   type: config_entity
@@ -552,7 +569,7 @@ canvas.json_schema_props:
           cardinality:
             type: integer
             label: 'Maximum number of values accepted by this component prop'
-            # @todo Uncomment this once Canvas requires Drupal >=11.2
+            # @todo Uncomment this in https://git.drupalcode.org/project/canvas/-/work_items/3526703
             #constraints:
             #  AtLeastOneOf:
             #    constraints:
@@ -610,6 +627,73 @@ canvas.json_schema_props:
                   - FieldTypeObjectPropsExpression
                   - ReferenceFieldTypePropExpression
                 message: 'The expression is valid, but not one of the allowed types: %choices.'
+          # Implementation metadata for this prop at this specific component version. Deliberately NOT part of the
+          # component version hash: anything in `derived_schema_metadata` CANNOT cause changes to component instances;
+          # it MUST be derived from information in ::getExplicitInputDefinitions() (which includes detailed schema
+          # information that is not retained in the Component config entity).
+          # @see \Drupal\canvas\PropShape\PropShape::getTranslatableStringShape()
+          # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::settingsAffectingVersionHash()
+          # @see \Drupal\canvas\ComponentSource\ComponentSourceBase::generateVersionHash()
+          derived_schema_metadata:
+            type: mapping
+            mapping:
+              # The normalized string JSON schema for this prop (for a multiple-cardinality prop: of its items),
+              # reduced to the keys that matter for translation systems. An implied `type: string` is omitted.
+              # Present if and only if the prop's JSON schema held translatable text when this component version was
+              # created. Translatability is derived from this shape — NOT stored as a boolean — so it can be re-derived
+              # if the translatability rules evolve. (A prop populated by an entity reference is not translatable even
+              # when this shape is present: references are structured data, not author-entered text. That is derived
+              # from this prop's `expression`.)
+              # @see \Drupal\canvas\PropShape\PropShape::getTranslatableStringShape()
+              # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::isExplicitInputTranslatable()
+              string_shape:
+                # Only present for props whose shape holds translatable text. Component versions created before this
+                # key existed never have it: their props are treated as not translatable.
+                # @todo Delete this (aka make this required) in Canvas 2.0, blocked on https://git.drupalcode.org/project/canvas/-/work_items/3530097 and then zero instances being left using component versions without `string_shape`
+                requiredKey: false
+                type: mapping
+                mapping:
+                  # Multi-line plain prose.
+                  pattern:
+                    requiredKey: false
+                    type: string
+                    constraints:
+                      Choice:
+                        choices:
+                          - '(.|\r?\n)*'
+                  # Rich prose.
+                  contentMediaType:
+                    requiredKey: false
+                    type: string
+                    label: 'Content media type'
+                    constraints:
+                      Choice:
+                        choices:
+                          - 'text/html'
+                  # Rich prose formatting context. Does not affect *whether* the prop is translatable, but translation
+                  # systems must respect it: an `inline` prop must not receive block-level HTML from a translation.
+                  'x-formatting-context':
+                    requiredKey: false
+                    type: string
+                    label: 'Formatting context'
+                    constraints:
+                      Choice:
+                        choices:
+                          - 'block'
+                          - 'inline'
+                  # URI-esque strings.
+                  # @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat::isUriEsque()
+                  format:
+                    requiredKey: false
+                    type: string
+                    label: 'Format'
+                    constraints:
+                      Choice:
+                        choices:
+                          - 'iri'
+                          - 'iri-reference'
+                          - 'uri'
+                          - 'uri-reference'
 
 canvas.component_source_local_id.js:
   type: canvas.component_source_local_id.*
@@ -802,6 +886,21 @@ canvas.asset_library.*:
         NotBlank: ~
       sequence:
         type: canvas.asset_library_manifest_entry
+    bundledSources:
+      type: sequence
+      label: 'Bundled local module sources'
+      requiredKey: false
+      orderby: value
+      constraints:
+        # There must be >=1 entry; otherwise the key should be omitted.
+        NotBlank: ~
+      sequence:
+        type: canvas.asset_library_bundled_source
+    packageJson:
+      type: string
+      label: 'Project package.json'
+      requiredKey: false
+      nullable: true
 
 canvas.asset_library_manifest_entry:
   type: mapping
@@ -818,6 +917,30 @@ canvas.asset_library_manifest_entry:
       constraints:
         NotBlank: []
         UriScheme: ['public']
+    path:
+      type: string
+      label: 'Original relative disk path'
+      requiredKey: false
+    source:
+      type: string
+      label: 'Original source code of a module'
+      requiredKey: false
+      nullable: true
+
+canvas.asset_library_bundled_source:
+  type: mapping
+  label: 'Bundled local module source'
+  mapping:
+    path:
+      type: string
+      label: 'Original relative disk path'
+      constraints:
+        NotBlank: []
+    source:
+      type: string
+      label: 'Verbatim original source code'
+      constraints:
+        NotBlank: []
 
 canvas.brand_kit.*:
   type: config_entity
@@ -1081,6 +1204,57 @@ canvas.staged_config_update.*:
             label: 'Input'
             constraints:
               NotBlank: [ ]
+
+canvas.staged_language_config_override.*:
+  type: config_entity
+  constraints:
+    FullyValidatable: ~
+  mapping:
+    id:
+      # The ID is "{langcode}.{config_name}", which contains dots. This ID intentionally does not use
+      # `type: machine_name`, because it is a composite ID that is better validated using the `StringParts` constraint
+      # than the `RegEx` constraint.
+      type: string
+      label: 'ID'
+      constraints:
+        NotBlank: [ ]
+        StringParts:
+          separator: .
+          reservedCharacters:
+            - ':'
+          reservedCharactersSubstitute: .
+          parts:
+            - '%parent.langcode'
+            - '%parent.config_name'
+    langcode:
+      type: string
+      label: 'Language code'
+      constraints:
+        NotBlank: [ ]
+        BetterConfigExists:
+          prefix: 'language.entity.'
+    config_name:
+      # We do not use `machine_name` since config entities have `.` in their IDs.
+      type: string
+      label: 'Config name'
+      constraints:
+        NotBlank: [ ]
+        Length:
+          # @see \Drupal\Core\Config\Entity\ConfigEntityStorage::MAX_ID_LENGTH
+          max: 166
+        # @todo Use `ConfigExists` once https://www.drupal.org/project/drupal/issues/3518273 is
+        #   fixed in core.
+        BetterConfigExists:
+          prefix: ''
+    data:
+      # The sparse override data has no fixed schema — it mirrors the structure of whatever config entity it targets.
+      # TRICKY: this could in theory be validated, but requires the default translation of the target config entity,
+      # which itself may be in the process of being modified (i.e. it may have a Canvas auto-save entry). This reduces
+      # the usefulness of validation, especially because when this staged language config override is saved, the final
+      # validation will be applied to the target config entity and all of its LanguageConfigOverrides anyway.
+      # @see \Drupal\canvas\Plugin\Validation\Constraint\CanvasConfigEntityTranslationsAreValidConstraintValidator
+      type: ignore
+      label: 'Override data'
 
 canvas.folder.*:
   type: config_entity

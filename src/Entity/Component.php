@@ -13,6 +13,7 @@ use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
 use Drupal\canvas\Element\RenderSafeComponentContainer;
 use Drupal\canvas\EntityHandlers\ContentCreatorVisibleCanvasConfigEntityAccessControlHandler;
+use Drupal\canvas\EntityHandlers\VersionedConfigEntityStorage;
 use Drupal\canvas\Form\ComponentListBuilder;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Fallback;
 use Drupal\canvas\Plugin\VersionedConfigurationSubsetSingleLazyPluginCollection;
@@ -53,6 +54,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
   admin_permission: self::ADMIN_PERMISSION,
   handlers: [
     'access' => ContentCreatorVisibleCanvasConfigEntityAccessControlHandler::class,
+    'storage' => VersionedConfigEntityStorage::class,
     'list_builder' => ComponentListBuilder::class,
     'route_provider' => [
       'html' => AdminHtmlRouteProvider::class,
@@ -79,7 +81,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     'versioned_properties',
   ],
   constraints: [
-    'ImmutableProperties' => ['id', 'source', 'source_local_id'],
+    'ImmutableProperties' => [
+      'properties' => ['id', 'source', 'source_local_id'],
+    ],
   ],
 )]
 final class Component extends VersionedConfigEntityBase implements ComponentInterface, CanvasHttpApiEligibleConfigEntityInterface, FolderItemInterface {
@@ -605,6 +609,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
       $this->getConfigUpdater()->unsetComponentCategoryProperty($this);
       $this->getConfigUpdater()->updateMultiBundleReferencePropExpressionToMultiBranch($this);
       $this->getConfigUpdater()->updateListFloatComponentVersionHash($this);
+      $this->getConfigUpdater()->updatePropFieldDefinitionsWithDerivedSchemaMetadata($this);
     }
     parent::preSave($storage);
 

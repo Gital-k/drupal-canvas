@@ -14,7 +14,11 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\Storage\ComponentTreeLoader;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\file\FileInterface;
 use Drupal\media\Entity\Media;
 use Drupal\media\MediaInterface;
@@ -50,9 +54,9 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system', 'block']);
-    $this->container->get('theme_installer')->install(['stark']);
-    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
+    $this->container->get(ModuleInstallerInterface::class)->install(['system', 'block']);
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
+    $this->container->get(ConfigFactoryInterface::class)->getEditable('system.theme')->set('default', 'stark')->save();
 
     (new CanvasTestSetup())->setup(TRUE);
     $this->setUpCurrentUser([], [
@@ -350,7 +354,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     if ($entity instanceof Node) {
       // Check that the client only receives field data they have access to.
       // @see ApiLayoutController::filterFormValues()
-      $this->assertSame([
+      $expected_entity_form_fields = [
         'changed',
         'field_hero[0][target_id]',
         'field_hero[0][alt]',
@@ -367,7 +371,12 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'title[0][value]',
         'langcode[0][value]',
         'revision',
-      ], \array_keys($data['entity_form_fields']));
+      ];
+      if (version_compare(\Drupal::VERSION, '11.4', '>=')) {
+        // Drupal 11.4 dropped the langcode element from the path (alias) widget.
+        $expected_entity_form_fields = \array_values(\array_diff($expected_entity_form_fields, ['path[0][langcode]']));
+      }
+      $this->assertSame($expected_entity_form_fields, \array_keys($data['entity_form_fields']));
     }
 
     $model = $data['model'];
@@ -658,7 +667,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         [
           'uuid' => $child_in_description_uuid,
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => 'b1e991f726a2a266',
+          'component_version' => 'd34b93534777207a',
           'inputs' => [
             'heading' => 'Child in description slot',
           ],
@@ -668,7 +677,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         [
           'uuid' => $child_in_sidebar_uuid,
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => 'b1e991f726a2a266',
+          'component_version' => 'd34b93534777207a',
           'inputs' => [
             'heading' => 'Child in sidebar slot',
           ],
@@ -768,7 +777,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       $response->getContent()
     ));
     self::assertNotNull($node->id());
-    $updatedNode = $this->container->get('entity_type.manager')
+    $updatedNode = $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage('node')
       ->loadUnchanged($node->id());
     \assert($updatedNode instanceof Node);
@@ -837,7 +846,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       $response->getContent()
     ));
     self::assertNotNull($node->id());
-    $updatedNode = $this->container->get('entity_type.manager')
+    $updatedNode = $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage('node')
       ->loadUnchanged($node->id());
     \assert($updatedNode instanceof Node);

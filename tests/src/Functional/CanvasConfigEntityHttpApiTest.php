@@ -21,8 +21,11 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\Random;
 use Drupal\Component\Uuid\Uuid;
 use Drupal\Core\Cache\Cache;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Entity\ConfigEntityType;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
+use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Url;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
@@ -185,6 +188,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         'sdc.canvas_test_sdc.component-mismatch-meta-enum',
         'sdc.canvas_test_sdc.component-mismatch-meta-enum-array-items',
         'sdc.canvas_test_sdc.component-no-meta-enum',
+        'sdc.canvas_test_sdc.code-example',
         'sdc.canvas_test_sdc.banner',
         'sdc.canvas_test_sdc.card',
         'sdc.canvas_test_sdc.props-no-slots',
@@ -331,7 +335,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertSame([], $body);
 
     // Admin should not be able to get disabled pattern from the Canvas HTTP API.
-    $body = $this->assertExpectedResponse('GET', $canonical_url, [], 403, ['user.permissions'], ['4xx-response', 'config:canvas.pattern.disabled_pattern', 'http_response'], 'UNCACHEABLE (request policy)', NULL);
+    $body = $this->assertExpectedResponse('GET', $canonical_url, [], 403, ['user.permissions'], ['4xx-response', 'config:canvas.pattern.disabled_pattern', 'http_response'], 'UNCACHEABLE (request policy)', 'UNCACHEABLE (403)');
     $this->assertSame([
       'errors' => [''],
     ], $body);
@@ -357,13 +361,13 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       [
         'uuid' => 'a3ade070-dc70-4989-b078-85cfd8fc741e',
         'nodeType' => 'component',
-        'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
+        'type' => 'sdc.canvas_test_sdc.props-no-slots@d34b93534777207a',
         'slots' => [],
       ],
       [
         'uuid' => '67d6b081-a62f-463c-a5d8-42a145ec7243',
         'nodeType' => 'component',
-        'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
+        'type' => 'sdc.canvas_test_sdc.props-no-slots@d34b93534777207a',
         'slots' => [],
       ],
     ];
@@ -459,14 +463,14 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
           [
             'uuid' => 'a3ade070-dc70-4989-b078-85cfd8fc741e',
             'nodeType' => 'component',
-            'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
+            'type' => 'sdc.canvas_test_sdc.props-no-slots@d34b93534777207a',
             'name' => NULL,
             'slots' => [],
           ],
           [
             'uuid' => '67d6b081-a62f-463c-a5d8-42a145ec7243',
             'nodeType' => 'component',
-            'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
+            'type' => 'sdc.canvas_test_sdc.props-no-slots@d34b93534777207a',
             'name' => NULL,
             'slots' => [],
           ],
@@ -536,13 +540,13 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
               [
                 'uuid' => 'a3ade070-dc70-4989-b078-85cfd8fc741e',
                 'nodeType' => 'component',
-                'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
+                'type' => 'sdc.canvas_test_sdc.props-no-slots@d34b93534777207a',
                 'slots' => [],
               ],
               [
                 'uuid' => '67d6b081-a62f-463c-a5d8-42a145ec7243',
                 'nodeType' => 'component',
-                'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
+                'type' => 'sdc.canvas_test_sdc.props-no-slots@d34b93534777207a',
                 'slots' => [],
               ],
             ],
@@ -738,6 +742,15 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         ],
       ],
     ];
+    $normalized_component_tree = [
+      [
+        'parent_uuid' => NULL,
+        'slot' => NULL,
+        ...$component_tree[0],
+        'label' => NULL,
+        'inputs_resolved' => $component_tree[0]['inputs'],
+      ],
+    ];
 
     // POST creates a region.
     $region_id = 'stark.sidebar_first';
@@ -758,7 +771,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'theme' => 'stark',
       'region' => 'sidebar_first',
       'status' => TRUE,
-      'component_tree' => $component_tree,
+      'component_tree' => $normalized_component_tree,
     ];
     $this->assertSame($expected_normalization, $body);
 
@@ -804,7 +817,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('PATCH', Url::fromUri("base:/canvas/api/v0/config/page_region/$second_region_id"), $request_options, 200, NULL, NULL, NULL, NULL);
     self::assertIsArray($body);
     self::assertFalse($body['status']);
-    self::assertSame($component_tree, $body['component_tree']);
+    self::assertSame($normalized_component_tree, $body['component_tree']);
 
     // PATCH with empty component_tree clears the tree.
     $request_options[RequestOptions::JSON] = ['component_tree' => []];
@@ -838,7 +851,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // refineListQuery filters to default theme. Install olivero and POST an
     // olivero region; list should still return only stark regions.
-    \Drupal::service('theme_installer')->install(['olivero']);
+    \Drupal::service(ThemeInstallerInterface::class)->install(['olivero']);
     $olivero_region_id = 'olivero.sidebar';
     $olivero_region_to_send = [
       'theme' => 'olivero',
@@ -974,6 +987,36 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertSame($expected_disabled_js_component_normalization, $body_without_preview);
     $jsComponent->delete();
 
+    // External code components contain metadata only: their implementation is
+    // owned by the configured external application.
+    $external_component = [
+      'machineName' => 'external_component',
+      'name' => 'External component',
+      'status' => FALSE,
+      'type' => 'external',
+      'required' => [],
+      'props' => [],
+      'slots' => [],
+      'importedJsComponents' => [],
+      'dataDependencies' => [],
+    ];
+    $request_options[RequestOptions::JSON] = $external_component;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    self::assertSame([
+      'machineName' => 'external_component',
+      'name' => 'External component',
+      'status' => FALSE,
+      'type' => 'external',
+      'props' => [],
+      'required' => [],
+      'slots' => [],
+      'dataDependencies' => [],
+      'links' => [],
+    ], $body);
+    self::assertArrayNotHasKey('default_markup', $body);
+    JavaScriptComponent::load('external_component')?->delete();
+
     // Create a Code Component via the Canvas HTTP API, but forget crucial data: 500, courtesy of OpenAPI.
     $code_component_to_send = [];
     $request_options[RequestOptions::JSON] = $code_component_to_send;
@@ -1081,11 +1124,6 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         ],
       ],
     ];
-    // Strip out the prefix added by https://www.drupal.org/node/3549909. This
-    // can be removed when 11.3 is the minimum supported version of core.
-    if (version_compare(\Drupal::VERSION, '11.3', '<')) {
-      $expected_body['errors'][0]['detail'] = substr($expected_body['errors'][0]['detail'], 26);
-    }
     $this->assertSame($expected_body, $body);
 
     // Meet data shape requirements, but provide missing component as a
@@ -1179,7 +1217,6 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
           'title' => 'Number',
           'examples' => [3.14, 42],
         ],
-        // Enum with meta-enum, as this is not mandatory in SDC < 11.2, but it is in Canvas.
         'enum' => [
           'type' => 'string',
           'enum' => ['primary', 'secondary'],
@@ -1653,7 +1690,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // Re-retrieve list: 200, empty list. Dynamic Page Cache miss.
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:js_component_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
     $this->assertSame([], $body);
-    $individual_body = $this->assertExpectedResponse('GET', Url::fromUri('base:/canvas/api/v0/config/js_component/test'), [], 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
+    $individual_body = $this->assertExpectedResponse('GET', Url::fromUri('base:/canvas/api/v0/config/js_component/test'), [], 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (404)');
     $this->assertSame([], $individual_body);
   }
 
@@ -1698,7 +1735,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertSame([], $body);
 
     // Admin should not be able to get disabled Asset Library from the Canvas HTTP API.
-    $body = $this->assertExpectedResponse('GET', $canonical_url, [], 403, ['user.permissions'], ['4xx-response', 'config:canvas.asset_library.global', 'http_response'], 'UNCACHEABLE (request policy)', NULL);
+    $body = $this->assertExpectedResponse('GET', $canonical_url, [], 403, ['user.permissions'], ['4xx-response', 'config:canvas.asset_library.global', 'http_response'], 'UNCACHEABLE (request policy)', 'UNCACHEABLE (403)');
     $this->assertSame([
       'errors' => [''],
     ], $body);
@@ -1714,6 +1751,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'imports' => NULL,
       'assets' => NULL,
       'shared' => NULL,
+      'bundledSources' => NULL,
+      'packageJson' => NULL,
     ];
     $request_options[RequestOptions::JSON] = $asset_library_to_send;
     $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 500, NULL, NULL, NULL, NULL);
@@ -1858,7 +1897,17 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
           'shared' => [$shared_entry],
         ],
         'expected_imports' => [$imports_entry],
-        'expected_assets' => [$assets_entry],
+        // The normalized `assets` entries expose a generated `url` alongside
+        // the stored `uri` for client-side fetching. The public files path is
+        // randomized per test run, so compute it the same way the source does.
+        // @see \Drupal\canvas\Entity\AssetLibrary::normalizeAssetsForClientSide()
+        'expected_assets' => [
+          [
+            ...$assets_entry,
+            'url' => \Drupal::service(FileUrlGeneratorInterface::class)
+              ->generateString($assets_entry['uri']),
+          ],
+        ],
         'expected_shared' => [$shared_entry],
       ],
     ];
@@ -1898,7 +1947,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // Insufficient permissions: 403.
     $this->drupalLogin($this->limitedPermissionsUser);
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', NULL);
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', 'UNCACHEABLE (403)');
     $this->assertSame([
       'errors' => [
         'Requires >=1 content entity type with a Canvas field that can be created or edited.',
@@ -1969,7 +2018,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $list_url = Url::fromUri("base:/canvas/api/v0/config/$entity_type_id");
 
     // Insufficient Permissions: 403.
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', NULL);
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', 'UNCACHEABLE (403)');
     $this->assertSame([
       'errors' => [
         'Requires >=1 content entity type with a Canvas field that can be created or edited.',
@@ -2093,7 +2142,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
   }
 
   public function testComponent(): void {
-    $this->container->get('theme_installer')->install(['stark', 'test_theme_child']);
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark', 'test_theme_child']);
     // TRICKY: On an actual site, the theme installer would trigger
     // `hook_rebuild()`, but we cannot do that in `hook_themes_installed()`, as
     // Stark is installed early in tests, which results in Components being
@@ -2182,7 +2231,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertSame('test_theme_child', Component::load('sdc.test_theme_child.test-child')->get('provider'));
     // Change the default theme from Stark to Test Theme Child, and observe the
     // impact on the list of Components returned.
-    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'test_theme_child')->save();
+    $this->container->get(ConfigFactoryInterface::class)->getEditable('system.theme')->set('default', 'test_theme_child')->save();
     $this->rebuildAll();
     $this->drupalGet('canvas/api/v0/config/component');
     $this->assertDynamicPageCacheAccelerated(maxAge: '-1 (Permanent)');

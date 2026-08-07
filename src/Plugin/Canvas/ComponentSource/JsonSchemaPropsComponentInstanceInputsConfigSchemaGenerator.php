@@ -7,9 +7,6 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 use Drupal\canvas\ComponentSource\ComponentInstanceInputsConfigSchemaGeneratorInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
 use Drupal\canvas\ConfigTranslation\CanvasStaticPropSourceFieldWidget;
-use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
-use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
-use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropSource\PropSource;
 
 /**
@@ -22,49 +19,29 @@ final readonly class JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator
    */
   public function getConfigSchemaMapping(ComponentSourceInterface $component_source): array {
     \assert($component_source instanceof JsonSchemaPropsComponentSourceBase);
-    ['required' => $required, 'shapes' => $shapes] = $component_source->getExplicitInputDefinitions();
-
-    $normalized_shapes = \array_map(
-      fn (array $raw_json_schema): array => PropShape::normalize(PropShape::standardize($raw_json_schema)->resolvedSchema)->schema,
-      $shapes,
-    );
+    // Build the mapping exclusively from the *versioned* prop field
+    // definitions — never from the live implementation's JSON Schema
+    // (`::getMetadata()`), which cannot describe past component versions. A
+    // prop removed from (or modified in) the live implementation keeps its
+    // schema mapping entry for the versions its instances reference —
+    // otherwise their previously-valid stored inputs would become "'…' is not
+    // a supported key".
+    $prop_field_definitions = $component_source->getConfiguration()['prop_field_definitions'] ?? [];
 
     $mapping_definition = [];
-    foreach ($normalized_shapes as $prop_name => $prop_shape) {
+    foreach ($prop_field_definitions as $prop_name => $prop_field_definition) {
       $mapping_definition[$prop_name] = [
         'type' => 'ignore',
       ];
-      if (!\in_array($prop_name, $required, TRUE)) {
+      if (!($prop_field_definition['required'] ?? FALSE)) {
         $mapping_definition[$prop_name]['requiredKey'] = FALSE;
       }
-      // For translatability, cardinality is irrelevant, only the shape matters,
-      // so peek inside any `type: array` and get the actual shape.
-      if ($prop_shape['type'] === JsonSchemaType::Array->value) {
-        \assert(\array_key_exists('items', $prop_shape));
-        $prop_shape = $prop_shape['items'];
-        \assert(\is_array($prop_shape));
-      }
-      // Plain strings, HTML strings and URLs are considered translatable. So:
-      // - type: string
-      // - type: string: format: iri
-      // - type: string: format: iri-reference
-      // - type: string: format: uri
-      // - type: string: format: uri-reference
-      // - type: string, contentMediaType: text/html
-      // - type: string, contentMediaType: text/html,
-      //   x-formatting-context: inline
-      // - type: string, contentMediaType: text/html,
-      //   x-formatting-context: block
-      // @todo Consider adding alter hook to allow more shapes to be translatable in https://drupal.org/i/3584178
-      $translatable = PropShape::isPlainOrRichProse($prop_shape)
-        || (
-          $prop_shape['type'] === 'string'
-          && \array_key_exists('format', $prop_shape)
-          && JsonSchemaStringFormat::tryFrom($prop_shape['format'])?->isUriEsque()
-        );
-      if ($translatable) {
-        \assert(\array_key_exists('type', $mapping_definition[$prop_name]));
+      if ($component_source->isExplicitInputTranslatable($prop_name)) {
         $mapping_definition[$prop_name]['translatable'] = TRUE;
+        // The label is cosmetic — unlike the mapping structure above, it may
+        // come from the live metadata: a prop that no longer exists there
+        // safely falls back to its name, and a stale title cannot invalidate
+        // stored config.
         $mapping_definition[$prop_name]['label'] = $component_source->getMetadata()->schema['properties'][$prop_name]['title'] ?? $prop_name;
         // Reuse Canvas field widgets rather than core's config_translation
         // Textfield/TextFormat form element classes. This single class handles
@@ -82,6 +59,22 @@ final readonly class JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator
    * {@inheritdoc}
    */
   public function refineForInstance(array $mapping, array $actual_inputs, string $component_id, string $component_version): array {
+    // A populated input without a field definition in this component version —
+    // e.g. a prop whose shape is not storable — must still validate, but only
+    // when populated by a non-static prop source (structured data, such as a
+    // DynamicPropSource). It is not translatable here; its value may be
+    // translated at its source (e.g. the entity field it evaluates). A static
+    // prop source for an unknown prop remains unsupported: that is
+    // author-entered data for a prop this component version cannot store.
+    foreach (\array_keys($actual_inputs) as $key) {
+      if (!\array_key_exists($key, $mapping) && !self::isStaticPropSource($actual_inputs[$key])) {
+        $mapping[$key] = [
+          'type' => 'ignore',
+          'requiredKey' => FALSE,
+        ];
+      }
+    }
+
     // Only user input provided by the Content Author (so: StaticPropSource) is
     // translatable. Structured data is not.
     foreach (\array_keys($mapping) as $key) {

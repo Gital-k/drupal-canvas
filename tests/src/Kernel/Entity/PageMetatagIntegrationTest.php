@@ -7,16 +7,20 @@ namespace Drupal\Tests\canvas\Kernel\Entity;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\EntityFormController;
 use Drupal\canvas\Entity\Page;
+use Drupal\Core\Entity\EntityDefinitionUpdateManagerInterface;
+use Drupal\Core\Entity\EntityFieldManagerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
+use Drupal\metatag\MetatagManager;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
 use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\RequiresFunction;
+use PHPUnit\Framework\Attributes\RequiresMethod;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -24,7 +28,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * Tests Page Metatag Integration.
  */
 #[RunTestsInSeparateProcesses]
-#[RequiresFunction('Drupal\\metatag\\MetatagManager::tagsFromEntity')]
+#[RequiresMethod(MetatagManager::class, 'tagsFromEntity')]
 #[Group('canvas')]
 final class PageMetatagIntegrationTest extends CanvasKernelTestBase {
 
@@ -51,16 +55,16 @@ final class PageMetatagIntegrationTest extends CanvasKernelTestBase {
   public function testTags(): void {
     self::assertArrayNotHasKey(
       'metatags',
-      $this->container->get('entity_field.manager')
+      $this->container->get(EntityFieldManagerInterface::class)
         ->getFieldDefinitions(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID)
     );
-    $this->container->get('module_installer')->install(['metatag']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
     self::assertArrayHasKey(
       'metatags',
-      $this->container->get('entity_field.manager')
+      $this->container->get(EntityFieldManagerInterface::class)
         ->getFieldDefinitions(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID)
     );
-    $changes = $this->container->get('entity.definition_update_manager')->getChangeList();
+    $changes = $this->container->get(EntityDefinitionUpdateManagerInterface::class)->getChangeList();
     self::assertArrayNotHasKey(Page::ENTITY_TYPE_ID, $changes);
 
     $media_type = $this->createMediaType('image');
@@ -140,7 +144,7 @@ final class PageMetatagIntegrationTest extends CanvasKernelTestBase {
 
   public function testSeoSettingsForm(): void {
     \Drupal::service(ThemeInstallerInterface::class)->install(['canvas_stark']);
-    $this->container->get('module_installer')->install(['metatag']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
     $page = Page::create([
       'title' => 'Test page',
       'description' => 'This is a test page.',
@@ -148,7 +152,7 @@ final class PageMetatagIntegrationTest extends CanvasKernelTestBase {
       'components' => [],
     ]);
     self::assertSaveWithoutViolations($page);
-    $themeHandler = $this->container->get('theme_handler');
+    $themeHandler = $this->container->get(ThemeHandlerInterface::class);
     \assert($themeHandler instanceof ThemeHandlerInterface);
     $sut = new EntityFormController($this->container->get(AutoSaveManager::class), $this->container->get(RequestStack::class), $themeHandler);
     $form = $sut->form(Page::ENTITY_TYPE_ID, $page, 'default');

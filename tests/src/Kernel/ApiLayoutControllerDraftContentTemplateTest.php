@@ -6,6 +6,7 @@ namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Url;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
@@ -40,7 +41,7 @@ class ApiLayoutControllerDraftContentTemplateTest extends ApiLayoutControllerTes
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['system']);
     (new CanvasTestSetup())->setup(TRUE);
     $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, 'edit any article content']);
   }
@@ -60,7 +61,7 @@ class ApiLayoutControllerDraftContentTemplateTest extends ApiLayoutControllerTes
       [
         'uuid' => $componentUuid,
         'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-        'component_version' => 'b1e991f726a2a266',
+        'component_version' => 'd34b93534777207a',
         'inputs' => [
           'heading' => [
             'sourceType' => PropSource::EntityField->value,

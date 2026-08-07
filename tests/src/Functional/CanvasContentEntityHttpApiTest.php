@@ -9,11 +9,14 @@ namespace Drupal\Tests\canvas\Functional;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Controller\ApiContentAutoSaveControllers;
+use Drupal\canvas\Controller\ErrorCodesEnum;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Url;
 use Drupal\user\Entity\Role;
@@ -420,6 +423,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $page_1->set('title', 'The updated title.');
     $page_1->set('path', ['alias' => "/the-updated-path"]);
     $autoSaveManager->saveEntity($page_1);
+    $expected_tags = Cache::mergeTags($expected_tags, $page_1->getCacheTags());
 
     $page_2 = Page::load(2);
     $this->assertInstanceOf(Page::class, $page_2);
@@ -461,6 +465,9 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
 
     $autoSaveManager->delete($page_1);
     $autoSaveManager->delete($page_2);
+    // With page 1's auto-save deleted, the list no longer renders its draft, so
+    // its cache tag drops out. Page 2's tag persists via system.site (homepage).
+    $expected_tags = \array_values(\array_diff($expected_tags, $page_1->getCacheTags()));
     $body = $this->assertExpectedResponse('GET', $url, [], 200, $list_cache_contexts, $expected_tags, 'UNCACHEABLE (request policy)', 'MISS');
     \assert(\is_array($body));
     $this->assertEquals(
@@ -542,7 +549,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     array_walk($expectedLinks, fn(&$value) => $value = Url::fromUri($value)->toString());
     // Enable canvas_test_access, which will disable view permission for page 1
     // and add extra cache contexts and cache tags.
-    $this->container->get('module_installer')->install(['canvas_test_access']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_access']);
     \Drupal::keyValue('canvas_test_access')->set('cache_contexts', $extraCacheContexts);
     \Drupal::keyValue('canvas_test_access')->set('cache_tags', $extraCacheTags);
 
@@ -735,7 +742,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     ];
 
     // Test module will return view access forbidden for canvas_page id 1 instance.
-    $this->container->get('module_installer')->install(['canvas_test_access']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_access']);
 
     // Try to duplicate entity without view access.
     $response = $this->makeApiRequest('POST', $url, $request_options);
@@ -746,7 +753,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     );
 
     // Turn off module to have proper view access.
-    $this->container->get('module_installer')->uninstall(['canvas_test_access']);
+    $this->container->get(ModuleInstallerInterface::class)->uninstall(['canvas_test_access']);
     // Duplicate Page 1 entity.
     $response = $this->makeApiRequest('POST', $url, $request_options);
     $this->assertSame(201, $response->getStatusCode());
@@ -833,22 +840,22 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
     Role::load('authenticated')?->grantPermission(Page::EDIT_PERMISSION)->save();
 
-    // Test that unexpected fields in request body return an error.
-    $request_options[RequestOptions::JSON] = ['status' => FALSE, 'unexpected_field' => 'value'];
-    $response = $this->makeApiRequest('PATCH', $url, $request_options);
-    $this->assertSame(400, $response->getStatusCode());
-    $response_data = json_decode((string) $response->getBody(), TRUE);
-    $this->assertStringContainsString('Unexpected fields in request body:', $response_data['error']);
-    $this->assertStringContainsString('unexpected_field', $response_data['error']);
-
-    // Test that missing 'status' field returns an error.
+    // Request without any of the required keys returns an error: 500,
+    // courtesy of OpenAPI.
     $request_options[RequestOptions::JSON] = [];
     $response = $this->makeApiRequest('PATCH', $url, $request_options);
-    $this->assertSame(400, $response->getStatusCode());
+    $this->assertSame(500, $response->getStatusCode());
     $this->assertSame(
-      ['error' => 'Missing required field: status'],
+      ['message' => 'Body does not match schema for content-type "application/json" for Request [patch /canvas/api/v0/content/auto-save/canvas_page/{entityId}]. [Keyword validation failed: Data must match exactly one schema, but matched none in ]'],
       json_decode((string) $response->getBody(), TRUE)
     );
+
+    // Send an unexpected field alongside "status": 500, courtesy of OpenAPI.
+    $request_options[RequestOptions::JSON] = ['status' => FALSE, 'unexpected_field' => 'value'];
+    $body = $this->assertExpectedResponse('PATCH', $url, $request_options, 500, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'message' => 'Body does not match schema for content-type "application/json" for Request [patch /canvas/api/v0/content/auto-save/canvas_page/{entityId}]. [Keyword validation failed: Data has additional properties (unexpected_field) which are not allowed in ]',
+    ], $body, 'Fails with unexpected fields in request body');
 
     // Unpublish page 1 (published -> unpublished).
     $request_options[RequestOptions::JSON] = ['status' => FALSE];
@@ -905,6 +912,197 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $this->assertFalse($autoSaveData->isEmpty());
     \assert($autoSaveData->entity instanceof EntityPublishedInterface);
     $this->assertFalse($autoSaveData->entity->isPublished());
+  }
+
+  public function testPatchConflictResolution(): void {
+    // Conflict resolution via PATCH is gated behind the `canvas_dev_cd` module.
+    \Drupal::service(ModuleInstallerInterface::class)->install(['canvas_dev_cd']);
+
+    $request_options = [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+      ],
+    ];
+
+    // Test unpublishing a published page.
+    $url = Url::fromUri('base:/canvas/api/v0/content/auto-save/canvas_page/1');
+
+    // Test authentication and authorization for PATCH.
+    $this->assertAuthenticationAndAuthorization($url, 'PATCH');
+
+    $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
+    Role::load('authenticated')?->grantPermission(Page::EDIT_PERMISSION)->save();
+
+    // Send null for "resolved_conflict_id" where a non-null string is expected:
+    // 500, courtesy of OpenAPI.
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => NULL];
+    $body = $this->assertExpectedResponse('PATCH', $url, $request_options, 500, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'message' => 'Body does not match schema for content-type "application/json" for Request [patch /canvas/api/v0/content/auto-save/canvas_page/{entityId}]. [Keyword validation failed: Value cannot be null in resolved_conflict_id]',
+    ], $body, 'Fails with incorrect data shape for "resolved_conflict_id" property.');
+
+    // Send an integer for "resolved_conflict_id" where a string is expected:
+    // 500, courtesy of OpenAPI.
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => 67];
+    $body = $this->assertExpectedResponse('PATCH', $url, $request_options, 500, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'message' => 'Body does not match schema for content-type "application/json" for Request [patch /canvas/api/v0/content/auto-save/canvas_page/{entityId}]. [Value expected to be \'string\', but \'integer\' given in resolved_conflict_id]',
+    ], $body, 'Fails with incorrect data shape for "resolved_conflict_id" property.');
+
+    // Send an unexpected field alongside "resolved_conflict_id": 500, courtesy
+    // of OpenAPI.
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => 'test', 'unexpected_field' => 'value'];
+    $body = $this->assertExpectedResponse('PATCH', $url, $request_options, 500, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'message' => 'Body does not match schema for content-type "application/json" for Request [patch /canvas/api/v0/content/auto-save/canvas_page/{entityId}]. [Keyword validation failed: Data has additional properties (unexpected_field) which are not allowed in ]',
+    ], $body, 'Fails with unexpected fields in conflict resolution request body.');
+
+    // Attempt resolving conflict with "resolved_conflict_id" set to empty
+    // string.
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => ''];
+    $response = $this->makeApiRequest('PATCH', $url, $request_options);
+    $this->assertSame(400, $response->getStatusCode());
+    $this->assertSame(
+      ['error' => 'Invalid format: resolved_conflict_id'],
+      json_decode((string) $response->getBody(), TRUE)
+    );
+
+    // Attempt resolving a conflict when no auto-save entry exists for the
+    // entity: 404.
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => 'test'];
+    $response = $this->makeApiRequest('PATCH', $url, $request_options);
+    $this->assertSame(404, $response->getStatusCode());
+    $page_without_conflict = Page::load(1);
+    \assert($page_without_conflict instanceof Page);
+    $page_without_conflict_key = AutoSaveManager::getAutoSaveKey($page_without_conflict);
+    $response_data = json_decode((string) $response->getBody(), TRUE);
+    $this->assertSame([
+      'errors' => [[
+        'detail' => ErrorCodesEnum::AutoSaveItemNotFound->getMessage(),
+        'source' => ['pointer' => $page_without_conflict_key],
+        'code' => ErrorCodesEnum::AutoSaveItemNotFound->value,
+        'meta' => [
+          'entity_type' => Page::ENTITY_TYPE_ID,
+          'entity_id' => '1',
+          'label' => 'Page 1',
+          'api_auto_save_key' => $page_without_conflict_key,
+        ],
+      ],
+      ],
+    ], $response_data);
+
+    // Only one operation per request allowed - status change or conflict
+    // resolution. If both 'resolved_conflict_id' and 'status' keys are sent in
+    // the request: 500, courtesy of OpenAPI.
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => 'test', 'status' => TRUE];
+    $body = $this->assertExpectedResponse('PATCH', $url, $request_options, 500, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'message' => 'Body does not match schema for content-type "application/json" for Request [patch /canvas/api/v0/content/auto-save/canvas_page/{entityId}]. [Keyword validation failed: Data must match exactly one schema, but matched 2 in ]',
+    ],
+      $body,
+      'Fails when both operations are requested in one PATCH payload.'
+    );
+
+    // Disable OpenAPI validation to assert controller-level error semantics.
+    $page_without_conflict = Page::load(1);
+    \assert($page_without_conflict instanceof Page);
+    $page_without_conflict->setUnpublished();
+    $page_without_conflict->save();
+    $request_options['headers']['X-NO-OPENAPI-VALIDATION'] = '1';
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => 'test', 'status' => TRUE];
+    $response = $this->makeApiRequest('PATCH', $url, $request_options);
+    $this->assertSame(400, $response->getStatusCode());
+    $this->assertSame(
+      ['error' => 'Fields status and resolved_conflict_id are mutually exclusive.'],
+      json_decode((string) $response->getBody(), TRUE)
+    );
+    unset($request_options['headers']['X-NO-OPENAPI-VALIDATION']);
+    $page_without_conflict = Page::load(1);
+    \assert($page_without_conflict instanceof Page);
+    $this->assertFalse($page_without_conflict->isPublished());
+
+    $auto_save_manager = $this->container->get(AutoSaveManager::class);
+    $page = Page::load(1);
+    \assert($page instanceof Page);
+    $page->set('title', 'Updated title for auto-save');
+    $auto_save_manager->saveEntity($page);
+
+    // An auto-save entry now exists, but it has no active conflict: 422.
+    $key = AutoSaveManager::getAutoSaveKey($page);
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => 'test'];
+    $response = $this->makeApiRequest('PATCH', $url, $request_options);
+    $this->assertSame(422, $response->getStatusCode());
+    $response_data = json_decode((string) $response->getBody(), TRUE);
+    $this->assertSame([
+      'errors' => [[
+        'detail' => ErrorCodesEnum::NoActiveConflictMatchingConflictId->getMessage(),
+        'source' => ['pointer' => $key],
+        'code' => ErrorCodesEnum::NoActiveConflictMatchingConflictId->value,
+        'meta' => [
+          'entity_type' => Page::ENTITY_TYPE_ID,
+          'entity_id' => '1',
+          // The route-loaded entity still has its stored label; only the
+          // auto-save entry carries the updated title.
+          'label' => 'Page 1',
+          'api_auto_save_key' => $key,
+        ],
+      ],
+      ],
+    ], $response_data);
+
+    $page->set('title', 'Conflicting title update')->save();
+
+    $key = AutoSaveManager::getAutoSaveKey($page);
+    $auto_save_entries = $auto_save_manager->getAllAutoSaveList(
+      with_entities: FALSE,
+      with_conflicts: TRUE,
+    );
+    $this->assertArrayHasKey('conflict_id', $auto_save_entries[$key]);
+    $original_conflict = $auto_save_entries[$key]['conflict_id'];
+    $this->assertNotNull($original_conflict);
+
+    // Attempting to resolve active conflict with 'resolved_conflict_id' set to
+    // the mismatching conflict id - controller assumes there's a new conflict
+    // detected: 409.
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => 'test'];
+    $response = $this->makeApiRequest('PATCH', $url, $request_options);
+    $this->assertSame(409, $response->getStatusCode());
+    $response_data = json_decode((string) $response->getBody(), TRUE);
+    $this->assertSame([
+      'errors' => [[
+        'detail' => ErrorCodesEnum::ItemEntityUpdatedExternally->getMessage(),
+        'source' => ['pointer' => $key],
+        'code' => ErrorCodesEnum::ItemEntityUpdatedExternally->value,
+        'meta' => [
+          'entity_type' => Page::ENTITY_TYPE_ID,
+          'entity_id' => '1',
+          'label' => (string) $page->label(),
+          'api_auto_save_key' => $key,
+          'conflict_id' => $original_conflict,
+        ],
+      ],
+      ],
+    ], $response_data);
+
+    // Conflict is still unresolved.
+    $auto_save_entries = $auto_save_manager->getAllAutoSaveList(
+      with_entities: FALSE,
+      with_conflicts: TRUE,
+    );
+    $this->assertArrayHasKey('conflict_id', $auto_save_entries[$key]);
+    $this->assertEquals($original_conflict, $auto_save_entries[$key]['conflict_id']);
+
+    // Resolve conflict with the current active conflict id.
+    $request_options[RequestOptions::JSON] = [ApiContentAutoSaveControllers::RESOLVED_CONFLICT_KEY => AutoSaveManager::getConflictId($page)];
+    $response = $this->makeApiRequest('PATCH', $url, $request_options);
+    // Active conflict with this id is found and resolved - 204 is returned.
+    $this->assertSame(204, $response->getStatusCode());
+
+    $auto_save_entries = $auto_save_manager->getAllAutoSaveList(
+      with_entities: FALSE,
+      with_conflicts: TRUE,
+    );
+    $this->assertArrayNotHasKey('conflict_id', $auto_save_entries[$key]);
   }
 
   /**
@@ -967,8 +1165,9 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     \assert($page_1 instanceof Page);
     $page_1->setUnpublished();
     $autoSaveManager->saveEntity($page_1);
+    $expected_tags = Cache::mergeTags($list_cache_tags, $page_1->getCacheTags());
 
-    $body = $this->assertExpectedResponse('GET', $url, [], 200, $list_cache_contexts, $list_cache_tags, 'UNCACHEABLE (request policy)', 'MISS');
+    $body = $this->assertExpectedResponse('GET', $url, [], 200, $list_cache_contexts, $expected_tags, 'UNCACHEABLE (request policy)', 'MISS');
     \assert(\is_array($body));
     $data_by_id = \array_column($body['data'], NULL, 'id');
 

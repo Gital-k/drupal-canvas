@@ -6,13 +6,20 @@ namespace Canvas\PHPStan\Architecture;
 
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\AutoSaveEntity;
+use Drupal\canvas\CodeComponentDataProvider;
 use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\ConfigTranslation\CanvasStaticPropSourceFieldWidget;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\AutoSavePublishAwareInterface;
 use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\Entity\Pattern;
+use Drupal\canvas\Entity\StagedLanguageConfigOverride;
+use Drupal\canvas\EntityHandlers\StagedLanguageConfigOverrideAccessControlHandler;
+use Drupal\canvas\EntityHandlers\StagedLanguageConfigOverrideStorage;
 use Drupal\canvas\GlobalImports;
 use Drupal\canvas\InvalidComponentInputsPropSourceException;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
@@ -33,6 +40,8 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropExpressions\PropExpressionInterface;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\canvas\Utility\TypedDataHelper;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Datetime\DrupalDateTime;
@@ -51,6 +60,7 @@ use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Url;
 use Drupal\file\Plugin\Field\FieldType\FileItem;
 use Drupal\file\Plugin\Field\FieldType\FileUriItem;
+use Drupal\language\Config\LanguageConfigOverride;
 use Drupal\options\Plugin\Field\FieldType\ListFloatItem;
 use Drupal\options\Plugin\Field\FieldType\ListIntegerItem;
 use Drupal\telephone\Plugin\Field\FieldType\TelephoneItem;
@@ -88,6 +98,8 @@ final class Layers {
         Selector::inNamespace('Drupal\Core\Http\Exception'),
         Selector::inNamespace('Drupal\Core\TypedData'),
         Selector::inNamespace('Drupal\Core\StringTranslation'),
+        // For the NegotiatedLanguage value object.
+        Selector::inNamespace('Drupal\Core\Language'),
         // For the Labeler & Evaluator to get the container.
         Selector::classname(\Drupal::class),
         // Special case in the Evaluator: datetime fields.
@@ -167,6 +179,7 @@ final class Layers {
         Selector::inNamespace('Drupal\canvas\PropShape'),
         Selector::inNamespace('Drupal\canvas\PropSource'),
         Selector::inNamespace('Drupal\canvas\JsonSchemaInterpreter'),
+        Selector::classname(TypedDataHelper::class),
         Selector::classname(AdapterInterface::class),
         Selector::classname(AdapterManager::class),
         // Shape matching only exists for
@@ -243,6 +256,7 @@ final class Layers {
         Selector::classname(FormStateInterface::class),
         Selector::classname(WidgetPluginManager::class),
         Selector::classname(ContentTemplate::class),
+        Selector::classname(Pattern::class),
         // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::validateComponentInput()
         self::usesConstraintViolationValueObjects(),
         // For the translatability of inputs.
@@ -321,6 +335,8 @@ final class Layers {
         Selector::classname(JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator::class),
         // Config entity types powering code components.
         Selector::classname(ConfigEntityStorageInterface::class),
+        // Selects Drupal or external rendering from Canvas Headless config.
+        Selector::classname(ConfigFactoryInterface::class),
         Selector::classname(EntityTypeManagerInterface::class),
         Selector::classname(AssetLibrary::class),
         Selector::classname(BrandKit::class),
@@ -328,6 +344,9 @@ final class Layers {
         // Code component functionality.
         Selector::classname(GlobalImports::class),
         Selector::classname(ImportMapResponseAttachmentsProcessor::class),
+        // Bubbles the cacheability of `canvasData.v0.mainEntity` data.
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+        Selector::classname(CodeComponentDataProvider::class),
         // Code components can be auto-saved, which requires awareness of them.
         Selector::inNamespace('Drupal\canvas\AutoSave'),
         Selector::classname(AutoSaveEntity::class),
@@ -355,6 +374,37 @@ final class Layers {
         Selector::classname(BetterEntityDataDefinition::class),
       )
       ->because('JsComponent is largely powered by JsonSchemaPropsComponentSourceBase and the additional dependencies are only for code component-specific logic.');
+  }
+
+  #[TestRule]
+  public function stagedLanguageConfigOverrideIsConfigEntityTypeAgnostic(): Rule {
+    return PHPat::rule()
+      ->classes(Selector::classname(StagedLanguageConfigOverride::class))
+      ->canOnlyDependOn()
+      ->classes(
+        // Its own dedicated entity handlers.
+        Selector::classname(StagedLanguageConfigOverrideStorage::class),
+        Selector::classname(StagedLanguageConfigOverrideAccessControlHandler::class),
+        // The interface that lets it participate in auto-save publishing.
+        Selector::classname(AutoSavePublishAwareInterface::class),
+        // It stages overrides for the `language` module's config overrides.
+        Selector::classname(LanguageConfigOverride::class),
+        // Plus Drupal core components.
+        Selector::inNamespace('Drupal\Component'),
+        // Plus specific Drupal core namespaces: the config entity base class,
+        // entity query + attribute infrastructure, cacheability metadata and
+        // string translation.
+        Selector::inNamespace('Drupal\Core\Cache'),
+        Selector::inNamespace('Drupal\Core\Config'),
+        Selector::inNamespace('Drupal\Core\Entity'),
+        Selector::inNamespace('Drupal\Core\StringTranslation'),
+        // e.g. \OutOfRangeException
+        Selector::isStandardClass(),
+        // @todo Remove these two temporary exceptions once StagedLanguageConfigOverride::__construct() no longer restricts staging to Canvas ContentTemplates and PageRegions.
+        Selector::classname(ContentTemplate::class),
+        Selector::classname(PageRegion::class),
+      )
+      ->because('StagedLanguageConfigOverride is designed to stage language config overrides for any config entity type, so it must not depend on specific config entity types (such as Component or Pattern); the ContentTemplate and PageRegion dependencies are a temporary restriction in its constructor.');
   }
 
   /**

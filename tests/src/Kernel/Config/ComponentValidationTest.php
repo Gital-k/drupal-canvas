@@ -18,7 +18,11 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Schema\SchemaIncompleteException;
+use Drupal\Core\Config\StorageCacheInterface;
+use Drupal\Core\Config\TypedConfigManagerInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
@@ -394,7 +398,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
 
     // Validate the saved (config-cast) config the way RecipeConfigInstaller
     // does: there must be no `active_version` mismatch.
-    $violations = $this->container->get('config.typed')->createFromNameAndData($name, $raw)->validate();
+    $violations = $this->container->get(TypedConfigManagerInterface::class)->createFromNameAndData($name, $raw)->validate();
     $version_violations = \array_filter(
       \iterator_to_array($violations),
       static fn ($violation): bool => \str_starts_with((string) $violation->getPropertyPath(), 'active_version'),
@@ -454,6 +458,86 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     // past version so existing component instances that reference it resolve).
     self::assertCount(2, $saved->getVersions());
     self::assertContains($stale_version, $saved->getVersions());
+
+    $this->entity = $saved;
+    $this->assertValidationErrors([]);
+  }
+
+  /**
+   * Tests that saving a Component backfills `derived_schema_metadata`.
+   *
+   * Covers the save path (`Component::preSave()`), which heals component
+   * config saved before `derived_schema_metadata` existed: the active
+   * version's is recomputed from the live implementation's JSON Schema; a past
+   * version's shapes are unknowable, so each of its props gets an empty
+   * mapping (= not translatable). Because `derived_schema_metadata` is
+   * excluded from the version hash, no version id changes.
+   *
+   * @see \Drupal\canvas\Entity\Component::preSave()
+   * @see \Drupal\canvas\CanvasConfigUpdater::updatePropFieldDefinitionsWithDerivedSchemaMetadata()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::settingsAffectingVersionHash()
+   */
+  public function testDerivedSchemaMetadataBackfilledOnSave(): void {
+    $get_derived_schema_metadata = static fn (Component $component): array => \array_map(
+      static fn (array $definition): array => $definition['derived_schema_metadata'],
+      $component->getSettings()['prop_field_definitions'],
+    );
+
+    $id = 'sdc.canvas_test_sdc.my-cta';
+    // setUp() saved this component without `derived_schema_metadata`, so
+    // Component::preSave() has already backfilled it — for the active version
+    // computed from the live implementation, for the past 'nonsensical'
+    // version (whose shapes are unknowable) as empty mappings.
+    $component = Component::load($id);
+    \assert($component instanceof Component);
+    $versions = $component->getVersions();
+    $active_version = $component->getActiveVersion();
+    $expected = [
+      'text' => ['string_shape' => []],
+      'href' => ['string_shape' => ['format' => 'uri']],
+      'target' => [],
+    ];
+    self::assertSame($expected, $get_derived_schema_metadata($component));
+    $component->loadVersion('nonsensical');
+    self::assertSame(['text' => []], $get_derived_schema_metadata($component));
+    $component->resetToActiveVersion();
+
+    // Simulate a pre-#3591727 install: strip `derived_schema_metadata` from
+    // every version's props, bypassing the entity API.
+    $name = "canvas.component.$id";
+    $raw = $this->config($name)->getRawData();
+    foreach ($raw['versioned_properties'] as &$versioned_properties) {
+      foreach ($versioned_properties['settings']['prop_field_definitions'] as &$prop_field_definition) {
+        unset($prop_field_definition['derived_schema_metadata']);
+      }
+      unset($prop_field_definition);
+    }
+    unset($versioned_properties);
+    // Write directly to config storage: saving through the config API would
+    // trip the test-only ConfigSchemaChecker on the (deliberately) missing
+    // required key.
+    $this->container->get(StorageCacheInterface::class)->write($name, $raw);
+    $this->container->get(ConfigFactoryInterface::class)->reset($name);
+    $this->container->get(EntityTypeManagerInterface::class)->getStorage(Component::ENTITY_TYPE_ID)->resetCache([$id]);
+
+    // Saving must backfill again, via Component::preSave().
+    $component = Component::load($id);
+    \assert($component instanceof Component);
+    self::assertArrayNotHasKey('derived_schema_metadata', $component->getSettings()['prop_field_definitions']['text']);
+    $component->save();
+
+    $saved = Component::load($id);
+    \assert($saved instanceof Component);
+    // The version ids are unchanged: `derived_schema_metadata` does not affect
+    // the version hash.
+    self::assertSame($active_version, $saved->getActiveVersion());
+    self::assertSame($versions, $saved->getVersions());
+    // The active version's is recomputed from the live implementation.
+    self::assertSame($expected, $get_derived_schema_metadata($saved));
+    // The past version's props are treated as not translatable.
+    $saved->loadVersion('nonsensical');
+    self::assertSame(['text' => []], $get_derived_schema_metadata($saved));
+    $saved->resetToActiveVersion();
 
     $this->entity = $saved;
     $this->assertValidationErrors([]);
@@ -525,9 +609,9 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     // @todo Update parent method to accept a `$additional_validation_errors` parameter in addition to `$valid_values`, and uncomment the next line, remove all lines after it.
     // parent::testImmutableProperties($valid_values);
     $constraints = $this->entity->getEntityType()->getConstraints();
-    $this->assertNotEmpty($constraints['ImmutableProperties'], 'All config entities should have at least one immutable ID property.');
+    $this->assertNotEmpty($constraints['ImmutableProperties']['properties'], 'All config entities should have at least one immutable ID property.');
 
-    foreach ($constraints['ImmutableProperties'] as $property_name) {
+    foreach ($constraints['ImmutableProperties']['properties'] as $property_name) {
       $original_value = $this->entity->get($property_name);
       $this->entity->set($property_name, $valid_values[$property_name] ?? $this->randomMachineName());
       try {
@@ -694,11 +778,6 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
         $expected_violations = [
           '' => \sprintf("In component canvas:invalid_slot:\n[slots] The property %s is not defined and the definition does not allow additional properties", $slot_name),
         ] + $expected_violations;
-      }
-      // Strip out the prefix added by https://www.drupal.org/node/3549909. This
-      // can be removed when 11.3 is the minimum supported version of core.
-      if (version_compare(\Drupal::VERSION, '11.3', '<')) {
-        $expected_violations[''] = substr($expected_violations[''], 34);
       }
       self::assertSame($expected_violations, self::violationsToArray($violations));
     }

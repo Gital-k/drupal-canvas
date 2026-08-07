@@ -8,6 +8,7 @@ use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\InvalidComponentInputsPropSourceException;
 use Drupal\canvas\MissingHostEntityException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -290,6 +291,76 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
   }
 
   /**
+   * Whether an explicit input ("prop") of this component version translates.
+   *
+   * Single source of truth for prop translatability, used both to generate the
+   * config schema mapping for a component instance's inputs (see
+   * JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator) and to extract
+   * TMGMT translatables (see ComponentInputsTranslatablesExtractor), so the two
+   * never disagree — a disagreement would make TMGMT offer an input the config
+   * schema rejects on save, or vice versa.
+   *
+   * Derived exclusively from this component *version's* stored
+   * `prop_field_definitions` — never from the live implementation's JSON
+   * Schema, which cannot describe past versions:
+   * - the prop's shape held translatable text when this version was created —
+   *   derived from the retained `string_shape`, see
+   *   \Drupal\canvas\PropShape\PropShape::getTranslatableStringShape();
+   * - AND the prop is not populated by an entity reference — derived from the
+   *   prop's field type prop `expression`. E.g. an image `src` stored as
+   *   `['target_id' => 1]` is a reference: not author-entered text, there is
+   *   nothing to translate, config translations may only hold translatable
+   *   strings (see ADR 0010), and storing a (necessarily empty) translation
+   *   breaks rendering. (A literal URL `src` is not a reference, so it remains
+   *   translatable.)
+   *
+   * Component versions created before `string_shape` was retained never have
+   * it: their props are treated as not translatable. Component instances
+   * become translatable when they are updated to the active version, which
+   * automatic component instance updating takes care of.
+   * (See `type: canvas.json_schema_props`.)
+   *
+   * @internal
+   */
+  public function isExplicitInputTranslatable(string $prop_name): bool {
+    $prop_field_definition = $this->configuration['prop_field_definitions'][$prop_name] ?? NULL;
+    if (!\is_array($prop_field_definition) || !isset($prop_field_definition['derived_schema_metadata']['string_shape'])) {
+      return FALSE;
+    }
+    try {
+      $static_prop_source = $this->getDefaultStaticPropSource($prop_name, FALSE);
+    }
+    catch (\OutOfRangeException) {
+      return FALSE;
+    }
+    return !$static_prop_source->expression instanceof ReferencePropExpressionInterface;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * The per-prop `derived_schema_metadata` retained in
+   * `prop_field_definitions` is version-specific *derived* metadata, not part
+   * of a component version's identity: it is fully derived from data already
+   * in the hash (the explicit-input `schema`). Strip it, so that recomputing
+   * or backfilling it never changes existing component version ids.
+   * (See `type: canvas.json_schema_props`.)
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentDiscoveryBase::getPropsForComponentPlugin()
+   */
+  protected function settingsAffectingVersionHash(mixed $settings): mixed {
+    if (\is_array($settings) && \is_array($settings['prop_field_definitions'] ?? NULL)) {
+      foreach ($settings['prop_field_definitions'] as &$prop_field_definition) {
+        if (\is_array($prop_field_definition)) {
+          unset($prop_field_definition['derived_schema_metadata']);
+        }
+      }
+      unset($prop_field_definition);
+    }
+    return $settings;
+  }
+
+  /**
    * @return array<string, string|\Drupal\Core\StringTranslation\TranslatableMarkup>
    *
    * @see \canvas_load_allowed_values_for_component_prop()
@@ -350,6 +421,38 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
   /**
    * {@inheritdoc}
    */
+
+  /**
+   * Resolves the fieldable host entity a component instance evaluates against.
+   *
+   * Prop sources can only evaluate structured data from fieldable entities, but
+   * a component tree may be contained by a config entity. Prioritize the given
+   * host entity; otherwise use the component instance's tree root entity if it
+   * is fieldable; otherwise none (no DynamicPropSource can be evaluated). It is
+   * up to the code using/rendering a config entity to provide a fieldable host
+   * entity if EntityFieldPropSources are used, which currently is only the case
+   * for ContentTemplate component trees.
+   *
+   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem $item
+   *   The component instance.
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|null $host_entity
+   *   The host entity provided by the caller, if any.
+   *
+   * @return \Drupal\Core\Entity\FieldableEntityInterface|null
+   *   The fieldable host entity, or NULL when neither the given host nor the
+   *   tree root is a fieldable entity.
+   *
+   * @see \Drupal\canvas\PropSource\PropSourceBase::evaluate()
+   */
+  protected function getFieldableHostEntity(ComponentTreeItem $item, ?FieldableEntityInterface $host_entity): ?FieldableEntityInterface {
+    $root = $item->getRoot();
+    return match (TRUE) {
+      $host_entity instanceof FieldableEntityInterface => $host_entity,
+      $root instanceof EntityAdapter && $root->getEntity() instanceof FieldableEntityInterface => $root->getEntity(),
+      default => NULL,
+    };
+  }
+
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
     if (!$this->requiresExplicitInput()) {
       return [
@@ -358,22 +461,7 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       ];
     }
 
-    // Prop sources can only evaluate structured data from fieldable entities,
-    // but the component tree may be contained by a config entity.
-    // It is up to the code using/rendering that config entity to provide a
-    // fieldable host entity if EntityFieldPropSources are used, which currently
-    // is only the case for ContentTemplate component trees.
-    // @see \Drupal\canvas\PropSource\PropSourceBase::evaluate()
-    $root = $item->getRoot();
-    $fieldable_host_entity = match (TRUE) {
-      // Prioritize using the given host entity, if any.
-      $host_entity instanceof FieldableEntityInterface => $host_entity,
-      // Next, use the component instance's tree's host entity, if fieldable.
-      $root instanceof EntityAdapter && $root->getEntity() instanceof FieldableEntityInterface => $root->getEntity(),
-      // Otherwise, fall back to no host entity. This implies no
-      // DynamicPropSource can be evaluated.
-      default => NULL,
-    };
+    $fieldable_host_entity = $this->getFieldableHostEntity($item, $host_entity);
 
     $values = $item->getInputs() ?? [];
 
@@ -557,7 +645,9 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
   public function getDefaultExplicitInput(bool $only_required = FALSE): array {
     $inputs = [];
     foreach ($this->configuration['prop_field_definitions'] as $prop_name => $def) {
-      if ($def['required'] === FALSE && $only_required) {
+      // A not-yet-upgraded instance's definition may lack `required`; treat a
+      // missing flag as not-required, matching ::getExplicitInputDefinitions().
+      if (($def['required'] ?? FALSE) === FALSE && $only_required) {
         continue;
       }
       \assert(\is_string($prop_name));
@@ -770,6 +860,7 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
     $entity_object_for_field_widget = match (TRUE) {
       $entity instanceof FieldableEntityInterface => $entity,
       $entity instanceof ContentTemplate => $entity->createEmptyTargetEntity(),
+      $entity instanceof Pattern => Pattern::createEmptyHostEntity(),
       default => throw new \LogicException(),
     };
 

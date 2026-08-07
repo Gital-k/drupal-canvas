@@ -3,6 +3,7 @@ parameters:
   level: 8
   strictRules:
     allRules: false
+    disallowedShortTernary: true
     strictFunctionCalls: true
   fileExtensions:
     - php
@@ -49,6 +50,11 @@ parameters:
     - identifier: varTag.type
     # All of the ignores below are for missing parameter or return types that are imposed by upstream implementations.
     -
+      message: '#^Method Drupal\\Tests\\canvas\\Functional\\FunctionalTestBase\:\:prepareSettings\(\) has no return type specified\.$#'
+      identifier: missingType.return
+      count: 1
+      path: tests/src/Functional/FunctionalTestBase.php
+    -
       message: '#^Method Drupal\\canvas\\Plugin\\Field\\FieldType\\ComponentTreeItemList\:\:get\(\) has parameter \$index with no type specified\.$#'
       identifier: missingType.parameter
       count: 1
@@ -92,15 +98,18 @@ rules:
   - Canvas\PHPStan\Rules\DisallowHookSchemaRule
   - Canvas\PHPStan\Rules\NoDuplicateTraitUseRule
   - Canvas\PHPStan\Rules\KernelTestsMustUseAssertEntityIsValidRule
+  - Canvas\PHPStan\Rules\ComponentInputsComparisonMustIgnoreKeyOrderRule
   - Canvas\PHPStan\Rules\NoOptionalParametersInDataProviderTestsRule
   - Canvas\PHPStan\Rules\NoJsonEncodedHttpExceptionMessageInApiControllersRule
   - Canvas\PHPStan\Rules\RequireStaticMethodsRule
+  - Canvas\PHPStan\Rules\SelfConstantReferenceRule
   - Canvas\PHPStan\Rules\ComponentPreSaveUpdateMethodsRule
   - Canvas\PHPStan\Rules\ComponentConfigUpdaterMustDeclarePreSaveIntentRule
+  - Canvas\PHPStan\Rules\RequireTypedDataHelperForInternalCheckRule
   - mglaman\PHPStanDrupal\Rules\Drupal\TodoCommentWithIssueUrlRule
-# Run `composer run phpstan-regenerate-ignores-for-11.3-and-higher` to update this list of ignores for Drupal >=11.3.
+# Run `composer run phpstan-regenerate-ignores-for-non-min-core-version-features` to update this list of ignores.
 includes:
-  - phpstan-11.3-and-higher-ignores.neon
+  - phpstan-ignores-non-min-core-version.neon
 services:
   -
     class: Canvas\PHPStan\Architecture\Layers

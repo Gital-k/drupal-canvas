@@ -14,7 +14,12 @@ use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\Component\FileCache\FileCacheFactory;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
+use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
+use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
@@ -92,6 +97,13 @@ class CanvasTestSetup implements TestSetupInterface {
     // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements()
     // @see /ui/tests/e2e/prop-types.cy.js
     'canvas.' . ComponentEntity::ENTITY_TYPE_ID . '.' . SingleDirectoryComponent::SOURCE_PLUGIN_ID . '.sdc_test_all_props.all-props',
+    // Canvas forward-ported a fix for `type: field.value.boolean`, which in
+    // turn causes core's `article_content_type` recipe's
+    // core.base_field_override.node.article.promote config's `default_value` to
+    // fail validation.
+    // @see https://www.drupal.org/project/drupal/issues/3534717
+    // @see \Drupal\canvas\Hook\ComponentSourceHooks::configSchemaInfoAlter()
+    'core.base_field_override.node.article.promote',
   ];
 
   public function setup(bool $createContentTemplate = FALSE): void {
@@ -144,7 +156,7 @@ class CanvasTestSetup implements TestSetupInterface {
       $kernel->rebuildContainer();
     }
 
-    $module_installer = \Drupal::service('module_installer');
+    $module_installer = \Drupal::service(ModuleInstallerInterface::class);
     $module_installer->install(['system', 'user']);
     $config_factory = \Drupal::configFactory();
     $config = $config_factory->getEditable('system.logging');
@@ -152,25 +164,25 @@ class CanvasTestSetup implements TestSetupInterface {
     $config->save(TRUE);
 
     if (getenv('CANVAS_DISABLE_AGGREGATION') !== 'true') {
-      $config = \Drupal::service('config.factory')->getEditable('system.performance');
+      $config = \Drupal::service(ConfigFactoryInterface::class)->getEditable('system.performance');
       $config->set('js.preprocess', TRUE);
       $config->set('css.preprocess', TRUE);
       $config->save();
     }
 
-    $module_installer = \Drupal::service('module_installer');
+    $module_installer = \Drupal::service(ModuleInstallerInterface::class);
     \assert($module_installer instanceof ModuleInstallerInterface);
     $module_installer->install(['node', 'media', 'block', 'file']);
 
     $theme = 'stark';
     $admin_theme = "claro";
-    \Drupal::service('theme_installer')->install([$theme, $admin_theme]);
-    \Drupal::service('config.factory')
+    \Drupal::service(ThemeInstallerInterface::class)->install([$theme, $admin_theme]);
+    \Drupal::service(ConfigFactoryInterface::class)
       ->getEditable('system.theme')
       ->set('default', $theme)
       ->set('admin', $admin_theme)
       ->save();
-    \Drupal::service('theme.manager')->resetActiveTheme();
+    \Drupal::service(ThemeManagerInterface::class)->resetActiveTheme();
     // Place the page title block.
     $this->placeBlock('page_title_block', ['region' => 'highlighted']);
     $this->placeBlock('system_messages_block');
@@ -251,7 +263,7 @@ class CanvasTestSetup implements TestSetupInterface {
       'system',
     ]);
     $this->createComponentTreeField('node', 'article', 'field_canvas_demo');
-    \Drupal::service('entity_display.repository')
+    \Drupal::service(EntityDisplayRepositoryInterface::class)
       ->getViewDisplay('node', 'article')
       ->setComponent('field_canvas_demo', [
         'label' => 'hidden',
@@ -264,7 +276,7 @@ class CanvasTestSetup implements TestSetupInterface {
     $this->createMyCtaComponentFromSdc();
     $this->createTestCodeComponent();
 
-    $field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions('node', 'article');
+    $field_definitions = \Drupal::service(EntityFieldManagerInterface::class)->getFieldDefinitions('node', 'article');
     $image_field_sample_value = ImageItem::generateSampleValue($field_definitions['field_hero']);
     // The field_hero field doesn't support 'title' in its field settings.
     $image_field_sample_value['title'] = '';
@@ -277,7 +289,7 @@ class CanvasTestSetup implements TestSetupInterface {
     $violations = self::violationsToArray($hero_reference->validate());
     \assert([] === $violations, print_r($violations, TRUE));
     $hero_reference->save();
-    $image_media_source_field_definition = \Drupal::service('entity_field.manager')->getFieldDefinitions('media', 'image')['field_media_image'];
+    $image_media_source_field_definition = \Drupal::service(EntityFieldManagerInterface::class)->getFieldDefinitions('media', 'image')['field_media_image'];
     $media4 = Media::create([
       'uuid' => self::UUID_MEDIA_IMAGE4,
       'bundle' => 'image',
@@ -433,7 +445,7 @@ class CanvasTestSetup implements TestSetupInterface {
         ],
       ],
     ])->save();
-    $display_repository = \Drupal::service('entity_display.repository');
+    $display_repository = \Drupal::service(EntityDisplayRepositoryInterface::class);
     $display_repository->getFormDisplay('node', 'article')
       ->setComponent('media_image_field', [
         'type' => 'media_library_widget',
@@ -583,8 +595,9 @@ class CanvasTestSetup implements TestSetupInterface {
     \assert([] === $violations, print_r($violations, TRUE));
     $canvas_user->save();
 
-    if (getenv('CANVAS_EXTRA_MODULES')) {
-      $modules = \explode(',', getenv('CANVAS_EXTRA_MODULES') ?: '');
+    $env_modules = getenv('CANVAS_EXTRA_MODULES');
+    if (\is_string($env_modules)) {
+      $modules = \explode(',', $env_modules);
       $module_installer->install($modules);
 
       // Rebuild the container before the test starts making HTTP requests.
@@ -592,10 +605,11 @@ class CanvasTestSetup implements TestSetupInterface {
       $kernel->invalidateContainer();
       $kernel->rebuildContainer();
     }
-    if (getenv('CANVAS_EXTRA_PERMISSIONS')) {
+    $env_permissions = getenv('CANVAS_EXTRA_PERMISSIONS');
+    if (\is_string($env_permissions)) {
       $role = Role::load('canvas');
       if ($role) {
-        $permissions = \explode(',', getenv('CANVAS_EXTRA_PERMISSIONS') ?: '');
+        $permissions = \explode(',', $env_permissions);
         foreach ($permissions as $permission) {
           $role->grantPermission($permission);
         }

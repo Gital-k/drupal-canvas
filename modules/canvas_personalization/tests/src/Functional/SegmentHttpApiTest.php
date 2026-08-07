@@ -6,6 +6,7 @@ namespace Drupal\Tests\canvas_personalization\Functional;
 
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas_personalization\Entity\Segment;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
 use Drupal\Tests\canvas\Functional\HttpApiTestBase;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
@@ -203,7 +204,7 @@ class SegmentHttpApiTest extends HttpApiTestBase {
 
     // Ensure it's disabled no matter what we sent in status.
     /** @var \Drupal\Core\Entity\EntityStorageInterface $segment_storage */
-    $segment_storage = \Drupal::service('entity_type.manager')->getStorage(Segment::ENTITY_TYPE_ID);
+    $segment_storage = \Drupal::service(EntityTypeManagerInterface::class)->getStorage(Segment::ENTITY_TYPE_ID);
     $segment = $segment_storage->loadUnchanged('my_segment');
     \assert($segment instanceof Segment);
     self::assertFalse($segment->status());
@@ -393,7 +394,7 @@ class SegmentHttpApiTest extends HttpApiTestBase {
     $list_url = Url::fromUri("base:/canvas/api/v0/config/$entity_type_id");
 
     // Anonymous user: 401.
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 401, ['user.roles:anonymous'], ['4xx-response', 'config:system.site', 'config:user.role.anonymous', 'http_response'], 'MISS', NULL);
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 401, ['user.roles:anonymous'], ['4xx-response', 'config:system.site', 'config:user.role.anonymous', 'http_response'], 'MISS', 'UNCACHEABLE (401)');
     $this->assertSame([
       'errors' => [
         "You must be logged in to access this resource.",
@@ -402,7 +403,7 @@ class SegmentHttpApiTest extends HttpApiTestBase {
 
     // Limited Permissions: 403.
     $this->drupalLogin($this->limitedPermissionsUser);
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', NULL);
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', 'UNCACHEABLE (403)');
     $this->assertSame([
       'errors' => [
         "Requires >=1 content entity type with a Canvas field that can be created or edited.",
@@ -533,7 +534,7 @@ class SegmentHttpApiTest extends HttpApiTestBase {
     $this->assertSame([
       Segment::DEFAULT_ID => $this->expectedDefaultSegment,
     ], $body);
-    $individual_body = $this->assertExpectedResponse('GET', $resource_url, [], 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
+    $individual_body = $this->assertExpectedResponse('GET', $resource_url, [], 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (404)');
     $this->assertSame([], $individual_body);
   }
 

@@ -23,12 +23,14 @@ use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\GeneratedUrl;
 use Drupal\Core\Plugin\Component as SdcPlugin;
 use Drupal\Core\StreamWrapper\PublicStream;
+use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\file\Entity\File;
 use Drupal\link\LinkItemInterface;
@@ -59,6 +61,7 @@ use Twig\Error\SyntaxError;
 #[CoversClass(SingleDirectoryComponent::class)]
 #[Group('canvas')]
 #[Group('canvas_component_sources')]
+#[Group('slow')]
 final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
 
   use SingleDirectoryComponentTreeTestTrait;
@@ -87,8 +90,8 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
 
     // We need to ensure the public://balloons.png image exists in the test
     // environment for the "Card with stream wrapper image" tests.
-    $file_system = \Drupal::service('file_system');
-    $extension_path_resolver = \Drupal::service('extension.path.resolver');
+    $file_system = \Drupal::service(FileSystemInterface::class);
+    $extension_path_resolver = \Drupal::service(ExtensionPathResolver::class);
     $module_path = $extension_path_resolver->getPath('module', 'canvas_test_sdc');
     $source = $module_path . '/components/card/balloons.png';
     $destination = 'public://balloons.png';
@@ -96,7 +99,31 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
     $file_system->prepareDirectory($directory, FileSystemInterface::CREATE_DIRECTORY);
     $file_system->copy($source, $destination, FileExists::Replace);
 
-    $this->container->get('theme_installer')->install(['sdc_theme_test']);
+    $this->container->get(ThemeInstallerInterface::class)->install(['sdc_theme_test']);
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Overridden to create the public file (fid 1) referenced by the image `src`
+   * in the entity-reference scenario; see
+   * ::providerSymmetricallyTranslatableComponentInstanceScenarios().
+   */
+  #[DataProvider('providerGetTranslatableInputKeys')]
+  public function testGetTranslatableInputKeys(string $host_entity_type_id, array $host_entity_values, string $component_id, array $inputs, array $expected_translatable_inputs): void {
+    // Validating the image `src` evaluates its computed file URI, which checks
+    // the 'access content' permission.
+    $this->setUpCurrentUser(permissions: ['access content']);
+    $file = File::create([
+      'fid' => 1,
+      'uri' => 'public://balloons.png',
+      'filename' => 'balloons.png',
+      'status' => 1,
+    ]);
+    $file->enforceIsNew();
+    $file->setPermanent();
+    $file->save();
+    parent::testGetTranslatableInputKeys($host_entity_type_id, $host_entity_values, $component_id, $inputs, $expected_translatable_inputs);
   }
 
   /**
@@ -160,6 +187,14 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
       'sdc.canvas_test_sdc.props-invalid-shapes' => [
         'Drupal Canvas does not know of a field type/widget to allow populating the <code>invalid_shape</code> prop, with the shape <code>{"type":"object"}</code>.',
       ],
+      'sdc.canvas_test_sdc.props-min-length' => [
+        // `minLength` cannot be enforced by Drupal core's string field types,
+        // nor by the existing translation systems (content translation, config
+        // translation, TMGMT), so it has no storable prop shape; a *required*
+        // prop without one makes the component ineligible.
+        // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
+        'Drupal Canvas does not know of a field type/widget to allow populating the <code>heading</code> prop, with the shape <code>{"type":"string","minLength":2}</code>.',
+      ],
       'sdc.canvas_test_sdc.props-no-examples' => [
         'Prop "heading" is required, but does not have example value',
       ],
@@ -202,13 +237,14 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
       ...$this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc'),
       ...$this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'sdc_theme_test'),
     ];
-    self::assertSame([
+    $expected = [
       'sdc.canvas_test_sdc.attributes',
       'sdc.canvas_test_sdc.banner',
       'sdc.canvas_test_sdc.card',
       'sdc.canvas_test_sdc.card-with-local-image',
       'sdc.canvas_test_sdc.card-with-remote-image',
       'sdc.canvas_test_sdc.card-with-stream-wrapper-image',
+      'sdc.canvas_test_sdc.code-example',
       'sdc.canvas_test_sdc.columns',
       'sdc.canvas_test_sdc.component-mismatch-meta-enum',
       'sdc.canvas_test_sdc.component-mismatch-meta-enum-array-items',
@@ -251,9 +287,29 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
       'sdc.sdc_theme_test.lib-overrides',
       'sdc.sdc_theme_test.my-card',
       'sdc.sdc_theme_test_base.my-card-no-schema',
-    ], $auto_created_components);
+    ];
+    if (version_compare(\Drupal::VERSION, '11.4', '>=')) {
+      // Drupal 11.4 adds the `cva` and `input` example components to the
+      // `sdc_theme_test` theme.
+      $offset = (int) array_search('sdc.sdc_theme_test.bar', $expected, TRUE) + 1;
+      array_splice($expected, $offset, 0, [
+        'sdc.sdc_theme_test.cva',
+        'sdc.sdc_theme_test.input',
+      ]);
+    }
+    self::assertSame($expected, $auto_created_components);
 
-    return array_combine($auto_created_components, $auto_created_components);
+    // The `cva` and `input` example components ship with the `sdc_theme_test`
+    // theme as of Drupal 11.4. Their discovery is asserted above; exclude them
+    // from the dependent tests to avoid maintaining Drupal-version-specific
+    // expected data (settings, render output, dependencies) for components that
+    // Canvas does not own.
+    $component_ids = array_values(array_diff($auto_created_components, [
+      'sdc.sdc_theme_test.cva',
+      'sdc.sdc_theme_test.input',
+    ]));
+
+    return array_combine($component_ids, $component_ids);
   }
 
   /**
@@ -511,6 +567,21 @@ HTML,
             'core/components.canvas_test_sdc--card-with-stream-wrapper-image',
             'core/components.canvas--image',
             'core/components.canvas_test_sdc--card-with-stream-wrapper-image',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.code-example' => [
+        'html' => <<<HTML
+  <pre><code class="language-php">&lt;?php
+echo &#039;Hello, world!&#039;;
+</code></pre>
+
+HTML,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--code-example',
+            'core/components.canvas_test_sdc--code-example',
           ],
         ],
       ],
@@ -1639,6 +1710,7 @@ HTML
             'field_widget' => 'string_textfield',
             'default_value' => [0 => ['value' => 'The not-attributes SDC prop!']],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -1656,6 +1728,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'text' => [
             'required' => FALSE,
@@ -1674,6 +1747,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎text_long␟processed',
+            'derived_schema_metadata' => ['string_shape' => ['contentMediaType' => 'text/html', 'x-formatting-context' => 'block']],
           ],
           'image' => [
             'required' => FALSE,
@@ -1683,6 +1757,7 @@ HTML
             'field_widget' => 'image_image',
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -1700,6 +1775,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'content' => [
             'required' => FALSE,
@@ -1713,6 +1789,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'footer' => [
             'required' => FALSE,
@@ -1726,6 +1803,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'date' => [
             'required' => FALSE,
@@ -1737,6 +1815,7 @@ HTML
             'field_widget' => 'datetime_default',
             'default_value' => NULL,
             'expression' => 'ℹ︎datetime␟value',
+            'derived_schema_metadata' => [],
           ],
           'image' => [
             'required' => TRUE,
@@ -1746,6 +1825,7 @@ HTML
             'field_widget' => 'image_image',
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
           'sizes' => [
             'required' => FALSE,
@@ -1759,6 +1839,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'loading' => [
             'required' => TRUE,
@@ -1774,6 +1855,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -1791,6 +1873,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'content' => [
             'required' => FALSE,
@@ -1804,6 +1887,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'footer' => [
             'required' => FALSE,
@@ -1817,6 +1901,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'src' => [
             'required' => TRUE,
@@ -1826,6 +1911,7 @@ HTML
             'field_widget' => 'image_image',
             'default_value' => [],
             'expression' => 'ℹ︎image␟src_with_alternate_widths',
+            'derived_schema_metadata' => ['string_shape' => ['format' => 'uri-reference']],
           ],
           'alt' => [
             'required' => TRUE,
@@ -1839,6 +1925,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'loading' => [
             'required' => TRUE,
@@ -1854,6 +1941,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -1871,6 +1959,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'content' => [
             'required' => FALSE,
@@ -1884,6 +1973,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'footer' => [
             'required' => FALSE,
@@ -1897,6 +1987,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'src' => [
             'required' => TRUE,
@@ -1906,6 +1997,7 @@ HTML
             'field_widget' => 'image_image',
             'default_value' => [],
             'expression' => 'ℹ︎image␟src_with_alternate_widths',
+            'derived_schema_metadata' => ['string_shape' => ['format' => 'uri-reference']],
           ],
           'alt' => [
             'required' => TRUE,
@@ -1919,6 +2011,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'width' => [
             'required' => TRUE,
@@ -1932,6 +2025,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎integer␟value',
+            'derived_schema_metadata' => [],
           ],
           'height' => [
             'required' => TRUE,
@@ -1945,6 +2039,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎integer␟value',
+            'derived_schema_metadata' => [],
           ],
           'loading' => [
             'required' => FALSE,
@@ -1960,6 +2055,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -1977,6 +2073,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'content' => [
             'required' => FALSE,
@@ -1990,6 +2087,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'footer' => [
             'required' => FALSE,
@@ -2003,6 +2101,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'src' => [
             'required' => TRUE,
@@ -2012,6 +2111,7 @@ HTML
             'field_widget' => 'image_image',
             'default_value' => [],
             'expression' => 'ℹ︎image␟entity␜␜entity:file␝uri␞␟value',
+            'derived_schema_metadata' => ['string_shape' => ['format' => 'uri']],
           ],
           'alt' => [
             'required' => TRUE,
@@ -2025,6 +2125,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'loading' => [
             'required' => FALSE,
@@ -2040,6 +2141,37 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.code-example' => [
+        'prop_field_definitions' => [
+          'language' => [
+            'required' => FALSE,
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [
+              0 => ['value' => 'php'],
+            ],
+            'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
+          ],
+          'code' => [
+            'required' => TRUE,
+            'field_type' => 'string_long',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textarea',
+            'default_value' => [
+              0 => ['value' => "<?php\necho 'Hello, world!';\n"],
+            ],
+            'expression' => 'ℹ︎string_long␟value',
+            'derived_schema_metadata' => ['string_shape' => ['pattern' => '(.|\\r?\\n)*']],
           ],
         ],
       ],
@@ -2055,6 +2187,7 @@ HTML
             'field_widget' => 'options_select',
             'default_value' => [0 => ['value' => 2]],
             'expression' => 'ℹ︎list_integer␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2070,6 +2203,7 @@ HTML
             'field_widget' => 'options_select',
             'default_value' => [0 => ['value' => 'small']],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
           'numbers' => [
             'required' => FALSE,
@@ -2081,6 +2215,7 @@ HTML
             'field_widget' => 'options_select',
             'default_value' => [0 => ['value' => '3.14']],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2100,6 +2235,7 @@ HTML
               1 => ['value' => 'blue'],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2115,6 +2251,7 @@ HTML
             'field_widget' => 'options_select',
             'default_value' => [0 => ['value' => 'small']],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2128,6 +2265,7 @@ HTML
             'field_widget' => 'boolean_checkbox',
             'default_value' => [0 => ['value' => FALSE]],
             'expression' => 'ℹ︎boolean␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2143,6 +2281,7 @@ HTML
             'field_widget' => 'datetime_default',
             'default_value' => NULL,
             'expression' => 'ℹ︎datetime␟value',
+            'derived_schema_metadata' => [],
           ],
           'caption' => [
             'required' => FALSE,
@@ -2152,6 +2291,7 @@ HTML
             'field_widget' => 'string_textfield',
             'default_value' => [0 => ['value' => 'Birthday']],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -2165,6 +2305,7 @@ HTML
             'field_widget' => 'string_textfield',
             'default_value' => [0 => ['value' => 'A text field']],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -2181,6 +2322,7 @@ HTML
             'field_widget' => 'string_textfield',
             'default_value' => [0 => ['value' => 'A text field']],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -2196,6 +2338,7 @@ HTML
             'field_widget' => 'options_select',
             'default_value' => [0 => ['value' => 'horizontal']],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2213,6 +2356,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'style' => [
             'required' => FALSE,
@@ -2228,6 +2372,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
           'element' => [
             'required' => TRUE,
@@ -2243,6 +2388,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2256,6 +2402,7 @@ HTML
             'field_widget' => 'image_image',
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2269,6 +2416,7 @@ HTML
             'field_widget' => 'string_textfield',
             'default_value' => NULL,
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'images' => [
             'required' => TRUE,
@@ -2281,6 +2429,7 @@ HTML
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2296,6 +2445,7 @@ HTML
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2309,6 +2459,7 @@ HTML
             'field_widget' => 'string_textfield',
             'default_value' => NULL,
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'image' => [
             'required' => FALSE,
@@ -2320,6 +2471,7 @@ HTML
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2335,6 +2487,7 @@ HTML
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2350,6 +2503,7 @@ HTML
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2363,6 +2517,7 @@ HTML
             'field_widget' => 'image_image',
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2378,6 +2533,7 @@ HTML
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
           'secondary_image' => [
             'required' => FALSE,
@@ -2389,6 +2545,7 @@ HTML
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
           'required_image' => [
             'required' => TRUE,
@@ -2400,6 +2557,7 @@ HTML
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2421,6 +2579,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'text_limited' => [
             'required' => FALSE,
@@ -2438,6 +2597,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'text_required' => [
             'required' => TRUE,
@@ -2455,6 +2615,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'link' => [
             'required' => FALSE,
@@ -2477,6 +2638,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎link␟url',
+            'derived_schema_metadata' => ['string_shape' => ['format' => 'uri']],
           ],
           'link_limited' => [
             'required' => FALSE,
@@ -2499,6 +2661,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎link␟url',
+            'derived_schema_metadata' => ['string_shape' => ['format' => 'uri']],
           ],
           'relative_link' => [
             'required' => FALSE,
@@ -2521,6 +2684,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎link␟url',
+            'derived_schema_metadata' => ['string_shape' => ['format' => 'uri-reference']],
           ],
           'relative_link_limited' => [
             'required' => FALSE,
@@ -2543,6 +2707,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎link␟url',
+            'derived_schema_metadata' => ['string_shape' => ['format' => 'uri-reference']],
           ],
           'number' => [
             'required' => FALSE,
@@ -2563,6 +2728,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎float␟value',
+            'derived_schema_metadata' => [],
           ],
           'number_limited' => [
             'required' => FALSE,
@@ -2580,6 +2746,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎float␟value',
+            'derived_schema_metadata' => [],
           ],
           'integer' => [
             'required' => FALSE,
@@ -2597,6 +2764,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎integer␟value',
+            'derived_schema_metadata' => [],
           ],
           'integer_limited' => [
             'required' => FALSE,
@@ -2614,6 +2782,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎integer␟value',
+            'derived_schema_metadata' => [],
           ],
           'datetime' => [
             'required' => FALSE,
@@ -2626,6 +2795,7 @@ HTML
             'field_widget' => 'datetime_default',
             'default_value' => NULL,
             'expression' => 'ℹ︎datetime␟value',
+            'derived_schema_metadata' => [],
           ],
           'datetime_limited' => [
             'required' => FALSE,
@@ -2638,6 +2808,7 @@ HTML
             'field_widget' => 'datetime_default',
             'default_value' => NULL,
             'expression' => 'ℹ︎datetime␟value',
+            'derived_schema_metadata' => [],
           ],
           'date' => [
             'required' => FALSE,
@@ -2650,6 +2821,7 @@ HTML
             'field_widget' => 'datetime_default',
             'default_value' => NULL,
             'expression' => 'ℹ︎datetime␟value',
+            'derived_schema_metadata' => [],
           ],
           'date_limited' => [
             'required' => FALSE,
@@ -2662,6 +2834,7 @@ HTML
             'field_widget' => 'datetime_default',
             'default_value' => NULL,
             'expression' => 'ℹ︎datetime␟value',
+            'derived_schema_metadata' => [],
           ],
           'list_text' => [
             'required' => FALSE,
@@ -2677,6 +2850,7 @@ HTML
               1 => ['value' => 'option_two'],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
           'list_text_limited' => [
             'required' => FALSE,
@@ -2692,6 +2866,7 @@ HTML
               1 => ['value' => 'option_two'],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
           'list_int' => [
             'required' => FALSE,
@@ -2707,6 +2882,7 @@ HTML
               1 => ['value' => 20],
             ],
             'expression' => 'ℹ︎list_integer␟value',
+            'derived_schema_metadata' => [],
           ],
           'list_int_limited' => [
             'required' => FALSE,
@@ -2722,6 +2898,7 @@ HTML
               1 => ['value' => 20],
             ],
             'expression' => 'ℹ︎list_integer␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2739,6 +2916,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'href' => [
             'required' => TRUE,
@@ -2756,6 +2934,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎link␟url',
+            'derived_schema_metadata' => ['string_shape' => ['format' => 'uri']],
           ],
           'target' => [
             'required' => FALSE,
@@ -2767,6 +2946,7 @@ HTML
             'field_widget' => 'options_select',
             'default_value' => NULL,
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2784,6 +2964,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'subheading' => [
             'required' => FALSE,
@@ -2797,6 +2978,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'cta1' => [
             'required' => FALSE,
@@ -2810,6 +2992,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'cta1href' => [
             'required' => TRUE,
@@ -2827,6 +3010,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎link␟url',
+            'derived_schema_metadata' => ['string_shape' => ['format' => 'uri-reference']],
           ],
           'cta2' => [
             'required' => FALSE,
@@ -2840,6 +3024,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -2857,6 +3042,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -2876,6 +3062,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2889,6 +3076,7 @@ HTML
             'field_widget' => 'string_textfield',
             'default_value' => [0 => ['value' => 'There goes my hero']],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -2902,6 +3090,7 @@ HTML
             'field_widget' => 'string_textfield',
             'default_value' => [0 => ['value' => 'There goes my hero']],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -2924,6 +3113,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎text_long␟processed',
+            'derived_schema_metadata' => ['string_shape' => ['contentMediaType' => 'text/html', 'x-formatting-context' => 'block']],
           ],
         ],
       ],
@@ -2941,6 +3131,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎integer␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -2958,6 +3149,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -2977,6 +3169,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
           'colors' => [
             'required' => FALSE,
@@ -2996,6 +3189,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -3015,6 +3209,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
           'pill' => [
             'required' => FALSE,
@@ -3028,6 +3223,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎boolean␟value',
+            'derived_schema_metadata' => [],
           ],
           'pulse' => [
             'required' => FALSE,
@@ -3041,6 +3237,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎boolean␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -3058,6 +3255,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'panel' => [
             'required' => TRUE,
@@ -3071,6 +3269,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'active' => [
             'required' => FALSE,
@@ -3080,6 +3279,7 @@ HTML
             'field_widget' => 'boolean_checkbox',
             'default_value' => NULL,
             'expression' => 'ℹ︎boolean␟value',
+            'derived_schema_metadata' => [],
           ],
           'closable' => [
             'required' => FALSE,
@@ -3089,6 +3289,7 @@ HTML
             'field_widget' => 'boolean_checkbox',
             'default_value' => NULL,
             'expression' => 'ℹ︎boolean␟value',
+            'derived_schema_metadata' => [],
           ],
           'disabled' => [
             'required' => FALSE,
@@ -3098,6 +3299,7 @@ HTML
             'field_widget' => 'boolean_checkbox',
             'default_value' => NULL,
             'expression' => 'ℹ︎boolean␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -3117,6 +3319,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
           'activation' => [
             'required' => FALSE,
@@ -3132,6 +3335,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_string␟value',
+            'derived_schema_metadata' => [],
           ],
           'no_scroll' => [
             'required' => FALSE,
@@ -3145,6 +3349,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎boolean␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -3162,6 +3367,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
           'active' => [
             'required' => FALSE,
@@ -3171,6 +3377,7 @@ HTML
             'field_widget' => 'boolean_checkbox',
             'default_value' => NULL,
             'expression' => 'ℹ︎boolean␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -3198,6 +3405,7 @@ HTML
               8 => ['value' => 9],
             ],
             'expression' => 'ℹ︎integer␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -3216,6 +3424,7 @@ HTML
               2 => ['value' => 'baz'],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -3235,6 +3444,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎list_integer␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -3250,6 +3460,7 @@ HTML
             'field_widget' => 'file_generic',
             'default_value' => [],
             'expression' => 'ℹ︎file␟{src↝entity␜␜entity:file␝uri␞␟url}',
+            'derived_schema_metadata' => [],
           ],
           'display_width' => [
             'required' => FALSE,
@@ -3262,6 +3473,7 @@ HTML
             'field_widget' => 'number',
             'default_value' => NULL,
             'expression' => 'ℹ︎integer␟value',
+            'derived_schema_metadata' => [],
           ],
         ],
       ],
@@ -3285,6 +3497,7 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => ['string_shape' => []],
           ],
         ],
       ],
@@ -3364,6 +3577,13 @@ HTML
           'core',
           'file',
           'image',
+          'options',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.code-example' => [
+        'module' => [
+          'core',
           'options',
           'canvas_test_sdc',
         ],
@@ -4325,6 +4545,51 @@ HTML
                 ],
               ],
               'resolved' => 'lazy',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.code-example' => [
+        'expected_output_selectors' => [
+          'pre > code.language-php',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'language' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'enum' => ['php', 'html', 'md', 'js', 'ts', 'jsx', 'tsx'],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'php'],
+              ],
+              'resolved' => 'php',
+            ],
+          ],
+          'code' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'pattern' => '(.|\r?\n)*',
+            ],
+            'sourceType' => 'static:field_item:string_long',
+            'expression' => 'ℹ︎string_long␟value',
+            'default_values' => [
+              'source' => [
+                0 => ['value' => "<?php\necho 'Hello, world!';\n"],
+              ],
+              'resolved' => "<?php\necho 'Hello, world!';\n",
             ],
           ],
         ],
@@ -6011,7 +6276,6 @@ HTML
             'required' => TRUE,
             'jsonSchema' => [
               'type' => 'string',
-              'minLength' => 2,
             ],
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
@@ -6083,7 +6347,6 @@ HTML
             'required' => TRUE,
             'jsonSchema' => [
               'type' => 'string',
-              'minLength' => 2,
             ],
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
@@ -6134,7 +6397,6 @@ HTML
             'required' => TRUE,
             'jsonSchema' => [
               'type' => 'string',
-              'minLength' => 2,
             ],
             'sourceType' => 'static:field_item:string',
             'expression' => 'ℹ︎string␟value',
@@ -7150,7 +7412,7 @@ HTML
 
   protected static function getPropsForComponentFallbackTesting(): array {
     /** @var \Drupal\Core\File\FileSystemInterface $file_system */
-    $file_system = \Drupal::service('file_system');
+    $file_system = \Drupal::service(FileSystemInterface::class);
     $file_uri = 'public://image-2.jpg';
     if (!\file_exists($file_uri)) {
       $file_system->copy(\Drupal::root() . '/core/tests/fixtures/files/image-2.jpg', PublicStream::basePath(), FileExists::Replace);
@@ -7208,7 +7470,7 @@ HTML
 
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
     /** @var \Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface */
-    return \Drupal::service('plugin.manager.sdc');
+    return \Drupal::service(ComponentPluginManager::class);
   }
 
   /**
@@ -7697,6 +7959,27 @@ HTML
       ['text', 'href'],
     ];
 
+    // An image `src` is a StaticPropSource backed by an entity reference. Its
+    // shape is a translatable URI-reference string, but a reference is not
+    // author-entered text, so it must NOT be translatable: storing a
+    // translation for it yields an empty value that breaks rendering of the
+    // translated component. The referenced public file (fid 1) is created in
+    // ::testGetTranslatableInputKeys().
+    yield 'Single-cardinality; entity-reference (image) input is not translatable despite a URI-reference shape' => [
+      'sdc.canvas_test_sdc.card-with-stream-wrapper-image',
+      [
+        'heading' => 'A heading',
+        'content' => 'Some content',
+        'footer' => 'A footer',
+        'src' => ['target_id' => 1],
+        'alt' => 'Alt text',
+        'loading' => 'lazy',
+      ],
+      // `src` is excluded (entity reference); `loading` is excluded (its `enum`
+      // shape is not translatable).
+      ['heading', 'content', 'footer', 'alt'],
+    ];
+
     // Only the ContentTemplate config entity type allows using structured data
     // prop source types: EntityFieldPropSource and HostEntityUrlPropSource.
     if ($host_entity_type_id === ContentTemplate::ENTITY_TYPE_ID) {
@@ -7804,6 +8087,17 @@ HTML
         'relative_link',
         'relative_link_limited',
       ],
+    ];
+
+    yield 'Multi-line plain prose prop is translatable; enum prop is not' => [
+      'sdc.canvas_test_sdc.code-example',
+      [
+        'language' => 'php',
+        'code' => "<?php\necho 'Hello, world!';\n",
+      ],
+      // `language` is not translatable: its `enum` shape is not prose.
+      // `code` is translatable: `pattern: '(.|\r?\n)*'` is multi-line plain prose.
+      ['code'],
     ];
   }
 

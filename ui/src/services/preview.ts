@@ -2,8 +2,15 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
-import { setLayoutModel } from '@/features/layout/layoutModelSlice';
-import { setHtml, setSnapshotHTML } from '@/features/pagePreview/previewSlice';
+import {
+  setLayoutModel,
+  setTranslations,
+} from '@/features/layout/layoutModelSlice';
+import {
+  setHtml,
+  setSnapshotHTML,
+  setSnapshotTitle,
+} from '@/features/pagePreview/previewSlice';
 import {
   baseQueryWithAutoSaves,
   popCanvasLayoutRequest,
@@ -11,6 +18,7 @@ import {
 } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
+import { getEntityTitle } from '@/utils/entityTitle';
 
 import type { RootState } from '@/app/store';
 import type {
@@ -91,7 +99,11 @@ export const previewApi = createApi({
     // Snapshot preview updates the preview frame without changing the active
     // model in the UI.
     getSnapshotPreview: builder.query<
-      { html: string },
+      {
+        html: string;
+        entity_form_fields?: Record<string, unknown>;
+        translations?: Record<string, any>;
+      },
       {
         entityType: string;
         entityId: string;
@@ -101,17 +113,34 @@ export const previewApi = createApi({
       }
     >({
       query: ({ entityType, entityId, language, isTemplate, templateInfo }) => {
-        const url = isTemplate
-          ? `${language}/canvas/api/v0/layout-content-template/${entityType}.${templateInfo?.bundle}.${templateInfo?.viewMode}/${entityId}`
-          : `${language}/canvas/api/v0/layout/${entityType}/${entityId}`;
+        // Request the translation via the `canvas_preview_langcode` query
+        // parameter. The backend routes the request through the site's
+        // configured language negotiation — redirecting when needed — so the
+        // right translation is served regardless of the negotiation method.
+        const path = isTemplate
+          ? `canvas/api/v0/layout-content-template/${entityType}.${templateInfo?.bundle}.${templateInfo?.viewMode}/${entityId}`
+          : `canvas/api/v0/layout/${entityType}/${entityId}`;
+        const url = language
+          ? `${path}?canvas_preview_langcode=${encodeURIComponent(language)}`
+          : path;
         return { url, method: 'GET' };
       },
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          const { html } = data;
+          const { html, entity_form_fields, translations } = data;
           // Update the snapshot HTML for preview-only display.
           dispatch(setSnapshotHTML(html));
+          // Update the snapshot title for the translated page title display.
+          const title = getEntityTitle(
+            arg.entityType,
+            (entity_form_fields as Record<string, string>) || {},
+          );
+          dispatch(setSnapshotTitle(title || ''));
+          // Update translations for template component overrides.
+          if (translations) {
+            dispatch(setTranslations(translations));
+          }
         } catch {
           // Error is handled by the component.
         }
@@ -128,6 +157,8 @@ export const previewApi = createApi({
         } else if (type === 'template') {
           url =
             'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
+        } else if (type === 'pattern') {
+          url = 'canvas/api/v0/layout-pattern/{entity_id}';
         }
         return {
           url,
@@ -158,6 +189,11 @@ export const previewApi = createApi({
             { type: 'PendingChanges', id: 'LIST' },
           ]),
         );
+        // Clear any stale snapshot (e.g. from a prior language/template preview)
+        // so selectPreviewHtml returns this fresh editor html instead of the
+        // preview snapshot, which selectPreviewHtml prefers while set.
+        dispatch(setSnapshotHTML(''));
+        dispatch(setSnapshotTitle(''));
         dispatch(setHtml(html));
         handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         // Pass update preview false to prevent a subsequent preview update,

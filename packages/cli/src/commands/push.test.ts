@@ -4,11 +4,18 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { generateManifest } from '../utils/generate-manifest';
-import { pushBuiltComponents } from '../utils/prepare-push';
 import {
+  prepareGlobalAssetLibraryUpdate,
+  pushBuiltComponents,
+} from '../utils/prepare-push';
+import {
+  formatDiscoveryWarning,
+  formatDiscoveryWarningReport,
   getSyncExclusionMessage,
   getSyncExclusionSource,
   syncManifestArtifacts,
+  updateGlobalAssetLibraryForPush,
+  uploadManifestArtifacts,
 } from './push';
 
 import type { ApiService } from '../services/api';
@@ -33,6 +40,7 @@ vi.mock('tailwindcss-in-browser', () => ({
 
 vi.mock('../utils/build-tailwind', () => ({
   buildTailwindForComponents: vi.fn(),
+  getGlobalCss: vi.fn(async () => 'body {}'),
 }));
 
 function mockApiService(): ApiService {
@@ -94,7 +102,33 @@ describe('push sync exclusion messages', () => {
   });
 });
 
-describe('Push artifacts', () => {
+describe('push discovery warning output', () => {
+  const missingJsWarning = {
+    code: 'missing_js_entry',
+    message: 'Missing JavaScript entry file for pricing-table.component.yml.',
+    path: path.join(
+      process.cwd(),
+      'src/components/pricing-table.component.yml',
+    ),
+  } as const;
+
+  it('formats discovery warnings with their relative location', () => {
+    expect(formatDiscoveryWarning(missingJsWarning)).toBe(
+      'Missing JavaScript entry file for pricing-table.component.yml. (src/components/pricing-table.component.yml)',
+    );
+  });
+
+  it('formats discovery warnings as an inline warning report', () => {
+    expect(formatDiscoveryWarningReport([missingJsWarning])).toContain(
+      [
+        'Warnings',
+        '  ! Missing JavaScript entry file for pricing-table.component.yml. (src/components/pricing-table.component.yml)',
+      ].join('\n'),
+    );
+  });
+});
+
+describe('Push component dependencies', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -105,7 +139,7 @@ describe('Push artifacts', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('uploads artifacts, syncs manifest, and verifies temp files exist', async () => {
+  it('uploads component dependencies, syncs the dependency map, and verifies temp files exist', async () => {
     const outputDir = path.join(tmpDir, 'dist');
     await fs.mkdir(path.join(outputDir, 'vendor'), { recursive: true });
     await fs.mkdir(path.join(outputDir, 'local'), { recursive: true });
@@ -246,7 +280,413 @@ describe('Push artifacts', () => {
     expect(result.artifactCount).toBe(2);
   });
 
-  it('skips manifest sync when there are no artifacts to upload', async () => {
+  it('carries localSources path onto all local entries and source onto text modules only', async () => {
+    const outputDir = path.join(tmpDir, 'dist');
+    await fs.mkdir(path.join(outputDir, 'vendor'), { recursive: true });
+    await fs.mkdir(path.join(outputDir, 'local'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(outputDir, 'vendor/lodash-abc123.js'),
+      'export default {}',
+      'utf-8',
+    );
+    await fs.writeFile(
+      path.join(outputDir, 'local/utils-def456.js'),
+      'export const cn = () => "";',
+      'utf-8',
+    );
+    await fs.writeFile(
+      path.join(outputDir, 'local/poster-ghi789.webp'),
+      'webp fixture',
+      'utf-8',
+    );
+
+    await generateManifest({
+      outputDir,
+      vendorImportMap: { imports: { lodash: './vendor/lodash-abc123.js' } },
+      localImportMap: {
+        '@/lib/utils': './local/utils-def456.js',
+        '@/assets/poster.webp': './local/poster-ghi789.webp',
+      },
+      localSources: {
+        '@/lib/utils': {
+          path: 'src/lib/utils.ts',
+          source: 'export const cn = () => "";\n',
+        },
+        '@/assets/poster.webp': { path: 'src/assets/poster.webp' },
+      },
+      sharedChunks: [],
+    });
+
+    const uploadArtifact = vi.fn(async (filename: string) => ({
+      uri: `public://canvas/artifacts/${filename}`,
+      fid: 1,
+    }));
+    const syncManifest = vi.fn().mockResolvedValue({ ok: true });
+
+    await syncManifestArtifacts(outputDir, {
+      apiService: { uploadArtifact, syncManifest },
+      createSpinner: () => ({
+        start: vi.fn(),
+        stop: vi.fn(),
+        message: vi.fn(),
+      }),
+      logInfo: vi.fn(),
+    });
+
+    expect(syncManifest).toHaveBeenCalledWith({
+      // Vendor entries stay {name, uri} — no path/source.
+      vendor: [
+        {
+          name: 'lodash',
+          uri: 'public://canvas/artifacts/lodash-abc123.js',
+        },
+      ],
+      // Sorted by specifier: assets before lib.
+      local: [
+        // Binary asset: path only, no source.
+        {
+          name: '@/assets/poster.webp',
+          uri: 'public://canvas/artifacts/poster-ghi789.webp',
+          path: 'src/assets/poster.webp',
+        },
+        // Text module: path + verbatim source.
+        {
+          name: '@/lib/utils',
+          uri: 'public://canvas/artifacts/utils-def456.js',
+          path: 'src/lib/utils.ts',
+          source: 'export const cn = () => "";\n',
+        },
+      ],
+      shared: [],
+    });
+  });
+
+  it('uploads component dependencies without syncing the dependency map', async () => {
+    const outputDir = path.join(tmpDir, 'dist');
+    await fs.mkdir(path.join(outputDir, 'vendor'), { recursive: true });
+    await fs.mkdir(path.join(outputDir, 'local'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(outputDir, 'vendor/lodash-abc123.js'),
+      'export default {}',
+      'utf-8',
+    );
+    await fs.writeFile(
+      path.join(outputDir, 'local/utils-def456.js'),
+      'export const cn = () => "";',
+      'utf-8',
+    );
+
+    await generateManifest({
+      outputDir,
+      vendorImportMap: { imports: { lodash: './vendor/lodash-abc123.js' } },
+      localImportMap: { '@/lib/utils': './local/utils-def456.js' },
+      sharedChunks: [],
+    });
+
+    const uploadArtifact = vi.fn(async (filename: string) => ({
+      uri: `public://canvas/artifacts/${filename}`,
+      fid: 1,
+    }));
+
+    const result = await uploadManifestArtifacts(outputDir, {
+      apiService: { uploadArtifact },
+      createSpinner: () => ({
+        start: vi.fn(),
+        stop: vi.fn(),
+        message: vi.fn(),
+      }),
+    });
+
+    expect(uploadArtifact).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({
+      artifactCount: 2,
+      groupedManifest: {
+        vendor: [
+          {
+            name: 'lodash',
+            uri: 'public://canvas/artifacts/lodash-abc123.js',
+          },
+        ],
+        local: [
+          {
+            name: '@/lib/utils',
+            uri: 'public://canvas/artifacts/utils-def456.js',
+          },
+        ],
+        shared: [],
+        bundledSources: [],
+      },
+    });
+  });
+
+  it('updates the global asset library once with CSS and dependency manifest fields', async () => {
+    const getGlobalAssetLibrary = vi.fn().mockResolvedValue({
+      bundledSources: null,
+      packageJson: null,
+    });
+    const updateGlobalAssetLibrary = vi.fn().mockResolvedValue({});
+
+    await updateGlobalAssetLibraryForPush(
+      { getGlobalAssetLibrary, updateGlobalAssetLibrary } as unknown as Pick<
+        ApiService,
+        'getGlobalAssetLibrary' | 'updateGlobalAssetLibrary'
+      >,
+      {
+        css: {
+          original: ':root { --canvas-test-color: #123456; }',
+          compiled: ':root{--canvas-test-color:#123456}',
+        },
+        js: {
+          original: '/* class candidates */',
+          compiled: '',
+        },
+      },
+      {
+        artifactCount: 3,
+        groupedManifest: {
+          vendor: [
+            {
+              name: 'lodash',
+              uri: 'public://canvas/artifacts/lodash-abc123.js',
+            },
+          ],
+          local: [
+            {
+              name: '@/lib/utils',
+              uri: 'public://canvas/artifacts/utils-def456.js',
+            },
+          ],
+          shared: [
+            {
+              name: './vendor/chunk-shared-ghi789.js',
+              uri: 'public://canvas/artifacts/chunk-shared-ghi789.js',
+            },
+          ],
+          bundledSources: [
+            {
+              path: 'src/lib/lib-a.ts',
+              source: 'export const a = 1;\n',
+            },
+          ],
+        },
+      },
+    );
+
+    expect(updateGlobalAssetLibrary).toHaveBeenCalledTimes(1);
+    expect(updateGlobalAssetLibrary).toHaveBeenCalledWith({
+      css: {
+        original: ':root { --canvas-test-color: #123456; }',
+        compiled: ':root{--canvas-test-color:#123456}',
+      },
+      js: {
+        original: '/* class candidates */',
+        compiled: '',
+      },
+      imports: [
+        {
+          name: 'lodash',
+          uri: 'public://canvas/artifacts/lodash-abc123.js',
+        },
+      ],
+      assets: [
+        {
+          name: '@/lib/utils',
+          uri: 'public://canvas/artifacts/utils-def456.js',
+        },
+      ],
+      shared: [
+        {
+          name: './vendor/chunk-shared-ghi789.js',
+          uri: 'public://canvas/artifacts/chunk-shared-ghi789.js',
+        },
+      ],
+      bundledSources: [
+        {
+          path: 'src/lib/lib-a.ts',
+          source: 'export const a = 1;\n',
+        },
+      ],
+    });
+  });
+
+  it('sends empty manifest groups so deleted imports are cleared on the server', async () => {
+    const getGlobalAssetLibrary = vi.fn().mockResolvedValue({
+      bundledSources: null,
+      packageJson: null,
+    });
+    const updateGlobalAssetLibrary = vi.fn().mockResolvedValue({});
+
+    await updateGlobalAssetLibraryForPush(
+      { getGlobalAssetLibrary, updateGlobalAssetLibrary } as unknown as Pick<
+        ApiService,
+        'getGlobalAssetLibrary' | 'updateGlobalAssetLibrary'
+      >,
+      undefined,
+      {
+        artifactCount: 0,
+        groupedManifest: {
+          vendor: [],
+          local: [],
+          shared: [],
+          bundledSources: [],
+        },
+      },
+    );
+
+    expect(updateGlobalAssetLibrary).toHaveBeenCalledTimes(1);
+    expect(updateGlobalAssetLibrary).toHaveBeenCalledWith({
+      imports: [],
+      assets: [],
+      shared: [],
+      bundledSources: [],
+    });
+  });
+
+  it('uses the legacy asset library payload for older Canvas sites', async () => {
+    const getGlobalAssetLibrary = vi.fn().mockResolvedValue({
+      id: 'global',
+      label: 'Global asset library',
+      css: null,
+      js: null,
+      imports: null,
+      assets: null,
+      shared: null,
+    });
+    const updateGlobalAssetLibrary = vi.fn().mockResolvedValue({});
+
+    await updateGlobalAssetLibraryForPush(
+      { getGlobalAssetLibrary, updateGlobalAssetLibrary } as unknown as Pick<
+        ApiService,
+        'getGlobalAssetLibrary' | 'updateGlobalAssetLibrary'
+      >,
+      {
+        packageJson: '{"name":"example"}',
+      },
+      {
+        artifactCount: 1,
+        groupedManifest: {
+          vendor: [],
+          local: [
+            {
+              name: '@/lib/example',
+              uri: 'public://canvas/assets/example.js',
+              path: 'src/lib/example.ts',
+              source: 'export const example = true;\n',
+            },
+          ],
+          shared: [],
+          bundledSources: [
+            {
+              path: 'src/lib/bundled.ts',
+              source: 'export const bundled = true;\n',
+            },
+          ],
+        },
+      },
+    );
+
+    expect(updateGlobalAssetLibrary).toHaveBeenCalledWith({
+      imports: [],
+      assets: [
+        {
+          name: '@/lib/example',
+          uri: 'public://canvas/assets/example.js',
+        },
+      ],
+      shared: [],
+    });
+  });
+
+  it('stops the dependency spinner with failure status when artifact upload fails', async () => {
+    const outputDir = path.join(tmpDir, 'dist');
+    await fs.mkdir(path.join(outputDir, 'vendor'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(outputDir, 'vendor/lodash-abc123.js'),
+      'export default {}',
+      'utf-8',
+    );
+
+    await generateManifest({
+      outputDir,
+      vendorImportMap: { imports: { lodash: './vendor/lodash-abc123.js' } },
+      localImportMap: {},
+      sharedChunks: [],
+    });
+
+    const uploadArtifact = vi
+      .fn()
+      .mockRejectedValue(new Error('Destination file path is not writable'));
+    const syncManifest = vi.fn();
+    const spinner = {
+      start: vi.fn(),
+      stop: vi.fn(),
+      message: vi.fn(),
+    };
+
+    await expect(
+      syncManifestArtifacts(outputDir, {
+        apiService: { uploadArtifact, syncManifest },
+        createSpinner: () => spinner,
+        logInfo: vi.fn(),
+      }),
+    ).rejects.toThrow(
+      'Failed to upload lodash: Destination file path is not writable',
+    );
+
+    expect(syncManifest).not.toHaveBeenCalled();
+    expect(spinner.stop).toHaveBeenCalledWith('Pushed dependencies', 2);
+  });
+
+  it('preserves structured artifact failures for dependency names with separators', async () => {
+    const outputDir = path.join(tmpDir, 'dist');
+    const dependencyName = '@/components/card: hero\nimage';
+    await fs.mkdir(path.join(outputDir, 'local'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(outputDir, 'local/hero.js'),
+      'export const hero = true;',
+      'utf-8',
+    );
+
+    await generateManifest({
+      outputDir,
+      vendorImportMap: null,
+      localImportMap: { [dependencyName]: './local/hero.js' },
+      sharedChunks: [],
+    });
+
+    const uploadError = 'Destination: not writable\nTry again';
+    const uploadArtifact = vi.fn().mockRejectedValue(new Error(uploadError));
+    const syncManifest = vi.fn();
+    const spinner = {
+      start: vi.fn(),
+      stop: vi.fn(),
+      message: vi.fn(),
+    };
+
+    const caught = await syncManifestArtifacts(outputDir, {
+      apiService: { uploadArtifact, syncManifest },
+      createSpinner: () => spinner,
+      logInfo: vi.fn(),
+    }).catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as { failedResults?: unknown }).failedResults).toEqual([
+      {
+        itemName: dependencyName,
+        itemType: 'Artifact',
+        success: false,
+        details: [{ content: uploadError }],
+      },
+    ]);
+    expect(syncManifest).not.toHaveBeenCalled();
+    expect(spinner.stop).toHaveBeenCalledWith('Pushed dependencies', 2);
+  });
+
+  it('skips dependency map sync when there are no component dependencies to upload', async () => {
     const outputDir = path.join(tmpDir, 'dist');
     await fs.mkdir(outputDir, { recursive: true });
 
@@ -273,14 +713,13 @@ describe('Push artifacts', () => {
 
     expect(uploadArtifact).not.toHaveBeenCalled();
     expect(syncManifest).not.toHaveBeenCalled();
-    expect(logInfo).toHaveBeenCalledWith(
-      'No manifest artifacts to upload, skipping manifest sync',
-    );
+    expect(logInfo).toHaveBeenCalledWith('No component dependencies to upload');
     expect(result.artifactCount).toBe(0);
     expect(result.groupedManifest).toEqual({
       vendor: [],
       local: [],
       shared: [],
+      bundledSources: [],
     });
   });
 });
@@ -339,5 +778,102 @@ describe('Push components', () => {
       'card',
       'button',
     ]);
+  });
+
+  it('returns component upload failures as component results', async () => {
+    const api = mockApiService();
+    const uploadError = [
+      'The component "canvas:button" uses non-string types for properties: image.',
+      '',
+      "[props.image.$ref] '$ref' is not a supported key.",
+    ].join('\n');
+    const spinner = {
+      start: vi.fn(),
+      stop: vi.fn(),
+      message: vi.fn(),
+    };
+
+    vi.mocked(api.listComponents).mockResolvedValue({});
+    vi.mocked(api.createComponent).mockRejectedValue(new Error(uploadError));
+
+    const results = await pushBuiltComponents(
+      [
+        {
+          machineName: 'button',
+          componentName: 'button',
+          importedJsComponents: [],
+          componentPayload: {
+            machineName: 'button',
+            name: 'button',
+            sourceCodeJs: 'export default function Button() {}',
+            compiledJs: 'export default function Button() {}',
+          } as never,
+        },
+      ],
+      api,
+      'Pushing',
+      spinner,
+    );
+
+    expect(spinner.stop).toHaveBeenCalledWith('Pushed components', 2);
+    expect(results).toEqual([
+      {
+        itemName: 'button',
+        success: false,
+        details: [{ content: uploadError }],
+      },
+    ]);
+  });
+});
+
+describe('prepareGlobalAssetLibraryUpdate package.json', () => {
+  let outputDir: string;
+  let projectRoot: string;
+
+  beforeEach(async () => {
+    outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'push-out-test-'));
+    projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'push-root-test-'));
+    // The compiled global CSS/JS must exist for a successful prepare.
+    await fs.writeFile(path.join(outputDir, 'index.css'), 'body {}', 'utf-8');
+    await fs.writeFile(path.join(outputDir, 'index.js'), '', 'utf-8');
+  });
+
+  afterEach(async () => {
+    await fs.rm(outputDir, { recursive: true, force: true });
+    await fs.rm(projectRoot, { recursive: true, force: true });
+  });
+
+  it('includes the project package.json verbatim when present', async () => {
+    const packageJson = '{\n  "name": "my-project"\n}\n';
+    await fs.writeFile(
+      path.join(projectRoot, 'package.json'),
+      packageJson,
+      'utf-8',
+    );
+
+    const { result, assetLibrary } = await prepareGlobalAssetLibraryUpdate(
+      outputDir,
+      projectRoot,
+    );
+
+    expect(result.success).toBe(true);
+    expect(assetLibrary?.packageJson).toBe(packageJson);
+  });
+
+  it('omits the packageJson key when no package.json exists', async () => {
+    const { result, assetLibrary } = await prepareGlobalAssetLibraryUpdate(
+      outputDir,
+      projectRoot,
+    );
+
+    expect(result.success).toBe(true);
+    expect(assetLibrary).toBeDefined();
+    expect('packageJson' in (assetLibrary ?? {})).toBe(false);
+  });
+
+  it('omits the packageJson key when no projectRoot is given', async () => {
+    const { assetLibrary } = await prepareGlobalAssetLibraryUpdate(outputDir);
+
+    expect('packageJson' in (assetLibrary ?? {})).toBe(false);
   });
 });

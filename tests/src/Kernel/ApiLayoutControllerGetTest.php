@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -12,14 +13,22 @@ use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\ParamConverter\ParamNotConvertedException;
+use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
+use Drupal\language\ConfigurableLanguageManagerInterface;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\link\LinkItemInterface;
+use Drupal\link\LinkTitleVisibility;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\node\NodeInterface;
@@ -29,6 +38,7 @@ use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -43,6 +53,10 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 #[Group('canvas')]
 #[Group('#slow')]
 class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
+
+  private const string PUBLISHED_PAGE_TITLE = 'Published version';
+  private const string AUTO_SAVE_PAGE_TITLE = 'Auto-save version';
+  private const string LAYOUT_GET_WITH_QUERY_ARGUMENT_URI_PATTERN = '%s?%s=%s';
 
   use ConstraintViolationsTestTrait;
 
@@ -60,7 +74,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['system']);
     (new CanvasTestSetup())->setup(TRUE);
     $this->setUpCurrentUser([], ['edit any article content']);
   }
@@ -100,7 +114,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         'uuid' => $top_level_component_uuid,
         'component_id' => 'sdc.canvas_test_sdc.props-slots',
-        'component_version' => '85a5c0c7dd53e0bb',
+        'component_version' => '0e79e884426a53ae',
         'inputs' => [
           'heading' => [
             'sourceType' => PropSource::EntityField->value,
@@ -111,7 +125,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         'uuid' => $nested_component_uuid,
         'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-        'component_version' => 'b1e991f726a2a266',
+        'component_version' => 'd34b93534777207a',
         'inputs' => [
           'heading' => [
             'sourceType' => PropSource::EntityField->value,
@@ -325,7 +339,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
    */
   public function testNonFullContentTemplateHidesGlobalRegions(): void {
     // Ensure the teaser view mode exists (node module provides it by default).
-    $view_mode = $this->container->get('entity_type.manager')
+    $view_mode = $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage('entity_view_mode')
       ->load('node.teaser');
     if ($view_mode === NULL) {
@@ -561,7 +575,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
           'expression' => 'ℹ︎link␟url',
           'sourceTypeSettings' => [
             'instance' => [
-              'title' => \DRUPAL_DISABLED,
+              'title' => LinkTitleVisibility::Disabled->value,
               'link_type' => LinkItemInterface::LINK_GENERIC,
             ],
           ],
@@ -687,6 +701,49 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $this->assertStatusFlags($draft_page, TRUE, TRUE, TRUE);
   }
 
+  /**
+   * Tests the `autoSaved` query argument in layout GET for Page entities.
+   */
+  #[TestWith([FALSE, self::PUBLISHED_PAGE_TITLE])]
+  #[TestWith([TRUE, self::AUTO_SAVE_PAGE_TITLE])]
+  public function testGetWithAutoSavedQueryArgument(
+    bool $auto_saved,
+    string $expected_title,
+  ): void {
+    // The `autoSaved` query argument and `updated` response property are gated
+    // behind the `canvas_dev_cd` module.
+    // @todo Remove in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+    $this->enableModules(['canvas_dev_cd']);
+
+    $this->setUpCurrentUser(permissions: [Page::CREATE_PERMISSION, Page::EDIT_PERMISSION]);
+    $autoSaveManager = $this->container->get(AutoSaveManager::class);
+    \assert($autoSaveManager instanceof AutoSaveManager);
+
+    $page = Page::create([
+      'title' => self::PUBLISHED_PAGE_TITLE,
+      'status' => TRUE,
+      'components' => [],
+    ]);
+    $page->save();
+
+    // Create an auto-save item that diverges from the published entity.
+    $page->set('title', self::AUTO_SAVE_PAGE_TITLE);
+    $page->setUnpublished();
+    $autoSaveManager->saveEntity($page);
+    $auto_save_entity = $autoSaveManager->getAutoSaveEntity($page);
+
+    $url = $this->getLayoutUrl($page);
+    $response = $this->request(Request::create(\sprintf(self::LAYOUT_GET_WITH_QUERY_ARGUMENT_URI_PATTERN, $url->toString(), ApiLayoutController::AUTO_SAVED_QUERY_KEY, ($auto_saved ? '1' : '0'))));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $decodedResponse = static::decodeResponse($response);
+
+    self::assertStringContainsString($expected_title, $decodedResponse['html']);
+    self::assertSame($expected_title, $decodedResponse['entity_form_fields']['title[0][value]']);
+    self::assertSame(!$auto_saved, $decodedResponse['isPublished']);
+    self::assertSame($auto_saved, $decodedResponse['hasUnsavedStatusChange']);
+    self::assertSame($auto_saved ? $auto_save_entity->updated : $page->getChangedTime(), $decodedResponse['updated']);
+  }
+
   private function assertStatusFlags(EntityInterface $entity, bool $isNew, ?bool $isPublished, ?bool $hasUnsavedStatusChange = NULL): void {
     $content = $this->parentRequest(Request::create($this->getLayoutUrl($entity)->toString()))->getContent();
     self::assertIsString($content);
@@ -767,19 +824,20 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     //   canvas field is not present.
     // @see \Drupal\canvas\Storage\ComponentTreeLoader::getCanvasFieldName
     $this->expectExceptionMessage('For now Canvas only works if the entity is a canvas_page! Other entity types and bundles must use content templates for now, see https://drupal.org/i/3498525');
-    $controller->get($node);
+    $request = Request::create('/api/canvas/content/canvas_page/' . $node->id());
+    $controller->get(request: $request, entity: $node);
   }
 
   /**
    * @return \Drupal\canvas\Entity\PageRegion[]
    */
   protected function enableGlobalRegions(string $theme = 'stark', int $expected_region_count = 11): array {
-    $this->container->get('theme_installer')->install([$theme]);
-    $this->container->get('config.factory')
+    $this->container->get(ThemeInstallerInterface::class)->install([$theme]);
+    $this->container->get(ConfigFactoryInterface::class)
       ->getEditable('system.theme')
       ->set('default', $theme)
       ->save();
-    $this->container->get('theme.manager')->resetActiveTheme();
+    $this->container->get(ThemeManagerInterface::class)->resetActiveTheme();
 
     $regions = PageRegion::createFromBlockLayout($theme);
     // Check that all the theme regions get a corresponding PageRegion config
@@ -824,7 +882,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
    */
   #[DataProvider('fieldAccessProvider')]
   public function testFieldAccess(array $permissions, ?string $exception_message): void {
-    $this->container->get('module_installer')->install(['canvas_test_field_access']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_field_access']);
     $this->setUpCurrentUser([], $permissions);
 
     // Test field access using URL/request approach rather than directly calling controller
@@ -931,6 +989,125 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $this->container->get(EntityTypeManagerInterface::class)->getAccessControlHandler('node')->resetCache();
     $response = $this->request(Request::create($url->toString()));
     $this->assertEquals(200, $response->getStatusCode(), 'Response status code is 200 OK');
+  }
+
+  /**
+   * Data provider for testConfigTranslationAccessDenied.
+   */
+  public static function providerConfigTranslationAccessDenied(): array {
+    return [
+      'no_permissions' => [[]],
+      'translate_config_only' => [['translate configuration']],
+    ];
+  }
+
+  /**
+   * Tests layout API denies access without ContentTemplate::ADMIN_PERMISSION.
+   */
+  #[DataProvider('providerConfigTranslationAccessDenied')]
+  public function testConfigTranslationAccessDenied(array $permissions): void {
+    $this->container->get(ModuleInstallerInterface::class)->install([
+      'config_translation',
+    ]);
+    $template = $this->getTestEntity(ContentTemplate::ENTITY_TYPE_ID);
+    $this->setUpCurrentUser([], $permissions);
+    $this->expectException(AccessDeniedHttpException::class);
+    $this->parentRequest(Request::create($this->getLayoutUrl($template)->toString()));
+  }
+
+  /**
+   * Tests config translation handling for ContentTemplate in the layout API.
+   *
+   * Covers:
+   * - Available translations includes languages that have a config language
+   *   override on the ContentTemplate.
+   * - The generated delete-form link points to
+   *   canvas.api.config.translation.delete (not the content-translation route).
+   * - No delete link is emitted for preview-entity content translations;
+   *   those belong to the article node, not to the template.
+   * - The delete link is gated on the 'translate configuration' permission
+   *   that protects the delete route.
+   * - The entire block is skipped when config_translation is not installed,
+   *    so config-override languages disappear from available entirely.
+   */
+  public function testConfigTranslationAvailabilityLinksAndPermissions(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install([
+      'language',
+      'config_translation',
+      'content_translation',
+    ]);
+
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    ConfigurableLanguage::createFromLangcode('es')->save();
+
+    // Add a Spanish content translation to the preview entity. This must
+    // NOT surface in translations.available for a ContentTemplate – the
+    // language selector only reflects the template's own config overrides.
+    $node = Node::load(1);
+    \assert($node instanceof Node);
+    $node->addTranslation('es', ['title' => 'Title in Spanish', 'status' => 1]);
+    $node->save();
+
+    // Add a French config language override to the ContentTemplate.
+    $template = $this->getTestEntity(ContentTemplate::ENTITY_TYPE_ID);
+    \assert($template instanceof ContentTemplate);
+    $languageManager = $this->container->get(LanguageManagerInterface::class);
+    \assert($languageManager instanceof ConfigurableLanguageManagerInterface);
+    $override = $languageManager->getLanguageConfigOverride('fr', $template->getConfigDependencyName());
+    $override->setData(['component_tree' => []])->save();
+
+    $url = $this->getLayoutUrl($template);
+
+    // ContentTemplate::ADMIN_PERMISSION is required to access the endpoint.
+    // Neither no permissions nor 'translate configuration' alone is sufficient.
+    // @see testConfigTranslationAccessDenied()
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, 'translate configuration']);
+
+    $json = static::decodeResponse($this->request(Request::create($url->toString())));
+
+    self::assertContains('fr', $json['translations']['available'],
+      'French config override is listed as available.');
+
+    self::assertNotContains('es', $json['translations']['available'],
+      'Preview-entity content translation for Spanish is not listed for a ContentTemplate.');
+
+    self::assertArrayHasKey('fr', $json['translations']['links'],
+      'Delete link is emitted for the French config override.');
+    $deleteLink = $json['translations']['links']['fr'][CanvasUriDefinitions::LINK_REL_DELETE];
+    $expectedDeleteLink = Url::fromRoute('canvas.api.config.translation.delete', [
+      'canvas_config_entity_type_id' => 'content_template',
+      'config_entity' => $template->id(),
+    ], ['language' => $languageManager->getLanguage('fr')])->toString();
+    self::assertSame($expectedDeleteLink, $deleteLink,
+      'Delete link points to canvas.api.config.translation.delete for the French override.');
+
+    self::assertArrayNotHasKey('es', $json['translations']['links'],
+      'No delete link is emitted for preview-entity content translations.');
+
+    // Without 'translate configuration', the language is still listed in
+    // available (so the selector shows it) but no delete link is emitted.
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION]);
+    $json = static::decodeResponse($this->request(Request::create($url->toString())));
+    self::assertContains('fr', $json['translations']['available'],
+      'French is still available without translate configuration.');
+    self::assertArrayNotHasKey('fr', $json['translations']['links'],
+      'No delete link without translate configuration permission.');
+
+    // Granting the permission brings the delete link back.
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION, 'translate configuration']);
+    $json = static::decodeResponse($this->request(Request::create($url->toString())));
+    self::assertArrayHasKey('fr', $json['translations']['links'],
+      'Delete link is present again once translate configuration is granted.');
+
+    // When config_translation is uninstalled the detection block is skipped
+    // entirely, so French must also disappear from available.
+    $this->container->get(ModuleInstallerInterface::class)->uninstall(['config_translation']);
+    $this->setUpCurrentUser([], [ContentTemplate::ADMIN_PERMISSION]);
+    $json = static::decodeResponse($this->request(Request::create($url->toString())));
+    self::assertNotContains('fr', $json['translations']['available'],
+      'French is absent from available when config_translation is uninstalled.');
+    self::assertArrayNotHasKey('fr', $json['translations']['links'],
+      'Delete link is absent when config_translation is not installed.');
   }
 
 }

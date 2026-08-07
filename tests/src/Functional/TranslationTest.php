@@ -13,14 +13,20 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\content_translation\BundleTranslationSettingsInterface;
+use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Extension\ThemeHandlerInterface;
+use Drupal\Core\Field\Entity\BaseFieldOverride;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\Routing\RouteBuilderInterface;
 use Drupal\Core\Url;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\language\Entity\ContentLanguageSettings;
+use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\ApiRequestTrait;
@@ -30,6 +36,7 @@ use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -81,8 +88,8 @@ class TranslationTest extends FunctionalTestBase {
   protected function setUp(): void {
     parent::setUp();
 
-    // In 11.2 and above we install modules in groups, which means this module
-    // cannot be installed in the same group as canvas
+    // Modules are installed in groups, which means this module cannot be
+    // installed in the same group as canvas
     \Drupal::service(ModuleInstallerInterface::class)->install(['canvas_test_config_node_article']);
 
     $article_template = ContentTemplate::create([
@@ -141,7 +148,7 @@ class TranslationTest extends FunctionalTestBase {
     $override->save();
 
     // Display the `field_canvas_test` field.
-    \Drupal::service('entity_display.repository')
+    \Drupal::service(EntityDisplayRepositoryInterface::class)
       ->getViewDisplay('node', 'article')
       ->setComponent('field_canvas_test', [
         'label' => 'hidden',
@@ -383,6 +390,68 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
+   * Tests canvas_page content language settings enforce Canvas constraints.
+   */
+  public function testCanvasPageContentLanguageSettingsFormSubmitPersistsExpectedConfiguration(): void {
+    $assert_session = $this->assertSession();
+
+    // Verify enforced Canvas constraints in the form, then submit only visible
+    // controls and assert persisted config matches those constraints.
+    $this->drupalGet('admin/config/regional/content-language');
+
+    $assert_session->fieldValueEquals('settings[canvas_page][canvas_page][settings][language][langcode]', LanguageInterface::LANGCODE_SITE_DEFAULT);
+    $assert_session->elementAttributeExists('named', ['field', 'settings[canvas_page][canvas_page][settings][language][langcode]'], 'disabled');
+    $assert_session->fieldNotExists('settings[canvas_page][canvas_page][settings][language][language_alterable]');
+    $assert_session->fieldNotExists('settings[canvas_page][canvas_page][settings][content_translation][untranslatable_fields_hide]');
+
+    $this->submitForm([
+      'entity_types[canvas_page]' => 1,
+      'settings[canvas_page][canvas_page][translatable]' => 1,
+    ], 'Save configuration');
+
+    $assert_session->pageTextContains('Settings successfully updated.');
+
+    $content_language_settings = ContentLanguageSettings::loadByEntityTypeBundle(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID);
+    self::assertNotNull($content_language_settings);
+    self::assertSame(LanguageInterface::LANGCODE_SITE_DEFAULT, $content_language_settings->getDefaultLangcode());
+    self::assertFalse($content_language_settings->isLanguageAlterable());
+
+    $content_translation_manager = $this->container->get(BundleTranslationSettingsInterface::class);
+    self::assertTrue($content_translation_manager->isEnabled(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID));
+    self::assertEquals([
+      'untranslatable_fields_hide' => 0,
+    ], $content_translation_manager->getBundleTranslationSettings(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID));
+
+    // The `components` base field override must have been forced to the
+    // symmetrical `translation_sync` combination, even though the form does
+    // not present the corresponding checkboxes.
+    // @see \Drupal\canvas\Hook\ModuleHooks::validateCanvasPageLanguageSettings()
+    $override = BaseFieldOverride::loadByName(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID, 'components');
+    self::assertNotNull($override);
+    self::assertSame([
+      'inputs' => 'inputs',
+      'tree' => '0',
+    ], $override->getThirdPartySetting('content_translation', 'translation_sync'));
+    self::assertSame([], self::violationsToArray($override->getTypedData()->validate()));
+
+    // Disable translation for the canvas_page bundle again:
+    // content_translation then saves the base field override without any
+    // `translation_sync` keys, which the config schema must allow.
+    // @see config/schema/canvas_symmetrical_translations_only.schema.yml
+    $this->drupalGet('admin/config/regional/content-language');
+    $this->submitForm([
+      'entity_types[canvas_page]' => 1,
+      'settings[canvas_page][canvas_page][translatable]' => 0,
+    ], 'Save configuration');
+    $assert_session->pageTextContains('Settings successfully updated.');
+
+    $override = BaseFieldOverride::loadByName(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID, 'components');
+    self::assertNotNull($override);
+    self::assertNull($override->getThirdPartySetting('content_translation', 'translation_sync'));
+    self::assertSame([], self::violationsToArray($override->getTypedData()->validate()));
+  }
+
+  /**
    * Creates an article node with a translation.
    *
    * @return \Drupal\node\Entity\Node
@@ -398,7 +467,7 @@ class TranslationTest extends FunctionalTestBase {
     // Create a translation from the original English node.
     $translation = $node->addTranslation('fr');
     $this->assertInstanceOf(Node::class, $translation);
-    $this->container->get('content_translation.manager')->getTranslationMetadata($translation)->setSource($node->language()->getId());
+    $this->container->get(BundleTranslationSettingsInterface::class)->getTranslationMetadata($translation)->setSource($node->language()->getId());
     // @phpstan-ignore-next-line
     $translation->title = 'The French title';
     $translation->save();
@@ -443,7 +512,7 @@ class TranslationTest extends FunctionalTestBase {
    * Returns the active version string for the heading SDC component.
    */
   private function getHeadingComponentVersion(): string {
-    $component = $this->container->get('entity_type.manager')
+    $component = $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage('component')
       ->load('sdc.canvas_test_sdc.heading');
     \assert($component instanceof Component);
@@ -465,8 +534,8 @@ class TranslationTest extends FunctionalTestBase {
       ->setDefaultLangcode(LanguageInterface::LANGCODE_SITE_DEFAULT)
       ->setLanguageAlterable(TRUE)
       ->save();
-    $this->container->get('content_translation.manager')->setEnabled('canvas_page', 'canvas_page', TRUE);
-    $this->container->get('router.builder')->setRebuildNeeded();
+    $this->container->get(BundleTranslationSettingsInterface::class)->setEnabled('canvas_page', 'canvas_page', TRUE);
+    $this->container->get(RouteBuilderInterface::class)->setRebuildNeeded();
 
     $version = $this->getHeadingComponentVersion();
 
@@ -490,6 +559,14 @@ class TranslationTest extends FunctionalTestBase {
     $page->save();
 
     $fr_page = $page->addTranslation('fr');
+    // Set the translation source metadata, like the UI would: core's
+    // FieldTranslationSynchronizer — active for this field thanks to the
+    // `translation_sync` setting created on module install — requires
+    // it to synchronize a newly added translation.
+    // @see \Drupal\content_translation\Hook\ContentTranslationHooks::entityPresave()
+    $this->container->get(BundleTranslationSettingsInterface::class)
+      ->getTranslationMetadata($fr_page)
+      ->setSource('en');
     $fr_page->set('title', 'Page de test Canvas');
     $fr_page->set('components', $page->get('components')->getValue());
     $fr_tree = $fr_page->getComponentTree();
@@ -512,11 +589,11 @@ class TranslationTest extends FunctionalTestBase {
   private function createPageRegionWithFrenchOverride(): PageRegion {
     $version = $this->getHeadingComponentVersion();
 
-    $default_theme = $this->container->get('theme_handler')->getDefault();
+    $default_theme = $this->container->get(ThemeHandlerInterface::class)->getDefault();
     $regions = PageRegion::createFromBlockLayout($default_theme);
     $new_region = reset($regions);
     \assert($new_region instanceof PageRegion);
-    $existing = $this->container->get('entity_type.manager')
+    $existing = $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage(PageRegion::ENTITY_TYPE_ID)
       ->load($new_region->id());
     $region = $existing instanceof PageRegion ? $existing : $new_region;
@@ -550,22 +627,18 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
-   * Tests that the layout API returns translated content from language-prefixed routes when canvas_dev_translation is enabled.
+   * Tests that the layout API returns translated content from language-prefixed routes.
    *
    * @todo This might just be temporary test until we have a Playwright test
    *    that test this functionality with the translation preview.
    */
-  public function testCanvasDevTranslationLayoutApi(): void {
+  public function testTranslationLayoutApi(): void {
     // Delete the content template created in setUp() — this test needs a
     // heading-based template with explicit labels to assert translation.
     $existing_template = ContentTemplate::load('node.article.full');
     if ($existing_template instanceof ContentTemplate) {
       $existing_template->delete();
     }
-
-    $module_installer = $this->container->get(ModuleInstallerInterface::class);
-    $module_installer->install(['canvas_dev_translation']);
-    $this->rebuildContainer();
 
     $page = $this->createCanvasTranslationTestPage();
     $this->createPageRegionWithFrenchOverride();
@@ -630,7 +703,7 @@ class TranslationTest extends FunctionalTestBase {
     };
 
     // Helper: returns the first component's name from the first non-content
-    // region (the PageRegion created by canvas_dev_translation hook_install()).
+    // region (the PageRegion created by createPageRegionWithFrenchOverride()).
     $get_region_name_in_api_response = function (string $root_relative_url): ?string {
       $response = $this->makeApiRequest('GET', Url::fromUri("base:$root_relative_url"), []);
       self::assertSame(200, $response->getStatusCode());
@@ -656,7 +729,7 @@ class TranslationTest extends FunctionalTestBase {
     // Create an article node with English and French translations to use as the
     // ContentTemplate preview entity. The French translation has a distinct
     // title so we can assert language-aware field resolution.
-    $node_storage = $this->container->get('entity_type.manager')->getStorage('node');
+    $node_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage('node');
     $node = $node_storage->create([
       'type' => 'article',
       'title' => 'Preview node',
@@ -686,6 +759,15 @@ class TranslationTest extends FunctionalTestBase {
     self::assertSame('Preview node', $get_resolved_title_in_api_response("/canvas/api/v0/layout-content-template/node.article.full/$node_id"));
     self::assertSame('Nœud de prévisualisation', $get_resolved_title_in_api_response("/fr/canvas/api/v0/layout-content-template/node.article.full/$node_id"));
 
+    // The preview ("example") entity must also be resolved in the requested
+    // language when the template is reached through the
+    // `?canvas_preview_langcode=` preview hint, which redirects to the
+    // negotiated URL asserted above.
+    $hinted = $this->makeApiRequest('GET', Url::fromUri("base:/canvas/api/v0/layout-content-template/node.article.full/$node_id", ['query' => ['canvas_preview_langcode' => 'fr']]), []);
+    self::assertSame(302, $hinted->getStatusCode());
+    self::assertStringContainsString("/fr/canvas/api/v0/layout-content-template/node.article.full/$node_id", $hinted->getHeaderLine('Location'));
+    self::assertSame('Nœud de prévisualisation', $get_resolved_title_in_api_response((string) parse_url($hinted->getHeaderLine('Location'), PHP_URL_PATH)));
+
     // Add a Hindi node translation to test fallback behavior when the
     // ContentTemplate has no Hindi translation. The template label should
     // fall back to English, but EntityFieldPropSource should resolve to the
@@ -704,16 +786,132 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
+   * Tests that the preview-language hint resolves the right translation.
+   *
+   * @see \Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber::redirectCanvasApiToPreviewLanguage()
+   */
+  #[DataProvider('previewLanguageNegotiationProvider')]
+  public function testCanvasPreviewLanguageNegotiation(string $method, ?string $prefix, string $expected_location): void {
+    $page = $this->createCanvasTranslationTestPage();
+    $layout_path = '/canvas/api/v0/layout/canvas_page/' . $page->id();
+
+    // Substitute the test site's base URL into the expected Location.
+    $base = parse_url($this->baseUrl);
+    self::assertIsArray($base);
+    $expected_location = strtr($expected_location, [
+      '{scheme}' => $base['scheme'] ?? 'http',
+      '{host}' => ($base['host'] ?? '') . (isset($base['port']) ? ':' . $base['port'] : ''),
+      '{base_path}' => $base['path'] ?? '',
+      '{layout_path}' => $layout_path,
+    ]);
+
+    switch ($method) {
+      case 'url':
+        if ($prefix !== NULL) {
+          $this->config('language.negotiation')->set('url.prefixes.fr', $prefix)->save();
+        }
+        break;
+
+      case 'domain':
+        // Negotiate the language from the domain instead of a URL prefix. The
+        // French domain is never requested; the test only asserts the redirect
+        // target.
+        $host = (string) parse_url($this->baseUrl, PHP_URL_HOST);
+        $this->config('language.negotiation')
+          ->set('url.source', LanguageNegotiationUrl::CONFIG_DOMAIN)
+          ->set('url.domains', ['en' => $host, 'fr' => 'fr.' . $host])
+          ->save();
+        break;
+
+      case 'session':
+        // Negotiate the language from the user-facing `language` query
+        // parameter via the session negotiator, with URL negotiation fully
+        // disabled — for the interface language too, since URL generation runs
+        // every enabled negotiation method's outbound processing, and the
+        // interface chain would otherwise still add a URL prefix to the
+        // redirect. The `language` parameter is a distinct concept from the
+        // internal `canvas_preview_langcode` hint; the redirect must translate
+        // the hint into it, via the negotiator's language switch links.
+        $this->config('language.negotiation')->set('session.parameter', 'language')->save();
+        $this->config('language.types')
+          ->set('negotiation.language_content.enabled', ['language-session' => -10, 'language-selected' => 12])
+          ->set('negotiation.language_interface.enabled', ['language-session' => -10, 'language-selected' => 12])
+          ->save();
+        break;
+
+      case 'session-content':
+        // Negotiate only the content language from the session negotiator,
+        // while the interface language keeps core's default URL-prefix
+        // negotiation: the redirect then carries both the interface chain's
+        // URL prefix (added by URL generation) and the content negotiator's
+        // query parameter.
+        $this->config('language.negotiation')->set('session.parameter', 'content_language')->save();
+        $this->config('language.types')
+          ->set('negotiation.language_content.enabled', ['language-session' => -10, 'language-selected' => 12])
+          ->save();
+        break;
+    }
+
+    // Requests a path (with an optional query) without following redirects.
+    $get = fn (string $path, array $query = []): ResponseInterface =>
+      $this->makeApiRequest('GET', Url::fromUri("base:$path", $query ? ['query' => $query] : []), []);
+    // Returns the first content-region component name from a 200 response.
+    $content_name = function (ResponseInterface $response): ?string {
+      self::assertSame(200, $response->getStatusCode());
+      $layout = json_decode((string) $response->getBody(), TRUE)['layout'];
+      $content_region = current(array_filter($layout, fn($r) => $r['id'] === 'content'));
+      return $content_region['components'][0]['name'];
+    };
+
+    // Baseline: no hint serves the default language.
+    self::assertSame('English heading', $content_name($get($layout_path)));
+
+    // A hint naming a language that does not exist is a request for a
+    // translation that cannot exist: 404, as a JSON:API-style error response
+    // (the exception is thrown after the router matched the Canvas API route, so
+    // ApiExceptionSubscriber converts it).
+    $not_found = $get($layout_path, ['canvas_preview_langcode' => 'xx']);
+    self::assertSame(404, $not_found->getStatusCode());
+    self::assertStringContainsString('application/json', $not_found->getHeaderLine('Content-Type'));
+    self::assertArrayHasKey('errors', json_decode((string) $not_found->getBody(), TRUE));
+
+    $response = $get($layout_path, ['canvas_preview_langcode' => 'fr']);
+    self::assertSame(302, $response->getStatusCode());
+    // The complete Location proves which negotiation method routed the
+    // translation: the URL prefix (which need not match the langcode), the
+    // language's domain, or the session negotiator's query parameter.
+    self::assertSame($expected_location, $response->getHeaderLine('Location'));
+
+    // Nothing persists the hint: repeating the hinted request redirects again.
+    self::assertSame(302, $get($layout_path, ['canvas_preview_langcode' => 'fr'])->getStatusCode());
+
+    // Regression: when the configured URL prefix differs from the langcode, the
+    // old langcode-as-prefix URL the buggy UI used no longer resolves.
+    if ($method === 'url' && $prefix !== NULL && $prefix !== 'fr') {
+      self::assertSame(404, $get("/fr$layout_path")->getStatusCode());
+    }
+  }
+
+  /**
+   * Data provider for ::testCanvasPreviewLanguageNegotiation().
+   */
+  public static function previewLanguageNegotiationProvider(): array {
+    return [
+      'URL prefix equal to langcode' => ['url', NULL, '{base_path}/fr{layout_path}'],
+      'URL prefix different from langcode' => ['url', 'francais', '{base_path}/francais{layout_path}'],
+      'domain per language' => ['domain', NULL, '{scheme}://fr.{host}{base_path}{layout_path}'],
+      'session (query parameter) negotiator' => ['session', NULL, '{base_path}{layout_path}?language=fr'],
+      'session content negotiation, URL-prefix interface negotiation' => ['session-content', NULL, '{base_path}/fr{layout_path}?content_language=fr'],
+    ];
+  }
+
+  /**
    * Tests canvas_page translation on /fr/page/{id}.
    *
    * Verifies that visiting /fr/page/{id} displays the French translation
    * of the canvas_page.
    */
   public function testTranslationForPage(): void {
-    $module_installer = $this->container->get(ModuleInstallerInterface::class);
-    $module_installer->install(['canvas_dev_translation']);
-    $this->rebuildContainer();
-
     $page = $this->createCanvasTranslationTestPage();
     $this->createPageRegionWithFrenchOverride();
     $page_id = $page->id();
@@ -905,10 +1103,6 @@ class TranslationTest extends FunctionalTestBase {
    * it falls back to the default language (English).
    */
   public function testNonDefaultTranslationPageRegionTranslation(): void {
-    $module_installer = $this->container->get(ModuleInstallerInterface::class);
-    $module_installer->install(['canvas_dev_translation']);
-    $this->rebuildContainer();
-
     $this->createPageRegionWithFrenchOverride();
 
     // Create a plain article node with no French translation.

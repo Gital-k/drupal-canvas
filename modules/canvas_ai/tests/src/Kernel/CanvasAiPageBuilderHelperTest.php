@@ -12,7 +12,12 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Drupal\canvas_personalization\Plugin\Canvas\ComponentSource\Personalization;
+use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\VariationCacheFactory;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
@@ -54,7 +59,7 @@ final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
     if (!$privileged_user instanceof User) {
       throw new \Exception('Failed to create test user');
     }
-    $this->container->get('current_user')->setAccount($privileged_user);
+    $this->container->get(AccountProxyInterface::class)->setAccount($privileged_user);
     $this->canvasAiPageBuilderHelper = $this->container->get('canvas_ai.page_builder_helper');
   }
 
@@ -389,10 +394,10 @@ XML;
    * Tests that getAllComponentsKeyedBySource uses cache correctly.
    */
   public function testGetAllComponentsKeyedBySourceCaching(): void {
-    $variation_cache = $this->container->get('variation_cache_factory')->get('default');
-    $memory_variation_cache = $this->container->get('variation_cache_factory')->get('canvas_ai_memory');
+    $variation_cache = $this->container->get(VariationCacheFactory::class)->get('default');
+    $memory_variation_cache = $this->container->get(VariationCacheFactory::class)->get('canvas_ai_memory');
     $cache_keys = [CanvasAiPageBuilderHelper::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE];
-    $component_entity_type = $this->container->get('entity_type.manager')->getDefinition(Component::ENTITY_TYPE_ID);
+    $component_entity_type = $this->container->get(EntityTypeManagerInterface::class)->getDefinition(Component::ENTITY_TYPE_ID);
     $initial_cacheability = new CacheableMetadata();
     $initial_cacheability->setCacheContexts($component_entity_type->getListCacheContexts());
     $initial_cacheability->setCacheTags($component_entity_type->getListCacheTags());
@@ -421,6 +426,260 @@ XML;
     $page_title_component->set('label', $page_title_component->label() . ' (updated)')->save();
     $this->assertFalse($variation_cache->get($cache_keys, $initial_cacheability), 'Persistent cache is invalidated after component update');
     $this->assertFalse($memory_variation_cache->get($cache_keys, $initial_cacheability), 'Memory cache is invalidated after component update');
+  }
+
+  /**
+   * Tests the processCanvasPageFields method.
+   */
+  public function testProcessCanvasPageFields(): void {
+    $response = [
+      'created_content' => 'New Title',
+      'other_key' => 'stay',
+      'metadata' => [
+        'metatag_description' => 'New Description',
+      ],
+    ];
+
+    $expected = [
+      'other_key' => 'stay',
+      'canvas_page_data' => [
+        'title[0][value]' => 'New Title',
+        'description[0][value]' => 'New Description',
+      ],
+    ];
+
+    $result = $this->canvasAiPageBuilderHelper->processCanvasPageFields($response);
+    $this->assertEquals($expected, $result);
+
+    // Test with refined_text (edit content).
+    $response = [
+      'refined_text' => 'Edited Title',
+    ];
+    $expected = [
+      'canvas_page_data' => [
+        'title[0][value]' => 'Edited Title',
+      ],
+    ];
+    $result = $this->canvasAiPageBuilderHelper->processCanvasPageFields($response);
+    $this->assertEquals($expected, $result);
+
+    // When the AI returns both title keys, created_content wins and
+    // refined_text is dropped.
+    $response = [
+      'created_content' => 'Created Title',
+      'refined_text' => 'Refined Title',
+    ];
+    $expected = [
+      'canvas_page_data' => [
+        'title[0][value]' => 'Created Title',
+      ],
+    ];
+    $result = $this->canvasAiPageBuilderHelper->processCanvasPageFields($response);
+    $this->assertEquals($expected, $result);
+
+    // A sibling key under metadata is preserved; only metatag_description is
+    // consumed.
+    $response = [
+      'metadata' => [
+        'metatag_description' => 'New Description',
+        'other_metadata' => 'keep',
+      ],
+    ];
+    $expected = [
+      'metadata' => [
+        'other_metadata' => 'keep',
+      ],
+      'canvas_page_data' => [
+        'description[0][value]' => 'New Description',
+      ],
+    ];
+    $result = $this->canvasAiPageBuilderHelper->processCanvasPageFields($response);
+    $this->assertEquals($expected, $result);
+
+    // When metatag_description is empty, metadata is left untouched and no
+    // canvas_page_data is produced.
+    $response = [
+      'metadata' => [
+        'metatag_description' => '',
+        'other_metadata' => 'keep',
+      ],
+    ];
+    $result = $this->canvasAiPageBuilderHelper->processCanvasPageFields($response);
+    $this->assertEquals($response, $result);
+  }
+
+  /**
+   * Tests that block components expose prop metadata in context.
+   */
+  public function testBlockComponentPropsInContext(): void {
+    // Create an admin user.
+    $privileged_user = $this->createUser([], '', TRUE);
+    \assert($privileged_user instanceof User);
+    $this->container->get(AccountProxyInterface::class)->setAccount($privileged_user);
+    $this->container->get(BlockManagerInterface::class)->getDefinitions();
+    $this->container->get(ComponentSourceManager::class)
+      ->generateComponents(BlockComponent::SOURCE_PLUGIN_ID, ['system_branding_block']);
+
+    $components = $this->canvasAiPageBuilderHelper->getAllComponentsKeyedBySource();
+    $this->assertArrayHasKey(BlockComponent::SOURCE_PLUGIN_ID, $components);
+    $component_id = BlockComponent::SOURCE_PLUGIN_ID . '.system_branding_block';
+    $block_component = $components[BlockComponent::SOURCE_PLUGIN_ID]['components'][$component_id] ?? NULL;
+    $this->assertIsArray($block_component);
+    $props = $block_component['props'] ?? NULL;
+    $this->assertIsArray($props);
+    $this->assertArrayHasKey('label', $props);
+    $this->assertArrayHasKey('label_display', $props);
+    $this->assertArrayHasKey('use_site_logo', $props);
+    $this->assertArrayHasKey('use_site_slogan', $props);
+    $this->assertTrue($props['label_display']['required']);
+  }
+
+  /**
+   * Tests that block storage data matches the access-checked listing.
+   *
+   * The 0007 post_update hook runs via `drush updb` as the anonymous user, for
+   * which getAllComponentsKeyedBySource() returns nothing.
+   * getEnabledBlockComponentsFromStorage() must reproduce the block data an
+   * admin would see there.
+   *
+   * @see \Drupal\canvas_ai\CanvasAiPageBuilderHelper::getEnabledBlockComponentsFromStorage()
+   */
+  public function testGetEnabledBlockComponentsFromStorageMatchesListing(): void {
+    $this->container->get(BlockManagerInterface::class)->getDefinitions();
+    $this->container->get(ComponentSourceManager::class)
+      ->generateComponents(BlockComponent::SOURCE_PLUGIN_ID, ['system_branding_block']);
+
+    // As an admin, capture the block components from the access-checked listing.
+    $admin = $this->createUser([], '', TRUE);
+    \assert($admin instanceof User);
+    $this->container->get(AccountProxyInterface::class)->setAccount($admin);
+    $listed = $this->canvasAiPageBuilderHelper->getAllComponentsKeyedBySource();
+    $this->assertArrayHasKey(BlockComponent::SOURCE_PLUGIN_ID, $listed);
+    $listed_blocks = $listed[BlockComponent::SOURCE_PLUGIN_ID]['components'];
+    // Ensure that block data exists.
+    $this->assertNotEmpty($listed_blocks);
+
+    // As the anonymous user, the storage path must return the same blocks.
+    $this->container->get(AccountProxyInterface::class)->setAccount(new AnonymousUserSession());
+    $stored_blocks = $this->canvasAiPageBuilderHelper->getEnabledBlockComponentsFromStorage();
+
+    $this->assertEquals($listed_blocks, $stored_blocks);
+  }
+
+  /**
+   * Tests dynamic_prompt_parts.yml exists with non-empty prompts at every key.
+   */
+  public function testComponentAgentDynamicPromptParts(): void {
+    $reflection = new \ReflectionClass(CanvasAiPageBuilderHelper::class);
+    $class_file = $reflection->getFileName();
+    $this->assertIsString($class_file);
+    $file = dirname($class_file) . '/DynamicPrompts/canvas_component_agent/dynamic_prompt_parts.yml';
+    $this->assertFileExists($file);
+
+    $prompt_parts = Yaml::parseFile($file);
+
+    // Single-string section.
+    $this->assertArrayHasKey('selected_component_required_props', $prompt_parts);
+    $this->assertIsString($prompt_parts['selected_component_required_props']);
+    $this->assertNotEmpty(trim($prompt_parts['selected_component_required_props']));
+
+    // Grouped sections keyed by state value.
+    $expected_sections = [
+      'selected_component' => ['empty', 'present'],
+      'json_api_module_status' => ['disabled', 'enabled'],
+      'menu_fetch_source' => [
+        'linkset_not_configured',
+        'menu_fetching_functionality_not_available',
+        'jsonapi_menu_items',
+        'linkset',
+      ],
+    ];
+    foreach ($expected_sections as $section => $keys) {
+      $this->assertArrayHasKey($section, $prompt_parts);
+      foreach ($keys as $key) {
+        $this->assertArrayHasKey($key, $prompt_parts[$section], "Missing '$section.$key' prompt.");
+        $this->assertIsString($prompt_parts[$section][$key], "'$section.$key' prompt is not a string.");
+        $this->assertNotEmpty(trim($prompt_parts[$section][$key]), "'$section.$key' prompt is empty.");
+      }
+    }
+  }
+
+  /**
+   * Tests that getComponentsByUuid returns a flat UUID-keyed map.
+   */
+  public function testGetComponentsByUuid(): void {
+    $input = [
+      "regions" => [
+        "header" => [
+          "nodePathPrefix" => [0],
+          "components" => [
+            [
+              "name" => "sdc.canvas_test_sdc.heading",
+              "uuid" => "3af8363b-143c-4136-9e7c-47374cb56679",
+              "props" => ["text" => "Hello", "element" => "h1"],
+            ],
+          ],
+        ],
+        "content" => [
+          "nodePathPrefix" => [1],
+          "components" => [
+            [
+              "name" => "sdc.canvas_test_sdc.two_column",
+              "uuid" => "e9e4308d-86f3-4253-ba12-abb8c037e5be",
+              "slots" => [
+                "e9e4308d-86f3-4253-ba12-abb8c037e5be/column_one" => [
+                  "components" => [
+                    [
+                      "name" => "sdc.canvas_test_sdc.image",
+                      "uuid" => "29d9f67e-38e9-4a76-b20d-bbe11fc9a609",
+                      "props" => ["src" => "/image.png"],
+                    ],
+                  ],
+                ],
+                "e9e4308d-86f3-4253-ba12-abb8c037e5be/column_two" => [
+                  "components" => [
+                    [
+                      "name" => "sdc.canvas_test_sdc.druplicon",
+                      "uuid" => "d280666e-b608-46e0-81e0-1919542195ad",
+                    ],
+                  ],
+                ],
+              ],
+            ],
+          ],
+        ],
+        "footer" => [
+          "nodePathPrefix" => [2],
+          "components" => [],
+        ],
+      ],
+    ];
+
+    // Nested-slot components are flattened to top-level entries; component_id
+    // comes from "name"; props default to [] when absent.
+    $expected = [
+      "3af8363b-143c-4136-9e7c-47374cb56679" => [
+        "component_id" => "sdc.canvas_test_sdc.heading",
+        "props" => ["text" => "Hello", "element" => "h1"],
+      ],
+      "e9e4308d-86f3-4253-ba12-abb8c037e5be" => [
+        "component_id" => "sdc.canvas_test_sdc.two_column",
+        "props" => [],
+      ],
+      "29d9f67e-38e9-4a76-b20d-bbe11fc9a609" => [
+        "component_id" => "sdc.canvas_test_sdc.image",
+        "props" => ["src" => "/image.png"],
+      ],
+      "d280666e-b608-46e0-81e0-1919542195ad" => [
+        "component_id" => "sdc.canvas_test_sdc.druplicon",
+        "props" => [],
+      ],
+    ];
+
+    $this->assertEquals($expected, $this->canvasAiPageBuilderHelper->getComponentsByUuid($input));
+
+    // An empty layout yields an empty map.
+    $this->assertSame([], $this->canvasAiPageBuilderHelper->getComponentsByUuid([]));
   }
 
 }

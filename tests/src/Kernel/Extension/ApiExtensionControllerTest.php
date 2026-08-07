@@ -8,6 +8,7 @@ use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Extension\CanvasExtensionTypeEnum;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableJsonResponse;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
@@ -39,6 +40,7 @@ class ApiExtensionControllerTest extends CanvasKernelTestBase {
   protected static $modules = [
     'canvas_test_extension',
     'canvas_test_extension_multiple',
+    'canvas_test_extension_page',
   ];
 
   /**
@@ -47,6 +49,8 @@ class ApiExtensionControllerTest extends CanvasKernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('user');
+    // Uninstalling a module triggers user_data cleanup, which needs this table.
+    $this->installSchema('user', ['users_data']);
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
 
@@ -64,16 +68,21 @@ class ApiExtensionControllerTest extends CanvasKernelTestBase {
     $this->assertSame([
       'user.permissions',
     ], $response->getCacheableMetadata()->getCacheContexts());
+    // Installing or uninstalling a module changes which extensions exist, so
+    // the response must be invalidated when the module list changes.
     $this->assertSame([
+      'config:core.extension',
       'http_response',
     ], $response->getCacheableMetadata()->getCacheTags());
     $this->assertSame(Cache::PERMANENT, $response->getCacheableMetadata()->getCacheMaxAge());
 
     $json = static::decodeResponse($response);
-    self::assertCount(3, $json);
+    self::assertCount(5, $json);
     self::assertArrayHasKey('canvas_test_extension', $json);
     self::assertArrayHasKey('canvas_test_extension_multiple', $json);
     self::assertArrayHasKey('canvas_test_yet_another_extension', $json);
+    self::assertArrayHasKey('canvas_test_page', $json);
+    self::assertArrayHasKey('canvas_test_page_no_permissions', $json);
 
     $canvas_extension = $json['canvas_test_extension'];
     self::assertSame('canvas_test_extension', $canvas_extension['id']);
@@ -86,6 +95,31 @@ class ApiExtensionControllerTest extends CanvasKernelTestBase {
 
     // Assert we don't expose the security permissions, that's a security risk.
     self::assertArrayNotHasKey('permissions', $canvas_extension);
+
+    // Verify the page extension is returned with the correct type.
+    $page_extension = $json['canvas_test_page'];
+    self::assertSame('canvas_test_page', $page_extension['id']);
+    self::assertSame('Test Page Extension', $page_extension['name']);
+    self::assertSame(CanvasExtensionTypeEnum::Page->value, $page_extension['type']);
+    self::assertArrayNotHasKey('permissions', $page_extension);
+  }
+
+  /**
+   * Changing the module list updates the list of extensions.
+   *
+   * The response is tagged with config:core.extension, so it is invalidated
+   * when a module providing extensions is installed or uninstalled.
+   */
+  public function testListReactsToModuleListChange(): void {
+    $response = $this->request(Request::create('/canvas/api/v0/extensions'));
+    \assert($response instanceof CacheableJsonResponse);
+    self::assertContains('config:core.extension', $response->getCacheableMetadata()->getCacheTags());
+    self::assertArrayHasKey('canvas_test_page', static::decodeResponse($response));
+
+    $this->container->get(ModuleInstallerInterface::class)->uninstall(['canvas_test_extension_page']);
+
+    $response = $this->request(Request::create('/canvas/api/v0/extensions'));
+    self::assertArrayNotHasKey('canvas_test_page', static::decodeResponse($response));
   }
 
 }

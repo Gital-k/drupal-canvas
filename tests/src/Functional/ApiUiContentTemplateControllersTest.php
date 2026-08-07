@@ -6,6 +6,8 @@ namespace Drupal\Tests\canvas\Functional;
 
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Url;
 use Drupal\field\Entity\FieldConfig;
@@ -117,7 +119,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
 
     // Set explicitly the form display components to ensure the suggestions
     // sorting is as expected.
-    $form_display = \Drupal::service('entity_display.repository')
+    $form_display = \Drupal::service(EntityDisplayRepositoryInterface::class)
       ->getFormDisplay('node', 'article');
     $weight = 10;
     foreach (['field_silly_image', 'uid', 'field_screenshots', 'user_picture', 'field_tags'] as $form_display_component_id) {
@@ -630,7 +632,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_cache_contexts: NULL,
       expected_cache_tags: NULL,
       expected_page_cache: 'UNCACHEABLE (request policy)',
-      expected_dynamic_page_cache: 'UNCACHEABLE (no cacheability)',
+      expected_dynamic_page_cache: "UNCACHEABLE (no cacheability)",
     );
     $this->assertSame(['errors' => [$expected_error_message]], $json);
 
@@ -647,7 +649,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_cache_contexts: ['user.permissions'],
       expected_cache_tags: ['4xx-response', 'http_response'],
       expected_page_cache: 'UNCACHEABLE (request policy)',
-      expected_dynamic_page_cache: NULL,
+      expected_dynamic_page_cache: 'UNCACHEABLE (403)',
     );
     $this->assertSame(['errors' => [\sprintf("The '%s' permission is required.", ContentTemplate::ADMIN_PERMISSION)]], $json);
   }
@@ -676,7 +678,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     $this->assertSame([], $json);
 
     // As soon as we create some, we are going to return those.
-    $entity_storage = $this->container->get('entity_type.manager')->getStorage($content_entity_type_id);
+    $entity_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage($content_entity_type_id);
     for ($i = 1; $i <= 5; ++$i) {
       $entity_storage->create([
         'title' => 'Entity ' . $i,
@@ -874,7 +876,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     \assert($user_without_permission instanceof UserInterface);
 
     // Create published and unpublished content entities.
-    $entity_storage = $this->container->get('entity_type.manager')->getStorage($content_entity_type_id);
+    $entity_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage($content_entity_type_id);
 
     // Create published entities.
     for ($i = 1; $i <= 3; ++$i) {
@@ -932,6 +934,35 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     $this->assertSame($expected, $json);
   }
 
+  /**
+   * The `search` module's node view modes, removed as of Drupal 11.4.
+   *
+   * Drupal 11.4 moved node-specific search functionality out of the Search
+   * module, including the `search_index` and `search_result` view modes. They
+   * were moved into a new `search_node` submodule, which this test does
+   * install.
+   *
+   * @return array<string, array{label: string, hasTemplate: bool}>
+   *
+   * @see https://www.drupal.org/node/3587564
+   * @see https://www.drupal.org/node/3590298
+   */
+  private static function expectSearchViewModesOnDrupal113(): array {
+    if (version_compare(\Drupal::VERSION, '11.4', '>=')) {
+      return [];
+    }
+    return [
+      'search_index' => [
+        'label' => 'Search index',
+        'hasTemplate' => FALSE,
+      ],
+      'search_result' => [
+        'label' => 'Search result highlighting input',
+        'hasTemplate' => FALSE,
+      ],
+    ];
+  }
+
   public function testViewModesList(): void {
     // 1. Test endpoint response when no Template entities are available.
     $json = $this->assertExpectedResponse(
@@ -961,14 +992,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
             'label' => 'RSS',
             'hasTemplate' => FALSE,
           ],
-          'search_index' => [
-            'label' => 'Search index',
-            'hasTemplate' => FALSE,
-          ],
-          'search_result' => [
-            'label' => 'Search result highlighting input',
-            'hasTemplate' => FALSE,
-          ],
+          ...self::expectSearchViewModesOnDrupal113(),
         ],
       ],
     ], $json);
@@ -1012,14 +1036,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
             'label' => 'RSS',
             'hasTemplate' => FALSE,
           ],
-          'search_index' => [
-            'label' => 'Search index',
-            'hasTemplate' => FALSE,
-          ],
-          'search_result' => [
-            'label' => 'Search result highlighting input',
-            'hasTemplate' => FALSE,
-          ],
+          ...self::expectSearchViewModesOnDrupal113(),
         ],
       ],
     ], $json);
@@ -1057,14 +1074,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
             'label' => 'RSS',
             'hasTemplate' => FALSE,
           ],
-          'search_index' => [
-            'label' => 'Search index',
-            'hasTemplate' => FALSE,
-          ],
-          'search_result' => [
-            'label' => 'Search result highlighting input',
-            'hasTemplate' => FALSE,
-          ],
+          ...self::expectSearchViewModesOnDrupal113(),
         ],
       ],
     ], $json);

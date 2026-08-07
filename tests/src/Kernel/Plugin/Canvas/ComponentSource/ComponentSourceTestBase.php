@@ -26,11 +26,14 @@ use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\DependencyInjection\ServiceModifierInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
+use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Logger\RfcLoggerTrait;
 use Drupal\Core\Logger\RfcLogLevel;
 use Drupal\Core\Render\BubbleableMetadata;
@@ -54,6 +57,7 @@ use PHPUnit\Framework\Attributes\Depends;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 
@@ -435,7 +439,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
     // Child implementations of ::generateCrashTestDummyComponentTree may
     // install additional modules, which will rebuild the container. So we add
     // the logger afterward.
-    $this->container->get('logger.factory')->addLogger($this);
+    $this->container->get(LoggerChannelFactoryInterface::class)->addLogger($this);
 
     // Unless explicitly expected to be invalid, inputs should be valid.
     $this->assertSame($expected_validation_errors, $this->violationsToArray($component_tree->validate()), 'Unrealistic test case encountered: it must still represent a valid component tree!');
@@ -651,7 +655,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
       self::assertCount(1, $out->filter(\sprintf('h1:contains("This is %s")', $slot)));
     }
     // We should also have the HTML comments that allow overlays to work.
-    $html = \trim(\preg_replace('/\s+/', ' ', $out->html()) ?: '');
+    $html = \trim(\preg_replace('/\s+/', ' ', $out->html()) ?? '');
     foreach ($slots as $slot_name) {
       self::assertMatchesRegularExpression(\sprintf('/<!-- canvas-slot-start-%s\/%s -->/', self::UUID_FALLBACK_ROOT, $slot_name), $html);
       self::assertMatchesRegularExpression(\sprintf('/canvas-slot-end-(.*)\/%s -->/', $slot_name), $html);
@@ -759,8 +763,8 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
 
   public function testIsBroken(): void {
     // Enable required themes and set the default.
-    $this->container->get('theme_installer')->install(['stark', 'canvas_stark']);
-    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark', 'canvas_stark']);
+    $this->container->get(ConfigFactoryInterface::class)->getEditable('system.theme')->set('default', 'stark')->save();
 
     // Setup the required entity-types.
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
@@ -811,7 +815,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
 
     // Should not trigger an exception during component list rendering.
     $listOutput = \Drupal::classResolver(ApiConfigControllers::class)->list(Component::ENTITY_TYPE_ID);
-    $list = \json_decode($listOutput->getContent() ?: '[]', TRUE, flags: \JSON_THROW_ON_ERROR);
+    $list = \json_decode((string) $listOutput->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
     self::assertArrayHasKey($component->id(), $list);
     // Component should be flagged as broken.
     self::assertTrue($list[$component->id()]['broken']);
@@ -830,7 +834,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
 
     // Component list's preview should also output verbose error.
     $listOutput = \Drupal::classResolver(ApiConfigControllers::class)->list(Component::ENTITY_TYPE_ID);
-    $list = \json_decode($listOutput->getContent() ?: '[]', TRUE, flags: \JSON_THROW_ON_ERROR);
+    $list = \json_decode((string) $listOutput->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
     self::assertArrayHasKey($component->id(), $list);
     // Component should be flagged as broken.
     self::assertTrue($list[$component->id()]['broken']);
@@ -849,7 +853,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
       'form_canvas_selected' => self::UUID_FALLBACK_ROOT,
     ]);
     $request->setSession(new Session(new MockArraySessionStorage()));
-    $this->container->get('request_stack')->push($request);
+    $this->container->get(RequestStack::class)->push($request);
 
     // Should not trigger an exception in the component instance form.
     $builtForm = \Drupal::formBuilder()->getForm(ComponentInstanceForm::class, $entity);

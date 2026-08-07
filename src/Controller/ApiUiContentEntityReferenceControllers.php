@@ -5,19 +5,30 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\canvas\Utility\TypedDataHelper;
+use Drupal\comment\CommentInterface;
+use Drupal\comment\CommentTypeInterface;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
@@ -29,8 +40,10 @@ use Drupal\Core\TypedData\ComplexDataDefinitionInterface;
 use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
 use Drupal\Core\Url;
 use Drupal\file\FileInterface;
+use Drupal\text\Plugin\Field\FieldType\TextItemBase;
 use Drupal\user\UserInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -157,9 +170,9 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
         throw new NotFoundHttpException('Parent expression is not a reference expression.');
       }
       // A multi-target-bundle reference anywhere in the chain makes the leaf
-      // to compose onto ambiguous. The picker never composes such parents.
+      // to compose onto ambiguous. The picker browses per bundle, so it never
+      // composes such parents.
       // @see ::resolveReferenceTarget()
-      // @see \Drupal\canvas\Plugin\Validation\Constraint\MultiTargetBundleReferenceNotSupportedConstraint
       if ($parent_expression->findMultiTargetBundleReference() !== NULL) {
         throw new NotFoundHttpException('Multi-target-bundle parent expressions are not supported.');
       }
@@ -181,8 +194,12 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       // Skip internal (non-computed) fields, mirroring the per-property rule in
       // buildFieldEntry(): the picker must not offer what storage rejects.
       // @see ::buildFieldEntry()
+      // @see \Drupal\canvas\Utility\TypedDataHelper::isEffectivelyInternal()
       // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionMustNotTargetInternalPropertyConstraint
-      if ($field_definition->isInternal() && !$field_definition->isComputed()) {
+      if (TypedDataHelper::isEffectivelyInternal($field_definition)) {
+        continue;
+      }
+      if (self::isConsideredIrrelevant($entity_type_def, $field_definition->getName())) {
         continue;
       }
       // Skip multi-valued fields, for the same reason: the picker composes
@@ -215,11 +232,11 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
     }
 
     $cacheability->addCacheTags($entity_type_def->getListCacheTags());
-    // The field list — and the per-field decisions to skip multi-valued or
-    // multi-target-bundle references — derive from field definitions. Both the
-    // cardinality (field storage config) and the target bundles (field config)
-    // can change, so depend on the tag invalidated whenever field definitions
-    // change.
+    // The field list — the per-field decision to skip multi-valued references,
+    // and the target bundles a reference can be browsed into — derive from
+    // field definitions. Both the cardinality (field storage config) and target
+    // bundles (field config) can change, so depend on the tag invalidated
+    // whenever field definitions change.
     // @see \Drupal\Core\Field\FieldStorageDefinitionListener::onFieldStorageDefinitionUpdate()
     // @see \Drupal\Core\Field\FieldConfigBase::postSave()
     $cacheability->addCacheTags(['entity_field_info']);
@@ -234,6 +251,31 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
     $response = new CacheableJsonResponse(data: ['data' => $data]);
     $response->addCacheableDependency($cacheability);
     return $response;
+  }
+
+  /**
+   * Resolves entityFields expressions against a selected content entity.
+   */
+  public static function preview(Request $request, string $entity_type, EntityInterface $entity): CacheableJsonResponse {
+    if (!$entity instanceof ContentEntityInterface) {
+      throw new BadRequestHttpException(\sprintf("The entity type '%s' is not a content entity type.", $entity_type));
+    }
+    $data = self::decode($request);
+    $resolved = [];
+    foreach ($data['entityFields'] as $prop_name => $expression_strings) {
+      try {
+        $expressions = JavaScriptComponent::parseAndCoalesceEntityFieldExpressions($expression_strings);
+        // The route loaded $entity in the active content language already, so
+        // resolve its fields in that same language.
+        $resolved[$prop_name] = JsComponent::buildReferencePayload(new EvaluationResult($entity), $expressions, NegotiatedLanguage::matchEntity($entity));
+      }
+      catch (\DomainException | \InvalidArgumentException | \UnhandledMatchError $e) {
+        throw new BadRequestHttpException($e->getMessage(), $e);
+      }
+    }
+    $resolved_result = new EvaluationResult($resolved);
+    return (new CacheableJsonResponse(data: ['data' => $resolved_result->value]))
+      ->addCacheableDependency($resolved_result);
   }
 
   /**
@@ -273,7 +315,7 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
     $bundles = $host->getBundles();
     $bundle = \is_array($bundles) && \count($bundles) === 1 ? reset($bundles) : NULL;
     \assert($bundle === NULL || \is_string($bundle));
-    $entity_type_bundles[] = [$entity_type_id, $bundle ?: $entity_type_id];
+    $entity_type_bundles[] = [$entity_type_id, $bundle ?? $entity_type_id];
 
     if ($expression instanceof ReferenceFieldPropExpression) {
       $referenced = $expression->referenced;
@@ -282,6 +324,44 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       }
     }
     return $entity_type_bundles;
+  }
+
+  /**
+   * Whether a base field is entity-system bookkeeping the picker should hide.
+   *
+   * Covers the translation and revision metadata base fields a Code Component
+   * Developer never consumes as content: "Default translation", "Revision
+   * translation affected", "Translation source", "Translation outdated" and
+   * "Revision log message". None are marked internal, so the internal-field
+   * rule in listFields() cannot reach them.
+   *
+   * Mirrors the intent of PropSourceSuggester::isConsideredIrrelevant() but is
+   * kept separate: the two surfaces have different needs (e.g. this picker
+   * offers a reference field's `target_id`, which the suggester hides).
+   *
+   * @see \Drupal\canvas\ShapeMatcher\PropSourceSuggester::isConsideredIrrelevant()
+   */
+  private static function isConsideredIrrelevant(EntityTypeInterface $entity_type, string $field_name): bool {
+    // "Default translation" and "Revision translation affected" are both
+    // default entity keys, defined on the base entity type regardless of
+    // whether it is a content or config entity.
+    // @see \Drupal\Core\Entity\EntityType::__construct()
+    $irrelevant = [
+      $entity_type->getKey('default_langcode'),
+      $entity_type->getKey('revision_translation_affected'),
+    ];
+    if ($entity_type instanceof ContentEntityTypeInterface) {
+      // The "Revision log message" field name is entity-type specific (node
+      // names it `revision_log`), so resolve it through the metadata key,
+      // which is only declared on ContentEntityTypeInterface.
+      $irrelevant[] = $entity_type->getRevisionMetadataKey('revision_log_message');
+    }
+    // content_translation adds these fixed-name base fields when a bundle is
+    // translatable.
+    // @see \Drupal\content_translation\ContentTranslationHandler::fieldStorageDefinitions()
+    $irrelevant[] = 'content_translation_source';
+    $irrelevant[] = 'content_translation_outdated';
+    return \in_array($field_name, \array_filter($irrelevant), TRUE);
   }
 
   /**
@@ -319,6 +399,20 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       [$target_entity_type, $target_bundles, $target_label_key] = $this->resolveReferenceTarget($field_definition);
     }
     $has_walkable_target = $target_entity_type !== NULL && $target_bundles !== [] && $target_label_key !== NULL;
+    // Do not offer descending into a multi-target-bundle reference when the
+    // parent chain already descends through one: picking fields across bundles
+    // at both levels would coalesce into a branch inside a branch (nested
+    // branching), which is not yet supported. The reference's own leaf
+    // properties (target_id, …) still surface; only the descent is withheld.
+    // @todo Offer this descent once nested branching is supported, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustNotNestBranchesConstraint
+    if ($has_walkable_target
+      && \count($target_bundles) > 1
+      && $parent_expression !== NULL
+      && $this->parentDescendsThroughMultiTargetBundleReference($parent_expression)
+    ) {
+      $has_walkable_target = FALSE;
+    }
 
     $item_definition = $field_definition->getItemDefinition();
     \assert($item_definition instanceof ComplexDataDefinitionInterface);
@@ -327,8 +421,61 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       // Skip properties that are internal but not computed — i.e. internal
       // because the developer marked them as such, not because of the
       // computed-defaults-to-internal behavior in core. Computed properties
-      // (e.g. Canvas's `src_with_alternate_widths`) stay pickable.
-      if ($property_definition->isInternal() && !$property_definition->isComputed()) {
+      // (e.g. Canvas's `src_with_alternate_widths`) stay pickable, unless the
+      // definition explicitly opts back in to being internal (e.g. `date`,
+      // via `DateTimeItemOverride`).
+      // @see \Drupal\canvas\Utility\TypedDataHelper::isEffectivelyInternal()
+      if (TypedDataHelper::isEffectivelyInternal($property_definition)) {
+        continue;
+      }
+      // The `image` field type exposes two computed properties that survive the
+      // rule above (computed and non-internal) but are implementation details a
+      // Code Component Developer should not pick: `src_with_alternate_widths`
+      // (which `src` clones, so listing it would show the same URL twice) and
+      // `srcset_candidate_uri_template` (a raw RFC 6570 URI template that feeds
+      // `src`). The developer-facing `src` is offered instead. They are
+      // excluded by name so any other (existing or future) image property stays
+      // offered by default.
+      // @todo Remove the `src_with_alternate_widths` exclusion once it is removed entirely in https://git.drupalcode.org/project/canvas/-/work_items/3591648
+      //
+      // This is done here, in the picker only: marking those properties
+      // internal at the field-type level would also hide them from
+      // PropSourceSuggester, which still offers them. The `is source for`
+      // setting cannot drive it either — it is set on `src`, and
+      // EntityFieldPropSourceMatcher reads it the other way around (it hides
+      // `src` and keeps `src_with_alternate_widths`), the opposite of what the
+      // picker wants.
+      // @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::recurseDataDefinitionInterface()
+      // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride::propertyDefinitions()
+      if (\in_array($property_name, ['src_with_alternate_widths', 'srcset_candidate_uri_template'], TRUE)
+        && \is_a($item_definition->getClass(), ImageItemOverride::class, TRUE)) {
+        continue;
+      }
+      // Formatted text field types (`text`, `text_long`, `text_with_summary`
+      // — all extend `TextItemBase`) expose the raw, unprocessed user input
+      // `value`/`summary`; exposing those would let a code component render
+      // markup that never passed through the text format's filters (an XSS
+      // vector), so keep only the computed `processed`/`summary_processed`.
+      // `format` is retained: it is not the raw input, and a code component
+      // may need it to conditionally load assets the way a Drupal `filter`
+      // plugin does, which `processed` cannot bubble when consumed over the
+      // API.
+      // @see \Drupal\text\Plugin\Field\FieldType\TextItemBase
+      // @see \Drupal\filter\FilterProcessResult
+      if (\in_array($property_name, ['value', 'summary'], TRUE)
+        && \is_a($item_definition->getClass(), TextItemBase::class, TRUE)) {
+        continue;
+      }
+      // A `uri`-typed property not constrained to the http/https schemes is
+      // not guaranteed to resolve to a browser-accessible URL: e.g. the
+      // `link` field type's raw `uri` can be `entity:node/1` or
+      // `internal:/node`, and the `file_uri` field type's raw `value` is a
+      // stream-wrapper URI like `public://image.jpg`. Properties that resolve
+      // such values to a browser-accessible URL add their own
+      // UriSchemeConstraint restricted to http/https instead (e.g. link's
+      // `url`, file's `url`).
+      // @see \Drupal\canvas\Utility\TypedDataHelper::isRestrictedToHttpSchemes()
+      if ($property_definition->getDataType() === 'uri' && !TypedDataHelper::isRestrictedToHttpSchemes($property_definition)) {
         continue;
       }
       // The typed-data reference property on reference fields is the descend
@@ -404,12 +551,7 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
    *   is empty.
    *
    * For bundle-less target types (user, file, …) the entity type ID itself
-   * is used as the bundle ID. References whose `target_bundles` resolve to
-   * more than one bundle also return [NULL, [], NULL]: browsing into them is
-   * deferred, because the resulting multi-target-bundle expression is not
-   * yet supported at render time.
-   *
-   * @todo https://git.drupalcode.org/project/canvas/-/work_items/3591656
+   * is used as the bundle ID.
    *
    * @return array{0: ?string, 1: list<string>, 2: ?string}
    */
@@ -450,16 +592,6 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
     }
     $resolved_bundles = $target_bundles ? \array_values(\array_map('strval', $target_bundles)) : [$target_type];
     \sort($resolved_bundles);
-    // References targeting more than one bundle would let the picker compose a
-    // multi-target-bundle expression (coalescing into
-    // ReferencedBundleSpecificBranches), which is not yet supported at render
-    // time. Don't offer browsing into them until that lands; the field's own
-    // leaf properties still surface.
-    // @see \Drupal\canvas\Plugin\Validation\Constraint\MultiTargetBundleReferenceNotSupportedConstraint
-    // @todo https://git.drupalcode.org/project/canvas/-/work_items/3591656
-    if (\count($resolved_bundles) > 1) {
-      return [NULL, [], NULL];
-    }
     $label_key = $target_entity_type->getKey('label');
     if (!$label_key) {
       $base_fields = $this->entityFieldManager->getBaseFieldDefinitions($target_type);
@@ -470,6 +602,45 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       return [NULL, [], NULL];
     }
     return [$target_type, $resolved_bundles, $label_key];
+  }
+
+  /**
+   * Whether the parent chain descends through a multi-target-bundle reference.
+   *
+   * Walks each referencer field in the chain followed so far and checks whether
+   * it targets more than one bundle. A further multi-bundle reference descended
+   * from here would coalesce into a branch inside a branch (nested branching),
+   * so the caller withholds that descent.
+   *
+   * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $parent_expression
+   *   The reference chain followed so far (a ReferenceFieldPropExpression).
+   *
+   * @return bool
+   *   TRUE if any referencer field in the chain targets multiple bundles.
+   */
+  private function parentDescendsThroughMultiTargetBundleReference(EntityFieldBasedPropExpressionInterface $parent_expression): bool {
+    for ($current = $parent_expression; $current instanceof ReferenceFieldPropExpression; $current = $current->referenced) {
+      $referencer = $current->referencer;
+      $host = $referencer->getHostEntityDataDefinition();
+      $entity_type = $host->getEntityTypeId();
+      \assert(\is_string($entity_type));
+      $bundles = $host->getBundles();
+      // Parents are single-bundle by construction of the picker (nested
+      // branching is not supported), so the host carries at most one bundle;
+      // assert it, lest a future multi-bundle host silently resolve field
+      // definitions for an arbitrary bundle.
+      \assert($bundles === NULL || \count($bundles) <= 1);
+      $bundle = \is_array($bundles) && $bundles !== [] ? (string) \reset($bundles) : $entity_type;
+      $field_definition = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle)[$referencer->getFieldName()] ?? NULL;
+      if ($field_definition === NULL || !\is_subclass_of($field_definition->getItemDefinition()->getClass(), EntityReferenceItemInterface::class, TRUE)) {
+        continue;
+      }
+      [, $target_bundles] = $this->resolveReferenceTarget($field_definition);
+      if (\count($target_bundles) > 1) {
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
   /**
@@ -505,8 +676,10 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
    * key.
    *
    * @see \Drupal\file\FileAccessControlHandler::checkAccess()
+   * @see \Drupal\comment\CommentAccessControlHandler::checkAccess()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
    */
-  private function createBundleStub(string $entity_type_id, string $bundle): ?ContentEntityInterface {
+  private function createBundleStub(string $entity_type_id, string $bundle, bool $inject_commented_entity = TRUE): ?ContentEntityInterface {
     $entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
     $storage = $this->entityTypeManager->getStorage($entity_type_id);
     $values = [];
@@ -520,23 +693,72 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       return NULL;
     }
     \assert($stub instanceof ContentEntityInterface);
+    self::normalizeStub($stub);
+
+    // Give a comment stub a commented (parent) entity so its access handler can
+    // check the access to the parent entity.
+    if ($inject_commented_entity && $stub instanceof CommentInterface) {
+      $comment_type = $this->entityTypeManager->getStorage('comment_type')->load($bundle);
+      \assert($comment_type instanceof CommentTypeInterface);
+      $parent_type_id = $comment_type->getTargetEntityTypeId();
+      // A comment type stores its target entity type id but declares no
+      // config dependency on that type's provider module (CommentType does
+      // not override calculateDependencies()), so uninstalling that module
+      // can leave a comment type with a dangling target. Skip it rather than
+      // dereferencing a missing definition; core does not guard this either
+      // (CommentTypeForm would fatal).
+      // @see https://www.drupal.org/project/drupal/issues/2717673
+      $parent_type = $this->entityTypeManager->getDefinition($parent_type_id, FALSE);
+      if ($parent_type === NULL) {
+        return NULL;
+      }
+      // A bundle-keyed parent (e.g. node) needs a bundle to be access-checked
+      // at all; coarse 'view' access is bundle-independent, so the first bundle
+      // represents the type.
+      $parent_bundle = $parent_type_id;
+      if ($parent_type->getKey('bundle')) {
+        $parent_bundles = \array_keys($this->entityTypeBundleInfo->getBundleInfo($parent_type_id));
+        // It is possible the entity type to be commented upon supports bundles
+        // but none have been created yet.
+        if ($parent_bundles === []) {
+          return NULL;
+        }
+        $parent_bundle = \reset($parent_bundles);
+      }
+      // Pass FALSE to avoid recursion on comment-on-comment: the parent stub
+      // then lacks a commented entity, so getBundleViewAccess() omits it.
+      $commented_entity_stub = $this->createBundleStub($parent_type_id, $parent_bundle, FALSE);
+      if ($commented_entity_stub === NULL) {
+        return NULL;
+      }
+      $stub->set('entity_id', $commented_entity_stub);
+    }
+    return $stub;
+  }
+
+  /**
+   * Normalizes a stub so a permitted user gets coarse 'view' access.
+   *
+   * Activates users and publishes content entities (for handlers that require
+   * the entity to be "active"/"published"), and gives files a public-scheme URI
+   * (FileAccessControlHandler grants view to a public file via 'access
+   * content', but a URI-less stub would be denied).
+   */
+  private static function normalizeStub(ContentEntityInterface $stub): void {
     match (TRUE) {
       $stub instanceof UserInterface => $stub->activate(),
       $stub instanceof FileInterface => $stub->setFileUri('public://'),
       $stub instanceof EntityPublishedInterface => $stub->setPublished(),
       default => NULL,
     };
-    return $stub;
   }
 
   /**
    * Checks 'view' access for a stub entity, swallowing handler errors.
    *
-   * Some core access handlers dereference fields the stub can't realistically
-   * populate (CommentAccessControlHandler calls
-   * `$entity->getCommentedEntity()->access(...)`, which errors on a stub with
-   * no commented entity). Treat those as forbidden so one such entity type
-   * doesn't sink the entire response.
+   * Last-resort guard for access handlers that dereference fields a bundle stub
+   * cannot populate. Comments are handled upstream (see ::createBundleStub()),
+   * so this now only guards unexpected failures, treated as forbidden.
    */
   private static function getBundleViewAccess(ContentEntityInterface $stub): AccessResultInterface {
     try {

@@ -6,10 +6,12 @@ namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ScalarPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -78,14 +80,18 @@ final class EntityFieldExpressionMustNotTargetInternalPropertyConstraintValidato
    * Finds the first internal (non-computed) field property in an expression.
    *
    * Walks reference chains and object-prop expressions, matching the picker's
-   * rule: a field property is excluded when it is internal but not computed.
-   * (Computed properties are internal-by-default in core yet remain pickable.)
+   * rule: a field property is excluded when it is internal but not computed,
+   * or when it explicitly opts back in to being internal despite being
+   * computed (e.g. `DateTimeItemOverride` marking `date` internal).
+   * (Computed properties are internal-by-default in core yet remain pickable
+   * otherwise.)
    *
    * @return array{0: string, 1: string}|null
    *   A [field, property] pair (e.g. ['entity:node:article.uid', 'pass']) for
    *   the offending property, or NULL when none is internal.
    *
    * @see \Drupal\canvas\Controller\ApiUiContentEntityReferenceControllers::buildFieldEntry()
+   * @see \Drupal\canvas\Utility\TypedDataHelper::isEffectivelyInternal()
    */
   private function findInternalProperty(EntityFieldBasedPropExpressionInterface $expression): ?array {
     // Object-prop expression: every sub-property is on this same field.
@@ -105,32 +111,39 @@ final class EntityFieldExpressionMustNotTargetInternalPropertyConstraintValidato
 
     // Reference expression: the referencer's `entity` property is computed (so
     // never internal-and-not-computed); descend into the referenced expression.
-    // Multi-target-bundle references are rejected separately.
-    // @see \Drupal\canvas\Plugin\Validation\Constraint\MultiTargetBundleReferenceNotSupportedConstraint
+    // A multi-target-bundle reference has one branch per bundle; descend into
+    // every branch, since an internal property in any branch is a violation.
     if ($expression instanceof ReferencePropExpressionInterface) {
-      // @todo Remove in https://git.drupalcode.org/project/canvas/-/work_items/3591656
       if ($expression instanceof ReferenceFieldPropExpression && $expression->targetsMultipleBundles()) {
+        \assert($expression->referenced instanceof ReferencedBundleSpecificBranches);
+        foreach ($expression->referenced->bundleSpecificReferencedExpressions as $branch_expression) {
+          $found = $this->findInternalProperty($branch_expression);
+          if ($found !== NULL) {
+            return $found;
+          }
+        }
         return NULL;
       }
       return $this->findInternalProperty($expression->getTargetExpression());
     }
 
     // Scalar leaf: apply the picker's rule. A field property is excluded when
-    // it is internal but not computed — at the field level (e.g. a base field
-    // marked internal) or the field property level.
+    // it is internal but not computed, or explicitly internal despite being
+    // computed — at the field level (e.g. a base field marked internal) or
+    // the field property level.
     if ($expression instanceof ScalarPropExpressionInterface) {
       $field_definition = $this->resolveFieldDefinition($expression);
       if ($field_definition === NULL) {
         return NULL;
       }
       $field_id = \sprintf('%s.%s', $expression->getHostEntityDataDefinition()->getDataType(), $expression->getFieldName());
-      if ($field_definition->isInternal() && !$field_definition->isComputed()) {
+      if (TypedDataHelper::isEffectivelyInternal($field_definition)) {
         return [$field_id, $expression->getFieldPropertyName()];
       }
       $item_definition = $field_definition->getItemDefinition();
       if ($item_definition instanceof ComplexDataDefinitionInterface) {
         $property_definition = $item_definition->getPropertyDefinition($expression->getFieldPropertyName());
-        if ($property_definition !== NULL && $property_definition->isInternal() && !$property_definition->isComputed()) {
+        if ($property_definition !== NULL && TypedDataHelper::isEffectivelyInternal($property_definition)) {
           return [$field_id, $expression->getFieldPropertyName()];
         }
       }

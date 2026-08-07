@@ -9,6 +9,8 @@ use Drupal\canvas\Hook\ContentTemplateHooks;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\layout_builder\Entity\LayoutBuilderEntityViewDisplay;
 use Drupal\node\NodeTypeInterface;
 use Drupal\Tests\BrowserTestBase;
@@ -94,7 +96,7 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $entityTypeManager = $this->container->get('entity_type.manager');
+    $entityTypeManager = $this->container->get(EntityTypeManagerInterface::class);
     $this->viewDisplayStorage = $entityTypeManager->getStorage('entity_view_display');
     $this->contentTemplateStorage = $entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID);
 
@@ -141,8 +143,16 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
     // Test 3: Template is enabled - should hide view mode tab (no permission).
     $this->setTemplateStatus($template, TRUE);
     $crawler = $this->getManageDisplayPageCrawler($bundle);
-    // As there's only 1 tab left, the menu tabs container is not rendered.
-    $this->assertTabsCount($crawler, 0, 'No tabs should be visible when template is enabled without permission.');
+    // The view mode tab is hidden (its display route access is denied without
+    // permission).
+    $this->assertTabsCount($crawler,
+      message: 'Only non-view-mode tabs should be visible when the template is enabled without permission.',
+      expected_count: version_compare(\Drupal::VERSION, '11.4', '>=')
+        // On Drupal >= 11.4 the "Overview" tab also remains, so 2 tabs render.
+        ? 2
+        // On Drupal < 11.4 only the "Default" tab remains — a single tab, so the tabs container is not rendered at all.
+        : 0
+    );
     $this->assertViewModeTabDoesNotExist($crawler, $view_mode_label);
 
     // Test 4: Verify direct access to view mode display page is forbidden.
@@ -196,11 +206,11 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
    */
   public function testLayoutBuilderCompatibility(): void {
     $bundle = 'page';
-    $this->container->get('module_installer')->install(['layout_builder']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['layout_builder']);
     $this->resetAll();
 
     // Refresh storage after module installation.
-    $this->viewDisplayStorage = $this->container->get('entity_type.manager')->getStorage('entity_view_display');
+    $this->viewDisplayStorage = $this->container->get(EntityTypeManagerInterface::class)->getStorage('entity_view_display');
 
     $this->createNodeType(['type' => $bundle]);
     $this->createViewDisplay($bundle, 'teaser');
@@ -279,7 +289,13 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
    * Asserts that only the default tabs are present.
    */
   private function assertDefaultTabsOnly(Crawler $crawler): void {
-    $this->assertTabsCount($crawler, 2, 'There should be 2 default tabs (Default, Full content).');
+    $expected = version_compare(\Drupal::VERSION, '11.4', '>=')
+      // 2 per-view-mode tabs (Default + the tested view mode), plus the
+      // "Overview" tab.
+      ? 3
+      // 2 per-view-mode tabs (Default + the tested view mode).
+      : 2;
+    $this->assertTabsCount($crawler, $expected, 'There should be the 2 default view mode tabs (Default + tested view mode), plus the "Overview" tab on Drupal >= 11.4.');
   }
 
   /**
@@ -356,7 +372,7 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
       'type' => $this->randomMachineName(8),
       'name' => $this->randomMachineName(8),
     ];
-    $type = $this->container->get('entity_type.manager')
+    $type = $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage('node_type')->create($values);
     $status = $type->save();
     $this->assertSame($status, SAVED_NEW);

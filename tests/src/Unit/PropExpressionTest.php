@@ -157,6 +157,53 @@ class PropExpressionTest extends UnitTestCase {
   }
 
   /**
+   * A follow-reference object entry may target bundle-specific branches.
+   *
+   * When a reference field targets multiple bundles and the per-bundle field
+   * selections differ, the coalesced form is one object whose common-field
+   * entry is a branch and whose bundle-specific entries are plain references.
+   * This exercises the depth-1 branch-inside-object-prop round trip.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::coalesce()
+   */
+  public function testFieldObjectPropsExpressionWithBranchPropRoundTrips(): void {
+    $news = BetterEntityDataDefinition::create('node', 'news_item');
+    $blog = BetterEntityDataDefinition::create('node', 'blog_post');
+    $referencer = new FieldPropExpression($news, 'field_related', NULL, 'entity');
+    $expression = new FieldObjectPropsExpression($news, 'field_related', NULL, [
+      // Bundle-specific: `body` exists only on news_item.
+      'body' => new ReferenceFieldPropExpression(
+        referencer: $referencer,
+        referenced: new FieldPropExpression($news, 'body', NULL, 'value'),
+      ),
+      // Common across bundles: `title` on both → a bundle-specific branch.
+      'label' => new ReferenceFieldPropExpression(
+        referencer: $referencer,
+        referenced: new ReferencedBundleSpecificBranches([
+          'entity:node:blog_post' => new FieldPropExpression($blog, 'title', NULL, 'value'),
+          'entity:node:news_item' => new FieldPropExpression($news, 'title', NULL, 'value'),
+        ]),
+      ),
+    ]);
+    $string_representation = 'ℹ︎␜entity:node:news_item␝field_related␞␟{body↝entity␜␜entity:node:news_item␝body␞␟value,label↝entity␜[␜entity:node:blog_post␝title␞␟value][␜entity:node:news_item␝title␞␟value]}';
+    self::assertSame($string_representation, (string) $expression);
+    self::assertEquals($expression, FieldObjectPropsExpression::fromString($string_representation));
+    self::assertEquals($expression, StructuredDataPropExpression::fromString($string_representation));
+  }
+
+  /**
+   * Nested branching inside an object prop is rejected (depth-1 only).
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\CompoundExpressionTrait::parseBranches()
+   */
+  public function testFieldObjectPropsExpressionRejectsNestedBranchProp(): void {
+    $nested = 'ℹ︎␜entity:node:news_item␝field_related␞␟{label↝entity␜[␜entity:node:blog_post␝field_x␞␟entity␜[␜entity:node:a␝t␞␟value][␜entity:node:b␝t␞␟value]][␜entity:node:news_item␝title␞␟value]}';
+    $this->expectException(\LogicException::class);
+    $this->expectExceptionMessage('Nested branching is not supported.');
+    FieldObjectPropsExpression::fromString($nested);
+  }
+
+  /**
    * Tests get reference chain prefixes.
    *
    * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression::getReferenceChainPrefixes
@@ -839,7 +886,10 @@ class PropExpressionTest extends UnitTestCase {
         ),
         self::EXPECT_NO_DEPRECATION,
         'Authored by␞124th item␜User␝Name',
-        new \LogicException('Requested delta 123 for single-cardinality field, must be either zero or omitted.'),
+        [
+          'module' => ['node', 'user'],
+          'content' => [],
+        ],
         ['ℹ︎␜entity:node␝uid␞123␟entity␜'],
       ],
       [
@@ -855,7 +905,10 @@ class PropExpressionTest extends UnitTestCase {
         ),
         self::EXPECT_NO_DEPRECATION,
         'Authored by␞124th item␜User␝Name␞1st item',
-        new \LogicException('Requested delta 123 for single-cardinality field, must be either zero or omitted.'),
+        [
+          'module' => ['node', 'user'],
+          'content' => [],
+        ],
         ['ℹ︎␜entity:node␝uid␞123␟entity␜'],
       ],
       [
@@ -871,7 +924,10 @@ class PropExpressionTest extends UnitTestCase {
         ),
         self::EXPECT_NO_DEPRECATION,
         'Authored by␞124th item␜User␝Name␞100th item',
-        new \LogicException('Requested delta 123 for single-cardinality field, must be either zero or omitted.'),
+        [
+          'module' => ['node', 'user'],
+          'content' => [],
+        ],
         ['ℹ︎␜entity:node␝uid␞123␟entity␜'],
       ],
     ];

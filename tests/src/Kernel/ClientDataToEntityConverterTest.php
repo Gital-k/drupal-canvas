@@ -75,7 +75,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
 
   public function setUp(): void {
     parent::setUp();
-    $this->container->get('module_installer')->install(['system']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['system']);
     // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
     $this->setUpImages();
@@ -355,7 +355,8 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       ],
     ]);
     self::assertSame([], self::violationsToArray($test_node->validate()));
-    $result = \Drupal::classResolver(ApiLayoutController::class)->get($test_node);
+    $request = Request::create('/api/canvas/content/canvas_page/' . $test_node->id());
+    $result = \Drupal::classResolver(ApiLayoutController::class)->get(request: $request, entity: $test_node);
     \assert($result instanceof PreviewEnvelope);
     $invalid_form_callback_client_json = \array_intersect_key($result->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
     // Assert the default date and time values are returned.
@@ -403,7 +404,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
       'Modified!',
     );
 
-    $this->container->get('module_installer')->install(['canvas_test_article_fields']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_article_fields']);
     // Remove the field_cvt_textarea_summary field installed by
     // canvas_test_article_fields because it is not used in the test and causes
     // unrelated validation errors.
@@ -597,7 +598,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     // Originally the `No more gravy please` checkbox is checked.
     $response = $this->request(Request::create($url->toString()));
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
-    $json = \json_decode($response->getContent() ?: '', TRUE, flags: \JSON_THROW_ON_ERROR);
+    $json = \json_decode((string) $response->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
     self::assertEquals(TRUE, $json['entity_form_fields'][CanvasTestArticleFieldsHooks::NO_MORE_GRAVY]);
     self::assertNull($autoSave->getAutoSaveEntity($node)->entity);
     self::assertEquals('Canvas Needs This For The Time Being', $json['entity_form_fields']['title[0][value]']);

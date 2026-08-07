@@ -49,14 +49,9 @@ class CanvasUiAccessCheckTest extends UnitTestCase {
       ->willReturn([]);
     $entityTypeManager = $this->prophesize(EntityTypeManagerInterface::class);
     $account = $this->createMock(AccountInterface::class);
-    if ($permission) {
-      $account->expects($this->atLeastOnce())
-        ->method('hasPermission')
-        ->willReturnCallback(fn (string $argPermission) => match ($argPermission) {
-          $permission => TRUE,
-          default => FALSE
-        });
-    }
+    $account->expects($this->atLeastOnce())
+      ->method('hasPermission')
+      ->willReturnCallback(fn (string $argPermission): bool => $argPermission === $permission);
     $accessChecker = new CanvasUiAccessCheck($entityFieldManager->reveal(), $entityTypeManager->reveal());
     $result = $accessChecker->access($account);
     $this->assertEquals($accessGranted, $result->isAllowed());
@@ -68,7 +63,7 @@ class CanvasUiAccessCheckTest extends UnitTestCase {
   public static function provider(): array {
     return [
       [NULL, FALSE],
-      [Pattern::ADMIN_PERMISSION, FALSE],
+      [Pattern::ADMIN_PERMISSION, TRUE],
       [JavaScriptComponent::ADMIN_PERMISSION, TRUE],
       [ContentTemplate::ADMIN_PERMISSION, TRUE],
     ];

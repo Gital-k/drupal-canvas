@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import axios from 'axios';
 import chalk from 'chalk';
+import { Option } from 'commander';
 import { useAgent } from 'request-filtering-agent';
 import * as p from '@clack/prompts';
 import {
@@ -11,14 +12,26 @@ import {
 } from '@drupal-canvas/discovery';
 
 import { ensureConfig, getConfig } from '../config.js';
-import { createApiService } from '../services/api.js';
-import { pluralize, updateConfigFromOptions } from '../utils/command-helpers';
+import { createApiService, ensureAuthConfig } from '../services/api.js';
+import {
+  applySyncOptionAliasesAndWarnings,
+  parseBooleanOption,
+  pluralize,
+  updateConfigFromOptions,
+} from '../utils/command-helpers';
+import { printCommandIntro } from '../utils/command-intro';
 import { getUnreconciledMedia } from '../utils/prop-transforms';
-import { reportResults } from '../utils/report-results';
+import {
+  COMMAND_RESULT_REPORT_OPTIONS,
+  reportResults,
+} from '../utils/report-results';
 import { processInPool } from '../utils/request-pool';
 import { isRecord } from '../utils/utils';
 
-import type { ComponentMetadata } from '@drupal-canvas/discovery';
+import type {
+  ComponentMetadata,
+  DiscoveryResult,
+} from '@drupal-canvas/discovery';
 import type { Command } from 'commander';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
 import type { ApiService, UploadedMedia } from '../services/api.js';
@@ -29,8 +42,32 @@ interface ReconcileMediaOptions {
   clientSecret?: string;
   siteUrl?: string;
   scope?: string;
+  includePages?: boolean;
+  includeContentTemplates?: boolean;
+  includeRegions?: boolean;
+  pages?: boolean;
+  contentTemplates?: boolean;
+  regions?: boolean;
+  sync?: Partial<{
+    pages: boolean;
+    contentTemplates: boolean;
+    regions: boolean;
+  }>;
   dir?: string;
   yes?: boolean;
+}
+
+export interface ReconcileMediaSyncConfig {
+  includePages: boolean;
+  includeContentTemplates: boolean;
+  includeRegions: boolean;
+}
+
+export interface ReconcileSpecFile {
+  label: string;
+  relativePath: string;
+  path: string;
+  spec: { elements: AuthoredSpecElementMap; [key: string]: unknown };
 }
 
 interface DownloadedMedia {
@@ -119,6 +156,82 @@ function defaultDownloadMedia(url: string): Promise<DownloadedMedia> {
     return Promise.resolve(downloadDataUrlMedia(url));
   }
   return downloadExternalMedia(url);
+}
+
+async function readReconcileSpecFile(
+  label: string,
+  relativePath: string,
+  specPath: string,
+): Promise<ReconcileSpecFile> {
+  const content = await fs.readFile(specPath, 'utf-8');
+  const parsedSpec = JSON.parse(content) as {
+    elements?: AuthoredSpecElementMap;
+    [key: string]: unknown;
+  };
+  return {
+    label,
+    relativePath,
+    path: specPath,
+    spec: { ...parsedSpec, elements: parsedSpec.elements ?? {} },
+  };
+}
+
+export async function collectReconcileSpecFiles(
+  discoveryResult: Pick<
+    DiscoveryResult,
+    'pages' | 'contentTemplates' | 'regions'
+  >,
+  syncConfig: ReconcileMediaSyncConfig,
+): Promise<ReconcileSpecFile[]> {
+  const specFiles: ReconcileSpecFile[] = [];
+
+  if (syncConfig.includePages) {
+    for (const page of discoveryResult.pages) {
+      specFiles.push(
+        await readReconcileSpecFile(
+          `page "${page.name}"`,
+          page.relativePath,
+          page.path,
+        ),
+      );
+    }
+  }
+
+  if (syncConfig.includeContentTemplates) {
+    for (const template of discoveryResult.contentTemplates) {
+      specFiles.push(
+        await readReconcileSpecFile(
+          `content template "${template.name}"`,
+          template.relativePath,
+          template.path,
+        ),
+      );
+    }
+  }
+
+  if (syncConfig.includeRegions) {
+    for (const region of discoveryResult.regions) {
+      specFiles.push(
+        await readReconcileSpecFile(
+          `global region "${region.region}"`,
+          region.relativePath,
+          region.path,
+        ),
+      );
+    }
+  }
+
+  return specFiles;
+}
+
+export function hasReconcileMediaSyncEnabled(
+  syncConfig: ReconcileMediaSyncConfig,
+): boolean {
+  return (
+    syncConfig.includePages ||
+    syncConfig.includeContentTemplates ||
+    syncConfig.includeRegions
+  );
 }
 
 export interface ReconcileSuccess {
@@ -274,75 +387,95 @@ export function reconcileMediaCommand(program: Command): void {
   program
     .command('reconcile-media')
     .description(
-      'upload supported external media from pages and content templates to Drupal and store its provenance',
+      'upload supported external media from pages, content templates, and global regions to Drupal and store its provenance',
     )
     .option('--client-id <id>', 'Client ID')
     .option('--client-secret <secret>', 'Client Secret')
     .option('--site-url <url>', 'Site URL')
     .option('--scope <scope>', 'Scope')
+    .addOption(
+      new Option(
+        '--include-pages [enabled]',
+        'Include pages in the media reconciliation operation',
+      )
+        .preset('true')
+        .argParser(parseBooleanOption)
+        .default(undefined),
+    )
+    .addOption(
+      new Option(
+        '--include-content-templates [enabled]',
+        'Include content templates in the media reconciliation operation',
+      )
+        .preset('true')
+        .argParser(parseBooleanOption)
+        .default(undefined),
+    )
+    .addOption(
+      new Option(
+        '--include-regions [enabled]',
+        'Include global regions in the media reconciliation operation',
+      )
+        .preset('true')
+        .argParser(parseBooleanOption)
+        .default(undefined),
+    )
+    .option(
+      '--no-pages',
+      'Exclude pages from the media reconciliation operation',
+    )
+    .option(
+      '--no-content-templates',
+      'Exclude content templates from the media reconciliation operation',
+    )
+    .option(
+      '--no-regions',
+      'Exclude global regions from the media reconciliation operation',
+    )
     .option('-d, --dir <directory>', 'Component directory')
     .option('-y, --yes', 'Skip confirmation prompts')
     .action(async (options: ReconcileMediaOptions) => {
       try {
-        p.intro(chalk.bold('Drupal Canvas CLI: reconcile media'));
+        printCommandIntro('reconcile media');
+        applySyncOptionAliasesAndWarnings(options);
         updateConfigFromOptions(options);
 
-        await ensureConfig([
-          'siteUrl',
-          'clientId',
-          'clientSecret',
-          'scope',
-          'componentDir',
-        ]);
+        const currentConfig = getConfig();
+        const syncConfig = {
+          includePages: currentConfig.includePages,
+          includeContentTemplates: currentConfig.includeContentTemplates,
+          includeRegions: currentConfig.includeRegions,
+        };
+        if (!hasReconcileMediaSyncEnabled(syncConfig)) {
+          p.log.info(
+            'No pages, content templates, or global regions are enabled for media reconciliation.',
+          );
+          p.outro('Media reconciliation skipped');
+          return;
+        }
+
+        await ensureAuthConfig();
+        await ensureConfig(['componentDir']);
 
         const nextConfig = getConfig();
         const discoveryResult = await discoverCanvasProject({
           componentRoot: nextConfig.componentDir,
           pagesRoot: nextConfig.pagesDir,
           contentTemplatesRoot: nextConfig.contentTemplatesDir,
+          regionsRoot: nextConfig.regionsDir,
           projectRoot: process.cwd(),
         });
         const componentMetadata = await loadComponentsMetadata(discoveryResult);
 
-        interface SpecFile {
-          label: string;
-          relativePath: string;
-          path: string;
-          spec: { elements: AuthoredSpecElementMap; [key: string]: unknown };
-        }
-
-        const specFiles: SpecFile[] = [];
-
-        for (const page of discoveryResult.pages) {
-          const content = await fs.readFile(page.path, 'utf-8');
-          const spec = JSON.parse(content) as {
-            title: string;
-            elements: AuthoredSpecElementMap;
-          };
-          specFiles.push({
-            label: `page "${page.name}"`,
-            relativePath: page.relativePath,
-            path: page.path,
-            spec,
-          });
-        }
-
-        for (const template of discoveryResult.contentTemplates) {
-          const content = await fs.readFile(template.path, 'utf-8');
-          const spec = JSON.parse(content) as {
-            label: string;
-            elements: AuthoredSpecElementMap;
-          };
-          specFiles.push({
-            label: `content template "${template.name}"`,
-            relativePath: template.relativePath,
-            path: template.path,
-            spec,
-          });
-        }
+        const specFiles = await collectReconcileSpecFiles(
+          discoveryResult,
+          syncConfig,
+        );
 
         if (specFiles.length === 0) {
-          p.log.warn('No local pages or content templates found.');
+          p.log.warn(
+            'No local pages, content templates, or global regions found for the enabled sync settings.',
+          );
           p.outro('Media reconciliation skipped');
           return;
         }
@@ -393,7 +526,6 @@ export function reconcileMediaCommand(program: Command): void {
         const spinner = p.spinner();
         spinner.start('Reconciling media');
 
-        let reconciledCount = 0;
         const resultsByUrl = new Map<string, Result>();
         for (const specFile of specFiles) {
           const { reconciled, failures, successes } =
@@ -438,40 +570,43 @@ export function reconcileMediaCommand(program: Command): void {
             continue;
           }
 
-          reconciledCount += reconciled;
           await fs.writeFile(
             specFile.path,
             JSON.stringify(specFile.spec, null, 2) + '\n',
             'utf-8',
           );
-          spinner.message(
-            `Reconciled ${reconciledCount}/${pendingCount} media items`,
-          );
+          spinner.message('Reconciling media');
         }
 
         const mediaResults = [...resultsByUrl.values()];
 
-        spinner.stop(
-          chalk.green(
-            `Reconciled ${reconciledCount} ${pluralize(reconciledCount, 'media item', 'media items')}`,
-          ),
+        spinner.stop('Reconciled media', 0);
+
+        reportResults(
+          mediaResults,
+          'Reconciled media',
+          'URL',
+          COMMAND_RESULT_REPORT_OPTIONS,
         );
 
-        reportResults(mediaResults, 'Reconciled media', 'URL');
-
+        const hasFailures = mediaResults.some((r) => !r.success);
         p.outro(
-          mediaResults.some((r) => !r.success)
-            ? 'Media reconciliation completed with errors'
+          hasFailures
+            ? 'Media reconciliation incomplete'
             : 'Media reconciliation completed',
         );
+        if (hasFailures) {
+          process.exitCode = 1;
+          return;
+        }
       } catch (error) {
         if (error instanceof Error) {
-          p.note(chalk.red(`Error: ${error.message}`));
+          p.log.error(chalk.red(`Error: ${error.message}`));
         } else {
-          p.note(chalk.red(`Unknown error: ${String(error)}`));
+          p.log.error(chalk.red(`Unknown error: ${String(error)}`));
         }
-        p.note(chalk.red('Media reconciliation aborted'));
-        process.exit(1);
+        p.outro('Media reconciliation failed');
+        process.exitCode = 1;
       }
     });
 }

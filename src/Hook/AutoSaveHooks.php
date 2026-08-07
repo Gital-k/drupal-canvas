@@ -33,7 +33,32 @@ class AutoSaveHooks {
    */
   #[Hook('entity_delete')]
   public function entityDelete(EntityInterface $entity): void {
-    $this->autoSaveManager->delete($entity);
+    // Deleting an entity invalidates its entire pending-changes set, not just
+    // the auto-save matching $entity's own langcode: a content entity's
+    // per-language snapshots and a config entity's per-language
+    // StagedLanguageConfigOverride drafts are all separate auto-save entries.
+    // Discard the whole group so no orphaned sibling draft is left behind.
+    $group = $this->autoSaveManager->getTranslationGroupAutoSaves($entity);
+    // An entity without any auto-save yields an empty group; still delete it
+    // directly so the non-auto-save cleanup (form violations, brand kit file
+    // usage) in AutoSaveManager::delete() runs.
+    foreach ($group !== [] ? $group : [$entity] as $member) {
+      $this->autoSaveManager->delete($member);
+    }
+  }
+
+  /**
+   * Implements hook_entity_translation_delete().
+   */
+  #[Hook('entity_translation_delete')]
+  public function entityTranslationDelete(EntityInterface $translation): void {
+    // Deleting a single translation removes only that translation from the
+    // entity, so unlike hook_entity_delete() the sibling translations' drafts
+    // must survive. Discard just the deleted translation's own snapshot,
+    // keyed by its langcode; otherwise the stale snapshot is reapplied on the
+    // next publish and silently resurrects the deleted translation.
+    // @see \Drupal\canvas\Controller\ApiAutoSaveController::applyAutoSaveTranslationSnapshots()
+    $this->autoSaveManager->delete($translation);
   }
 
   /**

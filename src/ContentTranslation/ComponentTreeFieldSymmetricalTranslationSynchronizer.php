@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ContentTranslation;
 
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\DataType\ComponentInputs;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\content_translation\FieldTranslationSynchronizerInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityFieldManagerInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
@@ -147,7 +150,7 @@ final class ComponentTreeFieldSymmetricalTranslationSynchronizer implements Fiel
       if ($field_definition->getType() !== ComponentTreeItem::PLUGIN_ID) {
         continue;
       }
-      if (!$this->isTreeSynced($field_definition) || $this->isInputsSynced($field_definition)) {
+      if (!self::isSymmetricallyTranslated($this->decorated, $field_definition)) {
         continue;
       }
 
@@ -162,12 +165,67 @@ final class ComponentTreeFieldSymmetricalTranslationSynchronizer implements Fiel
     }
   }
 
-  private function isTreeSynced(FieldDefinitionInterface $field_definition): bool {
-    return \in_array('uuid', $this->decorated->getFieldSynchronizedProperties($field_definition), TRUE);
+  public static function isTreeSynced(FieldTranslationSynchronizerInterface $synchronizer, FieldDefinitionInterface $field_definition): bool {
+    return \in_array('uuid', $synchronizer->getFieldSynchronizedProperties($field_definition), TRUE);
   }
 
-  private function isInputsSynced(FieldDefinitionInterface $field_definition): bool {
-    return \in_array('inputs', $this->decorated->getFieldSynchronizedProperties($field_definition), TRUE);
+  public static function isInputsSynced(FieldTranslationSynchronizerInterface $synchronizer, FieldDefinitionInterface $field_definition): bool {
+    return \in_array('inputs', $synchronizer->getFieldSynchronizedProperties($field_definition), TRUE);
+  }
+
+  /**
+   * Returns TRUE if the field is in symmetrical translation mode.
+   *
+   * Symmetrical mode: tree structure synced, inputs translatable.
+   *
+   * @see \Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSynchronizer::isAsymmetricallyTranslated()
+   */
+  public static function isSymmetricallyTranslated(FieldTranslationSynchronizerInterface $synchronizer, FieldDefinitionInterface $field_definition): bool {
+    return self::isTreeSynced($synchronizer, $field_definition) && !self::isInputsSynced($synchronizer, $field_definition);
+  }
+
+  /**
+   * Returns TRUE if the field is in asymmetrical translation mode.
+   *
+   * Asymmetrical mode: both tree structure and inputs are translatable
+   * (nothing synced).
+   *
+   * @see \Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSynchronizer::isSymmetricallyTranslated()
+   */
+  public static function isAsymmetricallyTranslated(FieldTranslationSynchronizerInterface $synchronizer, FieldDefinitionInterface $field_definition): bool {
+    return !self::isTreeSynced($synchronizer, $field_definition) && !self::isInputsSynced($synchronizer, $field_definition);
+  }
+
+  /**
+   * Forces symmetrical translation of the Canvas Page `components` field.
+   *
+   * Loads the base field override storing the `translation_sync` third party
+   * setting, or creates it, and sets the only supported combination: input
+   * values of component instances are translatable, the component tree is
+   * shared across languages.
+   *
+   * This cannot be shipped as `config/optional`: recipes import a module's
+   * optional config unconditionally (no dependency gating), so a recipe
+   * importing canvas config without content_translation installed would fail
+   * validation on the `content_translation` module dependency.
+   *
+   * Must only be called when the content_translation module is installed.
+   *
+   * @see \Drupal\canvas\Hook\ContentTranslationHooks::modulesInstalled()
+   * @see canvas_post_update_0022_enforce_symmetrical_canvas_page_components_translation()
+   * @todo Remove in https://git.drupalcode.org/project/canvas/-/work_items/3571130
+   */
+  public static function ensureSymmetricalCanvasPageComponents(): void {
+    $entity_field_manager = \Drupal::service(EntityFieldManagerInterface::class);
+    \assert($entity_field_manager instanceof EntityFieldManagerInterface);
+    $base_field_definitions = $entity_field_manager->getBaseFieldDefinitions(Page::ENTITY_TYPE_ID);
+    \assert($base_field_definitions['components'] instanceof BaseFieldDefinition);
+    $override = $base_field_definitions['components']->getConfig(Page::ENTITY_TYPE_ID);
+    $override->setThirdPartySetting('content_translation', 'translation_sync', [
+      'inputs' => 'inputs',
+      'tree' => '0',
+    ]);
+    $override->save();
   }
 
 }

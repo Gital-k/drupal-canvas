@@ -44,6 +44,11 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     // Provides a field type with an internal (non-computed) `secret` property,
     // for the same constraint's field-property-level coverage.
     'canvas_test_internal_field_property',
+    // Provides the `link` field type, for EntityFieldExpressionMayOnlyTargetResolvableUris
+    // coverage: its raw `uri` (not internal, but not resolvable to a
+    // browser-accessible URL either) is rejected, while its computed,
+    // resolvable `url` remains usable.
+    'link',
   ];
 
   /**
@@ -61,6 +66,11 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       "'compiled' is a required key.",
     ],
   ];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static array $propertiesWithOptionalValues = ['type'];
 
   /**
    * {@inheritdoc}
@@ -124,6 +134,20 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
   /**
    * {@inheritdoc}
    */
+  public function testRequiredPropertyValuesMissing(?array $additional_expected_validation_errors_when_missing = NULL): void {
+    parent::testRequiredPropertyValuesMissing([
+      'js' => [
+        'js' => 'React code components must contain JavaScript and CSS.',
+      ],
+      'css' => [
+        'css' => 'React code components must contain JavaScript and CSS.',
+      ],
+    ]);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function testEntityIsValid(): void {
     parent::testEntityIsValid();
 
@@ -144,6 +168,21 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         'canvas',
       ],
     ], $this->getAllDependencies($this->entity));
+  }
+
+  public function testAssetsMatchComponentType(): void {
+    $this->entity->set('type', 'external');
+    $this->assertValidationErrors([]);
+
+    $this->entity->set('js', NULL);
+    $this->entity->set('css', NULL);
+    $this->assertValidationErrors([]);
+
+    $this->entity->set('type', 'react');
+    $this->assertValidationErrors([
+      'js' => 'React code components must contain JavaScript and CSS.',
+      'css' => 'React code components must contain JavaScript and CSS.',
+    ]);
   }
 
   /**
@@ -777,11 +816,6 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
   #[DataProvider('providerTestEntityShapes')]
   public function testEntityShapes(array $shape, array $expected_errors): void {
     $this->entity = JavaScriptComponent::create($shape);
-    // Strip out the prefix added by https://www.drupal.org/node/3549909. This
-    // can be removed when 11.3 is the minimum supported version of core.
-    if (isset($expected_errors['']) && str_starts_with($expected_errors[''], 'In component canvas:test-unknown-prop-type:') && version_compare(\Drupal::VERSION, '11.3', '<')) {
-      $expected_errors[''] = substr($expected_errors[''], 44);
-    }
     $this->assertValidationErrors($expected_errors);
   }
 
@@ -1501,6 +1535,38 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       'label' => 'Field with a secret',
     ])->save();
 
+    // A field whose item type marks a *computed* property internal — for the
+    // case asserting that internal computed field properties cannot be
+    // referenced either. `DateTimeItemOverride` marks `date` internal.
+    // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\DateTimeItemOverride
+    FieldStorageConfig::create([
+      'field_name' => 'field_date',
+      'entity_type' => 'entity_test',
+      'type' => 'datetime',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_date',
+      'entity_type' => 'entity_test',
+      'bundle' => 'entity_test',
+      'label' => 'Date',
+    ])->save();
+
+    // A field whose raw `uri` property is not resolvable to a
+    // browser-accessible URL (it can be `entity:node/1`) — for the case
+    // asserting raw URI properties cannot be referenced.
+    // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\LinkItemOverride
+    FieldStorageConfig::create([
+      'field_name' => 'field_link',
+      'entity_type' => 'entity_test',
+      'type' => 'link',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_link',
+      'entity_type' => 'entity_test',
+      'bundle' => 'entity_test',
+      'label' => 'Link',
+    ])->save();
+
     // A multi-valued reference field — for the case asserting multi-valued
     // fields cannot be referenced.
     FieldStorageConfig::create([
@@ -1516,6 +1582,78 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       'bundle' => 'entity_test',
       'label' => 'Related users',
     ])->save();
+
+    // A multi-valued field on BOTH media bundles — for the case asserting a
+    // multi-valued field leaf *inside a branch* is still rejected. Both branches
+    // must have the same leaf cardinality, so the field exists on image + video.
+    FieldStorageConfig::create([
+      'field_name' => 'field_media_tags',
+      'entity_type' => 'media',
+      'type' => 'string',
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+    ])->save();
+    foreach (['image', 'video'] as $media_bundle) {
+      FieldConfig::create([
+        'field_name' => 'field_media_tags',
+        'entity_type' => 'media',
+        'bundle' => $media_bundle,
+        'label' => 'Tags',
+      ])->save();
+    }
+
+    // A single-valued reference from a media bundle into entity_test — for the
+    // case asserting a branch whose value is itself a nested reference chain
+    // containing a violating (internal) leaf is still rejected.
+    FieldStorageConfig::create([
+      'field_name' => 'field_media_et_ref',
+      'entity_type' => 'media',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'entity_test'],
+    ])->save();
+    foreach (['image', 'video'] as $media_bundle) {
+      FieldConfig::create([
+        'field_name' => 'field_media_et_ref',
+        'entity_type' => 'media',
+        'bundle' => $media_bundle,
+        'label' => 'Related entity test',
+      ])->save();
+    }
+
+    // A link field on BOTH media bundles — for the case asserting a raw `uri`
+    // leaf *inside a branch* is still rejected. Both branches must share the
+    // same leaf shape, so the field exists on image + video.
+    FieldStorageConfig::create([
+      'field_name' => 'field_media_link',
+      'entity_type' => 'media',
+      'type' => 'link',
+    ])->save();
+    foreach (['image', 'video'] as $media_bundle) {
+      FieldConfig::create([
+        'field_name' => 'field_media_link',
+        'entity_type' => 'media',
+        'bundle' => $media_bundle,
+        'label' => 'Link',
+      ])->save();
+    }
+
+    // A self-referential multi-target-bundle reference on BOTH media bundles —
+    // for the case asserting a nested branch (descending through a second
+    // multi-bundle reference inside a branch) is rejected gracefully, not fatal.
+    FieldStorageConfig::create([
+      'field_name' => 'field_media_related',
+      'entity_type' => 'media',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'media'],
+    ])->save();
+    foreach (['image', 'video'] as $media_bundle) {
+      FieldConfig::create([
+        'field_name' => 'field_media_related',
+        'entity_type' => 'media',
+        'bundle' => $media_bundle,
+        'label' => 'Related media',
+        'settings' => ['handler_settings' => ['target_bundles' => ['image' => 'image', 'video' => 'video']]],
+      ])->save();
+    }
 
     // Add `my_reference` as a content-entity-reference prop when the test row
     // targets it, so `entityFields` keys have a valid target.
@@ -1566,6 +1704,15 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       [
         '' => 'Missing "x-allowed-entity-type-id" for content entity reference prop "my_reference".',
         'dataDependencies.entityFields.my_reference.0' => '<em class="placeholder">not-a-valid-expression</em> is not a valid prop expression.',
+      ],
+      [],
+    ];
+
+    yield 'entityFields valid expression of disallowed type' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎string␟value']]],
+      [
+        '' => 'Missing "x-allowed-entity-type-id" for content entity reference prop "my_reference".',
+        'dataDependencies.entityFields.my_reference.0' => 'The expression is valid, but not one of the allowed types: <em class="placeholder">&quot;FieldPropExpression&quot;, &quot;FieldObjectPropsExpression&quot;, &quot;ReferenceFieldPropExpression&quot;</em>.',
       ],
       [],
     ];
@@ -1641,14 +1788,17 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     ];
 
     // Two ReferenceFieldPropExpressions starting on the same field (here `uid`
-    // → user) are a legitimate pattern when their final targets are DIFFERENT
-    // fields: each ref nests into a distinct key (`name`, `mail`) within the
-    // referenced object, so they don't collide and cannot be combined
-    // into a single FieldObjectPropsExpression.
+    // → user) into the same bundle but targeting DIFFERENT final fields are
+    // consumed only through a nested object — with no loose pick on `uid`, none
+    // of its values are picked directly. JsComponent::buildReferencePayload()
+    // keys the referenced object by the referencer, so they must be coalesced
+    // into a single FieldObjectPropsExpression on `uid` whose entries follow
+    // the reference (`↝`).
     // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
-    yield 'entityFields same field ReferenceFieldPropExpressions on different final fields are allowed' => [
+    // @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::coalesce()
+    yield 'entityFields same field ReferenceFieldPropExpressions on different final fields must be combined' => [
       ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝name␞␟value', 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝mail␞␟value']]],
-      [],
+      ['dataDependencies.entityFields.my_reference' => "Multiple expressions on the same field 'entity:node:article.uid' must be coalesced into a single FieldObjectPropsExpression."],
       [],
     ];
 
@@ -1662,7 +1812,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     // @see \Drupal\canvas\Entity\JavaScriptComponent::coalesceEntityFields()
     yield 'entityFields duplicate ReferenceFieldPropExpression on same final field+property is rejected' => [
       ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟alt', 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟alt']]],
-      ['dataDependencies.entityFields.my_reference' => "Multiple expressions on the same field 'entity:user.user_picture' must be coalesced into a single FieldObjectPropsExpression."],
+      ['dataDependencies.entityFields.my_reference' => "Multiple expressions on the same field 'entity:node:article.uid' must be coalesced into a single FieldObjectPropsExpression."],
       [],
     ];
 
@@ -1685,11 +1835,18 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       [],
     ];
 
-    // Multi-bundle references are not yet supported, so each expression is
-    // rejected outright (MultiTargetBundleReferenceNotSupported). On top of
-    // that, identical duplicates on the same reference field are still flagged
-    // by the coalescing constraint.
-    yield 'entityFields duplicate multi-bundle ReferenceFieldPropExpression is rejected' => [
+    // A single multi-bundle branch reference validates: a branch expression
+    // whose per-bundle leaves are all pickable has no violation.
+    yield 'entityFields multi-bundle branch ReferenceFieldPropExpression validates' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_image␞␟alt][␜entity:media:video␝field_media_video_file␞␟target_id]']]],
+      [],
+      [],
+    ];
+
+    // Multi-bundle references are no longer rejected outright, but identical
+    // duplicates on the same reference field are still flagged by the coalescing
+    // constraint (they must become one branch expression to be storable).
+    yield 'entityFields duplicate multi-bundle ReferenceFieldPropExpression must be coalesced' => [
       [
         'entityFields' => [
           'my_reference' => [
@@ -1700,17 +1857,15 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       ],
       [
         'dataDependencies.entityFields.my_reference' => "Multiple expressions on the same field 'entity:node:article.field_media' must be coalesced into a single FieldObjectPropsExpression.",
-        'dataDependencies.entityFields.my_reference.0' => "The reference field 'entity:node:article.field_media' targets multiple bundles, which is not yet supported.",
-        'dataDependencies.entityFields.my_reference.1' => "The reference field 'entity:node:article.field_media' targets multiple bundles, which is not yet supported.",
       ],
       [],
     ];
 
     // Two multi-bundle ReferenceFieldPropExpressions on the same reference
-    // field but with different sub-property picks: each is rejected as an
-    // unsupported multi-bundle reference, and the coalescing constraint flags
-    // the colliding picks on the same field too.
-    yield 'entityFields different-sub-property multi-bundle ReferenceFieldPropExpression on same field is rejected' => [
+    // field but with different sub-property picks: no longer rejected as
+    // unsupported multi-bundle references, but the coalescing constraint still
+    // flags the colliding picks on the same field.
+    yield 'entityFields different-sub-property multi-bundle ReferenceFieldPropExpression on same field must be coalesced' => [
       [
         'entityFields' => [
           'my_reference' => [
@@ -1721,9 +1876,85 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       ],
       [
         'dataDependencies.entityFields.my_reference' => "Multiple expressions on the same field 'entity:node:article.field_media' must be coalesced into a single FieldObjectPropsExpression.",
-        'dataDependencies.entityFields.my_reference.0' => "The reference field 'entity:node:article.field_media' targets multiple bundles, which is not yet supported.",
-        'dataDependencies.entityFields.my_reference.1' => "The reference field 'entity:node:article.field_media' targets multiple bundles, which is not yet supported.",
       ],
+      [],
+    ];
+
+    // The two remaining expression validators descend into every branch of a
+    // multi-target-bundle reference, so a violating leaf hidden INSIDE one
+    // branch is still rejected.
+    //
+    // (a) An internal (non-computed) field leaf inside one branch: `media`'s
+    // `revision_default` base field is internal. Both branches pick it so their
+    // leaf shape matches (a branch requires a consistent shape).
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionMustNotTargetInternalPropertyConstraint
+    yield 'entityFields internal field leaf inside a branch is rejected' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝revision_default␞␟value][␜entity:media:video␝revision_default␞␟value]']]],
+      ['dataDependencies.entityFields.my_reference.0' => "The field property 'entity:media:image.revision_default.value' is internal and cannot be referenced."],
+      [],
+    ];
+
+    // (b) A multi-valued field leaf inside one branch: `field_media_tags` is
+    // unlimited-cardinality. Both branches target it (matching leaf cardinality
+    // is required within a branch), so the multi-valued guard still fires.
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\MultiValuedFieldNotSupportedConstraint
+    yield 'entityFields multi-valued field leaf inside a branch is rejected' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_tags␞␟value][␜entity:media:video␝field_media_tags␞␟value]']]],
+      ['dataDependencies.entityFields.my_reference.0' => "The field 'entity:media:image.field_media_tags' is multi-valued, which is not yet supported."],
+      [],
+    ];
+
+    // A raw `uri` field leaf inside one branch: `field_media_link`'s raw `uri`
+    // is not resolvable to a browser-accessible URL. Both branches pick it, so
+    // the resolvable-URIs guard descends into each branch and rejects it.
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionMayOnlyTargetResolvableUrisConstraint
+    yield 'entityFields raw uri field leaf inside a branch is rejected' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_link␞␟uri][␜entity:media:video␝field_media_link␞␟uri]']]],
+      ['dataDependencies.entityFields.my_reference.0' => "The field property 'entity:media:image.field_media_link.uri' is a raw URI, not guaranteed to resolve to a browser-accessible URL, and cannot be referenced."],
+      [],
+    ];
+
+    // (c) A branch whose value is itself a nested reference chain containing a
+    // violating leaf: each branch descends via `field_media_et_ref` into
+    // `entity_test` and picks the internal `internal_string_field`. The internal
+    // guard descends through both the branch AND the nested chain to reject the
+    // leaf (`.0`).
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionMustNotTargetInternalPropertyConstraint
+    yield 'entityFields internal leaf in a nested chain inside a branch is rejected' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝internal_string_field␞␟value][␜entity:media:video␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝internal_string_field␞␟value]']]],
+      [
+        'dataDependencies.entityFields.my_reference.0' => "The field property 'entity:entity_test.internal_string_field.value' is internal and cannot be referenced.",
+      ],
+      [],
+    ];
+
+    // (d) The same shape as (c) but with a valid leaf: each branch descends via
+    // `field_media_et_ref` into `entity_test` and picks the public `name` base
+    // field. Nothing rejects it, so it is accepted.
+    yield 'entityFields valid leaf in a nested chain inside a branch is accepted' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:node:article␝field_media␞␟entity␜[␜entity:media:image␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝name␞␟value][␜entity:media:video␝field_media_et_ref␞␟entity␜␜entity:entity_test:entity_test␝name␞␟value]']]],
+      [],
+      [],
+    ];
+
+    // (e) A branch that descends through a SECOND multi-bundle reference is a
+    // nested branch (a branch inside a branch), which is not yet supported.
+    // `field_media_related` targets both media bundles, so descending it inside
+    // one `field_media` branch would nest. Coalescing bails gracefully (no
+    // fatal) and the same-field coalescing guard reports the precise reason
+    // instead of implying the picks can be combined.
+    // @todo Becomes an accepted case once nested branching is supported, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
+    yield 'entityFields nested branch (multi-bundle reference within a branch) is rejected' => [
+      [
+        'entityFields' => [
+          'my_reference' => [
+            'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_related␞␟entity␜␜entity:media:image␝name␞␟value',
+            'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:image␝field_media_related␞␟entity␜␜entity:media:video␝name␞␟value',
+            'ℹ︎␜entity:node:article␝field_media␞␟entity␜␜entity:media:video␝name␞␟value',
+          ],
+        ],
+      ],
+      ['dataDependencies.entityFields.my_reference' => "The expressions on field 'entity:node:article.field_media' descend through a multi-bundle reference more than once, which is not yet supported."],
       [],
     ];
 
@@ -1762,6 +1993,41 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     yield 'entityFields targeting an internal field property' => [
       ['entityFields' => ['my_reference' => ['ℹ︎␜entity:entity_test:entity_test␝field_with_secret␞␟secret']]],
       ['dataDependencies.entityFields.my_reference.0' => "The field property 'entity:entity_test.field_with_secret.secret' is internal and cannot be referenced."],
+      [],
+    ];
+
+    // Same, for a *computed* property explicitly marked internal:
+    // `DateTimeItemOverride` marks `date` internal, but because `date` is
+    // also computed, `DataDefinitionInterface::isInternal()` cannot
+    // distinguish that explicit mark from the default computed-properties-
+    // are-internal behavior — this used to go undetected.
+    // @see \Drupal\canvas\Utility\TypedDataHelper::isExplicitlyInternal()
+    yield 'entityFields targeting an internal computed field property' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:entity_test:entity_test␝field_date␞␟date']]],
+      ['dataDependencies.entityFields.my_reference.0' => "The field property 'entity:entity_test.field_date.date' is internal and cannot be referenced."],
+      [],
+    ];
+
+    // A `link` field's raw `uri` is not resolvable to a browser-accessible URL
+    // (it can be `entity:node/1`), so storing an expression targeting it is
+    // rejected. `uri` is not internal, so
+    // EntityFieldExpressionMustNotTargetInternalProperty does not catch this.
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionMayOnlyTargetResolvableUrisConstraint
+    yield 'entityFields targeting a raw uri field property' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:entity_test:entity_test␝field_link␞␟uri']]],
+      ['dataDependencies.entityFields.my_reference.0' => "The field property 'entity:entity_test.field_link.uri' is a raw URI, not guaranteed to resolve to a browser-accessible URL, and cannot be referenced."],
+      [],
+    ];
+
+    // Only the raw `uri` is rejected: a `link` field remains fully usable in
+    // CER through `url`, Canvas's computed, resolvable resolution of `uri` (it
+    // carries a UriSchemeConstraint restricted to http/https, so
+    // TypedDataHelper::isRestrictedToHttpSchemes() lets it through). A "Read
+    // more" style component can still bind a link's destination this way.
+    // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\LinkItemOverride
+    yield 'entityFields targeting a link field\'s resolvable url property' => [
+      ['entityFields' => ['my_reference' => ['ℹ︎␜entity:entity_test:entity_test␝field_link␞␟url']]],
+      [],
       [],
     ];
 
@@ -2017,11 +2283,6 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         "In component canvas:{$this->entity->id()}:\n[id] Does not match the regex pattern ^[a-z]([a-zA-Z0-9_-]*[a-zA-Z0-9])*:[a-z]([a-zA-Z0-9_-]*[a-zA-Z0-9])*$\n[machineName] Does not match the regex pattern ^[a-z]([a-zA-Z0-9_-]*[a-zA-Z0-9])*$",
         $expected_messages[''],
       ];
-      // Strip out the prefix added by https://www.drupal.org/node/3549909. This
-      // can be removed when 11.3 is the minimum supported version of core.
-      if (version_compare(\Drupal::VERSION, '11.3', '<')) {
-        $expected_messages[''][0] = substr($expected_messages[''][0], strlen("In component canvas:{$this->entity->id()}:\n"));
-      }
     }
     parent::assertValidationErrors($expected_messages);
   }

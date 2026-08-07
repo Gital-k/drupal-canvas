@@ -50,6 +50,11 @@ describe('regionToAuthoredSpec', () => {
     expect(spec.elements['11111111-1111-4111-8111-111111111111'].type).toBe(
       'js.logo',
     );
+    expect(spec.elements['11111111-1111-4111-8111-111111111111'].props).toEqual(
+      {
+        linkToFrontPage: true,
+      },
+    );
   });
 
   it('treats components with missing parent_uuid/slot/label as root', () => {
@@ -74,6 +79,68 @@ describe('regionToAuthoredSpec', () => {
     const spec = regionToAuthoredSpec(region);
 
     expect(spec.elements['9c1d5586-fdec-496a-84d1-071bdf995556']).toBeDefined();
+  });
+
+  it('uses resolved props while preserving references needed for push', () => {
+    const region: Region = {
+      id: 'olivero.header',
+      theme: 'olivero',
+      region: 'header',
+      status: true,
+      component_tree: [
+        {
+          uuid: '11111111-1111-4111-8111-111111111111',
+          parent_uuid: null,
+          slot: null,
+          component_id: 'js.article-card',
+          component_version: 'v1',
+          inputs: {
+            article: { target_id: '42' },
+            image: { target_id: 21 },
+            link: { uri: 'internal:/contact' },
+          },
+          inputs_resolved: {
+            article: {
+              __type: 'article',
+              title: 'Resolved article title',
+            },
+            image: {
+              src: '/sites/default/files/header.jpg',
+              alt: 'Header',
+              width: 1200,
+              height: 400,
+            },
+            link: {
+              url: '/contact',
+            },
+          },
+          label: null,
+        },
+      ],
+    };
+
+    expect(regionToAuthoredSpec(region).elements).toEqual({
+      '11111111-1111-4111-8111-111111111111': {
+        type: 'js.article-card',
+        props: {
+          article: { target_id: '42' },
+          image: {
+            src: '/sites/default/files/header.jpg',
+            alt: 'Header',
+            width: 1200,
+            height: 400,
+          },
+          link: {
+            url: '/contact',
+          },
+        },
+        _provenance: {
+          image: {
+            target_id: 21,
+          },
+        },
+      },
+    });
   });
 });
 

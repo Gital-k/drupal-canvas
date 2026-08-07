@@ -14,8 +14,13 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
+use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
+use Drupal\Core\Block\BlockManagerInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Form\FormState;
 use Drupal\Core\Url;
@@ -51,9 +56,9 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('theme_installer')->install(['stark']);
-    $this->container->get('module_installer')->install(['system', 'canvas_test_sdc', 'canvas_test_block']);
-    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
+    $this->container->get(ModuleInstallerInterface::class)->install(['system', 'canvas_test_sdc', 'canvas_test_block']);
+    $this->container->get(ConfigFactoryInterface::class)->getEditable('system.theme')->set('default', 'stark')->save();
 
     // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
@@ -381,10 +386,19 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     // - `subheading` CAN be NULL, and currently evaluates to NULL
     // @phpstan-ignore-next-line method.nonObject
     self::assertTrue($node->getFieldDefinition('title')->isRequired());
-    self::assertSame('Test node', Evaluator::evaluate($node, expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['heading']['expression']), is_required: FALSE)->value);
+    self::assertSame('Test node', Evaluator::evaluate($node,
+      expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['heading']['expression']),
+      is_required: FALSE,
+      language: NegotiatedLanguage::matchEntity($node),
+    )->value);
     // @phpstan-ignore-next-line method.nonObject
     self::assertFalse($node->getFieldDefinition('media_image_field')->isRequired());
-    self::assertNull(Evaluator::evaluate($node, expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['subheading']['expression']), is_required: FALSE)->value);
+    self::assertNull(Evaluator::evaluate(
+      entity_or_field: $node,
+      expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['subheading']['expression']),
+      is_required: FALSE,
+      language: NegotiatedLanguage::matchEntity($node),
+    )->value);
     $crawler = $this->getCrawlerForFormRequest($form_url, $component_entity, $form_canvas_props);
     // Confirm the linked prop fields are rendered.
     self::assertCount(1, $crawler->filter('.canvas-linked-prop-label-wrapper[data-drupal-selector*="-heading-"]'));
@@ -448,7 +462,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     // @see \Drupal\Tests\canvas\Kernel\BrokenBlockManager
     // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\BlockComponentTest::triggerBrokenComponent()
     $this->container->get('state')->set('canvas_test_block.remove_definitions', [$block_plugin_id]);
-    $this->container->get('plugin.manager.block')->clearCachedDefinitions();
+    $this->container->get(BlockManagerInterface::class)->clearCachedDefinitions();
 
     // Despite the tested block plugin being broken:
     self::assertTrue($component->getComponentSource()->isBroken());
@@ -507,7 +521,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
 
     // Delete the code component through the config factory to avoid normal
     // dependency cleanup that would also remove the Component entity.
-    $this->container->get('config.factory')
+    $this->container->get(ConfigFactoryInterface::class)
       ->getEditable($code_component->getConfigDependencyName())
       ->delete();
 
