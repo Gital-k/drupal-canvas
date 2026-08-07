@@ -99,7 +99,7 @@ final class ApiContentControllers extends ApiControllerBase {
    * storable (non-computed, or persisted-computed) fields are included.
    *
    * Fields the current user cannot *view* are omitted from the YAML output.
-   * Auto-save conflict detection is not affected by this filtering — it
+   * Auto-save conflict detection is not affected by this filtering - it
    * operates on the full stored data regardless of view access.
    *
    * @see \Drupal\canvas\AutoSave\AutoSaveManager::toStorableArray()
@@ -147,7 +147,7 @@ final class ApiContentControllers extends ApiControllerBase {
     }
     else {
       // The revision creation timestamp: the time the entity was last saved to
-      // storage. This is *not* the same as the auto-save updated time above —
+      // storage. This is *not* the same as the auto-save updated time above -
       // an auto-save item may be newer than the last published save.
       // When comparing timestamps across both sides of a diff (auto-save vs
       // stored), use this value only to establish the baseline revision time.
