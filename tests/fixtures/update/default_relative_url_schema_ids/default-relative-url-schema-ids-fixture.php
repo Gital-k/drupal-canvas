@@ -9,7 +9,10 @@
  * that reads it removes those entries, so it no longer matches the old saved
  * copy and refuses to load it. This adds that old, broken state to a page, all
  * four kinds of config that hold a component tree, and two auto-save drafts, on
- * top of the bare Canvas 1.5.0 dump.
+ * top of the bare Canvas 1.5.0 dump. Each store gets both an object (`image`)
+ * value and an array (`image-gallery`) value; the array's `items` also keep the
+ * resolver's `$id` and the SDC titles, because pre-1.5.1 normalize never
+ * recursed into an array's `items`.
  *
  * The dump was saved at 1.5.0 (updates done through 0019), so the earlier
  * updates that could otherwise clean this up as a side effect have already run
@@ -61,14 +64,64 @@ $prop_source = [
 $content_inputs = Json::encode(['image' => $prop_source]);
 $config_inputs = ['image' => $prop_source];
 
-// Builds one config component tree, keyed by the instance UUID (the shape
-// config uses since update 0017).
-$config_tree = static fn(string $uuid): array => [
-  $uuid => [
-    'uuid' => $uuid,
+// The same stale state, but for an array-of-object prop: an image gallery.
+// Pre-1.5.1 normalize never recursed into an array's `items`, so the stored
+// schema keeps the resolver's `$id` on the item AND on its `src`, plus every
+// SDC `title`. `$minimal` now drops all of that, so the 0027 update must strip
+// it — and `DefaultRelativeUrlPropSource::parse()` would 500 on the leftover
+// titles otherwise, because its healer only removes `$id`. The schema was
+// captured from PropShape::normalize(<gallery `images` schema>)->resolvedSchema.
+$gallery_component_id = 'sdc.canvas_test_sdc.image-gallery';
+$gallery_component_dependency = 'canvas.component.' . $gallery_component_id;
+$gallery_component_version = '4ae273efe125d37f';
+$gallery_stale_schema = [
+  'type' => 'array',
+  'items' => [
+    'type' => 'object',
+    'title' => 'image',
+    'required' => ['src'],
+    'properties' => [
+      'src' => [
+        'title' => 'Image URL',
+        'type' => 'string',
+        'format' => 'uri-reference',
+        'contentMediaType' => 'image/*',
+        'x-allowed-schemes' => ['http', 'https'],
+        '$id' => 'json-schema-definitions://canvas.module/image-uri',
+      ],
+      'alt' => ['title' => 'Alternative text', 'type' => 'string'],
+      'width' => ['title' => 'Image width', 'type' => 'integer'],
+      'height' => ['title' => 'Image height', 'type' => 'integer'],
+    ],
+    '$id' => 'json-schema-definitions://canvas.module/image',
+  ],
+  'minItems' => 1,
+];
+$gallery_prop_source = [
+  'sourceType' => 'default-relative-url',
+  'value' => [
+    ['src' => 'gracie.jpg', 'alt' => 'A good dog', 'width' => 601, 'height' => 402],
+  ],
+  'jsonSchema' => $gallery_stale_schema,
+  'componentId' => $gallery_component_id,
+];
+$gallery_content_inputs = Json::encode(['images' => $gallery_prop_source]);
+$gallery_config_inputs = ['images' => $gallery_prop_source];
+
+// Builds a config component tree with the image and the gallery component, each
+// keyed by its instance UUID (the shape config uses since update 0017).
+$config_tree = static fn(string $image_uuid, string $gallery_uuid): array => [
+  $image_uuid => [
+    'uuid' => $image_uuid,
     'component_id' => $component_id,
     'component_version' => $component_version,
     'inputs' => $config_inputs,
+  ],
+  $gallery_uuid => [
+    'uuid' => $gallery_uuid,
+    'component_id' => $gallery_component_id,
+    'component_version' => $gallery_component_version,
+    'inputs' => $gallery_config_inputs,
   ],
 ];
 
@@ -97,6 +150,7 @@ foreach (['canvas_page__components', 'canvas_page_revision__components'] as $tab
   $connection->insert($table)
     ->fields(['bundle', 'deleted', 'entity_id', 'revision_id', 'langcode', 'delta', 'components_parent_uuid', 'components_slot', 'components_uuid', 'components_component_id', 'components_component_version', 'components_inputs', 'components_label'])
     ->values(['bundle' => 'canvas_page', 'deleted' => '0', 'entity_id' => '100', 'revision_id' => '100', 'langcode' => 'en', 'delta' => '0', 'components_parent_uuid' => NULL, 'components_slot' => NULL, 'components_uuid' => 'f0a9c0de-0000-4000-8000-00000000d001', 'components_component_id' => $component_id, 'components_component_version' => $component_version, 'components_inputs' => $content_inputs, 'components_label' => NULL])
+    ->values(['bundle' => 'canvas_page', 'deleted' => '0', 'entity_id' => '100', 'revision_id' => '100', 'langcode' => 'en', 'delta' => '1', 'components_parent_uuid' => NULL, 'components_slot' => NULL, 'components_uuid' => 'f0a9c0de-0000-4000-8000-00000000d002', 'components_component_id' => $gallery_component_id, 'components_component_version' => $gallery_component_version, 'components_inputs' => $gallery_content_inputs, 'components_label' => NULL])
     ->execute();
 }
 
@@ -106,12 +160,19 @@ foreach (['canvas_page__components', 'canvas_page_revision__components'] as $tab
 $field_name = 'field.field.node.article.field_canvas_demo';
 $field_data = unserialize((string) $connection->select('config', 'c')->fields('c', ['data'])->condition('name', $field_name)->execute()->fetchField());
 $field_data['dependencies']['config'][] = $component_dependency;
+$field_data['dependencies']['config'][] = $gallery_component_dependency;
 \sort($field_data['dependencies']['config']);
 $field_data['default_value'][] = [
   'uuid' => 'f0a9c0de-0000-4000-8000-00000000c003',
   'component_id' => $component_id,
   'component_version' => $component_version,
   'inputs' => $config_inputs,
+];
+$field_data['default_value'][] = [
+  'uuid' => 'f0a9c0de-0000-4000-8000-00000000c004',
+  'component_id' => $gallery_component_id,
+  'component_version' => $gallery_component_version,
+  'inputs' => $gallery_config_inputs,
 ];
 $connection->update('config')->condition('name', $field_name)->fields(['data' => serialize($field_data)])->execute();
 
@@ -127,10 +188,10 @@ $connection->insert('config')
       'uuid' => 'f0a9c0de-0000-4000-8000-00000000c001',
       'langcode' => 'en',
       'status' => TRUE,
-      'dependencies' => ['config' => [$component_dependency]],
+      'dependencies' => ['config' => [$gallery_component_dependency, $component_dependency]],
       'id' => 'stale_default_relative_url',
       'label' => 'Stale default-relative-url pattern',
-      'component_tree' => $config_tree('f0a9c0de-0000-4000-8000-00000000c002'),
+      'component_tree' => $config_tree('f0a9c0de-0000-4000-8000-00000000c002', 'f0a9c0de-0000-4000-8000-00000000c005'),
     ]),
   ])
   ->values([
@@ -140,11 +201,11 @@ $connection->insert('config')
       'uuid' => 'f0a9c0de-0000-4000-8000-00000000c010',
       'langcode' => 'en',
       'status' => TRUE,
-      'dependencies' => ['config' => [$component_dependency], 'theme' => ['stark']],
+      'dependencies' => ['config' => [$gallery_component_dependency, $component_dependency], 'theme' => ['stark']],
       'id' => 'stark.sidebar_first',
       'region' => 'sidebar_first',
       'theme' => 'stark',
-      'component_tree' => $config_tree('f0a9c0de-0000-4000-8000-00000000c011'),
+      'component_tree' => $config_tree('f0a9c0de-0000-4000-8000-00000000c011', 'f0a9c0de-0000-4000-8000-00000000c012'),
     ]),
   ])
   ->values([
@@ -154,12 +215,12 @@ $connection->insert('config')
       'uuid' => 'f0a9c0de-0000-4000-8000-00000000c020',
       'langcode' => 'en',
       'status' => TRUE,
-      'dependencies' => ['config' => ['core.entity_view_mode.node.full', $component_dependency]],
+      'dependencies' => ['config' => ['core.entity_view_mode.node.full', $gallery_component_dependency, $component_dependency]],
       'id' => 'node.article.full',
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'article',
       'content_entity_type_view_mode' => 'full',
-      'component_tree' => $config_tree('f0a9c0de-0000-4000-8000-00000000c021'),
+      'component_tree' => $config_tree('f0a9c0de-0000-4000-8000-00000000c021', 'f0a9c0de-0000-4000-8000-00000000c022'),
       'exposed_slots' => [],
     ]),
   ])
@@ -195,6 +256,12 @@ $connection->insert('key_value')
           'component_version' => $component_version,
           'inputs' => $content_inputs,
         ],
+        [
+          'uuid' => 'f0a9c0de-0000-4000-8000-00000000a003',
+          'component_id' => $gallery_component_id,
+          'component_version' => $gallery_component_version,
+          'inputs' => $gallery_content_inputs,
+        ],
       ],
     ])),
   ])
@@ -210,6 +277,12 @@ $connection->insert('key_value')
           'component_id' => $component_id,
           'component_version' => $component_version,
           'inputs' => $config_inputs,
+        ],
+        [
+          'uuid' => 'f0a9c0de-0000-4000-8000-00000000a004',
+          'component_id' => $gallery_component_id,
+          'component_version' => $gallery_component_version,
+          'inputs' => $gallery_config_inputs,
         ],
       ],
     ])),

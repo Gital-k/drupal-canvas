@@ -80,56 +80,36 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
     \assert(\array_key_exists('jsonSchema', $sdc_prop_source));
     \assert(\array_key_exists('componentId', $sdc_prop_source));
 
+    $stored = $sdc_prop_source['jsonSchema'];
+
+    // The canonical shape: resolve `$ref`s, then normalize.
     // @todo Make this far less clunky 🙈
     $minimal = PropShape::normalize(
-    // First do basic normalization, and resolve.
-      PropShape::normalize($sdc_prop_source['jsonSchema'])->resolvedSchema
+      PropShape::normalize($stored)->resolvedSchema
     )->schema;
 
-    // Data saved before Canvas 1.5.1 kept some extra `$id` entries that the
-    // JSON Schema resolver adds. Newer code removes them when saving, so
-    // `$minimal` (what we expect) never has them. Remove them here too;
-    // otherwise every one of those old values would be rejected below even
-    // though it is really fine. Anything else unexpected is still caught below.
-    $healed_json_schema = self::stripResolverInjectedIds($sdc_prop_source['jsonSchema']);
+    // Data saved before Canvas 1.5.1 kept the resolver's `$id` entries, and
+    // older array data also kept the SDC `title`/`meta:enum` entries because
+    // normalization did not yet descend into an array's `items`. Re-normalizing
+    // the stored schema removes all of that, so those old values load instead
+    // of being rejected. If re-normalizing still does not match `$minimal`,
+    // resolving the schema changed its shape in a way normalization does not
+    // explain (e.g. an unresolved `$ref`), so surface it.
+    $renormalized = PropShape::normalize($stored)->schema;
 
-    $sorted_healed = $healed_json_schema;
-    SortArray::sortByKeyRecursive($sorted_healed);
+    $sorted_renormalized = $renormalized;
+    SortArray::sortByKeyRecursive($sorted_renormalized);
     SortArray::sortByKeyRecursive($minimal);
 
-    if ($sorted_healed !== $minimal) {
-      throw new \LogicException(\sprintf('Extraneous JSON Schema information detected: %s should have been just %s.', json_encode($sorted_healed, JSON_PRETTY_PRINT), json_encode($minimal, JSON_PRETTY_PRINT)));
+    if ($sorted_renormalized !== $minimal) {
+      throw new \LogicException(\sprintf('Extraneous JSON Schema information detected: %s should have been just %s.', json_encode($sorted_renormalized, JSON_PRETTY_PRINT), json_encode($minimal, JSON_PRETTY_PRINT)));
     }
 
     return new self(
       $sdc_prop_source['value'],
-      $healed_json_schema,
+      $renormalized,
       $sdc_prop_source['componentId'],
     );
-  }
-
-  /**
-   * Removes the extra `$id` (and older `id`) entries the resolver adds.
-   *
-   * Works at every level of the schema. Those entries always have a text value
-   * (a URI). A real prop that happens to be named `id` instead holds a nested
-   * schema (an array), so only removing entries whose value is text leaves such
-   * a prop untouched.
-   *
-   * @see \Drupal\canvas\PropShape\PropShape::normalizePropSchema()
-   */
-  private static function stripResolverInjectedIds(array $json_schema): array {
-    foreach (['$id', 'id'] as $keyword) {
-      if (isset($json_schema[$keyword]) && \is_string($json_schema[$keyword])) {
-        unset($json_schema[$keyword]);
-      }
-    }
-    foreach ($json_schema as $key => $value) {
-      if (\is_array($value)) {
-        $json_schema[$key] = self::stripResolverInjectedIds($value);
-      }
-    }
-    return $json_schema;
   }
 
   /**

@@ -173,12 +173,58 @@ class DefaultRelativeUrlPropSourceTest extends PropSourceTestBase {
     self::assertStringNotContainsString('"$id"', $json);
     self::assertSame('{"sourceType":"default-relative-url","value":{"src":"gracie.jpg","alt":"A good dog","width":601,"height":402},"jsonSchema":{"type":"object","properties":{"src":{"type":"string","contentMediaType":"image\/*","format":"uri-reference","x-allowed-schemes":["http","https"]},"alt":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"}},"required":["src"]},"componentId":"sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop"}', $json);
 
-    // Something that really should not be there (a `title` here) is still
-    // rejected — only the resolver's `$id` is quietly removed.
-    $extraneous = $stale;
-    $extraneous['jsonSchema']['title'] = 'Extraneous';
+    // A stray `title` (SDC metadata that normalization drops) is healed too, not
+    // rejected: array `items` titles are the same kind of thing, and pre-1.5.1
+    // array data kept them, so re-normalizing must remove them everywhere.
+    $with_title = $stale;
+    $with_title['jsonSchema']['title'] = 'Extraneous';
+    self::assertStringNotContainsString('Extraneous', (string) PropSource::parse($with_title));
+
+    // An array-of-object (gallery) prop: old data kept the resolver's `$id` and
+    // the SDC titles inside `items`, because pre-1.5.1 normalize never descended
+    // there. Re-normalizing heals all of it, so the gallery loads.
+    $stale_gallery = [
+      'sourceType' => 'default-relative-url',
+      'value' => [['src' => 'gracie.jpg', 'alt' => 'A good dog', 'width' => 601, 'height' => 402]],
+      'jsonSchema' => [
+        'type' => 'array',
+        'minItems' => 1,
+        'items' => [
+          '$id' => 'json-schema-definitions://canvas.module/image',
+          'type' => 'object',
+          'title' => 'image',
+          'properties' => [
+            'src' => [
+              '$id' => 'json-schema-definitions://canvas.module/image-uri',
+              'title' => 'Image URL',
+              'type' => 'string',
+              'contentMediaType' => 'image/*',
+              'format' => 'uri-reference',
+              'x-allowed-schemes' => ['http', 'https'],
+            ],
+            'alt' => ['title' => 'Alternative text', 'type' => 'string'],
+            'width' => ['title' => 'Image width', 'type' => 'integer'],
+            'height' => ['title' => 'Image height', 'type' => 'integer'],
+          ],
+          'required' => ['src'],
+        ],
+      ],
+      'componentId' => 'sdc.canvas_test_sdc.image-gallery',
+    ];
+    $gallery_json = (string) PropSource::parse($stale_gallery);
+    self::assertStringNotContainsString('json-schema-definitions', $gallery_json);
+    self::assertStringNotContainsString('"$id"', $gallery_json);
+    self::assertStringNotContainsString('"title"', $gallery_json);
+
+    // The guard still fires when resolving the schema changes its shape — here,
+    // an unresolved `$ref`, which a saved (already resolved) schema never has.
+    $unresolved = $stale;
+    $unresolved['jsonSchema'] = [
+      'type' => 'array',
+      'items' => ['$ref' => 'json-schema-definitions://canvas.module/image', 'type' => 'object'],
+    ];
     $this->expectException(\LogicException::class);
-    PropSource::parse($extraneous);
+    PropSource::parse($unresolved);
   }
 
 }

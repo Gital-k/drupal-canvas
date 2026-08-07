@@ -47,6 +47,15 @@ final class DefaultRelativeUrlSchemaIdsUpdateTest extends CanvasUpdatePathTestBa
   private const STALE_MARKER = 'json-schema-definitions:';
 
   /**
+   * A `title` only the stale array (gallery) schema carries.
+   *
+   * Pre-1.5.1 normalize never recursed into an array's `items`, so old gallery
+   * data keeps the SDC titles there too. `$id` healing alone does not remove
+   * them, so this proves the array items are fully normalized by the update.
+   */
+  private const STALE_TITLE_MARKER = 'Alternative text';
+
+  /**
    * The seeded config entities, keyed by class, to check after the update.
    */
   private const CONFIG = [
@@ -77,6 +86,11 @@ final class DefaultRelativeUrlSchemaIdsUpdateTest extends CanvasUpdatePathTestBa
     self::assertStringContainsString(self::STALE_MARKER, self::readConfig($connection), 'Expected the fixture to seed a stale $id in config.');
     self::assertStringContainsString(self::STALE_MARKER, Json::encode($store->getAll()), 'Expected a stale $id in auto-save drafts.');
 
+    // The array (gallery) values also seed a stale `title` inside their `items`.
+    self::assertStringContainsString(self::STALE_TITLE_MARKER, self::readPageInputs($connection), 'Expected the fixture to seed a stale array title in the page.');
+    self::assertStringContainsString(self::STALE_TITLE_MARKER, self::readConfig($connection), 'Expected the fixture to seed a stale array title in config.');
+    self::assertStringContainsString(self::STALE_TITLE_MARKER, Json::encode($store->getAll()), 'Expected a stale array title in auto-save drafts.');
+
     $this->runUpdates();
 
     // After the update: no `$id` is left in the page, in any revision. The
@@ -85,6 +99,8 @@ final class DefaultRelativeUrlSchemaIdsUpdateTest extends CanvasUpdatePathTestBa
     $after_page = self::readPageInputs($connection);
     self::assertStringNotContainsString(self::STALE_MARKER, $after_page);
     self::assertStringNotContainsString('"$id"', $after_page);
+    // The array items were normalized too, so their titles are gone.
+    self::assertStringNotContainsString(self::STALE_TITLE_MARKER, $after_page);
 
     // Every seeded config entity is valid and has no `$id` left. The parent
     // class already checks all config through the health report; check the ones
@@ -95,11 +111,13 @@ final class DefaultRelativeUrlSchemaIdsUpdateTest extends CanvasUpdatePathTestBa
       self::assertEntityIsValid($entity);
     }
     self::assertStringNotContainsString(self::STALE_MARKER, self::readConfig($connection));
+    self::assertStringNotContainsString(self::STALE_TITLE_MARKER, self::readConfig($connection));
 
     // The parent class does not fail on bad auto-save drafts, so check those
     // directly. Read them again from a fresh handle.
     $store = \Drupal::keyValue(AutoSaveManager::AUTO_SAVE_STORE);
     self::assertStringNotContainsString(self::STALE_MARKER, Json::encode($store->getAll()));
+    self::assertStringNotContainsString(self::STALE_TITLE_MARKER, Json::encode($store->getAll()));
   }
 
   /**
