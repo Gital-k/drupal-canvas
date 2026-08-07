@@ -37,6 +37,8 @@ class ApiContentControllersGetValuesAsTextTest extends CanvasKernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
+    // @todo Remove the use of 'canvas_dev_cd' flag in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+    'canvas_dev_cd',
     'canvas_test_page',
     'canvas_test_field_view_access',
     'field',

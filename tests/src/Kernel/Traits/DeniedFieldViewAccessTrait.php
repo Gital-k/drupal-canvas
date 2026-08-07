@@ -35,7 +35,7 @@ trait DeniedFieldViewAccessTrait {
     $state->set(CanvasTestFieldViewAccessHooks::STATE_KEY, \array_values(\array_unique($denied)));
 
     // Invalidate any cached access results that depend on this module's tag.
-    Cache::invalidateTags(['canvas_test_field_view_access']);
+    Cache::invalidateTags([CanvasTestFieldViewAccessHooks::CACHE_TAG]);
   }
 
 }

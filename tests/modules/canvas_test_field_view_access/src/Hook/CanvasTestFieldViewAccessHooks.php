@@ -22,15 +22,13 @@ use Drupal\Core\State\StateInterface;
  *
  * This module is intentionally entity-type agnostic: it works for Page,
  * ContentTemplate previews, node bundles, or any other fieldable entity type.
+ *
+ * @see \Drupal\Tests\canvas\Kernel\Traits\DeniedFieldViewAccessTrait
  */
 final class CanvasTestFieldViewAccessHooks {
 
-  /**
-   * State key holding the list of fields to deny "view" access to.
-   *
-   * The stored value is an array of "{entity_type_id}:{field_name}" strings.
-   */
   public const string STATE_KEY = 'canvas_test_field_view_access.denied';
+  public const string CACHE_TAG = 'canvas_test_field_view_access';
 
   public function __construct(
     private readonly StateInterface $state,
@@ -52,7 +50,7 @@ final class CanvasTestFieldViewAccessHooks {
     return AccessResult::forbiddenIf(
       condition: \in_array($key, $denied, TRUE),
       reason: \sprintf('Field "%s" view access is denied for testing.', $key),
-    )->addCacheTags(['canvas_test_field_view_access']);
+    )->addCacheTags([self::CACHE_TAG]);
   }
 
 }
