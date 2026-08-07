@@ -13,9 +13,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Tests that canvas URLs with a language prefix are redirected.
- *
- * @see CanvasRouteOptionsEventSubscriber::redirectCanvasToDefaultLanguage().
+ * Tests Canvas URLs with a language prefix.
  */
 #[Group('canvas')]
 #[RunTestsInSeparateProcesses]
@@ -44,9 +42,9 @@ final class CanvasLanguageRoutesTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that language-prefixed /canvas URLs redirect to their bare equivalents.
+   * Tests that language-prefixed Canvas URLs are supported.
    */
-  public function testLanguagePrefixedCanvasUrlRedirectsToDefaultLanguage(): void {
+  public function testLanguagePrefixedCanvasUrlsAreSupported(): void {
     ConfigurableLanguage::createFromLangcode('es')->save();
 
     $this->config('language.negotiation')
@@ -65,50 +63,37 @@ final class CanvasLanguageRoutesTest extends CanvasKernelTestBase {
     $page->save();
     $page_id = $page->id();
 
-    // Assert /es/canvas redirects to /canvas.
+    // Assert /es/canvas is supported.
     $response = $this->request(Request::create('/es/canvas'));
     self::assertSame(
-      302,
+      200,
       $response->getStatusCode(),
-      'A language-prefixed /canvas URL must trigger a 302 redirect.',
-    );
-    self::assertSame(
-      '/canvas',
-      $response->headers->get('Location'),
-      'The redirect must point to /canvas with the language prefix stripped.',
+      'A language-prefixed /canvas URL must be supported.',
     );
 
-    // Assert /es/canvas/editor/canvas_page/{id} redirects to
-    // /canvas/editor/canvas_page/{id}.
     $editor_path = "/canvas/editor/canvas_page/$page_id";
+    // Assert /es/canvas/editor/canvas_page/{id} is supported.
     $response = $this->request(Request::create("/es$editor_path"));
     self::assertSame(
-      302,
+      200,
       $response->getStatusCode(),
-      'A language-prefixed /canvas/editor URL must trigger a 302 redirect.',
-    );
-    self::assertSame(
-      $editor_path,
-      $response->headers->get('Location'),
-      'The redirect must point to the editor URL with the language prefix stripped.',
+      'A language-prefixed /canvas/editor URL must be supported.',
     );
 
-    // Assert /canvas/api/v0/layout/canvas_page/$page_id is not redirected.
+    // Assert /es/canvas/api/v0/layout/canvas_page/$page_id is supported.
     $api_layout_path = "/canvas/api/v0/layout/canvas_page/$page_id";
     $response = $this->request(Request::create("/es$api_layout_path"));
     self::assertSame(
       200,
       $response->getStatusCode(),
-      'A language-prefixed /canvas/api URL must NOT trigger a 302 redirect.',
+      'A language-prefixed /canvas/api URL must be supported.',
     );
   }
 
   /**
-   * Verifies redirect safety for languages with custom URL prefixes.
-   *
-   * @see \Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber::redirectCanvasToDefaultLanguage()
+   * Tests Canvas URLs with custom language prefixes.
    */
-  public function testLanguageWithCustomPrefixDoesNotCauseRedirectLoop(): void {
+  public function testLanguageWithCustomPrefixIsSupported(): void {
     ConfigurableLanguage::createFromLangcode('fr')->save();
 
     // Setting up a configurable language uses the langcode as the prefix by
@@ -125,14 +110,9 @@ final class CanvasLanguageRoutesTest extends CanvasKernelTestBase {
     $response = $this->request(Request::create('/francais/canvas'));
 
     self::assertSame(
-      302,
+      200,
       $response->getStatusCode(),
-      'A language-prefixed /canvas URL must trigger a 302 redirect.',
-    );
-    self::assertSame(
-      '/canvas',
-      $response->headers->get('Location'),
-      'The redirect must point to /canvas, not back to /francais/canvas.',
+      'A /canvas URL with a custom language prefix must be supported.',
     );
   }
 
