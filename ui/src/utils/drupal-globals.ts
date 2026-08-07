@@ -13,6 +13,21 @@ export const getDrupal = () => Drupal;
 export const getDrupalSettings = (): DrupalSettings => drupalSettings;
 export const getCanvasSettings = () => drupalSettings?.canvas;
 export const getBaseUrl = () => drupalSettings?.path?.baseUrl;
+/**
+ * Gets the base URL matching the current inbound path.
+ *
+ * Drupal's pathPrefix is generated for outbound URLs and can be present even
+ * when the current request did not use the configured language prefix.
+ */
+export const getBaseUrlForCurrentPath = () => {
+  const baseUrl = getBaseUrl();
+  const pathPrefix = drupalSettings?.path?.pathPrefix ?? '';
+  const prefixedBaseUrl = `${baseUrl}${pathPrefix}`;
+
+  return window.location.pathname.startsWith(prefixedBaseUrl)
+    ? prefixedBaseUrl
+    : baseUrl;
+};
 export const getLanguages = (): Language[] =>
   drupalSettings?.canvas?.languages ?? [];
 export const getCanvasPermissions = () =>

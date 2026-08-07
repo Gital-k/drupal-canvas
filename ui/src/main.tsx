@@ -26,7 +26,7 @@ import '@/styles/index.css';
 
 import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import {
-  getBaseUrl,
+  getBaseUrlForCurrentPath,
   getCanvasSettings,
   getDrupal,
   getDrupalSettings,
@@ -46,15 +46,14 @@ interface ProviderComponentProps {
 
 const Drupal = getDrupal();
 const canvasSettings = getCanvasSettings();
-const baseUrl = getBaseUrl();
+const baseUrl = getBaseUrlForCurrentPath();
 const drupalSettings = getDrupalSettings();
 
 const container = document.getElementById('canvas');
 
-const pathPrefix = drupalSettings?.path?.pathPrefix || '';
 const appConfiguration: AppConfiguration = {
   ...initialState,
-  baseUrl: baseUrl + pathPrefix || import.meta.env.BASE_URL,
+  baseUrl: baseUrl || import.meta.env.BASE_URL,
   devMode: canvasSettings.devMode || false,
   homepagePath: canvasSettings.homepagePath,
 };
