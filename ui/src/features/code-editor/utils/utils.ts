@@ -59,6 +59,12 @@ export function serializeDataDependencies(
 export function parsePropValueForPreview(
   prop: CodeComponentProp,
 ): CodeComponentPropPreviewValue {
+  if (prop.derivedType === 'contentEntityReference') {
+    // Matches the runtime contract for an unset/unresolved reference: the
+    // component always receives null, never undefined.
+    // @see JsComponent::buildReferencePayload()
+    return prop.previewResolvedValue ?? null;
+  }
   switch (prop.type) {
     case 'integer':
       return Number(prop.example);
