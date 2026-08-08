@@ -18,6 +18,7 @@ import {
   pluralize,
   pluralizeComponent,
   updateConfigFromOptions,
+  warnAboutSiteProvidedPackages,
 } from '../utils/command-helpers';
 import { printCommandIntro } from '../utils/command-intro';
 import { detectHeadlessSdk } from '../utils/detect-headless-sdk';
@@ -1143,6 +1144,11 @@ export function pushCommand(program: Command): void {
               'Tailwind build failed, global assets upload aborted. Nothing was pushed.',
             );
           }
+
+          warnAboutSiteProvidedPackages(
+            canvasBuild.siteProvidedPackages,
+            canvasBuild.siteImportsVerified,
+          );
 
           // Build and push components.
           try {
