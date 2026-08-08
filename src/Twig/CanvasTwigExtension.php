@@ -7,6 +7,7 @@ namespace Drupal\canvas\Twig;
 use Drupal\canvas\Entity\ParametrizedImageStyle;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\UrlHelper;
@@ -14,8 +15,11 @@ use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Image\ImageFactory;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RendererInterface;
+use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\Core\Template\Attribute;
+use Drupal\image\Entity\ImageStyle;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
@@ -25,27 +29,16 @@ use Twig\TwigFunction;
  *
  * This:
  * 1. adds metadata to output as HTML comments
- * 2. provides a `toSrcSet` Twig filter
+ * 2. provides a `toSrcSet` Twig filter.
  */
 final class CanvasTwigExtension extends AbstractExtension {
 
-  /**
-   * Constructs a new CanvasTwigExtension object.
-   *
-   * @param \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface $streamWrapperManager
-   *   The stream wrapper manager service.
-   * @param \Drupal\Core\Image\ImageFactory $imageFactory
-   *   The image factory service.
-   * @param \Drupal\Core\File\FileUrlGeneratorInterface $fileUrlGenerator
-   *   The file URL generator.
-   * @param \Drupal\Core\Render\RendererInterface $renderer
-   *   The renderer service.
-   */
   public function __construct(
     private readonly StreamWrapperManagerInterface $streamWrapperManager,
     private readonly ImageFactory $imageFactory,
     private readonly FileUrlGeneratorInterface $fileUrlGenerator,
     private readonly RendererInterface $renderer,
+    private readonly RequestStack $requestStack,
   ) {}
 
   /**
@@ -75,6 +68,10 @@ final class CanvasTwigExtension extends AbstractExtension {
         [$this, 'getHeight'],
       ),
       new TwigFilter(
+        'apply_image_style',
+        [$this, 'applyImageStyle'],
+      ),
+      new TwigFilter(
         'jsx_attributes',
         [$this, 'jsxAttributes'],
       ),
@@ -97,6 +94,10 @@ final class CanvasTwigExtension extends AbstractExtension {
   /**
    * Generates `srcset` from URLs with ?alternateWidths and stream wrapper URIs.
    *
+   * Also handles public files URLs (e.g., /sites/default/files/... including
+   * styled image URLs) by converting them to public:// stream wrapper URIs
+   * when possible.
+   *
    * @param string $src
    *   An img.src attribute.
    * @param int|null $intrinsicImageWidth
@@ -110,16 +111,18 @@ final class CanvasTwigExtension extends AbstractExtension {
 
     // URLs with alternateWidths query parameter.
     $query = parse_url($src, PHP_URL_QUERY);
+    $hasAlternateWidths = FALSE;
     if ($query) {
       parse_str($query, $params);
       if (!empty($params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM])) {
         // We only expect 1 `alternateWidths` query parameter.
         \assert(\is_string($params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM]));
         $template = urldecode($params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM]);
+        $hasAlternateWidths = TRUE;
       }
     }
     // Stream wrappers.
-    elseif ($this->streamWrapperManager->isValidUri($src)) {
+    if (!$hasAlternateWidths && $this->streamWrapperManager->isValidUri($src)) {
       $template = ParametrizedImageStyle::load('canvas_parametrized_width')?->buildUrlTemplate($src);
       if (\is_string($template)) {
         $template = $this->fileUrlGenerator->transformRelative($template);
@@ -132,6 +135,19 @@ final class CanvasTwigExtension extends AbstractExtension {
         : min($intrinsicImageWidth, $actual_intrinsic_image_width);
       if (\is_null($intrinsicImageWidth)) {
         $intrinsicImageWidth = $this->getWidth($src);
+      }
+    }
+    // Public files URLs (e.g., /sites/default/files/image.jpg).
+    // Convert to public:// URI when possible, then use same logic as above.
+    elseif (!$hasAlternateWidths && !$this->streamWrapperManager->isValidUri($src)) {
+      $uri = $this->urlToStreamWrapperUri($src);
+      if ($uri) {
+        $template = ParametrizedImageStyle::load('canvas_parametrized_width')?->buildUrlTemplate($uri);
+        if (\is_string($template)) {
+          $template = $this->fileUrlGenerator->transformRelative($template);
+        }
+        // Trust the passed width if available, otherwise try to read from file.
+        $intrinsicImageWidth ??= $this->getWidth($uri);
       }
     }
 
@@ -155,6 +171,40 @@ final class CanvasTwigExtension extends AbstractExtension {
 
     $srcset = \array_map(static fn($w) => str_replace('{width}', (string) $w, $template) . " {$w}w", $widths);
     return implode(', ', $srcset);
+  }
+
+  /**
+   * Converts a public files URL back to its stream wrapper URI.
+   *
+   * This reverses what \Drupal\Core\StreamWrapper\PublicStream::getLocalPath()
+   * does, but only for public:// files.
+   *
+   * @param string $url
+   *   A public files URL (e.g., /sites/default/files/image.jpg).
+   *
+   * @return string|null
+   *   The public:// stream wrapper URI, or NULL if not a public files URL.
+   */
+  private function urlToStreamWrapperUri(string $url): ?string {
+    $publicBasePath = PublicStream::basePath();
+    $pathSegment = parse_url($url, PHP_URL_PATH);
+    $path = ltrim(\is_string($pathSegment) ? $pathSegment : $url, '/');
+    $basePath = trim($this->requestStack->getCurrentRequest()?->getBasePath() ?? '', '/');
+    $prefix = $publicBasePath . '/';
+
+    if (str_starts_with($path, $prefix)) {
+      $target = substr($path, strlen($prefix));
+    }
+    elseif ($basePath !== '' && str_starts_with($path, $basePath . '/' . $prefix)) {
+      $target = substr($path, strlen($basePath . '/' . $prefix));
+    }
+    else {
+      return NULL;
+    }
+
+    // Decode the path so the URI uses actual characters, avoiding
+    // double-encoding when Drupal builds the styled URL.
+    return 'public://' . rawurldecode($target);
   }
 
   /**
@@ -195,6 +245,63 @@ final class CanvasTwigExtension extends AbstractExtension {
       }
     }
     return NULL;
+  }
+
+  /**
+   * Applies an image style to an image array.
+   *
+   * This filter takes an image array and applies a Drupal image style,
+   * returning a new array with the styled URL and transformed dimensions.
+   * The dimensions are calculated using ImageStyle::transformDimensions()
+   * so the styled derivative doesn't need to exist yet.
+   *
+   * @param array $image
+   *   Image array with 'src', 'width', 'height', and optionally 'alt'.
+   * @param string $styleName
+   *   The image style machine name.
+   *
+   * @return array
+   *   Image array with 'src' as styled URL and transformed 'width'/'height'.
+   */
+  public function applyImageStyle(array $image, string $styleName): array {
+    $result = $image;
+    $src = $image['src'] ?? '';
+
+    if (empty($src)) {
+      return $result;
+    }
+
+    $style = ImageStyle::load($styleName);
+    if (!$style) {
+      return $result;
+    }
+
+    // Convert src to URI if needed.
+    $uri = $this->streamWrapperManager->isValidUri($src)
+      ? $src
+      : $this->urlToStreamWrapperUri($src);
+
+    if (!$uri || !$style->supportsUri($uri)) {
+      return $result;
+    }
+
+    // Get styled URL.
+    $result['src'] = $this->fileUrlGenerator->transformRelative($style->buildUrl($uri));
+
+    // Transform dimensions if we have them.
+    if (!empty($image['width']) && !empty($image['height'])) {
+      $dimensions = [
+        'width' => $image['width'],
+        'height' => $image['height'],
+      ];
+      \assert(Inspector::assertAllNumeric($dimensions));
+      $dimensions = \array_map('intval', $dimensions);
+      $style->transformDimensions($dimensions, $uri);
+      $result['width'] = $dimensions['width'];
+      $result['height'] = $dimensions['height'];
+    }
+
+    return $result;
   }
 
   /**
