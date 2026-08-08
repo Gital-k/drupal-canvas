@@ -20,20 +20,20 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * Canvas 1.5.0 and earlier saved a default-relative-url value's JSON Schema
  * with extra `$id` entries that the schema resolver adds. Since 1.5.1
  * (#3591629) the code that reads it removes those entries, so it no longer
- * matches the old saved copy and the editor fails with a 500. The 0027 updates
+ * matches the old saved copy and the editor fails with a 500. The 0028 updates
  * remove the extra entries from pages, every kind of config that holds a
  * component tree, and auto-save drafts.
  *
  * The dump was saved at Canvas 1.5.0 (updates done through 0019), so no earlier
- * update re-saves the seeded data and quietly cleans it up first — the 0027
+ * update re-saves the seeded data and quietly cleans it up first — the 0028
  * updates are the only thing that fixes each case.
  *
- * @legacy-covers \canvas_post_update_0027_default_relative_url_schema_ids
- * @legacy-covers \canvas_post_update_0027_pattern_default_relative_url_schema_ids
- * @legacy-covers \canvas_post_update_0027_page_region_default_relative_url_schema_ids
- * @legacy-covers \canvas_post_update_0027_content_template_default_relative_url_schema_ids
- * @legacy-covers \canvas_post_update_0027_component_tree_field_default_value_default_relative_url_schema_ids
- * @legacy-covers \canvas_post_update_0027_auto_save_default_relative_url_schema_ids
+ * @legacy-covers \canvas_post_update_0028_default_relative_url_schema_ids
+ * @legacy-covers \canvas_post_update_0028_pattern_default_relative_url_schema_ids
+ * @legacy-covers \canvas_post_update_0028_page_region_default_relative_url_schema_ids
+ * @legacy-covers \canvas_post_update_0028_content_template_default_relative_url_schema_ids
+ * @legacy-covers \canvas_post_update_0028_component_tree_field_default_value_default_relative_url_schema_ids
+ * @legacy-covers \canvas_post_update_0028_auto_save_default_relative_url_schema_ids
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]

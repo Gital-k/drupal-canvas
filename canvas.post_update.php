@@ -6,6 +6,7 @@ use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSynchronizer;
 use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\Color;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Folder;
@@ -661,6 +662,8 @@ function _canvas_coerce_block_label_display_in_raw(array &$data): bool {
 }
 
 /**
+ * Installs the Color config entity type.
+ *
  * Rehash existing auto-save items with the strengthened normalization.
  *
  * Changes to AutoSaveManager::toStorableArray() and ::normalizeEntity() mean
@@ -709,6 +712,18 @@ function canvas_post_update_0026_rehash_auto_save_items(): void {
 }
 
 /**
+ * Installs the Color config entity type.
+ */
+function canvas_post_update_0027_install_color_entity_type(): void {
+  $entity_definition_update_manager = \Drupal::service(EntityDefinitionUpdateManagerInterface::class);
+  \assert($entity_definition_update_manager instanceof EntityDefinitionUpdateManagerInterface);
+  $change_list = $entity_definition_update_manager->getChangeList();
+  if (($change_list[Color::ENTITY_TYPE_ID]['entity_type'] ?? NULL) === EntityDefinitionUpdateManagerInterface::DEFINITION_CREATED) {
+    $entity_definition_update_manager->installEntityType(\Drupal::entityTypeManager()->getDefinition(Color::ENTITY_TYPE_ID));
+  }
+}
+
+/**
  * Cleans up old default-relative-url schemas saved in page/content data.
  *
  * Canvas 1.5.0 and earlier saved a default-relative-url value's JSON Schema
@@ -719,13 +734,13 @@ function canvas_post_update_0026_rehash_auto_save_items(): void {
  * translation, and rewrites the saved schema to the clean version.
  *
  * @see \Drupal\canvas\CanvasConfigUpdater::normalizeDefaultRelativeUrlSchema()
- * @see \canvas_post_update_0027_pattern_default_relative_url_schema_ids()
- * @see \canvas_post_update_0027_page_region_default_relative_url_schema_ids()
- * @see \canvas_post_update_0027_content_template_default_relative_url_schema_ids()
- * @see \canvas_post_update_0027_component_tree_field_default_value_default_relative_url_schema_ids()
- * @see \canvas_post_update_0027_auto_save_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_pattern_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_page_region_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_content_template_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_component_tree_field_default_value_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_auto_save_default_relative_url_schema_ids()
  */
-function canvas_post_update_0027_default_relative_url_schema_ids(array &$sandbox): void {
+function canvas_post_update_0028_default_relative_url_schema_ids(array &$sandbox): void {
   $entity_type_manager = \Drupal::entityTypeManager();
 
   // Collect the work up front: the id of every content item (every revision,
@@ -797,9 +812,9 @@ function canvas_post_update_0027_default_relative_url_schema_ids(array &$sandbox
 /**
  * Cleans up old default-relative-url schemas in Patterns.
  *
- * @see \canvas_post_update_0027_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
  */
-function canvas_post_update_0027_pattern_default_relative_url_schema_ids(array &$sandbox): void {
+function canvas_post_update_0028_pattern_default_relative_url_schema_ids(array &$sandbox): void {
   \Drupal::classResolver(ConfigEntityUpdater::class)
     ->update($sandbox, Pattern::ENTITY_TYPE_ID, static fn(Pattern $pattern): bool => CanvasConfigUpdater::needsDefaultRelativeUrlSchemaNormalization($pattern));
 }
@@ -807,9 +822,9 @@ function canvas_post_update_0027_pattern_default_relative_url_schema_ids(array &
 /**
  * Cleans up old default-relative-url schemas in Page Regions.
  *
- * @see \canvas_post_update_0027_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
  */
-function canvas_post_update_0027_page_region_default_relative_url_schema_ids(array &$sandbox): void {
+function canvas_post_update_0028_page_region_default_relative_url_schema_ids(array &$sandbox): void {
   \Drupal::classResolver(ConfigEntityUpdater::class)
     ->update($sandbox, PageRegion::ENTITY_TYPE_ID, static fn(PageRegion $region): bool => CanvasConfigUpdater::needsDefaultRelativeUrlSchemaNormalization($region));
 }
@@ -817,9 +832,9 @@ function canvas_post_update_0027_page_region_default_relative_url_schema_ids(arr
 /**
  * Cleans up old default-relative-url schemas in Content Templates.
  *
- * @see \canvas_post_update_0027_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
  */
-function canvas_post_update_0027_content_template_default_relative_url_schema_ids(array &$sandbox): void {
+function canvas_post_update_0028_content_template_default_relative_url_schema_ids(array &$sandbox): void {
   \Drupal::classResolver(ConfigEntityUpdater::class)
     ->update($sandbox, ContentTemplate::ENTITY_TYPE_ID, static fn(ContentTemplate $template): bool => CanvasConfigUpdater::needsDefaultRelativeUrlSchemaNormalization($template));
 }
@@ -827,9 +842,9 @@ function canvas_post_update_0027_content_template_default_relative_url_schema_id
 /**
  * Cleans up old default-relative-url schemas in field default values.
  *
- * @see \canvas_post_update_0027_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
  */
-function canvas_post_update_0027_component_tree_field_default_value_default_relative_url_schema_ids(array &$sandbox): void {
+function canvas_post_update_0028_component_tree_field_default_value_default_relative_url_schema_ids(array &$sandbox): void {
   \Drupal::classResolver(ConfigEntityUpdater::class)
     ->update($sandbox, 'field_config', static fn(FieldConfig $field): bool => CanvasConfigUpdater::needsDefaultRelativeUrlSchemaNormalization($field));
 }
@@ -843,9 +858,9 @@ function canvas_post_update_0027_component_tree_field_default_value_default_rela
  * a 500, even after the saved page itself is fixed. This rewrites every stored
  * component whose inputs have an affected schema.
  *
- * @see \canvas_post_update_0027_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
  */
-function canvas_post_update_0027_auto_save_default_relative_url_schema_ids(array &$sandbox): void {
+function canvas_post_update_0028_auto_save_default_relative_url_schema_ids(array &$sandbox): void {
   $store = \Drupal::keyValue(AutoSaveManager::AUTO_SAVE_STORE);
   $changed_keys = [];
   foreach ($store->getAll() as $key => $entry) {
