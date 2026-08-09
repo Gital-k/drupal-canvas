@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
+import parse from 'html-react-parser';
 import { useNavigate } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import Dialog from '@/components/Dialog';
+import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import {
   closeAllDialogs,
   selectDialogStates,
@@ -86,9 +88,7 @@ const AddToComponentsDialog = () => {
         isError
           ? {
               title: 'Failed to add to components',
-              message: `An error ${
-                'status' in error ? '(HTTP ' + error.status + ')' : ''
-              } occurred while adding to components. Please check the browser console for more details.`,
+              message: parse(extractErrorMessageFromApiResponse(error)),
               resetButtonText: 'Try again',
               onReset: handleSave,
             }

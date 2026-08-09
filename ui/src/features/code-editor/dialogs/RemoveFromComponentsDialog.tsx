@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import parse from 'html-react-parser';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -8,6 +9,7 @@ import {
   setCodeComponentProperty,
   setForceRefresh,
 } from '@/features/code-editor/codeEditorSlice';
+import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import {
   closeAllDialogs,
   selectDialogStates,
@@ -116,9 +118,7 @@ const RemoveFromComponentsDialog = () => {
         isError
           ? {
               title: 'Failed to remove from components',
-              message: `An error ${
-                'status' in error ? '(HTTP ' + error.status + ')' : ''
-              } occurred while removing from components. Please check the browser console for more details.`,
+              message: parse(extractErrorMessageFromApiResponse(error)),
               resetButtonText: 'Try again',
               onReset: handleSave,
             }
