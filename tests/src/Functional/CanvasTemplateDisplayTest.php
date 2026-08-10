@@ -263,16 +263,12 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
     \assert($template instanceof ConfigEntityInterface);
     $template->save();
 
-    $html = $this->drupalGet('admin/config/people/accounts/display');
+    $this->drupalGet('admin/config/people/accounts/display');
     $this->assertSession()->pageTextNotContains('Undefined array key');
-    $crawler = new Crawler($html);
-    $template_link = $crawler->filterXPath(self::TEMPLATE_LINK_XPATH);
-    $this->assertCount(1, $template_link, 'Exactly one template link should exist.');
-    $this->assertStringContainsString(
-      'canvas/template/user/user/compact',
-      (string) $template_link->attr('href'),
-      'Template link href should point to Canvas template editor.'
-    );
+    // Exactly one template link exists, pointing at the Canvas template editor
+    // for the implicit `user` bundle.
+    $this->assertSession()->elementsCount('xpath', self::TEMPLATE_LINK_XPATH, 1);
+    $this->assertSession()->elementAttributeContains('xpath', self::TEMPLATE_LINK_XPATH, 'href', 'canvas/template/user/user/compact');
   }
 
   /**

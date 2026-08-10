@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\canvas\ContentTemplateRepository;
+use Drupal\Core\DependencyInjection\AutowireTrait;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
@@ -19,20 +19,12 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
  */
 final class ContentTemplateEntityTypeConstraintValidator extends ConstraintValidator implements ContainerInjectionInterface {
 
+  use AutowireTrait;
+
   public function __construct(
     private readonly ContentTemplateRepository $contentTemplateRepository,
     private readonly EntityTypeManagerInterface $entityTypeManager,
   ) {}
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container): static {
-    return new static(
-      $container->get(ContentTemplateRepository::class),
-      $container->get(EntityTypeManagerInterface::class),
-    );
-  }
 
   /**
    * {@inheritdoc}

@@ -141,7 +141,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     foreach ($this->contentTemplateRepository->getSupportedEntityTypeIds() as $entity_type_id) {
       $entity_view_modes = $this->entityDisplayRepository->getViewModeOptions($entity_type_id);
       // @see \Drupal\Core\Entity\Entity\EntityViewMode
-      unset($entity_view_modes['default']);
+      unset($entity_view_modes[EntityDisplayRepositoryInterface::DEFAULT_DISPLAY_MODE]);
       if ($entity_view_modes === []) {
         continue;
       }

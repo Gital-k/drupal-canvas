@@ -45,7 +45,7 @@ final readonly class ContentTemplateRepository {
   public function getSupportedEntityTypeIds(): array {
     $definitions = array_filter(
       $this->entityTypeManager->getDefinitions(),
-      fn($entity_type): bool => self::isSupportedEntityType($entity_type),
+      self::isSupportedEntityType(...),
     );
     return \array_keys($definitions);
   }

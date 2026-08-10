@@ -11,6 +11,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
+use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
@@ -133,7 +134,7 @@ final class ContentTemplateHooks {
 
     // Only proceed if this is a routed URL on a view mode display route for a
     // supported entity type.
-    if (!$url instanceof Url || !$url->isRouted()) {
+    if (!$url?->isRouted()) {
       return;
     }
     $url_route_name = $url->getRouteName();
@@ -151,7 +152,7 @@ final class ContentTemplateHooks {
     // single implicit bundle equal to the entity type ID, and their Field UI
     // routes carry no bundle route parameter.
     $bundle = $bundle_entity_type !== NULL ? $route_parameters[$bundle_entity_type] : $entity_type_id;
-    $view_mode_id = $route_parameters['view_mode_name'] ?? 'default';
+    $view_mode_id = $route_parameters['view_mode_name'] ?? EntityDisplayRepositoryInterface::DEFAULT_DISPLAY_MODE;
 
     // Check if a Canvas template exists.
     $template = ContentTemplate::loadFor($entity_type_id, $bundle, $view_mode_id);
