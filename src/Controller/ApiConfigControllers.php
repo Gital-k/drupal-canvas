@@ -180,12 +180,7 @@ final class ApiConfigControllers extends ApiControllerBase {
       \assert($entity_type instanceof EntityTypeInterface);
       $bundle_entity_type_id = $entity_type->getBundleEntityType();
 
-      $label = $entity_type->getCollectionLabel();
-      if ($bundle_entity_type_id) {
-        $bundle_entity_type = $this->entityTypeManager->getDefinition($bundle_entity_type_id);
-        \assert($bundle_entity_type instanceof EntityTypeInterface);
-        $label = $bundle_entity_type->getCollectionLabel();
-      }
+      $label = $this->contentTemplateRepository->getBundleCollectionLabel($entity_type_id);
       $bundle_info = $this->bundleInfo->getBundleInfo($entity_type_id);
       $bundles = [];
       foreach ($bundle_info as $bundle_key => $info) {
@@ -229,6 +224,7 @@ final class ApiConfigControllers extends ApiControllerBase {
         $hierarchical_json[$entity_type_id]['bundles'][$entity_type_id]['label'] = NULL;
       }
       if ($bundle_entity_type_id) {
+        $bundle_entity_type = $this->entityTypeManager->getDefinition($bundle_entity_type_id);
         \assert($bundle_entity_type instanceof ConfigEntityTypeInterface);
         $additional_cacheability->addCacheTags($bundle_entity_type->getListCacheTags());
         $individual_bundle_entity_cache_tag_prefixes_to_ignore[] = \sprintf("config:%s.", $bundle_entity_type->getConfigPrefix());

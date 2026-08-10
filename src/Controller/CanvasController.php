@@ -145,6 +145,7 @@ HTML;
         $bundle_entity_type_id = $entity_type_definition->getBundleEntityType();
         $content_template_entity_types[$entity_type_id] = [
           'label' => (string) $entity_type_definition->getLabel(),
+          'bundleCollectionLabel' => $this->contentTemplateRepository->getBundleCollectionLabel($entity_type_id),
           'bundleLabel' => $bundle_entity_type_id !== NULL
             ? (string) $all_definitions[$bundle_entity_type_id]->getLabel()
             : NULL,

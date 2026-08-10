@@ -50,4 +50,30 @@ final readonly class ContentTemplateRepository {
     return \array_keys($definitions);
   }
 
+  /**
+   * Returns the label for the collection of templateable bundles.
+   *
+   * For entity types with a bundle entity type this is that bundle entity
+   * type's collection label (for example: "Content types" for `node`). For
+   * entity types without one it is the entity type's own collection label (for
+   * example: "Users" for `user`).
+   *
+   * @param string $entity_type_id
+   *   The entity type ID.
+   *
+   * @return string
+   *   The collection label.
+   */
+  public function getBundleCollectionLabel(string $entity_type_id): string {
+    $entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
+    \assert($entity_type instanceof EntityTypeInterface);
+    $bundle_entity_type_id = $entity_type->getBundleEntityType();
+    if ($bundle_entity_type_id === NULL) {
+      return (string) $entity_type->getCollectionLabel();
+    }
+    $bundle_entity_type = $this->entityTypeManager->getDefinition($bundle_entity_type_id);
+    \assert($bundle_entity_type instanceof EntityTypeInterface);
+    return (string) $bundle_entity_type->getCollectionLabel();
+  }
+
 }

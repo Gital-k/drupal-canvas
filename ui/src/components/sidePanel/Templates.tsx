@@ -62,10 +62,7 @@ const Templates = () => {
           <AccordionDetails
             key={entityTypeId}
             value={entityTypeId}
-            title={
-              data?.[entityTypeId]?.label ??
-              supportedEntityTypes[entityTypeId].label
-            }
+            title={supportedEntityTypes[entityTypeId].bundleCollectionLabel}
             onTriggerClick={() => onClickHandler(entityTypeId)}
           >
             <ErrorBoundary title="An unexpected error has occurred while fetching templates.">

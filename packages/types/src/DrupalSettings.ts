@@ -50,6 +50,7 @@ export interface DrupalSettings {
     contentTemplateEntityTypes: {
       [entityTypeId: string]: {
         label: string;
+        bundleCollectionLabel: string;
         bundleLabel: string | null;
       };
     };
