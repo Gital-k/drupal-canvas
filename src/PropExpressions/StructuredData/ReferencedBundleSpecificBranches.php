@@ -64,14 +64,18 @@ final class ReferencedBundleSpecificBranches {
    *     `entity:node:article`, `entity:media:image`, `entity:media:video`
    *   - values: an entity-field root expression: either a FieldPropExpression
    *     or a FieldObjectPropsExpression (for example for retrieving the URL of
-   *     an image field), or even another ReferenceFieldPropExpression pointing
-   *     to either of those (for example for retrieving a referenced media
-   *     entity's image field)
+   *     an image field), an EntityObjectPropsExpression (for retrieving several
+   *     of that bundle's fields at once), or even another
+   *     ReferenceFieldPropExpression pointing to any of those (for example for
+   *     retrieving a referenced media entity's image field)
    *   Keys must be sorted alphabetically to ensure a deterministic string
    *   representation
    *   All branch-specific expressions MUST consume the same data (presence or
    *   absence of deltas in the leaf expression) and evaluate to the same shape
-   *   (same leaf expression class and field cardinality).
+   *   (same leaf expression class and field cardinality). Entity-rooted object
+   *   branches are the exception to the second half: they share the leaf class
+   *   and always evaluate to exactly one object per entity, but each reads its
+   *   own bundle's fields, so their object keys differ per branch by design.
    *   These requirements ensure that the overall expression has predictable
    *   evaluation results, regardless of which branch is followed.
    */
@@ -126,10 +130,8 @@ final class ReferencedBundleSpecificBranches {
       // as an invalid branch set here — before the assert below fires — so
       // callers (like the Coalescer) can bail cleanly.
       // @todo Remove this guard once nested branching is supported, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
-      for ($branch_cursor = $expr; $branch_cursor instanceof ReferenceFieldPropExpression; $branch_cursor = $branch_cursor->referenced) {
-        if ($branch_cursor->targetsMultipleBundles()) {
-          throw new NestedBranchNotSupportedException(\sprintf('`%s` is a nested branch: descending through a multi-bundle reference within a branch is not yet supported.', (string) $expr));
-        }
+      if (self::descendsThroughMultiBundleReference($expr)) {
+        throw new NestedBranchNotSupportedException(\sprintf('`%s` is a nested branch: descending through a multi-bundle reference within a branch is not yet supported.', (string) $expr));
       }
 
       // Gather information for cross-branch validation.
@@ -150,6 +152,11 @@ final class ReferencedBundleSpecificBranches {
       $leaf_entity_type_id = $leaf_host_entity_data_definition->getEntityTypeId();
       if (
         $leaf_entity_type_id !== NULL
+        // An entity-rooted object spans multiple fields, so it has no single
+        // field whose cardinality to check. Skipping it is safe because it
+        // always evaluates to exactly one object per entity, whatever the
+        // cardinality of the fields its properties read.
+        && !$leaf instanceof EntityObjectPropsExpression
         // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
         && \Drupal::getContainer()->has('entity_type.manager')
         // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
@@ -185,6 +192,36 @@ final class ReferencedBundleSpecificBranches {
     if (count(array_unique($leaf_expression_has_deltas)) > 1) {
       throw new \InvalidArgumentException('Bundle-specific expressions have inconsistent leaf expressions: either all or none must specify a field delta.');
     }
+  }
+
+  /**
+   * Whether a branch descends through a multi-bundle reference at any depth.
+   *
+   * A reference branch is walked down its own chain. An entity-rooted object
+   * branch is not a reference itself, so its properties are walked in turn:
+   * each reads its own field and may descend through a multi-bundle reference,
+   * which would nest a branch inside this one.
+   *
+   * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $expr
+   *   The branch expression to inspect.
+   *
+   * @todo Remove alongside the guard that calls this, in https://git.drupalcode.org/project/canvas/-/work_items/3591865
+   */
+  private static function descendsThroughMultiBundleReference(EntityFieldBasedPropExpressionInterface $expr): bool {
+    if ($expr instanceof EntityObjectPropsExpression) {
+      foreach ($expr->getObjectExpressions() as $property) {
+        if (self::descendsThroughMultiBundleReference($property)) {
+          return TRUE;
+        }
+      }
+      return FALSE;
+    }
+    for ($branch_cursor = $expr; $branch_cursor instanceof ReferenceFieldPropExpression; $branch_cursor = $branch_cursor->referenced) {
+      if ($branch_cursor->targetsMultipleBundles()) {
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
   public function __toString(): string {

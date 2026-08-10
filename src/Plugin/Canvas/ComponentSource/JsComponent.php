@@ -16,6 +16,7 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\GlobalImports;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
@@ -320,7 +321,7 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     // are read in the negotiated language rather than the entity's own default.
     $entity = Evaluator::resolveTranslationForReference($entity, $language);
 
-    $payload = ['__type' => $entity->bundle()];
+    $payload = [EntityObjectPropsExpression::PAYLOAD_TYPE_KEY => $entity->bundle()];
     // The resulting payload must still describe the cacheability of how
     // $resolved_entity was loaded, the negotiated language it was resolved to,
     // plus the traversed entity itself: a `__type`-only payload (a bundle with
@@ -330,6 +331,29 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     $payload_cacheability = CacheableMetadata::createFromObject($resolved_entity)
       ->addCacheableDependency($entity)
       ->addCacheableDependency($language);
+
+    // An entity-rooted object is a bundle-specific branch selected for this
+    // resolved entity: spread its per-field properties so each is placed into
+    // this entity's payload exactly like a top-level pick would be. The
+    // object's own property names are dropped because each property must still
+    // go through the reference grouping below, which derives its payload key
+    // from the property itself. The two agree for anything storable: the
+    // Coalescer keys each property by exactly that developer-facing key, and an
+    // object keyed otherwise cannot survive the expand → coalesce round trip
+    // that EntityFieldExpressionsMustBeIdempotent enforces at save time.
+    // This payload already carries `__type` for this entity, so the spread
+    // properties need none of their own.
+    // @see \Drupal\canvas\PropExpressions\StructuredData\Coalescer::branchOfPerBundleObjects()
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsMustBeIdempotentConstraint
+    $flattened = [];
+    foreach ($expressions as $expression) {
+      if ($expression instanceof EntityObjectPropsExpression) {
+        \array_push($flattened, ...\array_values($expression->getObjectExpressions()));
+        continue;
+      }
+      $flattened[] = $expression;
+    }
+    $expressions = $flattened;
 
     // References sharing a referencer field are descended into once, with
     // their target sub-expressions merged into a single nested object.

@@ -11,27 +11,36 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 /**
  * Rejects a reference object that mixes bundle-specific picks.
  *
- * Example of a rejected input: an article's `field_media` reference that can
- * hold an *Image* or a *Video* media item, with two picks that read the image's
- * `field_media_image.alt` and the video's `field_media_video_file.display`.
- * Each pick descends into one specific bundle, but together they read different
- * fields from different bundles of the same reference — so they can't all
- * resolve against the one media entity the reference ultimately holds.
+ * Reading several fields per bundle from a multi-bundle reference coalesces
+ * into a branch of per-bundle objects, which renders. Picks that cannot take
+ * that path fall back to a single `FieldObjectPropsExpression` on the
+ * referencer field, and that object is unrenderable whenever a property is a
+ * single-bundle reference while the object references more than one bundle
+ * overall: at render time every property is evaluated against the one resolved
+ * referenced entity, and a bundle-specific property throws a `\DomainException`
+ * whenever the resolved entity is of a different bundle (only multi-bundle
+ * *branch* properties are bundle-matched and omitted).
  *
- * In detail: when several picks read more than one field per bundle from a
- * multi-bundle reference, they coalesce into a `FieldObjectPropsExpression` on
- * the referencer field, with one object property per field read. If any of
- * those properties is a single-bundle reference (it descends into one specific
- * bundle) while the object references more than one bundle overall, the object
- * is unrenderable: at render time every property is evaluated against the one
- * resolved referenced entity, and a bundle-specific property throws a
- * `\DomainException` whenever the resolved entity is of a different bundle
- * (only multi-bundle *branch* properties are bundle-matched and omitted). Such
- * selections must coalesce into a branch of per-bundle objects instead, which
- * is not yet produced.
+ * The message names the symptom, not a cause, because more than one selection
+ * reaches that fallback and the constraint cannot tell them apart:
+ * - a bundle reading several fields where one of them is read for multiple
+ *   PROPERTIES (say an image field's `alt` and `width`, alongside another
+ *   field): a branch member reads one field, and an entity-rooted branch object
+ *   holds one property per field, so neither can carry the resulting field
+ *   object — this is the case Canvas' own UI can produce today;
+ * - per-bundle objects that cannot share a shape.
+ *
+ * (A bundle whose picks collapse onto one developer-facing key does NOT reach
+ * this constraint: the object form hits the same collision and leaves the group
+ * un-coalesced, which EntityFieldExpressionsSameFieldMustBeCoalesced reports.)
+ *
+ * (A bundle reading multiple properties of one field and NOTHING else is fine:
+ * it is a single entry, so it becomes a plain `FieldObjectPropsExpression`
+ * branch of its own.)
  *
  * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::shouldOmitUnmatchedBundle()
- * @todo Remove this constraint (and its validator) once such selections coalesce into a branch, in https://git.drupalcode.org/project/canvas/-/work_items/3591873
+ * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+ * @todo Remove this constraint (and its validator) once an entity-rooted branch object can nest a field object, in a follow-up to https://git.drupalcode.org/project/canvas/-/work_items/3591873
  */
 #[Constraint(
   id: self::PLUGIN_ID,
@@ -45,6 +54,6 @@ final class EntityFieldExpressionsMustNotMixBundlesInObjectConstraint extends Sy
   /**
    * The error message.
    */
-  public string $message = "The expressions on field '@field' read several fields from more than one bundle of the same reference, which is not yet supported.";
+  public string $message = "The expressions on field '@field' coalesce into an object that mixes picks from more than one bundle, which cannot be rendered; this is not yet supported. Reading several fields per bundle is supported, but one of them being read for multiple properties is not.";
 
 }

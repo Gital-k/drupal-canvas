@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
@@ -92,6 +93,16 @@ final class EntityFieldExpressionsMustNotMixBundlesInObjectConstraintValidator e
       }
       if ($has_single_bundle_reference && \count($bundle_keys) > 1) {
         return TRUE;
+      }
+    }
+
+    // An entity-rooted object is itself bundle-matched at render, so it cannot
+    // mix bundles; but its properties may descend into an object that does.
+    if ($expr instanceof EntityObjectPropsExpression) {
+      foreach ($expr->getObjectExpressions() as $property) {
+        if (self::mixesBundlesInObject($property)) {
+          return TRUE;
+        }
       }
     }
 
