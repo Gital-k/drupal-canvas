@@ -4110,8 +4110,8 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     $fixtures = $this->setUpContentEntityReferenceFixtures(translatable: TRUE);
 
     NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
-    \Drupal::service('content_translation.manager')->setEnabled('node', 'blog_post', TRUE);
-    $this->container->get('entity_field.manager')->clearCachedFieldDefinitions();
+    \Drupal::service(BundleTranslationSettingsInterface::class)->setEnabled('node', 'blog_post', TRUE);
+    $this->container->get(EntityFieldManagerInterface::class)->clearCachedFieldDefinitions();
     self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
 
     // The blog-only second field, so the blog_post branch is an entity-rooted
