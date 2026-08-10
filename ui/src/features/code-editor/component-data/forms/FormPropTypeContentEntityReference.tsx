@@ -954,6 +954,11 @@ function EntityPreviewPicker({
 }) {
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 300);
+  // The server trims the search value and treats a whitespace-only one as "no
+  // search", so trim here too: it keeps `foo` and `foo ` on a single cache key
+  // and stops whitespace alone from being sent as a search at all.
+  // @see \Drupal\canvas\Controller\ApiUiContentTemplateControllers::suggestPreviewContentEntities()
+  const search = debouncedSearch.trim();
   const {
     data: suggestions,
     isFetching,
@@ -962,7 +967,7 @@ function EntityPreviewPicker({
   } = useGetPreviewContentEntitiesQuery({
     entityTypeId,
     bundle,
-    search: debouncedSearch || undefined,
+    search: search || undefined,
   });
   // `isUninitialized` covers the brief window before the query dispatches on
   // mount, where `isFetching` is still false: without it, the picker flashes
@@ -1033,7 +1038,7 @@ function EntityPreviewPicker({
           ? 'Loading…'
           : isError
             ? 'Could not load entities.'
-            : debouncedSearch
+            : search
               ? 'No matches'
               : 'No entities available'
       }
