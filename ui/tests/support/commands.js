@@ -1547,6 +1547,17 @@ Cypress.Commands.add('insertComponent', (identifier, options = {}) => {
   });
 });
 
+Cypress.Commands.add('drupalRecipeApply', (path) => {
+  let command = commandAsWebserver(
+    `DRUPAL_ROOT=${Cypress.env('coreDir')}/../ DRUPAL_DEV_SITE_PATH=${Cypress.env('drupalSitePath')} RECIPE=${path} php tests/support/recipe.php`,
+  );
+  cy.task('log', `Installing recipe: ${path}`);
+  cy.task('log', `Recipe install Command: ${command}`);
+  cy.exec(command).then((result) => {
+    cy.task('log', `Recipe install result: ${result.stdout}`);
+  });
+});
+
 // Represents a wait that does not exceed how long it would take for a real
 // user to proceed with a subsequent action. Intended to be used for actions
 // that would only fail if they occur faster than a user could reasonably

@@ -1,0 +1,8 @@
+name: 'Drupal Canvas Language - Interface Negotiation'
+description: 'Sets the language negotiation selected language to current interface.'
+type: 'Canvas'
+config:
+  actions:
+    language.content_settings.canvas_page.canvas_page:
+      simpleConfigUpdate:
+        default_langcode: current_interface

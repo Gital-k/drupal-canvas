@@ -1,0 +1,24 @@
+_meta:
+  version: '1.0'
+  entity_type: file
+  uuid: 93a3ed1e-a577-43d4-9d64-e2046b31e0f5
+  default_langcode: en
+default:
+  uid:
+    -
+      target_id: 1
+  filename:
+    -
+      value: 500x500.png
+  uri:
+    -
+      value: 'public://2026-03/500x500.png'
+  filemime:
+    -
+      value: image/png
+  filesize:
+    -
+      value: 752
+  status:
+    -
+      value: true

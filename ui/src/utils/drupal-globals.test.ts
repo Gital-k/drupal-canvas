@@ -5,15 +5,32 @@ import type { DrupalSettings } from '@drupal-canvas/types';
 const loadGlobals = async (
   canvas: Partial<DrupalSettings['canvas']>,
   baseUrl = '/',
+  pathPrefix = '',
 ) => {
   vi.resetModules();
   vi.doUnmock('@/utils/drupal-globals');
   Object.assign(window, {
     Drupal: {},
-    drupalSettings: { canvas, path: { baseUrl } },
+    drupalSettings: { canvas, path: { baseUrl, pathPrefix } },
   });
   return import('@/utils/drupal-globals');
 };
+
+describe('getBaseUrlForCurrentPath', () => {
+  it('includes the language prefix when it is present in the current path', async () => {
+    window.history.replaceState({}, '', '/es/canvas');
+    const { getBaseUrlForCurrentPath } = await loadGlobals({}, '/', 'es/');
+
+    expect(getBaseUrlForCurrentPath()).toBe('/es/');
+  });
+
+  it('excludes the language prefix when it is absent from the current path', async () => {
+    window.history.replaceState({}, '', '/canvas');
+    const { getBaseUrlForCurrentPath } = await loadGlobals({}, '/', 'en/');
+
+    expect(getBaseUrlForCurrentPath()).toBe('/');
+  });
+});
 
 describe('setCanvasHeadlessFrontend', () => {
   beforeEach(() => {

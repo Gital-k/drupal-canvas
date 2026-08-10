@@ -1,0 +1,34 @@
+name: 'Drupal Canvas Language'
+description: 'Enables content translation for the canvas_page entity type.'
+type: 'Canvas'
+install:
+  - language
+  - content_translation
+config:
+  strict: true
+  import:
+    language: '*'
+    content_translation: '*'
+  actions:
+    language.entity.es:
+      entity_create:create:
+        id: es
+        label: Spanish
+        direction: ltr
+        weight: 0
+    language.content_settings.media.image:
+      entity_create:create:
+        target_entity_type_id: media
+        target_bundle: image
+        default_langcode: site_default
+        third_party_settings:
+          content_translation:
+            enabled: true
+    language.content_settings.canvas_page.canvas_page:
+      entity_create:create:
+        target_entity_type_id: canvas_page
+        target_bundle: canvas_page
+        default_langcode: site_default
+        third_party_settings:
+          content_translation:
+            enabled: true

@@ -26,7 +26,7 @@ import '@/styles/index.css';
 
 import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import {
-  getBaseUrl,
+  getBaseUrlForCurrentPath,
   getCanvasSettings,
   getDrupal,
   getDrupalSettings,
@@ -46,7 +46,7 @@ interface ProviderComponentProps {
 
 const Drupal = getDrupal();
 const canvasSettings = getCanvasSettings();
-const baseUrl = getBaseUrl();
+const baseUrl = getBaseUrlForCurrentPath();
 const drupalSettings = getDrupalSettings();
 
 const container = document.getElementById('canvas');

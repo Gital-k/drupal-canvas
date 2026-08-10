@@ -148,6 +148,7 @@ export interface DrupalSettings {
   canvasExtension: object;
   path: {
     baseUrl: string;
+    pathPrefix?: string;
   };
   editor: {
     formats: {

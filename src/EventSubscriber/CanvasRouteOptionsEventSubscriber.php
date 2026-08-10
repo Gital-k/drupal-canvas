@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\EventSubscriber;
 
-use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\EventSubscriber\MainContentViewSubscriber;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\Core\Routing\LocalRedirectResponse;
 use Drupal\Core\Routing\RouteBuildEvent;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Routing\RoutingEvents;
@@ -30,43 +28,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
   public function __construct(
     private readonly RouteMatchInterface $routeMatch,
     private readonly LanguageManagerInterface $languageManager,
-    private readonly ConfigFactoryInterface $configFactory,
   ) {}
-
-  public function redirectCanvasToDefaultLanguage(RequestEvent $event): void {
-    $request = $event->getRequest();
-    $path = $request->getPathInfo();
-    // Only act on /canvas paths, but not canvas API paths - those handle
-    // language negotiation themselves and must not be redirected.
-    if (!preg_match('#^/[^/]+/canvas(/|$)#', $path) || str_contains($path, '/canvas/api/')) {
-      return;
-    }
-
-    // If the current language differs from the default, the URL will contain a
-    // language prefix (e.g. /es/canvas/editor/canvas_page/1). Strip it with a
-    // 302 redirect so that Canvas always receives a prefix-free path
-    // (/canvas/editor/canvas_page/1).
-    // @todo Remove this redirect once Canvas natively supports
-    //   language-prefixed URLs in
-    //   https://git.drupalcode.org/project/canvas/-/work_items/3546597.
-    // @see \Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber::preventRouteNormalization()
-    $default_langcode = $this->languageManager->getDefaultLanguage()->getId();
-    $current_langcode = $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_URL)->getId();
-    if ($current_langcode !== $default_langcode) {
-      $base_path = $request->getBasePath();
-      // Fetch the actual prefix configured for this language in Drupal's
-      // URL language negotiation settings, falling back to the langcode.
-      $config = $this->configFactory->get('language.negotiation');
-      $url_settings = $config->get('url');
-      $prefixes = $url_settings['prefixes'] ?? [];
-      $prefix = $prefixes[$current_langcode] ?? $current_langcode;
-      $prefix_path = "/$prefix/";
-      if (\str_starts_with($path, $prefix_path)) {
-        $canvas_path = substr_replace($path, '/', 0, strlen($prefix_path));
-        $event->setResponse(new LocalRedirectResponse($base_path . $canvas_path, 302));
-      }
-    }
-  }
 
   /**
    * Redirects layout GET requests to the hinted preview translation.
@@ -202,7 +164,6 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
    * {@inheritdoc}
    */
   public static function getSubscribedEvents(): array {
-    $events[KernelEvents::REQUEST][] = ['redirectCanvasToDefaultLanguage', 100];
     // Runs after the router (priority 32) so the matched route and raw
     // parameters are available, but before the OpenAPI request validator
     // (priority 0) so a redirected request never reaches it.
