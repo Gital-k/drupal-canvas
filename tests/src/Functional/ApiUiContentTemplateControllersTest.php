@@ -8,6 +8,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Url;
@@ -1087,7 +1088,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     // On a multilingual site, entities in another language are filtered out of
     // the candidates, and labels come from the translation matching the
     // negotiated content language, not from the default translation.
-    \Drupal::service('module_installer')->install(['language']);
+    \Drupal::service(ModuleInstallerInterface::class)->install(['language']);
     $this->rebuildContainer();
     ConfigurableLanguage::createFromLangcode('fr')->save();
     /** @var \Drupal\node\NodeInterface $translated_entity */
