@@ -3614,7 +3614,9 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     );
 
     // Neither pick is lost: the descended `title` (as `label`) and the loose
-    // `target_id` both surface, inline as one object leaf (no `__type`).
+    // `target_id` both surface, inline as one object leaf. There is no `__type`
+    // here because nothing in this object is an entity object: `label` is a
+    // scalar read through the reference, not the referenced entity itself.
     self::assertEquals(
       [
         '__type' => 'news_item',
@@ -3913,6 +3915,343 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
   }
 
   /**
+   * A branch of per-bundle objects resolves each bundle's fields at render.
+   *
+   * When a bundle reads MORE THAN ONE field from a multi-bundle reference, the
+   * picks coalesce into a branch whose members are entity-rooted objects — one
+   * per bundle, each reading that bundle's own fields. At render
+   * `buildReferencePayload()` selects the matching object and spreads its
+   * properties, so the component receives exactly that bundle's fields, and no
+   * property is ever evaluated against an entity of a different bundle (which
+   * would fatal). Here blog_post reads two fields (`title` + a blog-only field)
+   * and news_item reads one; each surfaces its own shape.
+   *
+   * The branch expression is saved through the component's NORMAL save, proving
+   * it validates end to end.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+   */
+  public function testMultiTargetBundleReferenceWithMultipleFieldsPerBundleResolvesPerBundle(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
+    self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
+
+    // A blog_post-only field, so the blog_post branch reads two fields (`title`
+    // + `field_blog_subtitle`) — what a single branch member cannot hold, and
+    // hence what the entity-rooted branch object exists for. news_item reads
+    // only `title`.
+    FieldStorageConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'type' => 'string',
+      'entity_type' => 'node',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'entity_type' => 'node',
+      'bundle' => 'blog_post',
+      'label' => 'Subtitle',
+    ])->save();
+
+    // Save the coalesced branch of per-bundle objects normally: blog_post reads
+    // `field_blog_subtitle` + `title` (keyed `label`); news_item reads `title`.
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜[␜entity:node:blog_post␟{field_blog_subtitle↠field_blog_subtitle␞␟value,label↠title␞␟value}][␜entity:node:news_item␟{label↠title␞␟value}]',
+    ];
+    $js_component->set('dataDependencies', $data_dependencies);
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    // Branch A: `field_related_news` resolves to a news_item — its object reads
+    // only `title`, so only `label` surfaces; the blog-only `field_blog_subtitle`
+    // is never evaluated against the news_item (which lacks it).
+    $branch_news = Node::create([
+      'type' => 'news_item',
+      'title' => 'A related news item',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_news);
+    $branch_news->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_news->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'news_item',
+          'label' => 'A related news item',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+
+    // Branch B: re-point at a blog_post — its object reads both fields, so both
+    // `field_blog_subtitle` and `label` surface.
+    $branch_blog = Node::create([
+      'type' => 'blog_post',
+      'title' => 'A related blog post',
+      'field_blog_subtitle' => 'A catchy subtitle',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_blog);
+    $branch_blog->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_blog->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'blog_post',
+          'field_blog_subtitle' => 'A catchy subtitle',
+          'label' => 'A related blog post',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+  }
+
+  /**
+   * A branch of per-bundle objects renders alongside a loose pick on the field.
+   *
+   * When the multi-bundle reference field ALSO has a leaf pick of its own
+   * (`target_id`), the branch of per-bundle objects folds next to it into one
+   * object on the referencer field. That is the one shape that reaches
+   * `Evaluator`'s entity-rooted object arm: `buildReferencePayload()` treats a
+   * mixed object as a flat leaf and hands the whole thing to the Evaluator,
+   * rather than spreading the object's properties itself. So the payload is
+   * shaped differently from the same picks without the loose leaf — nested
+   * under the referencer key, and with no `__type` for the referenced entity.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+   */
+  public function testMultiTargetBundleReferenceWithMultipleFieldsPerBundleAlongsideLoosePick(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
+    self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
+
+    FieldStorageConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'type' => 'string',
+      'entity_type' => 'node',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'entity_type' => 'node',
+      'bundle' => 'blog_post',
+      'label' => 'Subtitle',
+    ])->save();
+
+    // The branch of per-bundle objects, folded next to the loose `target_id`
+    // pick as one object on `field_related_news`.
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟{field_related_news↝entity␜[␜entity:node:blog_post␟{field_blog_subtitle↠field_blog_subtitle␞␟value,label↠title␞␟value}][␜entity:node:news_item␟{label↠title␞␟value}],target_id↠target_id}',
+    ];
+    $js_component->set('dataDependencies', $data_dependencies);
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    $branch_blog = Node::create([
+      'type' => 'blog_post',
+      'title' => 'A related blog post',
+      'field_blog_subtitle' => 'A catchy subtitle',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_blog);
+    $branch_blog->save();
+    $fixtures['referenced_news']->set('field_related_news', $branch_blog->id());
+    $fixtures['referenced_news']->save();
+
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          // The branch object is the referenced ENTITY, not a property of
+          // `field_related_news`, so it takes the reserved `__entity` name
+          // rather than repeating the key it already sits under. It carries the
+          // bundle it resolved to, without which a component could not tell why
+          // `field_blog_subtitle` is present here but absent for a news_item.
+          '__entity' => [
+            '__type' => 'blog_post',
+            'field_blog_subtitle' => 'A catchy subtitle',
+            'label' => 'A related blog post',
+          ],
+          'target_id' => (int) $branch_blog->id(),
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures)->value,
+    );
+  }
+
+  /**
+   * A per-bundle branch object reads its own fields in the negotiated language.
+   *
+   * #3591846 threads the negotiated language through the reference recursion,
+   * but its coverage is all single-bundle: a branch member reads one field, so
+   * nothing proved that a bundle's SEVERAL fields — the ones only an
+   * entity-rooted object can carry — are read in that language too. They are,
+   * because buildReferencePayload() spreads the object's properties into the
+   * same loop that evaluates top-level picks with $language. This locks that,
+   * so the flattening cannot later be rerouted around the language.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
+   */
+  public function testMultiTargetBundleReferenceWithMultipleFieldsPerBundleResolvesInHostLanguage(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures(translatable: TRUE);
+
+    NodeType::create(['type' => 'blog_post', 'name' => 'Blog post'])->save();
+    \Drupal::service(BundleTranslationSettingsInterface::class)->setEnabled('node', 'blog_post', TRUE);
+    $this->container->get(EntityFieldManagerInterface::class)->clearCachedFieldDefinitions();
+    self::widenRelatedNewsToBundles(['news_item', 'blog_post']);
+
+    // The blog-only second field, so the blog_post branch is an entity-rooted
+    // object rather than a plain branch member.
+    FieldStorageConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'type' => 'string',
+      'entity_type' => 'node',
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_blog_subtitle',
+      'entity_type' => 'node',
+      'bundle' => 'blog_post',
+      'label' => 'Subtitle',
+      'translatable' => TRUE,
+    ])->save();
+
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜[␜entity:node:blog_post␟{field_blog_subtitle↠field_blog_subtitle␞␟value,label↠title␞␟value}][␜entity:node:news_item␟{label↠title␞␟value}]',
+    ];
+    $js_component->set('dataDependencies', $data_dependencies);
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    $branch_blog = Node::create([
+      'type' => 'blog_post',
+      'title' => 'A related blog post',
+      'field_blog_subtitle' => 'A catchy subtitle',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($branch_blog);
+    $branch_blog->save();
+    $branch_blog->addTranslation('es', [
+      'title' => 'A related blog post in Spanish',
+      'field_blog_subtitle' => 'A catchy subtitle in Spanish',
+      'status' => 1,
+    ])->save();
+
+    // Point BOTH translations of the referenced news item at the blog post, so
+    // the reading language decides the translation, not which one carries it.
+    $referenced_news = $fixtures['referenced_news'];
+    $referenced_news->set('field_related_news', $branch_blog->id());
+    $referenced_news->getTranslation('es')->set('field_related_news', $branch_blog->id());
+    $referenced_news->save();
+
+    // Both of the blog_post object's own fields come back in the host language.
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'blog_post',
+          'field_blog_subtitle' => 'A catchy subtitle in Spanish',
+          'label' => 'A related blog post in Spanish',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures, 'es')->value,
+    );
+
+    // …and in English for an English host, so the assertion above is the
+    // language taking effect rather than the only translation there is.
+    self::assertSame(
+      [
+        '__type' => 'news_item',
+        'field_related_news' => [
+          '__type' => 'blog_post',
+          'field_blog_subtitle' => 'A catchy subtitle',
+          'label' => 'A related blog post',
+        ],
+      ],
+      $this->resolveNewsItemReference($fixtures, 'en')->value,
+    );
+  }
+
+  /**
+   * Two fields each folding into a mixed object keep their leaves separate.
+   *
+   * A mixed object's leaves are keyed by their object property name, which is a
+   * FIELD PROPERTY name (`target_id`) and therefore not unique across fields.
+   * They stay namespaced under the field they read, so two reference fields
+   * both picking `target_id` alongside a descent cannot clobber each other.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildReferencePayload()
+   */
+  public function testMixedObjectsOnTwoFieldsDoNotClobberEachOther(): void {
+    $fixtures = $this->setUpContentEntityReferenceFixtures();
+
+    $deep_news = Node::create([
+      'type' => 'news_item',
+      'title' => 'The deeply referenced news item',
+      'status' => 1,
+    ]);
+    self::assertEntityIsValid($deep_news);
+    $deep_news->save();
+    $fixtures['referenced_news']->set('field_related_news', $deep_news->id());
+    $fixtures['referenced_news']->save();
+
+    // `field_related_news` and `uid` each get a loose leaf pick plus a descent,
+    // so each folds into its own mixed object — and BOTH leaves are named
+    // `target_id`.
+    $js_component = JavaScriptComponent::load('content_entity_reference_test_component');
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $data_dependencies = $js_component->get('dataDependencies');
+    $data_dependencies['entityFields']['news_item_reference'] = [
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟target_id',
+      'ℹ︎␜entity:node:news_item␝field_related_news␞␟entity␜␜entity:node:news_item␝title␞␟value',
+      'ℹ︎␜entity:node:news_item␝uid␞␟target_id',
+      'ℹ︎␜entity:node:news_item␝uid␞␟entity␜␜entity:user␝name␞␟value',
+    ];
+    // Coalesce them the way the client would: two mixed objects, one per field.
+    $js_component->updateFromClientSide(['dataDependencies' => $data_dependencies]);
+    self::assertSame(
+      [
+        'ℹ︎␜entity:node:news_item␝field_related_news␞␟{label↝entity␜␜entity:node:news_item␝title␞␟value,target_id↠target_id}',
+        'ℹ︎␜entity:node:news_item␝uid␞␟{name↝entity␜␜entity:user␝name␞␟value,target_id↠target_id}',
+      ],
+      $js_component->get('dataDependencies')['entityFields']['news_item_reference'],
+    );
+    self::assertEntityIsValid($js_component);
+    $js_component->save();
+
+    $payload = $this->resolveNewsItemReference($fixtures)->value;
+    self::assertIsArray($payload);
+    // Four picks in, four values out: neither `target_id` overwrote the other.
+    self::assertSame(
+      ['label' => 'The deeply referenced news item', 'target_id' => (int) $deep_news->id()],
+      $payload['field_related_news'],
+    );
+    // `uid` surfaces as `owner`, node's entity key for it — the same mapping
+    // that names `title` as `label`.
+    self::assertSame(['__type', 'field_related_news', 'owner'], \array_keys($payload));
+    // Each object kept BOTH of its own entries. Were the leaves hoisted to the
+    // payload root, the two `target_id`s would share one key and one would win.
+    self::assertIsArray($payload['owner']);
+    self::assertSame(['name', 'target_id'], \array_keys($payload['owner']));
+  }
+
+  /**
    * Widens the self-referencing `field_related_news` to target several bundles.
    *
    * @param list<string> $bundles
@@ -3936,17 +4275,24 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
    *
    * @param array{host_news: \Drupal\node\NodeInterface, component_id: string, source: \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent} $fixtures
    *   The fixtures from ::setUpContentEntityReferenceFixtures().
+   * @param string|null $host_langcode
+   *   The host translation to resolve against, which is what the reading
+   *   language is negotiated from; NULL for the host's default language.
    *
    * @return \Drupal\canvas\PropExpressions\StructuredData\EvaluationResult
    *   The resolved `news_item_reference` payload.
    */
-  private function resolveNewsItemReference(array $fixtures): EvaluationResult {
+  private function resolveNewsItemReference(array $fixtures, ?string $host_langcode = NULL): EvaluationResult {
     $node_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage('node');
     $node_storage->resetCache();
     $host_id = $fixtures['host_news']->id();
     self::assertNotNull($host_id);
     $host = $node_storage->load($host_id);
     self::assertInstanceOf(NodeInterface::class, $host);
+    if ($host_langcode !== NULL) {
+      $host = $host->getTranslation($host_langcode);
+      self::assertInstanceOf(NodeInterface::class, $host);
+    }
     $rooted_item = $this->buildComponentTreeItem(
       $fixtures['component_id'],
       [
