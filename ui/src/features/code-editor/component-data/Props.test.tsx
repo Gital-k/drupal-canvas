@@ -686,6 +686,41 @@ describe('props in code editor', () => {
       });
     });
 
+    it('trims the search value before querying, like the server does', async () => {
+      const fetchSpy = mockCerFetch({
+        suggestions: {
+          1: { id: '1', label: 'CER Preview Verification Article' },
+        },
+      });
+
+      await addProp('Content entity reference', 'Author');
+      configureCerProp();
+      const picker = await screen.findByLabelText('Preview entity');
+
+      const suggestionUrls = () =>
+        fetchSpy.mock.calls
+          .map(([input]) =>
+            typeof input === 'string' ? input : (input as Request).url,
+          )
+          .filter((url) =>
+            url.includes('/content_template/suggestions/preview/'),
+          );
+
+      // react-select swallows a leading space (it selects the focused option
+      // while the input is empty), so a trailing one is the reachable case.
+      await userEvent.type(picker, 'CER ');
+      // The server trims the value, so sending it untrimmed would split
+      // identical searches across two cache keys.
+      await waitFor(() => {
+        expect(suggestionUrls().some((url) => url.includes('search=CER'))).toBe(
+          true,
+        );
+      });
+      expect(
+        suggestionUrls().some((url) => /search=CER(%20|\+)/.test(url)),
+      ).toBe(false);
+    });
+
     it('displays the selected entity label after picking it, not leftover search text', async () => {
       mockCerFetch({
         suggestions: {
