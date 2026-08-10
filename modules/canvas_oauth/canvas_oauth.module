@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+use Drupal\canvas_oauth\MediaScopesHelper;
+use Drupal\media\MediaTypeInterface;
+
+/**
+ * Implements hook_ENTITY_TYPE_insert() for media_type.
+ *
+ * Creates the canvas:media:{media_type}:create OAuth2 scope whenever a new
+ * image media type is created. This covers the case where canvas_oauth is
+ * installed before media types exist (e.g. when modules are installed in a
+ * specific order, or via recipe/config import where hook_install is skipped).
+ *
+ * @see \Drupal\canvas_oauth\MediaScopesHelper::ensureMediaImageScopes()
+ */
+function canvas_oauth_media_type_insert(MediaTypeInterface $media_type): void {
+  if ($media_type->getSource()->getPluginId() !== 'image') {
+    return;
+  }
+  \Drupal::classResolver(MediaScopesHelper::class)->ensureMediaImageScopes();
+}
