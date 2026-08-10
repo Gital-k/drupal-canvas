@@ -138,6 +138,38 @@ describe('detectValidSlotsOrPropChange', () => {
     ];
     expect(detectValidPropOrSlotChange(current, last)).toBe(true);
   });
+
+  // Preview state is editor-only and never persisted, so picking a preview
+  // entity must not mark the component as having unsaved changes.
+  it('invalid change when the only difference is preview entity state', () => {
+    const last = [
+      { id: '1', name: 'author', type: 'content-entity-reference' as const },
+    ];
+    const current = [
+      {
+        ...last[0],
+        previewEntity: { entityTypeId: 'node', entityId: '1' },
+        previewResolvedValue: { owner: { name: 'Bob' } },
+      },
+    ];
+    expect(detectValidPropOrSlotChange(current, last)).toBe(false);
+    // Clearing it again is equally uninteresting.
+    expect(detectValidPropOrSlotChange(last, current)).toBe(false);
+  });
+
+  it('valid change when a real edit accompanies preview entity state', () => {
+    const last = [
+      { id: '1', name: 'author', type: 'content-entity-reference' as const },
+    ];
+    const current = [
+      {
+        ...last[0],
+        name: 'renamed',
+        previewEntity: { entityTypeId: 'node', entityId: '1' },
+      },
+    ];
+    expect(detectValidPropOrSlotChange(current, last)).toBe(true);
+  });
 });
 
 describe('content entity reference props', () => {
