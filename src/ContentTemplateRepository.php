@@ -51,7 +51,7 @@ final readonly class ContentTemplateRepository {
   }
 
   /**
-   * Returns the label for the collection of templateable bundles.
+   * Returns the label for a collection of bundles.
    *
    * For entity types with a bundle entity type this is that bundle entity
    * type's collection label (for example: "Content types" for `node`). For
