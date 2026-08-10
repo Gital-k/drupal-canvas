@@ -1,4 +1,4 @@
-import { camelCase, isEqual } from 'lodash';
+import { camelCase, isEqual, omit } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 
 import derivedPropTypes from '@/features/code-editor/component-data/derivedPropTypes';
@@ -59,6 +59,12 @@ export function serializeDataDependencies(
 export function parsePropValueForPreview(
   prop: CodeComponentProp,
 ): CodeComponentPropPreviewValue {
+  if (prop.derivedType === 'contentEntityReference') {
+    // Matches the runtime contract for an unset/unresolved reference: the
+    // component always receives null, never undefined.
+    // @see JsComponent::buildReferencePayload()
+    return prop.previewResolvedValue ?? null;
+  }
   switch (prop.type) {
     case 'integer':
       return Number(prop.example);
@@ -582,6 +588,13 @@ export function formatToValidImportName(name: string): string {
 }
 
 /**
+ * Editor-only prop state that is never persisted, so it must never count as a
+ * change. Selecting a preview entity for a `content-entity-reference` prop
+ * mutates the prop, but the result is dropped by serializeProps().
+ */
+const EDITOR_ONLY_PROP_KEYS = ['previewEntity', 'previewResolvedValue'];
+
+/**
  * Detects if there is a valid change in props or slots.
  * Adding an item with an empty name is not considered a valid change.
  */
@@ -589,14 +602,23 @@ export function detectValidPropOrSlotChange(
   current: CodeComponentProp[] | CodeComponentSlot[],
   last: CodeComponentProp[] | CodeComponentSlot[],
 ): boolean {
+  // Slots carry none of these keys, so this is a no-op for them.
+  const stripEditorOnly = (items: CodeComponentProp[] | CodeComponentSlot[]) =>
+    items.map((item) => omit(item, EDITOR_ONLY_PROP_KEYS));
+
+  const comparableCurrent = stripEditorOnly(current);
+  const comparableLast = stripEditorOnly(last);
+
   // If arrays are identical, no change
-  if (isEqual(current, last)) {
+  if (isEqual(comparableCurrent, comparableLast)) {
     return false;
   }
 
   // Create a version of current without empty name items
-  const currentWithoutEmpty = current.filter((item) => item.name !== '');
-  const lastWithoutEmpty = last.filter((item) => item.name !== '');
+  const currentWithoutEmpty = comparableCurrent.filter(
+    (item) => item.name !== '',
+  );
+  const lastWithoutEmpty = comparableLast.filter((item) => item.name !== '');
 
   // Check if the only difference is empty-named items
   // by comparing the filtered current with last
