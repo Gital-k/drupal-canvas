@@ -40,6 +40,11 @@
       "import": "./dist/server/index.js",
       "default": "./dist/server/index.js"
     },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js",
+      "default": "./dist/node.js"
+    },
     "./components-endpoint": {
       "types": "./dist/components-endpoint/index.d.ts",
       "import": "./dist/components-endpoint/index.js",
