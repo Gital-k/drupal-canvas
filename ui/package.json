@@ -3,7 +3,7 @@
   "description": "A React application powering the Drupal Canvas UI.",
   "homepage": "https://www.drupal.org/project/canvas",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.10.1",
   "engines": {
     "node": ">=22.19.0 <23 || >=24.5.0"
   },
