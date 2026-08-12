@@ -7,31 +7,42 @@ import { kebabCase } from 'lodash';
 
 import { FallbackColor } from '@/types/Review';
 
+import type { Owner } from '@/services/pendingChangesApi';
 import type { UnpublishedChange } from '@/types/Review';
 
-// @todo https://www.drupal.org/i/3501449 - this color randomizer should be replaced with a proper solution
+// @todo https://www.drupal.org/i/3501449 - this color assignment should be replaced with a proper solution
 const colors = Object.values(FallbackColor);
-const usernameColorMap: Map<number, FallbackColor> = new Map();
-// Initialize colorIndex with a random starting point
-let colorIndex = Math.floor(Math.random() * colors.length);
 
 /**
- * Function to get a consistent color for a given username
- * @param userId
+ * Hashes a string to a 32-bit unsigned integer, using the FNV-1a algorithm.
+ *
+ * @param value
  */
-export function getAvatarInitialColor(userId: number): FallbackColor {
-  // Return the cached color if it exists
-  if (usernameColorMap.has(userId)) {
-    return usernameColorMap.get(userId)!;
+function hash(value: string): number {
+  let result = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    result ^= value.charCodeAt(i);
+    // Multiply by the FNV prime (16777619) without overflowing to a float.
+    result = Math.imul(result, 0x01000193);
   }
+  return result >>> 0;
+}
 
-  const color = colors[colorIndex];
-  // Store the color in the map for future reference
-  usernameColorMap.set(userId, color);
-  // Increment the color index, wrapping around if necessary
-  colorIndex = (colorIndex + 1) % colors.length;
-
-  return color;
+/**
+ * Function to get a consistent color for a given user.
+ *
+ * The color is derived by hashing the owner, so a given user always gets the
+ * same color: across page loads, across browsers, and regardless of the order
+ * in which users are encountered.
+ *
+ * @param owner
+ */
+export function getAvatarInitialColor(owner: Owner): FallbackColor {
+  // Hash the fields in a fixed order, so that the result never depends on
+  // the key order of the decoded JSON. Newlines cannot occur in any of the
+  // fields, so distinct owners cannot produce the same string.
+  const identity = `${owner.id}\n${owner.name}\n${owner.uri}\n${owner.avatar ?? ''}`;
+  return colors[hash(identity) % colors.length];
 }
 
 /**
