@@ -21,6 +21,7 @@ use Drupal\canvas\Health\HealthRecords;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\Component\Datetime\TimeInterface;
+use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\SortArray;
 use Drupal\content_moderation\Plugin\Field\ModerationStateFieldItemList;
 use Drupal\Core\Cache\CacheBackendInterface;
@@ -38,6 +39,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Entity\TranslatableInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
@@ -112,6 +114,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     private readonly ConfigManagerInterface $configManager,
     private readonly CacheTagsInvalidatorInterface $cacheTagsInvalidator,
     private readonly EntityTypeManagerInterface $entityTypeManager,
+    private readonly ModuleHandlerInterface $moduleHandler,
     // A non-serializing in-memory cache. ::getAutoSaveEntity() caches a live
     // entity object here; a serializing backend (e.g. cache.static) would run
     // the entity's ::__sleep(), forcing computed fields (such as metatag's) to
@@ -203,7 +206,7 @@ class AutoSaveManager implements EventSubscriberInterface {
 
   public function saveEntity(EntityInterface $entity, ?string $clientId = NULL): void {
     $key = $this->getAutoSaveKey($entity);
-    $data = self::normalizeEntity($entity);
+    $data = $this->normalizeEntity($entity);
     $data_hash = self::generateHash($data);
     $original_hash = $this->getUnchangedHash($entity);
 
@@ -215,7 +218,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     // expect one to be, the code below can be evaluated in a debugger and will
     // show you which field varies.
     // @code
-    // $original = self::normalizeEntity($this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id()))
+    // $original = $this->normalizeEntity($this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id()))
     // $data_hash = \array_map(self::generateHash(...), $data)
     // $original_hash = \array_map(self::generateHash(...), $original)
     // \array_diff($data_hash, $original_hash)
@@ -315,7 +318,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $this->componentInstanceFormViolationsStore->get($component_uuid) ?? new ConstraintViolationList();
   }
 
-  private static function normalizeEntity(EntityInterface $entity): array {
+  private function normalizeEntity(EntityInterface $entity): array {
     if (!$entity instanceof FieldableEntityInterface) {
       return self::toStorableArray($entity);
     }
@@ -353,6 +356,64 @@ class AutoSaveManager implements EventSubscriberInterface {
       if ($items->getFieldDefinition()->getType() === 'path') {
         $item_list = \array_filter($item_list, static fn (FieldItemInterface $item): bool => (string) $item->get('alias')->getValue() !== '');
         if ($item_list === []) {
+          continue;
+        }
+      }
+      // Metatag fields that contain only default token values must not
+      // contribute to the hash. The Canvas editor echoes back on every layout
+      // save the values currently in the form — often only a subset of
+      // metatag tags because Canvas hides most of them (see CanvasPageForm).
+      // Two complementary sources of "default" must be stripped:
+      //
+      // 1. Metatag's own config defaults (metatag_get_default_tags), which
+      //    preSave() would strip on a genuine entity save.
+      // 2. The field-level defaults set in the field definition
+      //    (BaseFieldDefinition::setDefaultValue), which Canvas uses for its
+      //    own token placeholders (e.g. "[canvas_page:title] | [site:name]").
+      //    These differ from metatag's global tokens and would not be stripped
+      //    by preSave(), yet they carry no user-supplied data.
+      //
+      // A tag is "non-custom" if its value is empty, matches a metatag config
+      // default, or matches the field-level default. The field is omitted from
+      // the hash only when every submitted tag is non-custom.
+      //
+      // This also covers the unpublish code path
+      // (ApiContentAutoSaveControllers::patch()), which calls saveEntity()
+      // directly without going through ClientDataToEntityConverter.
+      if ($items->getFieldDefinition()->getType() === 'metatag') {
+        $metatag_config_defaults = [];
+        if ($this->moduleHandler->moduleExists('metatag')
+            && \function_exists('metatag_get_default_tags')) {
+          $metatag_config_defaults = \metatag_get_default_tags($entity) ?? [];
+        }
+        $field_default_value = $items->getFieldDefinition()->getDefaultValue($entity);
+        $field_defaults = [];
+        if (!empty($field_default_value[0]['value']) && \is_string($field_default_value[0]['value'])) {
+          $field_defaults = Json::decode($field_default_value[0]['value']) ?? [];
+        }
+        $has_custom_values = FALSE;
+        foreach ($items->getValue() as $item) {
+          $stored = Json::decode($item['value'] ?? '[]') ?? [];
+          foreach ($stored as $tag_id => $tag_value) {
+            // An empty value carries no user-supplied data.
+            if ($tag_value === '') {
+              continue;
+            }
+            // Matches metatag's config-layer default for this tag.
+            if (\array_key_exists($tag_id, $metatag_config_defaults)
+                && $metatag_config_defaults[$tag_id] === $tag_value) {
+              continue;
+            }
+            // Matches the field-level default (e.g. Canvas's own token).
+            if (\array_key_exists($tag_id, $field_defaults)
+                && $field_defaults[$tag_id] === $tag_value) {
+              continue;
+            }
+            $has_custom_values = TRUE;
+            break 2;
+          }
+        }
+        if (!$has_custom_values) {
           continue;
         }
       }
@@ -404,7 +465,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     if ($original === NULL) {
       return NULL;
     }
-    return self::generateHash(self::normalizeEntity($original));
+    return self::generateHash($this->normalizeEntity($original));
   }
 
   public function getAutoSaveEntity(EntityInterface $entity, bool $bypass_cache = FALSE): AutoSaveEntity {
@@ -770,7 +831,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert(!\is_null($entity));
 
     // Compare the original_hash in auto-save entry vs latest entity hash.
-    if ($entry[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === self::generateHash(self::normalizeEntity($entity))) {
+    if ($entry[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === self::generateHash($this->normalizeEntity($entity))) {
       // Hashes are matching - no conflict.
       return NULL;
     }
@@ -837,7 +898,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert(!$entity->isNew());
     $stored = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
     \assert(!\is_null($stored));
-    $current_hash = self::generateHash(self::normalizeEntity($stored));
+    $current_hash = self::generateHash($this->normalizeEntity($stored));
     /** @var AutoSaveEntry $auto_save_data */
 
     if ($auto_save_data[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === $current_hash) {
@@ -1086,7 +1147,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       $this->setStoredEntityHash(
         self::getAutoSaveKey($autoSaveEntity),
         // Hash the freshly-saved stored entity, not the auto-save draft.
-        self::generateHash(self::normalizeEntity($entity)),
+        self::generateHash($this->normalizeEntity($entity)),
       );
       $this->saveEntity($autoSaveEntity, $autoSaveData->clientId);
     }

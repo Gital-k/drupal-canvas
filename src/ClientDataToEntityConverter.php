@@ -14,7 +14,6 @@ use Drupal\canvas\Form\ClientFormSubmissionHelper;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Component\Render\PlainTextOutput;
-use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\content_translation\FieldTranslationSynchronizerInterface;
@@ -269,26 +268,6 @@ class ClientDataToEntityConverter {
       }
     }
 
-    // Track entity field names the client is submitting.
-    $client_field_names = \array_keys(\array_filter(
-      $entity_form_fields,
-      static fn (string|int $key): bool => \is_string($key) && $entity->hasField($key),
-      ARRAY_FILTER_USE_KEY,
-    ));
-    // Load the persisted entity so we can restore fields after form processing.
-    // The entity passed in may already carry a previous auto-save's values.
-    $entity_id = $entity->id();
-    \assert($entity_id !== NULL);
-    $db_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity_id);
-    // Snapshot fields not being submitted; buildForm/submitForm runs
-    // extractFormValues() on all widgets and may overwrite them with defaults.
-    $preserved_field_values = [];
-    foreach ($entity->getFields() as $field_name => $field) {
-      if (!\in_array($field_name, $client_field_names, TRUE) && $field_name !== 'changed') {
-        $preserved_field_values[$field_name] = $field->getValue();
-      }
-    }
-
     $form_object = $this->entityTypeManager->getFormObject($entity->getEntityTypeId(), 'default');
     $form_object->setEntity($entity);
     // Flag this as a programmatic build of the entity form - but do not flag
@@ -397,13 +376,6 @@ class ClientDataToEntityConverter {
     }
     // Now trigger the form level submit handler.
     $form_object->submitForm($form, $form_state);
-    // Restore non-submitted fields overwritten by widget defaults during
-    // form processing.
-    foreach ($preserved_field_values as $field_name => $value) {
-      if ($entity->hasField($field_name)) {
-        $entity->set($field_name, $value);
-      }
-    }
     if ($ajax_form_build_id !== NULL && $ajax_submitted_form !== NULL) {
       // This conversion submitted the form and didn't trigger a form rebuild.
       // That means that the form cache entry will be deleted. The AJAX form in
@@ -447,46 +419,6 @@ class ClientDataToEntityConverter {
         }
       }
       $entity->set($name, $new_value);
-    }
-
-    // If a submitted metatag field contains only default token values (no
-    // custom user input), restore it from the DB to avoid a spurious hash
-    // difference that would create a phantom auto-save entry.
-    // Must run AFTER the $fields_to_update loop so it is not overwritten by
-    // the entity-clone copy.
-    if (\function_exists('metatag_get_default_tags')) {
-      $default_tags = \metatag_get_default_tags($entity) ?? [];
-      foreach ($client_field_names as $field_name) {
-        if (!$entity->hasField($field_name)) {
-          continue;
-        }
-        $field = $entity->get($field_name);
-        if ($field->getFieldDefinition()->getType() !== 'metatag') {
-          continue;
-        }
-        if ($field->isEmpty()) {
-          continue;
-        }
-        if (empty($default_tags)) {
-          continue;
-        }
-        // If every stored tag matches the entity default, the user set nothing
-        // custom — restore the DB value to prevent a phantom auto-save.
-        $has_custom_value = FALSE;
-        $stored_tags = [];
-        foreach ($field->getValue() as $item) {
-          $stored_tags = Json::decode($item['value'] ?? '[]') ?? [];
-          foreach ($stored_tags as $tag_id => $tag_value) {
-            if (!\array_key_exists($tag_id, $default_tags) || $default_tags[$tag_id] !== $tag_value) {
-              $has_custom_value = TRUE;
-              break 2;
-            }
-          }
-        }
-        if (!$has_custom_value && $db_entity instanceof FieldableEntityInterface && $db_entity->hasField($field_name)) {
-          $entity->set($field_name, $db_entity->get($field_name)->getValue());
-        }
-      }
     }
 
     \assert(!\is_null($entity->id()));
