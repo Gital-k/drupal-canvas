@@ -709,7 +709,7 @@ describe('vite-compat', () => {
     await fs.writeFile(
       path.join(hostRoot, '.env'),
       [
-        'CANVAS_SITE_URL=http://canvas.ddev.site',
+        'CANVAS_SITE_URL=https://canvas.ddev.site',
         'CANVAS_JSONAPI_PREFIX=api',
       ].join('\n'),
       'utf-8',
@@ -735,12 +735,11 @@ describe('vite-compat', () => {
       );
 
       const transformIndexHtml = drupalCanvasPlugin?.transformIndexHtml as
-        | ((html: string) => { tags?: Array<{ children?: string }> })
-        | undefined;
+        ((html: string) => { tags?: Array<{ children?: string }> }) | undefined;
       const transformed = transformIndexHtml?.('<html></html>');
       expect(transformed?.tags).toBeDefined();
       expect(transformed?.tags?.[0]?.children).toContain(
-        'http://canvas.ddev.site',
+        'https://canvas.ddev.site',
       );
       expect(transformed?.tags?.[0]?.children).toContain('"api"');
     });
