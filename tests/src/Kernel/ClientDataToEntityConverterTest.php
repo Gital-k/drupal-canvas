@@ -10,7 +10,6 @@ use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Controller\EntityFormTrait;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\EntityConstraintViolationList;
-use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\VersionedConfigEntityInterface;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -18,7 +17,6 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\canvas_test_article_fields\Hook\CanvasTestArticleFieldsHooks;
 use Drupal\Component\Datetime\Time;
-use Drupal\Component\Serialization\Json;
 use Drupal\content_moderation\Permissions;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
@@ -643,110 +641,6 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     self::assertSame([], self::violationsToArray($node->validate()));
     $this->assertSame(SAVED_NEW, $node->save());
     return $node;
-  }
-
-  /**
-   * Tests that default metatag values do not produce phantom auto-save entries.
-   *
-   * Canvas hides most metatag tags in its form, so each layout POST carries
-   * only the visible subset (typically just "title"). Canvas also defines
-   * field-level metatag defaults with Canvas-specific tokens (e.g.
-   * "[canvas_page:title] | [site:name]") that differ from metatag's global
-   * config defaults. Without the fix, normalizeEntity() hashes the full stored
-   * metatag data against the partial POST data, producing a phantom auto-save
-   * entry that then blocks publish actions after an unpublish.
-   *
-   * @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
-   */
-  public function testMetatagPhantomAutoSavePrevention(): void {
-    $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
-
-    $account = $this->createUser([Page::EDIT_PERMISSION]);
-    \assert($account instanceof User);
-    $this->setCurrentUser($account);
-
-    $page = Page::create([
-      'title' => 'Phantom auto-save test page',
-      'components' => [],
-    ]);
-    $page->save();
-
-    $autoSave = $this->container->get(AutoSaveManager::class);
-    \assert($autoSave instanceof AutoSaveManager);
-    self::assertNull(
-      $autoSave->getAutoSaveEntity($page)->entity,
-      'No auto-save entry exists for a freshly created page.',
-    );
-
-    $url = '/canvas/api/v0/layout/canvas_page/' . $page->id();
-
-    // GET the layout — when metatag is installed this returns entity_form_fields
-    // populated with the page's default metatag token values.
-    $getResponse = $this->request(Request::create($url));
-    self::assertEquals(Response::HTTP_OK, $getResponse->getStatusCode());
-    $json = \json_decode((string) $getResponse->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
-
-    $metatag_form_keys = \array_keys(\array_filter(
-      $json['entity_form_fields'],
-      static fn (string $key): bool => \str_starts_with($key, 'metatags'),
-      ARRAY_FILTER_USE_KEY,
-    ));
-    self::assertNotEmpty(
-      $metatag_form_keys,
-      'Installing metatag must add metatag form fields to the canvas_page layout response.',
-    );
-
-    // POST the layout back with the default metatag values untouched.
-    // Without the fix this creates a phantom auto-save entry because the
-    // metatag default values inflate the hash. With the fix, normalizeEntity()
-    // excludes them and the hash stays equal to the stored entity's hash.
-    unset($json['isNew'], $json['isPublished'], $json['html'], $json['hasUnsavedStatusChange']);
-    $json += $this->getPostContentsDefaults($page);
-    $postResponse = $this->request(Request::create(
-      $url,
-      method: 'POST',
-      server: ['CONTENT_TYPE' => 'application/json'],
-      content: \json_encode($json, \JSON_THROW_ON_ERROR),
-    ));
-    self::assertEquals(Response::HTTP_OK, $postResponse->getStatusCode());
-
-    self::assertNull(
-      $autoSave->getAutoSaveEntity($page)->entity,
-      'Posting default metatag values must not create a phantom auto-save entry.',
-    );
-
-    // Confirm that a genuinely custom metatag value DOES produce an auto-save.
-    $metatag_title_key = \array_values(\array_filter(
-      $metatag_form_keys,
-      static fn (string $key): bool => \str_contains($key, '[title]'),
-    ))[0] ?? NULL;
-    self::assertNotNull(
-      $metatag_title_key,
-      'The metatag title field must be present in canvas_page metatag form fields.',
-    );
-
-    $json2 = \json_decode((string) $getResponse->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
-    $json2['entity_form_fields'][$metatag_title_key] = 'Custom SEO title, not a token';
-    unset($json2['isNew'], $json2['isPublished'], $json2['html'], $json2['hasUnsavedStatusChange']);
-    $json2 += $this->getPostContentsDefaults($page);
-    $postResponse2 = $this->request(Request::create(
-      $url,
-      method: 'POST',
-      server: ['CONTENT_TYPE' => 'application/json'],
-      content: \json_encode($json2, \JSON_THROW_ON_ERROR),
-    ));
-    self::assertEquals(Response::HTTP_OK, $postResponse2->getStatusCode());
-
-    /** @var \Drupal\Core\Entity\EntityInterface|null $autoSaveEntity */
-    $autoSaveEntity = $autoSave->getAutoSaveEntity($page)->entity;
-    self::assertInstanceOf(
-      Page::class,
-      $autoSaveEntity,
-      'Posting a custom metatag title must create an auto-save entry.',
-    );
-    $raw = $autoSaveEntity->get('metatags')->getValue();
-    $decoded = Json::decode($raw[0]['value'] ?? '{}');
-    self::assertSame('Custom SEO title, not a token', ($decoded ?? [])['title'] ?? NULL);
   }
 
   public function testBooleanCheckboxesNotForBooleanField(): void {
