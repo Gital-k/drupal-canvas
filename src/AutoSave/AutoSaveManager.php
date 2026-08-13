@@ -369,12 +369,10 @@ class AutoSaveManager implements EventSubscriberInterface {
       // unpublish path (saveEntity() is called directly by
       // ApiContentAutoSaveControllers::patch()).
       // @see \Drupal\canvas\Entity\CanvasPageForm::form()
-      if ($items->getFieldDefinition()->getType() === 'metatag') {
-        $metatag_config_defaults = [];
-        if (\Drupal::moduleHandler()->moduleExists('metatag')
-            && \function_exists('metatag_get_default_tags')) {
-          $metatag_config_defaults = \metatag_get_default_tags($entity) ?? [];
-        }
+      if ($items->getFieldDefinition()->getType() === 'metatag'
+          && \Drupal::moduleHandler()->moduleExists('metatag')
+          && \function_exists('metatag_get_default_tags')) {
+        $metatag_config_defaults = \metatag_get_default_tags($entity) ?? [];
         $field_default_value = $items->getFieldDefinition()->getDefaultValue($entity);
         $field_defaults = [];
         if (!empty($field_default_value[0]['value']) && \is_string($field_default_value[0]['value'])) {
