@@ -648,19 +648,13 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
   /**
    * Tests that default metatag values do not produce phantom auto-save entries.
    *
-   * When metatag is installed the editor echoes default token values back on
-   * every layout save. Canvas defines its own field-level metatag defaults
-   * (e.g. "[canvas_page:title] | [site:name]") which differ from metatag's
-   * global config defaults ("[current-page:title] | [site:name]"). The Canvas
-   * form also hides most metatag fields, so each POST only carries the visible
-   * subset (typically just "title"). This means the stored entity (which has all
-   * Canvas field defaults) and the post-form entity (which has only the visible
-   * fields) would hash differently, creating a phantom auto-save entry even when
-   * no user change was made.
-   *
-   * With the fix, normalizeEntity() skips metatag tags whose value is empty,
-   * matches metatag's config-layer default, or matches the field-level default —
-   * so the hash is stable as long as no genuinely custom value is present.
+   * Canvas hides most metatag tags in its form, so each layout POST carries
+   * only the visible subset (typically just "title"). Canvas also defines
+   * field-level metatag defaults with Canvas-specific tokens (e.g.
+   * "[canvas_page:title] | [site:name]") that differ from metatag's global
+   * config defaults. Without the fix, normalizeEntity() hashes the full stored
+   * metatag data against the partial POST data, producing a phantom auto-save
+   * entry that then blocks publish actions after an unpublish.
    *
    * @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
    */

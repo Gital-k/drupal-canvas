@@ -359,27 +359,15 @@ class AutoSaveManager implements EventSubscriberInterface {
           continue;
         }
       }
-      // Metatag fields that contain only default token values must not
-      // contribute to the hash. The Canvas editor echoes back on every layout
-      // save the values currently in the form — often only a subset of
-      // metatag tags because Canvas hides most of them (see CanvasPageForm).
-      // Two complementary sources of "default" must be stripped:
-      //
-      // 1. Metatag's own config defaults (metatag_get_default_tags), which
-      //    preSave() would strip on a genuine entity save.
-      // 2. The field-level defaults set in the field definition
-      //    (BaseFieldDefinition::setDefaultValue), which Canvas uses for its
-      //    own token placeholders (e.g. "[canvas_page:title] | [site:name]").
-      //    These differ from metatag's global tokens and would not be stripped
-      //    by preSave(), yet they carry no user-supplied data.
-      //
-      // A tag is "non-custom" if its value is empty, matches a metatag config
-      // default, or matches the field-level default. The field is omitted from
-      // the hash only when every submitted tag is non-custom.
-      //
-      // This also covers the unpublish code path
-      // (ApiContentAutoSaveControllers::patch()), which calls saveEntity()
-      // directly without going through ClientDataToEntityConverter.
+      // Skip metatag fields that carry no user-supplied data. The editor echoes
+      // back form values on every save, but only for visible tags; hidden tags
+      // (description, canonical_url, …) are absent from the POST. Two default
+      // sources are checked: metatag's config defaults (metatag_get_default_tags)
+      // and the field-level defaults (Canvas uses its own tokens, e.g.
+      // "[canvas_page:title]", which differ from metatag's global ones). A tag
+      // is non-custom if its value is empty or matches either default source.
+      // Covers both layout POST and the unpublish path (saveEntity() is called
+      // directly by ApiContentAutoSaveControllers::patch()).
       if ($items->getFieldDefinition()->getType() === 'metatag') {
         $metatag_config_defaults = [];
         if ($this->moduleHandler->moduleExists('metatag')
