@@ -39,7 +39,6 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Entity\TranslatableInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
@@ -114,7 +113,6 @@ class AutoSaveManager implements EventSubscriberInterface {
     private readonly ConfigManagerInterface $configManager,
     private readonly CacheTagsInvalidatorInterface $cacheTagsInvalidator,
     private readonly EntityTypeManagerInterface $entityTypeManager,
-    private readonly ModuleHandlerInterface $moduleHandler,
     // A non-serializing in-memory cache. ::getAutoSaveEntity() caches a live
     // entity object here; a serializing backend (e.g. cache.static) would run
     // the entity's ::__sleep(), forcing computed fields (such as metatag's) to
