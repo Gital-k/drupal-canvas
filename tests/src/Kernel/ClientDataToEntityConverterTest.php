@@ -743,12 +743,13 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     ));
     self::assertEquals(Response::HTTP_OK, $postResponse2->getStatusCode());
 
+    /** @var \Drupal\Core\Entity\EntityInterface|null $autoSaveEntity */
     $autoSaveEntity = $autoSave->getAutoSaveEntity($page)->entity;
-    self::assertNotNull(
+    self::assertInstanceOf(
+      Page::class,
       $autoSaveEntity,
       'Posting a custom metatag title must create an auto-save entry.',
     );
-    \assert($autoSaveEntity instanceof Page);
     $raw = $autoSaveEntity->get('metatags')->getValue();
     $decoded = Json::decode($raw[0]['value'] ?? '{}');
     self::assertSame('Custom SEO title, not a token', ($decoded ?? [])['title'] ?? NULL);
