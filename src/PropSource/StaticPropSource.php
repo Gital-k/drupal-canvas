@@ -523,6 +523,15 @@ final class StaticPropSource extends PropSourceBase {
     \assert($field_definition instanceof FieldStorageDefinition);
     $field_definition->setRequired($is_required);
 
+    $triggering_element = $form_state->getTriggeringElement();
+    if (!empty($triggering_element['#value']) &&
+      (string) $triggering_element['#value'] === 'Remove' &&
+      isset($triggering_element['#delta'])) {
+      $delta = $triggering_element['#delta'];
+      $values = $this->fieldItemList->getValue();
+      unset($values[$delta]);
+      $this->fieldItemList->setValue(array_values($values));
+    }
     // A field widget needs a FieldItemListInterface object. Use cloning to
     // prevent the field widget plugin from being able to modify this
     // StaticPropSource's field item list by reference.
