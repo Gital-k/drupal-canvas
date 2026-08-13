@@ -61,9 +61,7 @@ const Topbar = () => {
       isTemplateEditorContext ||
       (isPagePreview && !isTranslatedTemplate));
 
-  const isTranslationEnabled =
-    canvasSettings?.contentTranslationEnabled ||
-    canvasSettings?.configTranslationEnabled;
+  const isTranslationEnabled = canvasSettings?.contentTranslationEnabled;
 
   if (
     canvasSettings?.aiExtensionAvailable &&

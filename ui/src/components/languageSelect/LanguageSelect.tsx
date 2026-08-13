@@ -267,7 +267,7 @@ const LanguageSelect = () => {
                     }
                   >
                     {language.name}
-                    {language.isDefault && ' (Default)'}
+                    {translations?.available?.[0] === language.id && ' (Original)'}
                   </Text>
                 </Flex>
               </DropdownMenu.Item>
