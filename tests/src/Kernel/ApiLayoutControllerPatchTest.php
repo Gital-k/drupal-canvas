@@ -62,6 +62,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $this->setUpCurrentUser([], [
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
       'edit any article content',
     ]);
   }
@@ -303,6 +304,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $this->setUpCurrentUser([], [
       'administer url aliases',
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
       self::getAdminPermission($entity),
     ]);
     $autoSave = $this->container->get(AutoSaveManager::class);

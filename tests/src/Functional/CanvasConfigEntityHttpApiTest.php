@@ -264,6 +264,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       JavaScriptComponent::ADMIN_PERMISSION,
       Pattern::ADMIN_PERMISSION,
       PageRegion::ADMIN_PERMISSION,
+      'edit canvas global regions',
       Folder::ADMIN_PERMISSION,
       ContentTemplate::ADMIN_PERMISSION,
       Color::ADMIN_PERMISSION,

@@ -13,9 +13,12 @@ ini_set('assert.active', 1);
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\PropSource\FieldStorageDefinition;
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Render\Markup;
+use Drupal\Core\Session\AccountInterface;
 
 /**
  * Provides allowed values for a 'list_*' field used in a StaticPropSource.
@@ -101,4 +104,30 @@ function canvas_preprocess_html(array &$variables): void {
   if ($current_route === 'entity.canvas_page.canonical') {
     $variables['attributes']['class'][] = 'canvas-page';
   }
+}
+
+/**
+ * Implements hook_entity_access().
+ *
+ * Restricts editing of global Canvas page regions (any page_region other than
+ * the "content" region) to users with the "edit canvas global regions"
+ * permission.
+ */
+function canvas_entity_access(EntityInterface $entity, string $operation, AccountInterface $account): AccessResult {
+  if ($entity->getEntityTypeId() !== 'page_region') {
+    return AccessResult::neutral();
+  }
+  $id = (string) ($entity->id() ?? '');
+  [, $region] = explode('.', $id, 2) + [NULL, NULL];
+  if (!$region || $region === 'content') {
+    return AccessResult::neutral();
+  }
+  if (!in_array($operation, ['update', 'edit', 'delete'], TRUE)) {
+    return AccessResult::neutral();
+  }
+  if ($account->hasPermission('edit canvas global regions')) {
+    return AccessResult::neutral()->cachePerPermissions();
+  }
+  return AccessResult::forbidden('Editing global Canvas regions requires the "edit canvas global regions" permission.')
+    ->cachePerPermissions();
 }
