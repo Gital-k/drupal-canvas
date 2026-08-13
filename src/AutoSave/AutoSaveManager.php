@@ -206,7 +206,7 @@ class AutoSaveManager implements EventSubscriberInterface {
 
   public function saveEntity(EntityInterface $entity, ?string $clientId = NULL): void {
     $key = $this->getAutoSaveKey($entity);
-    $data = $this->normalizeEntity($entity);
+    $data = self::normalizeEntity($entity);
     $data_hash = self::generateHash($data);
     $original_hash = $this->getUnchangedHash($entity);
 
@@ -218,7 +218,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     // expect one to be, the code below can be evaluated in a debugger and will
     // show you which field varies.
     // @code
-    // $original = $this->normalizeEntity($this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id()))
+    // $original = self::normalizeEntity($this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id()))
     // $data_hash = \array_map(self::generateHash(...), $data)
     // $original_hash = \array_map(self::generateHash(...), $original)
     // \array_diff($data_hash, $original_hash)
@@ -318,7 +318,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $this->componentInstanceFormViolationsStore->get($component_uuid) ?? new ConstraintViolationList();
   }
 
-  private function normalizeEntity(EntityInterface $entity): array {
+  private static function normalizeEntity(EntityInterface $entity): array {
     if (!$entity instanceof FieldableEntityInterface) {
       return self::toStorableArray($entity);
     }
@@ -371,7 +371,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       // directly by ApiContentAutoSaveControllers::patch()).
       if ($items->getFieldDefinition()->getType() === 'metatag') {
         $metatag_config_defaults = [];
-        if ($this->moduleHandler->moduleExists('metatag')
+        if (\Drupal::moduleHandler()->moduleExists('metatag')
             && \function_exists('metatag_get_default_tags')) {
           $metatag_config_defaults = \metatag_get_default_tags($entity) ?? [];
         }
@@ -454,7 +454,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     if ($original === NULL) {
       return NULL;
     }
-    return self::generateHash($this->normalizeEntity($original));
+    return self::generateHash(self::normalizeEntity($original));
   }
 
   public function getAutoSaveEntity(EntityInterface $entity, bool $bypass_cache = FALSE): AutoSaveEntity {
@@ -820,7 +820,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert(!\is_null($entity));
 
     // Compare the original_hash in auto-save entry vs latest entity hash.
-    if ($entry[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === self::generateHash($this->normalizeEntity($entity))) {
+    if ($entry[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === self::generateHash(self::normalizeEntity($entity))) {
       // Hashes are matching - no conflict.
       return NULL;
     }
@@ -887,7 +887,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert(!$entity->isNew());
     $stored = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
     \assert(!\is_null($stored));
-    $current_hash = self::generateHash($this->normalizeEntity($stored));
+    $current_hash = self::generateHash(self::normalizeEntity($stored));
     /** @var AutoSaveEntry $auto_save_data */
 
     if ($auto_save_data[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === $current_hash) {
@@ -1136,7 +1136,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       $this->setStoredEntityHash(
         self::getAutoSaveKey($autoSaveEntity),
         // Hash the freshly-saved stored entity, not the auto-save draft.
-        self::generateHash($this->normalizeEntity($entity)),
+        self::generateHash(self::normalizeEntity($entity)),
       );
       $this->saveEntity($autoSaveEntity, $autoSaveData->clientId);
     }
