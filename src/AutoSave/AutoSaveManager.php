@@ -358,15 +358,17 @@ class AutoSaveManager implements EventSubscriberInterface {
         }
       }
       // Skip metatag fields that carry no user-supplied data. The editor echoes
-      // back form values on every save, but only for visible tags; hidden tags
-      // (description, canonical_url, …) are absent from the POST. Two default
-      // sources are checked: metatag's config defaults
-      // (metatag_get_default_tags)
-      // and the field-level defaults (Canvas uses its own tokens, e.g.
-      // "[canvas_page:title]", which differ from metatag's global ones). A tag
-      // is non-custom if its value is empty or matches either default source.
-      // Covers both layout POST and the unpublish path (saveEntity() is called
-      // directly by ApiContentAutoSaveControllers::patch()).
+      // back form values on every save, but only for the tags
+      // CanvasPageForm::form() leaves visible (currently only "title");
+      // hidden tags (description, canonical_url, …) are absent from the
+      // POST. Two default sources are checked: metatag's config defaults
+      // (metatag_get_default_tags) and the field-level defaults (Canvas uses
+      // its own tokens, e.g. "[canvas_page:title]", which differ from
+      // metatag's global ones). A tag is non-custom if its value is empty or
+      // matches either default source. Covers both layout POST and the
+      // unpublish path (saveEntity() is called directly by
+      // ApiContentAutoSaveControllers::patch()).
+      // @see \Drupal\canvas\Entity\CanvasPageForm::form()
       if ($items->getFieldDefinition()->getType() === 'metatag') {
         $metatag_config_defaults = [];
         if (\Drupal::moduleHandler()->moduleExists('metatag')
