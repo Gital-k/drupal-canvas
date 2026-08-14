@@ -45,6 +45,7 @@ export interface RegionNode {
   id: string;
   nodeType: NodeType.Region;
   components: ComponentNode[];
+  sourceLangcode?: string;
 }
 
 export interface ComponentNode {

@@ -247,7 +247,7 @@ final class ApiLayoutController {
     return new PreviewEnvelope($this->buildPreviewRenderable($entity, $preview_entity), $data);
   }
 
-  private function buildRegion(string $id, ?ComponentTreeItemList $items = NULL, ?array &$model = NULL, ?FieldableEntityInterface $preview_entity = NULL): array {
+  private function buildRegion(string $id, ?ComponentTreeItemList $items = NULL, ?array &$model = NULL, ?FieldableEntityInterface $preview_entity = NULL, ?PageRegion $page_region = NULL): array {
     if ($items) {
       // Auto-update component instances before serving them, which will make
       // the preview accurate with what the editor would see when editing the
@@ -308,6 +308,7 @@ final class ApiLayoutController {
       'id' => $this->regionsClientSideIds[$id],
       'name' => $this->regions[$id],
       'components' => $components,
+      'sourceLangcode' => $page_region?->language()->getId(),
     ];
   }
 
@@ -361,14 +362,14 @@ final class ApiLayoutController {
       if ($draft_region = $this->autoSaveManager->getAutoSaveEntity($region)->entity) {
         \assert($draft_region instanceof PageRegion);
         // @phpstan-ignore-next-line parameterByRef.type
-        $layout[] = $this->buildRegion($id, $draft_region->getComponentTree(), $model);
+        $layout[] = $this->buildRegion($id, $draft_region->getComponentTree(), $model, NULL, $region);
       }
       // Otherwise fall back to the currently live PageRegion config entity.
       // (Note: this automatically ignores auto-saves for PageRegions that were
       // editable at the time, but no longer are.)
       else {
         // @phpstan-ignore-next-line parameterByRef.type
-        $layout[] = $this->buildRegion($id, $region->getComponentTree(), $model);
+        $layout[] = $this->buildRegion($id, $region->getComponentTree(), $model, NULL, $region);
       }
     }
   }
