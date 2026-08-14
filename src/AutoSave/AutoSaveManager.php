@@ -365,14 +365,10 @@ class AutoSaveManager implements EventSubscriberInterface {
       // POST. Two default sources are checked: metatag's config defaults
       // (metatag_get_default_tags) and the field-level defaults (Canvas uses
       // its own tokens, e.g. "[canvas_page:title]", which differ from
-      // metatag's global ones). A tag is non-custom only if it matches one
-      // of those default sources; an empty value is not treated as a
-      // default, because metatag does not fall back to a tag's default when
-      // its stored value is an explicit empty string.
-      // @see \Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem::preSave()
-      // @see \Drupal\metatag\MetatagManager::tagsFromEntityWithDefaults()
-      // Covers both layout POST and the unpublish path (saveEntity() is
-      // called directly by ApiContentAutoSaveControllers::patch()).
+      // metatag's global ones). A tag is non-custom if its value is empty or
+      // matches either default source. Covers both layout POST and the
+      // unpublish path (saveEntity() is called directly by
+      // ApiContentAutoSaveControllers::patch()).
       // @see \Drupal\canvas\Entity\CanvasPageForm::form()
       if ($items->getFieldDefinition()->getType() === 'metatag'
           && $this->moduleHandler->moduleExists('metatag')
@@ -387,6 +383,10 @@ class AutoSaveManager implements EventSubscriberInterface {
         foreach ($items->getValue() as $item) {
           $stored = Json::decode($item['value'] ?? '[]') ?? [];
           foreach ($stored as $tag_id => $tag_value) {
+            // An empty value carries no user-supplied data.
+            if ($tag_value === '') {
+              continue;
+            }
             // Matches metatag's config-layer default for this tag.
             if (\array_key_exists($tag_id, $metatag_config_defaults)
                 && $metatag_config_defaults[$tag_id] === $tag_value) {
