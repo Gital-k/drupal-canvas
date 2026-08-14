@@ -26,6 +26,7 @@ use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Url;
 use Drupal\file\FileInterface;
+use Drupal\metatag\Entity\MetatagDefaults;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
@@ -988,6 +989,51 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $raw = $autoSaveEntity->get('metatags')->getValue();
     $decoded = Json::decode($raw[0]['value'] ?? '{}');
     self::assertSame('Custom SEO title, not a token', ($decoded ?? [])['title'] ?? NULL);
+  }
+
+  /**
+   * A metatag value matching metatag's own config-level default (as opposed
+   * to Canvas's field-level default) must not be treated as a custom value.
+   *
+   * @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
+   */
+  public function testMetatagConfigDefaultValueIsNotCustom(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
+
+    // A bundle-level metatag default distinct from Canvas's own field
+    // default for the same tag.
+    // @see \Drupal\canvas\Hook\PageHooks::entityBaseFieldInfo()
+    MetatagDefaults::create([
+      'id' => Page::ENTITY_TYPE_ID,
+      'label' => 'Canvas page',
+      'tags' => [
+        'description' => 'Global default description, not a Canvas token',
+      ],
+    ])->save();
+
+    $page = Page::create([
+      'title' => 'Metatag config default test page',
+      'components' => [],
+    ]);
+    $page->save();
+
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    self::assertTrue($autoSave->getAutoSaveEntity($page)->isEmpty());
+
+    // Change only the `description` tag's raw value to match the metatag
+    // config-level default set above, leaving the other tags untouched
+    // (still matching Canvas's own field-level default).
+    $raw = $page->get('metatags')->getValue();
+    $tags = Json::decode($raw[0]['value'] ?? '{}') ?? [];
+    $tags['description'] = 'Global default description, not a Canvas token';
+    $page->set('metatags', Json::encode($tags));
+
+    $autoSave->saveEntity($page);
+
+    self::assertTrue(
+      $autoSave->getAutoSaveEntity($page)->isEmpty(),
+      'A metatag value matching the config-level default must not be treated as a custom value.',
+    );
   }
 
 }
