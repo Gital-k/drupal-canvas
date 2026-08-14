@@ -483,6 +483,14 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // plugin ID.
     $input += $defaults;
     unset($input['provider'], $input['id']);
+
+    // A context-aware block stores its context assignments in
+    // `context_mapping`. A block's `defaultConfiguration()` sets no value for
+    // it, so the merge above — which keeps only keys present in the default
+    // settings — drops it. Keep it straight from the client model when present.
+    if (!empty($client_model['resolved']['context_mapping'])) {
+      $input['context_mapping'] = $client_model['resolved']['context_mapping'];
+    }
     return $input;
   }
 

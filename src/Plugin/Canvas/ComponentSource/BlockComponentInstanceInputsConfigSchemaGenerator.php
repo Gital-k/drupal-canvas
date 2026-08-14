@@ -38,9 +38,10 @@ final readonly class BlockComponentInstanceInputsConfigSchemaGenerator implement
 
     // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::validateComponentInput()
     unset($mapping['provider'], $mapping['id']);
-    // @todo Consider uncommenting in https://www.drupal.org/project/canvas/issues/3485502.
-    unset($mapping['context_mapping']);
 
+    // Context-aware blocks will include `context_mapping` assignments in
+    // $mapping, and Canvas applies them when rendering the block.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::renderComponent()
     return $mapping;
   }
 

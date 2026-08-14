@@ -650,6 +650,60 @@ HTML,
     ], $violationMap);
   }
 
+  /**
+   * Tests that a context-aware block's `context_mapping` is stored and valid.
+   *
+   * @legacy-covers ::clientModelToInput
+   */
+  public function testContextMappingRoundTrip(): void {
+    $this->generateComponentConfig();
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+
+    $component_id = 'block.canvas_test_block_optional_contexts';
+    $component = Component::load($component_id);
+    \assert($component instanceof ComponentInterface);
+    $source = $component->getComponentSource();
+    \assert($source instanceof BlockComponent);
+    $uuid = 'f8f2c0a1-1f2b-4a3c-9d4e-5a6b7c8d9e0f';
+
+    // A `context_mapping` in the client model survives clientModelToInput, even
+    // though it is not one of the block's default settings.
+    $mapping = ['name' => 'canvas.host_entity'];
+    // @phpstan-ignore-next-line
+    $input = $source->clientModelToInput($uuid, $component, [
+      'resolved' => ['context_mapping' => $mapping],
+    ], NULL);
+    self::assertSame($mapping, $input['context_mapping']);
+
+    // A stored instance WITH a `context_mapping` validates: the generated inputs
+    // schema no longer strips the key.
+    $with_mapping = Page::create([
+      'title' => 'With mapping',
+      'components' => [
+        [
+          'uuid' => $uuid,
+          'component_id' => $component_id,
+          'inputs' => ['label' => 'Ctx', 'label_display' => '0', 'context_mapping' => $mapping],
+        ],
+      ],
+    ]);
+    self::assertEntityIsValid($with_mapping);
+
+    // Backwards compatibility: a stored instance WITHOUT a `context_mapping`
+    // still validates, because the key is optional.
+    $without_mapping = Page::create([
+      'title' => 'Without mapping',
+      'components' => [
+        [
+          'uuid' => '0a1b2c3d-4e5f-4061-8273-8495a6b7c8d9',
+          'component_id' => $component_id,
+          'inputs' => ['label' => 'No ctx', 'label_display' => '0'],
+        ],
+      ],
+    ]);
+    self::assertEntityIsValid($without_mapping);
+  }
+
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
     $decorator = \Drupal::service(BlockManagerInterface::class);
     \assert($decorator instanceof BlockManagerDecorator);
