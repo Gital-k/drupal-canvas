@@ -831,9 +831,7 @@ class CanvasAiPageBuilderHelper {
   /**
    * Returns TRUE if a block prop key should not be exposed to the agent.
    *
-   * The context_mapping key is excluded because Canvas does not apply context
-   * mappings at render time, so any value written by the agent would have no
-   * effect.
+   * @todo Revisit whether the agent should choose context assignments for context-aware blocks (for example when several gathered contexts match a required slot, so placement cannot auto-assign) in a follow-up issue.
    *
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentInstanceInputsConfigSchemaGenerator::getConfigSchemaMapping()
    */
