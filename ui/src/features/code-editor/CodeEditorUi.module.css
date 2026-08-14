@@ -12,8 +12,7 @@
 }
 
 .tabTrigger {
-  padding-right: var(--space-1) !important;
-  padding-left: var(--space-1) !important;
+  padding-inline: var(--space-1) !important;
 }
 
 .addToComponentsButton {

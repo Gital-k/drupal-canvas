@@ -52,7 +52,7 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
   const dispatch = useAppDispatch();
   const selectedModel: ComponentModel | EvaluatedComponentModel | boolean =
     model?.[selectedComponentId] || false;
-  if (!selectedModel) {
+  if (!suggestions || suggestions.length === 0) {
     return null;
   }
   const [linkerOpen, setLinkerOpen] = useState(false);
@@ -69,6 +69,8 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
 
   let selectedSourceAsString = '';
   if (
+    typeof selectedModel === 'object' &&
+    selectedModel !== null &&
     isEvaluatedComponentModel(selectedModel) &&
     selectedModel?.source?.[propName] &&
     Object.prototype.hasOwnProperty.call(
@@ -82,6 +84,15 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
     );
   }
 
+  const decodeAndFormatLabel = (label: string): string => {
+    if (!label) return '';
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = label;
+    let decoded = textarea.value;
+    decoded = decoded.replace(/\s*\([\s\S]*?\)\s*$/, '').trim();
+    return decoded;
+  };
+
   const DropdownMenuItem = ({
     item,
     isActive,
@@ -91,6 +102,7 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
     isActive: boolean;
     childOf?: string;
   }) => {
+    const formattedLabel = decodeAndFormatLabel(item.label);
     return (
       <DropdownMenu.Item
         onClick={() => handleFieldClick(item)}
@@ -98,11 +110,11 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
         className={clsx({
           [styles.disabled]: isActive,
         })}
-        data-link-suggestion-option={item.label}
+        data-link-suggestion-option={formattedLabel}
         data-child-of={childOf}
       >
         {isActive && <CheckIcon />}
-        {item.label}
+        {formattedLabel}
       </DropdownMenu.Item>
     );
   };
@@ -115,6 +127,7 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
     parent?: string;
   }) => {
     const isActive = JSON.stringify(item.source) === selectedSourceAsString;
+    const formattedLabel = decodeAndFormatLabel(item.label);
 
     if (item.items && item.items.length > 0) {
       return (
@@ -123,10 +136,10 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
             className={clsx(styles.subTrigger, {
               [styles.disabled]: isActive && item.source,
             })}
-            data-link-suggestion-option={item.label}
+            data-link-suggestion-option={formattedLabel}
             data-child-of={parent}
           >
-            {item.label}
+            {formattedLabel}
           </DropdownMenu.SubTrigger>
 
           <DropdownMenu.SubContent>
@@ -199,8 +212,16 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
     }, [])
     .map((item) => item.label);
 
+  const isRtl =
+    typeof document !== 'undefined' &&
+    document.documentElement.getAttribute('dir') === 'rtl';
+  const contentAlign = isRtl ? 'end' : 'start';
+
   return (
-    <DropdownMenu.Root onOpenChange={(open) => setLinkerOpen(open)}>
+    <DropdownMenu.Root
+      dir={isRtl ? 'rtl' : 'ltr'}
+      onOpenChange={(open) => setLinkerOpen(open)}
+    >
       <DropdownMenu.Trigger>
         <button
           className={clsx(styles.linker, {
@@ -213,7 +234,7 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
           {!linked && <LinkNone1Icon className={styles.default} />}
         </button>
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="end" side="bottom">
+      <DropdownMenu.Content align={contentAlign} side="bottom">
         {suggestions.map((suggestion, index) => {
           if (suggestion.items && suggestion.items.length > 0) {
             return (

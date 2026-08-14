@@ -54,6 +54,8 @@ const UndoRedo = () => {
     };
   });
 
+  const isRtl = document.documentElement.dir === 'rtl';
+
   return (
     <>
       <Button
@@ -65,7 +67,11 @@ const UndoRedo = () => {
         disabled={!isUndoable}
         aria-label="Undo"
       >
-        <ResetIcon height="16" width="auto" />
+        <ResetIcon
+          height="16"
+          width="16"
+          style={{ transform: isRtl ? 'scaleX(-1)' : undefined }}
+        />
       </Button>
       <Button
         variant="ghost"
@@ -78,8 +84,8 @@ const UndoRedo = () => {
       >
         <ResetIcon
           height="16"
-          width="auto"
-          style={{ transform: 'scaleX(-1)' }}
+          width="16"
+          style={{ transform: isRtl ? undefined : 'scaleX(-1)' }}
         />
       </Button>
     </>

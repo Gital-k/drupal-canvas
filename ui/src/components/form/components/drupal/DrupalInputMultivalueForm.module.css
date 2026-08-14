@@ -12,7 +12,7 @@
   padding: var(--space-3) var(--space-3);
   cursor: pointer;
   transition: background-color 0.15s ease;
-  text-align: left;
+  text-align: start;
   border: none;
   background-color: transparent;
 }
@@ -36,7 +36,7 @@
 
 .arrowIcon {
   position: absolute;
-  right: var(--space-3);
+  inset-inline-end: var(--space-3);
   flex-shrink: 0;
   margin-top: 5px;
   transition: opacity 0.15s ease;
@@ -82,18 +82,18 @@
 
 .visuallyHiddenInput {
   position: absolute;
-  left: -9999px;
+  inset-inline-start: -9999px;
 }
 
 .timeInputWrapper {
   margin-top: 8px;
 }
 
-/* Date and Time Input Styles - Move icons to the left */
+/* Date and Time Input Styles - Move icons to the start */
 .popoverContent input[type="date"],
 .popoverContent input[type="time"] {
   position: relative;
-  padding-left: 30px;
+  padding-inline-start: 30px;
   text-indent: 0;
   background-color: transparent;
   background-repeat: no-repeat;
@@ -101,14 +101,14 @@
   background-size: 16px 16px;
 }
 
-/* Position the calendar/clock picker indicator on the left side */
+/* Position the calendar/clock picker indicator on the start side */
 /* stylelint-disable-next-line property-no-vendor-prefix */
 .popoverContent input[type="date"]::-webkit-calendar-picker-indicator,
 .popoverContent input[type="time"]::-webkit-calendar-picker-indicator {
   position: absolute;
   z-index: 2;
-  right: auto;
-  left: 4px;
+  inset-inline-end: auto;
+  inset-inline-start: 4px;
   width: 20px;
   height: 20px;
   margin: 0;

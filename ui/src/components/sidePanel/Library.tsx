@@ -8,6 +8,7 @@ import LibraryToolbar from '@/components/sidePanel/LibraryToolbar';
 import { useCanvasHeadlessSettings } from '@/hooks/useCanvasHeadlessSettings';
 import useDebounce from '@/hooks/useDebounce';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { getDocDir } from '@/utils/function-utils';
 
 import type { ComponentVisibility } from '@/components/list/ComponentList';
 
@@ -29,7 +30,7 @@ const Library = () => {
 
   return (
     <>
-      <Tabs.Root defaultValue="components">
+      <Tabs.Root defaultValue="components" dir={getDocDir()}>
         <Tabs.List justify="start" mt="-2" size="1">
           <Tabs.Trigger
             value="components"

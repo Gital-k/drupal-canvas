@@ -30,7 +30,7 @@
       width: 100%;
       margin-bottom: 0;
       label {
-         margin-left: calc(var(--canvas-media-item-width) + var(--space-2));
+         margin-inline-start: calc(var(--canvas-media-item-width) + var(--space-2));
       }
       input {
         width: 40px;
@@ -49,7 +49,7 @@
   }
 
   :global(.js-media-library-widget-toggle-weight) {
-    margin-left: auto;
+    margin-inline-start: auto;
     color: var(--blue-9);
     font-size: 0;
     &::after {
@@ -145,7 +145,7 @@
           position: absolute;
           z-index: 1;
           top: calc((var(--canvas-media-item-height) / 2) - 8px);
-          right: 4px;
+          inset-inline-end: 4px;
           overflow: hidden;
           width: 16px;
           height: 16px;
@@ -204,7 +204,7 @@
   }
 
   :global(.canvas-media-preview-label) {
-    margin-right: 20px;
+    margin-inline-end: 20px;
     overflow-wrap: break-word;
     color: var(--slate-11);
   }

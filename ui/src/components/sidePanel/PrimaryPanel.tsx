@@ -18,6 +18,7 @@ import {
 } from '@/features/ui/primaryPanelSlice';
 import useHidePanelClasses from '@/hooks/useHidePanelClasses';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { getDocDir } from '@/utils/function-utils';
 import { hasPermission } from '@/utils/permissions';
 
 import AiWizard from '../aiExtension/AiWizard';
@@ -58,6 +59,7 @@ export const PrimaryPanel = () => {
       className={clsx(styles.primaryPanel, ...offLeftClasses)}
       data-testid="canvas-primary-panel"
       direction="column"
+      dir={getDocDir()}
     >
       {!!activePanel && (
         <>
@@ -65,10 +67,8 @@ export const PrimaryPanel = () => {
             <Heading as="h4" size="2" trim="both">
               {panelMap[activePanel]}
             </Heading>
-            <Box ml="auto">
+            <Box className={styles.closeButtonWrapper}>
               <Button
-                ml="auto"
-                mr="0"
                 variant="ghost"
                 size="1"
                 highContrast
@@ -79,7 +79,7 @@ export const PrimaryPanel = () => {
             </Box>
           </Flex>
           <Box flexGrow="1" className={styles.scrollArea}>
-            <ScrollArea scrollbars="vertical">
+            <ScrollArea scrollbars="vertical" dir={getDocDir()}>
               <Box p="4" className="primaryPanelContent">
                 {activePanel === 'library' && (
                   <ErrorBoundary>

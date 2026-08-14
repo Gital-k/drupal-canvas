@@ -23,9 +23,9 @@ import DrupalSelectMultivalueForm from '@/components/form/components/drupal/Drup
 import DrupalTextArea from '@/components/form/components/drupal/DrupalTextArea';
 import DrupalToggle from '@/components/form/components/drupal/DrupalToggle';
 import DrupalVerticalTabs from '@/components/form/components/drupal/DrupalVerticalTabs';
-import InputDescription from '@/components/form/components/drupal/InputDescription.js';
-import LinkedFieldBox from '@/components/form/components/drupal/LinkedFieldBox.js';
-import PropLinker from '@/components/form/components/drupal/PropLinker.js';
+import InputDescription from '@/components/form/components/drupal/InputDescription';
+import LinkedFieldBox from '@/components/form/components/drupal/LinkedFieldBox';
+import PropLinker from '@/components/form/components/drupal/PropLinker';
 import DrupalMediaLibraryWidgetContainer from '@/components/form/components/MediaLibraryWidgetContainer';
 import SerpPreview from '@/components/form/components/SerpPreview';
 

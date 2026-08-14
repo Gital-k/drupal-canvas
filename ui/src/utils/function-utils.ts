@@ -56,9 +56,22 @@ export function parseValue(
  */
 export function getHalfwayScrollPosition(parent: HTMLElement | null) {
   if (parent) {
-    // Calculate the maximum possible scrollLeft value (total scrollable width).
+    const anchor = parent.querySelector(
+      '#positionAnchor',
+    ) as HTMLElement | null;
+    const scaling = parent.querySelector(
+      '[data-testid="canvas-editor-frame-scaling"]',
+    ) as HTMLElement | null;
+    if (anchor) {
+      const width =
+        scaling && scaling.offsetWidth
+          ? scaling.offsetWidth
+          : anchor.offsetWidth || 1024;
+      const anchorCenterInPane = anchor.offsetLeft + width / 2;
+      return anchorCenterInPane - parent.clientWidth / 2;
+    }
+    // Fallback to half of max scrollable width if no anchor is found.
     const maxScrollLeft = parent.scrollWidth - parent.clientWidth;
-    // Return the halfway scroll position.
     return maxScrollLeft / 2;
   }
   return 0;
@@ -113,4 +126,12 @@ export function findInChanges(
     }
   }
   return false;
+}
+
+export function getDocDir(): 'ltr' | 'rtl' {
+  return typeof document !== 'undefined' &&
+    (document.documentElement.getAttribute('dir') === 'rtl' ||
+      document.dir === 'rtl')
+    ? 'rtl'
+    : 'ltr';
 }

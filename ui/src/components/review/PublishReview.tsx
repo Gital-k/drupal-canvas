@@ -326,10 +326,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
           </Box>
           <Divider />
           <Box className={isBusy ? styles.disabled : ''}>
-            <ScrollArea
-              style={{ maxHeight: '380px', width: '100%' }}
-              type="scroll"
-            >
+            <ScrollArea scrollbars="vertical" className={styles.scrollArea}>
               <ReviewErrors errorState={errors} />
               <Box px="4" pt="4">
                 <Text size="1">

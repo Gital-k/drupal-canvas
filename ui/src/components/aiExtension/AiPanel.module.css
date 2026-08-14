@@ -7,9 +7,9 @@
   }
 
   &[data-open="true"] + * {
-    margin-left: 8px;
-    border-left: 1px solid var(--gray-5);
-    border-top-left-radius: 8px;
+    margin-inline-start: 8px;
+    border-inline-start: 1px solid var(--gray-5);
+    border-start-start-radius: 8px;
   }
   &[data-open="true"] ~ * {
     margin-top: 16px !important;

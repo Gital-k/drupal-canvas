@@ -589,6 +589,7 @@ const EditorFrame: React.FC = () => {
   return (
     <div className={styles.editorFrameContainer}>
       <div
+        dir="ltr"
         className={clsx(styles.editorPane, {
           [styles.spaceKeyPressed]: spaceKeyPressed,
           [styles.zoomModifierKeyPressed]: zoomModifierKeyPressed,

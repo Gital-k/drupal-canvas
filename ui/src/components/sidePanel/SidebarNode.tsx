@@ -88,9 +88,11 @@ const SidebarNode = React.forwardRef<
     const content = (
       <Flex
         align="center"
-        pr="2"
         maxWidth="100%"
-        pl={`calc(${effectiveIndent} * var(--space-2))`}
+        style={{
+          paddingInlineStart: `calc(${effectiveIndent} * var(--space-2))`,
+          paddingInlineEnd: 'var(--space-2)',
+        }}
         className={clsx(
           styles[`${variant}Variant`],
           {
@@ -107,7 +109,7 @@ const SidebarNode = React.forwardRef<
         <Flex flexGrow="1" align="center" overflow="hidden">
           {leadingContent && (
             <Flex
-              mr="-2" // Offset the padding of the element to the right. This will provide a larger area for clicking.
+              style={{ marginInlineEnd: '-var(--space-2)' }}
               align="center"
               flexShrink="0"
               flexGrow="0"
@@ -116,19 +118,33 @@ const SidebarNode = React.forwardRef<
               {leadingContent}
             </Flex>
           )}
-          <Flex pl="2" align="center" flexShrink="0" className={styles.icon}>
+          <Flex
+            style={{ paddingInlineStart: 'var(--space-2)' }}
+            align="center"
+            flexShrink="0"
+            className={styles.icon}
+          >
             {broken
               ? VARIANTS['broken']?.icon
               : VARIANTS[variant]?.icon || <Component1Icon />}
           </Flex>
-          <Flex px="2" align="center" flexGrow="1" overflow="hidden">
+          <Flex
+            style={{ paddingInline: 'var(--space-2)' }}
+            align="center"
+            flexGrow="1"
+            overflow="hidden"
+          >
             <Text size="1" truncate className={styles.title}>
               {title}
             </Text>
           </Flex>
         </Flex>
         {trailingContent && (
-          <Flex align="center" flexShrink="0" mr="2">
+          <Flex
+            align="center"
+            flexShrink="0"
+            style={{ marginInlineEnd: 'var(--space-2)' }}
+          >
             {trailingContent}
           </Flex>
         )}
