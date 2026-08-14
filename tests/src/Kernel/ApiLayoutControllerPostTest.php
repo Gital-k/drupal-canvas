@@ -992,8 +992,10 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * A metatag value matching metatag's own config-level default (as opposed
-   * to Canvas's field-level default) must not be treated as a custom value.
+   * Tests that a metatag config-level default value is not a custom value.
+   *
+   * A tag matching metatag's own config-level default (as opposed to
+   * Canvas's field-level default) must not be treated as a custom value.
    *
    * @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
    */
