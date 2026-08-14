@@ -14,6 +14,7 @@ use Drupal\Core\Display\Attribute\PageDisplayVariant;
 use Drupal\Core\Display\PageVariantInterface;
 use Drupal\Core\Display\VariantBase;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Render\Element;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -193,7 +194,14 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
         };
       }
       \assert($fiber->isTerminated());
-      $build[$region->get('region')] = $fiber->getReturn();
+      $region_name = $region->get('region');
+      $region_build = $fiber->getReturn();
+      // Pass the region name to block render arrays so that
+      // hook_theme_suggestions_block_alter() can generate region-aware template
+      // suggestions.
+      // @see \Drupal\canvas\Hook\BlockThemeSuggestionsHooks::themeSuggestionsBlockAlter()
+      self::stampCanvasRegion($region_build, $region_name);
+      $build[$region_name] = $region_build;
     }
 
     // Now render the special "content" region.
@@ -209,6 +217,30 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
     }
 
     return $build;
+  }
+
+  /**
+   * Recursively stamps block render arrays with the Canvas region name.
+   *
+   * This walks the render tree and adds #canvas_region to any element using
+   * the 'block' theme hook, enabling region-aware template suggestions.
+   *
+   * @param array &$build
+   *   The render array to walk.
+   * @param string $region_name
+   *   The region name to stamp.
+   */
+  private static function stampCanvasRegion(array &$build, string $region_name): void {
+    if (isset($build['#theme']) && $build['#theme'] === 'block') {
+      $build['#canvas_region'] = $region_name;
+      return;
+    }
+    if (isset($build['#component']['#theme']) && $build['#component']['#theme'] === 'block') {
+      $build['#component']['#canvas_region'] = $region_name;
+    }
+    foreach (Element::children($build) as $key) {
+      self::stampCanvasRegion($build[$key], $region_name);
+    }
   }
 
 }
