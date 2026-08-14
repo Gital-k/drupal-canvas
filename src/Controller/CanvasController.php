@@ -141,25 +141,18 @@ HTML;
     $all_definitions = $this->entityTypeManager->getDefinitions();
     foreach ($all_definitions as $entity_type_id => $entity_type_definition) {
       $is_template_supported = $this->contentTemplateRepository->isSupportedEntityType($entity_type_definition);
+      $bundles = $this->entityTypeBundleInfo->getBundleInfo($entity_type_id);
       if ($is_template_supported) {
-        $bundle_entity_type_id = $entity_type_definition->getBundleEntityType();
+        $has_bundle_support = $entity_type_definition->hasKey('bundle');
         $content_template_entity_types[$entity_type_id] = [
           'label' => (string) $entity_type_definition->getLabel(),
           'bundleCollectionLabel' => $this->contentTemplateRepository->getBundleCollectionLabel($entity_type_id),
-          'bundleLabel' => $bundle_entity_type_id !== NULL
-            ? (string) $all_definitions[$bundle_entity_type_id]->getLabel()
-            : NULL,
+          'bundleLabel' => $has_bundle_support ? $entity_type_definition->getBundleLabel() : NULL,
         ];
       }
       if ($is_template_supported || $entity_type_definition->entityClassImplements(ComponentTreeEntityInterface::class)) {
         $entity_types_with_keys[$entity_type_id] = $entity_type_definition->getKeys();
-        if ($entity_type_definition->getBundleEntityType()) {
-          $bundles = $this->entityTypeBundleInfo->getBundleInfo($entity_type_id);
-          $entity_type_labels[$entity_type_id] = \array_map(fn($bundle) => $bundle['label'], $bundles);
-        }
-        else {
-          $entity_type_labels[$entity_type_id] = $entity_type_definition->getLabel();
-        }
+        $entity_type_labels[$entity_type_id] = \array_map(fn($bundle) => $bundle['label'], $bundles);
       }
     }
     $extensions = $this->extensionPluginManager->getDefinitions();
