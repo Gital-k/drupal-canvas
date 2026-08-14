@@ -339,8 +339,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     // persisted elsewhere on save (path aliases, moderation states).
     $fields = \array_filter($fields, static fn (FieldItemListInterface $field) => !$field->getFieldDefinition()->isComputed() || self::isPersistedComputedField($field->getFieldDefinition()));
 
-    foreach (\array_keys($fields) as $name) {
-      $items = $entity->get($name);
+    foreach ($fields as $items) {
       // Exclude items that are empty.
       if ($items->isEmpty()) {
         continue;
@@ -404,7 +403,7 @@ class AutoSaveManager implements EventSubscriberInterface {
           continue;
         }
       }
-      $normalized[$name] = TypedDataHelper::castRawPhpTypes($items);
+      $normalized[$items->getName()] = TypedDataHelper::castRawPhpTypes($items);
     }
     return $normalized;
   }
