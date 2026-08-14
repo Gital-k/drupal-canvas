@@ -678,9 +678,10 @@ function _canvas_coerce_block_label_display_in_raw(array &$data): bool {
 function canvas_post_update_0026_rehash_auto_save_items(): void {
   $auto_save_store = \Drupal::service('keyvalue')->get(AutoSaveManager::AUTO_SAVE_STORE);
   $entity_type_manager = \Drupal::service(EntityTypeManagerInterface::class);
+  $auto_save_manager = \Drupal::service(AutoSaveManager::class);
 
-  // AutoSaveManager's normalization helpers are private static. Use reflection
-  // to reach the necessary helpers without converting them to public.
+  // AutoSaveManager's normalization helpers are private. Use reflection to
+  // reach the necessary helpers without converting them to public.
   $normalize = new \ReflectionMethod(AutoSaveManager::class, 'normalizeEntity');
   $normalize->setAccessible(TRUE);
   $generate_hash = new \ReflectionMethod(AutoSaveManager::class, 'generateHash');
@@ -699,13 +700,13 @@ function canvas_post_update_0026_rehash_auto_save_items(): void {
     $entity = $storage->create($item['data']);
     $entity->enforceIsNew(FALSE);
     $item['data'] = $to_storable->invoke(NULL, $entity);
-    $item['data_hash'] = $generate_hash->invoke(NULL, $normalize->invoke(NULL, $entity));
+    $item['data_hash'] = $generate_hash->invoke(NULL, $normalize->invoke($auto_save_manager, $entity));
 
     // Recompute original_hash against the currently stored entity so conflict
     // detection stays correct after the normalization change.
     $stored = $storage->loadUnchanged($item['entity_id']);
     \assert($stored instanceof EntityInterface);
-    $item[AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY] = $generate_hash->invoke(NULL, $normalize->invoke(NULL, $stored));
+    $item[AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY] = $generate_hash->invoke(NULL, $normalize->invoke($auto_save_manager, $stored));
 
     $auto_save_store->set($key, $item);
   }
