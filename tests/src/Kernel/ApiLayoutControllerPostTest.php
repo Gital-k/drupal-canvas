@@ -915,7 +915,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
    *
    * @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
    */
-  public function testMetatagPhantomAutoSavePrevention(): void {
+  public function testMetatagFieldDefaultValueIsNotCustom(): void {
     $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
     $this->setUpCurrentUser([], [Page::EDIT_PERMISSION]);
 
