@@ -14,6 +14,7 @@ use Drupal\canvas\EntityHandlers\StagedLanguageConfigOverrideStorage;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
+use Drupal\language\ConfigurableLanguageManagerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\Request;
@@ -81,6 +82,44 @@ final class PageRegionSymmetricalTranslationPropagationTest extends ConfigEntity
     // The PageRegion is reconciled while previewing a Page; the layout GET route
     // requires edit access to that Page.
     return [Page::EDIT_PERMISSION];
+  }
+
+  /**
+   * GetTranslationLanguages() uses the entity's own langcode, not site default.
+   *
+   * The region was created while 'en' was the site default, so it carries
+   * langcode: en. After changing the site default to 'es', the entity langcode
+   * stays 'en'. getTranslationLanguages() must still treat 'en' as the default
+   * (excluding it from non-default results), and return 'es' only because a
+   * live config override exists for it — not because it is now the site default.
+   *
+   * Without the fix, getTranslationLanguages() uses getDefaultLanguage() ('es')
+   * as $default_langcode, treats 'en' as a non-default translation, and calls
+   * getTranslation('en'), which throws InvalidArgumentException.
+   *
+   * @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::getTranslationLanguages()
+   */
+  public function testGetTranslationLanguagesWithEntityLangcodeDifferingFromSiteDefault(): void {
+    // Write a live Spanish override so 'es' appears as a translation language.
+    $this->createComponentTreeTranslation('es', self::ES_TRANSLATION_INPUTS);
+
+    // Change the site default to 'es'; the region keeps langcode: en.
+    $this->config('system.site')->set('default_langcode', 'es')->save();
+    $language_manager = $this->container->get('language_manager');
+    \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
+    $language_manager->reset();
+    self::assertSame('es', $language_manager->getDefaultLanguage()->getId());
+    self::assertSame('en', $this->entity->language()->getId());
+
+    // Must not throw. 'en' is the entity default — include_default=TRUE returns
+    // both; include_default=FALSE returns only 'es'.
+    $all = $this->entity->getTranslationLanguages(include_default: TRUE);
+    self::assertArrayHasKey('en', $all, "'en' must appear as the default translation language.");
+    self::assertArrayHasKey('es', $all, "'es' must appear as a non-default translation language.");
+
+    $non_default = $this->entity->getTranslationLanguages(include_default: FALSE);
+    self::assertArrayNotHasKey('en', $non_default, "'en' must be excluded when include_default is FALSE.");
+    self::assertArrayHasKey('es', $non_default, "'es' must remain when include_default is FALSE.");
   }
 
 }

@@ -61,12 +61,29 @@ final class CanvasConfigEntityTranslationsAreValidConstraintValidator extends Co
     // entity instead of the given entity (e.g. an auto-saved one).
     $base_data = $value->toArray();
     if ($value instanceof ComponentTreeConfigEntityBase) {
+      // A LanguageConfigOverride always targets component instances by their
+      // UUID sequence key, but the base component_tree may still be
+      // delta-keyed: e.g. an auto-save draft created before any translation
+      // existed. Re-key the base by UUID so the two align on merge; otherwise
+      // NestedArray::mergeDeepArray() would treat them as disjoint and emit
+      // phantom, instance-less entries (an override's sparse inputs with no
+      // component_id or UUID), which fail config schema validation.
+      // @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::getTranslatedComponentTree()
+      $base_data['component_tree'] = ComponentTreeConfigEntityBase::asDeterministicallyAndTranslatableKeyedComponentTreeSequence(
+        \array_values($base_data['component_tree'] ?? []),
+      );
       // Calling ComponentTreeConfigEntityBase::getTranslation() has a static
       // caching side effect. Ensure that callers don't have to deal with the
       // consequences.
       $value = clone $value;
     }
-    $default_langcode = $this->languageManager->getDefaultLanguage()->getId();
+    // The base config's default translation is the entity's own langcode, not
+    // the site default language. getTranslation() rejects $value->langcode, so
+    // this must match it. Otherwise, when the site default language differs
+    // from the entity langcode, the entity langcode is treated as a
+    // non-default translation here and later passed to getTranslation(),
+    // throwing InvalidArgumentException.
+    $default_langcode = $value->language()->getId();
     $languages = $this->languageManager->getLanguages();
 
     foreach ($languages as $langcode => $language) {

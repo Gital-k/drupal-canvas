@@ -9,6 +9,8 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Extension\ThemeInstallerInterface;
+use Drupal\language\ConfigurableLanguageManagerInterface;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
@@ -499,6 +501,48 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       ],
       [],
     ];
+  }
+
+  /**
+   * Validator passes when entity langcode differs from the site default.
+   *
+   * PageRegion config entities keep their original langcode when the site
+   * default language changes. The validator must skip the entity's own langcode
+   * (not the site default) so getTranslation() is never called with it, and
+   * must re-key the base component_tree by UUID before merging an override so
+   * delta-keyed and UUID-keyed trees align.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\CanvasConfigEntityTranslationsAreValidConstraintValidator
+   */
+  public function testValidatorWithEntityLangcodeDifferentFromSiteDefault(): void {
+    $this->container->get('module_installer')->install(['language', 'config_translation']);
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+
+    // The region was created while 'en' was the site default, so it carries
+    // langcode: en. Now switch the site default to 'fr'.
+    $this->config('system.site')->set('default_langcode', 'fr')->save();
+    $language_manager = $this->container->get('language_manager');
+    \assert($language_manager instanceof ConfigurableLanguageManagerInterface);
+    $language_manager->reset();
+    self::assertSame('fr', $language_manager->getDefaultLanguage()->getId());
+    self::assertSame('en', $this->entity->language()->getId());
+
+    // Add a French override that targets the component instance by UUID key,
+    // the shape config_translation writes. The base component_tree is still
+    // delta-keyed at this point (region created before any translation).
+    // The validator must re-key the base by UUID before merging; without that
+    // fix, NestedArray::mergeDeepArray() produces phantom, instance-less
+    // entries and validation fails. Without the entity-langcode fix, the
+    // validator passes 'en' to getTranslation(), which throws.
+    $uuid = '93af433a-8ab0-4dd9-912a-73a99c882347';
+    $language_manager->getLanguageConfigOverride('fr', $this->entity->getConfigDependencyName())
+      ->set('component_tree', [
+        $uuid => ['inputs' => ['label' => 'Titre de la page', 'label_display' => '0']],
+      ])
+      ->save();
+
+    // Must not throw and must report no violations.
+    $this->assertValidationErrors([]);
   }
 
 }
