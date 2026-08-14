@@ -1036,4 +1036,45 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     );
   }
 
+  /**
+   * Clearing a metatag value to blank must be treated as a custom edit.
+   *
+   * Metatag does not restore a tag's default when its stored value is an
+   * explicit empty string: MetatagFieldItem::preSave() only drops a tag
+   * whose value equals metatag_get_default_tags(), not blank values, and
+   * MetatagManager::tagsFromEntityWithDefaults() merges overrides onto
+   * defaults with `+`, which does not replace an existing (even empty) key.
+   * So blanking a tag changes what renders. normalizeEntity()'s empty-value
+   * skip currently treats it as a no-op instead.
+   *
+   * @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
+   * @see \Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem::preSave()
+   * @see \Drupal\metatag\MetatagManager::tagsFromEntityWithDefaults()
+   */
+  public function testMetatagBlankValueIsCustom(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
+
+    $page = Page::create([
+      'title' => 'Metatag blank value test page',
+      'components' => [],
+    ]);
+    $page->save();
+
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    self::assertTrue($autoSave->getAutoSaveEntity($page)->isEmpty());
+
+    // Clear the `title` tag to an explicit empty string.
+    $raw = $page->get('metatags')->getValue();
+    $tags = Json::decode($raw[0]['value'] ?? '{}') ?? [];
+    $tags['title'] = '';
+    $page->set('metatags', Json::encode($tags));
+
+    $autoSave->saveEntity($page);
+
+    self::assertFalse(
+      $autoSave->getAutoSaveEntity($page)->isEmpty(),
+      'Clearing a metatag value to blank must be treated as a custom edit.',
+    );
+  }
+
 }
