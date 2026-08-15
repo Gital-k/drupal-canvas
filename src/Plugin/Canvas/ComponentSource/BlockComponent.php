@@ -7,6 +7,7 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
+use Drupal\canvas\ComponentSource\ContextGatherer;
 use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Form\ClientFormSubmissionHelper;
 use Drupal\canvas\MissingComponentInputsException;
@@ -34,6 +35,8 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Form\SubformState;
 use Drupal\Core\Link;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Plugin\Context\ContextHandlerInterface;
+use Drupal\Core\Plugin\ContextAwarePluginInterface;
 use Drupal\Core\Plugin\PluginDependencyTrait;
 use Drupal\Core\Plugin\PluginFormFactoryInterface;
 use Drupal\Core\Plugin\PluginFormInterface;
@@ -102,6 +105,8 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     private readonly FormBuilderInterface $formBuilder,
     private readonly PluginFormFactoryInterface $pluginFormFactory,
     private readonly AutoSaveManager $autoSaveManager,
+    private readonly ContextGatherer $contextGatherer,
+    private readonly ContextHandlerInterface $contextHandler,
   ) {
     \assert(\array_key_exists('local_source_id', $configuration));
     parent::__construct($configuration, $plugin_id, $plugin_definition);
@@ -121,6 +126,8 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       $container->get(FormBuilderInterface::class),
       $container->get(PluginFormFactoryInterface::class),
       $container->get(AutoSaveManager::class),
+      $container->get(ContextGatherer::class),
+      $container->get(ContextHandlerInterface::class),
     );
   }
 
@@ -182,7 +189,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   /**
    * {@inheritdoc}
    */
-  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE, ?FieldableEntityInterface $host_entity = NULL): array {
     $block = $this->getBlockPlugin();
 
     // Avoid the fallback rendering of the Block system; instead use Canvas'
@@ -223,6 +230,19 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       $block->setConfigurationValue($key, $value);
     }
 
+    // Give a context-aware block its context values before it builds. The
+    // stored `context_mapping` (set as a configuration value above) says which
+    // gathered context feeds each of the block's context slots. This resolves
+    // the block's implicit inputs from the real editing/rendering situation:
+    // the host content entity plus the populated global contexts.
+    // A required context that cannot be satisfied makes applyContextMapping()
+    // throw; that is left to bubble so the component-tree render path degrades
+    // to a placeholder instead of breaking the whole page.
+    // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::renderify()
+    if ($block instanceof ContextAwarePluginInterface && $block->getContextDefinitions() !== []) {
+      $this->contextHandler->applyContextMapping($block, $this->contextGatherer->getPopulatedContexts($host_entity));
+    }
+
     // Allow global context to be injected by suspending the fiber.
     // @see \Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant::build()
     if ($block instanceof TitleBlockPluginInterface || $block instanceof MessagesBlockPluginInterface) {
@@ -238,6 +258,13 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       '#access' => $block->access($this->currentUser, TRUE),
     ];
     $cacheable_metadata = CacheableMetadata::createFromObject($block);
+    // Bubble the cacheability of every context value applied above, so the
+    // render varies and invalidates with the contexts it was built from.
+    if ($block instanceof ContextAwarePluginInterface) {
+      foreach ($block->getContexts() as $context) {
+        $cacheable_metadata->addCacheableDependency($context);
+      }
+    }
     $cacheable_metadata->applyTo($build);
 
     \assert($build['#access'] instanceof AccessResultInterface);

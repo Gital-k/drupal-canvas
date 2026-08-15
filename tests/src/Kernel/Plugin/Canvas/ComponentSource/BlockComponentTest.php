@@ -7,12 +7,14 @@ namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 // cspell:ignore gitane
 
 use Drupal\canvas\Block\BlockManagerDecorator;
+use Drupal\canvas\ComponentSource\ContextGatherer;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputNone;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputSchemaChangePoc;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputTranslatability;
@@ -27,6 +29,7 @@ use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\node\Entity\Node;
+use Drupal\node\Entity\NodeType;
 use Drupal\system\Entity\Menu;
 use Drupal\Tests\canvas\Kernel\BrokenBlockManager;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
@@ -702,6 +705,109 @@ HTML,
       ],
     ]);
     self::assertEntityIsValid($without_mapping);
+  }
+
+  /**
+   * Tests that a context-aware block renders with its mapped context applied.
+   *
+   * @legacy-covers ::renderComponent
+   */
+  public function testContextAwareBlockRendering(): void {
+    $this->generateComponentConfig();
+    $this->installEntitySchema('node');
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
+    $node = Node::create(['type' => 'article', 'title' => 'Hello from the host']);
+    $node->save();
+
+    $component = Component::load('block.canvas_test_block_optional_contexts');
+    \assert($component instanceof ComponentInterface);
+    $source = $component->getComponentSource();
+    \assert($source instanceof BlockComponent);
+    $defaults = $component->getSettings()['default_settings'];
+
+    // Mapping the block's context to the host entity: the block renders the
+    // mapped node's label, and the node's cacheability bubbles into the render.
+    $inputs = [
+      BlockComponent::EXPLICIT_INPUT_NAME => [
+        'context_mapping' => ['name' => ContextGatherer::HOST_ENTITY_CONTEXT_ID],
+      ] + $defaults,
+    ];
+    $build = $source->renderComponent($inputs, [], 'some-uuid', FALSE, $node);
+    $html = (string) $this->renderer->renderInIsolation($build);
+    self::assertStringContainsString('Test Block with optional context value: Hello from the host', $html);
+    self::assertContains('node:' . $node->id(), $build['#cache']['tags']);
+
+    // With no context_mapping, the optional context stays unset: the block
+    // renders its no-value output and does not error (backwards compatibility).
+    $build = $source->renderComponent([BlockComponent::EXPLICIT_INPUT_NAME => $defaults], [], 'some-uuid', FALSE, $node);
+    $html = (string) $this->renderer->renderInIsolation($build);
+    self::assertStringContainsString('Test Block with no context value.', $html);
+    self::assertNotContains('node:' . $node->id(), $build['#cache']['tags'] ?? []);
+  }
+
+  /**
+   * Tests that rendering a host entity's tree threads it to context resolution.
+   *
+   * @legacy-covers \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::renderify
+   */
+  public function testContextAwareBlockRendersViaHostEntityTree(): void {
+    $this->generateComponentConfig();
+    $this->installEntitySchema('node');
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_config_node_article']);
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Host node title',
+      'field_canvas_test' => [
+        [
+          'uuid' => '6f3b8a1e-9c2d-4e7f-8a1b-2c3d4e5f6a7b',
+          'component_id' => 'block.canvas_test_block_optional_contexts',
+          'inputs' => [
+            'label' => 'Ctx',
+            'label_display' => '0',
+            'context_mapping' => ['name' => ContextGatherer::HOST_ENTITY_CONTEXT_ID],
+          ],
+        ],
+      ],
+    ]);
+    $node->save();
+
+    // Rendering the node's component tree passes the node as host entity down
+    // to the block, which resolves its mapped context to that node.
+    $tree = $node->get('field_canvas_test');
+    \assert($tree instanceof ComponentTreeItemList);
+    $build = $tree->toRenderable($node);
+    $html = (string) $this->renderer->renderInIsolation($build);
+    self::assertStringContainsString('Test Block with optional context value: Host node title', $html);
+
+    // When the stored mapping cannot be satisfied, applyContextMapping() throws.
+    // That must degrade to a placeholder rather than fatal the whole tree: the
+    // render still completes and the block's own output is gone.
+    // @todo Extend to an unsatisfiable REQUIRED context in
+    //   https://www.drupal.org/i/3485502 task 4, once required-context blocks
+    //   are discoverable.
+    $unsatisfiable = Node::create([
+      'type' => 'article',
+      'title' => 'Doomed instance',
+      'field_canvas_test' => [
+        [
+          'uuid' => '7a4c9b2f-0d3e-4f8a-9b2c-3d4e5f6a7b8c',
+          'component_id' => 'block.canvas_test_block_optional_contexts',
+          'inputs' => [
+            'label' => 'Ctx',
+            'label_display' => '0',
+            // A mapping for a context slot the block does not declare cannot be
+            // satisfied, so applyContextMapping() throws a ContextException.
+            'context_mapping' => ['not_a_real_slot' => ContextGatherer::HOST_ENTITY_CONTEXT_ID],
+          ],
+        ],
+      ],
+    ]);
+    $unsatisfiable->save();
+    $doomed_tree = $unsatisfiable->get('field_canvas_test');
+    \assert($doomed_tree instanceof ComponentTreeItemList);
+    $build = $doomed_tree->toRenderable($unsatisfiable);
+    $html = (string) $this->renderer->renderInIsolation($build);
+    self::assertStringNotContainsString('Test Block with optional context value', $html);
   }
 
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
