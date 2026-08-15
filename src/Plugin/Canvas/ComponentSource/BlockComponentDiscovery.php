@@ -12,7 +12,6 @@ use Drupal\Core\Block\BlockPluginInterface;
 use Drupal\Core\Block\MainContentBlockPluginInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
-use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
 use Drupal\Core\Validation\Plugin\Validation\Constraint\FullyValidatableConstraint;
 use Drupal\views\Entity\View;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -130,14 +129,12 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
       }
     }
 
-    $required_contexts = array_filter(
-      $plugin_definition['context_definitions'],
-      fn (ContextDefinitionInterface $definition): bool => $definition->isRequired(),
-    );
-    if ($required_contexts) {
-      $reasons[] = 'Block plugins that require context values are not supported.';
-    }
-
+    // Block plugins that require context values ARE supported: their context
+    // requirements are enforced at placement time (component library filtering)
+    // and render time (graceful degradation to a placeholder when a required
+    // context is unsatisfiable), not at discovery time.
+    // @see \Drupal\canvas\ComponentSource\ContextGatherer
+    // @see docs/components.md, section "Contexts: implicit inputs for Block components"
     if ($reasons) {
       throw new ComponentDoesNotMeetRequirementsException($reasons);
     }

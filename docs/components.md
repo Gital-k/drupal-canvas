@@ -130,7 +130,7 @@ defined  using config schema (`type: block.settings.<PLUGIN ID>`). Defaults are 
 
 `Block` `component`s DO accept implicit inputs, in two ways even:
 1. Logic in the block plugin can fetch data — through database queries, HTTP requests, anything.
-2. Contexts. Not yet supported. (⚠️ handling contexts is still TBD in [#3485502](https://www.drupal.org/project/canvas/issues/3485502))
+2. Contexts. See [section 3.2.1.1 below](#3.2.1.1).
 
 `Block` `component`s specify the accepted explicit inputs. They typically allow influencing the logic in the block
 plugin. These explicit inputs can hence be seen as knobs and levers to adjust what the underlying block plugin does.
@@ -138,13 +138,40 @@ plugin. These explicit inputs can hence be seen as knobs and levers to adjust wh
 `Block` DOES provide an input UX (`BlockPluginInterface::buildConfigurationForm()`), so its `Component Source Plugin`
 simply reuses that.
 
+<a name="3.2.1.1"></a>
+##### 3.2.1.1 Contexts: implicit inputs for `Block` `component`s
+
+A block plugin can declare [context definitions](https://www.drupal.org/docs/drupal-apis/plugin-api/plugin-contexts):
+implicit inputs it needs but does not receive from the editor as knobs. In Canvas terms:
+
+- `settings` are the block's **explicit** inputs — the values the editor sets directly.
+- `contexts` are the block's **implicit** inputs — values resolved from the situation the block renders in, not typed by the editor.
+
+The editor never provides a context _value_. Instead it provides a _mapping_: which available context feeds each of the
+block's context slots. That mapping is stored inside the block's `settings` as `context_mapping` (a
+`slot name ⇒ context id` map), the same way core stores it. It is therefore just another (auto-managed) part of the
+block's explicit input, while the values it points at stay implicit.
+
+At render time the mapping is resolved against the contexts gathered for that specific editing/rendering situation: the
+populated global contexts (for example the current user or the current language) plus an entity context for the **host
+entity** whose component tree is being rendered (so a field block can read the entity being edited). The gathering and
+the "are this block's required contexts satisfiable?" check both live in `\Drupal\canvas\ComponentSource\ContextGatherer`.
+`\Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::renderComponent()` applies the mapping via core's
+`ContextHandlerInterface::applyContextMapping()` before the block builds, and bubbles each applied context's cacheability
+into the render. When a required context cannot be satisfied, rendering degrades to the standard placeholder rather than
+crashing the page.
+
 #### 3.2.2 Criteria for `Block` `component`s
 
 For a `Block` to be compatible/eligible for use in Canvas it:
  - MUST have fully validatable block plugin settings config schema via the `FullyValidatable` constraint
- - MUST NOT have any required context (⚠️ handling contexts is still TBD in [#3485502](https://www.drupal.org/project/canvas/issues/3485502))
 
-These checks are implemented in `\Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::checkRequirements()`.
+Required contexts are NOT a discovery-time criterion: a block that declares required contexts is still discovered as a
+`component`. Whether its required contexts can actually be satisfied is a placement-time (component library filtering)
+and render-time (graceful degradation) concern instead. See [section 3.2.1.1 above](#3.2.1.1) and
+[#3485502](https://www.drupal.org/project/canvas/issues/3485502).
+
+These checks are implemented in `\Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::checkRequirements()`.
 
 _Note:_ this list of criteria is not final, it will keep evolving _at least_ until a `1.0` release of Canvas.
 

@@ -21,6 +21,7 @@ use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputTranslatability;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatable;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatableCrash;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockOptionalContexts;
+use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockRequiresContexts;
 use Drupal\canvas_test_block_form\Plugin\Block\CanvasTestBlockForm;
 use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Cache\CacheableMetadata;
@@ -58,9 +59,9 @@ final class BlockComponentTest extends ComponentSourceTestBase {
   /**
    * {@inheritdoc}
    *
-   * 6 additional Block Component config entities due to the additional modules.
+   * 7 additional Block Component config entities due to the additional modules.
    */
-  protected int $expectedDefaultComponentInstallCount = self::DEFAULT_COMPONENT_INSTALL_COUNT + 6;
+  protected int $expectedDefaultComponentInstallCount = self::DEFAULT_COMPONENT_INSTALL_COUNT + 7;
 
   use BlockComponentTreeTestTrait;
 
@@ -108,9 +109,6 @@ final class BlockComponentTest extends ComponentSourceTestBase {
       'block.canvas_test_block_input_unvalidatable' => [
         'Block plugin settings must opt into strict validation. Use the FullyValidatable constraint. See https://www.drupal.org/node/3404425',
       ],
-      'block.canvas_test_block_requires_contexts' => [
-        'Block plugins that require context values are not supported.',
-      ],
     ], $this->findIneligibleComponents(BlockComponent::SOURCE_PLUGIN_ID, 'canvas_test_block'));
     $auto_created_components = $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'canvas_test_block');
     self::assertSame([
@@ -120,6 +118,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
       'block.canvas_test_block_input_validatable',
       'block.canvas_test_block_input_validatable_crash',
       'block.canvas_test_block_optional_contexts',
+      'block.canvas_test_block_requires_contexts',
     ], $auto_created_components);
 
     // Trigger component generation, as if the test module was just installed.
@@ -198,6 +197,19 @@ final class BlockComponentTest extends ComponentSourceTestBase {
           'provider' => 'canvas_test_block',
         ],
       ],
+      'block.canvas_test_block_requires_contexts' => [
+        'default_settings' => [
+          'id' => 'canvas_test_block_requires_contexts',
+          'label' => 'Test Block with required contexts',
+          'label_display' => '0',
+          'provider' => 'canvas_test_block',
+          // The required "name" context is auto-assigned to a global context.
+          // @see \Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockRequiresContexts::defaultConfiguration()
+          'context_mapping' => [
+            'name' => '@user.current_user_context:current_user',
+          ],
+        ],
+      ],
     ], $this->getAllSettings($component_ids));
   }
 
@@ -217,6 +229,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
       'block.canvas_test_block_input_validatable' => CanvasTestBlockInputValidatable::class,
       'block.canvas_test_block_input_validatable_crash' => CanvasTestBlockInputValidatableCrash::class,
       'block.canvas_test_block_optional_contexts' => CanvasTestBlockOptionalContexts::class,
+      'block.canvas_test_block_requires_contexts' => CanvasTestBlockRequiresContexts::class,
     ], $this->getReferencedPluginClasses($component_ids));
   }
 
@@ -323,15 +336,40 @@ HTML,
         'attachments' => [],
       ],
       'block.canvas_test_block_optional_contexts' => [
+        // Live rendering passes no context_mapping and no host entity, so the
+        // optional context stays unset and the block renders its no-value path.
         'html' => <<<HTML
 <div id="block-some-uuid--6">
 
 
-      Test Block with optional context value: @todo in https://www.drupal.org/i/3485502
+      Test Block with no context value.
   </div>
 
 HTML,
         'cacheability' => $default_cacheability,
+        'attachments' => [],
+      ],
+      'block.canvas_test_block_requires_contexts' => [
+        'html' => <<<HTML
+<div id="block-some-uuid--7">
+
+
+      Test Block with required context value: bob
+  </div>
+
+HTML,
+        // The required "name" context is auto-assigned to the current user, so
+        // the applied context's cacheability (the "user" cache context and the
+        // user entity's cache tag) bubbles into the render.
+        'cacheability' => (clone $default_cacheability)
+          // @phpstan-ignore-next-line
+          ->addCacheableDependency(User::load(2))
+          ->setCacheContexts([
+            'languages:language_interface',
+            'theme',
+            'user',
+            'user.permissions',
+          ]),
         'attachments' => [],
       ],
     ], $rendered);
@@ -358,7 +396,12 @@ HTML,
         'expected_output_selectors' => ['div:contains("Hello, Canvas!")'],
       ],
       'block.canvas_test_block_optional_contexts' => [
-        'expected_output_selectors' => ['div:contains("Test Block with optional context value: @todo in https://www.drupal.org/i/3485502")'],
+        // The preview build passes no context_mapping, so the optional context
+        // stays unset and the block renders its no-value path.
+        'expected_output_selectors' => ['div:contains("Test Block with no context value.")'],
+      ],
+      'block.canvas_test_block_requires_contexts' => [
+        'expected_output_selectors' => ['div:contains("Test Block with required context value:")'],
       ],
     ];
   }
@@ -444,6 +487,7 @@ HTML,
       'block.canvas_test_block_input_validatable' => $dependencies,
       'block.canvas_test_block_input_validatable_crash' => $dependencies,
       'block.canvas_test_block_optional_contexts' => $dependencies,
+      'block.canvas_test_block_requires_contexts' => $dependencies,
     ], $this->callSourceMethodForEach('calculateDependencies', $component_ids));
   }
 
@@ -808,6 +852,55 @@ HTML,
     $build = $doomed_tree->toRenderable($unsatisfiable);
     $html = (string) $this->renderer->renderInIsolation($build);
     self::assertStringNotContainsString('Test Block with optional context value', $html);
+  }
+
+  /**
+   * Tests that an unsatisfiable REQUIRED context degrades to a placeholder.
+   *
+   * A required-context block whose context cannot be resolved makes
+   * applyContextMapping() throw a MissingValueContextException. That must not
+   * fatal the whole tree: the component-tree render path catches it and swaps in
+   * the RenderSafeComponentContainer placeholder, so the rest of the page still
+   * renders. Required-context blocks are only discoverable once the discovery
+   * gate is relaxed, so this path could not be exercised before.
+   *
+   * @legacy-covers \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::renderify
+   */
+  public function testUnsatisfiableRequiredContextDegradesToPlaceholder(): void {
+    $this->generateComponentConfig();
+    $this->installEntitySchema('node');
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_config_node_article']);
+
+    // The stored mapping points the required "name" context at the node route
+    // context, which carries no value in this render situation. The required
+    // context is therefore missing, so applyContextMapping() throws a
+    // MissingValueContextException that must degrade to a placeholder.
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Required context host',
+      'field_canvas_test' => [
+        [
+          'uuid' => '8b5d0c3f-1e4a-4b9c-8d2e-3f4a5b6c7d8e',
+          'component_id' => 'block.canvas_test_block_requires_contexts',
+          'inputs' => [
+            'label' => 'Ctx',
+            'label_display' => '0',
+            'context_mapping' => ['name' => '@node.node_route_context:node'],
+          ],
+        ],
+      ],
+    ]);
+    $node->save();
+
+    $tree = $node->get('field_canvas_test');
+    \assert($tree instanceof ComponentTreeItemList);
+    $build = $tree->toRenderable($node);
+    $html = (string) $this->renderer->renderInIsolation($build);
+    self::assertStringNotContainsString('Test Block with required context value', $html);
+    // The block degrades to the RenderSafeComponentContainer placeholder. In the
+    // default (non-verbose) logging state that renders the generic error message.
+    // @see \Drupal\canvas\Element\RenderSafeComponentContainer::handleComponentException()
+    self::assertStringContainsString('Oops, something went wrong! Site admins have been notified.', $html);
   }
 
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
