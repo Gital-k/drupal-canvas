@@ -29,6 +29,7 @@ use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Form\FormState;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\system\Entity\Menu;
@@ -722,6 +723,27 @@ HTML,
     ], NULL);
     self::assertSame($mapping, $input['context_mapping']);
 
+    // A stored `context_mapping` that points at a global context pre-populates
+    // the assignment select: it survives the round-trip back into the client
+    // model, so the select is pre-selected when the instance is edited again.
+    $global_mapping = ['name' => '@user.current_user_context:current_user'];
+    $client_model = $source->inputToClientModel(['context_mapping' => $global_mapping] + $component->getSettings()['default_settings']);
+    self::assertSame($global_mapping, $client_model['resolved']['context_mapping']);
+
+    // Placement path: a required-context block placed with an empty client model
+    // auto-assigns its single-candidate required context, so the freshly placed
+    // instance's stored inputs carry the mapping without the editor opening the
+    // form.
+    $required_component = Component::load('block.canvas_test_block_requires_contexts');
+    \assert($required_component instanceof ComponentInterface);
+    $required_source = $required_component->getComponentSource();
+    \assert($required_source instanceof BlockComponent);
+    // @phpstan-ignore-next-line
+    $placed = $required_source->clientModelToInput('c0ffee00-0000-4000-8000-000000000000', $required_component, [
+      'resolved' => [],
+    ], NULL);
+    self::assertSame(['name' => '@user.current_user_context:current_user'], $placed['context_mapping']);
+
     // A stored instance WITH a `context_mapping` validates: the generated inputs
     // schema no longer strips the key.
     $with_mapping = Page::create([
@@ -749,6 +771,71 @@ HTML,
       ],
     ]);
     self::assertEntityIsValid($without_mapping);
+  }
+
+  /**
+   * Tests the context UI a context-aware block's instance form exposes.
+   *
+   * @legacy-covers ::buildComponentInstanceForm
+   */
+  public function testContextAssignmentForm(): void {
+    $this->generateComponentConfig();
+
+    // An optional-context block shows an assignment select whose options are the
+    // available contexts. It is not required, and there is no read-only required
+    // display.
+    $optional = Component::load('block.canvas_test_block_optional_contexts');
+    \assert($optional instanceof ComponentInterface);
+    $optional_source = $optional->getComponentSource();
+    \assert($optional_source instanceof BlockComponent);
+    $form = $optional_source->buildComponentInstanceForm(
+      ['#parents' => ['canvas_component_props', 'optional-uuid'], '#tree' => TRUE],
+      new FormState(),
+      $optional,
+      'optional-uuid',
+    );
+    self::assertArrayHasKey('context_mapping', $form['settings']);
+    self::assertArrayHasKey('name', $form['settings']['context_mapping']);
+    self::assertSame('select', $form['settings']['context_mapping']['name']['#type']);
+    self::assertFalse($form['settings']['context_mapping']['name']['#required']);
+    self::assertArrayHasKey('@user.current_user_context:current_user', $form['settings']['context_mapping']['name']['#options']);
+    self::assertArrayNotHasKey('canvas_required_contexts', $form['settings']);
+
+    // A required-context block shows a read-only display of every required
+    // context and the context it resolves to. It is a non-input `item` element,
+    // so it submits no value.
+    $required = Component::load('block.canvas_test_block_requires_contexts');
+    \assert($required instanceof ComponentInterface);
+    $required_source = $required->getComponentSource();
+    \assert($required_source instanceof BlockComponent);
+    $form = $required_source->buildComponentInstanceForm(
+      ['#parents' => ['canvas_component_props', 'required-uuid'], '#tree' => TRUE],
+      new FormState(),
+      $required,
+      'required-uuid',
+    );
+    self::assertArrayHasKey('canvas_required_contexts', $form['settings']);
+    self::assertArrayHasKey('name', $form['settings']['canvas_required_contexts']);
+    self::assertSame('item', $form['settings']['canvas_required_contexts']['name']['#type']);
+    // The required "name" context resolves to the auto-assigned current user
+    // context, so the read-only display shows that context's label.
+    self::assertSame('Current user', (string) $form['settings']['canvas_required_contexts']['name']['#markup']);
+
+    // A block that declares no contexts gets no Canvas required-context display,
+    // and no extra processing: its `context_mapping` element stays the empty
+    // one that core's block form always adds for a context-aware plugin.
+    $plain = Component::load('block.canvas_test_block_input_none');
+    \assert($plain instanceof ComponentInterface);
+    $plain_source = $plain->getComponentSource();
+    \assert($plain_source instanceof BlockComponent);
+    $form = $plain_source->buildComponentInstanceForm(
+      ['#parents' => ['canvas_component_props', 'plain-uuid'], '#tree' => TRUE],
+      new FormState(),
+      $plain,
+      'plain-uuid',
+    );
+    self::assertSame([], $form['settings']['context_mapping']);
+    self::assertArrayNotHasKey('canvas_required_contexts', $form['settings']);
   }
 
   /**
