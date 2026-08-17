@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\DateRangeItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\DateTimeItemOverride;
@@ -318,7 +319,10 @@ class ShapeMatchingHooks {
       $storable_prop_shape->addCacheTags(['config:media_type_list']);
 
       $media_source_class = MediaSourceObjectShapes::SCHEMA_TO_MEDIA_SOURCE[$storable_prop_shape->shape->schema['$ref']];
-      $media_types = MediaSourceObjectShapes::getMediaTypesForSource($media_source_class);
+      $media_types = MediaSourceObjectShapes::getMediaTypesForSource(
+        $media_source_class,
+        JsonSchemaObjectRef::from($storable_prop_shape->shape->schema['$ref'])->allowedFileExtensions(),
+      );
 
       // For each media type (i.e. bundle), create a "branch" of this prop
       // expression that specifically targets the source field of the media
