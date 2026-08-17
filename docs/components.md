@@ -161,6 +161,13 @@ the "are this block's required contexts satisfiable?" check both live in `\Drupa
 into the render. When a required context cannot be satisfied, rendering degrades to the standard placeholder rather than
 crashing the page.
 
+The component library endpoint (`\Drupal\canvas\Controller\ApiConfigControllers::list()`) uses the same
+`ContextGatherer` to hide, before placement, block Components whose required contexts cannot be satisfied for the host
+being edited. The host is identified by optional `entity_type` and `entity_bundle` query parameters (only the type and
+bundle matter for satisfiability, so the response stays cacheable across entities of the same bundle); with no host only
+globally satisfiable Components are returned. Only block-sourced Components are filtered; other sources and blocks
+without required contexts are unaffected.
+
 #### 3.2.2 Criteria for `Block` `component`s
 
 For a `Block` to be compatible/eligible for use in Canvas it:

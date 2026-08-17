@@ -22,6 +22,7 @@ use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatable;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatableCrash;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockOptionalContexts;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockRequiresContexts;
+use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockRequiresNodeContext;
 use Drupal\canvas_test_block_form\Plugin\Block\CanvasTestBlockForm;
 use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Cache\CacheableMetadata;
@@ -60,9 +61,9 @@ final class BlockComponentTest extends ComponentSourceTestBase {
   /**
    * {@inheritdoc}
    *
-   * 7 additional Block Component config entities due to the additional modules.
+   * 8 additional Block Component config entities due to the additional modules.
    */
-  protected int $expectedDefaultComponentInstallCount = self::DEFAULT_COMPONENT_INSTALL_COUNT + 7;
+  protected int $expectedDefaultComponentInstallCount = self::DEFAULT_COMPONENT_INSTALL_COUNT + 8;
 
   use BlockComponentTreeTestTrait;
 
@@ -120,6 +121,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
       'block.canvas_test_block_input_validatable_crash',
       'block.canvas_test_block_optional_contexts',
       'block.canvas_test_block_requires_contexts',
+      'block.canvas_test_block_requires_node_context',
     ], $auto_created_components);
 
     // Trigger component generation, as if the test module was just installed.
@@ -211,6 +213,14 @@ final class BlockComponentTest extends ComponentSourceTestBase {
           ],
         ],
       ],
+      'block.canvas_test_block_requires_node_context' => [
+        'default_settings' => [
+          'id' => 'canvas_test_block_requires_node_context',
+          'label' => 'Test Block requiring a node context',
+          'label_display' => '0',
+          'provider' => 'canvas_test_block',
+        ],
+      ],
     ], $this->getAllSettings($component_ids));
   }
 
@@ -231,6 +241,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
       'block.canvas_test_block_input_validatable_crash' => CanvasTestBlockInputValidatableCrash::class,
       'block.canvas_test_block_optional_contexts' => CanvasTestBlockOptionalContexts::class,
       'block.canvas_test_block_requires_contexts' => CanvasTestBlockRequiresContexts::class,
+      'block.canvas_test_block_requires_node_context' => CanvasTestBlockRequiresNodeContext::class,
     ], $this->getReferencedPluginClasses($component_ids));
   }
 
@@ -255,6 +266,15 @@ final class BlockComponentTest extends ComponentSourceTestBase {
   #[Depends('testDiscovery')]
   public function testRenderComponentLive(array $component_ids): void {
     $this->assertNotEmpty($component_ids);
+    // The node-context block cannot be rendered live here: it requires an
+    // `entity:node` context that only a node host entity provides, and live
+    // rendering (unlike the component-tree render path) does not degrade an
+    // unsatisfiable required context to a placeholder. Whether it is offered at
+    // all is decided by host-entity library filtering, so a host-less live
+    // render is never a real scenario for it.
+    // @see \Drupal\canvas\Controller\ApiConfigControllers::list()
+    // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::renderify()
+    unset($component_ids['block.canvas_test_block_requires_node_context']);
     $rendered = $this->renderComponentsLive(
       $component_ids,
       get_default_input: fn (Component $component) => [BlockComponent::EXPLICIT_INPUT_NAME => $component->getSettings()['default_settings']],
@@ -404,6 +424,14 @@ HTML,
       'block.canvas_test_block_requires_contexts' => [
         'expected_output_selectors' => ['div:contains("Test Block with required context value:")'],
       ],
+      'block.canvas_test_block_requires_node_context' => [
+        // The component library preview is rendered without a host entity, so
+        // this block's required `entity:node` context is unsatisfiable and
+        // getClientSideInfo() returns an empty build (no preview). An empty
+        // selector list asserts the preview renders to nothing.
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::getClientSideInfo()
+        'expected_output_selectors' => [],
+      ],
     ];
   }
 
@@ -489,6 +517,7 @@ HTML,
       'block.canvas_test_block_input_validatable_crash' => $dependencies,
       'block.canvas_test_block_optional_contexts' => $dependencies,
       'block.canvas_test_block_requires_contexts' => $dependencies,
+      'block.canvas_test_block_requires_node_context' => $dependencies,
     ], $this->callSourceMethodForEach('calculateDependencies', $component_ids));
   }
 

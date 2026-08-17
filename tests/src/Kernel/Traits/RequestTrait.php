@@ -18,13 +18,18 @@ trait RequestTrait {
    *
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request.
+   * @param bool $catch
+   *   Whether to catch exceptions. Defaults to FALSE, so tests can inspect
+   *   thrown exceptions directly. Pass TRUE to have exceptions converted to a
+   *   response by the exception subscribers, as they would be for a real HTTP
+   *   request.
    *
    * @return \Symfony\Component\HttpFoundation\Response
    *   The response.
    *
    * @throws \Exception
    */
-  protected function request(Request $request): Response {
+  protected function request(Request $request, bool $catch = FALSE): Response {
     // Reset the request stack.
     // \Drupal\KernelTests\KernelTestBase::bootKernel() pushes a bogus request
     // to boot the kernel, but it is also needed for any URL generation in tests
@@ -40,7 +45,7 @@ trait RequestTrait {
     self::assertInstanceOf(HttpKernelInterface::class, $http_kernel);
 
     try {
-      $response = $http_kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, FALSE);
+      $response = $http_kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, $catch);
       $content = $response->getContent();
       self::assertNotFalse($content);
       $this->setRawContent($content);

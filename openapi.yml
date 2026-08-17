@@ -784,6 +784,14 @@ paths:
     description: TODO
     get:
       summary: Gets all Components available to instantiate.
+      description: >-
+        Optionally identify the host entity being edited with the `entity_type`
+        and `entity_bundle` query parameters. When given, block-sourced
+        Components whose required contexts cannot be satisfied for that host are
+        omitted. When omitted, only globally satisfiable Components are returned.
+      parameters:
+        - $ref: '#/components/parameters/queryHostEntityType'
+        - $ref: '#/components/parameters/queryHostEntityBundle'
       responses:
         '200':
           description: All available components
@@ -815,6 +823,20 @@ paths:
                 # @see \Drupal\Core\Plugin\Component::$machineName
                 additionalProperties:
                   $ref: '#/components/schemas/Component'
+        '400':
+          description: The host-entity query parameters are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - errors
+                properties:
+                  errors:
+                    type: array
+                    description: Error messages.
+                    items:
+                      type: string
   /canvas/api/v0/config/content_template:
     description: Provides a list of Templates
     get:
@@ -5747,6 +5769,28 @@ components:
         enum:
           - canvas_template
           - drupal_ajax
+    # @see \Drupal\canvas\Controller\ApiConfigControllers::deriveHostEntityFromRequest()
+    queryHostEntityType:
+      in: query
+      name: entity_type
+      required: false
+      description: >-
+        The entity type ID of the host entity whose component tree is being
+        edited. Used to hide block Components whose required contexts cannot be
+        satisfied for that host.
+      schema:
+        type: string
+      example: node
+    queryHostEntityBundle:
+      in: query
+      name: entity_bundle
+      required: false
+      description: >-
+        The bundle of the host entity. Required when the host entity type is
+        bundleable.
+      schema:
+        type: string
+      example: article
   # @see https://spec.openapis.org/oas/v3.1.0.html#header-object
   requestBodies:
     Layout:

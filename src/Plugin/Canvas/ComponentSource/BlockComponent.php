@@ -170,6 +170,30 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   }
 
   /**
+   * Gets the context definitions of the underlying block plugin.
+   *
+   * Used by the component library endpoint to decide whether this block-sourced
+   * Component can be placed in the editing situation being requested: a block
+   * whose required contexts cannot be satisfied is filtered out.
+   *
+   * @return array<string, \Drupal\Core\Plugin\Context\ContextDefinitionInterface>
+   *   The block plugin's context definitions keyed by context slot name, or an
+   *   empty array when the block is not context-aware or is broken/missing.
+   *
+   * @see \Drupal\canvas\Controller\ApiConfigControllers::list()
+   * @see \Drupal\canvas\ComponentSource\ContextGatherer::hasRequiredContextsSatisfied()
+   */
+  public function getContextDefinitions(): array {
+    try {
+      $block = $this->getBlockPlugin();
+    }
+    catch (PluginNotFoundException) {
+      return [];
+    }
+    return $block instanceof ContextAwarePluginInterface ? $block->getContextDefinitions() : [];
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function calculateDependencies(): array {
@@ -545,6 +569,18 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // @see `type: canvas.page_region.*`'s `component_trees.tree.presence`
     $block_plugin = $this->getBlockPlugin();
     if ($block_plugin instanceof TitleBlockPluginInterface || $block_plugin instanceof MessagesBlockPluginInterface) {
+      return ['build' => []];
+    }
+
+    // The component library preview is rendered without a host entity, so a
+    // block whose required contexts cannot be satisfied by the globally
+    // available contexts alone cannot be previewed here. Offer an empty preview
+    // instead of crashing the whole component list: the block is still
+    // placeable, and whether its contexts are satisfiable for the entity being
+    // edited is decided by the library filtering against the real host entity.
+    // @see \Drupal\canvas\Controller\ApiConfigControllers::list()
+    if ($block_plugin instanceof ContextAwarePluginInterface
+      && !$this->contextGatherer->hasRequiredContextsSatisfied($block_plugin->getContextDefinitions(), $this->contextGatherer->getPopulatedContexts())) {
       return ['build' => []];
     }
 
