@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectValidPropOrSlotChange } from './utils';
+import {
+  detectValidPropOrSlotChange,
+  parsePropValueForPreview,
+  serializeProps,
+} from './utils';
+
+import type { CodeComponentProp } from '@/types/CodeComponent';
 
 describe('detectValidSlotsOrPropChange', () => {
   it('invalid change when arrays are identical', () => {
@@ -131,5 +137,79 @@ describe('detectValidSlotsOrPropChange', () => {
       { id: '2', name: 'test2' },
     ];
     expect(detectValidPropOrSlotChange(current, last)).toBe(true);
+  });
+
+  // Preview state is editor-only and never persisted, so picking a preview
+  // entity must not mark the component as having unsaved changes.
+  it('invalid change when the only difference is preview entity state', () => {
+    const last = [
+      { id: '1', name: 'author', type: 'content-entity-reference' as const },
+    ];
+    const current = [
+      {
+        ...last[0],
+        previewEntity: { entityTypeId: 'node', entityId: '1' },
+        previewResolvedValue: { owner: { name: 'Bob' } },
+      },
+    ];
+    expect(detectValidPropOrSlotChange(current, last)).toBe(false);
+    // Clearing it again is equally uninteresting.
+    expect(detectValidPropOrSlotChange(last, current)).toBe(false);
+  });
+
+  it('valid change when a real edit accompanies preview entity state', () => {
+    const last = [
+      { id: '1', name: 'author', type: 'content-entity-reference' as const },
+    ];
+    const current = [
+      {
+        ...last[0],
+        name: 'renamed',
+        previewEntity: { entityTypeId: 'node', entityId: '1' },
+      },
+    ];
+    expect(detectValidPropOrSlotChange(current, last)).toBe(true);
+  });
+});
+
+describe('content entity reference props', () => {
+  const cerProp: CodeComponentProp = {
+    id: 'cer-prop',
+    name: 'Author',
+    type: 'object',
+    example: '',
+    derivedType: 'contentEntityReference',
+    $ref: 'json-schema-definitions://canvas.module/content-entity-reference',
+    entityFieldExpressions: ['ℹ︎␜entity:node:article␝title␞␟value'],
+  };
+
+  it('parsePropValueForPreview passes the resolved payload through, defaulting to null', () => {
+    expect(
+      parsePropValueForPreview({
+        ...cerProp,
+        previewResolvedValue: { __type: 'article', label: 'Hello' },
+      }),
+    ).toEqual({ __type: 'article', label: 'Hello' });
+    // An unset/unresolved reference is null, never undefined: the runtime
+    // payload contract for components.
+    expect(parsePropValueForPreview(cerProp)).toBeNull();
+    expect(
+      parsePropValueForPreview({ ...cerProp, previewResolvedValue: null }),
+    ).toBeNull();
+  });
+
+  it('serializeProps excludes the ephemeral preview state', () => {
+    const serialized = serializeProps([
+      {
+        ...cerProp,
+        previewEntity: { entityTypeId: 'node', entityId: '1' },
+        previewResolvedValue: { __type: 'article' },
+      },
+    ]);
+    const serializedProp = serialized.author;
+    expect(serializedProp).toBeDefined();
+    expect(serializedProp).not.toHaveProperty('previewEntity');
+    expect(serializedProp).not.toHaveProperty('previewResolvedValue');
+    expect(serializedProp).not.toHaveProperty('entityFieldExpressions');
   });
 });
