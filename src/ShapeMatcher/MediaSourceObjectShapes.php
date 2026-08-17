@@ -10,7 +10,6 @@ use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\media\Entity\MediaType;
 use Drupal\media\MediaTypeInterface;
-use Drupal\media\Plugin\media\Source\AudioFile;
 use Drupal\media\Plugin\media\Source\File;
 use Drupal\media\Plugin\media\Source\Image;
 use Drupal\media\Plugin\media\Source\VideoFile;
@@ -41,18 +40,6 @@ final class MediaSourceObjectShapes {
   ];
 
   /**
-   * Media source classes that extend a mapped source but match no schema.
-   *
-   * AudioFile extends File, but audio files are not documents. Without this
-   * list, media types using these sources would match the schema mapped to
-   * their parent class in SCHEMA_TO_MEDIA_SOURCE.
-   */
-  const UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES = [
-    // @see \Drupal\media\Plugin\media\Source\AudioFile
-    AudioFile::class,
-  ];
-
-  /**
    * @param class-string $media_source_class
    * @param list<string>|null $allowed_file_extensions
    *   File extensions from the shape's `x-allowed-file-extensions` schema
@@ -67,8 +54,11 @@ final class MediaSourceObjectShapes {
   public static function getMediaTypesForSource(string $media_source_class, ?array $allowed_file_extensions = NULL) : array {
     // Allow all MediaTypes that use the "image" MediaSource, for example.
     // A MediaType whose source is a more specific subclass never matches its
-    // parent class's schema: VideoFile and AudioFile both extend File, so
-    // video and audio MediaTypes must not match the document shape.
+    // parent class's schema: VideoFile extends File, so video MediaTypes must
+    // not match the document shape. AudioFile also extends File, but needs no
+    // such mapping: audio file extensions do not intersect the document
+    // shape's `x-allowed-file-extensions` list.
+    // @todo Map AudioFile to an `audio` object shape in SCHEMA_TO_MEDIA_SOURCE once one exists.
     // @see \Drupal\media\Plugin\media\Source\Image
     $media_types = array_filter(
       MediaType::loadMultiple(),
@@ -109,10 +99,9 @@ final class MediaSourceObjectShapes {
   /**
    * Whether a MediaType's source is a more specific subclass of a source.
    *
-   * A source class can be more specific because it maps to another schema
-   * (VideoFile) or because it matches no schema at all (AudioFile). Either
-   * way, its media types must not match the schema mapped to the given
-   * (parent) source class.
+   * A source class is more specific when it maps to another schema
+   * (VideoFile): its media types must not match the schema mapped to the
+   * given (parent) source class.
    *
    * @param \Drupal\media\MediaTypeInterface $type
    *   A media type.
@@ -122,10 +111,7 @@ final class MediaSourceObjectShapes {
    * @return bool
    */
   private static function hasMoreSpecificMediaSourceMapping(MediaTypeInterface $type, string $media_source_class): bool {
-    $more_specific_source_classes = [
-      ...\array_values(self::SCHEMA_TO_MEDIA_SOURCE),
-      ...self::UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES,
-    ];
+    $more_specific_source_classes = \array_values(self::SCHEMA_TO_MEDIA_SOURCE);
     foreach ($more_specific_source_classes as $other_source_class) {
       if ($other_source_class !== $media_source_class
         && is_subclass_of($other_source_class, $media_source_class)
