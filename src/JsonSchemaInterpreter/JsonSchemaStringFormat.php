@@ -6,6 +6,7 @@ namespace Drupal\canvas\JsonSchemaInterpreter;
 
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\UriTargetFileExtensionsConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTemplateWithVariablesConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
@@ -116,6 +117,12 @@ enum JsonSchemaStringFormat: string {
         \array_key_exists('contentMediaType', $schema)
           && UriTargetMediaTypeConstraint::isValidWildCard($schema['contentMediaType']) => new DataTypeShapeRequirements([
             new DataTypeShapeRequirement(UriTargetMediaTypeConstraint::PLUGIN_ID, ['mimeType' => $schema['contentMediaType']]),
+            // Allow `x-allowed-file-extensions`: the targeted resource must
+            // use one of the listed file extensions, which narrows matching
+            // below the wildcard MIME media type.
+            ...!\array_key_exists('x-allowed-file-extensions', $schema)
+              ? []
+              : [new DataTypeShapeRequirement(UriTargetFileExtensionsConstraint::PLUGIN_ID, ['allowedExtensions' => $schema['x-allowed-file-extensions']])],
             new DataTypeShapeRequirement(UriConstraint::PLUGIN_ID, [
               'allowReferences' => $this === static::IriReference || $this === static::UriReference,
             ]),
