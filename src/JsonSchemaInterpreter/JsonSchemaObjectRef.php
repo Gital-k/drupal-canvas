@@ -61,4 +61,18 @@ enum JsonSchemaObjectRef: string {
     return new PropShape($this->asPropShapeArray());
   }
 
+  /**
+   * Returns the file extensions the shape's `src` property allows.
+   *
+   * @return list<string>|null
+   *   The `x-allowed-file-extensions` annotation on the shape's `src`
+   *   property, or NULL when the shape declares none.
+   */
+  public function allowedFileExtensions(): ?array {
+    $extensions = $this->asPropShape()->resolvedSchema['properties']['src']['x-allowed-file-extensions'] ?? NULL;
+    \assert($extensions === NULL || (\is_array($extensions) && \array_is_list($extensions)));
+    /** @var list<string>|null $extensions */
+    return $extensions;
+  }
+
 }
