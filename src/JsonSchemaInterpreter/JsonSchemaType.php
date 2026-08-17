@@ -474,13 +474,12 @@ enum JsonSchemaType: string {
                 new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', NULL, 'value'),
               ),
             ]),
-            // Core's `media.type.document` source field extension list, minus
-            // `txt`: every retained extension maps to the `application` MIME
-            // media type, while `txt` maps to `text/plain`, and shape matching
-            // requires a single media type per field. Modules can widen this
-            // list via hook_canvas_storable_prop_shape_alter().
+            // The `document` shape's `src` property declares the allowed file
+            // extensions; the upload widget and shape matching both read that
+            // single list. Modules can widen the widget's list via
+            // hook_canvas_storable_prop_shape_alter().
             // @see https://git.drupalcode.org/project/canvas/-/work_items/3524130#note_1678367
-            fieldInstanceSettings: ['file_extensions' => 'rtf doc docx ppt pptx xls xlsx pdf odf odg odp ods odt fodt fods fodp fodg key numbers pages'],
+            fieldInstanceSettings: ['file_extensions' => implode(' ', JsonSchemaObjectRef::Document->allowedFileExtensions() ?? [])],
           ),
           default => NULL,
         },
