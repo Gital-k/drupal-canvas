@@ -59,9 +59,11 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $this->createMediaType('file', ['id' => 'baby_documents']);
     $this->createMediaType('file', ['id' => 'vacation_documents']);
     // AudioFile extends File, but audio media types must not match the
-    // document shape: this media type must not appear in any expectation.
+    // document shape: audio file extensions do not intersect the document
+    // shape's `x-allowed-file-extensions` list, so this media type must not
+    // appear in any expectation.
     // @see \Drupal\media\Plugin\media\Source\AudioFile
-    // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES
+    // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSource()
     $this->createMediaType('audio_file', ['id' => 'podcasts']);
     // File media types whose source field extensions do not intersect the
     // document shape's `x-allowed-file-extensions` list must not match the
