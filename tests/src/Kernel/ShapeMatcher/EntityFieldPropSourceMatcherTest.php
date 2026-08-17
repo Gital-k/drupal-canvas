@@ -18,7 +18,6 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
-use Drupal\field\FieldConfigInterface;
 use Drupal\link\LinkItemInterface;
 use Drupal\link\LinkTitleVisibility;
 use Drupal\node\Entity\NodeType;
@@ -1011,7 +1010,7 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
   private function createFileMediaTypeWithExtensions(string $id, string $file_extensions): void {
     $media_type = $this->createMediaType('file', ['id' => $id]);
     $source_field_definition = $media_type->getSource()->getSourceFieldDefinition($media_type);
-    \assert($source_field_definition instanceof FieldConfigInterface);
+    \assert($source_field_definition instanceof FieldConfig);
     $source_field_definition->setSetting('file_extensions', $file_extensions);
     $source_field_definition->save();
   }

@@ -8,7 +8,7 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
-use Drupal\field\FieldConfigInterface;
+use Drupal\field\Entity\FieldConfig;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -83,7 +83,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
   private function createFileMediaTypeWithExtensions(string $id, string $file_extensions): void {
     $media_type = $this->createMediaType('file', ['id' => $id]);
     $source_field_definition = $media_type->getSource()->getSourceFieldDefinition($media_type);
-    \assert($source_field_definition instanceof FieldConfigInterface);
+    \assert($source_field_definition instanceof FieldConfig);
     $source_field_definition->setSetting('file_extensions', $file_extensions);
     $source_field_definition->save();
   }
