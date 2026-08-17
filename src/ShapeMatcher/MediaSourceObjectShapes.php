@@ -54,10 +54,17 @@ final class MediaSourceObjectShapes {
 
   /**
    * @param class-string $media_source_class
+   * @param list<string>|null $allowed_file_extensions
+   *   File extensions from the shape's `x-allowed-file-extensions` schema
+   *   annotation, or NULL when the shape declares none. When given, a media
+   *   type matches only if its source field allows at least one of these
+   *   extensions. Intersection, not subset: core's `document` media type
+   *   allows `txt` next to `pdf` and must keep matching. The field's own
+   *   `file_extensions` validation still governs what can be uploaded.
    *
    * @return array<string, \Drupal\media\MediaTypeInterface>
    */
-  public static function getMediaTypesForSource(string $media_source_class) : array {
+  public static function getMediaTypesForSource(string $media_source_class, ?array $allowed_file_extensions = NULL) : array {
     // Allow all MediaTypes that use the "image" MediaSource, for example.
     // A MediaType whose source is a more specific subclass never matches its
     // parent class's schema: VideoFile and AudioFile both extend File, so
@@ -67,6 +74,7 @@ final class MediaSourceObjectShapes {
       MediaType::loadMultiple(),
       fn (MediaTypeInterface $type): bool => is_a($type->getSource(), $media_source_class)
         && !self::hasMoreSpecificMediaSourceMapping($type, $media_source_class)
+        && ($allowed_file_extensions === NULL || self::sourceFieldAllowsExtensions($type, $allowed_file_extensions))
     );
     ksort($media_types);
     $media_type_ids = \array_map(
@@ -75,6 +83,27 @@ final class MediaSourceObjectShapes {
       $media_types
     );
     return array_combine($media_type_ids, $media_types);
+  }
+
+  /**
+   * Whether a media type's source field allows any of the given extensions.
+   *
+   * @param \Drupal\media\MediaTypeInterface $type
+   *   A media type.
+   * @param list<string> $allowed_file_extensions
+   *   File extensions declared by the shape being matched.
+   *
+   * @return bool
+   */
+  private static function sourceFieldAllowsExtensions(MediaTypeInterface $type, array $allowed_file_extensions): bool {
+    $source_field_extensions = $type->getSource()->getSourceFieldDefinition($type)?->getSetting('file_extensions');
+    if (!\is_string($source_field_extensions)) {
+      return FALSE;
+    }
+    return \array_intersect(
+      \array_values(\array_filter(\explode(' ', $source_field_extensions))),
+      $allowed_file_extensions,
+    ) !== [];
   }
 
   /**

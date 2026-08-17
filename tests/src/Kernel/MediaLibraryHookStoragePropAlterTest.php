@@ -8,6 +8,7 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
+use Drupal\field\FieldConfigInterface;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\Attributes\Group;
@@ -65,12 +66,29 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     // @see \Drupal\media\Plugin\media\Source\AudioFile
     // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::UNSUPPORTED_MEDIA_SOURCE_SUBCLASSES
     $this->createMediaType('audio_file', ['id' => 'podcasts']);
+    // File media types whose source field extensions do not intersect the
+    // document shape's `x-allowed-file-extensions` list must not match the
+    // document shape: these media types must not appear in any expectation.
+    // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSource()
+    $this->createFileMediaTypeWithExtensions('archives', 'zip tar gz');
+    $this->createFileMediaTypeWithExtensions('plain_text_notes', 'txt');
 
     // A sample value is generated during the test, which needs this table.
     $this->installSchema('file', ['file_usage']);
 
     // @see \Drupal\media_library\MediaLibraryEditorOpener::__construct()
     $this->installEntitySchema('filter_format');
+  }
+
+  /**
+   * Creates a File media type whose source field allows the given extensions.
+   */
+  private function createFileMediaTypeWithExtensions(string $id, string $file_extensions): void {
+    $media_type = $this->createMediaType('file', ['id' => $id]);
+    $source_field_definition = $media_type->getSource()->getSourceFieldDefinition($media_type);
+    \assert($source_field_definition instanceof FieldConfigInterface);
+    $source_field_definition->setSetting('file_extensions', $file_extensions);
+    $source_field_definition->save();
   }
 
   public static function getExpectedUnstorablePropShapes(): array {
