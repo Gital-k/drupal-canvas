@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Unit\JsonSchemaInterpreter;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\UriTargetFileExtensionsConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
 use Drupal\canvas\ShapeMatcher\DataTypeShapeRequirement;
 use Drupal\Tests\UnitTestCase;
@@ -56,6 +57,22 @@ final class JsonSchemaStringFormatTest extends UnitTestCase {
       [
         UriTargetMediaTypeConstraint::PLUGIN_ID,
         UriConstraint::PLUGIN_ID,
+        'PrimitiveType',
+      ],
+    ];
+    yield 'wildcard contentMediaType with x-allowed-file-extensions adds the extension requirement' => [
+      [
+        'type' => 'string',
+        'format' => 'uri',
+        'contentMediaType' => 'application/*',
+        'x-allowed-schemes' => ['http', 'https'],
+        'x-allowed-file-extensions' => ['pdf', 'doc', 'docx'],
+      ],
+      [
+        UriTargetMediaTypeConstraint::PLUGIN_ID,
+        UriTargetFileExtensionsConstraint::PLUGIN_ID,
+        UriConstraint::PLUGIN_ID,
+        UriSchemeConstraint::PLUGIN_ID,
         'PrimitiveType',
       ],
     ];

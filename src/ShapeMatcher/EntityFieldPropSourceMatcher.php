@@ -9,6 +9,7 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\UriTargetFileExtensionsConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\FieldItemAnalyzer;
@@ -840,6 +841,13 @@ final class EntityFieldPropSourceMatcher {
               $transformed_property_data_definition->addConstraint(UriTargetMediaTypeConstraint::PLUGIN_ID, [
                 'mimeType' => $mime_type,
               ]);
+              // Also reflect the extension list itself: shapes annotated with
+              // `x-allowed-file-extensions` match on extension intersection,
+              // which narrows matching below the wildcard MIME media type.
+              // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat::toDataTypeShapeRequirements()
+              $transformed_property_data_definition->addConstraint(UriTargetFileExtensionsConstraint::PLUGIN_ID, [
+                'allowedExtensions' => \array_values(\array_filter(explode(' ', $file_entity_constraints['FileExtension']['extensions']))),
+              ]);
               $property_definition = $transformed_property_data_definition;
             }
           }
@@ -1264,6 +1272,16 @@ final class EntityFieldPropSourceMatcher {
         fn ($c) => $c instanceof UriConstraint
       );
       $constraint_found = !empty($property_constraint) && $required_constraint->isSupersetOf(reset($property_constraint));
+    }
+    // 1.c File extension lists match by intersection: the shape's allowed
+    // extensions and the field's allowed extensions rarely coincide exactly,
+    // but any overlap means the field can hold a fitting file.
+    if (!$constraint_found && $required_constraint instanceof UriTargetFileExtensionsConstraint) {
+      $property_constraint = array_filter(
+        (array) $constraints,
+        fn ($c) => $c instanceof UriTargetFileExtensionsConstraint
+      );
+      $constraint_found = !empty($property_constraint) && $required_constraint->intersectsWith(reset($property_constraint));
     }
     // 2. Optionally: the interface.
     $interface_found = $required_shape->interface === NULL
