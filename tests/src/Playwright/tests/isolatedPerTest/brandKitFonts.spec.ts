@@ -12,16 +12,26 @@ const SEL = {
   uploadButton: '[data-testid="canvas-brand-kit-upload-font-button"]',
   fileInput:
     '[data-testid="canvas-brand-kit-fonts-tab-content"] input[type="file"]',
+  // The rows and the flyout are styled through CSS modules, so they are
+  // addressed by the hashed class name prefix. This is what
+  // brandKitColors.spec.ts does for folder counts.
+  familyList: '[class*="_familyList"]',
   familyRow: 'button[class*="_familyRow"]',
+  flyout: '[class*="_flyoutContent"]',
   variantRow: 'button[class*="_variantRow"]',
+  // The family name field is the first input inside the flyout; the variant
+  // editor below it contributes the others.
   familyNameInput: '[class*="_flyoutContent"] input',
 };
 
 /**
  * Uploads a font file through the fonts section's hidden file input.
+ *
+ * The uploaded bytes are not a real font. Metadata parsing fails gracefully and
+ * the family name falls back to the filename, which keeps this spec free of a
+ * binary fixture.
  */
 const uploadFont = async (page: Page, filename: string) => {
-  // Use fake font bytes to avoid the need for real font files.
   await page.locator(SEL.fileInput).setInputFiles({
     name: filename,
     mimeType: 'font/woff2',
@@ -77,15 +87,30 @@ test.describe('brand kit fonts', () => {
     const familyRow = page.locator(SEL.familyRow);
     await expect(familyRow).toBeVisible();
     await expect(familyRow).toContainText('Mona Sans');
-    // @see https://www.drupal.org/i/3591954
+
+    // Regression guard: the family row is a <button> that resets its user agent
+    // styles with `all: unset` before declaring its own layout. If `all` is not
+    // the first declaration it wipes every declaration after it, and the row
+    // computes to `display: inline` with no height, padding, or width.
+    // @see https://www.drupal.org/i/3577631
     await expect(familyRow).toHaveCSS('display', 'flex');
+    const rowBox = await familyRow.boundingBox();
+    const listBox = await page.locator(SEL.familyList).boundingBox();
+    expect(rowBox).not.toBeNull();
+    expect(listBox).not.toBeNull();
+    // The row fills its list rather than shrinking to its text.
+    expect(rowBox!.width).toBeGreaterThanOrEqual(listBox!.width - 1);
+    expect(rowBox!.height).toBeGreaterThan(20);
 
     // Uploading selects the new font, which opens its family flyout. The
-    // variant rows there carry the same reset.
+    // variant rows there carry the same `all: unset` reset.
     // @see useFontUpload's onFontUploaded / useBrandKitFontSelection.selectFont
     const variantRow = page.locator(SEL.variantRow).first();
     await expect(variantRow).toBeVisible();
     await expect(variantRow).toHaveCSS('display', 'flex');
+    const variantBox = await variantRow.boundingBox();
+    expect(variantBox).not.toBeNull();
+    expect(variantBox!.height).toBeGreaterThan(20);
 
     // Rename the family. The name field commits on blur.
     const nameInput = page.locator(SEL.familyNameInput).first();
@@ -94,19 +119,19 @@ test.describe('brand kit fonts', () => {
     await nameInput.blur();
     await expect(familyRow).toContainText('Renamed Sans');
 
-    // Leave the fonts tab then return to it to ensure the flyout is closed.
+    // Switching to Colors and back keeps the fonts section working.
+    await page.keyboard.press('Escape');
+    await expect(page.locator(SEL.flyout)).toBeHidden();
     await page.locator(SEL.colorsTab).click();
     await expect(page.locator(SEL.uploadButton)).toBeHidden();
     await page.locator(SEL.tab).click();
     await expect(familyRow).toContainText('Renamed Sans');
 
-    // The rename survives a reload.
-    // Ensure all requests complete before reloading.
-    // eslint-disable-next-line playwright/no-networkidle
-    await page.waitForLoadState('networkidle');
+    // The rename survives a reload, and the row keeps its layout.
     await page.reload();
     await canvas.openBrandKitPanel();
     await page.locator(SEL.tab).click();
     await expect(familyRow).toContainText('Renamed Sans');
+    await expect(familyRow).toHaveCSS('display', 'flex');
   });
 });
