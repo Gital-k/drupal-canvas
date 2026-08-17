@@ -1227,7 +1227,7 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
     // over the site's HTTP(S) base URL — not to the raw stream URI.
     self::assertStringEndsWith('/system/files/docs/press-kit.pdf', $result->value['src']);
     self::assertSame('press-kit.pdf', $result->value['filename']);
-    self::assertSame(\strlen($file_contents), (int) $result->value['filesize']);
+    self::assertEquals(\strlen($file_contents), $result->value['filesize']);
     self::assertSame('application/pdf', $result->value['mimetype']);
   }
 
