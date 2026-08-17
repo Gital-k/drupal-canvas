@@ -5083,6 +5083,7 @@ HTML
                   'format' => 'uri-reference',
                   'contentMediaType' => 'application/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'x-allowed-file-extensions' => ['rtf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'pdf', 'odf', 'odg', 'odp', 'ods', 'odt', 'fodt', 'fods', 'fodp', 'fodg', 'key', 'numbers', 'pages'],
                 ],
                 'title' => [
                   'title' => 'Document title',
