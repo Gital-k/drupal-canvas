@@ -5,6 +5,10 @@ import { baseQueryWithAutoSaves } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
 
+import type {
+  FetchBaseQueryError,
+  QueryReturnValue,
+} from '@reduxjs/toolkit/query';
 import type { AutoSavesHash } from '@/types/AutoSaves';
 import type { BrandKit, BrandKitColor } from '@/types/CodeComponent';
 
@@ -26,6 +30,23 @@ const withGlobalBrandKit = (
     );
   if (globalBrandKit) {
     apply(globalBrandKit);
+  }
+};
+
+let colorWriteChain = Promise.resolve();
+
+const runColorWriteLocked = async <T>(work: () => Promise<T>): Promise<T> => {
+  const previous = colorWriteChain;
+  let releaseCurrent!: () => void;
+  colorWriteChain = new Promise<void>((resolve) => {
+    releaseCurrent = resolve;
+  });
+
+  await previous;
+  try {
+    return await work();
+  } finally {
+    releaseCurrent();
   }
 };
 
@@ -105,11 +126,19 @@ export const brandKitApi = createApi({
       query: (file) => createUploadFontRequest(file),
     }),
     createColor: builder.mutation<BrandKitColor, Omit<BrandKitColor, 'id'>>({
-      query: (body) => ({
-        url: 'canvas/api/v0/config/color',
-        method: 'POST',
-        body,
-      }),
+      queryFn: (body, _api, _extraOptions, baseQuery) =>
+        runColorWriteLocked(async () => {
+          const result = await baseQuery({
+            url: 'canvas/api/v0/config/color',
+            method: 'POST',
+            body,
+          });
+          return result as QueryReturnValue<
+            BrandKitColor,
+            FetchBaseQueryError,
+            {} | undefined
+          >;
+        }),
       async onQueryStarted(body, { dispatch, queryFulfilled }) {
         const optimisticColor: BrandKitColor = {
           id: createTempColorId(),
@@ -193,11 +222,19 @@ export const brandKitApi = createApi({
       BrandKitColor,
       { id: string; changes: Partial<BrandKitColor> }
     >({
-      query: ({ id, changes }) => ({
-        url: `canvas/api/v0/config/color/${id}`,
-        method: 'PATCH',
-        body: changes,
-      }),
+      queryFn: ({ id, changes }, _api, _extraOptions, baseQuery) =>
+        runColorWriteLocked(async () => {
+          const result = await baseQuery({
+            url: `canvas/api/v0/config/color/${id}`,
+            method: 'PATCH',
+            body: changes,
+          });
+          return result as QueryReturnValue<
+            BrandKitColor,
+            FetchBaseQueryError,
+            {} | undefined
+          >;
+        }),
       async onQueryStarted({ id, changes }, { dispatch, queryFulfilled }) {
         const patchResults = [
           dispatch(
@@ -243,10 +280,18 @@ export const brandKitApi = createApi({
       ],
     }),
     deleteColor: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `canvas/api/v0/config/color/${id}`,
-        method: 'DELETE',
-      }),
+      queryFn: (id, _api, _extraOptions, baseQuery) =>
+        runColorWriteLocked(async () => {
+          const result = await baseQuery({
+            url: `canvas/api/v0/config/color/${id}`,
+            method: 'DELETE',
+          });
+          return result as QueryReturnValue<
+            void,
+            FetchBaseQueryError,
+            {} | undefined
+          >;
+        }),
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
         const patchResults = [
           dispatch(
