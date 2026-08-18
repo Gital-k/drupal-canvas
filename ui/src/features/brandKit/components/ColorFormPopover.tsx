@@ -379,6 +379,7 @@ const ColorFormPopover = ({
               : undefined
           }
           data-testid="canvas-color-form-popover"
+          data-submission-state={isSubmittingHidden ? 'hidden' : 'visible'}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
           }}

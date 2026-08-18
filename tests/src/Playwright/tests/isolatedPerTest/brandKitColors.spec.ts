@@ -7,7 +7,8 @@ import type { Locator, Page } from '@playwright/test';
 // @cspell:ignore colormaster
 
 // Shared selector prefixes
-const POP_SEL = '[data-state="open"][data-testid="canvas-color-form-popover"]';
+const POP_SEL =
+  '[data-state="open"][data-testid="canvas-color-form-popover"][data-submission-state="visible"]';
 const FORM_SEL = 'form[data-form-id="component_instance_form"]';
 
 interface ColorSectionExpectation {
