@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Cross2Icon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import {
@@ -193,6 +193,7 @@ const ColorFormPopover = ({
   const [updateFolder] = useUpdateFolderMutation();
   const { data: foldersData } = useGetFoldersQuery();
   const [isSubmittingHidden, setIsSubmittingHidden] = useState(false);
+  const hasInitializedForOpenRef = useRef(false);
 
   // Form state managed via reducer
   const [formState, updateForm] = useReducer(formReducer, INITIAL_FORM_STATE);
@@ -217,14 +218,20 @@ const ColorFormPopover = ({
     }
   }, [open, resetCreate, resetUpdate]);
 
-  // Initialize form when opening
+  // Initialize form only once per open session so optimistic cache churn does
+  // not overwrite in-progress edits while the popover is still open.
   useEffect(() => {
-    if (open) {
+    if (open && !hasInitializedForOpenRef.current) {
       if (operation === 'edit' && color) {
         updateForm({ type: 'INIT_EDIT', color });
       } else {
         updateForm({ type: 'INIT_ADD' });
       }
+      hasInitializedForOpenRef.current = true;
+    }
+
+    if (!open) {
+      hasInitializedForOpenRef.current = false;
     }
   }, [open, operation, color]);
 
