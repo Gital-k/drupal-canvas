@@ -169,7 +169,7 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
       // the source field's extensions and the document shape's
       // `x-allowed-file-extensions` list: press_releases allows `txt` next to
       // `doc docx pdf`, so it matches despite `txt` mapping to `text/plain`.
-      // @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::matchMediaSourceObjectShape()
+      // @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::matchDocumentShapeToMediaTypes()
       // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSource()
       'type=object&$ref=' . JsonSchemaObjectRef::Document->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media:press_releases␝field_media_file␞␟{src↝entity␜␜entity:file␝uri␞␟url,filename↝entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:file␝filemime␞␟value}'],
       'type=object&$ref=' . JsonSchemaObjectRef::Image->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
@@ -451,7 +451,7 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
       ],
       // The host media entity's own source field provides the document object
       // props directly.
-      // @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::matchMediaSourceObjectShape()
+      // @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::matchDocumentShapeToMediaTypes()
       'type=object&$ref=' . JsonSchemaObjectRef::Document->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝field_media_file␞␟{src↝entity␜␜entity:file␝uri␞␟url,filename↝entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:file␝filemime␞␟value}'],
       'type=object&$ref=' . JsonSchemaObjectRef::Image->value . '!optional' => [
         'sourceType' => PropSource::EntityField->value,
