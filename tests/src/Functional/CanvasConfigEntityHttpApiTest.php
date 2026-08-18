@@ -2125,6 +2125,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'route.menu_active_trails:footer',
       'route.menu_active_trails:main',
       'theme',
+      'url.query_args:entity_bundle',
+      'url.query_args:entity_type',
       'user.permissions',
     ];
     $expected_cache_tags = [
