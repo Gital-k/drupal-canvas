@@ -434,22 +434,21 @@ final class EntityFieldPropSourceMatcher {
       ...$matches_references,
       ...$matches,
       ...self::matchContentEntityReferenceShape($entity_data_definition, $schema),
-      ...$this->matchMediaSourceObjectShape($entity_data_definition, $levels_to_recurse, $is_required_in_json_schema, $schema, $cardinality_in_json_schema),
+      ...$this->matchDocumentShapeToMediaTypes($entity_data_definition, $levels_to_recurse, $is_required_in_json_schema, $schema, $cardinality_in_json_schema),
     ];
   }
 
   /**
    * Matches media types and media reference fields to the document shape.
    *
-   * The media library integration matches media types to object shapes by
-   * their media source plugin class, not by their source field's allowed file
-   * extensions. Extension lists frequently span multiple MIME media types
-   * (core's `media.type.document` allows `txt` alongside `pdf`), which the
-   * extension-derived `UriTargetMediaType` transform cannot express, so the
-   * scalar-driven matching finds nothing for such media types. Matching by
-   * media source class here gives both prop source types the same behavior: a
-   * media entity that can be selected directly in the media library can also
-   * be linked from a host entity's media reference field.
+   * Media types match by their media source plugin class plus a non-empty
+   * intersection between their source field's allowed file extensions and the
+   * document shape's `x-allowed-file-extensions` list. Scalar-driven matching
+   * cannot express extension lists spanning multiple MIME media types (core's
+   * `media.type.document` allows `txt` alongside `pdf`), so it finds nothing
+   * for such media types. Matching them here gives both prop source types the
+   * same behavior: a media entity that can be selected directly in the media
+   * library can also be linked from a host entity's media reference field.
    *
    * @param \Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface $entity_data_definition
    *   The host entity type + bundle data definition.
@@ -462,11 +461,12 @@ final class EntityFieldPropSourceMatcher {
    * @param \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED|int<1, max> $cardinality_in_json_schema
    *
    * @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+   * @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSource()
    * @todo Match the image and video object shapes by media source class too in https://www.drupal.org/i/3591890
    *
    * @return ObjectMatches
    */
-  private function matchMediaSourceObjectShape(EntityDataDefinitionInterface $entity_data_definition, int $levels_to_recurse, bool $is_required_in_json_schema, array $schema, int $cardinality_in_json_schema): array {
+  private function matchDocumentShapeToMediaTypes(EntityDataDefinitionInterface $entity_data_definition, int $levels_to_recurse, bool $is_required_in_json_schema, array $schema, int $cardinality_in_json_schema): array {
     // Media reference fields hold a single media entity per delta; the object
     // shape must be single-cardinality too.
     if ($cardinality_in_json_schema !== 1 || !$this->entityTypeManager->hasDefinition('media')) {
