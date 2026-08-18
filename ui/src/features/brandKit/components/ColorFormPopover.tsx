@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import { Cross2Icon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import {
@@ -192,6 +192,7 @@ const ColorFormPopover = ({
   ] = useUpdateColorMutation();
   const [updateFolder] = useUpdateFolderMutation();
   const { data: foldersData } = useGetFoldersQuery();
+  const [isSubmittingHidden, setIsSubmittingHidden] = useState(false);
 
   // Form state managed via reducer
   const [formState, updateForm] = useReducer(formReducer, INITIAL_FORM_STATE);
@@ -210,6 +211,7 @@ const ColorFormPopover = ({
   // Reset mutations when popover opens/closes
   useEffect(() => {
     if (!open) {
+      setIsSubmittingHidden(false);
       resetCreate();
       resetUpdate();
     }
@@ -257,6 +259,8 @@ const ColorFormPopover = ({
 
     const cssVariable = `--${variableName.startsWith('--') ? variableName.slice(2) : variableName}`;
 
+    setIsSubmittingHidden(true);
+
     try {
       if (operation === 'add') {
         const newColor = await createColor({
@@ -285,6 +289,7 @@ const ColorFormPopover = ({
                 error:
                   'The color was created but could not be added to the folder. You can move it manually.',
               });
+              setIsSubmittingHidden(false);
               // Keep the popover open so the user sees the error.
               return;
             }
@@ -299,8 +304,10 @@ const ColorFormPopover = ({
         }).unwrap();
       }
 
+      setIsSubmittingHidden(false);
       onOpenChange(false);
     } catch (err) {
+      setIsSubmittingHidden(false);
       console.error('Failed to save color:', err);
     }
   };
@@ -359,6 +366,11 @@ const ColorFormPopover = ({
           align={align}
           sideOffset={4}
           className={styles.popoverContent}
+          style={
+            isSubmittingHidden
+              ? { opacity: 0, pointerEvents: 'none' }
+              : undefined
+          }
           data-testid="canvas-color-form-popover"
           onOpenAutoFocus={(e) => {
             e.preventDefault();
