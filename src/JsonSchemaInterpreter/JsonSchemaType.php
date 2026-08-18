@@ -484,7 +484,7 @@ enum JsonSchemaType: string {
             // single list. Modules can widen the widget's list via
             // hook_canvas_storable_prop_shape_alter().
             // @see https://git.drupalcode.org/project/canvas/-/work_items/3524130#note_1678367
-            fieldInstanceSettings: ['file_extensions' => implode(' ', JsonSchemaObjectRef::Document->allowedFileExtensions() ?? [])],
+            fieldInstanceSettings: ['file_extensions' => implode(' ', JsonSchemaObjectRef::Document->allowedFileExtensions())],
           ),
           default => NULL,
         },

@@ -480,7 +480,7 @@ final class EntityFieldPropSourceMatcher {
       return [];
     }
     $media_source_class = MediaSourceObjectShapes::SCHEMA_TO_MEDIA_SOURCE[JsonSchemaObjectRef::Document->value];
-    $media_types = MediaSourceObjectShapes::getMediaTypesForSource($media_source_class, JsonSchemaObjectRef::Document->allowedFileExtensions());
+    $media_types = MediaSourceObjectShapes::getMediaTypesForSource(JsonSchemaObjectRef::Document);
     if ($media_types === []) {
       return [];
     }
