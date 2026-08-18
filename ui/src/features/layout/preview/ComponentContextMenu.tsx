@@ -23,6 +23,7 @@ import useComponentSelection from '@/hooks/useComponentSelection';
 import useCopyPasteComponents from '@/hooks/useCopyPasteComponents';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import useGetComponentName from '@/hooks/useGetComponentName';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 
 import type React from 'react';
@@ -42,7 +43,7 @@ export const ComponentContextMenuContent: React.FC<
 > = ({ component, menuType = 'context' }) => {
   const dispatch = useAppDispatch();
   const layout = useAppSelector(selectLayout);
-  const { data: components } = useGetComponentsQuery();
+  const { data: components } = useGetComponentsQuery(useHostEntityParams());
   const componentName = useGetComponentName(component);
   const editorViewPortScale = useAppSelector(selectEditorViewPortScale);
   const hasGlobalRegions = layout.some((r) => r.id !== DEFAULT_REGION);

@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { useComponentTransforms } from '@/components/ComponentInstanceForm';
 import { toPropName } from '@/components/form/react-hook-form/fields/componentFormData';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import useInputUIData from '@/hooks/useInputUIData';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import { usePatchComponent } from '@/services/preview';
@@ -21,7 +22,7 @@ export const useComponentFormInputInfo = (fieldName: string) => {
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const dispatch = useAppDispatch();
   const polledBackgroundUpdate = useRef<number | null>(null);
-  const { data: components } = useGetComponentsQuery();
+  const { data: components } = useGetComponentsQuery(useHostEntityParams());
   const transforms = useComponentTransforms();
   const inputAndUiData = useInputUIData();
   const { selectedComponentType, version, selectedComponent } = inputAndUiData;

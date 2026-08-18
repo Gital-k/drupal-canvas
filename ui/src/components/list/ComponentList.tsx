@@ -3,6 +3,7 @@ import { useErrorBoundary } from 'react-error-boundary';
 
 import ListItem from '@/components/list/ListItem';
 import { LayoutItemType } from '@/features/ui/primaryPanelSlice';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import {
   useGetComponentsQuery,
   useGetFoldersQuery,
@@ -25,7 +26,11 @@ export type ComponentVisibility =
   | 'non-external-and-fallback-external';
 
 const ComponentList = ({ searchTerm, visibility }: ComponentListProps) => {
-  const { data: components, error, isLoading } = useGetComponentsQuery();
+  const {
+    data: components,
+    error,
+    isLoading,
+  } = useGetComponentsQuery(useHostEntityParams());
   const {
     data: folders,
     error: foldersError,

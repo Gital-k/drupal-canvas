@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 
 import { getDisplayNameForNode } from '@/features/layout/layoutUtils';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 
 import type {
@@ -15,7 +16,7 @@ const useGetComponentName = (
   node: LayoutChildNode | null,
   parentNode?: LayoutNode | null,
 ) => {
-  const { data: components } = useGetComponentsQuery();
+  const { data: components } = useGetComponentsQuery(useHostEntityParams());
 
   // Helper to cast parentNode to ComponentNode if needed
   const getParentComponentNode = (

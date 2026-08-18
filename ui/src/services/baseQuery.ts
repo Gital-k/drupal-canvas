@@ -62,18 +62,22 @@ export const popCanvasLayoutRequest = () => {
 export const extractEntityParams = (url: string) => {
   // Remove query parameters and hash fragments
   url = url.split('?')[0].split('#')[0];
+  // The `/canvas` prefix is optional so this matches both a full
+  // `window.location.href` (which carries the router basename, e.g.
+  // `…/canvas/editor/…`) and a basename-stripped react-router `location.pathname`
+  // (e.g. `/editor/…`).
   // Match /canvas/(editor||preview)/:entityType/:entityId/
   const matchPageEditor = url.match(
-    /\/canvas\/(editor|preview)\/([^/]+)\/([^/]+)\/?/,
+    /\/(?:canvas\/)?(editor|preview)\/([^/]+)\/([^/]+)\/?/,
   );
   // /template/:entityType/:bundle/:viewMode/:previewEntityId/
   // /canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}
   const matchTemplateEditor = url.match(
-    /\/canvas\/template\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)\/?/,
+    /\/(?:canvas\/)?template\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)\/?/,
   );
   // /pattern/:patternId/
   // /canvas/api/v0/layout-pattern/{entity_id}
-  const matchPatternEditor = url.match(/\/canvas\/pattern\/([^/]+)\/?/);
+  const matchPatternEditor = url.match(/\/(?:canvas\/)?pattern\/([^/]+)\/?/);
   if (matchPageEditor) {
     return { entityType: matchPageEditor[2], entityId: matchPageEditor[3] };
   } else if (matchTemplateEditor) {
@@ -87,6 +91,34 @@ export const extractEntityParams = (url: string) => {
     return { entityType: 'pattern', entityId: matchPatternEditor[1] };
   }
   return { entityType: undefined, entityId: undefined };
+};
+
+export interface HostEntityParams {
+  entityType?: string;
+  entityBundle?: string;
+}
+
+/**
+ * Derives the host entity currently being edited from the URL.
+ *
+ * Used to scope the component list to the host: the server omits block-sourced
+ * Components whose required contexts cannot be satisfied for that host. Returns
+ * the entity type and, when the route carries it, the bundle. Returns an empty
+ * object when there is no content-entity host (the pattern editor, or a route
+ * without an entity), so the caller sends no host parameters and receives only
+ * the globally satisfiable Components.
+ *
+ * @param url - The URL string to parse (usually `window.location.href`).
+ */
+export const getHostEntityParams = (url: string): HostEntityParams => {
+  const { entityType, templateBundle } = extractEntityParams(url);
+  // `extractEntityParams` returns the sentinel 'pattern' type for the pattern
+  // editor, which is not a content entity type and has no host.
+  if (!entityType || entityType === 'pattern') {
+    return {};
+  }
+  // @todo Send the host bundle for bundled content entities once the page editor supports them, in https://www.drupal.org/project/canvas/issues/3498525 — today the page editor is canvas_page-only (no bundle key), so a bundled host would send entity_type without entity_bundle and the server would return 400.
+  return { entityType, entityBundle: templateBundle };
 };
 
 /**

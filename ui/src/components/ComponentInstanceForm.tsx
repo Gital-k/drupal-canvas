@@ -28,6 +28,7 @@ import {
   selectSelectedComponentUuid,
 } from '@/features/ui/uiSlice';
 import { useDrupalBehaviors } from '@/hooks/useDrupalBehaviors';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import useInputUIData from '@/hooks/useInputUIData';
 import hyperscriptify from '@/local_packages/hyperscriptify';
 import propsify from '@/local_packages/hyperscriptify/propsify/standard/index.js';
@@ -281,7 +282,9 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   const dispatch = useAppDispatch();
   const model = useAppSelector(selectModel);
   const layout = useAppSelector(selectLayout);
-  const { data: components, error } = useGetComponentsQuery();
+  const { data: components, error } = useGetComponentsQuery(
+    useHostEntityParams(),
+  );
   const { showBoundary } = useErrorBoundary();
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
