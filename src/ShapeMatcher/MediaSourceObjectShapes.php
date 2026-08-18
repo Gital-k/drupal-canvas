@@ -40,18 +40,24 @@ final class MediaSourceObjectShapes {
   ];
 
   /**
-   * @param class-string $media_source_class
-   * @param list<string>|null $allowed_file_extensions
-   *   File extensions from the shape's `x-allowed-file-extensions` schema
-   *   annotation, or NULL when the shape declares none. When given, a media
-   *   type matches only if its source field allows at least one of these
-   *   extensions. Intersection, not subset: core's `document` media type
-   *   allows `txt` next to `pdf` and must keep matching. The field's own
-   *   `file_extensions` validation still governs what can be uploaded.
+   * Returns the media types whose media source matches an object shape.
+   *
+   * A media type matches when its source plugin is an instance of the class
+   * mapped in SCHEMA_TO_MEDIA_SOURCE, and, if the shape declares
+   * `x-allowed-file-extensions`, when its source field allows at least one of
+   * those extensions. Intersection, not subset: core's `document` media type
+   * allows `txt` next to `pdf` and must keep matching. The field's own
+   * `file_extensions` validation still governs what can be uploaded.
+   *
+   * @param \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef $ref
+   *   An object shape with an entry in SCHEMA_TO_MEDIA_SOURCE.
    *
    * @return array<string, \Drupal\media\MediaTypeInterface>
    */
-  public static function getMediaTypesForSource(string $media_source_class, ?array $allowed_file_extensions = NULL) : array {
+  public static function getMediaTypesForSource(JsonSchemaObjectRef $ref) : array {
+    \assert(\array_key_exists($ref->value, self::SCHEMA_TO_MEDIA_SOURCE));
+    $media_source_class = self::SCHEMA_TO_MEDIA_SOURCE[$ref->value];
+    $allowed_file_extensions = $ref->allowedFileExtensions();
     // Allow all MediaTypes that use the "image" MediaSource, for example.
     // A MediaType whose source is a more specific subclass never matches its
     // parent class's schema: VideoFile extends File, so video MediaTypes must
@@ -60,19 +66,19 @@ final class MediaSourceObjectShapes {
     // shape's `x-allowed-file-extensions` list.
     // @todo Map AudioFile to an `audio` object shape in SCHEMA_TO_MEDIA_SOURCE once one exists.
     // @see \Drupal\media\Plugin\media\Source\Image
-    $media_types = array_filter(
+    $media_types = \array_filter(
       MediaType::loadMultiple(),
-      fn (MediaTypeInterface $type): bool => is_a($type->getSource(), $media_source_class)
+      fn (MediaTypeInterface $type): bool => \is_a($type->getSource(), $media_source_class)
         && !self::hasMoreSpecificMediaSourceMapping($type, $media_source_class)
-        && ($allowed_file_extensions === NULL || self::sourceFieldAllowsExtensions($type, $allowed_file_extensions))
+        && ($allowed_file_extensions === [] || self::sourceFieldAllowsExtensions($type, $allowed_file_extensions))
     );
-    ksort($media_types);
+    \ksort($media_types);
     $media_type_ids = \array_map(
     // @phpstan-ignore-next-line
       fn (MediaTypeInterface $type): string => $type->id(),
       $media_types
     );
-    return array_combine($media_type_ids, $media_types);
+    return \array_combine($media_type_ids, $media_types);
   }
 
   /**
@@ -91,7 +97,7 @@ final class MediaSourceObjectShapes {
       return FALSE;
     }
     return \array_intersect(
-      \array_values(\array_filter(\explode(' ', $source_field_extensions))),
+      \array_filter(\explode(' ', $source_field_extensions)),
       $allowed_file_extensions,
     ) !== [];
   }
@@ -114,8 +120,8 @@ final class MediaSourceObjectShapes {
     $more_specific_source_classes = \array_values(self::SCHEMA_TO_MEDIA_SOURCE);
     foreach ($more_specific_source_classes as $other_source_class) {
       if ($other_source_class !== $media_source_class
-        && is_subclass_of($other_source_class, $media_source_class)
-        && is_a($type->getSource(), $other_source_class)) {
+        && \is_subclass_of($other_source_class, $media_source_class)
+        && \is_a($type->getSource(), $other_source_class)) {
         return TRUE;
       }
     }
