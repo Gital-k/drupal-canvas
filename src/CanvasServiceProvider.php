@@ -90,7 +90,21 @@ class CanvasServiceProvider extends ServiceProviderBase {
     $container->getDefinition('plugin.manager.sdc')
       ->setClass(ComponentPluginManager::class);
     // @todo Remove in clean-up follow-up; minimize non-essential changes.
-    $container->setAlias(ComponentPluginManager::class, 'plugin.manager.sdc');
+    // When another module decorates 'plugin.manager.sdc' (e.g. ui_patterns),
+    // the public service id resolves to the outermost decorator, which is not
+    // an instance of Canvas's ComponentPluginManager. Point Canvas's class
+    // alias at the decorated inner service in that case — after Symfony's
+    // DecoratorServicePass runs, that id holds the Canvas-classed instance the
+    // decorator wraps.
+    // @see https://www.drupal.org/project/canvas/issues/3561618
+    $sdc_alias_target = 'plugin.manager.sdc';
+    foreach ($container->getDefinitions() as $id => $definition) {
+      $decorated = $definition->getDecoratedService();
+      if ($decorated !== NULL && $decorated[0] === 'plugin.manager.sdc') {
+        $sdc_alias_target = $decorated[1] ?? ($id . '.inner');
+      }
+    }
+    $container->setAlias(ComponentPluginManager::class, $sdc_alias_target);
 
     // Decorate the Field UI view mode access check to add content template
     // access logic, ensuring safe handling when the Field UI module is not
