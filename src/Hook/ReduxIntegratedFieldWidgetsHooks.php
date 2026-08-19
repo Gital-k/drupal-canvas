@@ -7,6 +7,7 @@ namespace Drupal\canvas\Hook;
 use Drupal\canvas\Form\ComponentInstanceForm;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
@@ -36,6 +37,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     private readonly LibraryDiscoveryInterface $libraryDiscovery,
     private readonly RequestStack $requestStack,
     private readonly ThemeManagerInterface $themeManager,
+    private readonly ConfigFactoryInterface $configFactory,
   ) {
   }
 
@@ -64,7 +66,8 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         'css' => [],
       ];
     }
-    if ($extension === 'media_library') {
+    if ($extension === 'media_library'
+        && $this->configFactory->get('system.theme')->get('default') === 'canvas_stark') {
       // Typically, it's safe to assume the base libraries of a theme are
       // present, but we can't do this in Drupal Canvas. Here, the Media Library
       // dialog renders with the Admin Theme, but is triggered from a page
@@ -73,6 +76,11 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       // This is mitigated by attaching a dynamically built library that
       // contains the default CSS of the admin theme.
       // @see \Drupal\canvas\Hook\LibraryHooks::customizeDialogLibrary()
+      // Only needed when canvas_stark is the default theme. On sites where
+      // canvas_stark is not the default theme this dependency re-injects the
+      // admin theme stylesheet on every edit page, displacing the admin toolbar
+      // when a media library dialog is opened.
+      // @see https://git.drupalcode.org/project/canvas/-/work_items/3591965
       $libraries['ui']['dependencies'][] = 'canvas/canvas.scoped.admin.css';
     }
   }
