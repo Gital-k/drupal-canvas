@@ -147,4 +147,95 @@ final class PropShapeNormalizeTest extends UnitTestCase {
     yield 'Draft-07 / 6.9.0+ `$id`' => ['$id'];
   }
 
+  /**
+   * Tests that an array's `items` schema is normalized too, not just objects.
+   *
+   * `normalizePropSchema()` recursed into an object's `properties` but ignored
+   * an array's `items`, so the resolver's injected `$id` (and `meta:enum`,
+   * `title`) leaked into the shape of every array-of-object or array-of-enum
+   * prop. The `items` schema is a prop schema in its own right and must be
+   * normalized the same way: `type` first, and the resolver's leftovers gone.
+   *
+   * @param array<string, mixed> $schema
+   * @param array<string, mixed> $expected
+   *
+   * @see \Drupal\canvas\PropShape\PropShape::normalizePropSchema()
+   */
+  #[DataProvider('providerNormalizeArrayItems')]
+  public function testNormalizePropSchemaNormalizesArrayItems(array $schema, array $expected): void {
+    $this->assertSame($expected, PropShape::normalizePropSchema($schema));
+  }
+
+  /**
+   * @return \Generator<string, array{0: array<string, mixed>, 1: array<string, mixed>}>
+   */
+  public static function providerNormalizeArrayItems(): \Generator {
+    // An array of the resolved `image` object: the resolver stamps a `$id` on
+    // the item and on its `src` sub-prop, and SDC keeps `title`s. All of that
+    // must be stripped, `type` listed first, and the nested `properties`
+    // normalized too.
+    yield 'array of resolved object (image gallery)' => [
+      [
+        'type' => 'array',
+        'maxItems' => 2,
+        'items' => [
+          'type' => 'object',
+          'title' => 'image',
+          '$id' => 'json-schema-definitions://canvas.module/image',
+          'required' => ['src'],
+          'properties' => [
+            'src' => [
+              'type' => 'string',
+              'title' => 'Image URL',
+              'format' => 'uri-reference',
+              '$id' => 'json-schema-definitions://canvas.module/image-uri',
+            ],
+            'alt' => [
+              'type' => 'string',
+              'title' => 'Alternative text',
+            ],
+          ],
+        ],
+      ],
+      [
+        'type' => 'array',
+        'items' => [
+          'type' => 'object',
+          'properties' => [
+            'src' => [
+              'type' => 'string',
+              'format' => 'uri-reference',
+            ],
+            'alt' => [
+              'type' => 'string',
+            ],
+          ],
+          'required' => ['src'],
+        ],
+        'maxItems' => 2,
+      ],
+    ];
+
+    // An array of an enum: `meta:enum` and `title` are not part of the shape, so
+    // the normalized `items` keeps only `type` and `enum`.
+    yield 'array of enum' => [
+      [
+        'type' => 'array',
+        'items' => [
+          'type' => 'string',
+          'title' => 'Color',
+          'enum' => ['red', 'blue'],
+          'meta:enum' => ['red' => 'Red', 'blue' => 'Blue'],
+        ],
+      ],
+      [
+        'type' => 'array',
+        'items' => [
+          'type' => 'string',
+          'enum' => ['red', 'blue'],
+        ],
+      ],
+    ];
+  }
+
 }

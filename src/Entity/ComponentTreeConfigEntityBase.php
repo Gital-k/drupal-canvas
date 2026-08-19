@@ -172,6 +172,7 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
    */
   public function preSave(EntityStorageInterface $storage) {
     parent::preSave($storage);
+    self::getConfigUpdater()->updateConfigEntityDefaultRelativeUrlSchema($this);
     self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
     self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputsAsArrays($this);
     self::getConfigUpdater()->updateConfigEntityBlockLabelDisplay($this);

@@ -176,12 +176,20 @@ final class PropShape {
       );
     }
 
+    // Likewise, a `type: array` describes its entries in `items`, which is a
+    // prop schema in its own right. Normalize it too, otherwise leftovers such
+    // as the resolver's injected `$id` (stripped just below) would leak into
+    // the shape for every array-of-object prop.
+    if ($normalized_prop_schema['type'] === JsonSchemaType::Array->value && \array_key_exists('items', $normalized_prop_schema)) {
+      $normalized_prop_schema['items'] = self::normalizePropSchema($normalized_prop_schema['items']);
+    }
+
     // Omit the resolved $ref URI that schema resolution injects. Canvas uses
     // the JSON-Schema Draft-07 dialect, whose id keyword is `$id` (not
-    // Draft-04's `id`). justinrainbow/json-schema only emits `$id` as of
-    // 6.9.0; earlier versions injected `id` regardless of dialect. Strip both
-    // so the URI never leaks into the prop shape on either version
-    // (drupal/core-recommended still pins ~6.8.2 until core adopts 6.9.0).
+    // Draft-04's `id`). justinrainbow/json-schema only emits `$id` as of 6.9.0;
+    // earlier versions injected `id` regardless of dialect. Nothing pins the
+    // version, so a site may run either — strip both so the URI never leaks
+    // into the prop shape.
     // @see https://github.com/jsonrainbow/json-schema/issues/911
     // @see \JsonSchema\SchemaStorage::resolveRefSchema()
     // @see \JsonSchema\Uri\UriRetriever::retrieve()

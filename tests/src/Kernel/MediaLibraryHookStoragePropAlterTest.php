@@ -79,8 +79,8 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
       $storable_prop_shapes,
       array_flip([
         'type=object&$ref=' . JsonSchemaObjectRef::Image->value,
-        'type=array&items[$ref]=' . JsonSchemaObjectRef::Image->value . '&items[type]=object&minItems=1',
-        'type=array&items[$ref]=' . JsonSchemaObjectRef::Image->value . '&items[type]=object&maxItems=2',
+        'type=array&items[type]=object&items[$ref]=' . JsonSchemaObjectRef::Image->value . '&minItems=1',
+        'type=array&items[type]=object&items[$ref]=' . JsonSchemaObjectRef::Image->value . '&maxItems=2',
       ]),
     );
     foreach ($image_shapes as $k => $image_shape) {

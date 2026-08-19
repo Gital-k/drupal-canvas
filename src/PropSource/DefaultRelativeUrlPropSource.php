@@ -80,23 +80,34 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
     \assert(\array_key_exists('jsonSchema', $sdc_prop_source));
     \assert(\array_key_exists('componentId', $sdc_prop_source));
 
+    $stored = $sdc_prop_source['jsonSchema'];
+
+    // The canonical shape: resolve `$ref`s, then normalize.
     // @todo Make this far less clunky 🙈
     $minimal = PropShape::normalize(
-    // First do basic normalization, and resolve.
-      PropShape::normalize($sdc_prop_source['jsonSchema'])->resolvedSchema
+      PropShape::normalize($stored)->resolvedSchema
     )->schema;
 
-    $sdc_prop_source_json_schema = $sdc_prop_source['jsonSchema'];
-    SortArray::sortByKeyRecursive($sdc_prop_source_json_schema);
+    // Data saved before Canvas 1.5.1 kept the resolver's `$id` entries, and
+    // older array data also kept the SDC `title`/`meta:enum` entries because
+    // normalization did not yet descend into an array's `items`. Re-normalizing
+    // the stored schema removes all of that, so those old values load instead
+    // of being rejected. If re-normalizing still does not match `$minimal`,
+    // resolving the schema changed its shape in a way normalization does not
+    // explain (e.g. an unresolved `$ref`), so surface it.
+    $renormalized = PropShape::normalize($stored)->schema;
+
+    $sorted_renormalized = $renormalized;
+    SortArray::sortByKeyRecursive($sorted_renormalized);
     SortArray::sortByKeyRecursive($minimal);
 
-    if ($sdc_prop_source_json_schema !== $minimal) {
-      throw new \LogicException(\sprintf('Extraneous JSON Schema information detected: %s should have been just %s.', json_encode($sdc_prop_source_json_schema, JSON_PRETTY_PRINT), json_encode($minimal, JSON_PRETTY_PRINT)));
+    if ($sorted_renormalized !== $minimal) {
+      throw new \LogicException(\sprintf('Extraneous JSON Schema information detected: %s should have been just %s.', json_encode($sorted_renormalized, JSON_PRETTY_PRINT), json_encode($minimal, JSON_PRETTY_PRINT)));
     }
 
     return new self(
       $sdc_prop_source['value'],
-      $sdc_prop_source['jsonSchema'],
+      $renormalized,
       $sdc_prop_source['componentId'],
     );
   }

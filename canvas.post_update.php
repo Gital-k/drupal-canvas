@@ -722,3 +722,187 @@ function canvas_post_update_0027_install_color_entity_type(): void {
     $entity_definition_update_manager->installEntityType(\Drupal::entityTypeManager()->getDefinition(Color::ENTITY_TYPE_ID));
   }
 }
+
+/**
+ * Cleans up old default-relative-url schemas saved in page/content data.
+ *
+ * Canvas 1.5.0 and earlier saved a default-relative-url value's JSON Schema
+ * with extra `$id` entries that the schema resolver adds. Since 1.5.1
+ * (#3591629) the code that reads it removes those entries, so it no longer
+ * matches the old saved copy and refuses to load it — which makes the editor
+ * fail with a 500 error. This walks every content item, in every revision and
+ * translation, and rewrites the saved schema to the clean version.
+ *
+ * @see \Drupal\canvas\CanvasConfigUpdater::normalizeDefaultRelativeUrlSchema()
+ * @see \canvas_post_update_0028_pattern_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_page_region_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_content_template_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_component_tree_field_default_value_default_relative_url_schema_ids()
+ * @see \canvas_post_update_0028_auto_save_default_relative_url_schema_ids()
+ */
+function canvas_post_update_0028_default_relative_url_schema_ids(array &$sandbox): void {
+  $entity_type_manager = \Drupal::entityTypeManager();
+
+  // Collect the work up front: the id of every content item (every revision,
+  // if the entity type keeps revisions) that has a component tree field. Each
+  // revision is fixed on its own, because the site health check looks at the
+  // current, past and future revisions separately.
+  if (!isset($sandbox['items'])) {
+    $entity_field_manager = \Drupal::service(EntityFieldManagerInterface::class);
+    \assert($entity_field_manager instanceof EntityFieldManagerInterface);
+    $sandbox['items'] = [];
+    $sandbox['fields'] = [];
+    foreach ($entity_field_manager->getFieldMapByFieldType(ComponentTreeItem::PLUGIN_ID) as $entity_type_id => $fields) {
+      $sandbox['fields'][$entity_type_id] = \array_keys($fields);
+      $query = $entity_type_manager->getStorage($entity_type_id)->getQuery()->accessCheck(FALSE);
+      if ($entity_type_manager->getDefinition($entity_type_id)->isRevisionable()) {
+        $query->allRevisions();
+      }
+      // allRevisions() keys the result by revision id, otherwise by entity id.
+      foreach (\array_keys($query->execute()) as $id) {
+        $sandbox['items'][] = [$entity_type_id, $id];
+      }
+    }
+    $sandbox['total'] = \count($sandbox['items']);
+    $sandbox['progress'] = 0;
+  }
+
+  $batch = \array_slice($sandbox['items'], $sandbox['progress'], (int) Settings::get('entity_update_batch_size', 50));
+  foreach ($batch as [$entity_type_id, $id]) {
+    $storage = $entity_type_manager->getStorage($entity_type_id);
+    $revisionable = $entity_type_manager->getDefinition($entity_type_id)->isRevisionable();
+    if ($revisionable) {
+      \assert($storage instanceof RevisionableStorageInterface);
+      $entity = $storage->loadRevision($id);
+    }
+    else {
+      $entity = $storage->load($id);
+    }
+    if (!$entity instanceof ContentEntityInterface) {
+      continue;
+    }
+    $changed = FALSE;
+    // Inputs can differ per translation (asymmetric fields), so visit each.
+    foreach ($entity->getTranslationLanguages() as $langcode => $language) {
+      $translation = $entity->getTranslation($langcode);
+      foreach ($sandbox['fields'][$entity_type_id] as $field_name) {
+        \assert(\is_string($field_name));
+        if (!$translation->hasField($field_name)) {
+          continue;
+        }
+        foreach ($translation->get($field_name) as $item) {
+          \assert($item instanceof ComponentTreeItem);
+          $changed = CanvasConfigUpdater::normalizeDefaultRelativeUrlSchema($item) || $changed;
+        }
+      }
+    }
+    if ($changed) {
+      // Rewrite the revision in place; do not spawn a new one.
+      if ($revisionable) {
+        $entity->setNewRevision(FALSE);
+      }
+      $entity->save();
+    }
+  }
+
+  $sandbox['progress'] += \count($batch);
+  $sandbox['#finished'] = $sandbox['total'] == 0 ? 1 : ($sandbox['progress'] / $sandbox['total']);
+}
+
+/**
+ * Cleans up old default-relative-url schemas in Patterns.
+ *
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
+ */
+function canvas_post_update_0028_pattern_default_relative_url_schema_ids(array &$sandbox): void {
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, Pattern::ENTITY_TYPE_ID, static fn(Pattern $pattern): bool => CanvasConfigUpdater::needsDefaultRelativeUrlSchemaNormalization($pattern));
+}
+
+/**
+ * Cleans up old default-relative-url schemas in Page Regions.
+ *
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
+ */
+function canvas_post_update_0028_page_region_default_relative_url_schema_ids(array &$sandbox): void {
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, PageRegion::ENTITY_TYPE_ID, static fn(PageRegion $region): bool => CanvasConfigUpdater::needsDefaultRelativeUrlSchemaNormalization($region));
+}
+
+/**
+ * Cleans up old default-relative-url schemas in Content Templates.
+ *
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
+ */
+function canvas_post_update_0028_content_template_default_relative_url_schema_ids(array &$sandbox): void {
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, ContentTemplate::ENTITY_TYPE_ID, static fn(ContentTemplate $template): bool => CanvasConfigUpdater::needsDefaultRelativeUrlSchemaNormalization($template));
+}
+
+/**
+ * Cleans up old default-relative-url schemas in field default values.
+ *
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
+ */
+function canvas_post_update_0028_component_tree_field_default_value_default_relative_url_schema_ids(array &$sandbox): void {
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, 'field_config', static fn(FieldConfig $field): bool => CanvasConfigUpdater::needsDefaultRelativeUrlSchemaNormalization($field));
+}
+
+/**
+ * Cleans up old default-relative-url schemas in auto-save drafts.
+ *
+ * Auto-save drafts are kept as plain arrays in the `canvas.auto_save`
+ * key-value store, and the editor shows a draft in preference to the saved
+ * page. So an old `$id` left in a draft would still make the editor fail with
+ * a 500, even after the saved page itself is fixed. This rewrites every stored
+ * component whose inputs have an affected schema.
+ *
+ * @see \canvas_post_update_0028_default_relative_url_schema_ids()
+ */
+function canvas_post_update_0028_auto_save_default_relative_url_schema_ids(array &$sandbox): void {
+  $store = \Drupal::keyValue(AutoSaveManager::AUTO_SAVE_STORE);
+  $changed_keys = [];
+  foreach ($store->getAll() as $key => $entry) {
+    if (!\is_array($entry) || !\array_key_exists('data', $entry) || !\is_array($entry['data'])) {
+      continue;
+    }
+    if (_canvas_normalize_default_relative_url_schema_in_raw($entry['data'])) {
+      $store->set($key, $entry);
+      $changed_keys[] = $key;
+    }
+  }
+  if ($changed_keys !== []) {
+    \Drupal::service(CacheTagsInvalidatorInterface::class)->invalidateTags([AutoSaveManager::CACHE_TAG]);
+  }
+}
+
+/**
+ * Cleans up default-relative-url schemas anywhere in one raw auto-save draft.
+ *
+ * A component is any array that has an `inputs` key. `inputs` is a JSON string
+ * for content items and a plain array for config trees; both are handled. This
+ * changes $data in place and returns TRUE if anything changed.
+ *
+ * @see \Drupal\canvas\CanvasConfigUpdater::normalizeDefaultRelativeUrlSchemaInInputs()
+ */
+function _canvas_normalize_default_relative_url_schema_in_raw(array &$data): bool {
+  $changed = FALSE;
+  if (\array_key_exists('inputs', $data)) {
+    $inputs = $data['inputs'];
+    $was_string = \is_string($inputs);
+    if ($was_string) {
+      $inputs = Json::decode($inputs);
+    }
+    if (\is_array($inputs) && CanvasConfigUpdater::normalizeDefaultRelativeUrlSchemaInInputs($inputs)) {
+      $data['inputs'] = $was_string ? Json::encode($inputs) : $inputs;
+      $changed = TRUE;
+    }
+  }
+  foreach ($data as &$value) {
+    if (\is_array($value)) {
+      $changed = _canvas_normalize_default_relative_url_schema_in_raw($value) || $changed;
+    }
+  }
+  return $changed;
+}

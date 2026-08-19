@@ -382,10 +382,14 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
     $schema = (new PropShape($explicit_input_definitions['shapes'][$prop_name]))->resolvedSchema;
 
     // For array types, enum is inside items; for non-array types,
-    // enum is at root.
+    // enum is at root. The raw metadata schema decorates the declared type
+    // (SDC appends `object`), so `type` may be a list — the declared type is
+    // its first entry.
+    // @see \Drupal\Core\Theme\Component\ComponentMetadata
     $get_enum_schema = static function (array $search_schema): array {
-      $is_array_type = ($search_schema['type'] ?? NULL) === 'array';
-      if ($is_array_type) {
+      $type = $search_schema['type'] ?? NULL;
+      $declared_type = \is_array($type) ? ($type[0] ?? NULL) : $type;
+      if ($declared_type === 'array') {
         \assert(\array_key_exists('items', $search_schema), 'Array type props must have an items schema.');
         return $search_schema['items'];
       }

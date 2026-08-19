@@ -19,6 +19,7 @@ final class UpdateHooks {
 
   #[Hook('field_config_presave')]
   public function fieldConfigPreSave(FieldConfig $field): void {
+    $this->configUpdater->updateConfigEntityDefaultRelativeUrlSchema($field);
     $this->configUpdater->updateConfigEntityWithComponentTreeInputs($field);
     $this->configUpdater->updateConfigEntityWithComponentTreeInputsAsArrays($field);
     $this->configUpdater->updateConfigEntityBlockLabelDisplay($field);
