@@ -11,10 +11,16 @@ const ConceptProver = () => {
   // Get the entire layout model from the Redux store.
   const theLayout = useSelector((state) => state?.layoutModel?.present?.layout);
 
-  // Get the available components list from the redux store.
+  // Get the available components list from the redux store. The component list
+  // is now cache-keyed by the editing host, so find the fulfilled getComponents
+  // entry regardless of its host key rather than the old fixed
+  // `getComponents(undefined)` key.
   const availableComponents = useSelector((state) => {
-    return state?.componentAndLayoutApi?.queries['getComponents(undefined)']
-      ?.data;
+    const queries = state?.componentAndLayoutApi?.queries ?? {};
+    const key = Object.keys(queries).find(
+      (k) => k.startsWith('getComponents(') && queries[k]?.data,
+    );
+    return key ? queries[key].data : undefined;
   });
 
   // Get the uuid of the selected component from the Redux store.
