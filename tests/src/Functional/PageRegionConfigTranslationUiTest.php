@@ -87,19 +87,21 @@ final class PageRegionConfigTranslationUiTest extends FunctionalTestBase {
     $banner_component = Component::load('sdc.canvas_test_sdc.banner');
     \assert($banner_component instanceof Component);
 
-    $region->set('component_tree', [[
-      'uuid' => '11111111-1111-4111-8111-111111111111',
-      'component_id' => 'sdc.canvas_test_sdc.banner',
-      'component_version' => $banner_component->getActiveVersion(),
-      'inputs' => [
-        'heading' => 'Banner heading',
-        'text' => [
-          'value' => '<p>Banner text</p>',
-          'format' => 'canvas_html_block',
+    $region->set('component_tree', [
+      [
+        'uuid' => '11111111-1111-4111-8111-111111111111',
+        'component_id' => 'sdc.canvas_test_sdc.banner',
+        'component_version' => $banner_component->getActiveVersion(),
+        'inputs' => [
+          'heading' => 'Banner heading',
+          'text' => [
+            'value' => '<p>Banner text</p>',
+            'format' => 'canvas_html_block',
+          ],
         ],
+        'label' => 'Banner',
       ],
-      'label' => 'Banner',
-    ]]);
+    ]);
     $region->enable()->save();
 
     return $region->id();
