@@ -450,7 +450,6 @@ changesets:
       fi
 
 phpunit (11.3 sqlite):
-  needs: []
   rules:
     - *version-merge-skip-rule
     - *push-rule
