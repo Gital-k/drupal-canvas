@@ -54,7 +54,7 @@ final class MediaSourceObjectShapes {
    *
    * @return array<string, \Drupal\media\MediaTypeInterface>
    */
-  public static function getMediaTypesForSource(JsonSchemaObjectRef $ref) : array {
+  public static function getMediaTypesForSchemaObject(JsonSchemaObjectRef $ref) : array {
     \assert(\array_key_exists($ref->value, self::SCHEMA_TO_MEDIA_SOURCE));
     $media_source_class = self::SCHEMA_TO_MEDIA_SOURCE[$ref->value];
     $allowed_file_extensions = $ref->allowedFileExtensions();

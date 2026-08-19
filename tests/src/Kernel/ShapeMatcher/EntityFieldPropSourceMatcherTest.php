@@ -170,7 +170,7 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
       // `x-allowed-file-extensions` list: press_releases allows `txt` next to
       // `doc docx pdf`, so it matches despite `txt` mapping to `text/plain`.
       // @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::matchDocumentShapeToMediaTypes()
-      // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSource()
+      // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSchemaObject()
       'type=object&$ref=' . JsonSchemaObjectRef::Document->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media:press_releases␝field_media_file␞␟{src↝entity␜␜entity:file␝uri␞␟url,filename↝entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:file␝filemime␞␟value}'],
       'type=object&$ref=' . JsonSchemaObjectRef::Image->value => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
       'type=object&$ref=' . JsonSchemaObjectRef::Image->value . '!optional' => [
@@ -734,7 +734,7 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
     // File media types whose source field extensions do not intersect the
     // document shape's `x-allowed-file-extensions` list. These must not match
     // the document shape.
-    // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSource()
+    // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSchemaObject()
     $this->createFileMediaTypeWithExtensions('archives', 'zip tar gz');
     $this->createFileMediaTypeWithExtensions('plain_text_notes', 'txt');
     FieldStorageConfig::create([
@@ -924,7 +924,7 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
    * list must not match, even when they map to the `application` MIME media
    * type (`zip`).
    *
-   * @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSource()
+   * @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSchemaObject()
    * @see \Drupal\canvas\Plugin\Validation\Constraint\UriTargetFileExtensionsConstraint
    */
   public function testDocumentShapeFileExtensionFiltering(): void {

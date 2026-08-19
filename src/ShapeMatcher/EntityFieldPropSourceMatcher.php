@@ -461,7 +461,7 @@ final class EntityFieldPropSourceMatcher {
    * @param \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED|int<1, max> $cardinality_in_json_schema
    *
    * @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
-   * @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSource()
+   * @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSchemaObject()
    * @todo Match the image and video object shapes by media source class too in https://www.drupal.org/i/3591890
    *
    * @return ObjectMatches
@@ -480,7 +480,7 @@ final class EntityFieldPropSourceMatcher {
       return [];
     }
     $media_source_class = MediaSourceObjectShapes::SCHEMA_TO_MEDIA_SOURCE[JsonSchemaObjectRef::Document->value];
-    $media_types = MediaSourceObjectShapes::getMediaTypesForSource(JsonSchemaObjectRef::Document);
+    $media_types = MediaSourceObjectShapes::getMediaTypesForSchemaObject(JsonSchemaObjectRef::Document);
     if ($media_types === []) {
       return [];
     }
