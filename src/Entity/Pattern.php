@@ -12,7 +12,6 @@ use Drupal\Component\Utility\Random;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\Core\Entity\EntityStorageInterface;
-use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
@@ -44,6 +43,7 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
   public const string ADMIN_PERMISSION = 'administer patterns';
 
   use ClientServerConversionTrait;
+  use EmptyCanvasPageHostEntityTrait;
 
   /**
    * Pattern entity ID.
@@ -163,24 +163,6 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
       }
       $this->set($key, $value);
     }
-  }
-
-  /**
-   * Creates an empty content entity to host field widgets when editing.
-   *
-   * A Pattern renders standalone, so it has no host entity of its own. But
-   * building a component instance form still needs a fieldable "parent" entity
-   * for field widgets that require entity context (e.g. those calling
-   * FieldItemList::getEntity(), such as image, file or options widgets). Use an
-   * empty, unsaved canvas_page for that purpose.
-   *
-   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::buildComponentInstanceForm()
-   * @see \Drupal\canvas\Entity\ContentTemplate::createEmptyTargetEntity()
-   */
-  public static function createEmptyHostEntity(): FieldableEntityInterface {
-    $entity = \Drupal::entityTypeManager()->getStorage(Page::ENTITY_TYPE_ID)->create();
-    \assert($entity instanceof FieldableEntityInterface);
-    return $entity;
   }
 
   /**

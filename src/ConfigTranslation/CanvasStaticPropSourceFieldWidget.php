@@ -225,6 +225,8 @@ final class CanvasStaticPropSourceFieldWidget extends FormElementBase {
     // @see \Drupal\Core\Field\FieldItemListInterface::getEntity()
     // @see \Drupal\canvas\PropSource\StaticPropSource::formTemporaryRemoveThisExclamationExclamationExclamation()
     // @see \Drupal\ckeditor5\Hook\Ckeditor5Hooks::fieldWidgetSingleElementFormAlter()
+    // Page regions are config entities, so use a synthetic fieldable host.
+    // @see \Drupal\canvas\Entity\PageRegion::createEmptyHostEntity()
     $config_name = $this->element->getRoot()->getName();
     \assert(\is_string($config_name));
     [$module, $config_entity_type_id, $id] = explode('.', $config_name, 3);
@@ -238,6 +240,7 @@ final class CanvasStaticPropSourceFieldWidget extends FormElementBase {
     };
     $entity_object_for_field_widget = match (TRUE) {
       $config_entity instanceof ContentTemplate => $config_entity->createEmptyTargetEntity(),
+      $config_entity instanceof PageRegion => PageRegion::createEmptyHostEntity(),
       default => NULL,
     };
 
