@@ -172,7 +172,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   entity to use during evaluation of the EntityFieldPropSources.
    *   (Typically: when this is a component instance in a ContentTemplate.)
    *
-   * @todo Add ::getImplicitInput() in https://www.drupal.org/project/canvas/issues/3485502 — SDCs don't have implicit inputs, but Block plugins do: contexts
+   * @todo Add ::getImplicitInput() in https://www.drupal.org/project/canvas/issues/3591963 — SDCs don't have implicit inputs, but Block plugins do: contexts
    */
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array;
 
