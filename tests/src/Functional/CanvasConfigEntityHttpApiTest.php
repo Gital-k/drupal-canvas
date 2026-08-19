@@ -2423,13 +2423,19 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     self::assertArrayHasKey('errors', $body);
     self::assertNotEmpty($body['errors']);
 
-    // A bundleable entity type without the required bundle is also a 400.
-    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'node']]);
+    // A bundleable entity type with a bundle that does not exist is a 400.
+    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'node', 'entity_bundle' => 'does_not_exist']]);
     self::assertSame(400, $this->getSession()->getStatusCode(), $page->getContent());
     $body = Json::decode($page->getText());
     self::assertIsArray($body);
     self::assertArrayHasKey('errors', $body);
     self::assertNotEmpty($body['errors']);
+
+    // A bundleable entity type WITHOUT a bundle is not an error: the host's
+    // bundle is unknown (e.g. the page editor route carries none), so the list
+    // falls back to only globally satisfiable Components instead of 400-ing.
+    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'node']]);
+    self::assertSame(200, $this->getSession()->getStatusCode(), $page->getContent());
   }
 
   private function assertDynamicPageCacheAccelerated(?string $maxAge = NULL): void {
