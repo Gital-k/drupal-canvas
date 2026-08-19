@@ -868,10 +868,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   /**
    * Tests that resolved component inputs can be resolved when using this source.
    *
-   * @todo This should be ComponentConfigEntityId $component_id, but phpcs complains with Drupal.Commenting.DataTypeNamespace.DataTypeNamespace
-   *   (This is fixed upstream, but needed until we require drupal/core:^11.3 with drupal/coder:^9)
-   *
-   * @param string $component_id
+   * @param ComponentConfigEntityId $component_id
    * @param array $inputs
    * @param ?array $expectedResolvedInputs
    */
