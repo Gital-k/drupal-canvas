@@ -14,11 +14,18 @@ trait EmptyCanvasPageHostEntityTrait {
   /**
    * Creates an empty content entity to host field widgets when editing.
    *
-   * Some field widgets require a fieldable parent entity context, even when
-   * editing config entities such as Patterns or PageRegions.
+   * A Pattern renders standalone and a PageRegion is rendered on every page, so
+   * neither has a host entity of its own. But building a component instance
+   * form still needs a fieldable "parent" entity for field widgets that require
+   * entity context (e.g. those calling FieldItemList::getEntity(), such as
+   * image, file, options or rich text widgets). Use an empty, unsaved
+   * canvas_page for that purpose.
    *
    * @see \Drupal\Core\Field\FieldItemListInterface::getEntity()
    * @see \Drupal\canvas\PropSource\StaticPropSource::formTemporaryRemoveThisExclamationExclamationExclamation()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::buildComponentInstanceForm()
+   * @see \Drupal\canvas\ConfigTranslation\CanvasStaticPropSourceFieldWidget::buildWidgetForm()
+   * @see \Drupal\canvas\Entity\ContentTemplate::createEmptyTargetEntity()
    */
   public static function createEmptyHostEntity(): FieldableEntityInterface {
     $entity = \Drupal::entityTypeManager()->getStorage(Page::ENTITY_TYPE_ID)->create();

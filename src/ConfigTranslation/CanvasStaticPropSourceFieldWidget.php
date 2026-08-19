@@ -225,8 +225,6 @@ final class CanvasStaticPropSourceFieldWidget extends FormElementBase {
     // @see \Drupal\Core\Field\FieldItemListInterface::getEntity()
     // @see \Drupal\canvas\PropSource\StaticPropSource::formTemporaryRemoveThisExclamationExclamationExclamation()
     // @see \Drupal\ckeditor5\Hook\Ckeditor5Hooks::fieldWidgetSingleElementFormAlter()
-    // Page regions are config entities, so use a synthetic fieldable host.
-    // @see \Drupal\canvas\Entity\PageRegion::createEmptyHostEntity()
     $config_name = $this->element->getRoot()->getName();
     \assert(\is_string($config_name));
     [$module, $config_entity_type_id, $id] = explode('.', $config_name, 3);
@@ -239,8 +237,11 @@ final class CanvasStaticPropSourceFieldWidget extends FormElementBase {
       default => throw new \LogicException(),
     };
     $entity_object_for_field_widget = match (TRUE) {
+      // A ContentTemplate knows the entity type it renders, so it can build a
+      // stub of that. A PageRegion has no host entity of its own: it is
+      // rendered on every page, so use an empty canvas_page as stand-in.
       $config_entity instanceof ContentTemplate => $config_entity->createEmptyTargetEntity(),
-      $config_entity instanceof PageRegion => PageRegion::createEmptyHostEntity(),
+      $config_entity instanceof PageRegion => $config_entity::createEmptyHostEntity(),
       default => NULL,
     };
 

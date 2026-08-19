@@ -33,9 +33,12 @@ use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
  * - optional unpopulated prop (present in schema, absent in source data)
  * - non-static prop sources (excluded from translation)
  *
- * NOTE: PageRegions are not tested because ContentTemplate allows a superset of
- * prop sources (it allows EntityFieldPropSources etc which PageRegion config
- * entities' component trees do not).
+ * NOTE: the shared fixture uses a ContentTemplate because it allows a superset
+ * of prop sources (EntityFieldPropSource etc., which PageRegion config entities'
+ * component trees do not allow). PageRegions are covered separately, for the
+ * host entity context their component trees need.
+ *
+ * @see \Drupal\Tests\canvas\Functional\ConfigWithComponentTreeConfigTranslationUiTest::testPageRegionRichTextConfigTranslationFormLoads()
  *
  * @see \Drupal\Tests\canvas\Kernel\Config\ConfigWithComponentTreeTestBase
  * @see \Drupal\Tests\canvas\Kernel\Config\ContentTemplateTest::testTranslationLifeCycleInDepth()

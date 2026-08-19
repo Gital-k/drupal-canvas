@@ -143,11 +143,10 @@ class ConfigWithComponentTreeConfigTranslationUiTest extends ConfigWithComponent
     $regions = PageRegion::createFromBlockLayout('stark');
     $region = $regions['stark.sidebar_first'] ?? \reset($regions);
     \assert($region instanceof PageRegion);
+    // Only the banner instance is kept: it is the one with a rich text prop.
+    // `cta1` and `cta1href` belong to another instance, hence are irrelevant.
     $component_tree = self::populateActiveComponentVersionPlaceholders(
-      self::componentTreeItems(
-        cta1: 'Learn more',
-        cta1href: 'https://www.drupal.org',
-      )
+      self::componentTreeItems(cta1: NULL, cta1href: NULL)
     );
     $banner_component = \array_values(\array_filter(
       $component_tree,
