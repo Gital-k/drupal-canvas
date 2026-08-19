@@ -278,7 +278,7 @@ class ShapeMatchingHooks {
       // changes, this hook should be called again (for this shape).
       $storable_prop_shape->addCacheTags(['config:media_type_list']);
 
-      $media_types = MediaSourceObjectShapes::getMediaTypesForSource(JsonSchemaObjectRef::Image);
+      $media_types = MediaSourceObjectShapes::getMediaTypesForSchemaObject(JsonSchemaObjectRef::Image);
       if (!empty($media_types)) {
         $source_field_names = \array_map(
           // @phpstan-ignore method.nonObject
@@ -318,7 +318,7 @@ class ShapeMatchingHooks {
       $storable_prop_shape->addCacheTags(['config:media_type_list']);
 
       $media_source_class = MediaSourceObjectShapes::SCHEMA_TO_MEDIA_SOURCE[$storable_prop_shape->shape->schema['$ref']];
-      $media_types = MediaSourceObjectShapes::getMediaTypesForSource(JsonSchemaObjectRef::from($storable_prop_shape->shape->schema['$ref']));
+      $media_types = MediaSourceObjectShapes::getMediaTypesForSchemaObject(JsonSchemaObjectRef::from($storable_prop_shape->shape->schema['$ref']));
 
       // For each media type (i.e. bundle), create a "branch" of this prop
       // expression that specifically targets the source field of the media
