@@ -462,7 +462,7 @@ final class EntityFieldPropSourceMatcher {
    *
    * @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
    * @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSchemaObject()
-   * @todo Match the image and video object shapes by media source class too in https://www.drupal.org/i/3591890
+   * @todo Match the image and video object shapes by media source class too in https://git.drupalcode.org/project/canvas/-/work_items/3591890
    *
    * @return ObjectMatches
    */
