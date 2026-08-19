@@ -8,6 +8,7 @@ namespace Drupal\Tests\canvas\Functional;
 
 use Behat\Mink\Element\NodeElement;
 use Drupal\canvas\ConfigTranslation\CanvasStaticPropSourceFieldWidget;
+use Drupal\canvas\Entity\PageRegion;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -126,6 +127,45 @@ class ConfigWithComponentTreeConfigTranslationUiTest extends ConfigWithComponent
     $assert_session->pageTextContains('Successfully saved French translation');
 
     $this->assertTranslatedConfigComponentTree();
+  }
+
+  /**
+   * Confirms page region config translation loads rich text static-prop widgets.
+   */
+  public function testPageRegionRichTextConfigTranslationFormLoads(): void {
+    $module_installer = $this->container->get(ModuleInstallerInterface::class);
+    \assert($module_installer instanceof ModuleInstallerInterface);
+    if (!$this->container->get(ModuleHandlerInterface::class)->moduleExists('config_translation')) {
+      $module_installer->install(['config_translation']);
+      $this->rebuildContainer();
+    }
+
+    $regions = PageRegion::createFromBlockLayout('stark');
+    $region = $regions['stark.sidebar_first'] ?? \reset($regions);
+    \assert($region instanceof PageRegion);
+    $component_tree = self::populateActiveComponentVersionPlaceholders(
+      self::componentTreeItems(
+        cta1: 'Learn more',
+        cta1href: 'https://www.drupal.org',
+      )
+    );
+    $banner_component = \array_values(\array_filter(
+      $component_tree,
+      static fn (array $item): bool => $item['uuid'] === self::UUID_BANNER,
+    ));
+    \assert(\count($banner_component) === 1);
+    $region
+      ->setComponentTree($banner_component)
+      ->enable()
+      ->save();
+
+    $this->drupalGet("/admin/appearance/page-region/{$region->id()}/translate/fr/add");
+    $assert_session = $this->assertSession();
+    $assert_session->statusCodeEquals(200);
+    $assert_session->elementExists(
+      'css',
+      'input[type="hidden"][value="canvas_html_block"][name*="[inputs][text][0][format]"]',
+    );
   }
 
   private function getConfigTranslationUiFormElementsForComponentInstances(): array {

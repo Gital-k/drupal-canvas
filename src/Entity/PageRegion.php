@@ -55,6 +55,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase implements CanvasHt
   public const string ENTITY_TYPE_ID = 'page_region';
   public const string ADMIN_PERMISSION = 'administer page template';
   use ClientServerConversionTrait;
+  use EmptyCanvasPageHostEntityTrait;
 
   /**
    * ID, composed of theme + region.
