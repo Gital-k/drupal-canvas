@@ -257,7 +257,12 @@ final class ApiConfigControllers extends ApiControllerBase {
     $values = [];
     if ($entity_type->hasKey('bundle')) {
       if (!\is_string($bundle) || $bundle === '') {
-        throw new BadRequestHttpException(\sprintf('The "%s" entity type requires an "entity_bundle" query parameter.', $entity_type_id));
+        // The host's entity type is known but its bundle is not — e.g. the page
+        // editor route (/editor/{entity_type}/{entity_id}) carries no bundle.
+        // Fall back to no host rather than erroring, so only globally
+        // satisfiable Components are listed.
+        // @todo Filter by a bundled host once its bundle is known in https://www.drupal.org/project/canvas/issues/3498525
+        return NULL;
       }
       if (!\array_key_exists($bundle, $this->bundleInfo->getBundleInfo($entity_type_id))) {
         throw new BadRequestHttpException(\sprintf('The "%s" bundle does not exist for the "%s" entity type.', $bundle, $entity_type_id));

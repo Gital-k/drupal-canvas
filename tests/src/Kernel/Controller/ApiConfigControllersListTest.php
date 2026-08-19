@@ -146,12 +146,18 @@ final class ApiConfigControllersListTest extends ApiLayoutControllerTestBase {
     self::assertArrayHasKey('errors', $body);
     self::assertNotEmpty($body['errors']);
 
-    // A bundleable entity type without the required bundle parameter.
-    $response = $this->parentRequest(Request::create('/canvas/api/v0/config/component?entity_type=node'), TRUE);
+    // A bundleable entity type with a bundle that does not exist.
+    $response = $this->parentRequest(Request::create('/canvas/api/v0/config/component?entity_type=node&entity_bundle=does_not_exist'), TRUE);
     self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
     $body = self::decodeResponse($response);
     self::assertArrayHasKey('errors', $body);
     self::assertNotEmpty($body['errors']);
+
+    // A bundleable entity type WITHOUT a bundle is not an error: the host's
+    // bundle is unknown (e.g. the page editor route carries none), so the list
+    // falls back to only globally satisfiable Components instead of 400-ing.
+    $response = $this->parentRequest(Request::create('/canvas/api/v0/config/component?entity_type=node'), TRUE);
+    self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
   }
 
   /**
