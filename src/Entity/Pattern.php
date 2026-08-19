@@ -43,7 +43,6 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
   public const string ADMIN_PERMISSION = 'administer patterns';
 
   use ClientServerConversionTrait;
-  use EmptyCanvasPageHostEntityTrait;
 
   /**
    * Pattern entity ID.

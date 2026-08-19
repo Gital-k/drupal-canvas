@@ -10,6 +10,7 @@ use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\language\Config\LanguageConfigOverride;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 
@@ -348,6 +349,29 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
     // on the last-published live override.
     $this->stagedOverrides[$langcode] = StagedLanguageConfigOverride::fromLanguageConfigOverride($override);
     return $this->stagedOverrides[$langcode];
+  }
+
+  /**
+   * Creates an empty content entity to host field widgets when editing.
+   *
+   * Config entities may need a host content entity for handling. A Pattern
+   * renders standalone and a PageRegion is rendered on every page, so
+   * neither has a host entity of its own. But building a component instance
+   * form still needs a fieldable "parent" entity for field widgets that require
+   * entity context (e.g. those calling FieldItemList::getEntity(), such as
+   * image, file, options or rich text widgets). Use an empty, unsaved
+   * canvas_page for that purpose.
+   *
+   * @see \Drupal\Core\Field\FieldItemListInterface::getEntity()
+   * @see \Drupal\canvas\PropSource\StaticPropSource::formTemporaryRemoveThisExclamationExclamationExclamation()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::buildComponentInstanceForm()
+   * @see \Drupal\canvas\ConfigTranslation\CanvasStaticPropSourceFieldWidget::buildWidgetForm()
+   * @see \Drupal\canvas\Entity\ContentTemplate::createEmptyTargetEntity()
+   */
+  public static function createEmptyHostEntity(): FieldableEntityInterface {
+    $entity = \Drupal::entityTypeManager()->getStorage(Page::ENTITY_TYPE_ID)->create();
+    \assert($entity instanceof FieldableEntityInterface);
+    return $entity;
   }
 
 }
