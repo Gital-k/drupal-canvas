@@ -137,7 +137,6 @@ class ComponentTreeItem extends FieldItemBase {
 
   use ComponentTreeItemListInstantiatorTrait;
 
-  // phpcs:disable Drupal.Commenting.DataTypeNamespace.DataTypeNamespace
   /**
    * {@inheritdoc}
    *
@@ -145,7 +144,6 @@ class ComponentTreeItem extends FieldItemBase {
    *
    * @return ($name is 'parent_item' ? \Drupal\canvas\Plugin\DataType\ParentComponentReference : ($name is 'inputs' ? \Drupal\canvas\Plugin\DataType\ComponentInputs : ($name is 'component' ? \Drupal\Core\Entity\Plugin\DataType\EntityReference : \Drupal\Core\TypedData\Plugin\DataType\StringData)))
    */
-  // phpcs:enable Drupal.Commenting.DataTypeNamespace.DataTypeNamespace
   // @phpstan-ignore-next-line method.childParameterType
   public function get($name) {
     // @phpstan-ignore-next-line
