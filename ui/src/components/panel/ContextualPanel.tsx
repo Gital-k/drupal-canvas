@@ -17,6 +17,8 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ErrorBoundary from '@/components/error/ErrorBoundary';
 import PageDataForm from '@/components/PageDataForm';
 import { setCurrentComponent } from '@/features/form/formStateSlice';
+import { selectLayout } from '@/features/layout/layoutModelSlice';
+import { findComponentByUuid } from '@/features/layout/layoutUtils';
 import {
   EditorFrameContext,
   selectEditorFrameContext,
@@ -25,13 +27,11 @@ import {
   selectSelection,
   setRightPanelOpen,
 } from '@/features/ui/uiSlice';
+import useGetComponentName from '@/hooks/useGetComponentName';
 import useHidePanelClasses from '@/hooks/useHidePanelClasses';
 import { PAGE_VARIANT_ENTITY_TYPE } from '@/services/pageVariants';
 
 import styles from './ContextualPanel.module.css';
-import { selectLayout } from '@/features/layout/layoutModelSlice';
-import { findComponentByUuid } from '@/features/layout/layoutUtils';
-import useGetComponentName from '@/hooks/useGetComponentName';
 
 const ContextualPanel = () => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
@@ -40,7 +40,7 @@ const ContextualPanel = () => {
   const layout = useAppSelector(selectLayout);
   const selectedNode = findComponentByUuid(layout, selectedComponent || '');
   const selectedComponentName = useGetComponentName(selectedNode);
-  console.log('selectedComponentName', selectedComponentName)
+  console.log('selectedComponentName', selectedComponentName);
   const dispatch = useAppDispatch();
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const { entityId, entityType } = useParams();
