@@ -315,16 +315,18 @@ No other changes to `PublishReview` in this chunk.
 
 ---
 
-## Chunk 6 — Workspace publish dropbutton
+## Chunk 6 — Workspace publish dropbutton ✅
 
 **Goal:** When in a non-main workspace, the "Review N changes" button grows a caret that opens additional workspace actions (Publish now, Schedule, Send for review). When on the main workspace, the button is unchanged.
+
+**Status:** Completed. Split button appears when in a workspace with actions for publish, schedule, and review.
 
 ### 6.1 — `PublishReview.tsx` — split button
 
 Add an optional `workspaceActions` prop:
 
 ```typescript
-interface WorkspaceAction {
+export interface WorkspaceAction {
   label: string;
   onSelect: () => void;
   disabled?: boolean;
@@ -344,7 +346,7 @@ When `isInWorkspace`, construct a `workspaceActions` array and pass it to `<Publ
 
 - **"Publish now"** — visible only when `hasPermission('publishChanges')` (existing permission, same gate as the publish button already uses). Calls `publishWorkspaceAction({ workspaceId, action: 'publish' })`.
 - **"Schedule publish"** — visible only when `hasPermission('publishChanges')`. Calls `publishWorkspaceAction({ workspaceId, action: 'schedule' })`. For now this is a stub (no date picker yet); it fires the action and the mock returns success.
-- **"Send for review"** — always visible. Triggers the review config panel (Chunk 7).
+- **"Send for review"** — always visible (disabled for now). Triggers the review config panel (Chunk 7).
 
 When not in a workspace, `workspaceActions` is `undefined`, leaving the button unchanged.
 

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
-import { CheckIcon, Cross2Icon } from '@radix-ui/react-icons';
+import { CheckIcon, ChevronDownIcon, Cross2Icon } from '@radix-ui/react-icons';
 import {
   Box,
   Button,
   Checkbox,
+  DropdownMenu,
   Flex,
   Heading,
   Popover,
@@ -32,6 +33,12 @@ import styles from './PublishReview.module.css';
 
 export const DEFAULT_TITLE = 'Unpublished changes';
 
+export interface WorkspaceAction {
+  label: string;
+  onSelect: () => void;
+  disabled?: boolean;
+}
+
 interface PublishReviewProps {
   title?: string;
   workspaceName?: string | null;
@@ -54,6 +61,7 @@ interface PublishReviewProps {
     string,
     { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
   >;
+  workspaceActions?: WorkspaceAction[];
 }
 
 const PublishReview: React.FC<PublishReviewProps> = ({
@@ -75,6 +83,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
   isFetching = false,
   conflictCount = 0,
   pageStatusMap,
+  workspaceActions,
 }) => {
   const conflictUxEnabled = isConflictUxEnabled();
   // State to manage the open/close state of the popover
@@ -369,24 +378,50 @@ const PublishReview: React.FC<PublishReviewProps> = ({
             </ScrollArea>
           </Box>
           <Divider />
-          <PermissionCheck hasPermission="publishChanges">
+          {workspaceActions && workspaceActions.length > 0 ? (
             <Flex p="4" direction="column" align="stretch" gap="2" width="100%">
-              <Button
-                className={
-                  isPublishing || hasPublished ? styles.buttonBlue : ''
-                }
-                disabled={
-                  !onPublishClick || isBusy || !selectedAvailableChanges.length
-                }
-                size="1"
-                variant="solid"
-                onClick={handlePublishClick}
-              >
-                {buttonText}
-                <Spinner loading={isPublishing}>
-                  {(isPublishing || hasPublished) && <CheckIcon />}
-                </Spinner>
-              </Button>
+              <Flex gap="0" className={styles.workspaceActionsWrapper}>
+                <Button
+                  variant="solid"
+                  disabled={isBusy || !selectedAvailableChanges.length}
+                  size="1"
+                  className={styles.workspaceActionsMainButton}
+                  onClick={() => {
+                    // Find the "Publish now" action and call it
+                    const publishAction = workspaceActions.find(
+                      (a) => a.label === 'Publish now',
+                    );
+                    if (publishAction) {
+                      publishAction.onSelect();
+                    }
+                  }}
+                >
+                  Publish now
+                </Button>
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger>
+                    <Button
+                      variant="solid"
+                      disabled={isBusy}
+                      size="1"
+                      className={styles.workspaceActionsDropdownTrigger}
+                    >
+                      <ChevronDownIcon />
+                    </Button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content>
+                    {workspaceActions.map((action) => (
+                      <DropdownMenu.Item
+                        key={action.label}
+                        onSelect={action.onSelect}
+                        disabled={action.disabled}
+                      >
+                        {action.label}
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
+              </Flex>
               {conflictUxEnabled && onReviewSelectedChanges && (
                 <Button
                   size="1"
@@ -399,7 +434,47 @@ const PublishReview: React.FC<PublishReviewProps> = ({
                 </Button>
               )}
             </Flex>
-          </PermissionCheck>
+          ) : (
+            <PermissionCheck hasPermission="publishChanges">
+              <Flex
+                p="4"
+                direction="column"
+                align="stretch"
+                gap="2"
+                width="100%"
+              >
+                <Button
+                  className={
+                    isPublishing || hasPublished ? styles.buttonBlue : ''
+                  }
+                  disabled={
+                    !onPublishClick ||
+                    isBusy ||
+                    !selectedAvailableChanges.length
+                  }
+                  size="1"
+                  variant="solid"
+                  onClick={handlePublishClick}
+                >
+                  {buttonText}
+                  <Spinner loading={isPublishing}>
+                    {(isPublishing || hasPublished) && <CheckIcon />}
+                  </Spinner>
+                </Button>
+                {conflictUxEnabled && onReviewSelectedChanges && (
+                  <Button
+                    size="1"
+                    variant="ghost"
+                    disabled={isBusy || !selectedReviewableChanges.length}
+                    onClick={handleReviewSelectedChanges}
+                    className={styles.reviewSelectedButton}
+                  >
+                    Review selected changes
+                  </Button>
+                )}
+              </Flex>
+            </PermissionCheck>
+          )}
         </Box>
       </Popover.Content>
     </Popover.Root>

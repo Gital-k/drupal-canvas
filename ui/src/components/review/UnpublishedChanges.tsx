@@ -46,9 +46,12 @@ import {
 import {
   useGetWorkspaceChangesQuery,
   useGetWorkspacesQuery,
+  usePublishWorkspaceActionMutation,
 } from '@/services/workspacesApi';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { hasPermission } from '@/utils/permissions';
 
+import type { WorkspaceAction } from '@/components/review/PublishReview';
 import type { UnpublishedChange } from '@/types/Review';
 
 const REFETCH_INTERVAL_MS = 10000;
@@ -70,6 +73,8 @@ const UnpublishedChanges = () => {
   const [pollingInterval, setPollingInterval] =
     useState<number>(REFETCH_INTERVAL_MS);
   const [reviewOpen, setReviewOpen] = useState(false);
+
+  const [publishWorkspaceAction] = usePublishWorkspaceActionMutation();
 
   // Workspace integration: read active workspace and devWorkspaces flag
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId);
@@ -336,6 +341,46 @@ const UnpublishedChanges = () => {
     return map;
   }, [pageItems]);
 
+  const canPublish = hasPermission('publishChanges');
+
+  // Create workspace actions when in a workspace
+  const workspaceActions: WorkspaceAction[] = useMemo(() => {
+    if (!isInWorkspace || !activeWorkspaceId) {
+      return [];
+    }
+    const actions: WorkspaceAction[] = [];
+    if (canPublish) {
+      actions.push({
+        label: 'Publish now',
+        onSelect: () => {
+          void publishWorkspaceAction({
+            workspaceId: activeWorkspaceId,
+            action: 'publish',
+          });
+        },
+      });
+      actions.push({
+        label: 'Schedule publish',
+        onSelect: () => {
+          // @todo Stub for now - no date picker yet (Chunk 7 follow-up)
+          void publishWorkspaceAction({
+            workspaceId: activeWorkspaceId,
+            action: 'schedule',
+          });
+        },
+      });
+    }
+    actions.push({
+      label: 'Send for review',
+      onSelect: () => {
+        // @todo This will trigger the review configuration panel (Chunk 7)
+        // For now, it's a stub
+      },
+      disabled: true,
+    });
+    return actions;
+  }, [isInWorkspace, activeWorkspaceId, canPublish, publishWorkspaceAction]);
+
   return (
     <PublishReview
       open={reviewOpen}
@@ -345,6 +390,11 @@ const UnpublishedChanges = () => {
       conflictCount={conflictCount}
       errors={errorResponse}
       workspaceName={activeWorkspace?.name ?? null}
+      workspaceActions={
+        isInWorkspace && workspaceActions.length > 0
+          ? workspaceActions
+          : undefined
+      }
       onOpenChangeCallback={onOpenChangeHandler}
       onPublishClick={onPublishClick}
       onDiscardClick={onDiscardClick}

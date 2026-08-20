@@ -171,7 +171,7 @@ vi.mock('@/services/workspacesApi', () => ({
 vi.mock('@/utils/drupal-globals', async (importOriginal) => {
   const actual = await importOriginal<{
     setCanvasDrupalSetting: (property: string, value: unknown) => void;
-     
+
     [key: string]: any;
   }>();
   return {

@@ -48,6 +48,9 @@ export const workspacesApi = createApi({
     getWorkspaceChanges: builder.query<WorkspacePendingChange[], string>({
       query: (workspaceId) =>
         `/canvas/api/v0/workspaces-dev/${workspaceId}/changes`,
+      transformResponse: (response: {
+        data: { changes: WorkspacePendingChange[]; total: number };
+      }) => response.data.changes,
       providesTags: (result, error, workspaceId) => [
         { type: 'WorkspaceChanges', id: workspaceId },
       ],
