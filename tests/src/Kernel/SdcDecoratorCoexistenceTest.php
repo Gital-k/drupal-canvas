@@ -18,10 +18,10 @@ use PHPUnit\Framework\Attributes\Group;
  * instance of Canvas's ComponentPluginManager. Every typed PropShape call
  * then throws a TypeError; because the first one fires from
  * hook_modules_installed, the modules are already recorded as installed and
- * every subsequent cache rebuild fatals while cached pages keep serving.
+ * every subsequent cache rebuild crashes while cached pages keep serving.
  *
  * This test never calls generateComponents() — that is the call that
- * fatals — it asserts the container wiring the fix corrects: the class
+ * crashes — it asserts the container wiring the fix corrects: the class
  * alias must yield Canvas's own manager (the decorated inner instance),
  * decorator or no decorator.
  *
