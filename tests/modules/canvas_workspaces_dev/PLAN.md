@@ -254,9 +254,11 @@ The center section currently contains only `<PageInfo />` (and conditionally `<C
 
 ---
 
-## Chunk 4 — Add Workspace Modal
+## Chunk 4 — Add Workspace Modal ✅
 
 **Goal:** Clicking "+ New → Add workspace" opens a modal. The user names the workspace, picks a source, submits, and the new workspace becomes active.
+
+**Status:** Completed. Modal opens, form collects workspace name and source, creates workspace on submit, and switches to the new workspace.
 
 ### 4.1 — Slice addition
 
