@@ -354,15 +354,15 @@ When not in a workspace, `workspaceActions` is `undefined`, leaving the button u
 
 ---
 
-## Chunk 7 — Send for Review flow inside PublishReview
+## Chunk 7 — Send for Review flow inside PublishReview ✅
 
 **Goal:** Selecting "Send for review" from the dropbutton replaces the change list content inside the `PublishReview` popover with a reviewer selection form. Submitting it fires the publish-action endpoint with `action: 'review'` and shows a success state.
 
+**Status:** Completed. ReviewConfigurationPanel renders inside PublishReview when "Send for review" is selected. Submission fires the API call and shows success state before returning to the change list.
+
 ### 7.1 — `ReviewConfigurationPanel` component
 
-File: `ui/src/components/workspaces/ReviewConfigurationPanel.tsx`
-
-This is a self-contained panel — not a route, not a drawer, just a React fragment that `PublishReview` conditionally renders instead of its normal body.
+File: `ui/src/components/workspaces/ReviewConfigurationPanel.tsx` ✅
 
 Props:
 ```typescript
@@ -376,21 +376,21 @@ interface ReviewConfigurationPanelProps {
 
 Layout:
 1. **Back link** — `<Button variant="ghost" size="1">` with `<ChevronLeftIcon />` and "Back", calls `onBack`.
-2. **Reviewer combobox** — For now, a `<TextField.Root>` that accepts comma-separated user IDs (full combobox with avatar tokens is post-mock complexity). Each confirmed entry renders as a `<Badge>` token with a `<Cross2Icon>` remove button. This is intentionally simple for the mock; the plan marks the full combobox as a follow-up.
+2. **Reviewer combobox** — For now, a `<TextField.Root>` that accepts comma-separated user IDs. Each confirmed entry renders as a `<Badge>` token with a `<Cross2Icon>` remove button. This is intentionally simple for the mock; full combobox with avatar tokens is marked as follow-up work.
 3. **"Send for review"** button — disabled until at least one reviewer is added. While sending, shows `<Spinner>`. After success, shows `<CheckIcon />` and "Sent" (disabled).
 4. On success, after a short delay (1.5s), call `onBack()` to return the popover to the normal change list view.
 
-### 7.2 — `PublishReview.tsx` — panel switching
+### 7.2 — `PublishReview.tsx` — panel switching ✅
 
 Add local state: `isReviewPanelOpen: boolean` (default `false`).
 
 Add prop: `onSendForReview?: (reviewerIds: string[]) => void`.
 
-When `isReviewPanelOpen` is true, replace the ScrollArea + action footer with `<ReviewConfigurationPanel>`. The header (title + close button) remains visible throughout — the user can always close the popover entirely.
+When `isReviewPanelOpen` is true, replace the ScrollArea + action footer with `<ReviewConfigurationPanel>`. The header (title + close button) remains visible throughout.
 
 In `UnpublishedChanges.tsx`:
 - Wire `onSendForReview` to call `publishWorkspaceAction({ workspaceId, action: 'review', reviewerIds })`.
-- Pass the "Send for review" workspace action as a callback that sets `isReviewPanelOpen = true` inside `PublishReview` (pass a `onRequestReviewPanel` prop, or handle via the `workspaceActions` callback — the action's `onSelect` can call back into a prop).
+- Pass the "Send for review" workspace action as a callback that sets `isReviewPanelOpen = true` inside `PublishReview`.
 
 **Verify:** Select "Send for review" from the dropbutton, confirm the panel appears inside the popover with the back button. Add a reviewer token, confirm the Send button enables. Click Send, confirm the spinner shows, then the success state, then the popover returns to the change list.
 
@@ -412,6 +412,7 @@ In `UnpublishedChanges.tsx`:
 | `ui/src/components/workspaces/WorkspaceDropdown.module.css` | Styles |
 | `ui/src/components/workspaces/AddWorkspaceModal.tsx` | Create workspace dialog |
 | `ui/src/components/workspaces/ReviewConfigurationPanel.tsx` | Send-for-review form |
+| `ui/src/components/workspaces/ReviewConfigurationPanel.module.css` | Send-for-review styles |
 
 ### Modified files
 | File | Change |

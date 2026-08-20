@@ -373,10 +373,10 @@ const UnpublishedChanges = () => {
     actions.push({
       label: 'Send for review',
       onSelect: () => {
-        // @todo This will trigger the review configuration panel (Chunk 7)
-        // For now, it's a stub
+        // This triggers the review configuration panel via PublishReview's internal state
+        // The action is handled in PublishReview by opening the panel
       },
-      disabled: true,
+      disabled: false,
     });
     return actions;
   }, [isInWorkspace, activeWorkspaceId, canPublish, publishWorkspaceAction]);
@@ -412,6 +412,15 @@ const UnpublishedChanges = () => {
           refetchWorkspaceChanges();
         } else {
           refetch();
+        }
+      }}
+      onSendForReview={(reviewerIds) => {
+        if (isInWorkspace && activeWorkspaceId) {
+          void publishWorkspaceAction({
+            workspaceId: activeWorkspaceId,
+            action: 'review',
+            reviewerIds,
+          });
         }
       }}
       isPublishing={isPublishing}

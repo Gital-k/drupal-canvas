@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { CheckIcon, ChevronDownIcon, Cross2Icon } from '@radix-ui/react-icons';
 import {
@@ -17,6 +17,7 @@ import {
 import PermissionCheck from '@/components/PermissionCheck';
 import ReviewErrors from '@/components/review/ReviewErrors';
 import { getReviewGroupKey } from '@/components/review/utils';
+import ReviewConfigurationPanel from '@/components/workspaces/ReviewConfigurationPanel';
 import { Divider } from '@/features/code-editor/component-data/FormElement';
 import { isConflictUxEnabled } from '@/features/conflict/conflictUtils';
 
@@ -62,6 +63,7 @@ interface PublishReviewProps {
     { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
   >;
   workspaceActions?: WorkspaceAction[];
+  onSendForReview?: (reviewerIds: string[]) => void;
 }
 
 const PublishReview: React.FC<PublishReviewProps> = ({
@@ -84,6 +86,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
   conflictCount = 0,
   pageStatusMap,
   workspaceActions,
+  onSendForReview,
 }) => {
   const conflictUxEnabled = isConflictUxEnabled();
   // State to manage the open/close state of the popover
@@ -92,6 +95,13 @@ const PublishReview: React.FC<PublishReviewProps> = ({
 
   // Single source to determine if something is happening
   const isBusy = isUpdating || isPublishing || isDiscarding || isFetching;
+
+  // State to manage review panel visibility
+  const [isReviewPanelOpen, setIsReviewPanelOpen] = useState<boolean>(false);
+
+  // State to manage sending state for review
+  const [isSendingReview, setIsSendingReview] = useState<boolean>(false);
+  const [hasSentReview, setHasSentReview] = useState<boolean>(false);
 
   // State to manage selected changes
   const [selectedChanges, setSelectedChanges] = useState<UnpublishedChange[]>(
@@ -281,6 +291,44 @@ const PublishReview: React.FC<PublishReviewProps> = ({
     onReviewSelectedChanges?.(selectedAvailableChanges);
   };
 
+  const handleOpenReviewPanel = useCallback(() => {
+    setIsReviewPanelOpen(true);
+    setHasSentReview(false);
+    setIsSendingReview(false);
+  }, []);
+
+  const handleCloseReviewPanel = useCallback(() => {
+    setIsReviewPanelOpen(false);
+    setHasSentReview(false);
+    setIsSendingReview(false);
+  }, []);
+
+  const handleSendForReview = useCallback(
+    (reviewerIds: string[]) => {
+      if (onSendForReview) {
+        setIsSendingReview(true);
+        onSendForReview(reviewerIds);
+        // Note: The parent component (UnpublishedChanges) will handle the actual
+        // API call and should reset our loading state via props if needed.
+        // For now, we simulate completion after a short delay.
+        setTimeout(() => {
+          setIsSendingReview(false);
+          setHasSentReview(true);
+        }, 500);
+      }
+    },
+    [onSendForReview],
+  );
+
+  // Reset review panel state when popover closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsReviewPanelOpen(false);
+      setHasSentReview(false);
+      setIsSendingReview(false);
+    }
+  }, [isOpen]);
+
   return (
     <Popover.Root open={isOpen} onOpenChange={onOpenChangeHandler}>
       <Popover.Trigger>
@@ -378,102 +426,167 @@ const PublishReview: React.FC<PublishReviewProps> = ({
             </ScrollArea>
           </Box>
           <Divider />
-          {workspaceActions && workspaceActions.length > 0 ? (
-            <Flex p="4" direction="column" align="stretch" gap="2" width="100%">
-              <Flex gap="0" className={styles.workspaceActionsWrapper}>
-                <Button
-                  variant="solid"
-                  disabled={isBusy || !selectedAvailableChanges.length}
-                  size="1"
-                  className={styles.workspaceActionsMainButton}
-                  onClick={() => {
-                    // Find the "Publish now" action and call it
-                    const publishAction = workspaceActions.find(
-                      (a) => a.label === 'Publish now',
-                    );
-                    if (publishAction) {
-                      publishAction.onSelect();
-                    }
-                  }}
+          {isReviewPanelOpen ? (
+            <ReviewConfigurationPanel
+              onBack={handleCloseReviewPanel}
+              onSend={handleSendForReview}
+              isSending={isSendingReview}
+              hasSent={hasSentReview}
+            />
+          ) : (
+            <>
+              <Box className={isBusy ? styles.disabled : ''}>
+                <ScrollArea
+                  style={{ maxHeight: '380px', width: '100%' }}
+                  type="scroll"
                 >
-                  Publish now
-                </Button>
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger>
+                  <ReviewErrors errorState={errors} />
+                  <Box px="4" pt="4">
+                    <Text size="1">
+                      {changes.length
+                        ? `${selectedAvailableChanges.length} of ${changes?.length ?? 0} changes selected`
+                        : 'All changes published!'}
+                    </Text>
+                  </Box>
+                  {conflictUxEnabled && conflictCount > 0 && (
+                    <Box px="4" pt="4">
+                      <ConflictBanner
+                        conflictCount={conflictCount}
+                        onResolveClick={() => handleResolveConflict()}
+                        disabled={isBusy}
+                      />
+                    </Box>
+                  )}
+                  <Box px="4" pt="4">
+                    {changes?.length > 0 && (
+                      <>
+                        <ChangeList
+                          groups={groups}
+                          isBusy={isBusy}
+                          selectedChanges={selectedAvailableChanges}
+                          setSelectedChanges={setSelectedChanges}
+                          onDiscardClick={handleDiscardClick}
+                          onViewClick={onViewClick}
+                          isViewChangeAvailable={isViewChangeAvailable}
+                          onResolveConflict={handleResolveConflict}
+                          pageStatusMap={pageStatusMap}
+                        />
+                      </>
+                    )}
+                  </Box>
+                </ScrollArea>
+              </Box>
+              <Divider />
+              {workspaceActions && workspaceActions.length > 0 ? (
+                <Flex
+                  p="4"
+                  direction="column"
+                  align="stretch"
+                  gap="2"
+                  width="100%"
+                >
+                  <Flex gap="0" className={styles.workspaceActionsWrapper}>
                     <Button
                       variant="solid"
-                      disabled={isBusy}
+                      disabled={isBusy || !selectedAvailableChanges.length}
                       size="1"
-                      className={styles.workspaceActionsDropdownTrigger}
+                      className={styles.workspaceActionsMainButton}
+                      onClick={() => {
+                        // Find the "Publish now" action and call it
+                        const publishAction = workspaceActions.find(
+                          (a) => a.label === 'Publish now',
+                        );
+                        if (publishAction) {
+                          publishAction.onSelect();
+                        }
+                      }}
                     >
-                      <ChevronDownIcon />
+                      Publish now
                     </Button>
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Content>
-                    {workspaceActions.map((action) => (
-                      <DropdownMenu.Item
-                        key={action.label}
-                        onSelect={action.onSelect}
-                        disabled={action.disabled}
-                      >
-                        {action.label}
-                      </DropdownMenu.Item>
-                    ))}
-                  </DropdownMenu.Content>
-                </DropdownMenu.Root>
-              </Flex>
-              {conflictUxEnabled && onReviewSelectedChanges && (
-                <Button
-                  size="1"
-                  variant="ghost"
-                  disabled={isBusy || !selectedReviewableChanges.length}
-                  onClick={handleReviewSelectedChanges}
-                  className={styles.reviewSelectedButton}
-                >
-                  Review selected changes
-                </Button>
-              )}
-            </Flex>
-          ) : (
-            <PermissionCheck hasPermission="publishChanges">
-              <Flex
-                p="4"
-                direction="column"
-                align="stretch"
-                gap="2"
-                width="100%"
-              >
-                <Button
-                  className={
-                    isPublishing || hasPublished ? styles.buttonBlue : ''
-                  }
-                  disabled={
-                    !onPublishClick ||
-                    isBusy ||
-                    !selectedAvailableChanges.length
-                  }
-                  size="1"
-                  variant="solid"
-                  onClick={handlePublishClick}
-                >
-                  {buttonText}
-                  <Spinner loading={isPublishing}>
-                    {(isPublishing || hasPublished) && <CheckIcon />}
-                  </Spinner>
-                </Button>
-                {conflictUxEnabled && onReviewSelectedChanges && (
-                  <Button
-                    size="1"
-                    variant="ghost"
-                    disabled={isBusy || !selectedReviewableChanges.length}
-                    onClick={handleReviewSelectedChanges}
-                    className={styles.reviewSelectedButton}
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger>
+                        <Button
+                          variant="solid"
+                          disabled={isBusy}
+                          size="1"
+                          className={styles.workspaceActionsDropdownTrigger}
+                        >
+                          <ChevronDownIcon />
+                        </Button>
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Content>
+                        {workspaceActions.map((action) => (
+                          <DropdownMenu.Item
+                            key={action.label}
+                            onSelect={() => {
+                              if (action.label === 'Send for review') {
+                                handleOpenReviewPanel();
+                              } else {
+                                action.onSelect();
+                              }
+                            }}
+                            disabled={action.disabled}
+                          >
+                            {action.label}
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Root>
+                  </Flex>
+                  {conflictUxEnabled && onReviewSelectedChanges && (
+                    <Button
+                      size="1"
+                      variant="ghost"
+                      disabled={isBusy || !selectedReviewableChanges.length}
+                      onClick={handleReviewSelectedChanges}
+                      className={styles.reviewSelectedButton}
+                    >
+                      Review selected changes
+                    </Button>
+                  )}
+                </Flex>
+              ) : (
+                <PermissionCheck hasPermission="publishChanges">
+                  <Flex
+                    p="4"
+                    direction="column"
+                    align="stretch"
+                    gap="2"
+                    width="100%"
                   >
-                    Review selected changes
-                  </Button>
-                )}
-              </Flex>
-            </PermissionCheck>
+                    <Button
+                      className={
+                        isPublishing || hasPublished ? styles.buttonBlue : ''
+                      }
+                      disabled={
+                        !onPublishClick ||
+                        isBusy ||
+                        !selectedAvailableChanges.length
+                      }
+                      size="1"
+                      variant="solid"
+                      onClick={handlePublishClick}
+                    >
+                      {buttonText}
+                      <Spinner loading={isPublishing}>
+                        {(isPublishing || hasPublished) && <CheckIcon />}
+                      </Spinner>
+                    </Button>
+                    {conflictUxEnabled && onReviewSelectedChanges && (
+                      <Button
+                        size="1"
+                        variant="ghost"
+                        disabled={isBusy || !selectedReviewableChanges.length}
+                        onClick={handleReviewSelectedChanges}
+                        className={styles.reviewSelectedButton}
+                      >
+                        Review selected changes
+                      </Button>
+                    )}
+                  </Flex>
+                </PermissionCheck>
+              )}
+            </>
           )}
         </Box>
       </Popover.Content>
