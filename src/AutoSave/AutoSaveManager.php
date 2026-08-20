@@ -39,7 +39,6 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Entity\TranslatableInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
@@ -130,7 +129,6 @@ class AutoSaveManager implements EventSubscriberInterface {
     private readonly AccountProxyInterface $currentUser,
     private readonly TimeInterface $time,
     private readonly HealthRecords $healthRecords,
-    private readonly ModuleHandlerInterface $moduleHandler,
   ) {
     $this->autoSaveStore = $keyValueFactory->get(self::AUTO_SAVE_STORE);
     $this->formViolationsStore = $keyValueFactory->get(self::FORM_VIOLATIONS_STORE);
@@ -206,7 +204,7 @@ class AutoSaveManager implements EventSubscriberInterface {
 
   public function saveEntity(EntityInterface $entity, ?string $clientId = NULL): void {
     $key = $this->getAutoSaveKey($entity);
-    $data = $this->normalizeEntity($entity);
+    $data = self::normalizeEntity($entity);
     $data_hash = self::generateHash($data);
     $original_hash = $this->getUnchangedHash($entity);
 
@@ -218,7 +216,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     // expect one to be, the code below can be evaluated in a debugger and will
     // show you which field varies.
     // @code
-    // $original = $this->normalizeEntity($this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id()))
+    // $original = self::normalizeEntity($this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id()))
     // $data_hash = \array_map(self::generateHash(...), $data)
     // $original_hash = \array_map(self::generateHash(...), $original)
     // \array_diff($data_hash, $original_hash)
@@ -318,7 +316,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $this->componentInstanceFormViolationsStore->get($component_uuid) ?? new ConstraintViolationList();
   }
 
-  private function normalizeEntity(EntityInterface $entity): array {
+  private static function normalizeEntity(EntityInterface $entity): array {
     if (!$entity instanceof FieldableEntityInterface) {
       return self::toStorableArray($entity);
     }
@@ -358,52 +356,22 @@ class AutoSaveManager implements EventSubscriberInterface {
           continue;
         }
       }
-      // Skip metatag fields that carry no user-supplied data. The editor echoes
-      // back form values on every save, but only for the tags
-      // CanvasPageForm::form() leaves visible (currently only "title");
-      // hidden tags (description, canonical_url, …) are absent from the
-      // POST. Two default sources are checked: metatag's config defaults
-      // (metatag_get_default_tags) and the field-level defaults (Canvas uses
-      // its own tokens, e.g. "[canvas_page:title]", which differ from
-      // metatag's global ones). A tag is non-custom if its value is empty or
-      // matches either default source. Covers both layout POST and the
-      // unpublish path (saveEntity() is called directly by
-      // ApiContentAutoSaveControllers::patch()).
-      // @see \Drupal\canvas\Entity\CanvasPageForm::form()
-      if ($items->getFieldDefinition()->getType() === 'metatag'
-          && $this->moduleHandler->moduleExists('metatag')
-          && \function_exists('metatag_get_default_tags')) {
-        $metatag_config_defaults = \metatag_get_default_tags($entity) ?? [];
-        $field_default_value = $items->getFieldDefinition()->getDefaultValue($entity);
-        $field_defaults = [];
-        if (!empty($field_default_value[0]['value']) && \is_string($field_default_value[0]['value'])) {
-          $field_defaults = Json::decode($field_default_value[0]['value']) ?? [];
+      // Canonicalize metatag values before hashing. The field stores tags as
+      // an opaque JSON string, so the hash is order-sensitive, but the tag
+      // order carries no meaning. MetatagFieldItem::preSave() ksorts on a real
+      // entity save; auto-saving bypasses ::preSave(), and MetatagFirehose
+      // re-emits tags in form order, so an unchanged round-trip through the
+      // editor would otherwise hash differently than the stored entity.
+      // @see \Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem::preSave()
+      if ($items->getFieldDefinition()->getType() === 'metatag') {
+        $values = [];
+        foreach ($items->getValue() as $delta => $item) {
+          $tags = Json::decode($item['value'] ?? '[]') ?? [];
+          \ksort($tags);
+          $values[$delta] = ['value' => Json::encode($tags)];
         }
-        $has_custom_values = FALSE;
-        foreach ($items->getValue() as $item) {
-          $stored = Json::decode($item['value'] ?? '[]') ?? [];
-          foreach ($stored as $tag_id => $tag_value) {
-            // An empty value carries no user-supplied data.
-            if ($tag_value === '') {
-              continue;
-            }
-            // Matches metatag's config-layer default for this tag.
-            if (\array_key_exists($tag_id, $metatag_config_defaults)
-                && $metatag_config_defaults[$tag_id] === $tag_value) {
-              continue;
-            }
-            // Matches the field-level default (e.g. Canvas's own token).
-            if (\array_key_exists($tag_id, $field_defaults)
-                && $field_defaults[$tag_id] === $tag_value) {
-              continue;
-            }
-            $has_custom_values = TRUE;
-            break 2;
-          }
-        }
-        if (!$has_custom_values) {
-          continue;
-        }
+        $normalized[$items->getName()] = $values;
+        continue;
       }
       $normalized[$items->getName()] = TypedDataHelper::castRawPhpTypes($items);
     }
@@ -453,7 +421,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     if ($original === NULL) {
       return NULL;
     }
-    return self::generateHash($this->normalizeEntity($original));
+    return self::generateHash(self::normalizeEntity($original));
   }
 
   public function getAutoSaveEntity(EntityInterface $entity, bool $bypass_cache = FALSE): AutoSaveEntity {
@@ -819,7 +787,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert(!\is_null($entity));
 
     // Compare the original_hash in auto-save entry vs latest entity hash.
-    if ($entry[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === self::generateHash($this->normalizeEntity($entity))) {
+    if ($entry[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === self::generateHash(self::normalizeEntity($entity))) {
       // Hashes are matching - no conflict.
       return NULL;
     }
@@ -886,7 +854,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert(!$entity->isNew());
     $stored = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
     \assert(!\is_null($stored));
-    $current_hash = self::generateHash($this->normalizeEntity($stored));
+    $current_hash = self::generateHash(self::normalizeEntity($stored));
     /** @var AutoSaveEntry $auto_save_data */
 
     if ($auto_save_data[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === $current_hash) {
@@ -1135,7 +1103,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       $this->setStoredEntityHash(
         self::getAutoSaveKey($autoSaveEntity),
         // Hash the freshly-saved stored entity, not the auto-save draft.
-        self::generateHash($this->normalizeEntity($entity)),
+        self::generateHash(self::normalizeEntity($entity)),
       );
       $this->saveEntity($autoSaveEntity, $autoSaveData->clientId);
     }

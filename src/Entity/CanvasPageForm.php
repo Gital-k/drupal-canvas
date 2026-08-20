@@ -62,7 +62,6 @@ final class CanvasPageForm extends ContentEntityForm {
 
     // Hide most metatags fields until further decision is made which ones to
     // show and how. The fields are confusing and numerous.
-    // @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
     if (isset($form['metatags']['widget'][0])) {
       $form['metatags']['widget'][0]['#type'] = 'container';
       $form['metatags']['widget'][0]['basic']['#type'] = 'container';

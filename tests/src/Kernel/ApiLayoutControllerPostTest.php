@@ -903,19 +903,20 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * Tests that default metatag values do not produce phantom auto-save entries.
+   * Tests that an unchanged metatag round-trip creates no auto-save entry.
    *
-   * Canvas hides most metatag tags in its form, so each layout POST carries
-   * only the visible subset (typically just "title"). Canvas also defines
-   * field-level metatag defaults with Canvas-specific tokens (e.g.
-   * "[canvas_page:title] | [site:name]") that differ from metatag's global
-   * config defaults. Without the fix, normalizeEntity() hashes the full stored
-   * metatag data against the partial POST data, producing a phantom auto-save
-   * entry that then blocks publish actions after an unpublish.
+   * The metatag field stores its tags as one opaque JSON string, so the
+   * auto-save hash is sensitive to their order. MetatagFieldItem::preSave()
+   * sorts them by key, but that runs only on a real entity save; the
+   * metatag_firehose widget re-emits them in form order. Posting the layout
+   * back untouched therefore yields identical tag data in a different order,
+   * which without normalization hashes differently and produces a phantom
+   * auto-save entry that then blocks publish actions after an unpublish.
    *
    * @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
+   * @see \Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem::preSave()
    */
-  public function testMetatagFieldDefaultValueIsNotCustom(): void {
+  public function testMetatagUnchangedRoundTripCreatesNoAutoSave(): void {
     $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
     $this->setUpCurrentUser([], [Page::EDIT_PERMISSION]);
 
@@ -948,10 +949,10 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       'Installing metatag must add metatag form fields to the canvas_page layout response.',
     );
 
-    // POST the layout back with the default metatag values untouched.
-    // Without the fix this creates a phantom auto-save entry because the
-    // metatag default values inflate the hash. With the fix, normalizeEntity()
-    // excludes them and the hash stays equal to the stored entity's hash.
+    // POST the layout back with the metatag values untouched. The widget
+    // re-emits the same tags in form order rather than the sorted order the
+    // entity was saved in, so only normalizeEntity()'s sorting keeps the hash
+    // equal to the stored entity's hash.
     $post_json = $json;
     unset($post_json['isNew'], $post_json['isPublished'], $post_json['html'], $post_json['hasUnsavedStatusChange']);
     $post_json += $this->getPostContentsDefaults($page);
@@ -989,17 +990,39 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $raw = $autoSaveEntity->get('metatags')->getValue();
     $decoded = Json::decode($raw[0]['value'] ?? '{}');
     self::assertSame('Custom SEO title, not a token', ($decoded ?? [])['title'] ?? NULL);
+
+    // Publish that custom title, then round-trip the layout untouched once
+    // more, now that the field carries a user-supplied tag value alongside the
+    // default ones.
+    $autoSaveEntity->save();
+    $autoSave->delete($autoSaveEntity);
+    $page = $autoSaveEntity;
+
+    $content = (string) $this->parentRequest(Request::create($url))->getContent();
+    $json = \json_decode($content, TRUE, flags: \JSON_THROW_ON_ERROR);
+    $post_json = $json;
+    unset($post_json['isNew'], $post_json['isPublished'], $post_json['html'], $post_json['hasUnsavedStatusChange']);
+    $post_json += $this->getPostContentsDefaults($page);
+    $response = $this->request(Request::create($url, method: 'POST', content: \json_encode($post_json, \JSON_THROW_ON_ERROR)));
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    self::assertTrue(
+      $autoSave->getAutoSaveEntity($page)->isEmpty(),
+      'Round-tripping a page whose metatags carry a custom value must not create a phantom auto-save entry.',
+    );
   }
 
   /**
-   * Tests that a metatag config-level default value is not a custom value.
+   * Tests that replacing a metatag value with a config default is a change.
    *
-   * A tag matching metatag's own config-level default (as opposed to
-   * Canvas's field-level default) must not be treated as a custom value.
+   * A tag whose stored value is Canvas's field-level default token renders
+   * differently than metatag's own config-level default for that tag, so
+   * overwriting the former with the latter is a real edit and must produce an
+   * auto-save entry. Normalization sorts tags; it does not classify them.
    *
    * @see \Drupal\canvas\AutoSave\AutoSaveManager::normalizeEntity()
    */
-  public function testMetatagConfigDefaultValueIsNotCustom(): void {
+  public function testMetatagValueMatchingConfigDefaultIsAChange(): void {
     $this->container->get(ModuleInstallerInterface::class)->install(['metatag']);
 
     // A bundle-level metatag default distinct from Canvas's own field
@@ -1032,10 +1055,14 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
 
     $autoSave->saveEntity($page);
 
-    self::assertTrue(
-      $autoSave->getAutoSaveEntity($page)->isEmpty(),
-      'A metatag value matching the config-level default must not be treated as a custom value.',
+    $autoSaveEntity = $autoSave->getAutoSaveEntity($page)->entity;
+    self::assertInstanceOf(
+      Page::class,
+      $autoSaveEntity,
+      'Overwriting a tag with metatag\'s config-level default must create an auto-save entry.',
     );
+    $decoded = Json::decode($autoSaveEntity->get('metatags')->getValue()[0]['value'] ?? '{}') ?? [];
+    self::assertSame('Global default description, not a Canvas token', $decoded['description'] ?? NULL);
   }
 
 }
