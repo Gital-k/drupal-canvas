@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\Plugin\ComponentPluginManager;
-use Drupal\KernelTests\KernelTestBase;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
@@ -29,13 +28,12 @@ use PHPUnit\Framework\Attributes\Group;
  * @see https://www.drupal.org/project/canvas/issues/3561618
  */
 #[Group('canvas')]
-final class SdcDecoratorCoexistenceTest extends KernelTestBase {
+final class SdcDecoratorCoexistenceTest extends CanvasKernelTestBase {
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
-    ...CanvasKernelTestBase::CANVAS_KERNEL_TEST_MINIMAL_MODULES,
     'canvas_test_sdc_decorator',
   ];
 
@@ -45,6 +43,9 @@ final class SdcDecoratorCoexistenceTest extends KernelTestBase {
   public function testClassAliasSurvivesDecoration(): void {
     // The decorator really is the outermost service on the public id —
     // otherwise this test would pass vacuously with no decoration in play.
+    // The string id is the point here: this lookup and the class-keyed one
+    // below MUST be allowed to differ for the assertion to mean anything.
+    // phpcs:ignore Canvas.Services.ClassServiceId.StringServiceId
     $public = $this->container->get('plugin.manager.sdc');
     $this->assertInstanceOf(
       'Drupal\canvas_test_sdc_decorator\DecoratingComponentPluginManager',

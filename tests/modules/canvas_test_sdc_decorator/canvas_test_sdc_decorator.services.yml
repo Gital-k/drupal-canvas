@@ -2,4 +2,4 @@ services:
   canvas_test_sdc_decorator.manager:
     class: Drupal\canvas_test_sdc_decorator\DecoratingComponentPluginManager
     decorates: plugin.manager.sdc
-    arguments: ['@canvas_test_sdc_decorator.manager.inner']
+    arguments: ['@canvas_test_sdc_decorator.manager.inner', '@cache.discovery']
