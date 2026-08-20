@@ -34,6 +34,7 @@ export const DEFAULT_TITLE = 'Unpublished changes';
 
 interface PublishReviewProps {
   title?: string;
+  workspaceName?: string | null;
   changes: UnpublishedChange[];
   errors?: ErrorResponse | undefined;
   open?: boolean;
@@ -57,6 +58,7 @@ interface PublishReviewProps {
 
 const PublishReview: React.FC<PublishReviewProps> = ({
   title = DEFAULT_TITLE,
+  workspaceName,
   changes,
   errors,
   open: controlledOpen,
@@ -295,7 +297,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
           <Flex p="4" align="center" justify="between" width="100%">
             <Box>
               <Heading as="h3" size="3" weight="medium">
-                {title}
+                {workspaceName ?? title}
               </Heading>
             </Box>
             <Box>

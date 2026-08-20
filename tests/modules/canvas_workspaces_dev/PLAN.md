@@ -286,9 +286,11 @@ Uses the existing `<Dialog>` component (`ui/src/components/Dialog.tsx`). Props: 
 
 ---
 
-## Chunk 5 — Workspace-scoped Unpublished Changes
+## Chunk 5 — Workspace-scoped Unpublished Changes ✅
 
 **Goal:** When a non-main workspace is active, `UnpublishedChanges` fetches changes from the workspace-specific endpoint instead of the global pending-changes endpoint. The existing "Review N changes" button reflects the workspace's change count. The global endpoint is not called while in a workspace.
+
+**Status:** Completed. UnpublishedChanges conditionally fetches from the workspace endpoint and shows workspace name in the header.
 
 ### 5.1 — `UnpublishedChanges.tsx` modifications
 
