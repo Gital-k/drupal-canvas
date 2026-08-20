@@ -76,7 +76,7 @@ final readonly class TmgmtHooks {
    * altered. Config job items (ContentTemplate, PageRegion, via
    * ComponentInputsConfigProcessor) still show the sentinel.
    *
-   * @todo Extend the sentinel handling to config job items in https://www.drupal.org/project/canvas/issues/3591848 follow-up.
+   * @todo Extend the sentinel handling to config job items.
    *
    * @param string $source_text
    *   The source text to display, passed by reference.
