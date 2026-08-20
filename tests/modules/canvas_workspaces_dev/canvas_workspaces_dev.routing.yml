@@ -1,0 +1,59 @@
+canvas_workspaces_dev.workspaces.list:
+  path: '/canvas/api/v0/workspaces-dev'
+  defaults:
+    _controller: 'Drupal\canvas_workspaces_dev\Controller\WorkspacesMockController::listWorkspaces'
+  requirements:
+    _canvas_ui_access: 'TRUE'
+  methods: [GET]
+  options:
+    _format: 'json'
+
+canvas_workspaces_dev.workspaces.create:
+  path: '/canvas/api/v0/workspaces-dev'
+  defaults:
+    _controller: 'Drupal\canvas_workspaces_dev\Controller\WorkspacesMockController::createWorkspace'
+  requirements:
+    _canvas_ui_access: 'TRUE'
+  methods: [POST]
+  options:
+    _format: 'json'
+
+canvas_workspaces_dev.workspaces.update:
+  path: '/canvas/api/v0/workspaces-dev/{workspace_id}'
+  defaults:
+    _controller: 'Drupal\canvas_workspaces_dev\Controller\WorkspacesMockController::updateWorkspace'
+  requirements:
+    _canvas_ui_access: 'TRUE'
+  methods: [PATCH]
+  options:
+    _format: 'json'
+
+canvas_workspaces_dev.workspaces.delete:
+  path: '/canvas/api/v0/workspaces-dev/{workspace_id}'
+  defaults:
+    _controller: 'Drupal\canvas_workspaces_dev\Controller\WorkspacesMockController::deleteWorkspace'
+  requirements:
+    _canvas_ui_access: 'TRUE'
+  methods: [DELETE]
+  options:
+    _format: 'json'
+
+canvas_workspaces_dev.workspaces.changes:
+  path: '/canvas/api/v0/workspaces-dev/{workspace_id}/changes'
+  defaults:
+    _controller: 'Drupal\canvas_workspaces_dev\Controller\WorkspacesMockController::getChanges'
+  requirements:
+    _canvas_ui_access: 'TRUE'
+  methods: [GET]
+  options:
+    _format: 'json'
+
+canvas_workspaces_dev.workspaces.publish_action:
+  path: '/canvas/api/v0/workspaces-dev/{workspace_id}/publish-action'
+  defaults:
+    _controller: 'Drupal\canvas_workspaces_dev\Controller\WorkspacesMockController::publishAction'
+  requirements:
+    _canvas_ui_access: 'TRUE'
+  methods: [POST]
+  options:
+    _format: 'json'
