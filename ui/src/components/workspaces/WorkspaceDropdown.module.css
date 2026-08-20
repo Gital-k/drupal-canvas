@@ -1,5 +1,5 @@
 .root {
-  padding: var(--space-2);
+  padding: 0;
 }
 
 .search {
@@ -22,6 +22,7 @@
 
 .workspaceItem[data-active='true'] .workspaceName {
   color: var(--blue-11);
+  font-size: var(--font-size-1);
   font-weight: var(--font-weight-medium);
 }
 
@@ -42,6 +43,7 @@
 .workspaceName {
   overflow: hidden;
   flex: 1;
+  font-size: var(--font-size-1);
   white-space: nowrap;
   text-overflow: ellipsis;
 }

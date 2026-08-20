@@ -191,14 +191,28 @@ interface WorkspaceDropdownProps {
   activeWorkspaceId: string | null;
   onSelect: (id: string) => void;
   onAddWorkspace: () => void;
+  onPublishNow?: (workspaceId: string) => void;
+  onSchedulePublish?: (workspaceId: string) => void;
+  onSendForReview?: (workspaceId: string) => void;
+  onRename?: (workspaceId: string) => void;
+  onDelete?: (workspaceId: string) => void;
 }
 ```
 
 Layout, top to bottom:
 1. **Search input** — `<TextField.Root>` with `<MagnifyingGlassIcon>`, same markup pattern as `Navigation.tsx` L414–425. Filters the list client-side.
-2. **"+ New" dropdown button** — `<DropdownMenu.Root>` with a `<Button variant="soft" size="1">` trigger showing `<PlusIcon /> New <ChevronDownIcon />`, identical to `Navigation.tsx` L428–449. Initially one item: "Add workspace". This trigger calls `onAddWorkspace`.
+2. **"+ Add" dropdown button** — `<DropdownMenu.Root>` with a `<Button variant="soft" size="1">` trigger showing `<PlusIcon /> Add <ChevronDownIcon />`, identical to `Navigation.tsx` L428–449. Initially one item: "Add workspace". This trigger calls `onAddWorkspace`.
 3. **Workspace list** — `<ScrollArea>` (max-height `175px`, same as `Navigation.tsx`). Each item: a `<Flex>` row with workspace name on the left and a `<Badge>` on the right for status. Active item gets `color="blue"` treatment. Items without status changes (main/live) show no badge. On click, calls `onSelect(workspace.id)`.
-4. **Per-item `⋮` menu** (`<DropdownMenu.Root>` on hover, `<DotsVerticalIcon>` trigger) — items: **Rename** (TBD, disabled for now), **Delete** (disabled for now), **Duplicate** (disabled for now). These are stubs with `disabled` prop; they exist so the menu is structurally complete and won't require a rework of the component later.
+4. **Per-item `⋮` menu** (`<DropdownMenu.Root>` on hover, `<DotsVerticalIcon>` trigger) — items:
+   - **Publish now** — visible only for non-main workspaces in `draft`, `in_review`, or `scheduled` status; calls `onPublishNow?.(workspace.id)`
+   - **Schedule publish** — visible only for non-main workspaces in `draft` or `in_review` status; calls `onSchedulePublish?.(workspace.id)`
+   - **Send for review** — visible only for non-main workspaces in `draft` status; calls `onSendForReview?.(workspace.id)`
+   - Separator
+   - **Rename** — disabled for now (stub with `disabled` prop)
+   - Separator  
+   - **Delete** — disabled for now (stub with `disabled` prop), styled in red
+   
+   These menu items exist so the menu is structurally complete. Actions are conditionally shown based on the workspace's current status — non-draft workspaces don't show "Send for review", published workspaces don't show "Publish now" or "Schedule publish".
 5. **Empty state** — When `workspaces.length === 1` (only the main workspace exists) AND search is empty: render `<EmptyStateCallout>` with title "No workspaces yet" and a description that renders a clickable "Add workspace" link calling `onAddWorkspace`. This matches the `EmptyStateCallout` pattern already in the codebase.
 6. **No search results** — When search has a value but produces no matches: `<EmptyStateCallout title="No workspaces found" />`.
 

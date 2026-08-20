@@ -26,6 +26,11 @@ interface WorkspaceDropdownProps {
   activeWorkspaceId: string | null;
   onSelect: (id: string) => void;
   onAddWorkspace: () => void;
+  onPublishNow?: (workspaceId: string) => void;
+  onSchedulePublish?: (workspaceId: string) => void;
+  onSendForReview?: (workspaceId: string) => void;
+  onRename?: (workspaceId: string) => void;
+  onDelete?: (workspaceId: string) => void;
 }
 
 const statusColorMap: Record<WorkspaceStatus, string> = {
@@ -47,6 +52,11 @@ const WorkspaceDropdown = ({
   activeWorkspaceId,
   onSelect,
   onAddWorkspace,
+  onPublishNow,
+  onSchedulePublish,
+  onSendForReview,
+  onRename,
+  onDelete,
 }: WorkspaceDropdownProps) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -95,7 +105,7 @@ const WorkspaceDropdown = ({
               size="1"
             >
               <PlusIcon />
-              New
+              Add
               <ChevronDownIcon />
             </Button>
           </DropdownMenu.Trigger>
@@ -196,9 +206,62 @@ const WorkspaceDropdown = ({
                       </IconButton>
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Content>
-                      <DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
-                      <DropdownMenu.Item disabled>Delete</DropdownMenu.Item>
-                      <DropdownMenu.Item disabled>Duplicate</DropdownMenu.Item>
+                      {/* Publish actions - only for non-main workspaces */}
+                      {!workspace.isMain &&
+                        workspace.status !== 'published' && (
+                          <>
+                            {onPublishNow && (
+                              <DropdownMenu.Item
+                                onClick={() => onPublishNow(workspace.id)}
+                              >
+                                Publish now
+                              </DropdownMenu.Item>
+                            )}
+                            {onSchedulePublish &&
+                              workspace.status !== 'scheduled' && (
+                                <DropdownMenu.Item
+                                  onClick={() =>
+                                    onSchedulePublish(workspace.id)
+                                  }
+                                >
+                                  Schedule publish
+                                </DropdownMenu.Item>
+                              )}
+                            {onSendForReview &&
+                              workspace.status === 'draft' && (
+                                <DropdownMenu.Item
+                                  onClick={() => onSendForReview(workspace.id)}
+                                >
+                                  Send for review
+                                </DropdownMenu.Item>
+                              )}
+                            {(onPublishNow ||
+                              onSchedulePublish ||
+                              onSendForReview) && <DropdownMenu.Separator />}
+                          </>
+                        )}
+                      {/* Rename action */}
+                      {onRename && (
+                        <DropdownMenu.Item
+                          onClick={() => onRename(workspace.id)}
+                          disabled
+                        >
+                          Rename
+                        </DropdownMenu.Item>
+                      )}
+                      {/* Delete action */}
+                      {onDelete && (
+                        <>
+                          <DropdownMenu.Separator />
+                          <DropdownMenu.Item
+                            onClick={() => onDelete(workspace.id)}
+                            disabled
+                            color="red"
+                          >
+                            Delete
+                          </DropdownMenu.Item>
+                        </>
+                      )}
                     </DropdownMenu.Content>
                   </DropdownMenu.Root>
                 </Flex>

@@ -8,8 +8,12 @@ import {
   selectActiveWorkspaceId,
   setActiveWorkspace,
 } from '@/features/workspaces/workspacesSlice';
-import { useGetWorkspacesQuery } from '@/services/workspacesApi';
+import {
+  useGetWorkspacesQuery,
+  usePublishWorkspaceActionMutation,
+} from '@/services/workspacesApi';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { hasPermission } from '@/utils/permissions';
 
 import WorkspaceDropdown from './WorkspaceDropdown';
 
@@ -48,10 +52,16 @@ const WorkspaceSwitcher = ({ onAddWorkspace }: WorkspaceSwitcherProps) => {
     skip: !devWorkspaces,
   });
 
+  // @todo Use this for scheduling when date picker is implemented
+
+  const [publishWorkspaceAction] = usePublishWorkspaceActionMutation();
+
   // Return null early if devWorkspaces is disabled - no hooks called before this
   if (!devWorkspaces) {
     return null;
   }
+
+  const canPublish = hasPermission('publishChanges');
 
   // Ensure workspaces is always an array
   const workspaces = Array.isArray(workspacesResponse)
@@ -72,6 +82,40 @@ const WorkspaceSwitcher = ({ onAddWorkspace }: WorkspaceSwitcherProps) => {
   const handleAddWorkspace = () => {
     setPopoverOpen(false);
     onAddWorkspace();
+  };
+
+  const handlePublishNow = (workspaceId: string) => {
+    if (canPublish) {
+      void publishWorkspaceAction({
+        workspaceId,
+        action: 'publish',
+      });
+    }
+  };
+
+  const handleSchedulePublish = (workspaceId: string) => {
+    // @todo Stub for now - no date picker yet (Chunk 7 follow-up)
+    if (canPublish) {
+      void publishWorkspaceAction({
+        workspaceId,
+        action: 'schedule',
+      });
+    }
+  };
+
+  const handleSendForReview = (workspaceId: string) => {
+    void publishWorkspaceAction({
+      workspaceId,
+      action: 'review',
+    });
+  };
+
+  const handleRename = (_workspaceId: string) => {
+    // @todo Implement rename functionality
+  };
+
+  const handleDelete = (_workspaceId: string) => {
+    // @todo Implement delete functionality
   };
 
   // Show status badge unless published
@@ -116,6 +160,11 @@ const WorkspaceSwitcher = ({ onAddWorkspace }: WorkspaceSwitcherProps) => {
             activeWorkspaceId={activeWorkspaceId ?? activeWorkspace?.id ?? null}
             onSelect={handleSelect}
             onAddWorkspace={handleAddWorkspace}
+            onPublishNow={canPublish ? handlePublishNow : undefined}
+            onSchedulePublish={canPublish ? handleSchedulePublish : undefined}
+            onSendForReview={handleSendForReview}
+            onRename={handleRename}
+            onDelete={handleDelete}
           />
         </Panel>
       </Popover.Content>
