@@ -40,7 +40,6 @@ const ContextualPanel = () => {
   const layout = useAppSelector(selectLayout);
   const selectedNode = findComponentByUuid(layout, selectedComponent || '');
   const selectedComponentName = useGetComponentName(selectedNode);
-  console.log('selectedComponentName', selectedComponentName);
   const dispatch = useAppDispatch();
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const { entityId, entityType } = useParams();
