@@ -8,6 +8,7 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\FieldItemAnalyzer;
@@ -688,10 +689,9 @@ final class EntityFieldPropSourceMatcher {
             // @phpstan-ignore-next-line argument.type
             && is_a(FieldItemAnalyzer::getReferenceDependency($property_definition)->getFieldDefinition()->getItemDefinition()->getClass(), FileUriItem::class, TRUE);
 
-          // If either of those are true, the File entity's `FileExtension`
-          // constraint must be reflected at the field property level to allow
-          // for correct shape matching.
-          // @todo also update the stream wrappers allowed (in the `UriScheme` constraint) based on file field storage settings
+          // If either of those are true, the File entity's `FileExtension` and
+          // `UriScheme` constraints must be reflected at the field property
+          // level to allow for correct shape matching.
           $file_entity_constraints = match (TRUE) {
             $is_file_uri_field => $entity_data_definition->getConstraints(),
             // @phpstan-ignore-next-line argument.type
@@ -716,6 +716,17 @@ final class EntityFieldPropSourceMatcher {
               $transformed_property_data_definition->addConstraint(UriTargetMediaTypeConstraint::PLUGIN_ID, [
                 'mimeType' => $mime_type,
               ]);
+              $property_definition = $transformed_property_data_definition;
+            }
+            // Narrow the raw stored URI's `UriScheme` to the scheme the
+            // referencing file field is configured to store to. Only the stored
+            // `value` uses a stream-wrapper scheme; the computed `url` (and
+            // image `src`) properties are browser URLs and keep their own
+            // `http`/`https` constraint.
+            // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\FileUriItemOverride
+            if ($property_name === 'value' && \array_key_exists('UriScheme', $file_entity_constraints)) {
+              $transformed_property_data_definition = clone $property_definition;
+              $transformed_property_data_definition->addConstraint(UriSchemeConstraint::PLUGIN_ID, $file_entity_constraints['UriScheme']);
               $property_definition = $transformed_property_data_definition;
             }
           }
@@ -1245,6 +1256,14 @@ final class EntityFieldPropSourceMatcher {
       ]);
       \assert($field_item instanceof FileItem);
       $target->addConstraint('FileExtension', $field_item->getUploadValidators()['FileExtension']);
+      // Carry the field's configured storage location so the stored file URI's
+      // `UriScheme` constraint can be narrowed to it during matching: a field
+      // that stores to `private://` should only match files stored privately.
+      // @see \Drupal\file\Plugin\Field\FieldType\FileItem::defaultStorageSettings()
+      $uri_scheme = $field_definition->getSetting('uri_scheme');
+      if (\is_string($uri_scheme) && $uri_scheme !== '') {
+        $target->addConstraint(UriSchemeConstraint::PLUGIN_ID, ['allowedSchemes' => [$uri_scheme]]);
+      }
     }
     return $target;
   }

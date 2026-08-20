@@ -931,6 +931,55 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
     }
   }
 
+  /**
+   * A file field's `uri_scheme` narrows which stored files its shape matches.
+   *
+   * The `stream-wrapper-image-uri` prop shape expects a stored (public) stream
+   * wrapper image URI, matched against a file field's raw `uri` value. Proves
+   * the matcher reflects the referencing file field's configured storage
+   * location into that URI's `UriScheme` constraint: a field that stores to
+   * `private://` must NOT satisfy a `public://`-expecting prop, while an
+   * otherwise identical `public://` field must. Before this, the File entity's
+   * `uri` scheme was hardcoded, so every file field matched regardless of where
+   * it actually stores its files.
+   *
+   * The `stream-wrapper-image-uri` definition (in schema.json) pins
+   * `x-allowed-schemes` to `["public"]`.
+   *
+   * @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::getConstrainedTargetDefinition()
+   */
+  public function testFileFieldUriSchemeNarrowsMatching(): void {
+    // Two image fields that differ ONLY in where they store their files.
+    foreach (['field_public_photo' => 'public', 'field_private_photo' => 'private'] as $field_name => $uri_scheme) {
+      FieldStorageConfig::create([
+        'entity_type' => 'node',
+        'field_name' => $field_name,
+        'type' => 'image',
+        'cardinality' => 1,
+        'settings' => ['uri_scheme' => $uri_scheme],
+      ])->save();
+      FieldConfig::create([
+        'entity_type' => 'node',
+        'field_name' => $field_name,
+        'bundle' => 'foo',
+      ])->save();
+    }
+
+    $prop_shape = PropShape::normalize([
+      'type' => 'string',
+      '$ref' => 'json-schema-definitions://canvas.module/stream-wrapper-image-uri',
+    ]);
+    $matcher = \Drupal::service(EntityFieldPropSourceMatcher::class);
+    \assert($matcher instanceof EntityFieldPropSourceMatcher);
+    $matched_field_names = \array_map(
+      fn (EntityFieldPropSource $s): string => $s->expression->getFieldName(),
+      $matcher->match(FALSE, $prop_shape, 'node', 'foo'),
+    );
+
+    self::assertContains('field_public_photo', $matched_field_names, 'A public:// image field should satisfy a public-scheme stream-wrapper URI prop.');
+    self::assertNotContains('field_private_photo', $matched_field_names, 'A private:// image field must NOT satisfy a public-scheme stream-wrapper URI prop.');
+  }
+
   public static function provideContentEntityReferencePropMatches(): \Generator {
     yield 'bundleless target (user)' => [
       'constraints' => ['x-allowed-entity-type-id' => 'user'],
