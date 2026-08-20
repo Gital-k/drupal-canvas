@@ -76,9 +76,11 @@ All routes use `_canvas_ui_access: 'TRUE'` and `_format: 'json'`. The live works
 
 ---
 
-## Chunk 2 — Frontend types, RTK service, Redux slice
+## Chunk 2 — Frontend types, RTK service, Redux slice ✅
 
 **Goal:** The JS layer has typed models, a working RTK Query API pointed at the mock endpoints, and a Redux slice tracking `activeWorkspaceId`. No UI yet.
+
+**Status:** Completed. All files created and wired into store. Linting and type-checking pass.
 
 ### 2.1 — TypeScript types
 
