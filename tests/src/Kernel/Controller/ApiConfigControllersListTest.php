@@ -158,6 +158,16 @@ final class ApiConfigControllersListTest extends ApiLayoutControllerTestBase {
     // falls back to only globally satisfiable Components instead of 400-ing.
     $response = $this->parentRequest(Request::create('/canvas/api/v0/config/component?entity_type=node'), TRUE);
     self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+
+    // A known entity type that is not a content entity (e.g. the `page_variant`
+    // config entity, edited through the same /editor/{entity_type}/{entity_id}
+    // route as content Pages) is not an error either: it can never be a content
+    // host, so the list falls back to only globally satisfiable Components.
+    $response = $this->parentRequest(Request::create('/canvas/api/v0/config/component?entity_type=page_variant'), TRUE);
+    self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+    $data = self::decodeResponse($response);
+    self::assertArrayNotHasKey(self::REQUIRES_NODE, $data);
+    self::assertArrayHasKey(self::NO_CONTEXT, $data);
   }
 
   /**

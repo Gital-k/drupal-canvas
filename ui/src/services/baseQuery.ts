@@ -117,7 +117,7 @@ export const getHostEntityParams = (url: string): HostEntityParams => {
   if (!entityType || entityType === 'pattern') {
     return {};
   }
-  // @todo Send the host bundle for bundled content entities once the page editor supports them, in https://www.drupal.org/project/canvas/issues/3498525 — today the page editor is canvas_page-only (no bundle key), so a bundled host would send entity_type without entity_bundle and the server would return 400.
+  // @todo Send the host bundle for bundled content entities so their required-context blocks can be filtered, in https://www.drupal.org/project/canvas/issues/3498525 — the page editor route carries no bundle, so a bundled host currently sends entity_type without entity_bundle and the server falls back to the unfiltered list.
   return { entityType, entityBundle: templateBundle };
 };
 

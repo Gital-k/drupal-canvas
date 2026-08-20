@@ -239,7 +239,8 @@ final class ApiConfigControllers extends ApiControllerBase {
    *   host entity is identified.
    *
    * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
-   *   When the requested entity type or bundle does not exist.
+   *   When the requested entity type does not exist, or the requested bundle
+   *   does not exist for a bundleable entity type.
    */
   private function deriveHostEntityFromRequest(?Request $request): ?FieldableEntityInterface {
     $entity_type_id = $request?->query->get('entity_type');
@@ -250,8 +251,17 @@ final class ApiConfigControllers extends ApiControllerBase {
       throw new BadRequestHttpException('The "entity_type" query parameter must be a string.');
     }
     $entity_type = $this->entityTypeManager->getDefinition($entity_type_id, FALSE);
+    if ($entity_type === NULL) {
+      throw new BadRequestHttpException(\sprintf('The "%s" entity type does not exist.', $entity_type_id));
+    }
     if (!$entity_type instanceof ContentEntityTypeInterface) {
-      throw new BadRequestHttpException(\sprintf('The "%s" entity type does not exist or is not a content entity type.', $entity_type_id));
+      // The entity type exists but is not a content entity, so it can never be
+      // a content host — e.g. the `page_variant` config entity, which is edited
+      // through the same `/editor/{entity_type}/{entity_id}` route as content
+      // Pages and therefore reaches here as the `entity_type` query parameter.
+      // Gather only globally available contexts rather than erroring, so the
+      // editor keeps working and simply receives the unfiltered component list.
+      return NULL;
     }
 
     $bundle = $request->query->get('entity_bundle');

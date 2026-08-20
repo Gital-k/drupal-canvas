@@ -2436,6 +2436,16 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // falls back to only globally satisfiable Components instead of 400-ing.
     $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'node']]);
     self::assertSame(200, $this->getSession()->getStatusCode(), $page->getContent());
+
+    // A known entity type that is not a content entity (e.g. the `page_variant`
+    // config entity, edited through the same /editor/{entity_type}/{entity_id}
+    // route as content Pages) is not an error either: it can never be a content
+    // host, so the list falls back to only globally satisfiable Components.
+    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'page_variant']]);
+    self::assertSame(200, $this->getSession()->getStatusCode(), $page->getContent());
+    $data = Json::decode($page->getText());
+    self::assertArrayNotHasKey($requires_node, $data);
+    self::assertArrayHasKey($always_present, $data);
   }
 
   private function assertDynamicPageCacheAccelerated(?string $maxAge = NULL): void {
