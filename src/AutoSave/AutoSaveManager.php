@@ -358,10 +358,11 @@ class AutoSaveManager implements EventSubscriberInterface {
       }
       // Canonicalize metatag values before hashing. The field stores tags as
       // an opaque JSON string, so the hash is order-sensitive, but the tag
-      // order carries no meaning. MetatagFieldItem::preSave() ksorts on a real
-      // entity save; auto-saving bypasses ::preSave(), and MetatagFirehose
-      // re-emits tags in form order, so an unchanged round-trip through the
-      // editor would otherwise hash differently than the stored entity.
+      // order carries no meaning. MetatagFieldItem::preSave() sorts them by key
+      // on a real entity save; auto-saving bypasses ::preSave(), and
+      // MetatagFirehose re-emits tags in form order, so an unchanged round-trip
+      // through the editor would otherwise hash differently than the stored
+      // entity.
       // @see \Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem::preSave()
       if ($items->getFieldDefinition()->getType() === 'metatag') {
         $values = [];
