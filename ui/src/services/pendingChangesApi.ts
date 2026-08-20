@@ -9,7 +9,7 @@ import {
 import { baseQuery } from '@/services/baseQuery';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
 
-interface Owner {
+export interface Owner {
   name: string;
   avatar: string | null;
   uri: string;
