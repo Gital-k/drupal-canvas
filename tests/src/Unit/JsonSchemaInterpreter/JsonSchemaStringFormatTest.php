@@ -15,6 +15,18 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 
+/**
+ * Tests the shape requirements JsonSchemaStringFormat::Uri derives.
+ *
+ * A `format: uri` schema with a wildcard `contentMediaType` (for example,
+ * `application/*`) must yield a `UriTargetMediaType` requirement, plus a
+ * `UriTargetFileExtensions` requirement when the schema declares
+ * `x-allowed-file-extensions`, and a `UriScheme` requirement when it declares
+ * `x-allowed-schemes`. A concrete media type such as `application/pdf` takes
+ * the default branch, which emits neither target requirement.
+ *
+ * @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat::toDataTypeShapeRequirements()
+ */
 #[CoversClass(JsonSchemaStringFormat::class)]
 #[Group('canvas')]
 final class JsonSchemaStringFormatTest extends UnitTestCase {

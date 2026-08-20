@@ -55,9 +55,22 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     // @see \Drupal\media\Plugin\media\Source\VideoFile
     $this->createMediaType('video_file', ['id' => 'baby_videos']);
     $this->createMediaType('video_file', ['id' => 'vacation_videos']);
-    // @see \Drupal\media\Plugin\media\Source\File
+    // The `file` media source creates its source field with the default
+    // `file_extensions` setting of 'txt doc docx pdf'. Three of those (doc,
+    // docx, pdf) intersect the document shape's `x-allowed-file-extensions`
+    // list, so this media type matches the document shape with no explicit
+    // configuration — even though `txt` falls outside that list, because
+    // matching requires intersection, not a subset.
+    // @see \Drupal\media\Plugin\media\Source\File::createSourceField()
+    // @see \Drupal\canvas\ShapeMatcher\MediaSourceObjectShapes::getMediaTypesForSchemaObject()
     $this->createMediaType('file', ['id' => 'baby_documents']);
-    $this->createMediaType('file', ['id' => 'vacation_documents']);
+    // Unlike `baby_documents`, this media type does not rely on the source
+    // field defaults: its single allowed extension appears in the document
+    // shape's `x-allowed-file-extensions` list, proving a one-element
+    // intersection is enough to match. Contrast with `archives` and
+    // `plain_text_notes` below, whose extensions never intersect the list
+    // and therefore never match.
+    $this->createFileMediaTypeWithExtensions('vacation_documents', 'pdf');
     // AudioFile extends File, but audio media types must not match the
     // document shape: audio file extensions do not intersect the document
     // shape's `x-allowed-file-extensions` list, so this media type must not
