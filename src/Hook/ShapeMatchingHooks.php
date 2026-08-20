@@ -411,6 +411,8 @@ class ShapeMatchingHooks {
     $media_types = array_filter(
       MediaType::loadMultiple(),
       fn (MediaTypeInterface $type): bool => is_a($type->getSource(), $media_source_class)
+        // Filter out media types without a valid source field definition.
+        && $type->getSource()->getSourceFieldDefinition($type) !== NULL
     );
     ksort($media_types);
     $media_type_ids = \array_map(
