@@ -34,3 +34,22 @@ services:
     arguments:
       - '@config.factory'
   Drupal\canvas_ai\CanvasAiTempStore: '@canvas_ai.tempstore'
+
+  logger.channel.canvas_ai:
+    parent: logger.channel_base
+    arguments: ['canvas_ai']
+
+  canvas_ai.component_schema_loader:
+    class: Drupal\canvas_ai\Service\ComponentSchemaLoader
+    arguments:
+      - '@extension.list.theme'
+      - '@theme_handler'
+      - '@cache.default'
+      - '@logger.channel.canvas_ai'
+      - '@config.factory'
+
+  canvas_ai.direct_edit_matcher:
+    class: Drupal\canvas_ai\Service\DirectEditMatcher
+    arguments:
+      - '@canvas_ai.component_schema_loader'
+      - '@config.factory'
