@@ -5,7 +5,7 @@
 - All PHP work must pass phpcs and phpstan (see commands below); run phpcbf to auto-fix.
 - Never run full test suites. Run only tests that directly exercise changed code.
 - Commits follow the repo format: `🤖 <intent ≤160 chars>` + optional body + `Co-authored-by:` line.
-- No file is created without a reason traceable to a concrete user-visible behaviour.
+- No file is created without a reason traceable to a concrete user-visible behavior.
 
 ## Agent notes
 

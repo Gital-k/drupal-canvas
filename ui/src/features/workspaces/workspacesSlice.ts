@@ -7,6 +7,7 @@ const ACTIVE_WORKSPACE_STORAGE_KEY = 'canvas.activeWorkspaceId';
 
 interface WorkspacesState {
   activeWorkspaceId: string | null;
+  isAddWorkspaceModalOpen: boolean;
 }
 
 const getStoredWorkspaceId = (): string | null => {
@@ -32,6 +33,7 @@ const setStoredWorkspaceId = (id: string | null) => {
 
 const initialState: WorkspacesState = {
   activeWorkspaceId: getStoredWorkspaceId(),
+  isAddWorkspaceModalOpen: false,
 };
 
 export const workspacesSlice = createSlice({
@@ -46,12 +48,21 @@ export const workspacesSlice = createSlice({
       state.activeWorkspaceId = null;
       setStoredWorkspaceId(null);
     },
+    setAddWorkspaceModalOpen: (state, action: PayloadAction<boolean>) => {
+      state.isAddWorkspaceModalOpen = action.payload;
+    },
   },
 });
 
-export const { setActiveWorkspace, clearActiveWorkspace } =
-  workspacesSlice.actions;
+export const {
+  setActiveWorkspace,
+  clearActiveWorkspace,
+  setAddWorkspaceModalOpen,
+} = workspacesSlice.actions;
 
 // Selectors
 export const selectActiveWorkspaceId = (state: RootState): string | null =>
   state.workspaces.activeWorkspaceId;
+
+export const selectIsAddWorkspaceModalOpen = (state: RootState): boolean =>
+  state.workspaces.isAddWorkspaceModalOpen;

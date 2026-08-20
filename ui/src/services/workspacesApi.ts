@@ -11,7 +11,7 @@ import type {
 } from '@/types/Workspace';
 
 interface WorkspacesResponse {
-  data: Workspace[];
+  data: Record<string, Workspace>;
 }
 
 interface CreateWorkspaceResponse {
@@ -30,7 +30,8 @@ export const workspacesApi = createApi({
   endpoints: (builder) => ({
     getWorkspaces: builder.query<Workspace[], void>({
       query: () => '/canvas/api/v0/workspaces-dev',
-      transformResponse: (response: WorkspacesResponse) => response.data,
+      transformResponse: (response: WorkspacesResponse) =>
+        Object.values(response.data),
       providesTags: [{ type: 'Workspace', id: 'LIST' }],
     }),
     createWorkspace: builder.mutation<

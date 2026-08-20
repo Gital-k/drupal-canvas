@@ -5,7 +5,7 @@ import { CardStackPlusIcon, PersonIcon } from '@radix-ui/react-icons';
 import * as Menubar from '@radix-ui/react-menubar';
 import { Box, Button, Flex, Grid, Tooltip } from '@radix-ui/themes';
 
-import { useAppSelector } from '@/app/hooks';
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import AIToggleButton from '@/components/aiExtension/AiToggleButton';
 import FrontendSelect from '@/components/frontendSelect/FrontendSelect';
 import LanguageSelect from '@/components/languageSelect/LanguageSelect';
@@ -13,11 +13,13 @@ import PreviewControls from '@/components/PreviewControls';
 import UnpublishedChanges from '@/components/review/UnpublishedChanges';
 import ContentPreviewSelector from '@/components/templates/ContentPreviewSelector';
 import UndoRedo from '@/components/UndoRedo';
+import WorkspaceSwitcher from '@/components/workspaces/WorkspaceSwitcher';
 import NotificationBell from '@/features/notifications/NotificationBell';
 import {
   EditorFrameContext,
   selectEditorFrameContext,
 } from '@/features/ui/uiSlice';
+import { setAddWorkspaceModalOpen } from '@/features/workspaces/workspacesSlice';
 import { useCanvasHeadlessSettings } from '@/hooks/useCanvasHeadlessSettings';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout';
@@ -32,6 +34,7 @@ const PREVIOUS_URL_STORAGE_KEY = 'CanvasPreviousURL';
 
 const Topbar = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const location = useLocation();
   const { entityType, bundle, previewEntityId } = useParams();
   const isPreview = isPreviewPath(location.pathname);
@@ -157,7 +160,12 @@ const Topbar = () => {
             )}
           </Flex>
           <Flex align="center" justify="center" gap="2">
-            <PageInfo />
+            <Flex align="center" gap="2">
+              <WorkspaceSwitcher
+                onAddWorkspace={() => dispatch(setAddWorkspaceModalOpen(true))}
+              />
+              <PageInfo />
+            </Flex>
             {isTemplateEditorContext && (
               <ContentPreviewSelector
                 items={previewEntities}
