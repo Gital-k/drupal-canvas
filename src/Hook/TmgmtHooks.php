@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
-use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Tmgmt\ComponentInputsConfigProcessor;
@@ -73,6 +72,12 @@ final readonly class TmgmtHooks {
    * builds no source textarea at all, and formTmgmtJobItemEditFormAlter()
    * replaces it with an explanatory message.
    *
+   * Only content job items whose entity carries a component_tree field are
+   * altered. Config job items (ContentTemplate, PageRegion, via
+   * ComponentInputsConfigProcessor) still show the sentinel.
+   *
+   * @todo Extend the sentinel handling to config job items in https://www.drupal.org/project/canvas/issues/3591848 follow-up.
+   *
    * @param string $source_text
    *   The source text to display, passed by reference.
    * @param string $translation_text
@@ -84,7 +89,12 @@ final readonly class TmgmtHooks {
    */
   #[Hook('tmgmt_data_item_text_output_alter')]
   public static function tmgmtDataItemTextOutputAlter(string &$source_text, string &$translation_text, array $context): void {
-    if (!self::isCanvasPageJobItemContext($context)) {
+    $job_item = $context['job_item'] ?? NULL;
+    if (!$job_item instanceof JobItemInterface) {
+      return;
+    }
+    $entity = self::getContentJobItemEntity($job_item);
+    if ($entity === NULL || self::getComponentTreeFieldNames($entity) === []) {
       return;
     }
     if ($source_text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL) {
@@ -96,18 +106,22 @@ final readonly class TmgmtHooks {
   }
 
   /**
-   * Checks whether the hook context belongs to a Canvas Page content job item.
+   * Gets the names of the component_tree fields on an entity.
    *
-   * @param array<string, mixed> $context
-   *   TMGMT hook context.
+   * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
+   *   The entity.
+   *
+   * @return list<string>
+   *   The component_tree field names; empty if the entity has none.
    */
-  private static function isCanvasPageJobItemContext(array $context): bool {
-    $job_item = $context['job_item'] ?? NULL;
-    if (!$job_item instanceof JobItemInterface) {
-      return FALSE;
+  private static function getComponentTreeFieldNames(FieldableEntityInterface $entity): array {
+    $field_names = [];
+    foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
+      if ($definition->getType() === ComponentTreeItem::PLUGIN_ID) {
+        $field_names[] = $field_name;
+      }
     }
-    return $job_item->getPlugin() === 'content'
-      && $job_item->getItemType() === Page::ENTITY_TYPE_ID;
+    return $field_names;
   }
 
   /**
@@ -145,12 +159,7 @@ final readonly class TmgmtHooks {
     if ($entity === NULL) {
       return;
     }
-    $component_tree_field_names = [];
-    foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
-      if ($definition->getType() === ComponentTreeItem::PLUGIN_ID) {
-        $component_tree_field_names[] = $field_name;
-      }
-    }
+    $component_tree_field_names = self::getComponentTreeFieldNames($entity);
     if ($component_tree_field_names === []) {
       return;
     }
