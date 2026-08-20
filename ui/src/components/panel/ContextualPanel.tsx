@@ -29,11 +29,18 @@ import useHidePanelClasses from '@/hooks/useHidePanelClasses';
 import { PAGE_VARIANT_ENTITY_TYPE } from '@/services/pageVariants';
 
 import styles from './ContextualPanel.module.css';
+import { selectLayout } from '@/features/layout/layoutModelSlice';
+import { findComponentByUuid } from '@/features/layout/layoutUtils';
+import useGetComponentName from '@/hooks/useGetComponentName';
 
 const ContextualPanel = () => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const isMultiSelect = useAppSelector(selectIsMultiSelect);
   const selection = useAppSelector(selectSelection);
+  const layout = useAppSelector(selectLayout);
+  const selectedNode = findComponentByUuid(layout, selectedComponent || '');
+  const selectedComponentName = useGetComponentName(selectedNode);
+  console.log('selectedComponentName', selectedComponentName)
   const dispatch = useAppDispatch();
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const { entityId, entityType } = useParams();
@@ -127,6 +134,11 @@ const ContextualPanel = () => {
             <ScrollArea scrollbars="vertical" className={styles.scrollArea}>
               <Box px="4" width="100%">
                 <Tabs.Content value={'settings'}>
+                  {selectedComponentName && (
+                    <Box mb="-2" mt="3">
+                      <Text weight="bold">{selectedComponentName}</Text>
+                    </Box>
+                  )}
                   {isMultiSelect && (
                     <Box my="2">
                       <Flex direction="column" gap="2">
