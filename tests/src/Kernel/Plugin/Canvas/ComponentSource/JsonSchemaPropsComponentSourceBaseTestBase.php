@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use ColinODell\PsrTestLogger\TestLogger;
 use Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
@@ -13,6 +14,8 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBa
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\DependencyInjection\ClassResolverInterface;
+use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Logger\RfcLogLevel;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
 use Drupal\Tests\canvas\Kernel\Traits\PredictableImageStyleItokTestTrait;
@@ -28,6 +31,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 #[CoversClass(JsonSchemaPropsComponentSourceBase::class)]
 #[CoversMethod(JsonSchemaPropsComponentSourceBase::class, 'clientModelToInput')]
+#[CoversMethod(JsonSchemaPropsComponentSourceBase::class, 'getClientSideInfo')]
 abstract class JsonSchemaPropsComponentSourceBaseTestBase extends ComponentSourceTestBase {
 
   use MediaTypeCreationTrait;
@@ -172,16 +176,7 @@ abstract class JsonSchemaPropsComponentSourceBaseTestBase extends ComponentSourc
   public function testValidateComponentInputRejectsUnexpectedProps(string $source_id, string $source_specific_id, string $valid_prop_name, array $valid_prop_input): void {
     $this->generateComponentConfig();
 
-    $component_source_manager = $this->container->get(ComponentSourceManager::class);
-    \assert($component_source_manager instanceof ComponentSourceManager);
-    $component_source_definition = $component_source_manager->getDefinition($source_id);
-    \assert(\array_key_exists('discovery', $component_source_definition));
-    $discovery = $this->container->get(ClassResolverInterface::class)->getInstanceFromDefinition($component_source_definition['discovery']);
-    \assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
-    $component_id = $discovery::getComponentConfigEntityId($source_specific_id);
-
-    $component = Component::load($component_id);
-    $this->assertInstanceOf(Component::class, $component);
+    $component = $this->loadComponentForSource($source_id, $source_specific_id);
 
     $source = $component->getComponentSource();
     $this->assertInstanceOf(JsonSchemaPropsComponentSourceBase::class, $source);
@@ -294,6 +289,85 @@ abstract class JsonSchemaPropsComponentSourceBaseTestBase extends ComponentSourc
     if (\array_key_exists('heading', $prop_field_definitions)) {
       self::assertSame('Test heading', $input['heading']);
     }
+  }
+
+  /**
+   * Loads the Component config entity for a component source plugin.
+   *
+   * @param string $source_id
+   *   The component source plugin ID (e.g. 'js', 'sdc').
+   * @param string $source_specific_id
+   *   The source-specific component ID.
+   *
+   * @return \Drupal\canvas\Entity\Component
+   *   The Component config entity generated for that component.
+   */
+  protected function loadComponentForSource(string $source_id, string $source_specific_id): Component {
+    $component_source_manager = $this->container->get(ComponentSourceManager::class);
+    \assert($component_source_manager instanceof ComponentSourceManager);
+    $component_source_definition = $component_source_manager->getDefinition($source_id);
+    \assert(\array_key_exists('discovery', $component_source_definition));
+    $discovery = $this->container->get(ClassResolverInterface::class)->getInstanceFromDefinition($component_source_definition['discovery']);
+    \assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+
+    $component = Component::load($discovery::getComponentConfigEntityId($source_specific_id));
+    $this->assertInstanceOf(Component::class, $component);
+    return $component;
+  }
+
+  /**
+   * Tests that props absent from the component metadata are omitted, not fatal.
+   *
+   * A Component config entity's stored `prop_field_definitions` can outlive the
+   * props of the code powering it: an SDC (or code component) can remove or
+   * rename a prop while the Component config entity still stores a prop field
+   * definition for it. Building the client-side info must gracefully degrade in
+   * that situation instead of taking down the Canvas UI for every Component.
+   *
+   * The `$valid_prop_input` parameter is unused: this test only needs a
+   * component and the name of one prop that component actually has.
+   *
+   * @legacy-covers ::getClientSideInfo
+   */
+  #[DataProvider('providerComponentForValidateInputRejectsUnexpectedProps')]
+  public function testGetClientSideInfoOmitsPropsMissingFromMetadata(string $source_id, string $source_specific_id, string $valid_prop_name, array $valid_prop_input): void {
+    $this->generateComponentConfig();
+    $component = $this->loadComponentForSource($source_id, $source_specific_id);
+
+    $logger = new TestLogger();
+    $this->container->get(LoggerChannelFactoryInterface::class)->addLogger($logger);
+
+    $settings = $component->getSettings();
+    self::assertArrayHasKey($valid_prop_name, $settings['prop_field_definitions']);
+    $expected_props = \array_keys($settings['prop_field_definitions']);
+
+    // Baseline: every stored prop field definition yields a prop source, and
+    // nothing is logged.
+    $client_side_info = $component->getComponentSource()->getClientSideInfo($component);
+    self::assertSame($expected_props, \array_keys($client_side_info['propSources']));
+    self::assertSame([], $logger->records);
+
+    // Simulate the drift: a prop that the Component config entity still stores
+    // a prop field definition for, but that no longer exists in the code
+    // powering the component — and hence has no prop shape in its metadata.
+    // The definition is copied verbatim from a prop that does still exist, to
+    // prove that it is the *absence from the metadata* that matters, not the
+    // stored definition being malformed.
+    $settings['prop_field_definitions']['deletedInCode'] = $settings['prop_field_definitions'][$valid_prop_name];
+    $component->setSettings($settings);
+
+    $client_side_info = $component->getComponentSource()->getClientSideInfo($component);
+    self::assertSame($expected_props, \array_keys($client_side_info['propSources']));
+
+    // The stale prop is omitted, but not silently: a warning names both the
+    // Component config entity and the prop, because this points at a real
+    // config inconsistency that a site builder must resolve.
+    self::assertCount(1, $logger->records);
+    $record = \reset($logger->records);
+    self::assertSame(RfcLogLevel::WARNING, $record['level']);
+    self::assertSame('deletedInCode', $record['context']['%prop']);
+    self::assertSame($component->id(), $record['context']['%component']);
+    self::assertStringContainsString('no longer exists in the code powering it', (string) $record['message']);
   }
 
   /**

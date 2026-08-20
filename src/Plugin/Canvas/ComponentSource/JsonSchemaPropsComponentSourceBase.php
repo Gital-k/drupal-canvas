@@ -1145,6 +1145,27 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
     $transforms = [];
     foreach ($prop_field_definitions as $prop_name => $static_prop_source_field_definition) {
       $component_prop_expression = new ComponentPropExpression($component->id(), $prop_name);
+      // A Component config entity's stored `prop_field_definitions` can outlive
+      // the props of the code powering it: the code can remove or rename a prop
+      // (or change it to an `Attribute` prop, which never gets a prop shape)
+      // while the Component config entity still stores a definition for it.
+      // Such a prop is unusable — there is nothing left in the SDC or code
+      // component for the Content Author to populate — so omit it rather than
+      // crash. Crashing here would take down the entire Canvas UI, because
+      // every Component is normalized for the client at once.
+      // @see \Drupal\canvas\Entity\Component::normalizeForClientSide()
+      // @todo Detect this in ::isBroken() and let the UI convey it, in https://www.drupal.org/i/3532514
+      if (!\array_key_exists((string) $component_prop_expression, $prop_shapes)) {
+        // Do not fail silently: the Component config entity must be updated to
+        // a version matching the code, and only a log message can convey that.
+        // (Dynamic Page Cache caches the result of this method, so this is
+        // logged once per cache miss, not once per request.)
+        $this->logger->warning('The %prop prop of the %component Component config entity no longer exists in the code powering it, so it is omitted from the client-side info. Update the Component to the code\'s current props to resolve this.', [
+          '%prop' => $prop_name,
+          '%component' => $component->id(),
+        ]);
+        continue;
+      }
       $prop_shape = $prop_shapes[(string) $component_prop_expression];
       $storable_prop_shape = $this->propShapeRepository->getStorablePropShape($prop_shape);
       \assert($storable_prop_shape instanceof StorablePropShape);
