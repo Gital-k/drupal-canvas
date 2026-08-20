@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-// cspell:ignore Bienvenue savoir Découvrez Identité visuelle Charte graphique Bonjour
+// cspell:ignore Bienvenue savoir Découvrez Identité visuelle Charte graphique Bonjour Traduit Gitane
 
 use Behat\Mink\Element\NodeElement;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Hook\TmgmtHooks;
 use Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor;
+use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputTranslatability;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\Tests\canvas\Traits\ComponentTreeWithAllSymmetricalTranslationEdgeCasesTrait;
@@ -284,6 +285,10 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
    * AC5: OPTIONAL prop with source value "Sub" left blank → an explicitly
    *      empty string is stored (NOT the source value, NOT ∅), with no
    *      validation error.
+   * AC6: A translator plugin echoing the exact ∅ sentinel back for one item of
+   *      a composite input, next to a really translated sibling item → the
+   *      echoed item is refilled from the default translation; no NULL leaks
+   *      into the stored composite value.
    *
    * Falling back to the default translation's value is intentionally NOT
    * supported here; that is a separate design discussion.
@@ -297,6 +302,7 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
 
     $uuid_hero = 'ac1ac2ac-0000-4000-8000-000000000001';
     $uuid_block = 'ac3ac4ac-0000-4000-8000-000000000002';
+    $uuid_deep = 'ac6ac6ac-0000-4000-8000-000000000003';
 
     $canvas_page = Page::create([
       'title' => 'Empty-set AC test page',
@@ -321,6 +327,22 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
             'label' => '',
             'label_display' => '0',
             'name' => '',
+          ],
+        ],
+        [
+          'uuid' => $uuid_deep,
+          'component_id' => 'block.' . CanvasTestBlockInputTranslatability::PLUGIN_ID,
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
+          'inputs' => [
+            'label' => '',
+            'label_display' => '0',
+            'top_level_translatable_regardless_of_type' => ['translations', 'are', 'hard'],
+            // AC6: two sequence items so a discarded sentinel "translation"
+            // in one item sits next to a real translation in the other.
+            'deeply_nested_translatable' => [
+              ['foo' => 'Huh?', 'bar' => 'Gitane'],
+              ['foo' => 'Meh', 'bar' => 'Kro'],
+            ],
           ],
         ],
       ]),
@@ -348,6 +370,7 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
 
     $hero_delta = 0;
     $block_delta = 1;
+    $deep_delta = 2;
 
     // The ∅ sentinel must never be visible in the source column. Empty source
     // inputs (label, name) show an explanatory message instead of a textarea,
@@ -377,6 +400,13 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
       "components|{$block_delta}|label[translation]" => '',
       // AC4: name source is empty; provide a real French value.
       "components|{$block_delta}|name[translation]" => 'Bonjour',
+      // AC6: a translator plugin echoing the exact sentinel back for ONE item
+      // of a composite input while its sibling gets a real translation. The
+      // echoed item must be refilled from the default translation — no NULL
+      // may leak into the stored composite value.
+      "components|{$deep_delta}|label[translation]" => '',
+      "components|{$deep_delta}|deeply_nested_translatable|0|bar[translation]" => '∅',
+      "components|{$deep_delta}|deeply_nested_translatable|1|bar[translation]" => 'Traduit',
     ];
 
     // Blank translations must survive a plain "Save" and a fresh page load
@@ -453,6 +483,21 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     // AC4: real French value stored for an empty-source field.
     self::assertSame('Bonjour', $block_inputs['name'],
       'AC4: A real translation for an empty-source field must be stored.'
+    );
+
+    // AC6: the exact-sentinel echo for item 0 is discarded and the whole item
+    // is refilled from the default translation; the sibling item keeps its
+    // real translation. No NULL leaks into the stored composite value.
+    $deep_item = $fr_tree->getComponentTreeItemByUuid($uuid_deep);
+    self::assertNotNull($deep_item);
+    $deep_inputs = $deep_item->getInputs();
+    self::assertSame(
+      [
+        ['foo' => 'Huh?', 'bar' => 'Gitane'],
+        ['foo' => 'Meh', 'bar' => 'Traduit'],
+      ],
+      $deep_inputs['deeply_nested_translatable'] ?? NULL,
+      'AC6: A discarded sentinel echo inside a composite input must be refilled from the default translation, next to a really translated sibling.'
     );
   }
 

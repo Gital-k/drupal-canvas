@@ -138,21 +138,55 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
           // $inputs filtered to schema keys only.
           \array_intersect_key($inputs, \array_flip($config_schema_order)),
         );
-        // Keys resolved to NULL (a discarded ∅ sentinel "translation") are
+        // Values resolved to NULL (a discarded ∅ sentinel "translation") are
         // refilled from the default translation, because the entity cannot be
         // saved with a required prop absent: FieldItemList::preSave()
-        // enforces required props. Optional props absent in the default
-        // translation too remain NULL and are filtered out below.
+        // enforces required props. This must recurse: a composite input (e.g.
+        // a sequence of mappings) can carry a discarded leaf next to a really
+        // translated sibling, leaving a NULL at arbitrary depth. Values that
+        // stay NULL (absent in the default translation too) are dropped.
         $default_inputs = self::defaultTranslationInputs($field, $delta);
         foreach ($inputs_in_schema_order as $key => $value) {
-          if ($value === NULL && isset($default_inputs[$key])) {
-            $inputs_in_schema_order[$key] = $default_inputs[$key];
-          }
+          $inputs_in_schema_order[$key] = self::refillDiscardedFromDefault($value, $default_inputs[$key] ?? NULL);
         }
         // Write only non-NULL (preserve FALSE, 0, '', []).
         $item->setInput(\array_filter($inputs_in_schema_order, static fn($v) => $v !== NULL));
       }
     }
+  }
+
+  /**
+   * Replaces discarded (NULL) values with the default translation's values.
+   *
+   * @param mixed $value
+   *   An input value that may be, or contain at any depth, a NULL left behind
+   *   by a discarded ∅ sentinel "translation".
+   * @param mixed $default
+   *   The default translation's value at the same position, or NULL if it has
+   *   none.
+   *
+   * @return mixed
+   *   The value with every NULL replaced by the default translation's value
+   *   at the same position; nested values that stay NULL are removed. Returns
+   *   NULL only if the value itself is NULL and there is no default.
+   */
+  private static function refillDiscardedFromDefault(mixed $value, mixed $default): mixed {
+    if ($value === NULL) {
+      return $default;
+    }
+    if (!\is_array($value)) {
+      return $value;
+    }
+    foreach ($value as $key => $child) {
+      $refilled = self::refillDiscardedFromDefault($child, \is_array($default) ? ($default[$key] ?? NULL) : NULL);
+      if ($refilled === NULL) {
+        unset($value[$key]);
+      }
+      else {
+        $value[$key] = $refilled;
+      }
+    }
+    return $value;
   }
 
   /**
@@ -218,6 +252,10 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
       // empty-source placeholder back): returning NULL discards it, and
       // setTranslations() refills the key from the default translation. An
       // empty string is a valid, explicitly empty translation, stored as-is.
+      // Two consequences of this exact match: a translation that merely
+      // CONTAINS the sentinel (e.g. a machine translator returning "fr: ∅")
+      // is stored verbatim, and a translator can never store a literal ∅ as
+      // an intentional translation.
       if ($text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL) {
         return NULL;
       }
