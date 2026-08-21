@@ -6,6 +6,7 @@ namespace Drupal\canvas;
 
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
+use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 use Drupal\canvas\PropShape\EphemeralPropShapeRepository;
 use Drupal\canvas\PropShape\StorablePropShape;
@@ -139,6 +140,21 @@ final class ComponentMetadataRequirementsChecker {
       if (\array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'text/html' && isset($prop['x-formatting-context'])) {
         if (!\in_array($prop['x-formatting-context'], ['inline', 'block'], TRUE)) {
           $messages[] = \sprintf('Invalid value "%s" for "x-formatting-context". Valid values are "inline" and "block".', $prop['x-formatting-context']);
+          continue;
+        }
+      }
+
+      // Props targeting a wildcard `contentMediaType` (`image/*`, `video/*`,
+      // `application/*`) must declare `x-allowed-schemes`: no SDC prop ever
+      // blindly accepts any URI scheme, it is always either a stream wrapper
+      // URI or a browser-accessible URI. Without it, field properties storing
+      // Drupal-specific URIs (`public://`, `entity:`, `internal:`) would match.
+      // @see https://www.drupal.org/node/3542579
+      // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat::toDataTypeShapeRequirements()
+      if (\is_string($prop['contentMediaType'] ?? NULL) && UriTargetMediaTypeConstraint::isValidWildCard($prop['contentMediaType'])) {
+        $allowed_schemes = $prop['x-allowed-schemes'] ?? NULL;
+        if (!\is_array($allowed_schemes) || $allowed_schemes === [] || !\array_is_list($allowed_schemes)) {
+          $messages[] = \sprintf('Prop "%s" targets "%s" and must declare "x-allowed-schemes" as a non-empty list of URI schemes.', $prop_name, $prop['contentMediaType']);
           continue;
         }
       }

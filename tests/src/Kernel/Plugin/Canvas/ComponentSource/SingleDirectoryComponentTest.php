@@ -187,6 +187,9 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
         // @see \Drupal\Tests\canvas\Kernel\PropSourceSuggesterTest
         'Drupal Canvas does not know of a field type/widget to allow populating the <code>srcSetCandidateTemplate</code> prop, with the shape <code>{"type":"string","format":"uri-template","x-required-variables":["width"]}</code>.',
       ],
+      'sdc.canvas_test_sdc.image-uri-without-allowed-schemes' => [
+        'Prop "image_url" targets "image/*" and must declare "x-allowed-schemes" as a non-empty list of URI schemes.',
+      ],
       'sdc.canvas_test_sdc.obsolete' => [
         'Component has "obsolete" status',
       ],
