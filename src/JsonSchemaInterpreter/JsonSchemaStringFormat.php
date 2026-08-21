@@ -126,11 +126,14 @@ enum JsonSchemaStringFormat: string {
             new DataTypeShapeRequirement(UriConstraint::PLUGIN_ID, [
               'allowReferences' => $this === static::IriReference || $this === static::UriReference,
             ]),
-            // Allow `x-allowed-schemes`, mirroring the default branch: field
-            // properties storing Drupal-specific URI schemes must not match.
-            ...!\array_key_exists('x-allowed-schemes', $schema)
-              ? []
-              : [new DataTypeShapeRequirement(UriSchemeConstraint::PLUGIN_ID, ['allowedSchemes' => $schema['x-allowed-schemes']])],
+            // Require `x-allowed-schemes`, because no SDC prop ever blindly
+            // accepts any URI scheme: it's always either a stream wrapper URI or
+            // a browser-accessible URI. Component requirement checking rejects
+            // props without it before they reach this point.
+            // @see \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
+            new DataTypeShapeRequirement(UriSchemeConstraint::PLUGIN_ID, [
+              'allowedSchemes' => $schema['x-allowed-schemes'] ?? throw new \LogicException(\sprintf('A prop with `contentMediaType: %s` must declare `x-allowed-schemes`.', $schema['contentMediaType'])),
+            ]),
             new DataTypeShapeRequirement('PrimitiveType', [], UriInterface::class),
           ]),
         default => new DataTypeShapeRequirements([
