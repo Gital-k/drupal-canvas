@@ -69,7 +69,7 @@ final class WorkspacesMockController extends ControllerBase {
    * 'source_id'. Returns 201 with the new workspace object.
    */
   public function createWorkspace(Request $request): JsonResponse {
-    $body = $this->decodeBody($request);
+    $body = $this::decodeBody($request);
     $name = trim((string) ($body['name'] ?? ''));
     if ($name === '') {
       return new JsonResponse(['message' => "'name' is required."], Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -116,7 +116,7 @@ final class WorkspacesMockController extends ControllerBase {
       return new JsonResponse(['message' => 'Workspace not found.'], Response::HTTP_NOT_FOUND);
     }
 
-    $body = $this->decodeBody($request);
+    $body = $this::decodeBody($request);
     $workspace = $workspaces[$workspace_id];
 
     $mutable = ['name', 'status', 'reviewers', 'scheduledAt'];
@@ -205,7 +205,7 @@ final class WorkspacesMockController extends ControllerBase {
       return new JsonResponse(['message' => 'Workspace not found.'], Response::HTTP_NOT_FOUND);
     }
 
-    $body = $this->decodeBody($request);
+    $body = $this::decodeBody($request);
     $action = $body['action'] ?? 'publish';
 
     $workspace = $workspaces[$workspace_id];
@@ -409,7 +409,7 @@ final class WorkspacesMockController extends ControllerBase {
    * @return array<string, mixed>
    *   Decoded body or empty array.
    */
-  private function decodeBody(Request $request): array {
+  private static function decodeBody(Request $request): array {
     $decoded = json_decode($request->getContent(), TRUE);
     return \is_array($decoded) ? $decoded : [];
   }

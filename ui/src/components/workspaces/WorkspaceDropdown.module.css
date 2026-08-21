@@ -43,9 +43,9 @@
 .workspaceName {
   overflow: hidden;
   flex: 1;
-  font-size: var(--font-size-1);
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-size: var(--font-size-1);
 }
 
 .optionsButton {
