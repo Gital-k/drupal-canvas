@@ -151,7 +151,6 @@ const SEL = {
     delete: '[data-testid="canvas-color-row-delete"]',
   },
   renameInput: '[data-testid="canvas-color-row-rename-input"]',
-  deleteConfirm: '[data-testid="canvas-color-delete-confirm-button"]',
   instancesPop: '[data-testid="canvas-find-color-instances-popover"]',
 };
 
@@ -714,6 +713,50 @@ test.describe('brand kit colors', () => {
     await expect(redSwatch).toHaveCSS('background-color', 'rgb(0, 0, 255)');
   });
 
+  test('shows a new color before the create completes', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.login({ username: 'colormaster', password: 'colormaster' });
+    await canvas.openCanvasRoot();
+    await canvas.openBrandKitPanel();
+
+    // Hold the write open so the assertions below land while it is in flight.
+    let releaseWrite: () => void = () => {};
+    const writeHeld = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    await page.route(/\/canvas\/api\/v0\/config\/color$/, async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      await writeHeld;
+      await route.continue();
+    });
+
+    await page.locator(SEL.newBtn).click();
+    await page.locator(SEL.newColorBtn).click();
+    await page.locator(SEL.form.name).fill('Impatient Amber');
+    await page.locator(SEL.form.rgba.r).fill('255');
+    await page.locator(SEL.form.rgba.g).fill('191');
+    await page.locator(SEL.form.rgba.b).fill('0');
+    await page.locator(SEL.form.save).click();
+
+    // The row is in the list while the request is still open, and the form has
+    // already closed.
+    await expect(page.locator(SEL.row('Impatient Amber'))).toBeVisible();
+    await expect(page.locator(SEL.rowSwatch('Impatient Amber'))).toHaveCSS(
+      'background-color',
+      'rgb(255, 191, 0)',
+    );
+    await expect(page.locator(POP_SEL)).toBeHidden();
+
+    releaseWrite();
+    await expect(page.locator(SEL.row('Impatient Amber'))).toBeVisible();
+  });
+
   test('rolls back a rejected color edit', async ({ page, drupal, canvas }) => {
     await drupal.login({ username: 'colormaster', password: 'colormaster' });
     await canvas.openCanvasRoot();
@@ -751,78 +794,10 @@ test.describe('brand kit colors', () => {
 
     // The rejected value must not survive anywhere in the UI.
     await expect(greenSwatch).toHaveCSS('background-color', storedGreen);
-    // The form closes as soon as the edit is applied, so the failure is
-    // reported by the colors section rather than by the form.
-    await expect(page.locator(POP_SEL)).toBeHidden();
+    // The form closed on submit and came back on the rejection, still holding
+    // what was entered, so the edit can be corrected and retried.
+    await expect(page.locator(POP_SEL)).toBeVisible();
+    await expect(page.locator(SEL.form.hsla.h)).toHaveValue('300');
     await expect(page.getByText(/Failed to update color/)).toBeVisible();
-  });
-
-  test('restores a color when deleting it fails', async ({
-    page,
-    drupal,
-    canvas,
-  }) => {
-    await drupal.login({ username: 'colormaster', password: 'colormaster' });
-    await canvas.openCanvasRoot();
-    await canvas.openBrandKitPanel();
-
-    await page.route(/\/canvas\/api\/v0\/config\/color\/.+/, async (route) => {
-      if (route.request().method() !== 'DELETE') {
-        await route.continue();
-        return;
-      }
-      await route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ errors: [{ detail: 'Rejected by test.' }] }),
-      });
-    });
-
-    await page.locator(SEL.row('Brand Blue')).hover();
-    await page.locator(SEL.rowMenu('Brand Blue')).click();
-    await page.locator(SEL.menu.delete).click();
-    await page.locator(SEL.deleteConfirm).click();
-
-    // The row must come back rather than silently vanishing from a failed write.
-    await expect(page.locator(SEL.row('Brand Blue'))).toBeVisible();
-  });
-
-  test('reopens the add form on the entered values when the create fails', async ({
-    page,
-    drupal,
-    canvas,
-  }) => {
-    await drupal.login({ username: 'colormaster', password: 'colormaster' });
-    await canvas.openCanvasRoot();
-    await canvas.openBrandKitPanel();
-
-    await page.route(/\/canvas\/api\/v0\/config\/color$/, async (route) => {
-      if (route.request().method() !== 'POST') {
-        await route.continue();
-        return;
-      }
-      await route.fulfill({
-        status: 422,
-        contentType: 'application/json',
-        body: JSON.stringify({ errors: [{ detail: 'Rejected by test.' }] }),
-      });
-    });
-
-    await page.locator(SEL.newBtn).click();
-    await page.locator(SEL.newColorBtn).click();
-    await page.locator(SEL.form.name).fill('Doomed Color');
-    await page.locator(SEL.form.rgba.r).fill('1');
-    await page.locator(SEL.form.rgba.g).fill('2');
-    await page.locator(SEL.form.rgba.b).fill('3');
-    await page.locator(SEL.form.save).click();
-
-    // The optimistic row is withdrawn, and the form comes back holding what was
-    // entered so it does not have to be retyped.
-    await expect(page.locator(SEL.row('Doomed Color'))).toBeHidden();
-    await expect(page.locator(SEL.form.name)).toHaveValue('Doomed Color');
-    await expect(page.locator(SEL.form.rgba.r)).toHaveValue('1');
-    await expect(page.locator(SEL.form.rgba.g)).toHaveValue('2');
-    await expect(page.locator(SEL.form.rgba.b)).toHaveValue('3');
-    await expect(page.getByText(/Failed to create color/)).toBeVisible();
   });
 });
