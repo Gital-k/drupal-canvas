@@ -151,6 +151,20 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
     };
   }, [handlePointerMove, handlePointerUp]);
 
+  const setRightPanelVisibility = (visible: boolean) => {
+    if (rightColumnRef.current) {
+      rightColumnRef.current.style.display = visible ? 'block' : 'none';
+    }
+  };
+
+  useEffect(() => {
+    if (selectedComponent) {
+      setRightPanelVisibility(true);
+    } else {
+      setRightPanelVisibility(false);
+    }
+  }, [selectedComponent]);
+
   const effectiveRightWidth = isPanelHidden ? 0 : rightWidthPx;
   const showHandle = !isPanelHidden;
 
@@ -181,7 +195,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
         })}
         style={{ width: effectiveRightWidth }}
       >
-        <ContextualPanel />
+        <ContextualPanel setPanelVisibility={setRightPanelVisibility}/>
       </div>
     </div>
   );

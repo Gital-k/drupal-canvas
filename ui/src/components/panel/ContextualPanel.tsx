@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { Outlet, useParams } from 'react-router-dom';
-import { InfoCircledIcon } from '@radix-ui/react-icons';
+import { Cross1Icon, InfoCircledIcon } from '@radix-ui/react-icons';
 import {
   Box,
   Button,
@@ -30,7 +30,11 @@ import type React from 'react';
 
 import styles from './ContextualPanel.module.css';
 
-const ContextualPanel: React.FC = () => {
+interface ContextualPanelProps {
+  setPanelVisibility: (open: boolean) => void;
+}
+
+const ContextualPanel: React.FC<ContextualPanelProps> = ({ setPanelVisibility }) => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const isMultiSelect = useAppSelector(selectIsMultiSelect);
   const selection = useAppSelector(selectSelection);
@@ -89,6 +93,9 @@ const ContextualPanel: React.FC = () => {
         height="100%"
         data-testid={`canvas-contextual-panel-${selectedComponent}`}
       >
+        <Flex align="end" justify="end" pr="4">
+          <Cross1Icon onClick={() => setPanelVisibility(false)} />
+        </Flex>
         <ErrorBoundary>
           <Tabs.Root
             defaultValue={'pageData'}
