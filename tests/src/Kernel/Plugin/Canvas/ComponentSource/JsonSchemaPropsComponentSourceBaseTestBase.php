@@ -339,11 +339,13 @@ abstract class JsonSchemaPropsComponentSourceBaseTestBase extends ComponentSourc
 
     $settings = $component->getSettings();
     self::assertArrayHasKey($valid_prop_name, $settings['prop_field_definitions']);
+    self::assertIsArray($settings['prop_field_definitions']);
     $expected_props = \array_keys($settings['prop_field_definitions']);
 
     // Baseline: every stored prop field definition yields a prop source, and
     // nothing is logged.
     $client_side_info = $component->getComponentSource()->getClientSideInfo($component);
+    self::assertArrayHasKey('propSources', $client_side_info);
     self::assertSame($expected_props, \array_keys($client_side_info['propSources']));
     self::assertSame([], $logger->records);
 
@@ -357,6 +359,7 @@ abstract class JsonSchemaPropsComponentSourceBaseTestBase extends ComponentSourc
     $component->setSettings($settings);
 
     $client_side_info = $component->getComponentSource()->getClientSideInfo($component);
+    self::assertArrayHasKey('propSources', $client_side_info);
     self::assertSame($expected_props, \array_keys($client_side_info['propSources']));
 
     // The stale prop is omitted, but not silently: a warning names both the
@@ -364,6 +367,7 @@ abstract class JsonSchemaPropsComponentSourceBaseTestBase extends ComponentSourc
     // config inconsistency that a site builder must resolve.
     self::assertCount(1, $logger->records);
     $record = \reset($logger->records);
+    self::assertIsArray($record);
     self::assertSame(RfcLogLevel::WARNING, $record['level']);
     self::assertSame('deletedInCode', $record['context']['%prop']);
     self::assertSame($component->id(), $record['context']['%component']);
