@@ -51,9 +51,7 @@ services:
     public: true
 
   # Shape matching.
-  Drupal\canvas\ShapeMatcher\PropSourceSuggester:
-    arguments:
-      $propSourceMatchers: !tagged_iterator canvas.prop_source_matcher
+  Drupal\canvas\ShapeMatcher\PropSourceSuggester: {}
   Drupal\canvas\ShapeMatcher\AdaptedPropSourceMatcher:
     public: false
     tags:
@@ -72,9 +70,7 @@ services:
       - { name: canvas.prop_source_matcher }
 
   # Prop source parsing.
-  Drupal\canvas\PropSource\PropSourceTypeRegistry:
-    arguments:
-      $propSourceTypes: !tagged_iterator canvas.prop_source_type
+  Drupal\canvas\PropSource\PropSourceTypeRegistry: {}
 
   # Utilities.
   Drupal\canvas\CanvasNotificationHandler: {}

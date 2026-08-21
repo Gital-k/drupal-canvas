@@ -11,6 +11,8 @@ use Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSyn
 use Drupal\canvas\CoreBugFix\ConfigEntityQueryFactory;
 use Drupal\canvas\CoreBugFix\TypedConfigManagerWithCachePollutionFix;
 use Drupal\canvas\Plugin\ComponentPluginManager;
+use Drupal\canvas\PropSource\PropSourceTypeRegistry;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\canvas\Validation\JitSafeRegexValidator;
 use Drupal\canvas\Validation\JsonSchema\CanvasColorStringConstraint;
 use Drupal\canvas\Validation\JsonSchema\ContentEntityReferenceObjectConstraint;
@@ -21,6 +23,7 @@ use Drupal\Core\Theme\Component\ComponentValidator;
 use JsonSchema\Constraints\Factory;
 use JsonSchema\DraftIdentifiers;
 use JsonSchema\Validator;
+use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Validator\Constraints\RegexValidator;
@@ -67,6 +70,13 @@ class CanvasServiceProvider extends ServiceProviderBase {
    * {@inheritdoc}
    */
   public function alter(ContainerBuilder $container): void {
+    // Equivalent to `!tagged_iterator canvas.prop_source_matcher` /
+    // `!tagged_iterator canvas.prop_source_type` in canvas.services.yml.
+    $container->getDefinition(PropSourceSuggester::class)
+      ->setArgument('$propSourceMatchers', new TaggedIteratorArgument('canvas.prop_source_matcher'));
+    $container->getDefinition(PropSourceTypeRegistry::class)
+      ->setArgument('$propSourceTypes', new TaggedIteratorArgument('canvas.prop_source_type'));
+
     $validator = $container->getDefinition(ComponentValidator::class);
     $factory = $container->setDefinition(Factory::class, new Definition(Factory::class));
     // Align the PHP validator with the Ajv default in the UI: both use JSON
