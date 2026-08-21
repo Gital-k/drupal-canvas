@@ -331,6 +331,7 @@ See
 - `\Drupal\Tests\canvas\Unit\PropExpressionTest::testToString()`
 - `\Drupal\Tests\canvas\Kernel\PropExpressionKernelTest::testLabel()`
 - `\Drupal\Tests\canvas\Kernel\PropExpressionKernelTest::testCalculateDependencies()`
+- `\Drupal\Tests\canvas\Kernel\PropExpressionKernelTest::testGetFieldDefinition()`
 
 Many `field type`s contain a single `field prop` (typically named "value"), but not all. Most `field type`s have one
 required "main prop", many have additional optional props or even computed props.

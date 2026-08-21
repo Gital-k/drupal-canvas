@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\PropExpressions\StructuredData;
 
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
  * An expression that has an entity field as the starting point.
@@ -41,6 +42,23 @@ interface EntityFieldBasedPropExpressionInterface extends StructuredDataPropExpr
    *   A field name, such as `title`, `owner`, `field_image`, `field_tags`, etc.
    */
   public function getFieldName(): string;
+
+  /**
+   * Gets the definition of the field that this expression starts from.
+   *
+   * Resolves ::getFieldName() against ::getHostEntityDataDefinition(): for a
+   * host that targets a single bundle, the bundle's field definitions are used;
+   * otherwise only the entity type's base field definitions can be resolved.
+   *
+   * @return \Drupal\Core\Field\FieldDefinitionInterface|null
+   *   The field definition, or NULL if it cannot be resolved: the host entity
+   *   type does not exist, is not fieldable, or has no such field. Each of
+   *   those is reported by a dedicated validation constraint, so callers that
+   *   validate expressions may treat NULL as "not my concern".
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\ExpressionTargetEntityBundleExistsConstraint
+   */
+  public function getFieldDefinition(): ?FieldDefinitionInterface;
 
   /**
    * Optionally, a specific delta may be targeted by the expression.

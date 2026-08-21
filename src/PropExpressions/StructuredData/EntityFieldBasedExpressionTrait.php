@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\PropExpressions\StructuredData;
 
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
  * @see \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface
@@ -25,6 +26,25 @@ trait EntityFieldBasedExpressionTrait {
       $this->getFieldName(),
       $this->getDelta() ?? '*',
     );
+  }
+
+  /**
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface::getFieldDefinition()
+   */
+  public function getFieldDefinition(): ?FieldDefinitionInterface {
+    \assert($this instanceof EntityFieldBasedPropExpressionInterface);
+    $host_entity_data_definition = $this->getHostEntityDataDefinition();
+    $entity_type_id = $host_entity_data_definition->getEntityTypeId();
+    // ::getPropertyDefinitions() below would crash on a nonexistent entity
+    // type. That is reported by ExpressionTargetEntityBundleExists instead.
+    // @phpstan-ignore-next-line
+    if ($entity_type_id === NULL || !\Drupal::entityTypeManager()->hasDefinition($entity_type_id)) {
+      return NULL;
+    }
+    // Non-fieldable entity types yield an empty array, and a nonexistent field
+    // name simply is absent: both are reported by other constraints.
+    $field_definition = $host_entity_data_definition->getPropertyDefinitions()[$this->getFieldName()] ?? NULL;
+    return $field_definition instanceof FieldDefinitionInterface ? $field_definition : NULL;
   }
 
   /**
