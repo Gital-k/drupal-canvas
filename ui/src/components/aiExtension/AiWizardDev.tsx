@@ -35,6 +35,7 @@ import {
   selectPageData,
   updatePageDataExternally,
 } from '@/features/pageData/pageDataSlice';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import {
   useCreateCodeComponentMutation,
   useGetComponentsQuery,
@@ -652,7 +653,9 @@ const AiWizardDev = () => {
   const componentSelectionUtils = drupalSettings.canvas
     ?.componentSelectionUtils as any;
 
-  const { data: availableComponents } = useGetComponentsQuery();
+  const { data: availableComponents } = useGetComponentsQuery(
+    useHostEntityParams(),
+  );
   const componentsRef = useRef<any>(null);
 
   useEffect(() => {

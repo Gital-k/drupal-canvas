@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 
 import type { ComponentsList, libraryTypes } from '@/types/Component';
@@ -27,7 +28,11 @@ type getComponentsQueryOptions = {
 export const useGetFilteredComponentsQuery = (
   filterOptions: getComponentsQueryOptions,
 ) => {
-  const { data: components, error, isLoading } = useGetComponentsQuery();
+  const {
+    data: components,
+    error,
+    isLoading,
+  } = useGetComponentsQuery(useHostEntityParams());
 
   const filteredComponents = useMemo((): ComponentsList => {
     if (!components) return {};

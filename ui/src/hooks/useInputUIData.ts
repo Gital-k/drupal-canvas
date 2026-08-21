@@ -5,6 +5,7 @@ import { selectCurrentComponent } from '@/features/form/formStateSlice';
 import { selectLayout, selectModel } from '@/features/layout/layoutModelSlice';
 import { findComponentByUuid } from '@/features/layout/layoutUtils';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 
 import type { InputUIData } from '@/types/Form';
@@ -13,7 +14,7 @@ const useInputUIData = (): InputUIData => {
   const currentComponent = useAppSelector(selectCurrentComponent);
   const selectedComponent = currentComponent || 'noop';
   const model = useAppSelector(selectModel);
-  const { data: components } = useGetComponentsQuery();
+  const { data: components } = useGetComponentsQuery(useHostEntityParams());
   const layout = useAppSelector(selectLayout);
   const node = findComponentByUuid(layout, selectedComponent);
   const [selectedComponentType, version] = (

@@ -170,6 +170,7 @@ rightbar
 rightclick
 roundtripped
 rtkq
+satisfiability
 scriptification
 scriptified
 scriptify

@@ -3,6 +3,7 @@ import { useErrorBoundary } from 'react-error-boundary';
 
 import ListItem from '@/components/list/ListItem';
 import { LayoutItemType } from '@/features/ui/primaryPanelSlice';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import {
   useGetComponentsQuery,
   useGetFoldersQuery,
@@ -26,7 +27,11 @@ export type ComponentVisibility =
   | 'non-external-and-fallback-external';
 
 const ComponentList = ({ searchTerm, visibility }: ComponentListProps) => {
-  const { data: allComponents, error, isLoading } = useGetComponentsQuery();
+  const {
+    data: allComponents,
+    error,
+    isLoading,
+  } = useGetComponentsQuery(useHostEntityParams());
   // Markers (e.g. the page variant "Page content" marker) are intrinsic
   // placeholders managed by Canvas: they are never offered in the library.
   // Memoized: a fresh object on every render would remount the whole list on

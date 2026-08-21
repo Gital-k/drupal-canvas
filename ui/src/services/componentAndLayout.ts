@@ -19,18 +19,14 @@ import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
 
 import type { RootLayoutModel } from '@/features/layout/layoutModelSlice';
+import type { HostEntityParams } from '@/services/baseQuery';
 import type {
   UpdateComponentQueryArg,
   UpdateComponentResultType,
 } from '@/services/preview';
 import type { AutoSavesHash } from '@/types/AutoSaves';
 import type { CodeComponentSerialized } from '@/types/CodeComponent';
-import type { ComponentsList, libraryTypes } from '@/types/Component';
-
-type getComponentsQueryOptions = {
-  libraries: libraryTypes[];
-  mode: 'include' | 'exclude';
-};
+import type { ComponentsList } from '@/types/Component';
 
 export type LayoutApiResponse = RootLayoutModel & {
   entity_form_fields: Record<string, any>;
@@ -163,11 +159,23 @@ export const componentAndLayoutApi = createApi({
     'PreviewContentEntities',
   ],
   endpoints: (builder) => ({
-    getComponents: builder.query<
-      ComponentsList,
-      getComponentsQueryOptions | void
-    >({
-      query: () => `canvas/api/v0/config/component`,
+    getComponents: builder.query<ComponentsList, HostEntityParams>({
+      // Scope the list to the host entity being edited (when there is one) so
+      // the server can omit Components whose contexts it cannot satisfy. The
+      // host is a real query argument, so RTK Query keys the cache by it: the
+      // library is fetched again — and returns to a prior host's cached list —
+      // as the editor navigates between hosts. Callers pass `{}` for no host
+      // (the pattern editor or region editing) to receive the global list.
+      query: ({ entityType, entityBundle } = {}) => {
+        if (!entityType) {
+          return `canvas/api/v0/config/component`;
+        }
+        const params = new URLSearchParams({ entity_type: entityType });
+        if (entityBundle) {
+          params.set('entity_bundle', entityBundle);
+        }
+        return `canvas/api/v0/config/component?${params.toString()}`;
+      },
       providesTags: () => [{ type: 'Components', id: 'LIST' }],
       transformResponse: (response: ComponentsList) => {
         return Object.fromEntries(

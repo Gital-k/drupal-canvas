@@ -91,7 +91,7 @@ final class Marker extends ComponentSourceBase {
   /**
    * {@inheritdoc}
    */
-  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview, ?FieldableEntityInterface $host_entity = NULL): array {
     // A marker renders nothing on its own. In a page variant, the renderer
     // injects the route's main content in its place by resuming the fiber with
     // that content: suspending yields this source so the variant can recognize

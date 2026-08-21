@@ -58,7 +58,7 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     return new TranslatableMarkup('Fallback');
   }
 
-  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview, ?FieldableEntityInterface $host_entity = NULL): array {
     return [
       '#type' => 'inline_template',
       '#template' => '<div data-fallback="{{ component_uuid }}"></div>',

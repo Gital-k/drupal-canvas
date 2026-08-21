@@ -131,11 +131,16 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   Component UUID.
    * @param bool $isPreview
    *   TRUE if is preview.
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|null $host_entity
+   *   The host content entity whose component tree is being rendered, or NULL
+   *   when there is none (for example a site-wide PageRegion tree). Sources
+   *   that consume runtime contexts (such as blocks) use it as a context
+   *   source.
    *
    * @return array
    *   Render array.
    */
-  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview): array;
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview, ?FieldableEntityInterface $host_entity = NULL): array;
 
   public function generateVersionHash(): string;
 
@@ -167,7 +172,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   entity to use during evaluation of the EntityFieldPropSources.
    *   (Typically: when this is a component instance in a ContentTemplate.)
    *
-   * @todo Add ::getImplicitInput() in https://www.drupal.org/project/canvas/issues/3485502 — SDCs don't have implicit inputs, but Block plugins do: contexts
+   * @todo Add ::getImplicitInput() in https://www.drupal.org/project/canvas/issues/3591963 — SDCs don't have implicit inputs, but Block plugins do: contexts
    */
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array;
 

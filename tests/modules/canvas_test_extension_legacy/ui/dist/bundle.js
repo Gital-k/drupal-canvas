@@ -1,5 +1,5 @@
 
-(function(l, r) { if (!l || l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (self.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(self.document);
+(function(l, r) { if (!l || l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (self.location.host || 'localhost').split(':')[0] + ':35730/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(self.document);
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(require('react-dom'), require('react')) :
   typeof define === 'function' && define.amd ? define(['react-dom', 'react'], factory) :
@@ -2104,10 +2104,18 @@
       return state === null || state === void 0 || (_state$layoutModel = state.layoutModel) === null || _state$layoutModel === void 0 || (_state$layoutModel = _state$layoutModel.present) === null || _state$layoutModel === void 0 ? void 0 : _state$layoutModel.layout;
     });
 
-    // Get the available components list from the redux store.
+    // Get the available components list from the redux store. The component list
+    // is now cache-keyed by the editing host, so find the fulfilled getComponents
+    // entry regardless of its host key rather than the old fixed
+    // `getComponents(undefined)` key.
     var availableComponents = useSelector(function (state) {
-      var _state$componentAndLa;
-      return state === null || state === void 0 || (_state$componentAndLa = state.componentAndLayoutApi) === null || _state$componentAndLa === void 0 || (_state$componentAndLa = _state$componentAndLa.queries['getComponents(undefined)']) === null || _state$componentAndLa === void 0 ? void 0 : _state$componentAndLa.data;
+      var _state$componentAndLa, _state$componentAndLa2;
+      var queries = (_state$componentAndLa = state === null || state === void 0 || (_state$componentAndLa2 = state.componentAndLayoutApi) === null || _state$componentAndLa2 === void 0 ? void 0 : _state$componentAndLa2.queries) !== null && _state$componentAndLa !== void 0 ? _state$componentAndLa : {};
+      var key = Object.keys(queries).find(function (k) {
+        var _queries$k;
+        return k.startsWith('getComponents(') && ((_queries$k = queries[k]) === null || _queries$k === void 0 ? void 0 : _queries$k.data);
+      });
+      return key ? queries[key].data : undefined;
     });
 
     // Get the uuid of the selected component from the Redux store.

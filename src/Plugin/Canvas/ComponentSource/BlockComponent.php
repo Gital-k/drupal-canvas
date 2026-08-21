@@ -7,7 +7,9 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
+use Drupal\canvas\ComponentSource\ContextGatherer;
 use Drupal\canvas\Entity\Component as ComponentEntity;
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Form\ClientFormSubmissionHelper;
 use Drupal\canvas\MissingComponentInputsException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -34,6 +36,9 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Form\SubformState;
 use Drupal\Core\Link;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
+use Drupal\Core\Plugin\Context\ContextHandlerInterface;
+use Drupal\Core\Plugin\ContextAwarePluginInterface;
 use Drupal\Core\Plugin\PluginDependencyTrait;
 use Drupal\Core\Plugin\PluginFormFactoryInterface;
 use Drupal\Core\Plugin\PluginFormInterface;
@@ -53,14 +58,13 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 /**
  * Defines a component source based on block plugins.
- *
- * @todo Context mappings.
  */
 #[ComponentSource(
   id: self::SOURCE_PLUGIN_ID,
   label: new TranslatableMarkup('Blocks'),
-  // While Canvas does not support context mappings yet, Block plugins also can
-  // contain logic and perform e.g. database queries that fetch data to present.
+  // Block plugins can be context-aware (their context assignments are stored in
+  // `context_mapping`) and can also contain logic that performs e.g. database
+  // queries that fetch data to present.
   supportsImplicitInputs: TRUE,
   discovery: BlockComponentDiscovery::class,
   updater: FALSE,
@@ -102,6 +106,8 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     private readonly FormBuilderInterface $formBuilder,
     private readonly PluginFormFactoryInterface $pluginFormFactory,
     private readonly AutoSaveManager $autoSaveManager,
+    private readonly ContextGatherer $contextGatherer,
+    private readonly ContextHandlerInterface $contextHandler,
   ) {
     \assert(\array_key_exists('local_source_id', $configuration));
     parent::__construct($configuration, $plugin_id, $plugin_definition);
@@ -121,6 +127,8 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       $container->get(FormBuilderInterface::class),
       $container->get(PluginFormFactoryInterface::class),
       $container->get(AutoSaveManager::class),
+      $container->get(ContextGatherer::class),
+      $container->get(ContextHandlerInterface::class),
     );
   }
 
@@ -162,6 +170,30 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   }
 
   /**
+   * Gets the context definitions of the underlying block plugin.
+   *
+   * Used by the component library endpoint to decide whether this block-sourced
+   * Component can be placed in the editing situation being requested: a block
+   * whose required contexts cannot be satisfied is filtered out.
+   *
+   * @return array<string, \Drupal\Core\Plugin\Context\ContextDefinitionInterface>
+   *   The block plugin's context definitions keyed by context slot name, or an
+   *   empty array when the block is not context-aware or is broken/missing.
+   *
+   * @see \Drupal\canvas\Controller\ApiConfigControllers::list()
+   * @see \Drupal\canvas\ComponentSource\ContextGatherer::hasRequiredContextsSatisfied()
+   */
+  public function getContextDefinitions(): array {
+    try {
+      $block = $this->getBlockPlugin();
+    }
+    catch (PluginNotFoundException) {
+      return [];
+    }
+    return $block instanceof ContextAwarePluginInterface ? $block->getContextDefinitions() : [];
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function calculateDependencies(): array {
@@ -182,7 +214,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   /**
    * {@inheritdoc}
    */
-  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE, ?FieldableEntityInterface $host_entity = NULL): array {
     $block = $this->getBlockPlugin();
 
     // Avoid the fallback rendering of the Block system; instead use Canvas'
@@ -223,6 +255,19 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       $block->setConfigurationValue($key, $value);
     }
 
+    // Give a context-aware block its context values before it builds. The
+    // stored `context_mapping` (set as a configuration value above) says which
+    // gathered context feeds each of the block's context slots. This resolves
+    // the block's implicit inputs from the real editing/rendering situation:
+    // the host content entity plus the populated global contexts.
+    // A required context that cannot be satisfied makes applyContextMapping()
+    // throw; that is left to bubble so the component-tree render path degrades
+    // to a placeholder instead of breaking the whole page.
+    // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::renderify()
+    if ($block instanceof ContextAwarePluginInterface && $block->getContextDefinitions() !== []) {
+      $this->contextHandler->applyContextMapping($block, $this->contextGatherer->getPopulatedContexts($host_entity));
+    }
+
     // Allow global context to be injected by suspending the fiber.
     // @see \Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant::build()
     if ($block instanceof TitleBlockPluginInterface || $block instanceof MessagesBlockPluginInterface) {
@@ -238,6 +283,13 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       '#access' => $block->access($this->currentUser, TRUE),
     ];
     $cacheable_metadata = CacheableMetadata::createFromObject($block);
+    // Bubble the cacheability of every context value applied above, so the
+    // render varies and invalidates with the contexts it was built from.
+    if ($block instanceof ContextAwarePluginInterface) {
+      foreach ($block->getContexts() as $context) {
+        $cacheable_metadata->addCacheableDependency($context);
+      }
+    }
     $cacheable_metadata->applyTo($build);
 
     \assert($build['#access'] instanceof AccessResultInterface);
@@ -364,7 +416,13 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // @see \Drupal\system\Plugin\Block\SystemBrandingBlock::blockForm
     $block_plugin = $this->getBlockPlugin();
     $block_plugin->setConfiguration($explicit_input);
-    $form_object = $this->buildAnonymousFormForBlockPlugin(\hash('sha256', \json_encode($explicit_input, \JSON_THROW_ON_ERROR)), $block_plugin);
+    // Seed the gathered contexts so a context-aware block's form renders its
+    // context-assignment element: a stored `context_mapping` then pre-populates
+    // the selects, flows into the client model, and is sent back on the next
+    // edit. No host entity is available here, so only global contexts are
+    // offered as options.
+    $gathered_contexts = $this->gatherContextsFor($block_plugin, NULL);
+    $form_object = $this->buildAnonymousFormForBlockPlugin(\hash('sha256', \json_encode($explicit_input, \JSON_THROW_ON_ERROR)), $block_plugin, $gathered_contexts);
     $form_state->setFormObject($form_object);
     $form = $this->formBuilder->buildForm($form_object, $form_state);
     $values = self::filterClientInput($form_state->getValues(), $form);
@@ -408,6 +466,31 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     if ($inputValues) {
       $blockPlugin->setConfiguration($inputValues);
     }
+    // A context-aware block's configuration form renders a context-assignment
+    // element for each of its context slots, but only when the gathered
+    // contexts are seeded in form state. Seed them before building the subform
+    // so the block's own form adds and later applies the `context_mapping`
+    // element; Canvas does not fork that trait.
+    // @see \Drupal\Core\Block\BlockBase::buildConfigurationForm()
+    // @see \Drupal\block\BlockForm::form()
+    $gathered_contexts = [];
+    $is_context_aware = $blockPlugin instanceof ContextAwarePluginInterface && $blockPlugin->getContextDefinitions() !== [];
+    if ($is_context_aware) {
+      \assert($blockPlugin instanceof ContextAwarePluginInterface);
+      // The instance form receives the host entity for a content entity or,
+      // for a ContentTemplate, an empty entity of the previewed type; either
+      // exposes the entity context blocks match against. Region editing has no
+      // host entity, so only global contexts are available.
+      // @todo ComponentInstanceForm already resolves the selected host entity; a follow-up could seed the gathered contexts from the controller (or a shared context-aware component-source base) instead of re-deriving them per source here.
+      $host_entity = match (TRUE) {
+        $entity instanceof FieldableEntityInterface => $entity,
+        $entity instanceof ContentTemplate => $entity->createEmptyTargetEntity(),
+        default => NULL,
+      };
+      $gathered_contexts = $this->contextGatherer->getPopulatedContexts($host_entity);
+      $form_state->setTemporaryValue('gathered_contexts', $gathered_contexts);
+    }
+
     // Mirror the sub-form logic from the Block config entity form.
     // @see \Drupal\block\BlockForm::form
     $form['#tree'] = TRUE;
@@ -423,7 +506,58 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     foreach (['label', 'admin_label', 'label_display'] as $field) {
       unset($form['settings'][$field]);
     }
+
+    // Core hides a required context that has exactly one candidate, but the
+    // editor must still SEE which contexts the instance consumes. Add a
+    // read-only display of every required context and the context it resolves
+    // to. It is a non-input element, so it contributes no submitted value.
+    if ($is_context_aware) {
+      \assert($blockPlugin instanceof ContextAwarePluginInterface);
+      $form['settings'] += $this->buildRequiredContextsDisplay($blockPlugin, $gathered_contexts);
+    }
+
     return $form;
+  }
+
+  /**
+   * Builds a read-only display of a block's required contexts.
+   *
+   * @param \Drupal\Core\Plugin\ContextAwarePluginInterface $block_plugin
+   *   The context-aware block plugin.
+   * @param array<string, \Drupal\Core\Plugin\Context\ContextInterface> $gathered_contexts
+   *   The contexts available for this editing situation, keyed by context id.
+   *
+   * @return array
+   *   A render array of `item` elements, one per required context, or an empty
+   *   array when the block declares no required contexts.
+   *
+   * @todo The context-aware behavior on this source (gathering contexts, the required-context display, and mapping recovery) could move to a shared ContextAwareComponentSourceInterface once another component source needs it.
+   */
+  private function buildRequiredContextsDisplay(ContextAwarePluginInterface $block_plugin, array $gathered_contexts): array {
+    $required_definitions = \array_filter(
+      $block_plugin->getContextDefinitions(),
+      static fn (ContextDefinitionInterface $definition): bool => $definition->isRequired(),
+    );
+    if ($required_definitions === []) {
+      return [];
+    }
+    $mapping = $block_plugin->getContextMapping();
+    $display = ['canvas_required_contexts' => []];
+    foreach ($required_definitions as $context_slot => $definition) {
+      // The slot uses its stored/auto-assigned mapping when present, otherwise
+      // the single candidate core would auto-assign to a required context.
+      $matching_contexts = $this->contextHandler->getMatchingContexts($gathered_contexts, $definition);
+      $assigned_id = $mapping[$context_slot] ?? (\count($matching_contexts) === 1 ? \array_key_first($matching_contexts) : NULL);
+      $assigned_label = $assigned_id !== NULL && isset($gathered_contexts[$assigned_id])
+        ? $gathered_contexts[$assigned_id]->getContextDefinition()->getLabel()
+        : $this->t('Not available');
+      $display['canvas_required_contexts'][$context_slot] = [
+        '#type' => 'item',
+        '#title' => $definition->getLabel() ?? $context_slot,
+        '#markup' => $assigned_label,
+      ];
+    }
+    return $display;
   }
 
   /**
@@ -435,6 +569,18 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // @see `type: canvas.page_region.*`'s `component_trees.tree.presence`
     $block_plugin = $this->getBlockPlugin();
     if ($block_plugin instanceof TitleBlockPluginInterface || $block_plugin instanceof MessagesBlockPluginInterface) {
+      return ['build' => []];
+    }
+
+    // The component library preview is rendered without a host entity, so a
+    // block whose required contexts cannot be satisfied by the globally
+    // available contexts alone cannot be previewed here. Offer an empty preview
+    // instead of crashing the whole component list: the block is still
+    // placeable, and whether its contexts are satisfiable for the entity being
+    // edited is decided by the library filtering against the real host entity.
+    // @see \Drupal\canvas\Controller\ApiConfigControllers::list()
+    if ($block_plugin instanceof ContextAwarePluginInterface
+      && !$this->contextGatherer->hasRequiredContextsSatisfied($block_plugin->getContextDefinitions(), $this->contextGatherer->getPopulatedContexts())) {
       return ['build' => []];
     }
 
@@ -469,7 +615,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     ]));
 
     $block_plugin = $this->getBlockPlugin();
-    $this->submitBlockConfigurationForm($block_plugin, $component_instance_uuid, $input);
+    $this->submitBlockConfigurationForm($block_plugin, $component_instance_uuid, $input, $host_entity);
     $input = $label_input + \array_intersect_key(
       // Ignore any keys from configuration that don't exist in configuration.
       $block_plugin->getConfiguration(),
@@ -483,6 +629,24 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // plugin ID.
     $input += $defaults;
     unset($input['provider'], $input['id']);
+
+    // A context-aware block stores its context assignments in
+    // `context_mapping`. The merge above keeps only keys present in the default
+    // settings, so it drops `context_mapping` whenever the block declares no
+    // default for it. Recover the assignments the anonymous form produced when
+    // submitting: the context-assignment element auto-assigns a single
+    // candidate required context and applies any chosen mapping, so this
+    // covers both a freshly placed block and an edited one. Empty selections
+    // (an unset optional context) are filtered out so no mapping is stored.
+    if ($block_plugin instanceof ContextAwarePluginInterface && $block_plugin->getContextDefinitions() !== []) {
+      $context_mapping = \array_filter($block_plugin->getConfiguration()['context_mapping'] ?? []);
+      if ($context_mapping !== []) {
+        $input['context_mapping'] = $context_mapping;
+      }
+      else {
+        unset($input['context_mapping']);
+      }
+    }
     return $input;
   }
 
@@ -513,6 +677,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     BlockPluginInterface $block_plugin,
     string $component_instance_uuid,
     array $input,
+    ?FieldableEntityInterface $host_entity = NULL,
   ): FormStateInterface {
     $form_state = new FormState();
     // Some plugins make use of form elements that modify the submitted values
@@ -521,7 +686,13 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // To call these methods we make an anonymous form class with the block
     // plugin form in a sub-form and submit it with the values from the client
     // model.
-    $form_object = $this->buildAnonymousFormForBlockPlugin($component_instance_uuid, $block_plugin);
+    // Seed the gathered contexts so the block's own form adds the
+    // context-assignment element and, on submission, auto-assigns a
+    // single-candidate required context and applies any chosen mapping to the
+    // block plugin's `context_mapping`.
+    // @see \Drupal\Core\Block\BlockBase::submitConfigurationForm()
+    $gathered_contexts = $this->gatherContextsFor($block_plugin, $host_entity);
+    $form_object = $this->buildAnonymousFormForBlockPlugin($component_instance_uuid, $block_plugin, $gathered_contexts);
     $form_state = ClientFormSubmissionHelper::prepareProgrammedFormStateForFormObject($form_state, $form_object)
       // With the values provided from the front-end.
       ->setValues(['settings' => $input]);
@@ -537,7 +708,30 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     return $block;
   }
 
-  protected function buildAnonymousFormForBlockPlugin(string $form_id, BlockPluginInterface $block_plugin): FormInterface {
+  /**
+   * Gathers the contexts a context-aware block's form needs, if applicable.
+   *
+   * @param \Drupal\Core\Block\BlockPluginInterface $block_plugin
+   *   The block plugin.
+   * @param \Drupal\Core\Entity\EntityInterface|null $host_entity
+   *   The host entity whose tree is being edited, or NULL when there is none.
+   *
+   * @return array<string, \Drupal\Core\Plugin\Context\ContextInterface>
+   *   The gathered contexts keyed by context id, or an empty array when the
+   *   block declares no contexts. Seed these as the `gathered_contexts` form
+   *   state temporary value so the block's own form renders and applies its
+   *   `context_mapping` element.
+   *
+   * @see \Drupal\Core\Block\BlockBase::buildConfigurationForm()
+   */
+  private function gatherContextsFor(BlockPluginInterface $block_plugin, ?EntityInterface $host_entity): array {
+    if (!$block_plugin instanceof ContextAwarePluginInterface || $block_plugin->getContextDefinitions() === []) {
+      return [];
+    }
+    return $this->contextGatherer->getPopulatedContexts($host_entity);
+  }
+
+  protected function buildAnonymousFormForBlockPlugin(string $form_id, BlockPluginInterface $block_plugin, array $gathered_contexts = []): FormInterface {
     // Build and return an ephemeral form object that can be used with the form
     // builder to validate and submit block plugin forms. This gives any block
     // plugins that have logic in these methods a chance to modify the client
@@ -547,6 +741,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       $block_plugin,
       $this->pluginFormFactory,
       $this->autoSaveManager,
+      $gathered_contexts,
     ) implements FormInterface {
 
       public function __construct(
@@ -554,6 +749,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
         protected readonly BlockPluginInterface $blockPlugin,
         protected readonly PluginFormFactoryInterface $formFactory,
         protected readonly AutoSaveManager $autoSaveManager,
+        protected readonly array $gatheredContexts,
       ) {
       }
 
@@ -564,6 +760,15 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       public function buildForm(array $form, FormStateInterface $form_state): array {
         $form['#tree'] = TRUE;
         $form['settings'] = [];
+        // Seed the gathered contexts so a context-aware block's form adds the
+        // `context_mapping` element: it round-trips into the client model
+        // (::inputToClientModel) and, on submission, auto-assigns a
+        // single-candidate required context and applies any chosen mapping
+        // (::clientModelToInput).
+        // @see \Drupal\Core\Block\BlockBase::buildConfigurationForm()
+        if ($this->gatheredContexts !== []) {
+          $form_state->setTemporaryValue('gathered_contexts', $this->gatheredContexts);
+        }
         $subform_state = SubformState::createForSubform($form['settings'], $form, $form_state);
         $form['settings'] = $this->getPluginForm($this->blockPlugin)
           ->buildConfigurationForm($form['settings'], $subform_state);
@@ -651,7 +856,9 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
 
       public function submitForm(array &$form, FormStateInterface $form_state): void {
         // Give the block plugin a chance to perform any logic in its
-        // ::blockSubmit method.
+        // ::blockSubmit method. For a context-aware block this also applies the
+        // submitted `context_mapping` to the plugin configuration.
+        // @see \Drupal\Core\Block\BlockBase::submitConfigurationForm()
         $this->getPluginForm($this->blockPlugin)->submitConfigurationForm(
           $form['settings'],
           SubformState::createForSubform($form['settings'], $form, $form_state),

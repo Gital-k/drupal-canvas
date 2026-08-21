@@ -217,7 +217,12 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
     $hydrated = $renderable_component_tree->getTree();
 
     \assert(\array_keys($hydrated) === [self::ROOT_UUID]);
-    $build = self::renderify(self::buildRenderingContext($this, $entity), $hydrated, $isPreview);
+    // Only a content entity is a source of runtime contexts (for example an
+    // entity context for a field block). Config-entity trees (such as a
+    // site-wide PageRegion) have no host content entity, so they render with
+    // global contexts only.
+    $host_entity = $entity instanceof FieldableEntityInterface ? $entity : NULL;
+    $build = self::renderify(self::buildRenderingContext($this, $entity), $hydrated, $isPreview, $host_entity);
 
     // @see \Drupal\Core\Entity\EntityViewBuilder::getBuildDefaults()
     CacheableMetadata::createFromObject($renderable_component_tree)
@@ -240,7 +245,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
    * @return array
    *   The corresponding render array.
    */
-  private static function renderify(string $componentRenderingContext, array $hydrated, bool $isPreview = FALSE) {
+  private static function renderify(string $componentRenderingContext, array $hydrated, bool $isPreview = FALSE, ?FieldableEntityInterface $host_entity = NULL) {
     $build = [];
     foreach ($hydrated as $component_subtree_uuid => $component_instances) {
       foreach ($component_instances as $component_instance_uuid => $component_instance) {
@@ -257,7 +262,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           $component = Component::load($component_instance['component']);
           \assert($component instanceof Component);
           $source = $component->getComponentSource();
-          $element = $source->renderComponent($component_instance, $component->getSlotDefinitions(), $component_instance_uuid, $isPreview);
+          $element = $source->renderComponent($component_instance, $component->getSlotDefinitions(), $component_instance_uuid, $isPreview, $host_entity);
 
           // A component instance provided by a
           // ComponentSourceWithSwitchCasesInterface is guaranteed to either be
@@ -314,7 +319,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
               // Explicit slot value: renderify, just like the rest of the
               // component tree.
               else {
-                $slots += self::renderify($componentRenderingContext, [$slot => $slot_value], $isPreview);
+                $slots += self::renderify($componentRenderingContext, [$slot => $slot_value], $isPreview, $host_entity);
               }
             }
 

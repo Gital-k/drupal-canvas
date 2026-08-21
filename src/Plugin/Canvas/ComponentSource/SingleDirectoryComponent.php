@@ -7,6 +7,7 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\GeneratedUrl;
@@ -147,7 +148,7 @@ final class SingleDirectoryComponent extends JsonSchemaPropsComponentSourceBase 
   /**
    * {@inheritdoc}
    */
-  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE, ?FieldableEntityInterface $host_entity = NULL): array {
     // Fetch the prop schemas before resolving props so that color props can be
     // transformed to rich objects. If the underlying SDC plugin is unavailable
     // (broken component), pass an empty schema array: color resolution is

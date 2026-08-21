@@ -418,7 +418,7 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
   /**
    * {@inheritdoc}
    */
-  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE, ?FieldableEntityInterface $host_entity = NULL): array {
     $component = $this->getJavaScriptComponent();
     $headless_settings = NULL;
 

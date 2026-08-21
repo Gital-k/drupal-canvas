@@ -6,6 +6,8 @@ import {
   DEFAULT_REGION,
   selectEditorFrameContext,
 } from '@/features/ui/uiSlice';
+import { getHostEntityParams } from '@/services/baseQuery';
+import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import { previewApi } from '@/services/preview';
 import { hasSlotDefinitions, isPropSourceComponent } from '@/types/Component';
 import {
@@ -716,10 +718,14 @@ export const updateExistingComponentValues =
   async (dispatch, getState) => {
     const { componentSelectionUtils } = canvasSettings;
     const state = getState();
-    const components: ComponentsList | undefined = state?.componentAndLayoutApi
-      ?.queries?.['getComponents(undefined)']?.data as
-      | ComponentsList
-      | undefined;
+    // Read the same host-scoped cache entry the editor's `getComponents`
+    // subscription populated, via the endpoint's own selector so the key
+    // matches. The host comes from the route because this runs outside React
+    // (it is also exposed to extensions), where no hook is available.
+    const components: ComponentsList | undefined =
+      componentAndLayoutApi.endpoints.getComponents.select(
+        getHostEntityParams(window.location.href),
+      )(state)?.data;
     if (!components) {
       console.warn('No components list found, cannot update component values.');
       return;
@@ -815,10 +821,14 @@ export const _linkPropToEntityValue =
   }): AppThunk =>
   async (dispatch, getState) => {
     const state = getState();
-    const components: ComponentsList | undefined = state?.componentAndLayoutApi
-      ?.queries?.['getComponents(undefined)']?.data as
-      | ComponentsList
-      | undefined;
+    // Read the same host-scoped cache entry the editor's `getComponents`
+    // subscription populated, via the endpoint's own selector so the key
+    // matches. The host comes from the route because this runs outside React
+    // (it is also exposed to extensions), where no hook is available.
+    const components: ComponentsList | undefined =
+      componentAndLayoutApi.endpoints.getComponents.select(
+        getHostEntityParams(window.location.href),
+      )(state)?.data;
     if (!components) {
       console.warn('No components list found, cannot update component values.');
       return;

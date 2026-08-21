@@ -147,7 +147,7 @@ final class ThemePageTemplate extends ComponentSourceBase implements
   /**
    * {@inheritdoc}
    */
-  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview, ?FieldableEntityInterface $host_entity = NULL): array {
     // Build the theme's page template. Region content is placed as slots by
     // ::setSlots(), keyed by region machine name, so that page.html.twig prints
     // each region exactly where the theme expects it. Empty regions are left

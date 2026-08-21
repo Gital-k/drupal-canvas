@@ -23,6 +23,7 @@ import SidebarNode from '@/components/sidePanel/SidebarNode';
 import UnifiedMenu from '@/components/UnifiedMenu';
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import { useSmartRedirect } from '@/hooks/useSmartRedirect';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import {
@@ -357,7 +358,7 @@ const PageVariants = () => {
   const { redirectToNextBestPage } = useSmartRedirect();
   const { data: variants, error: variantsError } = useGetPageVariantsQuery();
   const { data: defaultVariant } = useGetDefaultPageVariantQuery();
-  const { data: components } = useGetComponentsQuery();
+  const { data: components } = useGetComponentsQuery(useHostEntityParams());
 
   const [
     createVariant,

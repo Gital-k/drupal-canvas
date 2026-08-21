@@ -21,6 +21,7 @@ import useComponentSelection from '@/hooks/useComponentSelection';
 import useCopyPasteComponents from '@/hooks/useCopyPasteComponents';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import useGetComponentName from '@/hooks/useGetComponentName';
+import { useHostEntityParams } from '@/hooks/useHostEntityParams';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import { isMarkerComponentType } from '@/services/pageVariants';
 
@@ -40,7 +41,7 @@ export const ComponentContextMenuContent: React.FC<
   }
 > = ({ component, menuType = 'context' }) => {
   const dispatch = useAppDispatch();
-  const { data: components } = useGetComponentsQuery();
+  const { data: components } = useGetComponentsQuery(useHostEntityParams());
   const componentName = useGetComponentName(component);
   const editorViewPortScale = useAppSelector(selectEditorViewPortScale);
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);

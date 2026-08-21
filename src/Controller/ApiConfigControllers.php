@@ -7,11 +7,14 @@ namespace Drupal\canvas\Controller;
 use Drupal\canvas\AssetRenderer;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\ComponentSource\ContextGatherer;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\Core\Access\AccessManagerInterface;
 use Drupal\Core\Access\AccessResultInterface;
@@ -19,10 +22,12 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -33,6 +38,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
@@ -59,6 +65,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     private readonly AccessManagerInterface $accessManager,
     private readonly AccountProxyInterface $currentUser,
     private readonly ComponentSourceManager $componentSourceManager,
+    private readonly ContextGatherer $contextGatherer,
   ) {}
 
   /**
@@ -72,7 +79,7 @@ final class ApiConfigControllers extends ApiControllerBase {
    * the preview slightly to be able to guarantee strong cacheability and fast
    * responses.
    */
-  public function list(string $canvas_config_entity_type_id): CacheableJsonResponse {
+  public function list(string $canvas_config_entity_type_id, ?Request $request = NULL): CacheableJsonResponse {
     $canvas_config_entity_type = $this->entityTypeManager->getDefinition($canvas_config_entity_type_id);
     \assert($canvas_config_entity_type instanceof ConfigEntityTypeInterface);
 
@@ -113,6 +120,16 @@ final class ApiConfigControllers extends ApiControllerBase {
       return $access->isAllowed();
     });
 
+    // When listing Components, hide block-sourced Components whose required
+    // contexts cannot be satisfied for the editing situation identified by the
+    // request, so editors are never offered a block that is doomed to render as
+    // a placeholder. Other config entity types on this shared route, and
+    // Components from non-block sources, are untouched.
+    $context_filter_cacheability = new CacheableMetadata();
+    if ($canvas_config_entity_type_id === Component::ENTITY_TYPE_ID) {
+      $config_entities = $this->filterByContextSatisfiability($config_entities, $request, $context_filter_cacheability);
+    }
+
     $normalizations = [];
     $normalizations_cacheability = new CacheableMetadata();
     foreach ($config_entities as $key => &$entity) {
@@ -135,7 +152,8 @@ final class ApiConfigControllers extends ApiControllerBase {
     $total_cacheability = (new CacheableMetadata())
       ->addCacheableDependency($query_cacheability)
       ->addCacheableDependency($access_cacheability)
-      ->addCacheableDependency($normalizations_cacheability);
+      ->addCacheableDependency($normalizations_cacheability)
+      ->addCacheableDependency($context_filter_cacheability);
     $total_cacheability->setCacheTags(array_filter(
       $total_cacheability->getCacheTags(),
       fn (string $tag): bool =>
@@ -148,6 +166,124 @@ final class ApiConfigControllers extends ApiControllerBase {
 
     return (new CacheableJsonResponse($normalizations))
       ->addCacheableDependency($total_cacheability);
+  }
+
+  /**
+   * Filters block-sourced Components by whether their required contexts fit.
+   *
+   * The context set is gathered once for the whole request (not per Component),
+   * from the host entity identified by the request plus the globally available
+   * contexts. A Component is kept when it is not block-sourced, when its block
+   * plugin declares no required contexts, or when every required context has a
+   * matching context in the gathered set.
+   *
+   * @param array<string, \Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface> $config_entities
+   *   The Component config entities to filter.
+   * @param \Symfony\Component\HttpFoundation\Request|null $request
+   *   The current request, carrying the optional host-entity query parameters.
+   * @param \Drupal\Core\Cache\CacheableMetadata $cacheability
+   *   Collects the cache metadata for the filtering: the request-parameter
+   *   variation axis and the structural tags that invalidate eligibility.
+   *
+   * @return array<string, \Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface>
+   *   The kept Component config entities.
+   */
+  private function filterByContextSatisfiability(array $config_entities, ?Request $request, CacheableMetadata $cacheability): array {
+    $host_entity = $this->deriveHostEntityFromRequest($request);
+
+    // Eligibility depends on which context *types* are available for the host
+    // entity's type and bundle, never on a specific entity id, so vary only on
+    // the request parameters (bounded to entity type + bundle) to avoid a
+    // per-entity-id cache explosion. Field blocks appear or disappear when a
+    // bundle's fields or the set of bundles change, so invalidate on those.
+    $cacheability->addCacheContexts([
+      'url.query_args:entity_type',
+      'url.query_args:entity_bundle',
+    ]);
+    if ($host_entity !== NULL) {
+      $cacheability->addCacheTags(['entity_bundles', 'entity_field_info']);
+    }
+
+    // Gather the available contexts once for the whole request.
+    $gathered_contexts = $this->contextGatherer->getPopulatedContexts($host_entity);
+
+    return array_filter($config_entities, function (CanvasHttpApiEligibleConfigEntityInterface $config_entity) use ($gathered_contexts): bool {
+      if (!$config_entity instanceof Component) {
+        return TRUE;
+      }
+      $source = $config_entity->getComponentSource();
+      // @todo Replace this concrete BlockComponent check with a ContextAwareComponentSourceInterface once one exists, so any context-aware component source participates in library filtering, not just blocks.
+      if (!$source instanceof BlockComponent) {
+        return TRUE;
+      }
+      return $this->contextGatherer->hasRequiredContextsSatisfied($source->getContextDefinitions(), $gathered_contexts);
+    });
+  }
+
+  /**
+   * Derives the host entity for context gathering from the request parameters.
+   *
+   * The list route is shared by many config entity types, so the host entity is
+   * identified by optional `entity_type` and `entity_bundle` query parameters
+   * rather than a path-embedded entity: only the entity type and bundle matter
+   * for context satisfiability, so no specific entity needs to be loaded (which
+   * also keeps the response cacheable across entities of the same bundle). When
+   * no `entity_type` is given (for example region editing, or a caller not yet
+   * sending the host) only globally available contexts are considered.
+   *
+   * @param \Symfony\Component\HttpFoundation\Request|null $request
+   *   The current request.
+   *
+   * @return \Drupal\Core\Entity\FieldableEntityInterface|null
+   *   An empty host entity of the requested type and bundle, or NULL when no
+   *   host entity is identified.
+   *
+   * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
+   *   When the requested entity type does not exist, or the requested bundle
+   *   does not exist for a bundleable entity type.
+   */
+  private function deriveHostEntityFromRequest(?Request $request): ?FieldableEntityInterface {
+    $entity_type_id = $request?->query->get('entity_type');
+    if ($entity_type_id === NULL || $entity_type_id === '') {
+      return NULL;
+    }
+    if (!\is_string($entity_type_id)) {
+      throw new BadRequestHttpException('The "entity_type" query parameter must be a string.');
+    }
+    $entity_type = $this->entityTypeManager->getDefinition($entity_type_id, FALSE);
+    if ($entity_type === NULL) {
+      throw new BadRequestHttpException(\sprintf('The "%s" entity type does not exist.', $entity_type_id));
+    }
+    if (!$entity_type instanceof ContentEntityTypeInterface) {
+      // The entity type exists but is not a content entity, so it can never be
+      // a content host — e.g. the `page_variant` config entity, which is edited
+      // through the same `/editor/{entity_type}/{entity_id}` route as content
+      // Pages and therefore reaches here as the `entity_type` query parameter.
+      // Gather only globally available contexts rather than erroring, so the
+      // editor keeps working and simply receives the unfiltered component list.
+      return NULL;
+    }
+
+    $bundle = $request->query->get('entity_bundle');
+    $values = [];
+    if ($entity_type->hasKey('bundle')) {
+      if (!\is_string($bundle) || $bundle === '') {
+        // The host's entity type is known but its bundle is not — e.g. the page
+        // editor route (/editor/{entity_type}/{entity_id}) carries no bundle.
+        // Fall back to no host rather than erroring, so only globally
+        // satisfiable Components are listed.
+        // @todo Filter by a bundled host once its bundle is known in https://www.drupal.org/project/canvas/issues/3498525
+        return NULL;
+      }
+      if (!\array_key_exists($bundle, $this->bundleInfo->getBundleInfo($entity_type_id))) {
+        throw new BadRequestHttpException(\sprintf('The "%s" bundle does not exist for the "%s" entity type.', $bundle, $entity_type_id));
+      }
+      $values[(string) $entity_type->getKey('bundle')] = $bundle;
+    }
+
+    $host_entity = $this->entityTypeManager->getStorage($entity_type_id)->create($values);
+    \assert($host_entity instanceof FieldableEntityInterface);
+    return $host_entity;
   }
 
   /**

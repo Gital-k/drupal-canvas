@@ -16,7 +16,7 @@ describe('Primary panel', () => {
     { retries: { openMode: 0, runMode: 3 } },
     () => {
       // Stub the HTTP request to return many components to make scrolling necessary
-      cy.intercept('GET', '**/canvas/api/v0/config/component', {
+      cy.intercept('GET', '**/canvas/api/v0/config/component*', {
         statusCode: 200,
         body: Array(50)
           .fill()

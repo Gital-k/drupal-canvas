@@ -27,6 +27,7 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Entity\ConfigEntityType;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Url;
@@ -2192,6 +2193,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'route.menu_active_trails:footer',
       'route.menu_active_trails:main',
       'theme',
+      'url.query_args:entity_bundle',
+      'url.query_args:entity_type',
       'user.permissions',
     ];
     $expected_cache_tags = [
@@ -2273,6 +2276,11 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'languages:language_interface',
       'route.menu_active_trails:main',
       'theme',
+      // The component list varies by the optional host-entity query parameters,
+      // so block Components can be filtered by satisfiable context.
+      // @see \Drupal\canvas\Controller\ApiConfigControllers::list()
+      'url.query_args:entity_bundle',
+      'url.query_args:entity_type',
       'user.node_grants:view',
       'user.permissions',
     ];
@@ -2352,6 +2360,93 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'sdc.canvas_broken_sdcs.invalid-filter',
       'sdc.canvas_broken_sdcs.malformed-image',
     ], \array_keys($broken_sdcs));
+  }
+
+  /**
+   * Tests host-entity-aware filtering of the component list endpoint.
+   *
+   * `testComponent()` above exhaustively asserts the unfiltered component list;
+   * this focuses on the optional `entity_type` + `entity_bundle` host filtering
+   * at the HTTP/OpenAPI level. `canvas_test_block` is installed inside this
+   * method only (functional methods each get a fresh site), so it never churns
+   * `testComponent()`'s exhaustive component-list and cache-tag assertions.
+   *
+   * @see \Drupal\canvas\Controller\ApiConfigControllers::list()
+   * @see \Drupal\Tests\canvas\Kernel\Controller\ApiConfigControllersListTest
+   */
+  public function testComponentContextFiltering(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_block']);
+    NodeType::create(['type' => 'article', 'name' => 'Articles'])->save();
+    $this->generateComponentConfig();
+
+    // The block whose required `entity:node` context is only satisfiable by a
+    // node host became a Component.
+    $requires_node = 'block.canvas_test_block_requires_node_context';
+    self::assertInstanceOf(ComponentInterface::class, Component::load($requires_node));
+    // A block without any required context: always placeable, used to prove the
+    // assertions below are filtering rather than returning an empty list.
+    $always_present = 'block.canvas_test_block_input_none';
+
+    $page = $this->getSession()->getPage();
+    $this->drupalLogin($this->httpApiUser);
+
+    // A satisfying host (a node) offers the node-context block.
+    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'node', 'entity_bundle' => 'article']]);
+    self::assertSame(200, $this->getSession()->getStatusCode(), $page->getContent());
+    $data = Json::decode($page->getText());
+    self::assertArrayHasKey($requires_node, $data);
+    self::assertArrayHasKey($always_present, $data);
+    // The host-entity query parameters are the only added variation axis.
+    $this->assertCacheContext('url.query_args:entity_type');
+    $this->assertCacheContext('url.query_args:entity_bundle');
+
+    // A non-satisfying host (a user provides no node context) omits the block.
+    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'user']]);
+    self::assertSame(200, $this->getSession()->getStatusCode(), $page->getContent());
+    $data = Json::decode($page->getText());
+    self::assertArrayNotHasKey($requires_node, $data);
+    self::assertArrayHasKey($always_present, $data);
+
+    // No host at all: only globally satisfiable Components; the block is absent.
+    $this->drupalGet('canvas/api/v0/config/component');
+    self::assertSame(200, $this->getSession()->getStatusCode(), $page->getContent());
+    $data = Json::decode($page->getText());
+    self::assertArrayNotHasKey($requires_node, $data);
+    self::assertArrayHasKey($always_present, $data);
+
+    // An unknown entity type is a hard error: 400 with a JSON:API-style body.
+    // The request runs through Canvas's runtime OpenAPI validators, so the
+    // error response is also asserted to conform to the spec.
+    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'does_not_exist']]);
+    self::assertSame(400, $this->getSession()->getStatusCode(), $page->getContent());
+    $body = Json::decode($page->getText());
+    self::assertIsArray($body);
+    self::assertArrayHasKey('errors', $body);
+    self::assertNotEmpty($body['errors']);
+
+    // A bundleable entity type with a bundle that does not exist is a 400.
+    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'node', 'entity_bundle' => 'does_not_exist']]);
+    self::assertSame(400, $this->getSession()->getStatusCode(), $page->getContent());
+    $body = Json::decode($page->getText());
+    self::assertIsArray($body);
+    self::assertArrayHasKey('errors', $body);
+    self::assertNotEmpty($body['errors']);
+
+    // A bundleable entity type WITHOUT a bundle is not an error: the host's
+    // bundle is unknown (e.g. the page editor route carries none), so the list
+    // falls back to only globally satisfiable Components instead of 400-ing.
+    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'node']]);
+    self::assertSame(200, $this->getSession()->getStatusCode(), $page->getContent());
+
+    // A known entity type that is not a content entity (e.g. the `page_variant`
+    // config entity, edited through the same /editor/{entity_type}/{entity_id}
+    // route as content Pages) is not an error either: it can never be a content
+    // host, so the list falls back to only globally satisfiable Components.
+    $this->drupalGet('canvas/api/v0/config/component', ['query' => ['entity_type' => 'page_variant']]);
+    self::assertSame(200, $this->getSession()->getStatusCode(), $page->getContent());
+    $data = Json::decode($page->getText());
+    self::assertArrayNotHasKey($requires_node, $data);
+    self::assertArrayHasKey($always_present, $data);
   }
 
   private function assertDynamicPageCacheAccelerated(?string $maxAge = NULL): void {

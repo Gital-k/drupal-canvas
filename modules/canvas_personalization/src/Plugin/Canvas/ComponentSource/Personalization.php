@@ -114,7 +114,7 @@ final class Personalization extends ComponentSourceBase implements
     return $this->getType() === self::CASE;
   }
 
-  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview, ?FieldableEntityInterface $host_entity = NULL): array {
     $build = [];
 
     // When live rendering:

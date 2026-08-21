@@ -15,6 +15,10 @@ vi.mock('@/services/componentAndLayout', () => ({
   useGetFoldersQuery: queryMocks.folders,
 }));
 
+vi.mock('@/hooks/useHostEntityParams', () => ({
+  useHostEntityParams: () => ({}),
+}));
+
 vi.mock('react-error-boundary', () => ({
   useErrorBoundary: () => ({ showBoundary: vi.fn() }),
 }));

@@ -51,6 +51,16 @@ block.settings.canvas_test_block_input_schema_change_poc:
       constraints:
         Choice:
           choices: [bar, baz]
+block.settings.canvas_test_block_requires_contexts:
+  type: block_settings
+  label: 'Canvas Test Block with required contexts settings'
+  constraints:
+    FullyValidatable: ~
+block.settings.canvas_test_block_requires_node_context:
+  type: block_settings
+  label: 'Canvas Test Block requiring a node context settings'
+  constraints:
+    FullyValidatable: ~
 block.settings.canvas_test_block_input_translatability:
   type: block_settings
   label: 'Canvas Test Block for testing input translatability'
