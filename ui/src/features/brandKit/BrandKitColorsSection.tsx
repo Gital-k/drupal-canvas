@@ -26,18 +26,8 @@ import UnifiedMenu from '@/components/UnifiedMenu';
 import ColorFormPopover from '@/features/brandKit/components/ColorFormPopover';
 import ColorRow from '@/features/brandKit/components/ColorRow';
 import FolderNameInput from '@/features/brandKit/components/FolderNameInput';
-import {
-  CREATE_COLOR_CACHE_KEY,
-  DELETE_COLOR_CACHE_KEY,
-  UPDATE_COLOR_CACHE_KEY,
-} from '@/features/brandKit/constants';
 import { useBrandKitColors } from '@/features/brandKit/hooks/useBrandKitColors';
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
-import {
-  useCreateColorMutation,
-  useDeleteColorMutation,
-  useUpdateColorMutation,
-} from '@/services/brandKit';
 import { useGetFoldersQuery } from '@/services/componentAndLayout';
 
 import type { FormEvent } from 'react';
@@ -57,28 +47,6 @@ const BrandKitColorsSection = () => {
     error: foldersError,
     isLoading: isLoadingFolders,
   } = useGetFoldersQuery();
-  // Editing and deleting a color both apply optimistically and close or unmount
-  // the popover that started them, so neither has a form left to report a
-  // rejection in. Subscribing to the same fixed cache keys keeps those failures
-  // reportable here, which outlives both.
-  const [, { error: deleteColorError }] = useDeleteColorMutation({
-    fixedCacheKey: DELETE_COLOR_CACHE_KEY,
-  });
-  const [, { error: updateColorError }] = useUpdateColorMutation({
-    fixedCacheKey: UPDATE_COLOR_CACHE_KEY,
-  });
-  // A rejected add closed its form and rolled its row back. The form reopens on
-  // the values that were entered rather than making them be retyped; the shared
-  // cache key is what lets that reopened form render the failure.
-  const [, { reset: resetCreateColor }] = useCreateColorMutation({
-    fixedCacheKey: CREATE_COLOR_CACHE_KEY,
-  });
-  const [rejectedColor, setRejectedColor] = useState<BrandKitColor | null>(
-    null,
-  );
-  const [folderAssignmentError, setFolderAssignmentError] = useState<
-    string | null
-  >(null);
 
   // Folder creation state
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -224,11 +192,6 @@ const BrandKitColorsSection = () => {
               onClick={() => {
                 suppressAutoFocusRef.current = true;
                 setAddColorFolderId(undefined);
-                // Starting a new color drops any rejected attempt, so the form
-                // opens empty rather than on someone else's failed values.
-                resetCreateColor();
-                setRejectedColor(null);
-                setFolderAssignmentError(null);
                 setIsAddColorPopoverOpen(true);
               }}
               data-testid="canvas-brand-kit-colors-new-color-button"
@@ -255,28 +218,11 @@ const BrandKitColorsSection = () => {
         />
       )}
 
-      {(errorMessage ||
-        foldersError ||
-        deleteColorError ||
-        updateColorError ||
-        folderAssignmentError) && (
+      {(errorMessage || foldersError) && (
         <Text color="red" size="2">
           {errorMessage ||
             (foldersError &&
-              parse(extractErrorMessageFromApiResponse(foldersError))) ||
-            (deleteColorError && (
-              <>
-                Failed to delete color:{' '}
-                {parse(extractErrorMessageFromApiResponse(deleteColorError))}
-              </>
-            )) ||
-            (updateColorError && (
-              <>
-                Failed to update color:{' '}
-                {parse(extractErrorMessageFromApiResponse(updateColorError))}
-              </>
-            )) ||
-            folderAssignmentError}
+              parse(extractErrorMessageFromApiResponse(foldersError)))}
         </Text>
       )}
 
@@ -307,9 +253,6 @@ const BrandKitColorsSection = () => {
               <UnifiedMenu.Item
                 onClick={() => {
                   setAddColorFolderId(folder.id);
-                  resetCreateColor();
-                  setRejectedColor(null);
-                  setFolderAssignmentError(null);
                   setIsAddColorPopoverOpen(true);
                 }}
                 data-testid="canvas-brand-kit-colors-folder-add-color-button"
@@ -343,12 +286,6 @@ const BrandKitColorsSection = () => {
         align="start"
         open={isAddColorPopoverOpen}
         onOpenChange={setIsAddColorPopoverOpen}
-        rejectedColor={rejectedColor ?? undefined}
-        onFolderAssignmentError={setFolderAssignmentError}
-        onCreateRejected={(color) => {
-          setRejectedColor(color);
-          setIsAddColorPopoverOpen(true);
-        }}
       />
     </Flex>
   );

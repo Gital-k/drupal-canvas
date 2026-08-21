@@ -3,7 +3,6 @@ import * as Popover from '@radix-ui/react-popover';
 import { Box, Button, Flex, IconButton, Text } from '@radix-ui/themes';
 
 import ErrorCard from '@/components/error/ErrorCard';
-import { DELETE_COLOR_CACHE_KEY } from '@/features/brandKit/constants';
 import { useDeleteColorMutation } from '@/services/brandKit';
 
 import type { Measurable } from '@radix-ui/rect';
@@ -25,7 +24,7 @@ const DeleteColorPopover = ({
   onOpenChange,
 }: DeleteColorPopoverProps) => {
   const [deleteColor, { isLoading: isDeleting, isError, error, reset }] =
-    useDeleteColorMutation({ fixedCacheKey: DELETE_COLOR_CACHE_KEY });
+    useDeleteColorMutation();
 
   const handleDelete = async () => {
     try {
@@ -117,7 +116,6 @@ const DeleteColorPopover = ({
               loading={isDeleting}
               size="1"
               color="red"
-              data-testid="canvas-color-delete-confirm-button"
             >
               Delete
             </Button>
