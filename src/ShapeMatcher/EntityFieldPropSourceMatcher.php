@@ -948,7 +948,7 @@ final class EntityFieldPropSourceMatcher implements PropSourceMatcherInterface {
    * @return list<\Drupal\canvas\PropSource\EntityFieldPropSource>
    *   An array of EntityFieldPropSource instances, empty array if no matches.
    */
-  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id, string $host_entity_bundle): array {
+  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id = '', string $host_entity_bundle = ''): array {
     return \array_map(
       fn (EntityFieldBasedPropExpressionInterface $expr) => new EntityFieldPropSource($expr),
       $this->findFieldInstanceFormatMatches(

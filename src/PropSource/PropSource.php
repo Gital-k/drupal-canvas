@@ -95,7 +95,6 @@ enum PropSource: string {
     // Not one of the built-in cases: a module may have registered a custom
     // prop source type (tagged `canvas.prop_source_type`) for this prefix.
     if ($case === NULL) {
-      // @phpstan-ignore-next-line globalDrupalDependencyInjection.useDependencyInjection
       $registry = \Drupal::service(PropSourceTypeRegistry::class);
       \assert($registry instanceof PropSourceTypeRegistry);
       $custom_type = $registry->getBySourceTypePrefix($source_type_prefix);

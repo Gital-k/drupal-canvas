@@ -44,7 +44,7 @@ final readonly class AdaptedPropSourceMatcher implements PropSourceMatcherInterf
    *
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    */
-  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type, string $host_entity_bundle): array {
+  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id = '', string $host_entity_bundle = ''): array {
     return $this->adapterManager->getDefinitionsByOutputSchema($prop_shape->schema);
   }
 

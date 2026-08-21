@@ -39,7 +39,7 @@ interface PropSourceMatcherInterface {
    * @return list<object>
    *   All matches, empty array if no matches.
    */
-  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id, string $host_entity_bundle): array;
+  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id = '', string $host_entity_bundle = ''): array;
 
   /**
    * The identifier this matcher's matches are keyed by in the raw matches.

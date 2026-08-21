@@ -41,7 +41,7 @@ final class HostEntityPropSourceMatcher implements PropSourceMatcherInterface {
    *   not satisfy the prop's constraints (or the prop is not a
    *   content-entity-reference).
    */
-  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id, string $host_entity_bundle): array {
+  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id = '', string $host_entity_bundle = ''): array {
     $schema = $prop_shape->resolvedSchema;
 
     // Only content-entity-reference shapes are candidates: x-allowed-entity-

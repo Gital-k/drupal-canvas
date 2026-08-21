@@ -139,7 +139,7 @@ final readonly class PropSourceSuggester {
    *   Host entity type + bundle, necessary to suggest certain types of prop
    *   sources.
    *
-   * @return array<string, array{required: bool, entity-field: array<string, EntityFieldPropSource>, adapter: array<AdapterInterface>}&array<string, array<string, LinkablePropSourceInterface>>>
+   * @return array<string, array{required: bool, entity-field: array<string, EntityFieldPropSource>, adapter: array<AdapterInterface>, ...<array<string, LinkablePropSourceInterface>>}>
    *   Keyed by `entity-field` and `adapter` (always present), plus one key
    *   per other tagged `canvas.prop_source_matcher` service's
    *   ::getPropSourceType() (present when it produced matches) — for example
@@ -242,6 +242,7 @@ final readonly class PropSourceSuggester {
         }
         $suggestions[$cpe][$type] = array_combine(
           \array_map(
+            // @phpstan-ignore argument.type
             fn (LinkablePropSourceInterface $s): string => (string) $s->label($host_entity_type),
             $matches,
           ),
@@ -254,7 +255,7 @@ final readonly class PropSourceSuggester {
   }
 
   /**
-   * @return array<string, array{entity-field: array<EntityFieldPropSource>, adapter: array<\Drupal\canvas\Plugin\Adapter\AdapterInterface>}&array<string, array<\Drupal\canvas\PropSource\LinkablePropSourceInterface>>>
+   * @return array<string, array{entity-field: array<EntityFieldPropSource>, adapter: array<\Drupal\canvas\Plugin\Adapter\AdapterInterface>, ...<array<\Drupal\canvas\PropSource\LinkablePropSourceInterface>>}>
    */
   private function getRawMatches(string $component_plugin_id, ComponentMetadata $component_metadata, string $host_entity_type, string $host_entity_bundle): array {
     $raw_matches = [];
