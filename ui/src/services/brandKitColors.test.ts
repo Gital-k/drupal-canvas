@@ -15,23 +15,14 @@ const makeColor = (id: string, hex: string): BrandKitColor => ({
   value: { colorSpace: 'srgb', components: [0, 0, 0], alpha: null, hex },
 });
 
-/**
- * A write captured by the fetch stub, which the test settles by hand.
- *
- * Holding every write open is what makes ordering deterministic: a test can
- * apply two optimistic edits and then settle them in whichever order it needs,
- * which cannot be arranged reliably against a real server.
- */
-interface PendingWrite {
-  url: string;
-  method: string;
-  succeed: () => void;
-  fail: (status?: number) => void;
-}
-
 /** The colors the fake server currently stores. */
 let serverColors: BrandKitColor[] = [];
-let pending: PendingWrite[] = [];
+
+/** Settles the write the test is holding open. */
+let releaseWrite: (status: number) => void = () => {};
+
+/** When set, the auto-save read waits on this before responding. */
+let heldAutoSave: Promise<void> | null = null;
 
 const jsonResponse = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), {
@@ -46,31 +37,7 @@ const brandKitBody = (): BrandKit => ({
   colors: serverColors,
 });
 
-const brandKitResponse = () => jsonResponse(brandKitBody(), 200);
-
-/** When set, the auto-save read waits on this before responding. */
-let heldAutoSave: Promise<void> | null = null;
-
-/**
- * Applies a write to the fake server's stored colors.
- */
-const applyToServer = (method: string, id: string, body: unknown) => {
-  if (method === 'DELETE') {
-    serverColors = serverColors.filter((color) => color.id !== id);
-    return;
-  }
-  if (method === 'POST') {
-    serverColors = [...serverColors, body as BrandKitColor];
-    return;
-  }
-  const changes = (body ?? {}) as Partial<BrandKitColor>;
-  serverColors = serverColors.map((color) =>
-    color.id === id ? { ...color, ...changes } : color,
-  );
-};
-
 beforeEach(() => {
-  pending = [];
   heldAutoSave = null;
   vi.stubGlobal(
     'fetch',
@@ -92,31 +59,35 @@ beforeEach(() => {
           }
           return jsonResponse({ data: brandKitBody(), autoSaves: {} }, 200);
         }
-        if (url.includes('/config/brand_kit/')) {
-          return brandKitResponse();
-        }
-        return jsonResponse({}, 404);
+        return jsonResponse(brandKitBody(), 200);
       }
 
-      const id = url.endsWith('/config/color')
-        ? ''
-        : (url.split('/').pop() ?? '');
       // RTK Query passes a fully built Request, so `init` carries no body.
       const body = await request
         .clone()
         .json()
         .catch(() => undefined);
+      const id = url.split('/').pop() ?? '';
+      // The write is held open so a test can assert the optimistic state while
+      // it is still in flight, then decide how it settles.
+      // The server assigns an id on create; the client never sends one.
+      const created = { ...(body ?? {}), id: 'assigned-by-server' };
       return new Promise<Response>((resolve) => {
-        pending.push({
-          url,
-          method,
-          succeed: () => {
-            applyToServer(method, id, body);
-            resolve(jsonResponse({ ...body, id }, 200));
-          },
-          fail: (status = 422) =>
-            resolve(jsonResponse({ errors: ['Rejected'] }, status)),
-        });
+        releaseWrite = (status) => {
+          if (status >= 400) {
+            resolve(jsonResponse({ errors: ['Rejected'] }, status));
+            return;
+          }
+          if (method === 'POST') {
+            serverColors = [...serverColors, created as BrandKitColor];
+            resolve(jsonResponse(created, status));
+            return;
+          }
+          serverColors = serverColors.map((color) =>
+            color.id === id ? { ...color, ...(body ?? {}) } : color,
+          );
+          resolve(jsonResponse({ ...body, id }, status));
+        };
       });
     },
   );
@@ -130,24 +101,9 @@ afterEach(() => {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
- * Returns the captured write for a color id, failing loudly if absent.
- *
- * Matches the trailing path segment; a bare substring match would also hit
- * "canvas", "api", and "color" elsewhere in the URL.
- */
-const writeFor = (id: string, index = 0): PendingWrite => {
-  const matches = pending.filter((write) => write.url.endsWith(`/${id}`));
-  const match = matches[index];
-  if (!match) {
-    throw new Error(`No write captured for color ${id} at index ${index}`);
-  }
-  return match;
-};
-
-/**
  * Builds a store subscribed to the Brand kit query, seeded from the fake
  * server. The live subscription keeps the cache entry from being evicted when
- * a mutation invalidates it.
+ * the mutation invalidates it.
  */
 const setup = async (colors: BrandKitColor[]) => {
   serverColors = colors;
@@ -164,31 +120,22 @@ const setup = async (colors: BrandKitColor[]) => {
   });
 
   // Await the initial load: if it were still in flight it would land on top of
-  // the first optimistic patch and silently overwrite it.
+  // the optimistic patch and silently overwrite it.
   await store.dispatch(
     brandKitApi.endpoints.getBrandKit.initiate(BRAND_KIT_ID),
   );
   await flush();
-  pending = [];
-
-  const readColors = (): BrandKitColor[] =>
-    brandKitApi.endpoints.getBrandKit.select(BRAND_KIT_ID)(store.getState())
-      .data?.colors ?? [];
 
   const readHex = (id: string): string | null | undefined =>
-    readColors().find((color) => color.id === id)?.value.hex;
+    brandKitApi.endpoints.getBrandKit
+      .select(BRAND_KIT_ID)(store.getState())
+      .data?.colors?.find((color) => color.id === id)?.value.hex;
 
-  /**
-   * Reads the color the way `useBrandKitColors` does: the auto-save draft's
-   * colors win over the canonical ones when a draft is loaded.
-   */
-  const readEffectiveHex = (id: string): string | null | undefined => {
-    const draft = brandKitApi.endpoints.getAutoSave.select(BRAND_KIT_ID)(
-      store.getState(),
-    ).data?.data;
-    const colors = draft?.colors ?? readColors();
-    return colors.find((color) => color.id === id)?.value.hex;
-  };
+  /** Reads the color the auto-save draft carries, which the UI must ignore. */
+  const readDraftHex = (id: string): string | null | undefined =>
+    brandKitApi.endpoints.getAutoSave
+      .select(BRAND_KIT_ID)(store.getState())
+      .data?.data.colors?.find((color) => color.id === id)?.value.hex;
 
   // Deliberately not async: returning the mutation promise from an async
   // helper would make `await editColor(...)` wait on a request the test has
@@ -201,26 +148,25 @@ const setup = async (colors: BrandKitColor[]) => {
       }),
     );
 
-  const deleteColor = (id: string) =>
-    store.dispatch(brandKitApi.endpoints.deleteColor.initiate(id));
+  const readIds = (): string[] =>
+    brandKitApi.endpoints.getBrandKit
+      .select(BRAND_KIT_ID)(store.getState())
+      .data?.colors?.map((color) => color.id) ?? [];
 
-  const createColor = (id: string, hex: string) =>
+  const createColor = (name: string) =>
     store.dispatch(
-      brandKitApi.endpoints.createColor.initiate(makeColor(id, hex)),
+      brandKitApi.endpoints.createColor.initiate({
+        name,
+        cssVariable: `--${name}`,
+        weight: 0,
+        value: makeColor(name, '#00ff00').value,
+      }),
     );
 
-  return {
-    store,
-    readColors,
-    readHex,
-    readEffectiveHex,
-    editColor,
-    deleteColor,
-    createColor,
-  };
+  return { store, readHex, readIds, readDraftHex, editColor, createColor };
 };
 
-describe('brand kit color optimistic writes', () => {
+describe('brand kit color optimistic edits', () => {
   it('applies an edit before the request settles', async () => {
     const { readHex, editColor } = await setup([makeColor('a', '#ff0000')]);
 
@@ -229,9 +175,8 @@ describe('brand kit color optimistic writes', () => {
 
     // The cache already shows the new value while the write is still open.
     expect(readHex('a')).toBe('#00ff00');
-    expect(pending).toHaveLength(1);
 
-    writeFor('a').succeed();
+    releaseWrite(200);
     await edit;
     await flush();
     expect(readHex('a')).toBe('#00ff00');
@@ -244,7 +189,7 @@ describe('brand kit color optimistic writes', () => {
     await flush();
     expect(readHex('a')).toBe('#00ff00');
 
-    writeFor('a').fail(422);
+    releaseWrite(422);
     await edit;
     await flush();
 
@@ -252,146 +197,67 @@ describe('brand kit color optimistic writes', () => {
     expect(readHex('a')).toBe('#ff0000');
   });
 
-  it('keeps the last intent when responses arrive out of order', async () => {
-    const { readHex, editColor } = await setup([makeColor('a', '#ff0000')]);
+  it('shows a new color before the create completes', async () => {
+    const { readIds, createColor } = await setup([makeColor('a', '#ff0000')]);
 
-    const first = editColor('a', '#00ff00');
+    const create = createColor('b');
     await flush();
-    const second = editColor('a', '#0000ff');
+
+    // The row is there while the request is still open, under a stand-in id.
+    expect(readIds()).toHaveLength(2);
+    expect(readIds()[1]).toMatch(/^pending-/);
+
+    releaseWrite(201);
+    await create;
     await flush();
-    expect(readHex('a')).toBe('#0000ff');
 
-    // The later write lands first and reconciles.
-    writeFor('a', 1).succeed();
-    await second;
-    await flush();
-    expect(readHex('a')).toBe('#0000ff');
-
-    // Then the earlier request fails. Assert before anything else can refetch,
-    // so this checks the rollback itself rather than a later server response
-    // quietly repairing the damage.
-    writeFor('a', 0).fail(500);
-    await first;
-
-    // The stale failure must not resurrect the value the user moved away from.
-    expect(readHex('a')).toBe('#0000ff');
+    // The response's id replaces the stand-in, so the row is actionable.
+    expect(readIds()).toEqual(['a', 'assigned-by-server']);
   });
 
-  it('does not let a failed write disturb a different color', async () => {
-    const { readHex, editColor } = await setup([
-      makeColor('a', '#ff0000'),
-      makeColor('b', '#ffffff'),
-    ]);
+  it('removes an optimistically added color when the create is rejected', async () => {
+    const { readIds, createColor } = await setup([makeColor('a', '#ff0000')]);
 
-    const editA = editColor('a', '#00ff00');
+    const create = createColor('b');
     await flush();
-    const editB = editColor('b', '#000000');
+    expect(readIds()).toHaveLength(2);
+
+    releaseWrite(422);
+    await create;
     await flush();
-    expect(readHex('a')).toBe('#00ff00');
-    expect(readHex('b')).toBe('#000000');
 
-    writeFor('a').fail(422);
-    await editA;
-
-    // Rolling back color a must leave color b's in-flight edit intact.
-    expect(readHex('a')).toBe('#ff0000');
-    expect(readHex('b')).toBe('#000000');
-
-    writeFor('b').succeed();
-    await editB;
-    await flush();
-    expect(readHex('b')).toBe('#000000');
+    // The rejected color must not linger in a list that claims to be stored.
+    expect(readIds()).toEqual(['a']);
   });
 
-  it('removes a deleted color at once and restores it on failure', async () => {
-    const { readColors, deleteColor } = await setup([
-      makeColor('a', '#ff0000'),
-      makeColor('b', '#ffffff'),
-    ]);
-
-    const remove = deleteColor('a');
-    await flush();
-    expect(readColors().map((color) => color.id)).toEqual(['b']);
-
-    writeFor('a').fail(422);
-    await remove;
-    await flush();
-
-    expect(readColors().map((color) => color.id)).toEqual(['a', 'b']);
-  });
-
-  it('keeps a color deleted when the delete succeeds', async () => {
-    const { readColors, deleteColor } = await setup([
-      makeColor('a', '#ff0000'),
-      makeColor('b', '#ffffff'),
-    ]);
-
-    const remove = deleteColor('a');
-    await flush();
-    writeFor('a').succeed();
-    await remove;
-    await flush();
-
-    expect(readColors().map((color) => color.id)).toEqual(['b']);
-  });
-
-  it('survives an auto-save response that lands mid-write', async () => {
+  it('ignores an auto-save response that lands mid-write', async () => {
     // Hold the auto-save read open so it resolves *after* the optimistic patch,
-    // carrying pre-edit colors. useBrandKitColors prefers the draft, so without
-    // re-application this response reverts the swatch to the old color.
+    // carrying pre-edit colors. Were the draft a color source, this response
+    // would revert the swatch to the old color.
     let releaseAutoSave: () => void = () => {};
     heldAutoSave = new Promise<void>((resolve) => {
       releaseAutoSave = resolve;
     });
 
-    const { store, readEffectiveHex, editColor } = await setup([
+    const { store, readHex, readDraftHex, editColor } = await setup([
       makeColor('a', '#ff0000'),
     ]);
     store.dispatch(brandKitApi.endpoints.getAutoSave.initiate(BRAND_KIT_ID));
     await flush();
 
-    editColor('a', '#00ff00');
+    const edit = editColor('a', '#00ff00');
     await flush();
-    expect(readEffectiveHex('a')).toBe('#00ff00');
+    expect(readHex('a')).toBe('#00ff00');
 
     releaseAutoSave();
     await flush();
 
-    // The stale draft must not overwrite the value the user just chose.
-    expect(readEffectiveHex('a')).toBe('#00ff00');
-  });
+    // The draft did land, and it does carry the pre-edit color.
+    expect(readDraftHex('a')).toBe('#ff0000');
+    // It is not what the colors UI reads.
+    expect(readHex('a')).toBe('#00ff00');
 
-  it('shows a new color before the create completes', async () => {
-    const { readColors, createColor } = await setup([
-      makeColor('a', '#ff0000'),
-    ]);
-
-    const create = createColor('b', '#00ff00');
-    await flush();
-
-    // The client mints the id, so the row is present under its final
-    // identifier while the request is still open.
-    expect(readColors().map((color) => color.id)).toEqual(['a', 'b']);
-
-    writeFor('color').succeed();
-    await create;
-    await flush();
-    expect(readColors().map((color) => color.id)).toEqual(['a', 'b']);
-  });
-
-  it('removes an optimistically added color when the create is rejected', async () => {
-    const { readColors, createColor } = await setup([
-      makeColor('a', '#ff0000'),
-    ]);
-
-    const create = createColor('b', '#00ff00');
-    await flush();
-    expect(readColors().map((color) => color.id)).toEqual(['a', 'b']);
-
-    writeFor('color').fail(422);
-    await create;
-
-    // The rejected color must not linger in a list that claims to be stored.
-    expect(readColors().map((color) => color.id)).toEqual(['a']);
+    releaseWrite(200);
+    await edit;
   });
 });

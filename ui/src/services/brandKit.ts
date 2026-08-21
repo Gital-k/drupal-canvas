@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { BRAND_KIT_ID } from '@/features/brandKit/constants';
@@ -16,126 +17,16 @@ export interface UploadedArtifact {
 }
 
 /**
- * Builds the cache patches that apply a color-list change optimistically.
- *
- * Returns one `updateQueryData` thunk per cache entry the Brand kit colors UI
- * reads from. Both entries must be patched: `useBrandKitColors` prefers the
- * auto-save draft's colors over the canonical ones, so patching only the
- * canonical entry leaves the UI unchanged whenever a Brand kit draft exists.
- *
- * The mutator must change the smallest possible part of the list. Immer records
- * an inverse patch per mutated path, so a narrow edit produces a narrow undo. A
- * mutator that reassigns the whole array would make its undo restore the whole
- * array, discarding any concurrent edit to a different color.
+ * Patches the Brand kit cache entry the colors UI reads from.
  *
  * @param mutate - Mutates the draft color list in place.
  */
-const buildColorCachePatches = (mutate: (colors: BrandKitColor[]) => void) => [
+const patchColors = (mutate: (colors: BrandKitColor[]) => void) =>
   brandKitApi.util.updateQueryData('getBrandKit', BRAND_KIT_ID, (draft) => {
-    if (draft.colors) {
-      mutate(draft.colors);
-    }
-  }),
-  brandKitApi.util.updateQueryData('getAutoSave', BRAND_KIT_ID, (draft) => {
-    if (draft.data?.colors) {
-      mutate(draft.data.colors);
-    }
-  }),
-];
-
-/**
- * The in-flight optimistic write per color id, newest last.
- *
- * Two things need this. A rejected write must not roll back a newer write to
- * the same color that has already been applied, so each write carries a token
- * and only rolls back while it is still the newest. And a Brand kit read that
- * resolves mid-write arrives with pre-edit colors, so the mutator is kept here
- * to be re-applied on top of that response.
- */
-const pendingColorWrites = new Map<
-  string,
-  { token: symbol; mutate: (colors: BrandKitColor[]) => void }
->();
-
-/**
- * The dispatch handed to an endpoint lifecycle, narrowed to what is used here.
- */
-interface PatchDispatch {
-  (patch: ReturnType<typeof buildColorCachePatches>[number]): {
-    undo: () => void;
-  };
-  (action: ReturnType<typeof brandKitApi.util.invalidateTags>): unknown;
-}
-
-/**
- * Re-applies every in-flight optimistic write to the Brand kit caches.
- *
- * `useBrandKitColors` prefers the auto-save draft's colors, and the UI becomes
- * interactive as soon as the canonical query resolves. A `getAutoSave` response
- * that lands while a write is in flight therefore carries pre-edit colors and
- * would replace the optimistic value with the old one until reconciliation —
- * a visible flash of a color the user already changed.
- *
- * @param dispatch - The lifecycle dispatch.
- */
-const reapplyPendingColorWrites = (dispatch: PatchDispatch) => {
-  if (pendingColorWrites.size === 0) {
-    return;
-  }
-  buildColorCachePatches((colors) => {
-    pendingColorWrites.forEach(({ mutate }) => mutate(colors));
-  }).forEach((patch) => dispatch(patch));
-};
-
-/**
- * Applies a color change optimistically and reconciles it with the response.
- *
- * @param id - The color being written to.
- * @param mutate - Mutates the draft color list in place.
- * @param dispatch - The mutation lifecycle dispatch.
- * @param queryFulfilled - Resolves when the write succeeds.
- *
- * @returns Whether the write was accepted by the server.
- */
-const applyOptimisticColorWrite = async (
-  id: string,
-  mutate: (colors: BrandKitColor[]) => void,
-  dispatch: PatchDispatch,
-  queryFulfilled: Promise<unknown>,
-) => {
-  const token = Symbol(id);
-  pendingColorWrites.set(id, { token, mutate });
-  const patches = buildColorCachePatches(mutate).map((patch) =>
-    dispatch(patch),
-  );
-  const isNewest = () => pendingColorWrites.get(id)?.token === token;
-  try {
-    await queryFulfilled;
-    if (isNewest()) {
-      pendingColorWrites.delete(id);
-    }
-    return true;
-  } catch {
-    // The server rejected the write, so restore the previous value. The UI must
-    // never keep showing something that was not stored.
-    if (!isNewest()) {
-      return false;
-    }
-    pendingColorWrites.delete(id);
-    patches.forEach((patch) => patch.undo());
-    // A read may have re-applied this write on top of a response since the
-    // patches above were recorded, which their inverses do not account for.
-    // Failure is the rare path, so resync from the server rather than trying to
-    // reconstruct the difference. `invalidatesTags` only fires on success.
-    dispatch(
-      brandKitApi.util.invalidateTags([
-        { type: 'BrandKits', id: BRAND_KIT_ID },
-        { type: 'BrandKitsAutoSave', id: BRAND_KIT_ID },
-      ]),
-    );
-    return false;
-  }
-};
+    // The list is omitted entirely while the Brand kit has no colors.
+    draft.colors ??= [];
+    mutate(draft.colors);
+  });
 
 export const createUploadFontRequest = (file: File) => ({
   url: 'canvas/api/v0/artifacts/upload',
@@ -158,14 +49,6 @@ export const brandKitApi = createApi({
     getBrandKit: builder.query<BrandKit, string>({
       query: (id) => `canvas/api/v0/config/brand_kit/${id}`,
       providesTags: (result, error, id) => [{ type: 'BrandKits', id }],
-      async onQueryStarted(id, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-        } catch {
-          return;
-        }
-        reapplyPendingColorWrites(dispatch);
-      },
     }),
     getAutoSave: builder.query<
       { data: BrandKit; autoSaves: AutoSavesHash },
@@ -180,10 +63,7 @@ export const brandKitApi = createApi({
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         } catch (err) {
           console.error(err);
-          return;
         }
-        // This response carries pre-edit colors if a write is in flight.
-        reapplyPendingColorWrites(dispatch);
       },
     }),
     updateAutoSave: builder.mutation<
@@ -217,38 +97,41 @@ export const brandKitApi = createApi({
     uploadFont: builder.mutation<UploadedArtifact, File>({
       query: (file) => createUploadFontRequest(file),
     }),
-    createColor: builder.mutation<BrandKitColor, BrandKitColor>({
-      // The client mints the UUID, so the new row carries the identifier it
-      // will keep and is fully interactive straight away. A placeholder id
-      // would otherwise reach the server through the row's edit, rename, and
-      // delete actions.
+    createColor: builder.mutation<BrandKitColor, Omit<BrandKitColor, 'id'>>({
       query: (body) => ({
         url: 'canvas/api/v0/config/color',
         method: 'POST',
         body,
       }),
       async onQueryStarted(color, { dispatch, queryFulfilled }) {
-        await applyOptimisticColorWrite(
-          color.id,
-          (colors) => {
-            // Idempotent: this mutator is re-applied on top of Brand kit reads
-            // that land while the create is still in flight.
-            if (!colors.some((candidate) => candidate.id === color.id)) {
-              colors.push(color);
-            }
-          },
-          dispatch,
-          queryFulfilled,
+        // The server assigns the id, so the row is rendered under a stand-in
+        // until the response carries the real one. Only this list reads it in
+        // that window, and it is swapped rather than left to the reconcile
+        // refetch so the row is never actionable under an id the server does
+        // not know.
+        const pendingId = `pending-${uuidv4()}`;
+        const patchResult = dispatch(
+          patchColors((colors) => {
+            colors.push({ ...color, id: pendingId });
+          }),
         );
+        try {
+          const { data: created } = await queryFulfilled;
+          dispatch(
+            patchColors((colors) => {
+              const index = colors.findIndex((c) => c.id === pendingId);
+              if (index !== -1) {
+                colors[index] = created;
+              }
+            }),
+          );
+        } catch {
+          patchResult.undo();
+        }
       },
       invalidatesTags: [
         { type: 'BrandKits', id: 'LIST' },
         { type: 'BrandKits', id: 'global' },
-        // The auto-save draft embeds colors too, and `useBrandKitColors`
-        // prefers it over the canonical entry, so it must be reconciled as
-        // well. Without this a new color is not reflected at all while a Brand
-        // kit draft exists.
-        { type: 'BrandKitsAutoSave', id: BRAND_KIT_ID },
       ],
     }),
     updateColor: builder.mutation<
@@ -261,34 +144,29 @@ export const brandKitApi = createApi({
         body: changes,
       }),
       async onQueryStarted({ id, changes }, { dispatch, queryFulfilled }) {
-        // Apply the edit to the cache before the request goes out so the color
+        // Apply the edit to the cache before the request goes out, so the color
         // row and the preview update without waiting for the round trip.
-        const applied = await applyOptimisticColorWrite(
-          id,
-          (colors) => {
+        const patchResult = dispatch(
+          patchColors((colors) => {
             const color = colors.find((candidate) => candidate.id === id);
             if (color) {
               Object.assign(color, changes);
             }
-          },
-          dispatch,
-          queryFulfilled,
+          }),
         );
-        if (applied) {
+        try {
+          await queryFulfilled;
           // A color prop resolves to a literal value server-side, so a
           // component can bake the old color into its rendered markup. Only a
           // re-render picks that up.
           dispatch(setUpdatePreview(true));
+        } catch {
+          patchResult.undo();
         }
       },
       invalidatesTags: [
         { type: 'BrandKits', id: 'LIST' },
-        { type: 'BrandKits', id: 'global' },
-        // The auto-save draft embeds colors too, and `useBrandKitColors`
-        // prefers it over the canonical entry, so it must be reconciled as
-        // well. Without this a color edit is not reflected at all while a
-        // Brand kit draft exists.
-        { type: 'BrandKitsAutoSave', id: BRAND_KIT_ID },
+        { type: 'BrandKits', id: BRAND_KIT_ID },
       ],
     }),
     deleteColor: builder.mutation<void, string>({
@@ -296,28 +174,9 @@ export const brandKitApi = createApi({
         url: `canvas/api/v0/config/color/${id}`,
         method: 'DELETE',
       }),
-      async onQueryStarted(id, { dispatch, queryFulfilled }) {
-        // Remove the row immediately; restore it if the delete is rejected.
-        await applyOptimisticColorWrite(
-          id,
-          (colors) => {
-            const index = colors.findIndex((color) => color.id === id);
-            if (index !== -1) {
-              colors.splice(index, 1);
-            }
-          },
-          dispatch,
-          queryFulfilled,
-        );
-      },
       invalidatesTags: [
         { type: 'BrandKits', id: 'LIST' },
         { type: 'BrandKits', id: 'global' },
-        // The auto-save draft embeds colors too, and `useBrandKitColors`
-        // prefers it over the canonical entry, so it must be reconciled as
-        // well. Without this a color edit is not reflected at all while a
-        // Brand kit draft exists.
-        { type: 'BrandKitsAutoSave', id: BRAND_KIT_ID },
       ],
     }),
   }),
