@@ -8,6 +8,7 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropSource\HostEntityUrlPropSource;
+use Drupal\canvas\PropSource\PropSource;
 
 /**
  * Matcher for host entity URL prop sources.
@@ -16,7 +17,7 @@ use Drupal\canvas\PropSource\HostEntityUrlPropSource;
  *
  * @internal
  */
-final class HostEntityUrlPropSourceMatcher {
+final class HostEntityUrlPropSourceMatcher implements PropSourceMatcherInterface {
 
   /**
    * Matches host entity URL prop sources for a given prop shape.
@@ -25,11 +26,15 @@ final class HostEntityUrlPropSourceMatcher {
    *   Whether the prop shape to match is required or not.
    * @param \Drupal\canvas\PropShape\PropShape $prop_shape
    *   The prop shape to match.
+   * @param string $host_entity_type_id
+   *   Unused; host entity URLs do not depend on the host entity type.
+   * @param string $host_entity_bundle
+   *   Unused; host entity URLs do not depend on the host entity bundle.
    *
    * @return list<\Drupal\canvas\PropSource\HostEntityUrlPropSource>
    *   An array of HostEntityUrlPropSource instances, empty array if no matches.
    */
-  public static function match(bool $is_required, PropShape $prop_shape): array {
+  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id = '', string $host_entity_bundle = ''): array {
     if ($prop_shape->getType() !== JsonSchemaType::String) {
       return [];
     }
@@ -71,6 +76,13 @@ final class HostEntityUrlPropSourceMatcher {
     // @todo Offer `canonical` vs `edit-form` vs … (and check whether the given entity type actually contains such a link template).
     $matches[] = new HostEntityUrlPropSource(absolute: $string_format->allowsOnlyAbsoluteUri());
     return $matches;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPropSourceType(): string {
+    return PropSource::HostEntityUrl->value;
   }
 
 }

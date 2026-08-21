@@ -32,12 +32,18 @@ Replace:
 
 #### Phase 1: Matchers (Objective)
 **"Does this square block fit this square hole?"**
-The three matcher services (three materials!) ask objectively:
+The built-in matcher services (materials!) ask objectively:
 
 - **EntityFieldPropSourceMatcher**: "Does this entity field produce the right shape?" (e.g. "Does the 'title' field produce a `type=string&` (square)?") → YES or NO
 - **HostEntityUrlPropSourceMatcher**: "Does the host entity's URL produce the right shape?" (e.g. "Does a URL produce `type=string&format=uri` (square)?") → YES or NO
+- **HostEntityPropSourceMatcher**: "Does the host entity itself produce the right shape?" (e.g. "Does this node's own type+bundle satisfy the `content-entity-reference` shape (star)?") → YES or NO
 - **AdaptedPropSourceMatcher**: "Does this adapter transform data into the right shape?" (e.g. "Does the image adapter produce an `image` (heart)?") → YES or NO
   These matchers find *all* valid fits — like checking every hole to see which ones the block actually fits through.
+
+  Each matcher is a service tagged `canvas.prop_source_matcher`
+  (implementing `\Drupal\canvas\ShapeMatcher\PropSourceMatcherInterface`), collected by
+  `PropSourceSuggester` via a `!tagged_iterator`. Other modules can tag their own service with
+  `canvas.prop_source_matcher` to contribute additional materials without modifying this module.
 
 #### Phase 2: Suggester (Subjective)
 **"Which of the square blocks from phase 1 is preferable??"**
@@ -63,8 +69,12 @@ PropSourceSuggester.suggest(component, host_entity)
   ↓
   FOR each prop in component.props:
     ↓
+    FOR each matcher tagged `canvas.prop_source_matcher` (built-in + custom):
+      matcher.match(prop_shape)
+    ↓ e.g.:
     EntityFieldPropSourceMatcher.match(prop_shape)      → square_field1, square_field2, square_field3
     HostEntityUrlPropSourceMatcher.match(prop_shape)    → none
+    HostEntityPropSourceMatcher.match(prop_shape)       → none
     AdaptedPropSourceMatcher.match(prop_shape)          → square_adapter1
     ↓ (all matches combined — all fit the square block)
     square_field1, square_field2, square_field3, square_adapter1
@@ -288,6 +298,11 @@ choose one.
 
 The suggester relies on multiple `prop source matcher`s, each responsible for a particular `prop source` type. The
 matchers are objective, the suggesters are subjective: they filter and change order.
+
+Other modules can contribute additional `prop source matcher`s (tag a service `canvas.prop_source_matcher`,
+implementing `\Drupal\canvas\ShapeMatcher\PropSourceMatcherInterface`) and additional `prop source` types (tag a
+service `canvas.prop_source_type`, implementing `\Drupal\canvas\PropSource\PropSourceTypeInterface`, so
+`PropSource::parse()` can reconstruct the custom `PropSourceBase` subclass from storage) — see [`README.md`](../README.md#extending-prop-source-suggestions).
 
 There may be additional `prop source`s that may be offered as suggestions to Site Builders and/or Content Authors to
 populate `component input`s:

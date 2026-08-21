@@ -7,10 +7,11 @@ namespace Drupal\canvas\PropSource;
 /**
  * Defines what prop source types are available, and instantiates them.
  *
- * Prop sources are not pluggable; Canvas only supports a hard-coded set of prop
- * sources, and that list is defined by this enum. The ::parse() method will,
- * given a prop source's array representation, instantiate the appropriate
- * concrete PropSourceBase object. For example:
+ * Canvas's own prop sources are a hard-coded set, defined by this enum. Other
+ * modules can contribute additional prop source types by tagging a service
+ * `canvas.prop_source_type` (see \Drupal\canvas\PropSource\PropSourceTypeInterface).
+ * The ::parse() method will, given a prop source's array representation,
+ * instantiate the appropriate concrete PropSourceBase object. For example:
  * @code
  * $prop_source = PropSource::parse([
  *   'sourceType' => 'static:field_item:string',
@@ -55,17 +56,21 @@ enum PropSource: string {
    *   passed to self::tryFrom().
    */
   public static function getTypePrefix(PropSourceBase|string $prop_source): string {
-    if ($prop_source instanceof PropSourceBase) {
-      $prop_source = $prop_source::class;
-    }
-    return match ($prop_source) {
+    $instance = $prop_source instanceof PropSourceBase ? $prop_source : NULL;
+    $class = $instance !== NULL ? $instance::class : $prop_source;
+    return match ($class) {
       AdaptedPropSource::class => self::Adapter->value,
       DefaultRelativeUrlPropSource::class => self::DefaultRelativeUrl->value,
       HostEntityUrlPropSource::class => self::HostEntityUrl->value,
       HostEntityPropSource::class => self::HostEntity->value,
       StaticPropSource::class => self::Static->value,
       EntityFieldPropSource::class => self::EntityField->value,
-      default => throw new \LogicException('Unknown prop source class.'),
+      // Not one of the built-in cases: a module may have registered a custom
+      // prop source type (tagged `canvas.prop_source_type`) for this class.
+      // Such a subclass MUST override ::getSourceType() itself —
+      // PropSourceBase's own default implementation calls back into this
+      // method, which would recurse infinitely here.
+      default => $instance?->getSourceType() ?? throw new \LogicException('Unknown prop source class.'),
     };
   }
 
@@ -85,7 +90,19 @@ enum PropSource: string {
       // 'entity-field'.
       @trigger_error('The "dynamic" prop source was renamed to "entity field" and is deprecated in canvas:1.2.0 and will be removed from canvas:2.0.0. Re-save (and re-export) all Canvas content templates. See https://www.drupal.org/node/3566701', E_USER_DEPRECATED);
     }
-    return match (self::tryFrom($source_type_prefix)) {
+    $case = self::tryFrom($source_type_prefix);
+    // Not one of the built-in cases: a module may have registered a custom
+    // prop source type (tagged `canvas.prop_source_type`) for this prefix.
+    if ($case === NULL) {
+      // @phpstan-ignore-next-line globalDrupalDependencyInjection.useDependencyInjection
+      $registry = \Drupal::service(PropSourceTypeRegistry::class);
+      \assert($registry instanceof PropSourceTypeRegistry);
+      $custom_type = $registry->getBySourceTypePrefix($source_type_prefix);
+      if ($custom_type !== NULL) {
+        return $custom_type->parse($prop_source);
+      }
+    }
+    return match ($case) {
       // The DefaultRelativeUrlPropSource allows referring to a
       // component-defined default value for a URL prop shape at storage time,
       // but will then be transformed to a resolvable (working) absolute or

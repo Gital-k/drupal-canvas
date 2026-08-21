@@ -22,3 +22,26 @@ You'll need a set of components to use with Canvas. Either build your own or sta
 
 - [Mercury Theme](https://www.drupal.org/project/mercury) is an open source Twig / SDC based component system that was built for Drupal CMS.
 - [Nebula](https://github.com/acquia/nebula) is an open source template repository for [@drupal-canvas/create](https://www.npmjs.com/package/@drupal-canvas/create) to scaffold a new codebase for working with JavaScript Code Components.
+
+## Extending prop source suggestions
+
+Two service tags let other modules extend the "suggest a prop source" UI
+(`PropSourceSuggester`) without modifying this module:
+
+- `canvas.prop_source_matcher`: tag a service implementing
+  `\Drupal\canvas\ShapeMatcher\PropSourceMatcherInterface` (`match()` +
+  `getPropSourceType()`) to contribute additional prop source suggestions,
+  collected alongside the built-in matchers (`EntityFieldPropSourceMatcher`,
+  `AdaptedPropSourceMatcher`, `HostEntityUrlPropSourceMatcher`,
+  `HostEntityPropSourceMatcher`). `getPropSourceType()` MUST return an
+  identifier not already used by another tagged matcher.
+- `canvas.prop_source_type`: tag a service implementing
+  `\Drupal\canvas\PropSource\PropSourceTypeInterface`
+  (`getSourceTypePrefix()` + `parse()`) so `PropSource::parse()` can
+  reconstruct a custom `PropSourceBase` subclass from storage, the same way
+  it does for a built-in prop source type. The subclass's own
+  `::getSourceType()` must return the same prefix.
+
+@see \Drupal\canvas\ShapeMatcher\PropSourceMatcherInterface
+@see \Drupal\canvas\PropSource\PropSourceTypeInterface
+@see \Drupal\canvas\PropSource\PropSourceTypeRegistry
