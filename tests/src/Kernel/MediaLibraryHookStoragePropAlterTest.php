@@ -67,10 +67,12 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     // Unlike `baby_documents`, this media type does not rely on the source
     // field defaults: its single allowed extension appears in the document
     // shape's `x-allowed-file-extensions` list, proving a one-element
-    // intersection is enough to match. Contrast with `archives` and
-    // `plain_text_notes` below, whose extensions never intersect the list
-    // and therefore never match.
-    $this->createFileMediaTypeWithExtensions('vacation_documents', 'pdf');
+    // intersection is enough to match. It is uppercase on purpose: core's
+    // file upload validation treats extensions case-insensitively, so shape
+    // matching must too. Contrast with `archives` and `plain_text_notes`
+    // below, whose extensions never intersect the list and therefore never
+    // match.
+    $this->createFileMediaTypeWithExtensions('vacation_documents', 'PDF');
     // AudioFile extends File, but audio media types must not match the
     // document shape: audio file extensions do not intersect the document
     // shape's `x-allowed-file-extensions` list, so this media type must not

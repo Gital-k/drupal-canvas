@@ -966,7 +966,9 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
    */
   public function testDocumentShapeFileExtensionFiltering(): void {
     // Plain file fields on the "foo" node type, for the scalar matching path.
-    foreach (['field_pdf_download' => 'pdf', 'field_zip_download' => 'zip'] as $field_name => $file_extensions) {
+    // `PDF` is uppercase on purpose: core's file upload validation treats
+    // extensions case-insensitively, so shape matching must too.
+    foreach (['field_pdf_download' => 'PDF', 'field_zip_download' => 'zip'] as $field_name => $file_extensions) {
       FieldStorageConfig::create([
         'entity_type' => 'node',
         'field_name' => $field_name,
