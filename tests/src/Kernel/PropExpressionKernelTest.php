@@ -356,6 +356,87 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Tests resolving an expression's starting point to a field definition.
+   *
+   * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedExpressionTrait::getFieldDefinition
+   */
+  public function testGetFieldDefinition(): void {
+    $article = BetterEntityDataDefinition::create('node', ['article']);
+
+    // Every case maps an expression to the name of the field definition it is
+    // expected to resolve to, or NULL if it cannot be resolved.
+    $cases = [
+      'base field of a bundle' => [
+        new FieldPropExpression($article, 'title', NULL, 'value'),
+        'title',
+      ],
+      'configurable field of a bundle' => [
+        new FieldPropExpression($article, 'field_tags', NULL, 'target_id'),
+        'field_tags',
+      ],
+      'configurable field of another bundle' => [
+        new FieldPropExpression($article, 'bar', NULL, 'value'),
+        NULL,
+      ],
+      'configurable field of the bundle it is attached to' => [
+        new FieldPropExpression(BetterEntityDataDefinition::create('node', ['foo']), 'bar', NULL, 'value'),
+        'bar',
+      ],
+      // Without a bundle, only the entity type's base fields are resolvable.
+      'base field, no bundle' => [
+        new FieldPropExpression(BetterEntityDataDefinition::create('node'), 'title', NULL, 'value'),
+        'title',
+      ],
+      'configurable field, no bundle' => [
+        new FieldPropExpression(BetterEntityDataDefinition::create('node'), 'field_tags', NULL, 'target_id'),
+        NULL,
+      ],
+      // A bundle-less entity type has a single implicit bundle named after the
+      // entity type, so its configurable fields are resolvable.
+      'configurable field of a bundle-less entity type' => [
+        new FieldPropExpression(BetterEntityDataDefinition::create('user'), 'user_picture', NULL, 'target_id'),
+        'user_picture',
+      ],
+      'nonexistent field' => [
+        new FieldPropExpression($article, 'field_does_not_exist', NULL, 'value'),
+        NULL,
+      ],
+      'nonexistent entity type' => [
+        new FieldPropExpression(BetterEntityDataDefinition::create('does_not_exist'), 'title', NULL, 'value'),
+        NULL,
+      ],
+      // Config entity types have no fields.
+      'non-fieldable entity type' => [
+        new FieldPropExpression(BetterEntityDataDefinition::create('node_type'), 'type', NULL, 'value'),
+        NULL,
+      ],
+      // A reference expression starts from the referencing field, not the
+      // referenced one.
+      'reference expression' => [
+        new ReferenceFieldPropExpression(
+          new FieldPropExpression($article, 'field_tags', NULL, 'entity'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('taxonomy_term', ['tags']), 'name', 0, 'value'),
+        ),
+        'field_tags',
+      ],
+    ];
+
+    foreach ($cases as $label => [$expression, $expected_field_name]) {
+      self::assertSame(
+        $expected_field_name,
+        $expression->getFieldDefinition()?->getName(),
+        \sprintf('%s (%s)', $label, (string) $expression),
+      );
+    }
+
+    // The bundle-specific field definition is resolved, not merely the base
+    // field definition: only the former carries the configured cardinality.
+    $field_definition = (new FieldPropExpression($article, 'field_tags', NULL, 'target_id'))->getFieldDefinition();
+    self::assertInstanceOf(FieldConfig::class, $field_definition);
+    self::assertSame(FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED, $field_definition->getFieldStorageDefinition()->getCardinality());
+  }
+
+  /**
    * Tests calculate dependencies.
    *
    * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::calculateDependencies

@@ -156,8 +156,9 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
     // @see \canvas_post_update_0011_multi_bundle_reference_prop_expressions()
     \assert(\is_string($this->fieldName));
     \assert(\is_string($this->propName));
-    $field_definitions = $this->entityType->getPropertyDefinitions();
-    if (!isset($field_definitions[$this->fieldName])) {
+    $field_definition = $this->getFieldDefinition();
+    if ($field_definition === NULL) {
+      $field_definitions = $this->entityType->getPropertyDefinitions();
       throw new \LogicException(\sprintf("%s field referenced in %s %s does not exist. %d fields available: `%s`.", $this->fieldName, (string) $this, __CLASS__, count($field_definitions), implode('`, `', \array_keys($field_definitions))));
     }
     // Determine the bundle to use during dependency calculation:
@@ -167,8 +168,6 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
       // - no bundle: the entity type is targeted
       default => NULL,
     };
-    \assert($field_definitions[$this->fieldName] instanceof FieldDefinitionInterface);
-    $field_definition = $field_definitions[$this->fieldName];
     $dependencies = NestedArray::mergeDeep($dependencies, $this->calculateDependenciesForFieldDefinition($field_definition, $bundle));
 
     // Computed properties can have dependencies of their own.

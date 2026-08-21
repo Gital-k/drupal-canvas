@@ -621,17 +621,13 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
   private function parentDescendsThroughMultiTargetBundleReference(EntityFieldBasedPropExpressionInterface $parent_expression): bool {
     for ($current = $parent_expression; $current instanceof ReferenceFieldPropExpression; $current = $current->referenced) {
       $referencer = $current->referencer;
-      $host = $referencer->getHostEntityDataDefinition();
-      $entity_type = $host->getEntityTypeId();
-      \assert(\is_string($entity_type));
-      $bundles = $host->getBundles();
       // Parents are single-bundle by construction of the picker (nested
       // branching is not supported), so the host carries at most one bundle;
       // assert it, lest a future multi-bundle host silently resolve field
       // definitions for an arbitrary bundle.
+      $bundles = $referencer->getHostEntityDataDefinition()->getBundles();
       \assert($bundles === NULL || \count($bundles) <= 1);
-      $bundle = \is_array($bundles) && $bundles !== [] ? (string) \reset($bundles) : $entity_type;
-      $field_definition = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle)[$referencer->getFieldName()] ?? NULL;
+      $field_definition = $referencer->getFieldDefinition();
       if ($field_definition === NULL || !\is_subclass_of($field_definition->getItemDefinition()->getClass(), EntityReferenceItemInterface::class, TRUE)) {
         continue;
       }

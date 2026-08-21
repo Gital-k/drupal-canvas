@@ -12,12 +12,7 @@ use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterfac
 use Drupal\canvas\PropExpressions\StructuredData\ScalarPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\Utility\TypedDataHelper;
-use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
-use Drupal\Core\Entity\EntityFieldManagerInterface;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\TypedData\ComplexDataDefinitionInterface;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
@@ -25,22 +20,7 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 /**
  * Validates the EntityFieldExpressionMayOnlyTargetResolvableUris constraint.
  */
-final class EntityFieldExpressionMayOnlyTargetResolvableUrisConstraintValidator extends ConstraintValidator implements ContainerInjectionInterface {
-
-  public function __construct(
-    private readonly EntityTypeManagerInterface $entityTypeManager,
-    private readonly EntityFieldManagerInterface $entityFieldManager,
-  ) {}
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container): static {
-    return new static(
-      $container->get(EntityTypeManagerInterface::class),
-      $container->get(EntityFieldManagerInterface::class),
-    );
-  }
+final class EntityFieldExpressionMayOnlyTargetResolvableUrisConstraintValidator extends ConstraintValidator {
 
   /**
    * {@inheritdoc}
@@ -128,7 +108,7 @@ final class EntityFieldExpressionMayOnlyTargetResolvableUrisConstraintValidator 
 
     // Scalar leaf: reject a raw `uri` property.
     if ($expression instanceof ScalarPropExpressionInterface) {
-      $field_definition = $this->resolveFieldDefinition($expression);
+      $field_definition = $expression->getFieldDefinition();
       if ($field_definition === NULL) {
         return NULL;
       }
@@ -146,25 +126,6 @@ final class EntityFieldExpressionMayOnlyTargetResolvableUrisConstraintValidator 
     }
 
     return NULL;
-  }
-
-  /**
-   * Resolves a scalar leaf expression to its field definition.
-   */
-  private function resolveFieldDefinition(ScalarPropExpressionInterface&EntityFieldBasedPropExpressionInterface $expression): ?FieldDefinitionInterface {
-    $host = $expression->getHostEntityDataDefinition();
-    $entity_type_id = $host->getEntityTypeId();
-    if ($entity_type_id === NULL || !$this->entityTypeManager->hasDefinition($entity_type_id)) {
-      // Unknown entity type is handled by ExpressionTargetEntityBundleExists.
-      return NULL;
-    }
-    $bundles = $host->getBundles();
-    // Single-bundle or bundle-less (use the entity type ID as the bundle).
-    $bundle = \is_array($bundles) && \count($bundles) === 1 ? \reset($bundles) : $entity_type_id;
-
-    $field_definitions = $this->entityFieldManager->getFieldDefinitions($entity_type_id, (string) $bundle);
-    $field_definition = $field_definitions[$expression->getFieldName()] ?? NULL;
-    return $field_definition instanceof FieldDefinitionInterface ? $field_definition : NULL;
   }
 
 }

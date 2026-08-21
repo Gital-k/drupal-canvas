@@ -10,11 +10,6 @@ use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
-use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
-use Drupal\Core\Entity\EntityFieldManagerInterface;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
@@ -24,22 +19,7 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
  *
  * @todo Remove in https://git.drupalcode.org/project/canvas/-/work_items/3589536
  */
-final class MultiValuedFieldNotSupportedConstraintValidator extends ConstraintValidator implements ContainerInjectionInterface {
-
-  public function __construct(
-    private readonly EntityTypeManagerInterface $entityTypeManager,
-    private readonly EntityFieldManagerInterface $entityFieldManager,
-  ) {}
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container): static {
-    return new static(
-      $container->get(EntityTypeManagerInterface::class),
-      $container->get(EntityFieldManagerInterface::class),
-    );
-  }
+final class MultiValuedFieldNotSupportedConstraintValidator extends ConstraintValidator {
 
   /**
    * {@inheritdoc}
@@ -128,7 +108,7 @@ final class MultiValuedFieldNotSupportedConstraintValidator extends ConstraintVa
     }
 
     if ($expression instanceof FieldPropExpression) {
-      return $this->isMultiValued($expression) ? $expression : NULL;
+      return self::isMultiValued($expression) ? $expression : NULL;
     }
 
     return NULL;
@@ -137,20 +117,10 @@ final class MultiValuedFieldNotSupportedConstraintValidator extends ConstraintVa
   /**
    * Whether an expression's field has a cardinality other than 1.
    */
-  private function isMultiValued(FieldPropExpression $expression): bool {
-    $host = $expression->getHostEntityDataDefinition();
-    $entity_type_id = $host->getEntityTypeId();
-    if ($entity_type_id === NULL || !$this->entityTypeManager->hasDefinition($entity_type_id)) {
-      // Unknown entity type is handled by ExpressionTargetEntityBundleExists.
-      return FALSE;
-    }
-    $bundles = $host->getBundles();
-    // Single-bundle or bundle-less (use the entity type ID as the bundle).
-    $bundle = \is_array($bundles) && \count($bundles) === 1 ? \reset($bundles) : $entity_type_id;
-
-    $field_definition = $this->entityFieldManager->getFieldDefinitions($entity_type_id, (string) $bundle)[$expression->getFieldName()] ?? NULL;
-    if (!$field_definition instanceof FieldDefinitionInterface) {
-      // A nonexistent field is handled by other constraints.
+  private static function isMultiValued(FieldPropExpression $expression): bool {
+    $field_definition = $expression->getFieldDefinition();
+    if ($field_definition === NULL) {
+      // A nonexistent entity type or field is handled by other constraints.
       return FALSE;
     }
     return $field_definition->getFieldStorageDefinition()->getCardinality() !== 1;
