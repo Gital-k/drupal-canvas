@@ -9,61 +9,71 @@ Proposed
 ## Context
 
 Code Component developers author metadata in `component.yml`. This Canvas-specific exchange format reuses parts of the
-Single-Directory Component prop and slot vocabulary, but it is not a subset of SDC metadata. Canvas moves required prop
-names to the document's top level, gives fields such as `status` Canvas-specific meanings, derives other values during
-push, and projects the result into an SDC definition for Drupal validation.
+Single-Directory Component prop and slot vocabulary, but it is not itself an SDC definition or a JSON Schema document.
+Canvas moves required prop names to the document's top level, derives some values during push, and projects the result
+into an SDC definition for Drupal validation.
+
+The definitions under `props.properties` are different: each prop definition is JSON Schema. Drupal uses that schema to
+validate example and runtime prop values. Drupal config schema separately describes which JSON Schema vocabulary Canvas
+can store, and entity constraints determine which valid JSON Schema shapes Canvas and the target site can support.
+Drupal config schema is not JSON Schema, and translating it would require reproducing dynamic config schema types,
+inheritance, custom data classes, and Symfony constraints.
 
 The metadata acceptance contract spans several kinds of rules:
 
-- structural rules, such as supported keys, value types, prop shapes, formats, and `$ref` values;
-- relationships between metadata values, such as content entity reference props matching
-  `dataDependencies.entityFields`;
-- project conventions involving component names, directories, imports, and exports; and
+- the authored document envelope, including its required and allowed fields;
+- whether each prop definition is valid JSON Schema and its examples conform to it;
+- relationships between metadata values;
+- project conventions involving names, directories, imports, and exports; and
 - site-dependent rules involving installed field types, widgets, the entity model, and alter hooks.
 
-Drupal config schema describes the supported prop vocabulary, but it is not JSON Schema and standard JSON Schema tools
-cannot consume it. Some metadata requirements also cannot be represented by standard JSON Schema. In particular, a
-schema cannot validate an example against the prop schema containing it or determine whether a site can provide a
-storable field type and widget for a prop shape.
-
-A CLI-bundled contract cannot establish whether a target site will accept metadata. The CLI and Drupal site can run
-different Canvas versions, and sites can have different data models and extensions. A version marker in `component.yml`
-would not resolve this mismatch: the target accepts the contract provided by its installed Canvas version rather than
-selecting among historical contracts declared by a component.
-
-Canvas needs useful validation without Drupal while preserving an authoritative, non-mutating validation path against
-the target site.
+No offline validator can reproduce the final category or provide an authoritative target-site verdict. Canvas needs useful
+local feedback without maintaining a second implementation of Drupal's validation model.
 
 ## Decision
 
-### Publish an authored metadata schema
+### Publish a hand-authored metadata schema
 
-Canvas will publish `component-metadata.schema.json` in the module root. It will describe the authored `component.yml`
-format and use JSON Schema draft-07.
+Canvas will publish a hand-authored `component-metadata.schema.json` in the module root. It will use JSON Schema draft-07
+and describe the stable authored `component.yml` envelope, including:
 
-The schema will be generated from two inputs:
+- required `name` and `machineName` fields;
+- optional `status`, `required`, `props`, `slots`, and `dataDependencies` fields;
+- `dataDependencies.entityFields` as the only authored data dependency;
+- no authored `type`, URL dependencies, Drupal settings dependencies, or projected `x-allowed-*` keys; and
+- unknown-key rejection at fully defined metadata levels.
 
-1. a hand-authored JSON template defining the document envelope and rules that do not originate in Drupal config schema;
-   and
-2. generated prop definitions translated from `config/schema/canvas.json_schema.yml`.
+The schema will not be generated from Drupal config schema. A prop definition will be checked against the draft-07
+meta-schema because it is already JSON Schema. The published schema will require the Canvas metadata needed around that
+schema, such as a prop title and type, but it will not attempt to duplicate which otherwise valid JSON Schema shapes a
+particular Canvas site supports.
 
-The translator will support only the Drupal config schema constructs used by the prop definitions. It will fail when it
-encounters an unsupported type or constraint instead of publishing a weaker schema. The complete generated artifact will
-be committed, regenerated by the repository fix workflow, and checked for drift in CI.
-
-The schema will be versioned with Canvas releases rather than on an independent schedule. A public URL tracking the
-latest development version will support editors and documentation, and release tags will provide immutable historical
-URLs. The CLI will bundle the generated artifact for offline validation.
+The schema will be versioned with Canvas releases rather than on an independent schedule. The latest development branch
+and release tags provide mutable and immutable public URLs. The CLI will bundle the schema for local envelope validation.
+Metadata files will not declare a schema URL or schema version because the target site remains authoritative and the same
+component may be used with different sites.
 
 Canvas-owned JSON schemas consumed by TypeScript will use draft-07 consistently. A private workspace package will provide
-a strict Ajv factory with the standard and draft-2019 string formats Canvas supports, without changing the schema
-dialect. The UI and CLI will use this factory, and the published CLI bundle will include its implementation rather than
-depending on the private package at runtime.
+a strict Ajv factory with the standard and draft-2019 string formats Canvas supports. The UI and CLI will share this
+factory, and the published CLI bundle will include its implementation rather than depending on the private package at
+runtime.
+
+### Validate prop schemas directly
+
+After validating the authored envelope, the CLI will check each definition under `props.properties` as JSON Schema
+directly. It will validate the first example value, which Canvas uses as the default, against its containing prop schema
+where that schema can be resolved locally. Target- or extension-provided `$ref` values may not be resolvable offline and
+will remain the target site's responsibility. Drupal combines these definitions with the authored `required` names when
+it projects the normalized payload into the complete SDC `props` schema.
+
+These local checks establish only that the document is structurally usable and that its directly resolvable prop schemas
+and default examples are internally consistent. They do not establish that Canvas can map a prop shape to a field and widget or
+that a target site's extensions accept it.
 
 ### Define the authored metadata boundary
 
-Only `name` and `machineName` will be required in an authored metadata document. The CLI will validate the raw parsed YAML
-before normalizing optional values. Valid documents will then receive explicit defaults for internal processing:
+Only `name` and `machineName` are required in an authored metadata document. The CLI validates raw parsed YAML before
+normalizing optional values. Valid documents then receive explicit defaults for internal processing:
 
 - `status` defaults to `true`;
 - `required` defaults to an empty array;
@@ -71,98 +81,69 @@ before normalizing optional values. Valid documents will then receive explicit d
 - `slots` defaults to an empty object; and
 - `dataDependencies` defaults to an empty object.
 
-The authored contract will apply these boundaries:
+`type`, URL dependencies, and Drupal settings dependencies are derived during push. Projected
+`x-allowed-entity-type-id` and `x-allowed-bundle` values are not valid authored metadata; in accordance with
+[ADR 11](0011-content-entity-reference-props-in-code-components.md), `dataDependencies.entityFields` remains their source
+of truth.
 
-- `status`, `required`, `props`, `slots`, and `dataDependencies` are optional.
-- `dataDependencies` may contain only `entityFields`.
-- `type` is derived from the component's mode and supplied during push rather than authored.
-- URL and Drupal settings dependencies are derived from source code rather than authored.
-- `x-allowed-entity-type-id` and `x-allowed-bundle` are projected values and are not valid authored metadata. In
-  accordance with [ADR 11](0011-content-entity-reference-props-in-code-components.md),
-  `dataDependencies.entityFields` remains their source of truth.
-- Unknown keys are rejected at fully defined schema levels.
-
-`pull` will continue to emit optional fields explicitly, but it will omit projected `x-allowed-*` values and preserve
-`dataDependencies.entityFields`. Metadata files will not declare a schema URL or schema version because the target site
-remains authoritative and the same component may be used with different sites.
+`pull` continues to emit optional fields explicitly, omits projected `x-allowed-*` values, and preserves
+`dataDependencies.entityFields`.
 
 ### Make target validation authoritative
 
-An authenticated Canvas site will expose two Code Component operations:
-
-- a schema operation returning the raw `application/schema+json` artifact with an ETag derived from its contents; and
-- a non-mutating validation operation accepting one normalized Code Component API payload and returning `204` when valid
-  or the existing structured constraint-violation response when invalid.
-
-Both operations will require Code Component authentication and authorization. The schema operation will honor
-`If-None-Match` with `304`. The validation operation will construct an in-memory create or update candidate as needed and
-run the same entity and metadata constraint chain used by create and update without saving or otherwise mutating stored
-configuration.
+An authenticated Canvas site will expose a non-mutating Code Component validation operation. It accepts one normalized
+Code Component API payload, constructs an in-memory create or update candidate, and runs the same entity and metadata
+constraint chain used by create and update. It returns `204` when valid or the existing structured constraint-violation
+response when invalid. It never saves or otherwise mutates stored configuration.
 
 `canvas validate` will:
 
-1. read the target site and credentials from the existing environment configuration;
-2. request the target schema with `If-None-Match` on every validation;
-3. cache schemas by normalized site URL under the ignored `.canvas/schema-cache/` directory, together with the ETag and
-   fetch metadata;
-4. use the cached target schema after a `304` response;
-5. fall back to the cached target schema or bundled schema when target retrieval is unavailable, authentication fails,
-   or an older target does not provide the operation;
-6. clearly warn that fallback validation is offline and not authoritative;
-7. validate raw YAML with Ajv, map validation paths to YAML locations where practical, and then normalize valid metadata;
-8. run project-oriented ESLint rules and aggregate their diagnostics with structural diagnostics; and
-9. submit each structurally valid normalized payload to target validation when that operation is reachable.
+1. validate raw YAML against the bundled authored-envelope schema;
+2. check the prop definitions as JSON Schema and validate locally resolvable examples;
+3. run project-oriented ESLint rules and aggregate their diagnostics;
+4. normalize structurally valid metadata and construct the complete Code Component payload; and
+5. submit that payload to the target operation when authenticated access is available.
 
-Offline validation will be best effort and may exit successfully when bundled or cached checks pass, but its warning will
-distinguish that result from target validation. No command-line switch will be added for this fallback.
+If the target cannot be reached or does not provide the operation, the CLI will clearly report that only local checks
+were completed and that target acceptance was not validated. Local checks may succeed without a target.
 
-`push` will pass its authenticated API service through the same validation path and validate every complete component
-payload before the first create, update, or delete. If an older site does not provide the new operations, the CLI will
-warn, perform offline validation, and retain per-component save-time Drupal validation.
+`push` will validate every complete component payload against the target before the first create, update, or delete. If an
+older site does not provide the operation, the CLI will warn and retain per-component save-time Drupal validation; a
+partial push therefore remains possible on older sites.
 
-`build` will remain offline. Discovery, Workbench, and headless consumers will retain defensive metadata parsing rather
-than enforcing the CLI-bundled schema because they do not necessarily know the target site's contract.
+`build` remains offline. Discovery, Workbench, and headless consumers retain defensive metadata parsing rather than
+enforcing target acceptance because they do not know the target site's contract.
 
 ### Keep ESLint focused on project conventions
 
-ESLint will remain authoritative for project conventions, including prop names, imports, exports, directory names, and
-component hierarchy. It will not determine whether target metadata is accepted.
-
-Metadata rules represented by the published schema will not also produce duplicate blocking ESLint diagnostics. Image
-example URL and empty-string checks will move into the schema before their ESLint rules are removed. The schema will
-validate content entity reference structure where expressible, while Drupal will validate relational and site-dependent
-requirements.
+ESLint remains authoritative for project conventions, including prop names, imports, exports, directory names, and
+component hierarchy. It does not determine whether target metadata is accepted. Schema and target diagnostics should not
+be duplicated as blocking ESLint diagnostics.
 
 ## Alternatives considered
 
-- **Use only the schema bundled with the CLI.** Rejected because it can disagree with the target site's contract and
-  capabilities.
-- **Download only the target schema.** Rejected because JSON Schema cannot express every metadata relationship or
-  site-dependent storage requirement.
-- **Use only remote Drupal validation.** Rejected because developers and editors need fast structural feedback and
-  offline validation.
+- **Generate JSON Schema from Drupal config schema.** Rejected because the formats describe different contracts and do
+  not map mechanically. The resulting translator would be a second, incomplete implementation of Drupal config schema.
+- **Use only a bundled metadata schema.** Rejected because it cannot account for target version, extensions, field types,
+  widgets, or alter hooks.
+- **Use only remote Drupal validation.** Rejected because YAML, envelope, and directly resolvable prop-schema errors can
+  be reported quickly and precisely without Drupal.
+- **Download a target-specific schema.** Rejected because a schema still cannot express all target constraints; the
+  non-mutating validation operation already provides the authoritative verdict without schema translation or caching.
 - **Declare a contract version in each `component.yml`.** Rejected because a site accepts its installed contract rather
-  than retaining validators for every historical version, and one component may target sites running different versions.
-- **Interpret Drupal config schema directly in the CLI.** Rejected because this would require reproducing Drupal's dynamic
-  config schema types, inheritance, custom data classes, and Symfony constraints in TypeScript.
+  than retaining validators for every historical version.
 - **Make ESLint the metadata contract.** Rejected because unconditional CLI rules can disagree with the target and are not
   reusable by standard JSON Schema tools.
-- **Apply the generated schema in discovery and Workbench.** Rejected because those consumers do not necessarily know the
-  target site and would enforce the bundled contract instead.
 
 ## Consequences
 
-- Editors, CI jobs, and offline CLI workflows gain a published, machine-readable description of authored metadata.
-- A reachable target site provides the authoritative metadata verdict at validation time without mutating component
-  configuration.
-- Schema generation reduces drift between Drupal's supported prop vocabulary and the published artifact.
-- The generated artifact, template, translator, shared Ajv package, cache behavior, authenticated operations, and parity
-  fixtures add maintenance and testing responsibilities.
-- Offline success does not guarantee target acceptance and must always be identified as non-authoritative.
-- Validation against multiple sites requires one invocation per target, and results may differ legitimately.
-- Older sites retain save-time validation but cannot provide an all-component remote preflight. Partial push remains
-  possible and must be disclosed by the CLI warning.
-- Rejecting unknown and projected keys may invalidate metadata accepted by less strict tooling; no general backward
-  compatibility guarantee is provided.
-- Migrating Canvas-owned schemas and validators to draft-07 broadens the initial change but establishes one TypeScript
+- The authored envelope and the prop schemas have readable, explicit validation paths.
+- The repository does not maintain a Drupal-config-schema-to-JSON-Schema translator.
+- Editors and offline CLI workflows receive useful structural feedback, but offline success does not guarantee target
+  acceptance.
+- A reachable target site provides the authoritative verdict without mutating component configuration.
+- The hand-authored envelope schema must be updated deliberately when the authored format changes.
+- Custom or extension-provided `$ref` values may only be fully validated by the target site.
+- Older sites retain save-time validation but cannot provide an all-component remote preflight.
+- Migrating Canvas-owned schemas and validators to draft-07 remains part of the change and establishes one TypeScript
   JSON Schema dialect and one tested Ajv configuration.

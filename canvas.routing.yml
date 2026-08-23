@@ -124,17 +124,6 @@ canvas.api.config.auto-save.patch:
     _format: 'json'
   methods: [PATCH]
 
-canvas.api.code_component.metadata_schema:
-  path: '/canvas/api/v0/code-components/metadata-schema'
-  defaults:
-    _controller: 'Drupal\canvas\Controller\ApiCodeComponentMetadataController::schema'
-  requirements:
-    _canvas_authentication_required: TRUE
-    _permission: 'administer code components'
-  options:
-    canvas_external_api: true
-  methods: [GET]
-
 canvas.api.code_component.validate:
   path: '/canvas/api/v0/code-components/validate'
   defaults:

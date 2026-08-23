@@ -45,12 +45,6 @@ export class CodeComponentMetadataOperationUnsupportedError extends Error {}
 
 export class CodeComponentMetadataValidationUnavailableError extends Error {}
 
-export interface ComponentMetadataSchemaResponse {
-  etag?: string;
-  schema?: unknown;
-  status: 200 | 304;
-}
-
 export interface UploadedMedia<TInputsResolved = unknown> {
   id: number;
   uuid: string;
@@ -310,30 +304,6 @@ export class ApiService {
 
   getAccessToken(): string | null {
     return this.accessToken;
-  }
-
-  getSiteUrl(): string {
-    return this.siteUrl;
-  }
-
-  async getComponentMetadataSchema(
-    etag?: string,
-  ): Promise<ComponentMetadataSchemaResponse> {
-    const response = await this.client.get(
-      '/canvas/api/v0/code-components/metadata-schema',
-      {
-        headers: etag ? { 'If-None-Match': etag } : undefined,
-        validateStatus: (status) => status === 200 || status === 304,
-      },
-    );
-    return {
-      status: response.status as 200 | 304,
-      schema: response.status === 200 ? response.data : undefined,
-      etag:
-        typeof response.headers.etag === 'string'
-          ? response.headers.etag
-          : undefined,
-    };
   }
 
   async validateCodeComponentPayload(component: Component): Promise<void> {
