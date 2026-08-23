@@ -7,38 +7,17 @@ namespace Drupal\canvas\Controller;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Extension\ModuleExtensionList;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Provides the target site's Code Component metadata contract.
+ * Validates Code Component metadata against the target site.
  */
 final class ApiCodeComponentMetadataController extends ApiControllerBase {
 
   public function __construct(
-    private readonly ModuleExtensionList $moduleExtensionList,
     private readonly EntityTypeManagerInterface $entityTypeManager,
   ) {}
-
-  /**
-   * Returns the generated authored metadata schema.
-   */
-  public function schema(Request $request): Response {
-    $schema_path = $this->moduleExtensionList->getPath('canvas') . '/component-metadata.schema.json';
-    $schema = file_get_contents($schema_path);
-    if ($schema === FALSE) {
-      throw new \RuntimeException('The Code Component metadata schema could not be read.');
-    }
-
-    $response = new Response($schema, Response::HTTP_OK, [
-      'Content-Type' => 'application/schema+json',
-    ]);
-    $response->setPrivate();
-    $response->setEtag(hash('sha256', $schema));
-    $response->isNotModified($request);
-    return $response;
-  }
 
   /**
    * Validates a normalized payload without saving it.

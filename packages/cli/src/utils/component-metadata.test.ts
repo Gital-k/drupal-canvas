@@ -37,6 +37,32 @@ describe('component metadata', () => {
     });
   });
 
+  it('validates prop examples directly against their JSON Schema', async () => {
+    const filePath = path.join(
+      fixtureRoot,
+      'prop-invalid/example-does-not-match-schema.yml',
+    );
+    const parsed = await parseComponentMetadata(filePath);
+
+    expect(validateParsedComponentMetadata(parsed)).toEqual([
+      expect.objectContaining({
+        path: '$.props.properties.count.examples[0]',
+        line: 10,
+        message: 'must be integer',
+      }),
+    ]);
+  });
+
+  it.each(['empty-string-examples.yml', 'relative-image-examples.yml'])(
+    'leaves target-specific rules in %s to Drupal',
+    async (fixtureName) => {
+      const filePath = path.join(fixtureRoot, 'target-invalid', fixtureName);
+      const parsed = await parseComponentMetadata(filePath);
+
+      expect(validateParsedComponentMetadata(parsed)).toEqual([]);
+    },
+  );
+
   it('reports schema failures at YAML locations', async () => {
     const filePath = path.join(fixtureRoot, 'invalid/projected-prop-key.yml');
     const parsed = await parseComponentMetadata(filePath);
@@ -49,7 +75,7 @@ describe('component metadata', () => {
           line: 9,
           column: 33,
           message:
-            "must not contain unknown property 'x-allowed-entity-type-id'",
+            "must not contain projected property 'x-allowed-entity-type-id'",
         }),
       ]),
     );

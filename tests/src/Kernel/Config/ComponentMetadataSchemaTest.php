@@ -18,7 +18,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 #[Group('canvas')]
 #[RunTestsInSeparateProcesses]
-class ComponentMetadataSchemaParityTest extends KernelTestBase {
+class ComponentMetadataSchemaTest extends KernelTestBase {
 
   /**
    * {@inheritdoc}
