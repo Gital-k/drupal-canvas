@@ -11,7 +11,6 @@ import {
   reportResults,
   splitFailedResultsByFile,
 } from '../utils/report-results.js';
-import { resolveTargetComponentMetadataSchema } from '../utils/target-component-metadata.js';
 import { validateContentTemplates } from '../utils/validate-content-template.js';
 import { validatePageTemplates } from '../utils/validate-page-variant.js';
 import { validatePages } from '../utils/validate-page.js';
@@ -84,11 +83,6 @@ export function validateCommand(program: Command): void {
         }
         const results: Result[] = [];
         const apiService = await createOptionalValidationApiService();
-        const componentMetadataContext =
-          await resolveTargetComponentMetadataSchema(process.cwd(), apiService);
-        for (const warning of componentMetadataContext.warnings) {
-          p.log.warn(warning);
-        }
         let availablePageVariantIds: Set<string> | undefined;
         if (apiService) {
           try {
@@ -109,9 +103,6 @@ export function validateCommand(program: Command): void {
           await validateComponents(discoveryResult, {
             fix: options.fix,
             apiService,
-            schema: componentMetadataContext.schema,
-            remoteValidationAvailable:
-              componentMetadataContext.remoteValidationAvailable,
           });
         for (const warning of validationWarnings) {
           p.log.warn(warning);

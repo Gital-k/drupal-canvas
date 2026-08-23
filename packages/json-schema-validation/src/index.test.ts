@@ -25,6 +25,15 @@ describe('createCanvasAjv', () => {
     expect(() => createCanvasAjv().compile(schema)).not.toThrow();
   });
 
+  it('uses strict schema checks by default but permits explicit overrides', () => {
+    const schema = { type: 'string', 'x-target-annotation': true };
+
+    expect(() => createCanvasAjv().compile(schema)).toThrow('strict mode');
+    expect(() =>
+      createCanvasAjv({ strictSchema: false }).compile(schema),
+    ).not.toThrow();
+  });
+
   it('supports draft 2019 string formats without changing the dialect', () => {
     const validate = createCanvasAjv().compile({
       $schema: 'http://json-schema.org/draft-07/schema#',

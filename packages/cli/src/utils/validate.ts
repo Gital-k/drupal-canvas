@@ -15,7 +15,6 @@ import type {
   DiscoveredComponent,
   DiscoveryResult,
 } from '@drupal-canvas/discovery';
-import type { AnySchema } from '@drupal-canvas/json-schema-validation';
 import type { ApiService } from '../services/api';
 import type { Metadata } from '../types/Metadata';
 import type { Result } from '../types/Result';
@@ -62,7 +61,6 @@ async function validateComponent(
   component: DiscoveredComponent,
   options: {
     fix: boolean;
-    schema?: AnySchema;
     remoteValidation?: Pick<ApiService, 'validateCodeComponentPayload'>;
   },
 ): Promise<{ result: Result; remoteUnsupported: boolean }> {
@@ -94,10 +92,7 @@ async function validateComponent(
 
   let remoteUnsupported = false;
   try {
-    const metadata = await readComponentMetadata(
-      component.metadataPath,
-      options.schema,
-    );
+    const metadata = await readComponentMetadata(component.metadataPath);
     if (options.remoteValidation) {
       try {
         await options.remoteValidation.validateCodeComponentPayload(
@@ -143,26 +138,27 @@ export async function validateComponents(
   options: {
     fix?: boolean;
     apiService?: Pick<ApiService, 'validateCodeComponentPayload'>;
-    remoteValidationAvailable?: boolean;
-    schema?: AnySchema;
   } = {},
 ): Promise<{ results: Result[]; warnings: string[] }> {
   const results: Result[] = [];
   const warnings: string[] = [];
-  let remoteValidation = options.remoteValidationAvailable
-    ? options.apiService
-    : undefined;
+  const components = getComponentsToValidate(discoveryResult.components);
+  let remoteValidation = options.apiService;
+  if (components.length > 0 && !remoteValidation) {
+    warnings.push(
+      'No authenticated target site is available. Only local checks were completed; target acceptance was not validated.',
+    );
+  }
 
-  for (const component of getComponentsToValidate(discoveryResult.components)) {
+  for (const component of components) {
     const outcome = await validateComponent(component, {
       fix: options.fix ?? false,
-      schema: options.schema,
       remoteValidation,
     });
     results.push(outcome.result);
     if (outcome.remoteUnsupported) {
       warnings.push(
-        'Target metadata validation is unavailable. Validation is offline and not authoritative.',
+        'Target metadata validation is unavailable. Only local checks were completed; target acceptance was not validated.',
       );
       remoteValidation = undefined;
     }

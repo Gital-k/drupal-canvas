@@ -69,11 +69,8 @@ variables:
   - "tests/**/*"
   - "!tests/src/Playwright/**/*"
 
-.component-metadata-schema-files: &component-metadata-schema-files
+.component-metadata-files: &component-metadata-files
   - component-metadata.schema.json
-  - config/schema/canvas.json_schema.yml
-  - scripts/component-metadata.schema.template.json
-  - scripts/generate-component-metadata-schema.js
   - "tests/fixtures/component-metadata/**/*"
   - "packages/json-schema-validation/**/*"
 
@@ -468,7 +465,7 @@ phpunit (11.3 sqlite):
         compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
     - <<: *mr-rule
       changes:
-        paths: *component-metadata-schema-files
+        paths: *component-metadata-files
         compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
     - <<: *mr-rule
       changes:
@@ -866,7 +863,7 @@ test (packages):
         compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
     - <<: *mr-rule
       changes:
-        paths: *component-metadata-schema-files
+        paths: *component-metadata-files
         compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
     - *manual-rule
   variables:

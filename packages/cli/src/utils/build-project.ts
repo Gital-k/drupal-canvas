@@ -27,7 +27,6 @@ import type {
   DiscoveredComponent,
   DiscoveryResult,
 } from '@drupal-canvas/discovery';
-import type { AnySchema } from '@drupal-canvas/json-schema-validation';
 import type {
   CanvasDependencyMetadata,
   CanvasVendorArtifactBuildResult,
@@ -63,7 +62,6 @@ export interface CanvasProjectBuildOptions {
   discoveryResult: DiscoveryResult;
   cleanOutputDir?: boolean;
   requireJsEntries?: boolean;
-  componentMetadataSchema?: AnySchema;
   // When the Canvas Headless SDK is installed, every component is pushed as an
   // external component (metadata only): the SDK-powered app renders them.
   headlessSdkDetected?: boolean;
@@ -293,9 +291,8 @@ function emptyBuildManifest(): Manifest {
 
 async function validateComponentsForBuild(
   discoveryResult: DiscoveryResult,
-  schema?: AnySchema,
 ): Promise<Result[]> {
-  const { results } = await validateComponents(discoveryResult, { schema });
+  const { results } = await validateComponents(discoveryResult);
   return results.filter((result) => !result.success);
 }
 
@@ -315,7 +312,6 @@ export async function buildCanvasProject(
 
   const validationFailures = await validateComponentsForBuild(
     options.discoveryResult,
-    options.componentMetadataSchema,
   );
   if (validationFailures.length > 0) {
     const manifestPath = path.join(outputDir, 'canvas-manifest.json');
