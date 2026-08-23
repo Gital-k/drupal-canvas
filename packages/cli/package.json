@@ -67,6 +67,7 @@
     "unifont": "^0.7.4",
     "vite": "^6.3.5",
     "vite-plugin-svgr": "^4.5.0",
-    "woff2-encoder": "^2.0.0"
+    "woff2-encoder": "^2.0.0",
+    "yaml": "^2.8.3"
   }
 }
