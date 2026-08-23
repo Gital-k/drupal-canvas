@@ -2,7 +2,10 @@ import path from 'path';
 import { ESLint } from 'eslint';
 import { required as drupalCanvasRequired } from '@drupal-canvas/eslint-config';
 
-import { CodeComponentMetadataOperationUnsupportedError } from '../services/api';
+import {
+  CodeComponentMetadataOperationUnsupportedError,
+  CodeComponentMetadataValidationUnavailableError,
+} from '../services/api';
 import {
   createComponentPayload,
   readComponentMetadata,
@@ -101,7 +104,10 @@ async function validateComponent(
           createValidationPayload(component, metadata),
         );
       } catch (error) {
-        if (error instanceof CodeComponentMetadataOperationUnsupportedError) {
+        if (
+          error instanceof CodeComponentMetadataOperationUnsupportedError ||
+          error instanceof CodeComponentMetadataValidationUnavailableError
+        ) {
           remoteUnsupported = true;
         } else {
           details.push({
@@ -156,7 +162,7 @@ export async function validateComponents(
     results.push(outcome.result);
     if (outcome.remoteUnsupported) {
       warnings.push(
-        'The target site does not provide metadata validation. Validation is offline and not authoritative.',
+        'Target metadata validation is unavailable. Validation is offline and not authoritative.',
       );
       remoteValidation = undefined;
     }

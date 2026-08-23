@@ -69,6 +69,14 @@ variables:
   - "tests/**/*"
   - "!tests/src/Playwright/**/*"
 
+.component-metadata-schema-files: &component-metadata-schema-files
+  - component-metadata.schema.json
+  - config/schema/canvas.json_schema.yml
+  - scripts/component-metadata.schema.template.json
+  - scripts/generate-component-metadata-schema.js
+  - "tests/fixtures/component-metadata/**/*"
+  - "packages/json-schema-validation/**/*"
+
 .packages-files: &packages-files
   - "packages/**/*"
   - ".changeset/**/*"
@@ -110,6 +118,7 @@ variables:
   - packages/drupal-canvas/**/*
   - packages/headless/**/*
   - packages/headless-host/**/*
+  - packages/json-schema-validation/**/*
   - packages/types/**/*
 
 .user-docs-files: &user-docs-files
@@ -456,6 +465,10 @@ phpunit (11.3 sqlite):
     - <<: *mr-rule
       changes:
         paths: *backend-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-rule
+      changes:
+        paths: *component-metadata-schema-files
         compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
     - <<: *mr-rule
       changes:
@@ -850,6 +863,10 @@ test (packages):
     - <<: *mr-rule
       changes:
         paths: *data-integrity-files
+        compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
+    - <<: *mr-rule
+      changes:
+        paths: *component-metadata-schema-files
         compare_to: 'refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME'
     - *manual-rule
   variables:

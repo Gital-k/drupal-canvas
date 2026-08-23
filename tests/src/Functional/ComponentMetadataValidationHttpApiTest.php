@@ -80,7 +80,7 @@ class ComponentMetadataValidationHttpApiTest extends HttpApiTestBase {
     $url = Url::fromUri('base:/canvas/api/v0/code-components/validate');
     $this->drupalLogin($this->codeComponentAdmin);
 
-    $payload = $this->validPayload('new_component');
+    $payload = self::validPayload('new_component');
     $response = $this->makeApiRequest('POST', $url, [
       RequestOptions::HEADERS => [
         'Content-Type' => 'application/json',
@@ -91,13 +91,13 @@ class ComponentMetadataValidationHttpApiTest extends HttpApiTestBase {
     $this->assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode(), (string) $response->getBody());
     $this->assertNull(JavaScriptComponent::load('new_component'));
 
-    $stored_payload = $this->validPayload('stored_component');
+    $stored_payload = self::validPayload('stored_component');
     $stored_payload['props'] = [];
     $stored_payload['slots'] = [];
     $stored_payload['dataDependencies'] = [];
     $stored = JavaScriptComponent::createFromClientSide($stored_payload);
     $stored->save();
-    $payload = $this->validPayload('stored_component');
+    $payload = self::validPayload('stored_component');
     $payload['name'] = 'Changed only in memory';
     $response = $this->makeApiRequest('POST', $url, [
       RequestOptions::HEADERS => [
@@ -107,7 +107,9 @@ class ComponentMetadataValidationHttpApiTest extends HttpApiTestBase {
       RequestOptions::JSON => $payload,
     ]);
     $this->assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode(), (string) $response->getBody());
-    $this->assertSame('stored_component', JavaScriptComponent::load('stored_component')?->label());
+    $unchanged = JavaScriptComponent::load('stored_component');
+    $this->assertInstanceOf(JavaScriptComponent::class, $unchanged);
+    $this->assertSame('stored_component', $unchanged->label());
 
     $payload['props'] = [
       'invalid' => [
@@ -125,13 +127,15 @@ class ComponentMetadataValidationHttpApiTest extends HttpApiTestBase {
     $this->assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
     $body = json_decode((string) $response->getBody(), associative: TRUE, flags: JSON_THROW_ON_ERROR);
     $this->assertArrayHasKey('errors', $body);
-    $this->assertSame('stored_component', JavaScriptComponent::load('stored_component')?->label());
+    $unchanged = JavaScriptComponent::load('stored_component');
+    $this->assertInstanceOf(JavaScriptComponent::class, $unchanged);
+    $this->assertSame('stored_component', $unchanged->label());
   }
 
   /**
    * Creates a complete normalized API payload.
    */
-  private function validPayload(string $machine_name): array {
+  private static function validPayload(string $machine_name): array {
     return [
       'machineName' => $machine_name,
       'name' => $machine_name,

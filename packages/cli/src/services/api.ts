@@ -43,6 +43,8 @@ export interface ApiOptions {
 
 export class CodeComponentMetadataOperationUnsupportedError extends Error {}
 
+export class CodeComponentMetadataValidationUnavailableError extends Error {}
+
 export interface ComponentMetadataSchemaResponse {
   etag?: string;
   schema?: unknown;
@@ -341,8 +343,19 @@ export class ApiService {
         component,
       );
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new CodeComponentMetadataOperationUnsupportedError();
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          throw new CodeComponentMetadataOperationUnsupportedError();
+        }
+        if (
+          !error.response ||
+          [401, 403].includes(error.response.status) ||
+          error.response.status >= 500
+        ) {
+          throw new CodeComponentMetadataValidationUnavailableError(
+            'Target metadata validation is unavailable.',
+          );
+        }
       }
       this.handleApiError(error);
     }
