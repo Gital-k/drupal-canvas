@@ -15,8 +15,8 @@ props:
         - Example
         - Alternative
       meta:enum:
-        - Example label
-        - Alternative label
+        Example: Example label
+        Alternative: Alternative label
       x-translation-context: Component example
       format: uri-reference
     formattedText:
@@ -44,8 +44,8 @@ props:
         - 1
         - 3
       meta:enum:
-        - One
-        - Three
+        1: One
+        3: Three
     ratio:
       type: number
       title: Ratio
