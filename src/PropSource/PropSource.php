@@ -9,7 +9,7 @@ namespace Drupal\canvas\PropSource;
  *
  * Canvas's own prop sources are a hard-coded set, defined by this enum. Other
  * modules can contribute additional prop source types by tagging a service
- * `canvas.prop_source_type` 
+ * `canvas.prop_source_type`
  * (see \Drupal\canvas\PropSource\PropSourceTypeInterface).
  * The ::parse() method will, given a prop source's array representation,
  * instantiate the appropriate concrete PropSourceBase object. For example:
