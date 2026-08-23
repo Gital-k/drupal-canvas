@@ -452,6 +452,7 @@ describe('buildCanvasProject', () => {
     await fs.writeFile(staleManifestPath, '{"stale":true}', 'utf-8');
 
     vi.mocked(validateComponents).mockResolvedValueOnce({
+      warnings: [],
       results: [
         {
           itemName: 'card',
