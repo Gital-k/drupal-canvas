@@ -232,7 +232,13 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           'required' => $suggestions[$prop_name]['required'],
           PropSource::EntityField->value => \array_map(fn (EntityFieldPropSource $s): array => $s->toArray(), $suggestions[$prop_name][PropSource::EntityField->value]),
           PropSource::Adapter->value => \array_map(fn (AdapterInterface $a): string => $a->getPluginId(), $suggestions[$prop_name][PropSource::Adapter->value]),
+          // PropSourceSuggester::suggest() builds this key dynamically, so
+          // PHPStan cannot correlate its unsealed return shape with this
+          // literal offset, nor narrow the value type to the concrete
+          // LinkablePropSourceInterface implementor the closure expects.
+          // @phpstan-ignore offsetAccess.notFound, argument.type
           PropSource::HostEntityUrl->value => \array_map(fn (HostEntityUrlPropSource $s): array => $s->toArray(), $suggestions[$prop_name][PropSource::HostEntityUrl->value]),
+          // @phpstan-ignore offsetAccess.notFound, argument.type
           PropSource::HostEntity->value => \array_map(fn (HostEntityPropSource $s): array => $s->toArray(), $suggestions[$prop_name][PropSource::HostEntity->value]),
         ],
         "Unexpected prop source suggestion for $prop_name"
@@ -1744,6 +1750,10 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
     $suggestions = $this->container->get(PropSourceSuggester::class)
       ->suggest($plugin_id, $metadata, $host_entity_type);
     $cpe = "⿲{$plugin_id}␟{$prop_name}";
+    // PropSourceSuggester::suggest() builds this key dynamically, so
+    // PHPStan cannot correlate its unsealed return shape with this literal
+    // offset, nor narrow the value type to HostEntityPropSource specifically.
+    // @phpstan-ignore offsetAccess.notFound, return.type
     return $suggestions[$cpe][PropSource::HostEntity->value];
   }
 

@@ -251,6 +251,11 @@ final readonly class PropSourceSuggester {
       }
     }
 
+    // PHPStan cannot correlate the dynamic $type keys assigned above with
+    // the declared return shape's literal + unsealed catch-all keys, so it
+    // widens the value type of the whole per-$cpe array instead of matching
+    // the shape.
+    // @phpstan-ignore return.type
     return $suggestions;
   }
 
@@ -283,6 +288,9 @@ final readonly class PropSourceSuggester {
       }
     }
 
+    // Same PHPStan limitation as ::suggest(): the dynamic
+    // $prop_source_matcher->getPropSourceType() key defeats shape matching.
+    // @phpstan-ignore return.type
     return $raw_matches;
   }
 

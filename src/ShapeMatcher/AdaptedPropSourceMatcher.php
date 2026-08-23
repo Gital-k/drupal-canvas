@@ -34,7 +34,7 @@ final readonly class AdaptedPropSourceMatcher implements PropSourceMatcherInterf
    *   Whether the prop shape to match is required or not.
    * @param \Drupal\canvas\PropShape\PropShape $prop_shape
    *   The prop shape to match.
-   * @param string $host_entity_type
+   * @param string $host_entity_type_id
    *   Unused; adapters do not depend on the host entity type.
    * @param string $host_entity_bundle
    *   Unused; adapters do not depend on the host entity bundle.
