@@ -219,42 +219,6 @@ function exampleValueSchema(config, propType) {
   return schema;
 }
 
-function imageExampleCondition({ array = false } = {}) {
-  const itemSchema = { $ref: '#/definitions/overlays/imageExample' };
-  return {
-    if: {
-      type: 'object',
-      required: [array ? 'items' : '$ref'],
-      properties: array
-        ? {
-            items: {
-              type: 'object',
-              required: ['$ref'],
-              properties: {
-                $ref: {
-                  const: 'json-schema-definitions://canvas.module/image',
-                },
-              },
-            },
-          }
-        : {
-            $ref: {
-              const: 'json-schema-definitions://canvas.module/image',
-            },
-          },
-    },
-    then: {
-      type: 'object',
-      properties: {
-        examples: {
-          type: 'array',
-          items: array ? { type: 'array', items: itemSchema } : itemSchema,
-        },
-      },
-    },
-  };
-}
-
 function shapeSchema(config, propType) {
   const definitionName = `canvas.json_schema.prop_shape.${propType}`;
   const resolved = resolveDefinition(config, definitionName);
@@ -327,29 +291,43 @@ function propSchema(config, propType) {
   };
 
   if (propType === 'object') {
-    schema.allOf = [imageExampleCondition()];
+    const refs = properties.$ref.enum;
+    schema.oneOf = refs.map((ref) => ({
+      type: 'object',
+      required: ['$ref'],
+      properties: {
+        $ref: { const: ref },
+        examples: {
+          type: 'array',
+          items:
+            ref === 'json-schema-definitions://canvas.module/image'
+              ? { $ref: '#/definitions/overlays/imageExample' }
+              : { $ref: '#/definitions/overlays/nonEmptyObject' },
+        },
+      },
+    }));
   }
   if (propType === 'array') {
-    schema.allOf = primitiveTypes.map((itemType) => {
-      const itemExamples = config[`canvas.json_schema.prop_examples.array.${itemType}`];
-      if (!itemExamples) {
-        fail(
+    schema.oneOf = primitiveTypes
+      .filter((itemType) => itemType !== 'object')
+      .map((itemType) => {
+        const itemExamples =
+          config[`canvas.json_schema.prop_examples.array.${itemType}`];
+        if (!itemExamples) {
+          fail(
+            `canvas.json_schema.prop_examples.array.${itemType}`,
+            'missing array example definition',
+          );
+        }
+        const translated = translateNode(
+          itemExamples,
           `canvas.json_schema.prop_examples.array.${itemType}`,
-          'missing array example definition',
         );
-      }
-      const translated = translateNode(
-        itemExamples,
-        `canvas.json_schema.prop_examples.array.${itemType}`,
-      );
-      let items = translated.items;
-      if (itemType === 'string') {
-        items = { $ref: '#/definitions/overlays/nonEmptyString' };
-      } else if (itemType === 'object') {
-        items = { $ref: '#/definitions/overlays/nonEmptyObject' };
-      }
-      return {
-        if: {
+        const items =
+          itemType === 'string'
+            ? { $ref: '#/definitions/overlays/nonEmptyString' }
+            : translated.items;
+        return {
           type: 'object',
           required: ['items'],
           properties: {
@@ -358,20 +336,40 @@ function propSchema(config, propType) {
               required: ['type'],
               properties: { type: { const: itemType } },
             },
-          },
-        },
-        then: {
-          type: 'object',
-          properties: {
             examples: {
               type: 'array',
               items: { type: 'array', items },
             },
           },
+        };
+      });
+    const objectRefs = shapeSchema(config, 'object').properties.$ref.enum;
+    schema.oneOf.push(
+      ...objectRefs.map((ref) => ({
+        type: 'object',
+        required: ['items'],
+        properties: {
+          items: {
+            type: 'object',
+            required: ['type', '$ref'],
+            properties: {
+              type: { const: 'object' },
+              $ref: { const: ref },
+            },
+          },
+          examples: {
+            type: 'array',
+            items: {
+              type: 'array',
+              items:
+                ref === 'json-schema-definitions://canvas.module/image'
+                  ? { $ref: '#/definitions/overlays/imageExample' }
+                  : { $ref: '#/definitions/overlays/nonEmptyObject' },
+            },
+          },
         },
-      };
-    });
-    schema.allOf.push(imageExampleCondition({ array: true }));
+      })),
+    );
   }
 
   return schema;

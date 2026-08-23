@@ -518,27 +518,71 @@
             }
           }
         },
-        "allOf": [
+        "oneOf": [
           {
-            "if": {
-              "type": "object",
-              "required": [
-                "$ref"
-              ],
-              "properties": {
-                "$ref": {
-                  "const": "json-schema-definitions://canvas.module/image"
+            "type": "object",
+            "required": [
+              "$ref"
+            ],
+            "properties": {
+              "$ref": {
+                "const": "json-schema-definitions://canvas.module/image"
+              },
+              "examples": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/overlays/imageExample"
                 }
               }
-            },
-            "then": {
-              "type": "object",
-              "properties": {
-                "examples": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/definitions/overlays/imageExample"
-                  }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "$ref"
+            ],
+            "properties": {
+              "$ref": {
+                "const": "json-schema-definitions://canvas.module/video"
+              },
+              "examples": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/overlays/nonEmptyObject"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "$ref"
+            ],
+            "properties": {
+              "$ref": {
+                "const": "json-schema-definitions://canvas.module/document"
+              },
+              "examples": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/overlays/nonEmptyObject"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "$ref"
+            ],
+            "properties": {
+              "$ref": {
+                "const": "json-schema-definitions://canvas.module/content-entity-reference"
+              },
+              "examples": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/overlays/nonEmptyObject"
                 }
               }
             }
@@ -596,212 +640,242 @@
             "type": "array"
           }
         },
-        "allOf": [
+        "oneOf": [
           {
-            "if": {
-              "type": "object",
-              "required": [
-                "items"
-              ],
-              "properties": {
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "type"
-                  ],
-                  "properties": {
-                    "type": {
-                      "const": "string"
-                    }
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "string"
                   }
                 }
-              }
-            },
-            "then": {
-              "type": "object",
-              "properties": {
-                "examples": {
+              },
+              "examples": {
+                "type": "array",
+                "items": {
                   "type": "array",
                   "items": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/definitions/overlays/nonEmptyString"
-                    }
+                    "$ref": "#/definitions/overlays/nonEmptyString"
                   }
                 }
               }
             }
           },
           {
-            "if": {
-              "type": "object",
-              "required": [
-                "items"
-              ],
-              "properties": {
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "type"
-                  ],
-                  "properties": {
-                    "type": {
-                      "const": "number"
-                    }
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "number"
                   }
                 }
-              }
-            },
-            "then": {
-              "type": "object",
-              "properties": {
-                "examples": {
+              },
+              "examples": {
+                "type": "array",
+                "items": {
                   "type": "array",
                   "items": {
-                    "type": "array",
-                    "items": {
-                      "type": "number"
-                    }
+                    "type": "number"
                   }
                 }
               }
             }
           },
           {
-            "if": {
-              "type": "object",
-              "required": [
-                "items"
-              ],
-              "properties": {
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "type"
-                  ],
-                  "properties": {
-                    "type": {
-                      "const": "integer"
-                    }
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "integer"
                   }
                 }
-              }
-            },
-            "then": {
-              "type": "object",
-              "properties": {
-                "examples": {
+              },
+              "examples": {
+                "type": "array",
+                "items": {
                   "type": "array",
                   "items": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer"
-                    }
+                    "type": "integer"
                   }
                 }
               }
             }
           },
           {
-            "if": {
-              "type": "object",
-              "required": [
-                "items"
-              ],
-              "properties": {
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "type"
-                  ],
-                  "properties": {
-                    "type": {
-                      "const": "boolean"
-                    }
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "boolean"
                   }
                 }
-              }
-            },
-            "then": {
-              "type": "object",
-              "properties": {
-                "examples": {
+              },
+              "examples": {
+                "type": "array",
+                "items": {
                   "type": "array",
                   "items": {
-                    "type": "array",
-                    "items": {
-                      "type": "boolean"
-                    }
+                    "type": "boolean"
                   }
                 }
               }
             }
           },
           {
-            "if": {
-              "type": "object",
-              "required": [
-                "items"
-              ],
-              "properties": {
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "type"
-                  ],
-                  "properties": {
-                    "type": {
-                      "const": "object"
-                    }
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "$ref"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "object"
+                  },
+                  "$ref": {
+                    "const": "json-schema-definitions://canvas.module/image"
                   }
                 }
-              }
-            },
-            "then": {
-              "type": "object",
-              "properties": {
-                "examples": {
+              },
+              "examples": {
+                "type": "array",
+                "items": {
                   "type": "array",
                   "items": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/definitions/overlays/nonEmptyObject"
-                    }
+                    "$ref": "#/definitions/overlays/imageExample"
                   }
                 }
               }
             }
           },
           {
-            "if": {
-              "type": "object",
-              "required": [
-                "items"
-              ],
-              "properties": {
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "$ref"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "object"
+                  },
+                  "$ref": {
+                    "const": "json-schema-definitions://canvas.module/video"
+                  }
+                }
+              },
+              "examples": {
+                "type": "array",
                 "items": {
-                  "type": "object",
-                  "required": [
-                    "$ref"
-                  ],
-                  "properties": {
-                    "$ref": {
-                      "const": "json-schema-definitions://canvas.module/image"
-                    }
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/overlays/nonEmptyObject"
                   }
                 }
               }
-            },
-            "then": {
-              "type": "object",
-              "properties": {
-                "examples": {
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "$ref"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "object"
+                  },
+                  "$ref": {
+                    "const": "json-schema-definitions://canvas.module/document"
+                  }
+                }
+              },
+              "examples": {
+                "type": "array",
+                "items": {
                   "type": "array",
                   "items": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/definitions/overlays/imageExample"
-                    }
+                    "$ref": "#/definitions/overlays/nonEmptyObject"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "$ref"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "object"
+                  },
+                  "$ref": {
+                    "const": "json-schema-definitions://canvas.module/content-entity-reference"
+                  }
+                }
+              },
+              "examples": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/overlays/nonEmptyObject"
                   }
                 }
               }
