@@ -14,6 +14,7 @@ export default defineConfig({
     'tailwindcss-in-browser',
     '@drupal-canvas/auth',
     '@drupal-canvas/discovery',
+    '@drupal-canvas/json-schema-validation',
     '@drupal-canvas/vite-compat',
   ],
   loader: {
