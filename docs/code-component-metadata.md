@@ -1,12 +1,11 @@
 # Code Component metadata
 
 Code Component source directories contain an authored `component.yml` file. Canvas publishes a hand-authored JSON Schema
-for the document envelope:
+for the current document envelope at
+<https://git.drupalcode.org/project/canvas/-/raw/1.x/component-metadata.schema.json>.
 
-- Latest development schema:
-  <https://git.drupalcode.org/project/canvas/-/raw/1.x/component-metadata.schema.json>
-- Immutable release schema, replacing `<release-tag>` with a Canvas tag such as `v1.10.1`:
-  `https://git.drupalcode.org/project/canvas/-/raw/<release-tag>/component-metadata.schema.json`
+This is a rolling schema, not a versioned compatibility contract. Copies found in release tags are historical source
+snapshots; Canvas does not promise that current targets accept metadata described by older copies.
 
 The schema uses JSON Schema draft-07. Prop definitions under `props.properties` are themselves JSON Schema and are checked
 directly rather than generated from Drupal config schema. Metadata files do not include `$schema` or a schema version
