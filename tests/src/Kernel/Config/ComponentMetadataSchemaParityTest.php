@@ -38,7 +38,7 @@ class ComponentMetadataSchemaParityTest extends KernelTestBase {
     $validator = new Validator();
     $validator->validate($document, $schema, Constraint::CHECK_MODE_NORMAL);
 
-    $this->assertSame($expected_valid, $validator->isValid(), json_encode($validator->getErrors(), JSON_PRETTY_PRINT));
+    $this->assertSame($expected_valid, $validator->isValid(), json_encode($validator->getErrors(), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
   }
 
   /**
@@ -47,7 +47,8 @@ class ComponentMetadataSchemaParityTest extends KernelTestBase {
   public static function providerFixtures(): iterable {
     $module_path = dirname(__DIR__, 4);
     foreach ([TRUE => 'valid', FALSE => 'invalid'] as $expected_valid => $directory) {
-      foreach (glob("$module_path/tests/fixtures/component-metadata/$directory/*.yml") ?: [] as $fixture_path) {
+      $fixture_paths = glob("$module_path/tests/fixtures/component-metadata/$directory/*.yml");
+      foreach ($fixture_paths !== FALSE ? $fixture_paths : [] as $fixture_path) {
         $relative_path = substr($fixture_path, \strlen($module_path) + 1);
         yield "$directory: " . basename($fixture_path) => [$relative_path, (bool) $expected_valid];
       }

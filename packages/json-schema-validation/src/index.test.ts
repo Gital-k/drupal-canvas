@@ -32,6 +32,7 @@ describe('createCanvasAjv', () => {
       format: 'idn-email',
     });
 
+    // cspell:ignore δοκιμή παράδειγμα
     expect(validate('δοκιμή@παράδειγμα.δοκιμή')).toBe(true);
     expect(validate('not an email')).toBe(false);
   });
