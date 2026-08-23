@@ -48,10 +48,11 @@ meta-schema because it is already JSON Schema. The published schema will require
 schema, such as a prop title and type, but it will not attempt to duplicate which otherwise valid JSON Schema shapes a
 particular Canvas site supports.
 
-The schema will be versioned with Canvas releases rather than on an independent schedule. The latest development branch
-and release tags provide mutable and immutable public URLs. The CLI will bundle the schema for local envelope validation.
-Metadata files will not declare a schema URL or schema version because the target site remains authoritative and the same
-component may be used with different sites.
+Canvas will publish one rolling schema for the current authored format from the latest development branch. It will not
+define independently versioned contracts or promise that a current target accepts metadata described by an older copy.
+Schema files present in release tags are historical source snapshots, not supported schema versions. The CLI will bundle
+its current schema for local envelope validation. Metadata files will not declare a schema URL or schema version because
+the target site remains authoritative and the same component may be used with different sites.
 
 Canvas-owned JSON schemas consumed by TypeScript will use draft-07 consistently. A private workspace package will provide
 a strict Ajv factory with the standard and draft-2019 string formats Canvas supports. The UI and CLI will share this
