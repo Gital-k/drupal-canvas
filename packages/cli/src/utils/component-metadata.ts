@@ -1,6 +1,9 @@
 import { promises as fs } from 'node:fs';
 import { LineCounter, parseDocument } from 'yaml';
-import { createCanvasAjv } from '@drupal-canvas/json-schema-validation';
+import {
+  createCanvasAjv,
+  MissingRefError,
+} from '@drupal-canvas/json-schema-validation';
 
 import bundledComponentMetadataSchema from '../../../../component-metadata.schema.json';
 
@@ -88,26 +91,84 @@ function formatErrorMessage(error: ErrorObject): string {
   return error.message ?? 'is invalid';
 }
 
+function diagnosticFromError(
+  parsed: ParsedComponentMetadata,
+  error: ErrorObject,
+  prefix: string[] = [],
+): ComponentMetadataDiagnostic {
+  const parts = [...prefix, ...getErrorPath(error)];
+  const node = locateNode(parsed.document, parts);
+  const position = node?.range
+    ? parsed.lineCounter.linePos(node.range[0])
+    : undefined;
+  const property = parts.at(-1);
+  const message =
+    error.keyword === 'not' &&
+    ['x-allowed-entity-type-id', 'x-allowed-bundle'].includes(property ?? '')
+      ? `must not contain projected property '${property}'`
+      : formatErrorMessage(error);
+  return {
+    path: diagnosticPath(parts),
+    message,
+    line: position?.line,
+    column: position?.col,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function validatePropDefinitions(
+  parsed: ParsedComponentMetadata,
+): ComponentMetadataDiagnostic[] {
+  if (!isRecord(parsed.value) || !isRecord(parsed.value.props)) return [];
+  const properties = parsed.value.props.properties;
+  if (!isRecord(properties)) return [];
+
+  const diagnostics: ComponentMetadataDiagnostic[] = [];
+  for (const [propName, propDefinition] of Object.entries(properties)) {
+    if (!isRecord(propDefinition)) continue;
+
+    // Target extensions may add JSON Schema vocabulary unknown to the CLI.
+    const ajv = createCanvasAjv({ allErrors: true, strict: false });
+    let validate: ValidateFunction;
+    try {
+      validate = ajv.compile(propDefinition);
+    } catch (error) {
+      // Target and extension JSON Schema references cannot necessarily be
+      // resolved offline. Drupal validates them authoritatively.
+      if (error instanceof MissingRefError) continue;
+      diagnostics.push({
+        path: diagnosticPath(['props', 'properties', propName]),
+        message: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
+
+    if (!Array.isArray(propDefinition.examples)) continue;
+    const example = propDefinition.examples[0];
+    if (example === undefined || validate(example)) continue;
+    const prefix = ['props', 'properties', propName, 'examples', '0'];
+    diagnostics.push(
+      ...(validate.errors ?? []).map((error) =>
+        diagnosticFromError(parsed, error, prefix),
+      ),
+    );
+  }
+  return diagnostics;
+}
+
 export function validateParsedComponentMetadata(
   parsed: ParsedComponentMetadata,
-  schema: AnySchema = bundledComponentMetadataSchema,
 ): ComponentMetadataDiagnostic[] {
-  const validate = getValidator(schema);
-  if (validate(parsed.value)) return [];
-
-  return (validate.errors ?? []).map((error) => {
-    const parts = getErrorPath(error);
-    const node = locateNode(parsed.document, parts);
-    const position = node?.range
-      ? parsed.lineCounter.linePos(node.range[0])
-      : undefined;
-    return {
-      path: diagnosticPath(parts),
-      message: formatErrorMessage(error),
-      line: position?.line,
-      column: position?.col,
-    };
-  });
+  const validate = getValidator(bundledComponentMetadataSchema);
+  if (!validate(parsed.value)) {
+    return (validate.errors ?? []).map((error) =>
+      diagnosticFromError(parsed, error),
+    );
+  }
+  return validatePropDefinitions(parsed);
 }
 
 export async function parseComponentMetadata(
@@ -159,10 +220,9 @@ export function normalizeComponentMetadata(value: unknown): Metadata {
 
 export async function readValidatedComponentMetadata(
   filePath: string,
-  schema: AnySchema = bundledComponentMetadataSchema,
 ): Promise<Metadata> {
   const parsed = await parseComponentMetadata(filePath);
-  const diagnostics = validateParsedComponentMetadata(parsed, schema);
+  const diagnostics = validateParsedComponentMetadata(parsed);
   if (diagnostics.length > 0) {
     throw new Error(
       diagnostics
