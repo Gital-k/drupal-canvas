@@ -53,6 +53,10 @@ import {
   splitFailedResultsByFile,
 } from '../utils/report-results';
 import { createProgressCallback, processInPool } from '../utils/request-pool';
+import {
+  preflightCodeComponentPayloads,
+  resolveTargetComponentMetadataSchema,
+} from '../utils/target-component-metadata';
 import { formatFilePathForOutput } from '../utils/utils';
 import { validateContentTemplates } from '../utils/validate-content-template';
 import { validatePages } from '../utils/validate-page';
@@ -867,6 +871,24 @@ export function pushCommand(program: Command): void {
 
         apiService = await createApiService();
         const pushApiService = apiService;
+        const componentMetadataContext =
+          components.length > 0
+            ? await resolveTargetComponentMetadataSchema(
+                process.cwd(),
+                apiService,
+              )
+            : undefined;
+        for (const warning of componentMetadataContext?.warnings ?? []) {
+          p.log.warn(warning);
+        }
+        if (
+          componentMetadataContext &&
+          !componentMetadataContext.remoteValidationAvailable
+        ) {
+          p.log.warn(
+            'Push will use per-component save-time validation, so a partial push remains possible.',
+          );
+        }
         const existingComponents =
           components.length > 0 ? await apiService.listComponents() : {};
         const remoteNames = new Set(Object.keys(existingComponents));
@@ -1089,6 +1111,7 @@ export function pushCommand(program: Command): void {
             cleanOutputDir: true,
             requireJsEntries: true,
             headlessSdkDetected,
+            componentMetadataSchema: componentMetadataContext?.schema,
           }).catch((error) => {
             const message = formatErrorMessage(error);
             if (message.startsWith('Missing local Tailwind CSS file')) {
@@ -1149,6 +1172,30 @@ export function pushCommand(program: Command): void {
               'Build failed',
               'Tailwind build failed, global assets upload aborted. Nothing was pushed.',
             );
+          }
+
+          if (componentMetadataContext?.remoteValidationAvailable) {
+            const preflight = await preflightCodeComponentPayloads(
+              canvasBuild.builtComponents,
+              componentPushApiService,
+            );
+            for (const warning of preflight.warnings) {
+              p.log.warn(warning);
+            }
+            if (preflight.results.some((result) => !result.success)) {
+              componentSpinner.stop('Validation failed', 2);
+              reportResults(
+                preflight.results.filter((result) => !result.success),
+                'Component validation failed',
+                'Component',
+                PUSH_REPORT_OPTIONS,
+              );
+              reportDiscoveryWarnings(componentDiscoveryWarnings);
+              throw new ReportedPushError(
+                'Component validation failed',
+                'Target validation failed. Nothing was pushed.',
+              );
+            }
           }
 
           // Build and push components.
