@@ -157,10 +157,12 @@ function translateNode(node, configPath) {
       schema = { type: 'integer' };
       break;
     case 'label':
-    case 'required_label':
     case 'string':
     case 'text':
       schema = { type: 'string' };
+      break;
+    case 'required_label':
+      schema = { type: 'string', minLength: 1 };
       break;
     case 'uri':
       schema = { type: 'string', format: 'uri' };
@@ -228,6 +230,11 @@ function shapeSchema(config, propType) {
   for (const [key, child] of Object.entries(resolved.mapping ?? {})) {
     if (key === 'type') {
       properties.type = { const: propType };
+    } else if (key === 'meta:enum') {
+      properties[key] = {
+        type: 'object',
+        additionalProperties: { type: 'string' },
+      };
     } else if (key === 'items') {
       properties.items = {
         oneOf: primitiveTypes.map((type) => ({
@@ -262,6 +269,11 @@ function propSchema(config, propType) {
   for (const [key, child] of Object.entries(mapping)) {
     if (key === 'type') {
       properties.type = { const: propType };
+    } else if (key === 'meta:enum') {
+      properties[key] = {
+        type: 'object',
+        additionalProperties: { type: 'string' },
+      };
     } else if (key === 'examples') {
       if (propType === 'array') {
         properties.examples = { type: 'array' };

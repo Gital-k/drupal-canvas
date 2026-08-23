@@ -124,9 +124,10 @@ export async function parseComponentMetadata(
     throw new Error(
       document.errors
         .map((error) => {
-          const position = error.pos[0]
-            ? lineCounter.linePos(error.pos[0])
-            : undefined;
+          const position =
+            error.pos[0] !== undefined
+              ? lineCounter.linePos(error.pos[0])
+              : undefined;
           const location = position
             ? `Line ${position.line}, Column ${position.col}: `
             : '';
