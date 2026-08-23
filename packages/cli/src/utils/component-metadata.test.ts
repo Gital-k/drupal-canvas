@@ -53,6 +53,22 @@ describe('component metadata', () => {
     ]);
   });
 
+  it('resolves Canvas-owned prop schema references', async () => {
+    const filePath = path.join(
+      fixtureRoot,
+      'prop-invalid/canvas-ref-example-does-not-match.yml',
+    );
+    const parsed = await parseComponentMetadata(filePath);
+
+    expect(validateParsedComponentMetadata(parsed)).toEqual([
+      expect.objectContaining({
+        path: '$.props.properties.image.examples[0]',
+        line: 10,
+        message: "must contain required property 'src'",
+      }),
+    ]);
+  });
+
   it.each(['empty-string-examples.yml', 'relative-image-examples.yml'])(
     'leaves target-specific rules in %s to Drupal',
     async (fixtureName) => {

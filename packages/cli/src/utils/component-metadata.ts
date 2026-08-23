@@ -6,6 +6,7 @@ import {
 } from '@drupal-canvas/json-schema-validation';
 
 import bundledComponentMetadataSchema from '../../../../component-metadata.schema.json';
+import canvasJsonSchemaDefinitions from '../../../../schema.json';
 
 import type {
   AnySchema,
@@ -119,6 +120,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function createPropSchemaValidator() {
+  // Target extensions may add JSON Schema vocabulary unknown to the CLI.
+  const ajv = createCanvasAjv({
+    allErrors: true,
+    logger: false,
+    strict: false,
+  });
+  const definitions = canvasJsonSchemaDefinitions.$defs as Record<
+    string,
+    AnySchema
+  >;
+  for (const [name, definition] of Object.entries(definitions)) {
+    ajv.addSchema(
+      definition,
+      `json-schema-definitions://canvas.module/${name}`,
+    );
+  }
+  return ajv;
+}
+
 function validatePropDefinitions(
   parsed: ParsedComponentMetadata,
 ): ComponentMetadataDiagnostic[] {
@@ -127,15 +148,10 @@ function validatePropDefinitions(
   if (!isRecord(properties)) return [];
 
   const diagnostics: ComponentMetadataDiagnostic[] = [];
+  const ajv = createPropSchemaValidator();
   for (const [propName, propDefinition] of Object.entries(properties)) {
     if (!isRecord(propDefinition)) continue;
 
-    // Target extensions may add JSON Schema vocabulary unknown to the CLI.
-    const ajv = createCanvasAjv({
-      allErrors: true,
-      logger: false,
-      strict: false,
-    });
     let validate: ValidateFunction;
     try {
       validate = ajv.compile(propDefinition);
