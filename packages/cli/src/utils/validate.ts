@@ -57,14 +57,19 @@ async function validateComponent(
       });
     });
 
-  const metadata = await readComponentMetadata(component.metadataPath);
-  if (metadata) {
+  try {
+    const metadata = await readComponentMetadata(component.metadataPath);
     details.push(
       ...(await validateContentEntityReferencePropExpressions(
         metadata,
         apiService,
       )),
     );
+  } catch (error) {
+    details.push({
+      heading: path.relative(process.cwd(), component.metadataPath),
+      content: error instanceof Error ? error.message : String(error),
+    });
   }
 
   const success =
