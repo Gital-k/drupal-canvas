@@ -1,15 +1,16 @@
 # Code Component metadata
 
-Code Component source directories contain an authored `component.yml` file. Canvas publishes a JSON Schema for this
-format:
+Code Component source directories contain an authored `component.yml` file. Canvas publishes a hand-authored JSON Schema
+for the document envelope:
 
 - Latest development schema:
   <https://git.drupalcode.org/project/canvas/-/raw/1.x/component-metadata.schema.json>
 - Immutable release schema, replacing `<release-tag>` with a Canvas tag such as `v1.10.1`:
   `https://git.drupalcode.org/project/canvas/-/raw/<release-tag>/component-metadata.schema.json`
 
-The schema uses JSON Schema draft-07. Metadata files do not include `$schema` or a schema version because the Drupal site
-targeted by a CLI operation provides the authoritative contract.
+The schema uses JSON Schema draft-07. Prop definitions under `props.properties` are themselves JSON Schema and are checked
+directly rather than generated from Drupal config schema. Metadata files do not include `$schema` or a schema version
+because the Drupal site targeted by a CLI operation provides the authoritative contract.
 
 ## Authored fields
 
@@ -31,19 +32,20 @@ Canvas validates the raw YAML before applying defaults. It rejects unknown keys.
 `canvas pull` omits projected keys, preserves `dataDependencies.entityFields`, and writes the optional authored fields
 explicitly.
 
-## Offline and target validation
+## Local and target validation
 
-`canvas validate` and `canvas push` authenticate to the configured Drupal site, request its schema, and submit normalized
-payloads for non-mutating validation. The target site runs the same metadata constraints used for create and update
-operations, so its result is authoritative for that site's installed Canvas version and configuration at validation time.
+The CLI uses the bundled schema to validate the authored envelope. It also checks each prop definition as JSON Schema and
+validates its first example, which Canvas uses as the default, when the prop schema is locally resolvable. Target- or
+extension-provided `$ref` values may not
+be resolvable locally.
 
-Target schemas are cached by normalized site URL under `.canvas/schema-cache/`. The CLI requests the schema on every run
-with `If-None-Match` and uses the cache after a `304 Not Modified` response.
+`canvas validate` and `canvas push` submit normalized payloads to the authenticated Drupal site for non-mutating
+validation. The target runs the same metadata constraints used for create and update operations, so only its result is
+authoritative for that installed Canvas version and site configuration.
 
-If authentication, authorization, or connectivity fails, the CLI uses a cached target schema or its bundled schema and
-prints a warning. Offline validation can succeed, but that result is not authoritative. Older sites without the schema
-and validation operations also produce a warning; during push, they retain per-component save-time validation, so a
-partial push remains possible.
+If authentication, authorization, connectivity, or the target operation is unavailable, the CLI reports that only local
+checks were completed. During push, older sites retain per-component save-time validation, so a partial push remains
+possible.
 
-`canvas build` uses the bundled schema. Component discovery, Workbench, and headless consumers remain offline and do not
-become target-aware.
+`canvas build` performs only local checks. Component discovery, Workbench, and headless consumers remain offline and do
+not become target-aware.

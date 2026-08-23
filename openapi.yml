@@ -1066,30 +1066,6 @@ paths:
       responses:
         '204':
           description: Deleted individual Folder.
-  /canvas/api/v0/code-components/metadata-schema:
-    get:
-      summary: Gets the target site's authored Code Component metadata schema
-      responses:
-        '200':
-          description: The JSON Schema contract for authored component.yml metadata.
-          headers:
-            ETag:
-              description: A validator derived from the schema contents.
-              schema:
-                type: string
-          content:
-            application/schema+json:
-              schema:
-                type: object
-                additionalProperties: true
-        '304':
-          description: The schema matches the supplied If-None-Match value.
-        '401':
-          description: Unauthorized (unauthenticated) response.
-          $ref: '#/components/responses/UnauthorizedErrorResponse'
-        '403':
-          description: Access denied response.
-          $ref: '#/components/responses/AuthenticationErrorResponse'
   /canvas/api/v0/code-components/validate:
     post:
       summary: Validates a normalized Code Component payload without saving it

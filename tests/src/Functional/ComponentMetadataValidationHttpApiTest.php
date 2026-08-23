@@ -13,7 +13,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Tests the target-aware Code Component metadata operations.
+ * Tests target-aware Code Component metadata validation.
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
@@ -44,42 +44,25 @@ class ComponentMetadataValidationHttpApiTest extends HttpApiTestBase {
   }
 
   /**
-   * Tests schema authentication, authorization, and ETag handling.
-   */
-  public function testSchema(): void {
-    $url = Url::fromUri('base:/canvas/api/v0/code-components/metadata-schema');
-
-    $response = $this->makeApiRequest('GET', $url, []);
-    $this->assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
-
-    $this->drupalLogin($this->limitedUser);
-    $response = $this->makeApiRequest('GET', $url, []);
-    $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
-
-    $this->drupalLogin($this->codeComponentAdmin);
-    $response = $this->makeApiRequest('GET', $url, []);
-    $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $this->assertStringStartsWith('application/schema+json', $response->getHeaderLine('Content-Type'));
-    $this->assertNotSame('', $response->getHeaderLine('ETag'));
-    $schema = json_decode((string) $response->getBody(), associative: TRUE, flags: JSON_THROW_ON_ERROR);
-    $this->assertSame('http://json-schema.org/draft-07/schema#', $schema['$schema']);
-
-    $response = $this->makeApiRequest('GET', $url, [
-      RequestOptions::HEADERS => [
-        'If-None-Match' => $response->getHeaderLine('ETag'),
-      ],
-    ]);
-    $this->assertSame(Response::HTTP_NOT_MODIFIED, $response->getStatusCode());
-    $this->assertSame('', (string) $response->getBody());
-  }
-
-  /**
    * Tests authoritative validation without saving.
    */
   public function testValidationDoesNotSave(): void {
     $url = Url::fromUri('base:/canvas/api/v0/code-components/validate');
-    $this->drupalLogin($this->codeComponentAdmin);
 
+    $response = $this->makeApiRequest('POST', $url, []);
+    $this->assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
+
+    $this->drupalLogin($this->limitedUser);
+    $response = $this->makeApiRequest('POST', $url, [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+        'X-CSRF-Token' => $this->drupalGet('session/token'),
+      ],
+      RequestOptions::JSON => self::validPayload('limited'),
+    ]);
+    $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+
+    $this->drupalLogin($this->codeComponentAdmin);
     $payload = self::validPayload('new_component');
     $response = $this->makeApiRequest('POST', $url, [
       RequestOptions::HEADERS => [
@@ -127,6 +110,34 @@ class ComponentMetadataValidationHttpApiTest extends HttpApiTestBase {
     $this->assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
     $body = json_decode((string) $response->getBody(), associative: TRUE, flags: JSON_THROW_ON_ERROR);
     $this->assertArrayHasKey('errors', $body);
+
+    $payload = self::validPayload('target_specific_rules');
+    $payload['props'] = [
+      'text' => [
+        'title' => 'Text',
+        'type' => 'string',
+        'examples' => [''],
+      ],
+      'image' => [
+        'title' => 'Image',
+        'type' => 'object',
+        '$ref' => 'json-schema-definitions://canvas.module/image',
+        'examples' => [
+          ['src' => '/images/example.png'],
+        ],
+      ],
+    ];
+    $response = $this->makeApiRequest('POST', $url, [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+        'X-CSRF-Token' => $this->drupalGet('session/token'),
+      ],
+      RequestOptions::JSON => $payload,
+    ]);
+    $this->assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+    $this->assertStringContainsString('cannot be used as a default', (string) $response->getBody());
+    $this->assertStringContainsString('must be a fully-qualified URL', (string) $response->getBody());
+
     $unchanged = JavaScriptComponent::load('stored_component');
     $this->assertInstanceOf(JavaScriptComponent::class, $unchanged);
     $this->assertSame('stored_component', $unchanged->label());
