@@ -35,9 +35,9 @@ explicitly.
 ## Local and target validation
 
 The CLI uses the bundled schema to validate the authored envelope. It also checks each prop definition as JSON Schema and
-validates its first example, which Canvas uses as the default, when the prop schema is locally resolvable. Target- or
-extension-provided `$ref` values may not
-be resolvable locally.
+validates its first example, which Canvas uses as the default, when the prop schema is locally resolvable. Canvas-owned
+`$ref` definitions from `schema.json` are bundled with the CLI. References provided by other target extensions may not be
+resolvable locally.
 
 `canvas validate` and `canvas push` submit normalized payloads to the authenticated Drupal site for non-mutating
 validation. The target runs the same metadata constraints used for create and update operations, so only its result is
