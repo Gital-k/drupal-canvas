@@ -131,7 +131,11 @@ function validatePropDefinitions(
     if (!isRecord(propDefinition)) continue;
 
     // Target extensions may add JSON Schema vocabulary unknown to the CLI.
-    const ajv = createCanvasAjv({ allErrors: true, strict: false });
+    const ajv = createCanvasAjv({
+      allErrors: true,
+      logger: false,
+      strict: false,
+    });
     let validate: ValidateFunction;
     try {
       validate = ajv.compile(propDefinition);
