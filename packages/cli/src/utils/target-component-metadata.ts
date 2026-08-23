@@ -4,7 +4,10 @@ import path from 'node:path';
 import axios from 'axios';
 import { createCanvasAjv } from '@drupal-canvas/json-schema-validation';
 
-import { CodeComponentMetadataOperationUnsupportedError } from '../services/api';
+import {
+  CodeComponentMetadataOperationUnsupportedError,
+  CodeComponentMetadataValidationUnavailableError,
+} from '../services/api';
 import { bundledComponentMetadataSchema } from './component-metadata';
 
 import type {
@@ -142,11 +145,14 @@ export async function preflightCodeComponentPayloads(
       await apiService.validateCodeComponentPayload(component.componentPayload);
       results.push({ itemName: component.componentName, success: true });
     } catch (error) {
-      if (error instanceof CodeComponentMetadataOperationUnsupportedError) {
+      if (
+        error instanceof CodeComponentMetadataOperationUnsupportedError ||
+        error instanceof CodeComponentMetadataValidationUnavailableError
+      ) {
         return {
           results: [],
           warnings: [
-            'The target site does not provide metadata validation. Push will use per-component save-time validation, so a partial push remains possible.',
+            'Target metadata validation is unavailable. Push will use per-component save-time validation, so a partial push remains possible.',
           ],
         };
       }
@@ -181,7 +187,15 @@ export async function resolveTargetComponentMetadataSchema(
   }
 
   const siteUrl = normalizeSiteUrl(apiService.getSiteUrl());
-  const cached = await readCache(projectRoot, siteUrl);
+  let cached = await readCache(projectRoot, siteUrl);
+  let cachedValidator: ValidateFunction | undefined;
+  if (cached) {
+    try {
+      cachedValidator = compileSchema(cached.schema);
+    } catch {
+      cached = undefined;
+    }
+  }
   try {
     let response = await apiService.getComponentMetadataSchema(
       cached?.metadata.etag,
@@ -192,7 +206,7 @@ export async function resolveTargetComponentMetadataSchema(
     if (response.status === 304 && cached) {
       return {
         schema: cached.schema,
-        validate: compileSchema(cached.schema),
+        validate: cachedValidator as ValidateFunction,
         remoteValidationAvailable: true,
         warnings: [],
       };
@@ -200,12 +214,19 @@ export async function resolveTargetComponentMetadataSchema(
     if (response.status === 200 && response.schema) {
       const schema = response.schema as AnySchema;
       const validate = compileSchema(schema);
-      await writeCache(projectRoot, siteUrl, response);
+      const warnings: string[] = [];
+      try {
+        await writeCache(projectRoot, siteUrl, response);
+      } catch {
+        warnings.push(
+          'The target metadata schema was retrieved but could not be cached.',
+        );
+      }
       return {
         schema,
         validate,
         remoteValidationAvailable: true,
-        warnings: [],
+        warnings,
       };
     }
     throw new Error(
