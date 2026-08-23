@@ -2,15 +2,20 @@ import path from 'path';
 import { ESLint } from 'eslint';
 import { required as drupalCanvasRequired } from '@drupal-canvas/eslint-config';
 
-import { readComponentMetadata } from './process-component-files';
-import { validateContentEntityReferencePropExpressions } from './validate-content-entity-reference';
+import { CodeComponentMetadataOperationUnsupportedError } from '../services/api';
+import {
+  createComponentPayload,
+  readComponentMetadata,
+} from './process-component-files';
 
 import type {
   DiscoveredComponent,
   DiscoveryResult,
 } from '@drupal-canvas/discovery';
+import type { AnySchema } from '@drupal-canvas/json-schema-validation';
+import type { ApiService } from '../services/api';
+import type { Metadata } from '../types/Metadata';
 import type { Result } from '../types/Result';
-import type { ContentEntityReferenceValidationApi } from './validate-content-entity-reference';
 
 function getComponentsToValidate(
   components: DiscoveredComponent[],
@@ -26,18 +31,45 @@ function getComponentsToValidate(
   return [...componentsByDirectory.values()];
 }
 
+function createValidationPayload(
+  component: DiscoveredComponent,
+  metadata: Metadata,
+) {
+  const common = {
+    metadata,
+    machineName: metadata.machineName,
+    componentName: component.name,
+    dataDependencies: {},
+  };
+  return component.type === 'external'
+    ? createComponentPayload({ ...common, type: 'external' })
+    : createComponentPayload({
+        ...common,
+        code: {
+          sourceCodeJs: '',
+          compiledJs: '',
+          sourceCodeCss: '',
+          compiledCss: '',
+          importedJsComponents: [],
+        },
+      });
+}
+
 async function validateComponent(
   component: DiscoveredComponent,
-  fix: boolean = false,
-  apiService?: ContentEntityReferenceValidationApi,
-): Promise<Result> {
+  options: {
+    fix: boolean;
+    schema?: AnySchema;
+    remoteValidation?: Pick<ApiService, 'validateCodeComponentPayload'>;
+  },
+): Promise<{ result: Result; remoteUnsupported: boolean }> {
   const eslint = new ESLint({
     overrideConfigFile: true,
     overrideConfig: drupalCanvasRequired,
-    fix,
+    fix: options.fix,
   });
   const eslintResults = await eslint.lintFiles(component.directory + '/**/*');
-  if (fix) {
+  if (options.fix) {
     await ESLint.outputFixes(eslintResults);
   }
   const details: { heading: string; content: string }[] = [];
@@ -57,14 +89,28 @@ async function validateComponent(
       });
     });
 
+  let remoteUnsupported = false;
   try {
-    const metadata = await readComponentMetadata(component.metadataPath);
-    details.push(
-      ...(await validateContentEntityReferencePropExpressions(
-        metadata,
-        apiService,
-      )),
+    const metadata = await readComponentMetadata(
+      component.metadataPath,
+      options.schema,
     );
+    if (options.remoteValidation) {
+      try {
+        await options.remoteValidation.validateCodeComponentPayload(
+          createValidationPayload(component, metadata),
+        );
+      } catch (error) {
+        if (error instanceof CodeComponentMetadataOperationUnsupportedError) {
+          remoteUnsupported = true;
+        } else {
+          details.push({
+            heading: 'Target site validation',
+            content: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
   } catch (error) {
     details.push({
       heading: path.relative(process.cwd(), component.metadataPath),
@@ -77,9 +123,12 @@ async function validateComponent(
     details.length === 0;
 
   return {
-    itemName: component.name,
-    success,
-    details,
+    result: {
+      itemName: component.name,
+      success,
+      details,
+    },
+    remoteUnsupported,
   };
 }
 
@@ -87,16 +136,31 @@ export async function validateComponents(
   discoveryResult: DiscoveryResult,
   options: {
     fix?: boolean;
-    apiService?: ContentEntityReferenceValidationApi;
+    apiService?: Pick<ApiService, 'validateCodeComponentPayload'>;
+    remoteValidationAvailable?: boolean;
+    schema?: AnySchema;
   } = {},
-): Promise<{ results: Result[] }> {
+): Promise<{ results: Result[]; warnings: string[] }> {
   const results: Result[] = [];
+  const warnings: string[] = [];
+  let remoteValidation = options.remoteValidationAvailable
+    ? options.apiService
+    : undefined;
 
   for (const component of getComponentsToValidate(discoveryResult.components)) {
-    results.push(
-      await validateComponent(component, options.fix, options.apiService),
-    );
+    const outcome = await validateComponent(component, {
+      fix: options.fix ?? false,
+      schema: options.schema,
+      remoteValidation,
+    });
+    results.push(outcome.result);
+    if (outcome.remoteUnsupported) {
+      warnings.push(
+        'The target site does not provide metadata validation. Validation is offline and not authoritative.',
+      );
+      remoteValidation = undefined;
+    }
   }
 
-  return { results };
+  return { results, warnings };
 }
