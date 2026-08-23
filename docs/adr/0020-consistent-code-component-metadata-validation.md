@@ -62,8 +62,9 @@ runtime.
 
 After validating the authored envelope, the CLI will check each definition under `props.properties` as JSON Schema
 directly. It will validate the first example value, which Canvas uses as the default, against its containing prop schema
-where that schema can be resolved locally. Target- or extension-provided `$ref` values may not be resolvable offline and
-will remain the target site's responsibility. Drupal combines these definitions with the authored `required` names when
+where that schema can be resolved locally. The CLI will bundle and register Canvas-owned definitions from `schema.json`.
+References provided by other target extensions may not be resolvable offline and will remain the target site's
+responsibility. Drupal combines these definitions with the authored `required` names when
 it projects the normalized payload into the complete SDC `props` schema.
 
 These local checks establish only that the document is structurally usable and that its directly resolvable prop schemas
@@ -143,7 +144,8 @@ be duplicated as blocking ESLint diagnostics.
   acceptance.
 - A reachable target site provides the authoritative verdict without mutating component configuration.
 - The hand-authored envelope schema must be updated deliberately when the authored format changes.
-- Custom or extension-provided `$ref` values may only be fully validated by the target site.
+- Canvas-owned `$ref` values are resolved against the definitions bundled with the CLI, which may differ from the target's
+  installed Canvas version; extension-provided references remain target-only.
 - Older sites retain save-time validation but cannot provide an all-component remote preflight.
 - Migrating Canvas-owned schemas and validators to draft-07 remains part of the change and establishes one TypeScript
   JSON Schema dialect and one tested Ajv configuration.
