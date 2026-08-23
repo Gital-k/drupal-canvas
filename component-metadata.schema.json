@@ -155,8 +155,8 @@
             }
           },
           "meta:enum": {
-            "type": "array",
-            "items": {
+            "type": "object",
+            "additionalProperties": {
               "type": "string"
             }
           },
@@ -227,8 +227,8 @@
             }
           },
           "meta:enum": {
-            "type": "array",
-            "items": {
+            "type": "object",
+            "additionalProperties": {
               "type": "string"
             }
           },
@@ -280,7 +280,8 @@
             }
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "description": {
             "type": "string"
@@ -317,7 +318,8 @@
             "const": "number"
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "description": {
             "type": "string"
@@ -347,8 +349,8 @@
             }
           },
           "meta:enum": {
-            "type": "array",
-            "items": {
+            "type": "object",
+            "additionalProperties": {
               "type": "string"
             }
           },
@@ -375,8 +377,8 @@
             }
           },
           "meta:enum": {
-            "type": "array",
-            "items": {
+            "type": "object",
+            "additionalProperties": {
               "type": "string"
             }
           },
@@ -384,7 +386,8 @@
             "type": "string"
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "description": {
             "type": "string"
@@ -421,7 +424,8 @@
             "const": "boolean"
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "description": {
             "type": "string"
@@ -454,8 +458,8 @@
             }
           },
           "meta:enum": {
-            "type": "array",
-            "items": {
+            "type": "object",
+            "additionalProperties": {
               "type": "string"
             }
           },
@@ -491,8 +495,8 @@
             }
           },
           "meta:enum": {
-            "type": "array",
-            "items": {
+            "type": "object",
+            "additionalProperties": {
               "type": "string"
             }
           },
@@ -506,7 +510,8 @@
             ]
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "description": {
             "type": "string"
@@ -631,7 +636,8 @@
             ]
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "description": {
             "type": "string"
