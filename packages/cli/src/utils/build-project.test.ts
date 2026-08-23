@@ -244,10 +244,9 @@ describe('buildCanvasProject', () => {
         'props:',
         '  properties:',
         '    article:',
+        '      title: Article',
         '      type: object',
         '      $ref: json-schema-definitions://canvas.module/content-entity-reference',
-        '      x-allowed-entity-type-id: node',
-        '      x-allowed-bundle: article',
         'slots: {}',
         'dataDependencies:',
         '  entityFields:',
@@ -298,6 +297,7 @@ describe('buildCanvasProject', () => {
       },
     });
     expect(result.builtComponents[0]?.componentPayload.props.article).toEqual({
+      title: 'Article',
       type: 'object',
       $ref: 'json-schema-definitions://canvas.module/content-entity-reference',
     });
@@ -312,7 +312,6 @@ describe('buildCanvasProject', () => {
         'name: hero',
         'machineName: hero',
         'status: true',
-        'type: external',
         'props:',
         '  properties: {}',
         'slots: {}',

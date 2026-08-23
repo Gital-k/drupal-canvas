@@ -33,9 +33,11 @@
     "lint:tsc": "turbo run type-check",
     "lint:cspell": "cspell . --no-progress",
     "lint:yaml": "yamllint '**/*.(yaml|yml)' --ignore='.gitlab/**' --ignore='.gitlab-ci.yml' --ignore='node_modules/**'",
-    "fix": "npm run lint:prettier -- --write && npm run lint:eslint -- --fix && npm run lint:stylelint -- --fix",
+    "fix": "npm run generate:component-metadata-schema && npm run lint:prettier -- --write && npm run lint:eslint -- --fix && npm run lint:stylelint -- --fix",
     "test": "turbo run --continue test:playwright",
-    "lint": "turbo run --continue lint:cspell lint:eslint lint:openapi lint:prettier lint:stylelint lint:yaml type-check"
+    "lint": "turbo run --continue lint:cspell lint:eslint lint:openapi lint:prettier lint:stylelint lint:yaml type-check",
+    "generate:component-metadata-schema": "node scripts/generate-component-metadata-schema.js",
+    "check:component-metadata-schema": "node scripts/generate-component-metadata-schema.js --check"
   },
   "repository": {
     "type": "git",
@@ -66,6 +68,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^16.1.0",
+    "js-yaml": "^4.2.0",
     "prettier": "^3.5.3",
     "stylelint": "^17.6.0",
     "stylelint-checkstyle-formatter": "^0.1.2",
