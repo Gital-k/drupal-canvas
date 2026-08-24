@@ -37,6 +37,14 @@ describe('component metadata', () => {
     });
   });
 
+  it('accepts the complete valid metadata fixture', async () => {
+    const parsed = await parseComponentMetadata(
+      path.join(fixtureRoot, 'valid/all-prop-types.yml'),
+    );
+
+    expect(validateParsedComponentMetadata(parsed)).toEqual([]);
+  });
+
   it('validates prop examples directly against their JSON Schema', async () => {
     const filePath = path.join(
       fixtureRoot,
@@ -69,15 +77,67 @@ describe('component metadata', () => {
     ]);
   });
 
-  it.each(['empty-string-examples.yml', 'relative-image-examples.yml'])(
-    'leaves target-specific rules in %s to Drupal',
-    async (fixtureName) => {
-      const filePath = path.join(fixtureRoot, 'target-invalid', fixtureName);
+  it.each([
+    [
+      'empty-string-examples.yml',
+      '$.props.properties.text.examples[0]',
+      'must not be empty strings',
+    ],
+    [
+      'relative-image-examples.yml',
+      '$.props.properties.image.examples[0].src',
+      'must be a fully qualified URL',
+    ],
+  ])(
+    'validates installation-independent semantics in %s',
+    async (fixtureName, expectedPath, expectedMessage) => {
+      const filePath = path.join(fixtureRoot, 'semantic-invalid', fixtureName);
       const parsed = await parseComponentMetadata(filePath);
 
-      expect(validateParsedComponentMetadata(parsed)).toEqual([]);
+      expect(validateParsedComponentMetadata(parsed)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: expectedPath,
+            message: expect.stringContaining(expectedMessage),
+          }),
+        ]),
+      );
     },
   );
+
+  it('validates relationships between metadata fields', async () => {
+    const filePath = path.join(
+      fixtureRoot,
+      'semantic-invalid/metadata-relationships.yml',
+    );
+    const parsed = await parseComponentMetadata(filePath);
+    const diagnostics = validateParsedComponentMetadata(parsed);
+
+    expect(diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '$.required[0]',
+          message:
+            'Required prop "missing" is not defined in props.properties.',
+        }),
+        expect.objectContaining({
+          path: '$.props.properties.requiredList.minItems',
+          message:
+            'Required array prop "requiredList" must specify minItems: 1.',
+        }),
+        expect.objectContaining({
+          path: '$.props.properties.reference.examples',
+          message:
+            'Prop "reference" is a content entity reference prop and must not have examples.',
+        }),
+        expect.objectContaining({
+          path: '$.dataDependencies.entityFields.optionalList',
+          message:
+            'dataDependencies.entityFields.optionalList does not identify a content entity reference prop.',
+        }),
+      ]),
+    );
+  });
 
   it('reports schema failures at YAML locations', async () => {
     const filePath = path.join(fixtureRoot, 'invalid/projected-prop-key.yml');
