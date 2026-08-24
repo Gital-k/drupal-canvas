@@ -17,6 +17,10 @@ export default defineConfig({
     '@drupal-canvas/json-schema-validation',
     '@drupal-canvas/vite-compat',
   ],
+  // Bundled CommonJS format validators load punycode dynamically.
+  banner: {
+    js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
+  },
   loader: {
     '.wasm': 'file',
   },

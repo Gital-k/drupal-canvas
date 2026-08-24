@@ -90,10 +90,13 @@ async function validateComponent(
       });
     });
 
+  const localLintIsValid = eslintResults.every(
+    (result) => result.errorCount === 0,
+  );
   let remoteUnsupported = false;
   try {
     const metadata = await readComponentMetadata(component.metadataPath);
-    if (options.remoteValidation) {
+    if (options.remoteValidation && localLintIsValid) {
       try {
         await options.remoteValidation.validateCodeComponentPayload(
           createValidationPayload(component, metadata),
@@ -119,9 +122,7 @@ async function validateComponent(
     });
   }
 
-  const success =
-    eslintResults.every((result) => result.errorCount === 0) &&
-    details.length === 0;
+  const success = localLintIsValid && details.length === 0;
 
   return {
     result: {
