@@ -7,7 +7,6 @@ import {
 
 import bundledComponentMetadataSchema from '../../../../component-metadata.schema.json';
 import canvasJsonSchemaDefinitions from '../../../../schema.json';
-import { validateComponentMetadataSemantics } from './component-metadata-semantics';
 
 import type {
   AnySchema,
@@ -203,12 +202,7 @@ export function validateParsedComponentMetadata(
       diagnosticFromError(parsed, error),
     );
   }
-  return [
-    ...validatePropDefinitions(parsed),
-    ...validateComponentMetadataSemantics(parsed.value).map((issue) =>
-      diagnosticFromParts(parsed, issue.parts, issue.message),
-    ),
-  ];
+  return validatePropDefinitions(parsed);
 }
 
 export async function parseComponentMetadata(
