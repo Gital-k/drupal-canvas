@@ -58,49 +58,6 @@ function canvas_uninstall(bool $is_syncing): void {
 }
 
 /**
- * Implements hook_requirements().
- *
- * @todo Remove when https://www.drupal.org/project/drupal/issues/3472008 is fixed in Drupal core.
- */
-function canvas_requirements(string $phase): array {
-  $requirements = [];
-  if ($phase === 'install' || $phase == 'runtime') {
-    $canvas_stark_enabled = \Drupal::service(ThemeHandlerInterface::class)->themeExists('canvas_stark');
-    if (!$canvas_stark_enabled) {
-      $requirements['canvas_stark'] = [
-        'title' => t('Drupal Canvas Theme'),
-        'description' => t('The required theme <code>canvas_stark</code> is no longer installed due to manually modified changes to <code>core.extension</code>. The Drupal Canvas user interface will be broken without this theme. You can install it by running <code>drush theme:install canvas_stark</code>.'),
-        'severity' => RequirementSeverity::Warning,
-      ];
-    }
-
-    // Check if JSON:API module is enabled.
-    $json_api_enabled = \Drupal::moduleHandler()->moduleExists('jsonapi');
-    if ($json_api_enabled) {
-      $severity = RequirementSeverity::Warning;
-      // Check if PHP assertions are enabled and update the severity.
-      // @see \Drupal\canvas\EventSubscriber\ApiMessageValidator::isProd()
-      $assertions_disabled = TRUE;
-      // @phpstan-ignore-next-line booleanNot.alwaysTrue
-      assert(!($assertions_disabled = FALSE));
-      // @phpstan-ignore-next-line booleanNot.alwaysTrue function.alreadyNarrowedType
-      if (!$assertions_disabled) {
-        $severity = RequirementSeverity::Error;
-      }
-      $requirements['canvas'] = [
-        'title' => t('Drupal Canvas'),
-        'description' => t("Drupal Canvas requires the <code>justinrainbow/json-schema</code> library which may impact site performance when the JSON:API module is installed and PHP assertions are enabled. See <a href=':url'>:url</a> for more information.", [':url' => 'https://www.drupal.org/project/drupal/issues/3472008']),
-        'severity' => $severity,
-      ];
-    }
-  }
-  if ($phase === 'runtime') {
-    $requirements['canvas_data_health'] = _canvas_data_health_requirement();
-  }
-  return $requirements;
-}
-
-/**
  * Builds the 'canvas_data_health' entry for hook_requirements().
  *
  * @return array
