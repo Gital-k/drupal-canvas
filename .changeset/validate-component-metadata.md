@@ -6,7 +6,7 @@
 
 Validate authored Code Component metadata with the Canvas JSON Schema contract.
 
-- The CLI validates raw `component.yml` envelopes, directly resolvable prop schemas, and installation-independent metadata relationships locally. It uses the authenticated target site's non-mutating validation operation when available and warns when target acceptance was not validated.
+- The CLI validates raw `component.yml` envelopes, directly resolvable prop schemas, and portable generic metadata relationships locally. It uses the authenticated target site's non-mutating validation operation when available and warns when target acceptance was not validated.
 - Push preflights every complete Code Component payload before mutation when the target supports it.
 - ESLint keeps project-convention rules and leaves metadata acceptance to local metadata validation and Drupal.
 - Workbench schemas use the shared Canvas draft-07 dialect.
