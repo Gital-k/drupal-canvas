@@ -3,6 +3,7 @@ machineName: all-prop-types
 status: true
 required:
   - text
+  - tags
 props:
   properties:
     text:
