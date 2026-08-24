@@ -1,7 +1,6 @@
 name: Invalid metadata relationships
 machineName: invalid-metadata-relationships
 required:
-  - missing
   - requiredList
   - reference
 props:

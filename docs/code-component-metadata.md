@@ -38,9 +38,9 @@ validates its first example, which Canvas uses as the default, when the prop sch
 `$ref` definitions from `schema.json` are bundled with the CLI. References provided by other target extensions may not be
 resolvable locally.
 
-The CLI also checks installation-independent Canvas rules that cross metadata fields or extend JSON Schema, including
-required-prop relationships, array cardinality, content entity reference relationships, nonempty string examples, and
-fully qualified image example URLs.
+The CLI also checks portable rules that cross metadata fields or extend JSON Schema: required names must identify defined
+props, required props must provide a default example, and string examples must not be empty. Drupal owns Canvas-specific
+metadata policy, including array cardinality, content entity reference relationships, and image URL restrictions.
 
 `canvas validate` and `canvas push` submit normalized payloads to the authenticated Drupal site for non-mutating
 validation. The target runs the same metadata constraints used for create and update operations, so only its result is
