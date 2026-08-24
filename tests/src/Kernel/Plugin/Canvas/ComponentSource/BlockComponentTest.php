@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
-// cspell:ignore gitane
+// cspell:ignore Druplicons gitane
 
 use Drupal\canvas\Block\BlockManagerDecorator;
 use Drupal\canvas\Controller\ApiConfigControllers;
@@ -473,10 +473,12 @@ HTML,
       $preview = $this->crawlerForRenderArray($preview_build);
       self::assertCount(1, $preview->filter(\sprintf('[data-component-uuid="%s"]:contains("Component failed to render, check logs for more detail.")', self::UUID_CRASH_TEST_DUMMY)));
 
-      // On a delivered page it must travel on to Drupal's exception handling.
-      $build = $component_tree->toRenderable($page, FALSE);
+      // On a delivered page it must travel on to Drupal's exception handling,
+      // no matter whether it surfaces while the render array is built or while
+      // it is rendered.
       $this->expectException(BadRequestHttpException::class);
       $this->expectExceptionMessage('Intentional test exception.');
+      $build = $component_tree->toRenderable($page, FALSE);
       $this->crawlerForRenderArray($build);
     }
     finally {
@@ -507,8 +509,9 @@ HTML,
     );
     $page = Page::create(['title' => 'A page']);
     $request_stack = $this->container->get(RequestStack::class);
-    $subscriber = $this->container->get(ComponentRenderFailureSubscriber::class);
     $http_kernel = $this->container->get(HttpKernelInterface::class);
+    // The subscriber must be wired up, otherwise nothing acts on the flag.
+    self::assertTrue($this->container->has(ComponentRenderFailureSubscriber::class));
 
     // A preview render must not mark anything as failed: the Canvas UI renders
     // broken components on purpose.
@@ -534,13 +537,13 @@ HTML,
 
     // The response for that request is a server error, and uncacheable.
     $response = new CacheableResponse('<html>a page</html>');
-    $subscriber->onResponse(new ResponseEvent($http_kernel, $request, HttpKernelInterface::MAIN_REQUEST, $response));
+    ComponentRenderFailureSubscriber::onResponse(new ResponseEvent($http_kernel, $request, HttpKernelInterface::MAIN_REQUEST, $response));
     self::assertSame(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
     self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
 
     // The preview request's response is left alone.
     $preview_response = new CacheableResponse('<html>a preview</html>');
-    $subscriber->onResponse(new ResponseEvent($http_kernel, $preview_request, HttpKernelInterface::MAIN_REQUEST, $preview_response));
+    ComponentRenderFailureSubscriber::onResponse(new ResponseEvent($http_kernel, $preview_request, HttpKernelInterface::MAIN_REQUEST, $preview_response));
     self::assertSame(Response::HTTP_OK, $preview_response->getStatusCode());
   }
 
