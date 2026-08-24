@@ -34,7 +34,9 @@ interface ContextualPanelProps {
   setPanelVisibility: (open: boolean) => void;
 }
 
-const ContextualPanel: React.FC<ContextualPanelProps> = ({ setPanelVisibility }) => {
+const ContextualPanel: React.FC<ContextualPanelProps> = ({
+  setPanelVisibility,
+}) => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const isMultiSelect = useAppSelector(selectIsMultiSelect);
   const selection = useAppSelector(selectSelection);

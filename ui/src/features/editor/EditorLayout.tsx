@@ -195,7 +195,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
         })}
         style={{ width: effectiveRightWidth }}
       >
-        <ContextualPanel setPanelVisibility={setRightPanelVisibility}/>
+        <ContextualPanel setPanelVisibility={setRightPanelVisibility} />
       </div>
     </div>
   );
