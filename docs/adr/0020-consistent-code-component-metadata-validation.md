@@ -68,13 +68,14 @@ References provided by other target extensions may not be resolvable offline and
 responsibility. Drupal combines these definitions with the authored `required` names when it projects the normalized
 payload into the complete SDC `props` schema.
 
-The CLI will also validate installation-independent Canvas metadata invariants that JSON Schema cannot express cleanly,
-including required-prop relationships, array cardinality rules, content entity reference relationships, nonempty string
-examples, and fully qualified image example URLs.
+The CLI will also validate portable metadata invariants that JSON Schema cannot express cleanly: required names must
+identify defined props, required props must provide a default example, and string examples must not be empty.
+Canvas-specific metadata policy, including array cardinality, content entity reference relationships, and image URL
+restrictions, remains Drupal's responsibility to avoid duplicating implementation details in the CLI.
 
 These local checks establish only that the document is structurally usable and that its directly resolvable prop schemas,
-default examples, and installation-independent relationships are internally consistent. They do not establish that Canvas
-can map a prop shape to a field and widget or that a target site's extensions accept it.
+default examples, and generic relationships are internally consistent. They do not establish that Canvas can map a prop
+shape to a field and widget or that a target site's extensions accept it.
 
 ### Define the authored metadata boundary
 
@@ -105,7 +106,7 @@ response when invalid. It never saves or otherwise mutates stored configuration.
 `canvas validate` will:
 
 1. validate raw YAML against the bundled authored-envelope schema;
-2. check prop definitions, locally resolvable examples, and installation-independent metadata relationships;
+2. check prop definitions, locally resolvable examples, and portable generic metadata relationships;
 3. run project-oriented ESLint rules and aggregate their diagnostics;
 4. normalize structurally valid metadata and construct the complete Code Component payload; and
 5. submit that payload to the target operation when authenticated access is available.
