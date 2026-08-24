@@ -91,15 +91,7 @@ final class ComponentSourceManager extends DefaultPluginManager {
     // Do not auto-create/update Canvas configuration when syncing config o
     // deploying.
     // @todo Introduce a "Canvas development mode" similar to Twig's: https://www.drupal.org/node/3359728
-    if ($this->configInstaller->isSyncing()) {
-      return $this;
-    }
-    // @todo Fix upstream core bug in Recipes: it inconsistently claims to be
-    // syncing when installing modules, but not when installing configuration.
-    // Even though it is listed under `import`, and that should hence match the
-    // behavior of the /admin/config/development/configuration/single/import UI.
-    // @todo Remove when https://www.drupal.org/i/3613607 is fixed.
-    if (self::isRecipeApplying()) {
+    if ($this->configInstaller->isSyncing() && !self::isRecipeApplying()) {
       return $this;
     }
 
@@ -124,6 +116,9 @@ final class ComponentSourceManager extends DefaultPluginManager {
     return $this;
   }
 
+  /**
+   * @todo Remove when https://www.drupal.org/i/3613607 is fixed.
+   */
   private static function isRecipeApplying(): bool {
     // If the recipe runner is ANYWHERE in the backtrace, for any reason, we're
     // in the middle of applying a recipe.
