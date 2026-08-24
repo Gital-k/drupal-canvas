@@ -35,42 +35,17 @@ local feedback without maintaining a second implementation of Drupal's validatio
 
 ## Decision
 
-### Use distinct validation layers
+### Validation overview
 
-```mermaid
-flowchart TD
-  metadata["component.yml"]
-
-  envelope["Envelope validation"]
-  envelopeSource["Repository root<br/>component-metadata.schema.json"]
-
-  props["Prop schema and default example validation"]
-  propMetaSource["Draft-07 meta-schema"]
-  propRefSource["Canvas module root schema.json<br/>Canvas-owned $defs"]
-
-  lint["Authoring and project linting"]
-  lintSource["Required ESLint configuration"]
-
-  payload["Normalized Code Component payload"]
-  target["Authoritative target validation"]
-  targetSource["Installed Drupal constraints, extensions,<br/>entity model, field types, widgets, and alter hooks"]
-
-  metadata --> envelope
-  envelopeSource --> envelope
-  metadata --> props
-  propMetaSource --> props
-  propRefSource --> props
-  metadata --> lint
-  lintSource --> lint
-  envelope --> payload
-  props --> payload
-  lint --> payload
-  payload --> target
-  targetSource --> target
+```text
+component.yml
+  ├─ JSON Schema → envelope, prop schemas, and default examples
+  ├─ ESLint → portable authoring and project rules
+  └─ Drupal target → authoritative acceptance
 ```
 
-The first three layers run locally. The target Drupal site owns the final acceptance decision because only it has the
-installed code and configuration represented by the final source box.
+The CLI bundles the repository's envelope schema and Canvas-owned prop definitions. The target uses its installed code and
+configuration.
 
 ### Publish a hand-authored metadata schema
 
