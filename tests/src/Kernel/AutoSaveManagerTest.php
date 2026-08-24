@@ -17,6 +17,7 @@ use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\Component\Datetime\Time;
+use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityInterface;
@@ -922,6 +923,7 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
    *   Expected count of items with 'conflict_id' properties.
    *
    * @legacy-covers \Drupal\canvas\AutoSave\AutoSaveManager::getAllAutoSaveList
+   * @legacy-covers \Drupal\canvas\AutoSave\AutoSaveManager::getAutoSaveListByEntityType
    */
   #[TestWith([FALSE, FALSE, 5, 0, 0])]
   #[TestWith([TRUE, FALSE, 5, 5, 0])]
@@ -1060,6 +1062,103 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     // The 'conflict_id' elements should be present in the auto-save items list
     // if $with_conflicts is set to TRUE.
     self::assertCount($items_with_conflicts, \array_column($list, 'conflict_id'));
+
+    // Scoping the same list to one entity type must yield exactly the entries
+    // ::getAllAutoSaveList() returns for that type — same keys, same order,
+    // same values — for every combination of the two flags.
+    $without_entity = static fn (array $items): array => \array_map(
+      static fn (array $item): array => \array_diff_key($item, \array_flip(['entity'])),
+      $items,
+    );
+    $entity_ids = static fn (array $items): array => \array_map(
+      static fn (array $item): ?string => $item['entity'] instanceof EntityInterface ? (string) $item['entity']->id() : NULL,
+      $items,
+    );
+    foreach ([Page::ENTITY_TYPE_ID => 3, PageRegion::ENTITY_TYPE_ID => 2] as $entity_type_id => $expected_count) {
+      $scoped_list = $auto_save_manager->getAutoSaveListByEntityType($entity_type_id, with_entities: $with_entities, with_conflicts: $with_conflicts);
+      $hand_filtered = \array_filter($list, static fn (array $item): bool => $item['entity_type'] === $entity_type_id);
+      self::assertCount($expected_count, $scoped_list);
+      // Entity instances are recreated on every call, so they cannot be
+      // compared by identity; compare everything else, then their IDs.
+      self::assertSame($without_entity($hand_filtered), $without_entity($scoped_list));
+      self::assertSame($entity_ids($hand_filtered), $entity_ids($scoped_list));
+      // Only the requested entity type is ever hydrated.
+      foreach ($scoped_list as $item) {
+        self::assertSame($entity_type_id, $item['entity_type']);
+        if ($with_entities) {
+          self::assertInstanceOf(EntityInterface::class, $item['entity']);
+          self::assertSame($entity_type_id, $item['entity']->getEntityTypeId());
+        }
+      }
+    }
+
+    // An entity type without any auto-save entries yields an empty list.
+    self::assertSame([], $auto_save_manager->getAutoSaveListByEntityType(JavaScriptComponent::ENTITY_TYPE_ID, with_entities: $with_entities, with_conflicts: $with_conflicts));
+  }
+
+  /**
+   * Tests that ::getAutoSaveListByEntityType() hydrates only one entity type.
+   *
+   * An auto-save entry for an entity type that has no storage handler cannot be
+   * hydrated: ::createEntityFromAutoSaveEntry() asks the entity type manager for
+   * that storage and it throws. Such an entry is therefore a canary for whether
+   * hydration ran at all: ::getAllAutoSaveList() trips over it, while
+   * ::getAutoSaveListByEntityType() must not, because it filters first.
+   *
+   * @legacy-covers ::getAutoSaveListByEntityType
+   */
+  public function testGetAutoSaveListByEntityTypeHydratesOnlyRequestedEntityType(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $page = Page::create([
+      'title' => 'Test Page, please ignore',
+      'components' => [],
+    ]);
+    \assert($page instanceof Page);
+    self::assertEntityIsValid($page);
+    self::assertSame(SAVED_NEW, $page->save());
+
+    $auto_save_manager = $this->container->get(AutoSaveManager::class);
+    \assert($auto_save_manager instanceof AutoSaveManager);
+    $page->set('title', 'Updated title');
+    $auto_save_manager->saveEntity($page);
+
+    // Write an entry for an entity type that cannot be hydrated.
+    $store = $this->container->get('keyvalue')->get(AutoSaveManager::AUTO_SAVE_STORE);
+    $store->set('a_missing_entity_type:1', [
+      'data' => [],
+      'owner' => 0,
+      'updated' => 0,
+      'entity_type' => 'a_missing_entity_type',
+      'entity_id' => '1',
+      'label' => 'Test entry, please ignore',
+      AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY => '',
+      'data_hash' => '',
+      'client_id' => NULL,
+      'langcode' => NULL,
+      'is_default_translation' => TRUE,
+    ]);
+
+    // Scoping to Page never reaches the entry for the unknown entity type.
+    $scoped_list = $auto_save_manager->getAutoSaveListByEntityType(Page::ENTITY_TYPE_ID, with_entities: TRUE, with_conflicts: FALSE);
+    self::assertSame([AutoSaveManager::getAutoSaveKey($page)], \array_keys($scoped_list));
+    self::assertInstanceOf(Page::class, $scoped_list[AutoSaveManager::getAutoSaveKey($page)]['entity']);
+
+    // Whereas hydrating the whole store does reach it, and fails.
+    try {
+      $auto_save_manager->getAllAutoSaveList(with_entities: TRUE, with_conflicts: FALSE);
+      self::fail('Expected hydrating an entry for an unknown entity type to fail.');
+    }
+    catch (PluginNotFoundException $e) {
+      self::assertStringContainsString('a_missing_entity_type', $e->getMessage());
+    }
+
+    // Both list a not-yet-hydrated entry for the unknown entity type, proving
+    // the difference above is hydration and not filtering of the raw entries.
+    self::assertArrayHasKey('a_missing_entity_type:1', $auto_save_manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE));
+    self::assertArrayHasKey('a_missing_entity_type:1', $auto_save_manager->getAutoSaveListByEntityType('a_missing_entity_type', with_entities: FALSE, with_conflicts: FALSE));
+
+    $store->delete('a_missing_entity_type:1');
   }
 
 }

@@ -581,9 +581,8 @@ class AutoSaveManager implements EventSubscriberInterface {
     $entity_id = (string) $entity->id();
     // Every pending translation auto-save of this content entity.
     $group = \array_filter(
-      $this->getAllAutoSaveList(with_entities: FALSE, with_conflicts: FALSE),
-      static fn (array $entry): bool => $entry['entity_type'] === $entity_type_id
-        && (string) $entry['entity_id'] === $entity_id,
+      $this->getAutoSaveListByEntityType($entity_type_id, with_entities: FALSE, with_conflicts: FALSE),
+      static fn (array $entry): bool => (string) $entry['entity_id'] === $entity_id,
     );
     if ($group === []) {
       return AutoSaveEntity::empty();
@@ -642,7 +641,57 @@ class AutoSaveManager implements EventSubscriberInterface {
   public function getAllAutoSaveList(bool $with_entities, bool $with_conflicts): array {
     /** @var array<string, AutoSaveEntry> $entries */
     $entries = $this->autoSaveStore->getAll();
+    return $this->buildAutoSaveList($entries, $with_entities, $with_conflicts);
+  }
 
+  /**
+   * Gets the auto-save data for a single entity type.
+   *
+   * Equivalent to filtering ::getAllAutoSaveList() on `entity_type`, but the
+   * filtering happens before hydration: when $with_entities is TRUE, only the
+   * requested entity type's entries are turned into entity objects. Callers
+   * that only care about one entity type must use this instead, to avoid
+   * loading and reconstructing every other type's drafts.
+   *
+   * @param string $entity_type_id
+   *   The entity type ID to restrict the auto-save data to.
+   * @param bool $with_entities
+   *   Whether the auto-save items should contain entity instances in 'entity'.
+   * @param bool $with_conflicts
+   *   Whether the auto-save items contain 'conflict_id' for items with detected
+   *   unresolved conflicts due to external updates to the entity on which the
+   *   auto-save item was based.
+   *
+   * @return array<string, AutoSaveEntry>
+   *   The auto-save data entries for $entity_type_id. Always empty for
+   *   StagedLanguageConfigOverride, which ::getAllAutoSaveList() hides too.
+   */
+  public function getAutoSaveListByEntityType(string $entity_type_id, bool $with_entities, bool $with_conflicts): array {
+    /** @var array<string, AutoSaveEntry> $entries */
+    $entries = $this->autoSaveStore->getAll();
+    $entries = \array_filter(
+      $entries,
+      static fn (array $entry): bool => ($entry['entity_type'] ?? NULL) === $entity_type_id,
+    );
+    return $this->buildAutoSaveList($entries, $with_entities, $with_conflicts);
+  }
+
+  /**
+   * Builds an auto-save list out of raw auto-save store entries.
+   *
+   * @param array<string, AutoSaveEntry> $entries
+   *   Raw entries as read from the auto-save store.
+   * @param bool $with_entities
+   *   Whether the auto-save items should contain entity instances in 'entity'.
+   * @param bool $with_conflicts
+   *   Whether the auto-save items contain 'conflict_id' for items with detected
+   *   unresolved conflicts due to external updates to the entity on which the
+   *   auto-save item was based.
+   *
+   * @return array<string, AutoSaveEntry>
+   *   The auto-save data entries, sorted by key.
+   */
+  private function buildAutoSaveList(array $entries, bool $with_entities, bool $with_conflicts): array {
     // StagedLanguageConfigOverride entries are internal implementation details:
     // they are published implicitly when their base config entity is published
     // (see ApiAutoSaveController::post()), and discarded atomically via
@@ -972,9 +1021,8 @@ class AutoSaveManager implements EventSubscriberInterface {
     //   for symmetric translation. Make it selective once asymmetric
     //   translation is supported: https://www.drupal.org/i/3522198
     $entries = \array_filter(
-      $this->getAllAutoSaveList(with_entities: TRUE, with_conflicts: FALSE),
-      static fn (array $entry): bool => $entry['entity_type'] === $entity->getEntityTypeId()
-        && (string) $entry['entity_id'] === (string) $entity->id(),
+      $this->getAutoSaveListByEntityType($entity->getEntityTypeId(), with_entities: TRUE, with_conflicts: FALSE),
+      static fn (array $entry): bool => (string) $entry['entity_id'] === (string) $entity->id(),
     );
     return \array_values(\array_map(
       static function (array $entry): EntityInterface {
@@ -1093,8 +1141,9 @@ class AutoSaveManager implements EventSubscriberInterface {
   }
 
   public function onCanvasConfigDelete(ConfigCrudEvent $event): void {
-    $autoSaveEntities = $this->getAllAutoSaveList(with_entities: TRUE, with_conflicts: FALSE);
-    $autoSaveEntities = array_filter($autoSaveEntities, fn($entityData) => $entityData['entity'] instanceof StagedConfigUpdate);
+    // StagedConfigUpdate is final, so scoping to its entity type ID selects
+    // exactly the entries the `instanceof` check used to select.
+    $autoSaveEntities = $this->getAutoSaveListByEntityType(StagedConfigUpdate::ENTITY_TYPE_ID, with_entities: TRUE, with_conflicts: FALSE);
     foreach ($autoSaveEntities as $autoSaveEntity) {
       $staged_config_update = $autoSaveEntity['entity'];
       \assert($staged_config_update instanceof StagedConfigUpdate);
