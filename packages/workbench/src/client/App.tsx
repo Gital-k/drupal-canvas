@@ -741,11 +741,7 @@ export function App() {
         const entityFields = selectedComponent.dataDependencies.entityFields;
         const entityFieldGroups =
           selectedComponentMock === null
-            ? groupEntityFieldsByProp(
-                entityFields,
-                selectedComponent.props,
-                selectedComponentEntityIds,
-              )
+            ? groupEntityFieldsByProp(entityFields, selectedComponentEntityIds)
             : [];
         if (workbenchConfig?.siteUrl && entityFieldGroups.length > 0) {
           try {

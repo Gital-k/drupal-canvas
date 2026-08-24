@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { CodeComponentMetadataOperationUnsupportedError } from '../services/api';
+import {
+  CodeComponentMetadataOperationUnsupportedError,
+  CodeComponentMetadataValidationUnavailableError,
+} from '../services/api';
 import { preflightCodeComponentPayloads } from './target-component-metadata';
 
 import type { BuiltComponent } from './build-project';
@@ -30,6 +33,29 @@ describe('target component metadata', () => {
     expect(preflight.results).toEqual([
       expect.objectContaining({ itemName: 'First', success: false }),
       expect.objectContaining({ itemName: 'Second', success: true }),
+    ]);
+  });
+
+  it('fails before mutation when target validation becomes unavailable', async () => {
+    const preflight = await preflightCodeComponentPayloads(
+      [
+        {
+          componentName: 'Example',
+          componentPayload: { machineName: 'example' },
+        } as BuiltComponent,
+      ],
+      {
+        validateCodeComponentPayload: vi
+          .fn()
+          .mockRejectedValue(
+            new CodeComponentMetadataValidationUnavailableError(),
+          ),
+      },
+    );
+
+    expect(preflight.warnings).toEqual([]);
+    expect(preflight.results).toEqual([
+      expect.objectContaining({ itemName: 'Example', success: false }),
     ]);
   });
 
