@@ -10,6 +10,8 @@ export {
 export { DEFAULT_CANVAS_CONFIG, resolveCanvasConfig } from './config';
 export type { CanvasConfigWarning } from './config';
 export { detectHeadlessSdk } from './detect-headless-sdk';
+export { getContentEntityReferenceTarget } from './content-entity-reference';
+export type { ContentEntityReferenceTarget } from './content-entity-reference';
 export { findDuplicateMachineNames, loadComponentsMetadata } from './metadata';
 export type {
   CanvasConfig,
