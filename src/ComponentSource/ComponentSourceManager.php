@@ -23,6 +23,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Plugin\DefaultPluginManager;
+use Drupal\Core\Recipe\RecipeRunner;
 use Drupal\Core\Update\UpdateKernel;
 
 /**
@@ -97,11 +98,8 @@ final class ComponentSourceManager extends DefaultPluginManager {
     // syncing when installing modules, but not when installing configuration.
     // Even though it is listed under `import`, and that should hence match the
     // behavior of the /admin/config/development/configuration/single/import UI.
-    if (\in_array('installRecipeConfig', array_column(debug_backtrace(), 'function'), TRUE)) {
-      // Assert the bug is still present. This will start failing as soon as the
-      // upstream bug is fixed.
-      // @phpstan-ignore-next-line function.alreadyNarrowedType
-      \assert(!$this->configInstaller->isSyncing());
+    // @todo Remove when https://www.drupal.org/i/3613607 is fixed.
+    if (self::isRecipeApplying()) {
       return $this;
     }
 
@@ -124,6 +122,20 @@ final class ComponentSourceManager extends DefaultPluginManager {
       $this->generateComponentsForSource($source_definition_id, $discovery, $existing_components, $source_specific_ids);
     }
     return $this;
+  }
+
+  private static function isRecipeApplying(): bool {
+    // If the recipe runner is ANYWHERE in the backtrace, for any reason, we're
+    // in the middle of applying a recipe.
+    return array_any(
+      debug_backtrace(),
+      function (array $item): bool {
+        return (
+          (isset($item['object']) && $item['object'] instanceof RecipeRunner) ||
+          (isset($item['class']) && $item['class'] === RecipeRunner::class)
+        );
+      }
+    );
   }
 
   /**
