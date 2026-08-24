@@ -23,8 +23,11 @@ The metadata acceptance contract spans several kinds of rules:
 
 - the authored document envelope, including its required and allowed fields;
 - whether each prop definition is valid JSON Schema and its examples conform to it;
-- relationships between metadata values;
-- project conventions involving names, directories, imports, and exports; and
+- relationships between authored values, such as every name in `required` identifying a prop in `props.properties` and
+  every required prop providing a default example;
+- project conventions, such as `machineName` matching the component directory or metadata filename, prop names matching
+  their titles, component directories having the expected hierarchy, imports using supported paths, and component source
+  files providing a default export; and
 - site-dependent rules involving installed field types, widgets, the entity model, and alter hooks.
 
 No offline validator can reproduce the final category or provide an authoritative target-site verdict. Canvas needs useful
@@ -43,30 +46,36 @@ and describe the stable authored `component.yml` envelope, including:
 - no authored `type`, URL dependencies, Drupal settings dependencies, or projected `x-allowed-*` keys; and
 - unknown-key rejection at fully defined metadata levels.
 
-The schema will not be generated from Drupal config schema. A prop definition will be checked against the draft-07
-meta-schema because it is already JSON Schema. The published schema will require the Canvas metadata needed around that
-schema, such as a prop title and type, but it will not attempt to duplicate which otherwise valid JSON Schema shapes a
-particular Canvas site supports.
+The schema will not be generated from Drupal config schema. Each value under `props.properties` serves two roles: it is a
+JSON Schema for that prop's values, and it carries metadata Canvas requires to present the prop. Validation against the
+draft-07 meta-schema checks that JSON Schema keywords such as `type`, `enum`, `items`, and `properties` are used
+correctly. The authored-envelope schema adds Canvas's portable requirements, including a nonempty `title` and an explicit
+`type`. Neither check decides whether a site can store that prop shape, map it to an installed field and widget, resolve an
+extension-provided `$ref`, or accept it after site-specific alterations; Drupal determines those constraints.
 
 Canvas will publish one rolling schema for the current authored format from the latest development branch. It will not
 define independently versioned contracts or promise that a current target accepts metadata described by an older copy.
-Schema files present in release tags are historical source snapshots, not supported schema versions. The CLI will bundle
-its current schema for local envelope validation. Metadata files will not declare a schema URL or schema version because
-the target site remains authoritative and the same component may be used with different sites.
+Schema files present in release tags are historical source snapshots, not supported schema versions. The CLI source will
+consume the same root `component-metadata.schema.json` that the repository publishes, and the CLI package build will
+bundle that file for reproducible offline validation. It will not maintain a separate schema or fetch the rolling branch
+URL at runtime. Metadata files will not declare a schema URL or schema version because the target site remains
+authoritative and the same component may be used with different sites.
 
 Canvas-owned JSON schemas consumed by TypeScript will use draft-07 consistently. A private workspace package will provide
-a strict Ajv factory with the standard and draft-2019 string formats Canvas supports. The UI and CLI will share this
-factory, and the published CLI bundle will include its implementation rather than depending on the private package at
-runtime.
+a strict Ajv factory with the standard format validators and the additional string formats Canvas supports, including
+`idn-email`, `idn-hostname`, `iri`, `iri-reference`, and `duration`. These additional validators come from the
+`ajv-formats-draft2019` package, but registering them does not change the JSON Schema dialect from draft-07. The UI and CLI
+will share this factory, and the published CLI bundle will include its implementation rather than depending on the
+private package at runtime.
 
 ### Validate prop schemas directly
 
 After validating the authored envelope, the CLI will check each definition under `props.properties` as JSON Schema
 directly. It will validate the first example value, which Canvas uses as the default, against its containing prop schema
-where that schema can be resolved locally. The CLI will bundle and register Canvas-owned definitions from `schema.json`.
-References provided by other target extensions may not be resolvable offline and will remain the target site's
-responsibility. Drupal combines these definitions with the authored `required` names when it projects the normalized
-payload into the complete SDC `props` schema.
+where that schema can be resolved locally. The CLI will bundle and register Canvas-owned prop definitions from the Canvas
+module root [`schema.json`](../../schema.json). References provided by other target extensions may not be resolvable
+offline and will remain the target site's responsibility. Drupal combines these definitions with the authored `required`
+names when it projects the normalized payload into the complete SDC `props` schema.
 
 The required ESLint configuration will validate portable authoring rules that JSON Schema cannot express cleanly:
 required names must identify defined props, required props must provide a default example, and string examples must not
@@ -139,7 +148,8 @@ diagnostics.
 - **Download a target-specific schema.** Rejected because a schema still cannot express all target constraints; the
   non-mutating validation operation already provides the authoritative verdict without schema translation or caching.
 - **Declare a contract version in each `component.yml`.** Rejected because a site accepts its installed contract rather
-  than retaining validators for every historical version.
+  than retaining validators for every historical version. The same component may also be used across sites running
+  different Canvas versions, so one declared contract version would not describe every target.
 - **Make ESLint the complete metadata contract.** Rejected because Canvas-specific rules can disagree with the target and
   envelope and prop-schema validation should remain reusable by standard JSON Schema tools. ESLint is limited to portable
   authoring rules and project conventions.
