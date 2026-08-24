@@ -1,3 +1,7 @@
 use Drupal Canvas AI:
   title: 'Use Drupal Canvas AI'
   description: 'Use the AI in Drupal Canvas.'
+
+administer Drupal Canvas AI:
+  title: 'Administer Drupal Canvas AI'
+  description: "Administer the Drupal Canvas AI module settings and configurations."

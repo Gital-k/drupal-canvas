@@ -19,7 +19,7 @@ canvas_ai.component_description_settings:
     _title: 'Canvas AI Component Description Settings Form'
     _form: 'Drupal\canvas_ai\Form\CanvasAiComponentDescriptionSettingsForm'
   requirements:
-    _permission: 'administer components'
+    _permission: 'administer Drupal Canvas AI'
 
 canvas_ai.setting:
   path: '/admin/config/ai/canvas-ai-settings'
@@ -27,7 +27,7 @@ canvas_ai.setting:
     _title: 'Canvas AI Settings Form'
     _form: 'Drupal\canvas_ai\Form\CanvasAiSettingsForm'
   requirements:
-    _permission: 'use Drupal Canvas AI'
+    _permission: 'administer Drupal Canvas AI'
 
 canvas_ai.page_variant_settings:
   path: '/admin/config/ai/canvas-ai-page-variant-settings'
