@@ -86,24 +86,26 @@ private package at runtime.
 ### Validate prop schemas directly
 
 After validating the authored envelope, the CLI will check each definition under `props.properties` as JSON Schema
-directly. It will validate the first example value, which Canvas uses as the default, against its containing prop schema
-where that schema can be resolved locally.
+directly. This catches malformed schemas, such as an invalid `type` value or a string used for a numeric constraint. It will also
+validate the first example value, which Canvas uses as the default, against its containing prop schema. For example, it can
+reject a string default for an integer prop or an image default missing the `src` required by the Canvas image definition.
 
 The CLI also statically imports the Canvas module root [`schema.json`](../../schema.json), and the package build embeds it.
 At runtime, the CLI registers each entry under that file's `$defs` at its
 `json-schema-definitions://canvas.module/<name>` URI. Ajv can then resolve Canvas-owned references in prop schemas without
 network access. References provided by target extensions are not in the bundled file and may remain unresolved locally;
-Drupal validates them authoritatively. Drupal combines these definitions with the authored `required` names when it
-projects the normalized payload into the complete SDC `props` schema.
+the CLI does not reject unknown extension vocabulary, and Drupal validates it authoritatively. Drupal combines these
+definitions with the authored `required` names when it projects the normalized payload into the complete SDC `props`
+schema.
 
 The required ESLint configuration will validate portable authoring rules that JSON Schema cannot express cleanly:
 required names must identify defined props, required props must provide a default example, and string examples must not
-be empty. Canvas-specific metadata policy, including array cardinality, content entity reference relationships, and image
-URL restrictions, remains Drupal's responsibility to avoid duplicating implementation details in the CLI.
+be empty. These checks describe authored source rather than target acceptance.
 
-Together, schema and ESLint checks establish only that the document is structurally usable and that its directly
-resolvable prop schemas, default examples, and authoring relationships are internally consistent. They do not establish
-that Canvas can map a prop shape to a field and widget or that a target site's extensions accept it.
+Passing local validation means that the metadata is structurally usable and its resolvable prop schemas and defaults are
+internally consistent. It does not mean that Canvas can store the shape or map it to an installed field and widget. Drupal
+also owns policies such as array cardinality and content entity reference relationships. For example, a relative image URL
+can conform to the bundled `uri-reference` schema while Drupal's Code Component policy requires a fully qualified URL.
 
 ### Define the authored metadata boundary
 
