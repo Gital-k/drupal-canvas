@@ -1,7 +1,4 @@
-import {
-  CodeComponentMetadataOperationUnsupportedError,
-  CodeComponentMetadataValidationUnavailableError,
-} from '../services/api';
+import { CodeComponentMetadataOperationUnsupportedError } from '../services/api';
 
 import type { ApiService } from '../services/api';
 import type { Result } from '../types/Result';
@@ -17,14 +14,11 @@ export async function preflightCodeComponentPayloads(
       await apiService.validateCodeComponentPayload(component.componentPayload);
       results.push({ itemName: component.componentName, success: true });
     } catch (error) {
-      if (
-        error instanceof CodeComponentMetadataOperationUnsupportedError ||
-        error instanceof CodeComponentMetadataValidationUnavailableError
-      ) {
+      if (error instanceof CodeComponentMetadataOperationUnsupportedError) {
         return {
           results: [],
           warnings: [
-            'Target metadata validation is unavailable. Push will use per-component save-time validation, so a partial push remains possible.',
+            'The target does not support metadata preflight validation. Push will use per-component save-time validation, so a partial push remains possible.',
           ],
         };
       }
