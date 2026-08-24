@@ -180,6 +180,18 @@ const DrupalFormattedTextArea = forwardRef<
         onReady={(editor) => {
           editorRef.current = editor as EditorInstance;
 
+          // Canvas mounts CKEditor through React, so Drupal core's editor.js
+          // never runs and never tags the editor's source element with the
+          // active text format. The ai_ckeditor module reads that format from
+          // `data-editor-active-text-format` on editor.sourceElement to build
+          // its dialog; without it the dialog throws "We cannot determine that
+          // this is a CKEditor field." Set the attribute here so AI CKEditor
+          // dialogs work inside Canvas.
+          const textFormat = attributes['data-canvas-text-format'];
+          if (editor.sourceElement && textFormat) {
+            (editor.sourceElement as HTMLElement).dataset.editorActiveTextFormat = String(textFormat);
+          }
+
           // If the rows attribute is present, let that inform the editor's
           // minimum height
           if (attributes.rows && Number(attributes.rows)) {
