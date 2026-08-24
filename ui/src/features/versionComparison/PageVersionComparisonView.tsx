@@ -47,10 +47,14 @@ type PageVersionScrollAreas = Record<
   PageVersionScrollElement | null
 >;
 
+type PageVersionFrameWrappers = Record<PageVersionId, HTMLDivElement | null>;
+
 type ScrollPosition = {
   scrollLeft: number;
   scrollTop: number;
 };
+
+const pageVersionIds: PageVersionId[] = ['published', 'new'];
 
 const isEditableKeyboardTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) {
@@ -198,6 +202,10 @@ export const PageVersionComparisonView = ({
     published: null,
     new: null,
   });
+  const visualFrameWrappersRef = useRef<PageVersionFrameWrappers>({
+    published: null,
+    new: null,
+  });
   const ignoredScrollPositionsRef = useRef(
     new Map<PageVersionScrollElement, ScrollPosition>(),
   );
@@ -205,6 +213,13 @@ export const PageVersionComparisonView = ({
   const handleVisualScrollAreaMount = useCallback(
     (version: PageVersionId, node: PageVersionScrollElement | null) => {
       visualScrollAreasRef.current[version] = node;
+    },
+    [],
+  );
+
+  const handleVisualFrameWrapperMount = useCallback(
+    (version: PageVersionId, node: HTMLDivElement | null) => {
+      visualFrameWrappersRef.current[version] = node;
     },
     [],
   );
@@ -261,7 +276,15 @@ export const PageVersionComparisonView = ({
             Visual
           </Tabs.Trigger>
         </Tabs.List>
-        {tab === 'visual' && <ViewportSelector />}
+        {tab === 'visual' && (
+          <Flex align="center" gap="2" className={styles.toolbarControls}>
+            <PageVersionPreviewControls
+              previewScrollAreasRef={visualScrollAreasRef}
+              previewFrameWrappersRef={visualFrameWrappersRef}
+            />
+            <ViewportSelector />
+          </Flex>
+        )}
       </Flex>
       <Tabs.Content value="visual" className={styles.tabContent}>
         <ComparisonGrid>
@@ -279,6 +302,7 @@ export const PageVersionComparisonView = ({
               loading={!!publishedVersion.loading}
               version="published"
               onScrollAreaMount={handleVisualScrollAreaMount}
+              onFrameWrapperMount={handleVisualFrameWrapperMount}
               onScrollAreaScroll={handleVisualScroll}
             />
           </PreviewCard>
@@ -298,6 +322,7 @@ export const PageVersionComparisonView = ({
               loading={!!newVersion.loading}
               version="new"
               onScrollAreaMount={handleVisualScrollAreaMount}
+              onFrameWrapperMount={handleVisualFrameWrapperMount}
               onScrollAreaScroll={handleVisualScroll}
             />
           </PreviewCard>
@@ -458,6 +483,7 @@ const VisualFrame = ({
   loading,
   version,
   onScrollAreaMount,
+  onFrameWrapperMount,
   onScrollAreaScroll,
 }: {
   html: string;
@@ -466,6 +492,10 @@ const VisualFrame = ({
   onScrollAreaMount?: (
     version: PageVersionId,
     node: PageVersionScrollElement | null,
+  ) => void;
+  onFrameWrapperMount?: (
+    version: PageVersionId,
+    node: HTMLDivElement | null,
   ) => void;
   onScrollAreaScroll?: (
     version: PageVersionId,
@@ -476,7 +506,6 @@ const VisualFrame = ({
   const previewWidth = useAppSelector(selectViewportWidth);
   const previewMinHeight = useAppSelector(selectViewportMinHeight);
   const previewScrollAreaRef = useRef<HTMLDivElement | null>(null);
-  const previewFrameWrapperRef = useRef<HTMLDivElement | null>(null);
   const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
   const dragStateRef = useRef<{
     pointerId: number;
@@ -498,6 +527,13 @@ const VisualFrame = ({
       onScrollAreaMount?.(version, node);
     },
     [onScrollAreaMount, version],
+  );
+
+  const handleFrameWrapperRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      onFrameWrapperMount?.(version, node);
+    },
+    [onFrameWrapperMount, version],
   );
 
   const handleScroll = useCallback(
@@ -729,7 +765,7 @@ const VisualFrame = ({
             }
           >
             <div
-              ref={previewFrameWrapperRef}
+              ref={handleFrameWrapperRef}
               className={styles.previewFrameWrapper}
               style={
                 {
@@ -756,54 +792,58 @@ const VisualFrame = ({
           </div>
         )}
       </div>
-      <PageVersionPreviewControls
-        previewScrollAreaRef={previewScrollAreaRef}
-        previewFrameWrapperRef={previewFrameWrapperRef}
-      />
     </div>
   );
 };
 
 interface PageVersionPreviewControlsProps {
-  previewScrollAreaRef: React.RefObject<HTMLDivElement | null>;
-  previewFrameWrapperRef: React.RefObject<HTMLDivElement | null>;
+  previewScrollAreasRef: React.MutableRefObject<PageVersionScrollAreas>;
+  previewFrameWrappersRef: React.MutableRefObject<PageVersionFrameWrappers>;
 }
 
 const PageVersionPreviewControls = ({
-  previewScrollAreaRef,
-  previewFrameWrapperRef,
+  previewScrollAreasRef,
+  previewFrameWrappersRef,
 }: PageVersionPreviewControlsProps) => {
   const dispatch = useAppDispatch();
 
   const handleScaleToFit = () => {
-    const previewScrollArea = previewScrollAreaRef.current;
-    const previewFrameWrapper = previewFrameWrapperRef.current;
+    const fitScales: number[] = [];
 
-    if (!previewScrollArea || !previewFrameWrapper) {
+    pageVersionIds.forEach((version) => {
+      const previewScrollArea = previewScrollAreasRef.current[version];
+      const previewFrameWrapper = previewFrameWrappersRef.current[version];
+
+      if (!previewScrollArea || !previewFrameWrapper) {
+        return;
+      }
+
+      const availableWidth = Math.max(
+        previewScrollArea.clientWidth - PREVIEW_FIT_PADDING,
+        0,
+      );
+      const availableHeight = Math.max(
+        previewScrollArea.clientHeight - PREVIEW_FIT_PADDING,
+        0,
+      );
+      const frameWidth = previewFrameWrapper.offsetWidth;
+      const frameHeight = previewFrameWrapper.offsetHeight;
+
+      if (!availableWidth || !availableHeight || !frameWidth || !frameHeight) {
+        return;
+      }
+
+      fitScales.push(
+        Math.min(availableWidth / frameWidth, availableHeight / frameHeight),
+      );
+    });
+
+    if (fitScales.length === 0) {
       dispatch(setEditorFrameViewPort({ scale: 1 }));
       return;
     }
 
-    const availableWidth = Math.max(
-      previewScrollArea.clientWidth - PREVIEW_FIT_PADDING,
-      0,
-    );
-    const availableHeight = Math.max(
-      previewScrollArea.clientHeight - PREVIEW_FIT_PADDING,
-      0,
-    );
-    const frameWidth = previewFrameWrapper.offsetWidth;
-    const frameHeight = previewFrameWrapper.offsetHeight;
-
-    if (!availableWidth || !availableHeight || !frameWidth || !frameHeight) {
-      dispatch(setEditorFrameViewPort({ scale: 1 }));
-      return;
-    }
-
-    const scaleToFit = Math.min(
-      availableWidth / frameWidth,
-      availableHeight / frameHeight,
-    );
+    const scaleToFit = Math.min(...fitScales);
     const closestScale = findClosestPreviewScaleValue(scaleToFit);
 
     dispatch(
