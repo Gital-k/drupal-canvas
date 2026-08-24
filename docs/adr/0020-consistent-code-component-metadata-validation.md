@@ -68,14 +68,14 @@ References provided by other target extensions may not be resolvable offline and
 responsibility. Drupal combines these definitions with the authored `required` names when it projects the normalized
 payload into the complete SDC `props` schema.
 
-The CLI will also validate portable metadata invariants that JSON Schema cannot express cleanly: required names must
-identify defined props, required props must provide a default example, and string examples must not be empty.
-Canvas-specific metadata policy, including array cardinality, content entity reference relationships, and image URL
-restrictions, remains Drupal's responsibility to avoid duplicating implementation details in the CLI.
+The required ESLint configuration will validate portable authoring rules that JSON Schema cannot express cleanly:
+required names must identify defined props, required props must provide a default example, and string examples must not
+be empty. Canvas-specific metadata policy, including array cardinality, content entity reference relationships, and image
+URL restrictions, remains Drupal's responsibility to avoid duplicating implementation details in the CLI.
 
-These local checks establish only that the document is structurally usable and that its directly resolvable prop schemas,
-default examples, and generic relationships are internally consistent. They do not establish that Canvas can map a prop
-shape to a field and widget or that a target site's extensions accept it.
+Together, schema and ESLint checks establish only that the document is structurally usable and that its directly
+resolvable prop schemas, default examples, and authoring relationships are internally consistent. They do not establish
+that Canvas can map a prop shape to a field and widget or that a target site's extensions accept it.
 
 ### Define the authored metadata boundary
 
@@ -106,9 +106,9 @@ response when invalid. It never saves or otherwise mutates stored configuration.
 `canvas validate` will:
 
 1. validate raw YAML against the bundled authored-envelope schema;
-2. check prop definitions, locally resolvable examples, and portable generic metadata relationships;
-3. run project-oriented ESLint rules and aggregate their diagnostics;
-4. normalize structurally valid metadata and construct the complete Code Component payload; and
+2. check prop definitions and locally resolvable examples;
+3. run ESLint authoring and project rules and aggregate their diagnostics;
+4. normalize locally valid metadata and construct the complete Code Component payload; and
 5. submit that payload to the target operation when authenticated access is available.
 
 If the target cannot be reached or does not provide the operation, the CLI will clearly report that only local checks
@@ -121,11 +121,12 @@ partial push therefore remains possible on older sites.
 `build` remains offline. Discovery, Workbench, and headless consumers retain defensive metadata parsing rather than
 enforcing target acceptance because they do not know the target site's contract.
 
-### Keep ESLint focused on project conventions
+### Keep ESLint focused on authoring rules
 
-ESLint remains authoritative for project conventions, including prop names, imports, exports, directory names, and
-component hierarchy. It does not determine whether target metadata is accepted. Schema and target diagnostics should not
-be duplicated as blocking ESLint diagnostics.
+ESLint remains authoritative for portable authoring rules and project conventions, including required-prop relationships,
+nonempty string examples, prop names, imports, exports, directory names, and component hierarchy. It does not determine
+whether target metadata is accepted. Schema and target diagnostics should not be duplicated as blocking ESLint
+diagnostics.
 
 ## Alternatives considered
 
@@ -139,8 +140,9 @@ be duplicated as blocking ESLint diagnostics.
   non-mutating validation operation already provides the authoritative verdict without schema translation or caching.
 - **Declare a contract version in each `component.yml`.** Rejected because a site accepts its installed contract rather
   than retaining validators for every historical version.
-- **Make ESLint the metadata contract.** Rejected because unconditional CLI rules can disagree with the target and are not
-  reusable by standard JSON Schema tools.
+- **Make ESLint the complete metadata contract.** Rejected because Canvas-specific rules can disagree with the target and
+  envelope and prop-schema validation should remain reusable by standard JSON Schema tools. ESLint is limited to portable
+  authoring rules and project conventions.
 
 ## Consequences
 
