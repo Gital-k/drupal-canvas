@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Element;
 
+use Drupal\canvas\EventSubscriber\ComponentRenderFailureSubscriber;
 use Drupal\Component\Utility\Xss;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Form\EnforcedResponseException;
@@ -16,6 +17,7 @@ use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * Defines a render element that provides safety against an exception.
@@ -70,6 +72,13 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
         throw $e;
       }
       catch (\Throwable $e) {
+        // An exception that carries HTTP semantics of its own must be answered
+        // by Drupal's exception handling, so it can report a suiting status.
+        // @see \Drupal\Core\Form\EventSubscriber\FormAjaxSubscriber::onException()
+        // @see \Drupal\Core\EventSubscriber\DefaultExceptionHtmlSubscriber
+        if (!($element['#is_preview'] ?? FALSE) && $e instanceof HttpExceptionInterface) {
+          throw $e;
+        }
         // In this scenario because rendering fails the context isn't updated or
         // bubbled.
         // TRICKY: depending on where an exception is thrown, it is possible
@@ -123,6 +132,17 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
           : new TranslatableMarkup('Component failed to render, check logs for more detail.'),
       ];
     }
+    // A delivered page that contains a component which failed to render is not
+    // "200 OK": the failure would otherwise go unnoticed (no error status for
+    // monitoring to see) and be cached and served to every other visitor. The
+    // response does not exist yet at this point, so record the failure on the
+    // current request; the response subscriber acts on it.
+    // @see \Drupal\canvas\EventSubscriber\ComponentRenderFailureSubscriber
+    \Drupal::requestStack()->getCurrentRequest()?->attributes->set(
+      ComponentRenderFailureSubscriber::REQUEST_ATTRIBUTE,
+      TRUE,
+    );
+
     $build = [
       '#type' => 'container',
       '#attributes' => [

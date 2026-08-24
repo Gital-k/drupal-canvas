@@ -25,6 +25,17 @@ class CanvasTestBlockInputValidatableCrash extends CanvasTestBlockInputUnvalidat
   public static bool $forceCrash = FALSE;
 
   /**
+   * When set, this block crashes with this exception instead of a generic one.
+   *
+   * This lets a test crash this block with an exception that carries HTTP
+   * semantics of its own — mirroring a block whose rendering triggers, say,
+   * core's "broken POST request" guard.
+   *
+   * @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\BlockComponentTest::testHttpExceptionDuringRenderIsNotSwallowed()
+   */
+  public static ?\Throwable $crashWith = NULL;
+
+  /**
    * {@inheritdoc}
    */
   public function defaultConfiguration(): array {
@@ -40,8 +51,8 @@ class CanvasTestBlockInputValidatableCrash extends CanvasTestBlockInputUnvalidat
    * {@inheritdoc}
    */
   public function build(): array {
-    if ($this->configuration['crash'] || self::$forceCrash) {
-      throw new \Exception('Intentional test exception.');
+    if ($this->configuration['crash'] || self::$forceCrash || self::$crashWith !== NULL) {
+      throw self::$crashWith ?? new \Exception('Intentional test exception.');
     }
     return [
       '#markup' => $this->t('<div>Hello, :name!</div>', [':name' => $this->configuration['name']]),

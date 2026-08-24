@@ -11,6 +11,7 @@ use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\EventSubscriber\ComponentRenderFailureSubscriber;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -23,6 +24,7 @@ use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockOptionalContexts;
 use Drupal\canvas_test_block_form\Plugin\Block\CanvasTestBlockForm;
 use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\CacheableResponse;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -41,6 +43,12 @@ use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\TestWith;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
@@ -428,6 +436,112 @@ HTML,
     // …and the other components stay present and usable.
     self::assertArrayHasKey('block.canvas_test_block_input_none', $list);
     self::assertFalse($list['block.canvas_test_block_input_none']['broken']);
+  }
+
+  /**
+   * An exception carrying HTTP semantics must not become page content.
+   *
+   * Containing a crashed component is right, but an exception that asks for a
+   * specific HTTP response — core's "broken POST request" guard for an AJAX
+   * form request, an access or not-found exception raised while a block
+   * resolves an entity — can only be answered by Drupal's exception handling.
+   * Rendering it into the page answers "200 OK" instead, and makes the failure
+   * cacheable.
+   *
+   * @see \Drupal\canvas\Element\RenderSafeComponentContainer::renderComponent()
+   * @see \Drupal\Core\Form\FormBuilder::buildForm()
+   */
+  public function testHttpExceptionDuringRenderIsNotSwallowed(): void {
+    $this->setUpCurrentUser(permissions: ['view media']);
+    $component_tree = $this->generateCrashTestDummyComponentTree(
+      'block.canvas_test_block_input_validatable_crash',
+      [
+        'label' => 'crash dummy',
+        'label_display' => '0',
+        'name' => 'Canvas',
+        'crash' => FALSE,
+      ],
+    );
+    $page = Page::create(['title' => 'A page']);
+
+    // @see \Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatableCrash::build()
+    CanvasTestBlockInputValidatableCrash::$crashWith = new BadRequestHttpException('Intentional test exception.');
+    try {
+      // Previewing keeps containing it: the Canvas UI must be able to show a
+      // broken component instead of failing wholesale.
+      $preview_build = $component_tree->toRenderable($page, TRUE);
+      $preview = $this->crawlerForRenderArray($preview_build);
+      self::assertCount(1, $preview->filter(\sprintf('[data-component-uuid="%s"]:contains("Component failed to render, check logs for more detail.")', self::UUID_CRASH_TEST_DUMMY)));
+
+      // On a delivered page it must travel on to Drupal's exception handling.
+      $build = $component_tree->toRenderable($page, FALSE);
+      $this->expectException(BadRequestHttpException::class);
+      $this->expectExceptionMessage('Intentional test exception.');
+      $this->crawlerForRenderArray($build);
+    }
+    finally {
+      CanvasTestBlockInputValidatableCrash::$crashWith = NULL;
+    }
+  }
+
+  /**
+   * A contained crash must still fail the response it ends up in.
+   *
+   * The crash stays contained — the rest of the tree renders — but the response
+   * is a server error and is not cacheable: a page that failed to render part
+   * of itself is not "200 OK", and must not be stored by Drupal's caches, a
+   * reverse proxy or a CDN and then served to everyone else.
+   *
+   * @see \Drupal\canvas\EventSubscriber\ComponentRenderFailureSubscriber
+   */
+  public function testRenderFailureMakesTheResponseNotOk(): void {
+    $this->setUpCurrentUser(permissions: ['view media']);
+    $component_tree = $this->generateCrashTestDummyComponentTree(
+      'block.canvas_test_block_input_validatable_crash',
+      [
+        'label' => 'crash dummy',
+        'label_display' => '0',
+        'name' => 'Canvas',
+        'crash' => TRUE,
+      ],
+    );
+    $page = Page::create(['title' => 'A page']);
+    $request_stack = $this->container->get(RequestStack::class);
+    $subscriber = $this->container->get(ComponentRenderFailureSubscriber::class);
+    $http_kernel = $this->container->get(HttpKernelInterface::class);
+
+    // A preview render must not mark anything as failed: the Canvas UI renders
+    // broken components on purpose.
+    $preview_request = Request::create('/canvas/api/v0/layout/canvas_page/1');
+    $request_stack->push($preview_request);
+    $preview_build = $component_tree->toRenderable($page, TRUE);
+    $this->crawlerForRenderArray($preview_build);
+    $request_stack->pop();
+    self::assertNull($preview_request->attributes->get(ComponentRenderFailureSubscriber::REQUEST_ATTRIBUTE));
+
+    // A delivered page records the failure on the request…
+    $request = Request::create('/page/1');
+    $request_stack->push($request);
+    $build = $component_tree->toRenderable($page, FALSE);
+    $crawler = $this->crawlerForRenderArray($build);
+    $request_stack->pop();
+    self::assertTrue($request->attributes->get(ComponentRenderFailureSubscriber::REQUEST_ATTRIBUTE));
+
+    // …while still containing the crash: the fallback is rendered in place, and
+    // all 3 surrounding Druplicons are still there.
+    self::assertCount(1, $crawler->filter(\sprintf('[data-component-uuid="%s"]:contains("Oops, something went wrong! Site admins have been notified.")', self::UUID_CRASH_TEST_DUMMY)));
+    self::assertCount(3, $crawler->filter('svg title:contains("Druplicon")'));
+
+    // The response for that request is a server error, and uncacheable.
+    $response = new CacheableResponse('<html>a page</html>');
+    $subscriber->onResponse(new ResponseEvent($http_kernel, $request, HttpKernelInterface::MAIN_REQUEST, $response));
+    self::assertSame(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
+    self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
+
+    // The preview request's response is left alone.
+    $preview_response = new CacheableResponse('<html>a preview</html>');
+    $subscriber->onResponse(new ResponseEvent($http_kernel, $preview_request, HttpKernelInterface::MAIN_REQUEST, $preview_response));
+    self::assertSame(Response::HTTP_OK, $preview_response->getStatusCode());
   }
 
   public static function providerRenderComponentFailure(): \Generator {

@@ -26,6 +26,7 @@ use Drupal\Core\Form\EnforcedResponseException;
 use Drupal\Core\Form\FormAjaxException;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RenderableInterface;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * A component tree: a list item class for ComponentTreeItem.
@@ -336,6 +337,12 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           throw $e;
         }
         catch (\Throwable $e) {
+          // Exceptions carrying their own HTTP semantics must reach Drupal's
+          // exception handling instead of becoming page content.
+          // @see \Drupal\canvas\Element\RenderSafeComponentContainer::renderComponent()
+          if (!$isPreview && $e instanceof HttpExceptionInterface) {
+            throw $e;
+          }
           // @todo Remove all the wrapping-in-RenderSafeComponentContainer complexity and make ComponentSourceInterface::renderComponent() for that instead in https://www.drupal.org/i/3521041
           $build[$component_subtree_uuid][$component_instance_uuid] = RenderSafeComponentContainer::handleComponentException(
             $e,
