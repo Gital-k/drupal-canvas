@@ -35,6 +35,43 @@ local feedback without maintaining a second implementation of Drupal's validatio
 
 ## Decision
 
+### Use distinct validation layers
+
+```mermaid
+flowchart TD
+  metadata["component.yml"]
+
+  envelope["Envelope validation"]
+  envelopeSource["Repository root<br/>component-metadata.schema.json"]
+
+  props["Prop schema and default example validation"]
+  propMetaSource["Draft-07 meta-schema"]
+  propRefSource["Canvas module root schema.json<br/>Canvas-owned $defs"]
+
+  lint["Authoring and project linting"]
+  lintSource["Required ESLint configuration"]
+
+  payload["Normalized Code Component payload"]
+  target["Authoritative target validation"]
+  targetSource["Installed Drupal constraints, extensions,<br/>entity model, field types, widgets, and alter hooks"]
+
+  metadata --> envelope
+  envelopeSource --> envelope
+  metadata --> props
+  propMetaSource --> props
+  propRefSource --> props
+  metadata --> lint
+  lintSource --> lint
+  envelope --> payload
+  props --> payload
+  lint --> payload
+  payload --> target
+  targetSource --> target
+```
+
+The first three layers run locally. The target Drupal site owns the final acceptance decision because only it has the
+installed code and configuration represented by the final source box.
+
 ### Publish a hand-authored metadata schema
 
 Canvas will publish a hand-authored `component-metadata.schema.json` in the module root. It will use JSON Schema draft-07
@@ -55,10 +92,13 @@ extension-provided `$ref`, or accept it after site-specific alterations; Drupal 
 
 Canvas will publish one rolling schema for the current authored format from the latest development branch. It will not
 define independently versioned contracts or promise that a current target accepts metadata described by an older copy.
-Schema files present in release tags are historical source snapshots, not supported schema versions. The CLI source will
-consume the same root `component-metadata.schema.json` that the repository publishes, and the CLI package build will
-bundle that file for reproducible offline validation. It will not maintain a separate schema or fetch the rolling branch
-URL at runtime. Metadata files will not declare a schema URL or schema version because the target site remains
+Schema files present in release tags are historical source snapshots, not supported schema versions.
+
+Publication and bundling serve different consumers but use one source file. The repository root
+[`component-metadata.schema.json`](../../component-metadata.schema.json) has a rolling repository URL as its `$id`, so
+editors and other external tools can use the published file. The CLI source statically imports that same file, and the CLI
+package build embeds it for reproducible offline validation. The CLI therefore does not maintain a second schema or fetch
+the rolling URL at runtime. Metadata files will not declare `$schema` or a schema version because the target site remains
 authoritative and the same component may be used with different sites.
 
 Canvas-owned JSON schemas consumed by TypeScript will use draft-07 consistently. A private workspace package will provide
@@ -72,10 +112,14 @@ private package at runtime.
 
 After validating the authored envelope, the CLI will check each definition under `props.properties` as JSON Schema
 directly. It will validate the first example value, which Canvas uses as the default, against its containing prop schema
-where that schema can be resolved locally. The CLI will bundle and register Canvas-owned prop definitions from the Canvas
-module root [`schema.json`](../../schema.json). References provided by other target extensions may not be resolvable
-offline and will remain the target site's responsibility. Drupal combines these definitions with the authored `required`
-names when it projects the normalized payload into the complete SDC `props` schema.
+where that schema can be resolved locally.
+
+The CLI also statically imports the Canvas module root [`schema.json`](../../schema.json), and the package build embeds it.
+At runtime, the CLI registers each entry under that file's `$defs` at its
+`json-schema-definitions://canvas.module/<name>` URI. Ajv can then resolve Canvas-owned references in prop schemas without
+network access. References provided by target extensions are not in the bundled file and may remain unresolved locally;
+Drupal validates them authoritatively. Drupal combines these definitions with the authored `required` names when it
+projects the normalized payload into the complete SDC `props` schema.
 
 The required ESLint configuration will validate portable authoring rules that JSON Schema cannot express cleanly:
 required names must identify defined props, required props must provide a default example, and string examples must not
