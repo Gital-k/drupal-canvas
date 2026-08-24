@@ -101,9 +101,6 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
           CacheableMetadata::createFromRenderArray($element['#component']),
         );
 
-        // Prevent caching for this element.
-        $fallback['#cache']['max-age'] = 0;
-
         // Convey to the caller that this component instance render crashed.
         $element['#render_crashed'] = TRUE;
         return $this->renderer->render($fallback);
