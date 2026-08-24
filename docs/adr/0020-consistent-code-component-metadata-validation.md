@@ -65,12 +65,16 @@ After validating the authored envelope, the CLI will check each definition under
 directly. It will validate the first example value, which Canvas uses as the default, against its containing prop schema
 where that schema can be resolved locally. The CLI will bundle and register Canvas-owned definitions from `schema.json`.
 References provided by other target extensions may not be resolvable offline and will remain the target site's
-responsibility. Drupal combines these definitions with the authored `required` names when
-it projects the normalized payload into the complete SDC `props` schema.
+responsibility. Drupal combines these definitions with the authored `required` names when it projects the normalized
+payload into the complete SDC `props` schema.
 
-These local checks establish only that the document is structurally usable and that its directly resolvable prop schemas
-and default examples are internally consistent. They do not establish that Canvas can map a prop shape to a field and widget or
-that a target site's extensions accept it.
+The CLI will also validate installation-independent Canvas metadata invariants that JSON Schema cannot express cleanly,
+including required-prop relationships, array cardinality rules, content entity reference relationships, nonempty string
+examples, and fully qualified image example URLs.
+
+These local checks establish only that the document is structurally usable and that its directly resolvable prop schemas,
+default examples, and installation-independent relationships are internally consistent. They do not establish that Canvas
+can map a prop shape to a field and widget or that a target site's extensions accept it.
 
 ### Define the authored metadata boundary
 
@@ -101,7 +105,7 @@ response when invalid. It never saves or otherwise mutates stored configuration.
 `canvas validate` will:
 
 1. validate raw YAML against the bundled authored-envelope schema;
-2. check the prop definitions as JSON Schema and validate locally resolvable examples;
+2. check prop definitions, locally resolvable examples, and installation-independent metadata relationships;
 3. run project-oriented ESLint rules and aggregate their diagnostics;
 4. normalize structurally valid metadata and construct the complete Code Component payload; and
 5. submit that payload to the target operation when authenticated access is available.
