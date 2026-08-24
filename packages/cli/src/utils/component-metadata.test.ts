@@ -77,49 +77,15 @@ describe('component metadata', () => {
     ]);
   });
 
-  it('validates generic metadata semantics', async () => {
-    const filePath = path.join(
-      fixtureRoot,
-      'semantic-invalid/required-props.yml',
-    );
-    const parsed = await parseComponentMetadata(filePath);
-
-    expect(validateParsedComponentMetadata(parsed)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          path: '$.required[0]',
-          message:
-            'Required prop "missing" is not defined in props.properties.',
-        }),
-        expect.objectContaining({
-          path: '$.props.properties.text',
-          message: 'Required prop "text" must have an example value.',
-        }),
-      ]),
-    );
-  });
-
-  it('rejects empty string examples locally', async () => {
-    const filePath = path.join(
-      fixtureRoot,
-      'semantic-invalid/empty-string-examples.yml',
-    );
-    const parsed = await parseComponentMetadata(filePath);
-
-    expect(validateParsedComponentMetadata(parsed)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          path: '$.props.properties.text.examples[0]',
-          message: expect.stringContaining('must not be empty strings'),
-        }),
-      ]),
-    );
-  });
-
-  it.each(['relative-image-examples.yml', 'implementation-relationships.yml'])(
-    'leaves Drupal implementation rules in %s to the target',
-    async (fixtureName) => {
-      const filePath = path.join(fixtureRoot, 'target-invalid', fixtureName);
+  it.each([
+    ['eslint-invalid', 'required-props.yml'],
+    ['eslint-invalid', 'empty-string-examples.yml'],
+    ['target-invalid', 'relative-image-examples.yml'],
+    ['target-invalid', 'implementation-relationships.yml'],
+  ])(
+    'leaves non-schema rules in %s/%s to their owner',
+    async (fixtureDirectory, fixtureName) => {
+      const filePath = path.join(fixtureRoot, fixtureDirectory, fixtureName);
       const parsed = await parseComponentMetadata(filePath);
 
       expect(validateParsedComponentMetadata(parsed)).toEqual([]);
