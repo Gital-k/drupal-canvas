@@ -7,6 +7,7 @@ import {
 
 import bundledComponentMetadataSchema from '../../../../component-metadata.schema.json';
 import canvasJsonSchemaDefinitions from '../../../../schema.json';
+import { validateComponentMetadataSemantics } from './component-metadata-semantics';
 
 import type {
   AnySchema,
@@ -92,28 +93,36 @@ function formatErrorMessage(error: ErrorObject): string {
   return error.message ?? 'is invalid';
 }
 
-function diagnosticFromError(
+function diagnosticFromParts(
   parsed: ParsedComponentMetadata,
-  error: ErrorObject,
-  prefix: string[] = [],
+  parts: string[],
+  message: string,
 ): ComponentMetadataDiagnostic {
-  const parts = [...prefix, ...getErrorPath(error)];
   const node = locateNode(parsed.document, parts);
   const position = node?.range
     ? parsed.lineCounter.linePos(node.range[0])
     : undefined;
-  const property = parts.at(-1);
-  const message =
-    error.keyword === 'not' &&
-    ['x-allowed-entity-type-id', 'x-allowed-bundle'].includes(property ?? '')
-      ? `must not contain projected property '${property}'`
-      : formatErrorMessage(error);
   return {
     path: diagnosticPath(parts),
     message,
     line: position?.line,
     column: position?.col,
   };
+}
+
+function diagnosticFromError(
+  parsed: ParsedComponentMetadata,
+  error: ErrorObject,
+  prefix: string[] = [],
+): ComponentMetadataDiagnostic {
+  const parts = [...prefix, ...getErrorPath(error)];
+  const property = parts.at(-1);
+  const message =
+    error.keyword === 'not' &&
+    ['x-allowed-entity-type-id', 'x-allowed-bundle'].includes(property ?? '')
+      ? `must not contain projected property '${property}'`
+      : formatErrorMessage(error);
+  return diagnosticFromParts(parsed, parts, message);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -132,10 +141,16 @@ function createPropSchemaValidator() {
     AnySchema
   >;
   for (const [name, definition] of Object.entries(definitions)) {
-    ajv.addSchema(
-      definition,
-      `json-schema-definitions://canvas.module/${name}`,
-    );
+    const uri = `json-schema-definitions://canvas.module/${name}`;
+    // Some Canvas references are self-referential named-type sentinels. PHP
+    // handles those specially; offline validation uses their underlying shape.
+    const localDefinition =
+      isRecord(definition) && definition.$ref === uri
+        ? Object.fromEntries(
+            Object.entries(definition).filter(([key]) => key !== '$ref'),
+          )
+        : definition;
+    ajv.addSchema(localDefinition, uri);
   }
   return ajv;
 }
@@ -188,7 +203,12 @@ export function validateParsedComponentMetadata(
       diagnosticFromError(parsed, error),
     );
   }
-  return validatePropDefinitions(parsed);
+  return [
+    ...validatePropDefinitions(parsed),
+    ...validateComponentMetadataSemantics(parsed.value).map((issue) =>
+      diagnosticFromParts(parsed, issue.parts, issue.message),
+    ),
+  ];
 }
 
 export async function parseComponentMetadata(
