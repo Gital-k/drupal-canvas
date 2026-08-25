@@ -56,7 +56,7 @@ final class UriConstraintValidator extends ConstraintValidator implements Contai
     // scheme and require a non-empty target instead.
     // @see \Drupal\Core\StreamWrapper\StreamWrapperInterface
     $scheme = StreamWrapperManager::getScheme($value);
-    if (is_string($scheme) && $this->streamWrapperManager->isValidScheme($scheme)) {
+    if (\is_string($scheme) && $this->streamWrapperManager->isValidScheme($scheme)) {
       $target = StreamWrapperManager::getTarget($value);
       if ($target === FALSE || $target === '') {
         $this->context->buildViolation($constraint->messageInvalidUri)
