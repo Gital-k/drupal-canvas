@@ -159,6 +159,26 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       'GET js component' => ['canvas.api.config.get', ['canvas_config_entity_type_id' => JavaScriptComponent::ENTITY_TYPE_ID, 'canvas_config_entity' => 'test-code-component'], [], 'GET', []],
       'GET asset library' => ['canvas.api.config.get', ['canvas_config_entity_type_id' => AssetLibrary::ENTITY_TYPE_ID, 'canvas_config_entity' => AssetLibrary::GLOBAL_ID], [], 'GET', []],
       'GET brand kit' => ['canvas.api.config.get', ['canvas_config_entity_type_id' => BrandKit::ENTITY_TYPE_ID, 'canvas_config_entity' => BrandKit::GLOBAL_ID], [], 'GET', []],
+      'VALIDATE code component' => [
+        'canvas.api.code_component.validate',
+        [],
+        ['administer code components'],
+        'POST',
+        [
+          'machineName' => 'validated-code-component',
+          'name' => 'Validated code component',
+          'status' => TRUE,
+          'required' => [],
+          'props' => [],
+          'slots' => [],
+          'sourceCodeJs' => '// JS source',
+          'sourceCodeCss' => '/* CSS source */',
+          'compiledJs' => '// Compiled JS',
+          'compiledCss' => '/* Compiled CSS */',
+          'importedJsComponents' => [],
+          'dataDependencies' => [],
+        ],
+      ],
       'POST js component' => [
         'canvas.api.config.post',
         ['canvas_config_entity_type_id' => JavaScriptComponent::ENTITY_TYPE_ID],
@@ -269,6 +289,33 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
         ['default_page_variant' => NULL],
       ],
     ];
+  }
+
+  /**
+   * Tests Code Component validation with OAuth authentication.
+   */
+  public function testCodeComponentValidationEndpointWithOauth(): void {
+    $access_token = $this->requestAccessToken(['administer code components']);
+    $request = $this->createRequest('canvas.api.code_component.validate', [], 'POST', [
+      'machineName' => 'oauth-validated-code-component',
+      'name' => 'OAuth validated code component',
+      'status' => TRUE,
+      'required' => [],
+      'props' => [],
+      'slots' => [],
+      'sourceCodeJs' => '// JS source',
+      'sourceCodeCss' => '/* CSS source */',
+      'compiledJs' => '// Compiled JS',
+      'compiledCss' => '/* Compiled CSS */',
+      'importedJsComponents' => [],
+      'dataDependencies' => [],
+    ]);
+    $request->headers->set('Authorization', 'Bearer ' . $access_token);
+    $request->headers->set('X-Canvas-CLI', '1');
+
+    $response = $this->request($request);
+    self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+    self::assertNull(JavaScriptComponent::load('oauth-validated-code-component'));
   }
 
   /**

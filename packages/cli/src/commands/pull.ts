@@ -249,7 +249,7 @@ export function createComponentsPullTask(
           component.props || {},
         ),
       },
-      slots: component.slots || {},
+      slots: Array.isArray(component.slots) ? {} : component.slots || {},
       dataDependencies: component.dataDependencies?.entityFields
         ? { entityFields: component.dataDependencies.entityFields }
         : {},
