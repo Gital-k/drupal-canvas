@@ -132,7 +132,7 @@ enum JsonSchemaStringFormat: string {
             // props without it before they reach this point.
             // @see \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
             new DataTypeShapeRequirement(UriSchemeConstraint::PLUGIN_ID, [
-              'allowedSchemes' => $schema['x-allowed-schemes'] ?? throw new \LogicException(\sprintf('A prop with `contentMediaType: %s` must declare `x-allowed-schemes`.', $schema['contentMediaType'])),
+              'allowedSchemes' => $schema['x-allowed-schemes'] ?? throw new \LogicException(\sprintf('A prop with `contentMediaType: %s` must declare `x-allowed-schemes` as a non-empty list of URI schemes.', $schema['contentMediaType'])),
             ]),
             new DataTypeShapeRequirement('PrimitiveType', [], UriInterface::class),
           ]),

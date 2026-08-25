@@ -47,7 +47,7 @@ final class JsonSchemaStringFormatTest extends UnitTestCase {
 
   public function testWildcardContentMediaTypeRequiresAllowedSchemes(): void {
     $this->expectException(\LogicException::class);
-    $this->expectExceptionMessage('A prop with `contentMediaType: image/*` must declare `x-allowed-schemes`.');
+    $this->expectExceptionMessage('A prop with `contentMediaType: image/*` must declare `x-allowed-schemes` as a non-empty list of URI schemes.');
     JsonSchemaStringFormat::Uri->toDataTypeShapeRequirements([
       'type' => 'string',
       'format' => 'uri',
