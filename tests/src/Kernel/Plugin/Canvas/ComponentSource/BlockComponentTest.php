@@ -29,6 +29,7 @@ use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
+use Drupal\Core\Form\Exception\BrokenPostRequestException;
 use Drupal\node\Entity\Node;
 use Drupal\system\Entity\Menu;
 use Drupal\Tests\canvas\Kernel\BrokenBlockManager;
@@ -428,6 +429,39 @@ HTML,
     // …and the other components stay present and usable.
     self::assertArrayHasKey('block.canvas_test_block_input_none', $list);
     self::assertFalse($list['block.canvas_test_block_input_none']['broken']);
+  }
+
+  /**
+   * Core's form AJAX guard must reach the kernel instead of becoming markup.
+   *
+   * Containing a crashed component is right, but this exception is flow
+   * control: rendering it into the page answers "200 OK" and caches the
+   * failure, and FormAjaxSubscriber never gets to answer it.
+   *
+   * @see \Drupal\canvas\Element\RenderSafeComponentContainer::renderComponent()
+   */
+  public function testFlowControlExceptionIsNotSwallowed(): void {
+    $this->setUpCurrentUser(permissions: ['view media']);
+    $component_tree = $this->generateCrashTestDummyComponentTree(
+      'block.canvas_test_block_input_validatable_crash',
+      [
+        'label' => 'crash dummy',
+        'label_display' => '0',
+        'name' => 'Canvas',
+        'crash' => FALSE,
+      ],
+    );
+    // @see \Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatableCrash::build()
+    CanvasTestBlockInputValidatableCrash::$crashWith = new BrokenPostRequestException(1024, 'Intentional test exception.');
+    try {
+      $this->expectException(BrokenPostRequestException::class);
+      $this->expectExceptionMessage('Intentional test exception.');
+      $build = $component_tree->toRenderable(Page::create(['title' => 'A page']), FALSE);
+      $this->crawlerForRenderArray($build);
+    }
+    finally {
+      CanvasTestBlockInputValidatableCrash::$crashWith = NULL;
+    }
   }
 
   public static function providerRenderComponentFailure(): \Generator {
