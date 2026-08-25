@@ -277,6 +277,25 @@ describe('Pull Command', () => {
       });
     });
 
+    it('normalizes empty slots from the API to an authored mapping', async () => {
+      const component = {
+        ...mockComponent('empty-slots'),
+        slots: [],
+      } as unknown as Component;
+      const task = createComponentsPullTask(
+        mockApiService({ a: component }),
+        tmpDir,
+        false,
+      );
+
+      await task.prepare();
+      await task.execute();
+
+      const metadataPath = path.join(tmpDir, 'empty-slots', 'component.yml');
+      const metadata = await readValidatedComponentMetadata(metadataPath);
+      expect(metadata.slots).toEqual({});
+    });
+
     it('writes metadata that validates without projected prop keys', async () => {
       const component: Component = {
         ...mockComponent('article-card'),
