@@ -27,6 +27,7 @@ use Drupal\Core\Entity\Routing\AdminHtmlRouteProvider;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Form\EnforcedResponseException;
+use Drupal\Core\Form\Exception\BrokenPostRequestException;
 use Drupal\Core\Form\FormAjaxException;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RendererInterface;
@@ -364,7 +365,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     // them through.
     // @see \Drupal\canvas\Element\RenderSafeComponentContainer::renderComponent()
     // @todo Remove this catch when https://www.drupal.org/i/2367555 is fixed.
-    catch (EnforcedResponseException | FormAjaxException $e) {
+    catch (EnforcedResponseException | FormAjaxException | BrokenPostRequestException $e) {
       throw $e;
     }
     catch (\Throwable $e) {
