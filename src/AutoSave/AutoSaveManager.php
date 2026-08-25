@@ -358,7 +358,8 @@ class AutoSaveManager implements EventSubscriberInterface {
       }
       // Canonicalize metatag values before hashing. Two sources of phantom
       // auto-saves are addressed: (1) MetatagFirehose re-emits tags in form
-      // order while preSave() ksorts them — solved by ksort before hashing;
+      // order while preSave() sorts them by key — solved by ksort before
+      // hashing;
       // (2) an entity whose stored metatag data pre-dates or omits Canvas's
       // field-level token defaults will hash differently from a fresh
       // round-trip — solved by skipping the field entirely when every tag

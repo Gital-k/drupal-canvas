@@ -1010,6 +1010,83 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       $autoSave->getAutoSaveEntity($page)->isEmpty(),
       'Round-tripping a page whose metatags carry a custom value must not create a phantom auto-save entry.',
     );
+
+    // Finally, a page stored without any metatag data — e.g. one created
+    // before the metatag module was installed. The metatag_firehose widget
+    // prefills metatag's config defaults into the form, so the layout POST
+    // echoes tags the entity does not store. Those must canonicalize to
+    // nothing: ::preSave() would strip them on a real save, so publishing the
+    // difference could never converge to a clean state.
+    $empty_page = Page::create([
+      'title' => 'Empty metatags page',
+      'components' => [],
+      'metatags' => [],
+    ]);
+    $empty_page->save();
+    self::assertTrue($empty_page->get('metatags')->isEmpty());
+    self::assertTrue($autoSave->getAutoSaveEntity($empty_page)->isEmpty());
+
+    $url = $this->getLayoutUrl($empty_page)->toString();
+    $json = \json_decode((string) $this->parentRequest(Request::create($url))->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
+    // The layout GET carries no metatag form values for this page, but when
+    // the editor opens the page data form, the metatag_firehose widget
+    // prefills tags the entity does not store with metatag's config defaults,
+    // and the client echoes them into subsequent layout POSTs.
+    // @see \Drupal\metatag\Plugin\Field\FieldWidget\MetatagFirehose::formElement()
+    $post_json = $json;
+    $post_json['entity_form_fields']['metatags[0][basic][title]'] = '[current-page:title] | [site:name]';
+    unset($post_json['isNew'], $post_json['isPublished'], $post_json['html'], $post_json['hasUnsavedStatusChange']);
+    $post_json += $this->getPostContentsDefaults($empty_page);
+    $response = $this->request(Request::create($url, method: 'POST', content: \json_encode($post_json, \JSON_THROW_ON_ERROR)));
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    self::assertTrue(
+      $autoSave->getAutoSaveEntity($empty_page)->isEmpty(),
+      'Round-tripping a page stored without metatag data must not create a phantom auto-save entry from widget-prefilled defaults.',
+    );
+
+    // Lastly, the no-module-churn path into that same empty-storage state: a
+    // site admin configures metatag defaults for canvas_page with the same
+    // tokens as Canvas's field-level defaults (the natural choice at
+    // /admin/config/search/metatag). MetatagFieldItem::preSave() then strips
+    // every stored tag on the next real save, so the page persists `{}` while
+    // the widget keeps prefilling the tokens.
+    // @see \Drupal\canvas\Hook\PageHooks::entityBaseFieldInfo()
+    MetatagDefaults::create([
+      'id' => Page::ENTITY_TYPE_ID,
+      'label' => 'Canvas page',
+      'tags' => [
+        'title' => '[canvas_page:title] | [site:name]',
+        'description' => '[canvas_page:description]',
+        'canonical_url' => '[canvas_page:url]',
+        'image_src' => '[canvas_page:image:entity:field_media_image:entity:url]',
+      ],
+    ])->save();
+
+    $stripped_page = Page::create([
+      'title' => 'Stripped-by-defaults page',
+      'components' => [],
+    ]);
+    $stripped_page->save();
+    // preSave() stripped all four field-default tags as config-default
+    // matches.
+    self::assertSame('[]', $stripped_page->get('metatags')->getValue()[0]['value'] ?? NULL);
+    self::assertTrue($autoSave->getAutoSaveEntity($stripped_page)->isEmpty());
+
+    $url = $this->getLayoutUrl($stripped_page)->toString();
+    $json = \json_decode((string) $this->parentRequest(Request::create($url))->getContent(), TRUE, flags: \JSON_THROW_ON_ERROR);
+    $post_json = $json;
+    // The widget prefill the client would echo back.
+    $post_json['entity_form_fields']['metatags[0][basic][title]'] = '[canvas_page:title] | [site:name]';
+    unset($post_json['isNew'], $post_json['isPublished'], $post_json['html'], $post_json['hasUnsavedStatusChange']);
+    $post_json += $this->getPostContentsDefaults($stripped_page);
+    $response = $this->request(Request::create($url, method: 'POST', content: \json_encode($post_json, \JSON_THROW_ON_ERROR)));
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    self::assertTrue(
+      $autoSave->getAutoSaveEntity($stripped_page)->isEmpty(),
+      'A page whose stored tags were stripped as config-default matches must not phantom when the widget echoes those defaults back.',
+    );
   }
 
   /**
