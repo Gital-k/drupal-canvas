@@ -27,11 +27,16 @@ const DeleteColorPopover = ({
     useDeleteColorMutation();
 
   const handleDelete = async () => {
+    if (isDeleting) {
+      return;
+    }
+
+    onOpenChange(false);
     try {
       await deleteColor(color.id).unwrap();
-      onOpenChange(false);
       reset();
     } catch (err) {
+      onOpenChange(true);
       console.error('Failed to delete color:', err);
     }
   };

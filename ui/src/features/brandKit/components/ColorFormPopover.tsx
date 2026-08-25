@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Cross2Icon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import {
@@ -192,6 +192,8 @@ const ColorFormPopover = ({
   ] = useUpdateColorMutation();
   const [updateFolder] = useUpdateFolderMutation();
   const { data: foldersData } = useGetFoldersQuery();
+  const [isSubmittingHidden, setIsSubmittingHidden] = useState(false);
+  const hasInitializedForOpenRef = useRef(false);
 
   // Form state managed via reducer
   const [formState, updateForm] = useReducer(formReducer, INITIAL_FORM_STATE);
@@ -210,19 +212,26 @@ const ColorFormPopover = ({
   // Reset mutations when popover opens/closes
   useEffect(() => {
     if (!open) {
+      setIsSubmittingHidden(false);
       resetCreate();
       resetUpdate();
     }
   }, [open, resetCreate, resetUpdate]);
 
-  // Initialize form when opening
+  // Initialize form only once per open session so optimistic cache churn does
+  // not overwrite in-progress edits while the popover is still open.
   useEffect(() => {
-    if (open) {
+    if (open && !hasInitializedForOpenRef.current) {
       if (operation === 'edit' && color) {
         updateForm({ type: 'INIT_EDIT', color });
       } else {
         updateForm({ type: 'INIT_ADD' });
       }
+      hasInitializedForOpenRef.current = true;
+    }
+
+    if (!open) {
+      hasInitializedForOpenRef.current = false;
     }
   }, [open, operation, color]);
 
@@ -257,6 +266,8 @@ const ColorFormPopover = ({
 
     const cssVariable = `--${variableName.startsWith('--') ? variableName.slice(2) : variableName}`;
 
+    setIsSubmittingHidden(true);
+
     try {
       if (operation === 'add') {
         const newColor = await createColor({
@@ -285,6 +296,7 @@ const ColorFormPopover = ({
                 error:
                   'The color was created but could not be added to the folder. You can move it manually.',
               });
+              setIsSubmittingHidden(false);
               // Keep the popover open so the user sees the error.
               return;
             }
@@ -299,8 +311,10 @@ const ColorFormPopover = ({
         }).unwrap();
       }
 
+      setIsSubmittingHidden(false);
       onOpenChange(false);
     } catch (err) {
+      setIsSubmittingHidden(false);
       console.error('Failed to save color:', err);
     }
   };
@@ -359,7 +373,13 @@ const ColorFormPopover = ({
           align={align}
           sideOffset={4}
           className={styles.popoverContent}
+          style={
+            isSubmittingHidden
+              ? { opacity: 0, pointerEvents: 'none' }
+              : undefined
+          }
           data-testid="canvas-color-form-popover"
+          data-submission-state={isSubmittingHidden ? 'hidden' : 'visible'}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
           }}

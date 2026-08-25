@@ -7,7 +7,8 @@ import type { Locator, Page } from '@playwright/test';
 // @cspell:ignore colormaster
 
 // Shared selector prefixes
-const POP_SEL = '[data-state="open"][data-testid="canvas-color-form-popover"]';
+const POP_SEL =
+  '[data-state="open"][data-testid="canvas-color-form-popover"][data-submission-state="visible"]';
 const FORM_SEL = 'form[data-form-id="component_instance_form"]';
 
 interface ColorSectionExpectation {
@@ -669,5 +670,127 @@ test.describe('brand kit colors', () => {
         colorSpace: 'srgb',
       });
     });
+  });
+
+  test('optimistic color edits', async ({ page, drupal, canvas }) => {
+    await drupal.login({ username: 'colormaster', password: 'colormaster' });
+    await canvas.openCanvasRoot();
+    await canvas.openBrandKitPanel();
+
+    let shouldFailNextEdit = true;
+    let shouldFailNextAdd = true;
+    await page.route(
+      /\/canvas\/api\/v0\/config\/color(?:\/[^/?#]+)?(?:\?.*)?$/,
+      async (route) => {
+        const request = route.request();
+        if (request.method() === 'PATCH' && shouldFailNextEdit) {
+          shouldFailNextEdit = false;
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ message: 'Forced PATCH failure' }),
+          });
+          return;
+        }
+        if (request.method() === 'POST' && shouldFailNextAdd) {
+          shouldFailNextAdd = false;
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ message: 'Forced POST failure' }),
+          });
+          return;
+        }
+        await route.continue();
+      },
+    );
+
+    // Edit failure: form stays open with entered values and row value is rolled back.
+    const brandBlueSwatch = page.locator(SEL.rowSwatch('Brand Blue'));
+    const originalBrandBlueStyle = await brandBlueSwatch.getAttribute('style');
+    expect(originalBrandBlueStyle).not.toBeNull();
+    await page.locator(SEL.row('Brand Blue')).hover();
+    await page.locator(SEL.rowMenu('Brand Blue')).click();
+    await page.locator(SEL.menu.edit).click();
+
+    await page.locator(SEL.form.rgba.r).fill('10');
+    await page.locator(SEL.form.rgba.g).fill('20');
+    await page.locator(SEL.form.rgba.b).fill('30');
+    await page.locator(SEL.form.rgba.a).fill('1');
+    await page
+      .locator(SEL.form.save)
+      .evaluate((button: HTMLButtonElement) => button.click());
+
+    await expect(page.locator(SEL.form.header)).toBeVisible();
+    await expect(page.locator(SEL.form.rgba.r)).toHaveValue('10');
+    await expect(page.locator(SEL.form.rgba.g)).toHaveValue('20');
+    await expect(page.locator(SEL.form.rgba.b)).toHaveValue('30');
+    await expect(brandBlueSwatch).toHaveAttribute(
+      'style',
+      originalBrandBlueStyle!,
+    );
+
+    // Edit success: second save passes through and closes the form.
+    await page.locator(SEL.form.rgba.r).fill('10');
+    await page.locator(SEL.form.rgba.g).fill('20');
+    await page.locator(SEL.form.rgba.b).fill('30');
+    await page.locator(SEL.form.rgba.a).fill('1');
+    await page
+      .locator(SEL.form.save)
+      .evaluate((button: HTMLButtonElement) => button.click());
+    await expect(page.locator(SEL.form.header)).toBeHidden();
+    await expect(page.locator(SEL.rowSwatch('Brand Blue'))).toHaveAttribute(
+      'style',
+      /background-color: rgb\(10, 20, 30\)/,
+    );
+
+    // Add failure: form stays open with entered values and no new row.
+    await page.locator(SEL.newBtn).click();
+    await page.locator(SEL.newColorBtn).click();
+    await page.locator(SEL.form.name).fill('Optimistic Test Color');
+    await page.locator(SEL.form.variable).fill('optimistic-test-color');
+    await page.locator(SEL.form.rgba.r).fill('1');
+    await page.locator(SEL.form.rgba.g).fill('2');
+    await page.locator(SEL.form.rgba.b).fill('3');
+    await page.locator(SEL.form.rgba.a).fill('1');
+    await page
+      .locator(SEL.form.save)
+      .evaluate((button: HTMLButtonElement) => button.click());
+
+    await expect(page.locator(SEL.form.header)).toBeVisible();
+    await expect(page.locator(SEL.form.name)).toHaveValue(
+      'Optimistic Test Color',
+    );
+    await expect(page.locator(SEL.form.variable)).toHaveValue(
+      'optimistic-test-color',
+    );
+    await expect(page.locator(SEL.form.rgba.r)).toHaveValue('1');
+    await expect(page.locator(SEL.form.rgba.g)).toHaveValue('2');
+    await expect(page.locator(SEL.form.rgba.b)).toHaveValue('3');
+    await expect(page.locator(SEL.row('Optimistic Test Color'))).toBeHidden();
+
+    // Add success: second save passes through and the new color is present.
+    await page
+      .locator(SEL.form.save)
+      .evaluate((button: HTMLButtonElement) => button.click());
+    await expect(page.locator(SEL.form.header)).toBeHidden();
+    await expect(page.locator(SEL.row('Optimistic Test Color'))).toBeVisible();
+
+    // Re-open both colors to confirm final persisted values are loaded in the forms.
+    await page.locator(SEL.row('Brand Blue')).hover();
+    await page.locator(SEL.rowMenu('Brand Blue')).click();
+    await page.locator(SEL.menu.edit).click();
+    await expect(page.locator(SEL.form.rgba.r)).toHaveValue('10');
+    await expect(page.locator(SEL.form.rgba.g)).toHaveValue('20');
+    await expect(page.locator(SEL.form.rgba.b)).toHaveValue('30');
+    await page.locator(SEL.form.cancel).click();
+
+    await page.locator(SEL.row('Optimistic Test Color')).hover();
+    await page.locator(SEL.rowMenu('Optimistic Test Color')).click();
+    await page.locator(SEL.menu.edit).click();
+    await expect(page.locator(SEL.form.rgba.r)).toHaveValue('1');
+    await expect(page.locator(SEL.form.rgba.g)).toHaveValue('2');
+    await expect(page.locator(SEL.form.rgba.b)).toHaveValue('3');
+    await page.locator(SEL.form.cancel).click();
   });
 });
