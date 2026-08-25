@@ -356,46 +356,45 @@ class AutoSaveManager implements EventSubscriberInterface {
           continue;
         }
       }
-      // Canonicalize metatag values before hashing. Two sources of phantom
-      // auto-saves are addressed: (1) MetatagFirehose re-emits tags in form
-      // order while preSave() sorts them by key — solved by ksort before
-      // hashing;
-      // (2) an entity whose stored metatag data pre-dates or omits Canvas's
-      // field-level token defaults will hash differently from a fresh
-      // round-trip — solved by skipping the field entirely when every tag
-      // matches a field-level default or is empty (only user-supplied values
-      // are meaningful for change detection).
+      // Canonicalize metatag values before hashing: transform each item into
+      // what MetatagFieldItem::preSave() would store on a real entity save,
+      // because auto-saving bypasses ::preSave(). Without this, an unchanged
+      // editor round-trip hashes differently than the stored entity, in two
+      // ways. First, the field stores its tags as one order-sensitive JSON
+      // string: ::preSave() sorts them by key, but the metatag_firehose widget
+      // re-emits them in form order. Second, ::preSave() strips tags matching
+      // metatag's config defaults, but the widget prefills those very defaults
+      // into empty tags, so a page stored without metatag data (e.g. created
+      // before the metatag module was installed) echoes them back on every
+      // layout POST — and publishing that difference can never converge,
+      // because ::preSave() strips the tags again.
       // @see \Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem::preSave()
-      // @see \Drupal\canvas\Hook\PageHooks::entityBaseFieldInfo()
+      // @see \Drupal\metatag\Plugin\Field\FieldWidget\MetatagFirehose::formElement()
       if ($items->getFieldDefinition()->getType() === 'metatag') {
-        $field_default_value = $items->getFieldDefinition()->getDefaultValue($entity);
-        $field_defaults = [];
-        if (!empty($field_default_value[0]['value']) && \is_string($field_default_value[0]['value'])) {
-          $field_defaults = Json::decode($field_default_value[0]['value']) ?? [];
-        }
-        $has_custom_values = FALSE;
-        foreach ($items->getValue() as $item) {
-          foreach (Json::decode($item['value'] ?? '[]') ?? [] as $tag_id => $tag_value) {
-            if ($tag_value === '') {
-              continue;
-            }
-            if (\array_key_exists($tag_id, $field_defaults) && $field_defaults[$tag_id] === $tag_value) {
-              continue;
-            }
-            $has_custom_values = TRUE;
-            break 2;
-          }
-        }
-        if (!$has_custom_values) {
-          continue;
-        }
+        $metatag_defaults = \function_exists('metatag_get_default_tags')
+          ? \metatag_get_default_tags($entity) ?? []
+          : [];
         $values = [];
         foreach ($items->getValue() as $delta => $item) {
           $tags = Json::decode($item['value'] ?? '[]') ?? [];
+          // Match ::preSave()'s loose comparison.
+          $tags = \array_filter(
+            $tags,
+            static fn (mixed $tag_value, string $tag_id): bool => !isset($metatag_defaults[$tag_id]) || $tag_value != $metatag_defaults[$tag_id],
+            \ARRAY_FILTER_USE_BOTH,
+          );
+          if ($tags === []) {
+            continue;
+          }
           \ksort($tags);
           $values[$delta] = ['value' => Json::encode($tags)];
         }
-        $normalized[$items->getName()] = $values;
+        // Items holding only default tags canonicalize to nothing; treat the
+        // field like an empty one so it matches an entity stored without
+        // metatag data.
+        if ($values !== []) {
+          $normalized[$items->getName()] = $values;
+        }
         continue;
       }
       $normalized[$items->getName()] = TypedDataHelper::castRawPhpTypes($items);
