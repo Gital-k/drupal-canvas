@@ -14,8 +14,13 @@ export default defineConfig({
     'tailwindcss-in-browser',
     '@drupal-canvas/auth',
     '@drupal-canvas/discovery',
+    '@drupal-canvas/json-schema-validation',
     '@drupal-canvas/vite-compat',
   ],
+  // Bundled CommonJS format validators load punycode dynamically.
+  banner: {
+    js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
+  },
   loader: {
     '.wasm': 'file',
   },
