@@ -548,7 +548,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $form_canvas_props = $this->getFormCanvasPropsForComponent($unlimited_component_id);
     $unlimited_component = Component::load($unlimited_component_id);
     \assert($unlimited_component instanceof ComponentInterface);
-    $json = self::decodeResponse($this->request(Request::create(
+    $json = self::decodeResponse($this->request(self::createFormEncodedRequest(
       '/canvas/api/v0/form/component-instance/node/' . $node->id(),
       'PATCH',
       [
@@ -590,7 +590,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     // `undefined` as value, which happens when the inputs are empty on a
     // missing component.
     // @todo Make it not nullable in https://www.drupal.org/i/3558721
-    $json = self::decodeResponse($this->request(Request::create($form_url, 'PATCH', [
+    $json = self::decodeResponse($this->request(self::createFormEncodedRequest($form_url, 'PATCH', [
       'form_canvas_tree' => json_encode([
         'nodeType' => 'component',
         'slots' => [],

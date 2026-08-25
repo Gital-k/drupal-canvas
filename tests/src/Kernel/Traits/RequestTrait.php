@@ -67,6 +67,37 @@ trait RequestTrait {
     }
   }
 
+  /**
+   * Creates a form-encoded request, the way Canvas front ends send them.
+   *
+   * For PATCH requests, Request::create() populates only the parameter bag: it
+   * sets neither a `Content-Type` header nor a raw request body. Real clients
+   * send both, and the Canvas OpenAPI specification documents these operations
+   * as accepting `application/x-www-form-urlencoded` request bodies.
+   *
+   * @param string $uri
+   *   The URI.
+   * @param string $method
+   *   The HTTP method.
+   * @param array $parameters
+   *   The request body parameters.
+   *
+   * @return \Symfony\Component\HttpFoundation\Request
+   *   The request.
+   *
+   * @see \Symfony\Component\HttpFoundation\Request::create()
+   * @see \Drupal\canvas\EventSubscriber\ApiRequestValidator
+   */
+  protected static function createFormEncodedRequest(string $uri, string $method, array $parameters): Request {
+    return Request::create(
+      $uri,
+      $method,
+      $parameters,
+      server: ['CONTENT_TYPE' => 'application/x-www-form-urlencoded'],
+      content: \http_build_query($parameters),
+    );
+  }
+
   protected static function decodeResponse(Response $response): array {
     self::assertInstanceOf(JsonResponse::class, $response);
     self::assertIsString($response->getContent());
