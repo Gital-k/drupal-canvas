@@ -44,8 +44,12 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
     return $this->getValue()?->getGeneratedUrl();
   }
 
-  private static function getParametrizedImageStyle(): ?ParametrizedImageStyle {
-    return ParametrizedImageStyle::load('canvas_parametrized_width');
+  private static function getParametrizedImageStyle(): ParametrizedImageStyle {
+    $style = ParametrizedImageStyle::load('canvas_parametrized_width');
+    if ($style === NULL) {
+      throw new \RuntimeException('The `canvas_parametrized_width` image style was not found, but is needed for Canvas to work properly.');
+    }
+    return $style;
   }
 
   /**
@@ -69,9 +73,6 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
 
     \assert(\is_string($file->getFileUri()));
     $parametrized_image_style = $this->getParametrizedImageStyle();
-    if ($parametrized_image_style === NULL) {
-      return NULL;
-    }
     $url_template = $parametrized_image_style->buildUrlTemplate($file->getFileUri());
     \assert(str_contains($url_template, '{width}'));
 
@@ -88,14 +89,10 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
   /**
    * {@inheritdoc}
    */
-  public function calculateDependencies(): array {
-    $style = self::getParametrizedImageStyle();
-    if ($style) {
-      return [
-        'config' => [$style->getConfigDependencyName()],
-      ];
-    }
-    return [];
+  public function calculateDependencies() {
+    return [
+      'config' => [$this->getParametrizedImageStyle()->getConfigDependencyName()],
+    ];
   }
 
 }
