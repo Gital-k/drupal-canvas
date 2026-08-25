@@ -11,6 +11,7 @@ use Drupal\canvas\Entity\Page;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\File\FileSystemInterface;
+use Drupal\file\FileInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\MockFileUploadTrait;
 use Drupal\Tests\canvas\Kernel\Traits\PredictableImageStyleItokTestTrait;
@@ -193,6 +194,44 @@ class ApiMediaControllersPostTest extends CanvasKernelTestBase {
     $entity_type_manager = $this->container->get(EntityTypeManagerInterface::class);
     $this->assertEmpty($entity_type_manager->getStorage('file')->loadMultiple());
     $this->assertEmpty($entity_type_manager->getStorage('media')->loadMultiple());
+  }
+
+  /**
+   * A file whose name contains a space uploads successfully.
+   *
+   * A stream wrapper URI is not an RFC 3986 URI: what follows `://` is a file
+   * path rather than an authority plus a path, and Drupal never percent-encodes
+   * file names. Validating the stored `public://…` URI as an RFC 3986 URI
+   * therefore rejected every upload whose file name contains a space — for
+   * every file field on the site, not just Canvas' own.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\UriConstraintValidator
+   * @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\FileUriItemOverride
+   * @legacy-covers \Drupal\canvas\Controller\ApiMediaControllers::upload
+   */
+  public function testPostFileNameWithSpaces(): void {
+    $response = $this->request(
+      Request::create(
+        \sprintf(self::URL, 'image'),
+        'POST',
+        parameters: ['file' => 'gracie big.jpg', 'alt' => 'Gracie Dog'],
+        files: [
+          'file' => new UploadedFile($this->testImagePath, 'gracie big.jpg', 'image/jpeg', NULL, test: TRUE),
+        ],
+        server: ['CONTENT_TYPE' => 'multipart/form-data'],
+      )
+    );
+    $this->assertSame(Response::HTTP_CREATED, $response->getStatusCode());
+
+    $files = $this->container->get(EntityTypeManagerInterface::class)
+      ->getStorage('file')
+      ->loadMultiple();
+    $this->assertCount(1, $files);
+    $file = \reset($files);
+    \assert($file instanceof FileInterface);
+    // The space survives: it is stored, and the File entity is valid.
+    $this->assertStringEndsWith('/gracie big.jpg', $file->getFileUri());
+    $this->assertCount(0, $file->validate());
   }
 
   public function testPostWithoutFile(): void {
