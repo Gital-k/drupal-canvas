@@ -160,8 +160,6 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
   useEffect(() => {
     if (selectedComponent) {
       setRightPanelVisibility(true);
-    } else {
-      setRightPanelVisibility(false);
     }
   }, [selectedComponent]);
 
