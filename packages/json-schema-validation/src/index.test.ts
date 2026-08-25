@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import componentMetadataSchema from '../../../component-metadata.schema.json';
-import dataHealthSchema from '../../../docs/data-health.schema.json';
 import componentMocksSchema from '../../workbench/src/lib/schemas/component-mocks.schema.json';
 import contentTemplateSpecSchema from '../../workbench/src/lib/schemas/content-template-spec.schema.json';
 import pageSpecSchema from '../../workbench/src/lib/schemas/page-spec.schema.json';
@@ -10,7 +9,6 @@ import { createCanvasAjv } from './index';
 
 const schemas = {
   'component-metadata.schema.json': componentMetadataSchema,
-  'docs/data-health.schema.json': dataHealthSchema,
   'packages/workbench/src/lib/schemas/component-mocks.schema.json':
     componentMocksSchema,
   'packages/workbench/src/lib/schemas/content-template-spec.schema.json':

@@ -1,8 +1,8 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://git.drupalcode.org/project/canvas/-/raw/HEAD/docs/data-health.schema.json",
   "title": "Canvas Doctor JSON report envelope",
-  "description": "The `--format=json` output of `canvas:doctor` (see docs/data-health.md). The envelope — report_version, environment_fingerprint, overall, and each checks entry's type/status/total/healthy/cached/duration_s — is stable: additive changes (new keys, new checks) do not bump report_version, a breaking change does. A check's `details` shape is frozen exactly when this schema constrains it with its own definitions entry; a check validating only against the generic checkEntry makes no such promise, so consume its `details` defensively. This schema tracks HEAD: validate a pinned report against the schema of the same Canvas version.",
+  "description": "The `--format=json` output of `canvas:doctor` (see docs/data-health.md). The envelope — report_version, environment_fingerprint, overall, and each checks entry's type/status/total/healthy/cached/duration_s — is stable: additive changes (new keys, new checks) do not bump report_version, a breaking change does. A check's `details` shape is frozen exactly when this schema constrains it with its own $defs entry; a check validating only against the generic checkEntry makes no such promise, so consume its `details` defensively. This schema tracks HEAD: validate a pinned report against the schema of the same Canvas version.",
   "type": "object",
   "required": ["report_version", "environment_fingerprint", "overall", "checks"],
   "additionalProperties": false,
@@ -29,22 +29,22 @@
     },
     "checks": {
       "type": "object",
-      "description": "One entry per requested check, keyed by check name. A check with its own definitions entry below freezes its `details` shape. The map is open: a check added by a later release validates against the generic entry.",
+      "description": "One entry per requested check, keyed by check name. A check with its own $defs entry below freezes its `details` shape. The map is open: a check added by a later release validates against the generic entry.",
       "properties": {
-        "code_tagged_releases": { "$ref": "#/definitions/codeTaggedReleasesEntry" },
-        "update_path_executed": { "$ref": "#/definitions/updatesExecutedEntry" },
-        "update_path_escaped_config": { "$ref": "#/definitions/updatesEscapedConfigEntry" },
-        "component_source_supports_schema_evolution": { "$ref": "#/definitions/checkEntry" },
-        "config": { "$ref": "#/definitions/dataCheckEntry" },
-        "content": { "$ref": "#/definitions/dataCheckEntry" },
-        "content_past_revisions": { "$ref": "#/definitions/dataCheckEntry" },
-        "content_forward_revisions": { "$ref": "#/definitions/dataCheckEntry" },
-        "auto_save": { "$ref": "#/definitions/dataCheckEntry" }
+        "code_tagged_releases": { "$ref": "#/$defs/codeTaggedReleasesEntry" },
+        "update_path_executed": { "$ref": "#/$defs/updatesExecutedEntry" },
+        "update_path_escaped_config": { "$ref": "#/$defs/updatesEscapedConfigEntry" },
+        "component_source_supports_schema_evolution": { "$ref": "#/$defs/checkEntry" },
+        "config": { "$ref": "#/$defs/dataCheckEntry" },
+        "content": { "$ref": "#/$defs/dataCheckEntry" },
+        "content_past_revisions": { "$ref": "#/$defs/dataCheckEntry" },
+        "content_forward_revisions": { "$ref": "#/$defs/dataCheckEntry" },
+        "auto_save": { "$ref": "#/$defs/dataCheckEntry" }
       },
-      "additionalProperties": { "$ref": "#/definitions/checkEntry" }
+      "additionalProperties": { "$ref": "#/$defs/checkEntry" }
     }
   },
-  "definitions": {
+  "$defs": {
     "checkEntry": {
       "type": "object",
       "description": "A single check's normalized report entry, shaped uniformly for system and data checks alike so tooling can iterate `checks` without special-casing.",
@@ -63,16 +63,15 @@
     "dataCheckEntry": {
       "description": "A data check (config, content, the revision checks, auto-save): `details` lists the failing data items and their constraint violations. auto-save findings surface as status `risk`, never `problem`: drafts are allowed to be invalid.",
       "allOf": [
-        { "$ref": "#/definitions/checkEntry" },
+        { "$ref": "#/$defs/checkEntry" },
         {
-          "type": "object",
           "properties": {
             "details": {
               "type": "object",
               "required": ["failures"],
               "additionalProperties": false,
               "properties": {
-                "failures": { "type": "array", "description": "One entry per failing finding. Empty when the check is healthy.", "items": { "$ref": "#/definitions/finding" } }
+                "failures": { "type": "array", "description": "One entry per failing finding. Empty when the check is healthy.", "items": { "$ref": "#/$defs/finding" } }
               }
             }
           }
@@ -86,7 +85,7 @@
       "additionalProperties": false,
       "properties": {
         "label": { "type": "string", "description": "Human-readable identifier of the data item, e.g. \"canvas_page 8 (default revision, nl)\"." },
-        "violations": { "type": "array", "items": { "$ref": "#/definitions/violation" } }
+        "violations": { "type": "array", "items": { "$ref": "#/$defs/violation" } }
       }
     },
     "violation": {
@@ -102,9 +101,8 @@
     "updatesExecutedEntry": {
       "description": "update_path_executed: the Canvas schema version and its post-update state.",
       "allOf": [
-        { "$ref": "#/definitions/checkEntry" },
+        { "$ref": "#/$defs/checkEntry" },
         {
-          "type": "object",
           "properties": {
             "details": {
               "type": "object",
@@ -123,9 +121,8 @@
     "codeTaggedReleasesEntry": {
       "description": "code_tagged_releases: installed extensions that are development checkouts. A dev checkout is an advisory RISK, not a problem: it disables incremental result reuse but never fails the run.",
       "allOf": [
-        { "$ref": "#/definitions/checkEntry" },
+        { "$ref": "#/$defs/checkEntry" },
         {
-          "type": "object",
           "properties": {
             "details": {
               "type": "object",
@@ -142,9 +139,8 @@
     "updatesEscapedConfigEntry": {
       "description": "update_path_escaped_config: config entities with a detectable pending migration.",
       "allOf": [
-        { "$ref": "#/definitions/checkEntry" },
+        { "$ref": "#/$defs/checkEntry" },
         {
-          "type": "object",
           "properties": {
             "details": {
               "type": "object",
