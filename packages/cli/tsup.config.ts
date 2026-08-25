@@ -17,7 +17,8 @@ export default defineConfig({
     '@drupal-canvas/json-schema-validation',
     '@drupal-canvas/vite-compat',
   ],
-  // Bundled CommonJS format validators load punycode dynamically.
+  // The bundled CommonJS validators from ajv-formats-draft2019 load punycode
+  // dynamically, so the ESM CLI bundle must provide require.
   banner: {
     js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
   },
