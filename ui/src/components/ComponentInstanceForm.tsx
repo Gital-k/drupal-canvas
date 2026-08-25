@@ -6,7 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
-import { Spinner, Text } from '@radix-ui/themes';
+import { Box, Spinner, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import EmptyStateCallout from '@/components/EmptyStateCallout';
@@ -43,6 +43,8 @@ import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import { isPropSourceComponent } from '@/types/Component';
 import parseHyperscriptifyTemplate from '@/utils/parse-hyperscriptify-template';
 
+import useGetComponentName from '../hooks/useGetComponentName';
+
 import type {
   ComponentModel,
   EvaluatedComponentModel,
@@ -77,9 +79,10 @@ const ComponentInstanceFormRenderer: React.FC<
     selectedComponentType,
     selectedComponent,
     editorFrameContext,
+    node: selectedNode,
     components,
   } = inputAndUiData;
-
+  const selectedComponentName = useGetComponentName(selectedNode ?? null);
   const [jsxFormContent, setJsxFormContent] =
     useState<React.ReactElement | null>(null);
   const [currentComponentId, setCurrentComponentId] = useState<string | null>(
@@ -270,9 +273,16 @@ const ComponentInstanceFormRenderer: React.FC<
         ref={formRef}
       >
         {persistentTransforms.current && (
-          <TransformsContext.Provider value={persistentTransforms.current}>
-            {jsxFormContent}
-          </TransformsContext.Provider>
+          <>
+            {selectedComponentName && (
+              <Box mb="-2" mt="3">
+                <Text weight="bold">{selectedComponentName}</Text>
+              </Box>
+            )}
+            <TransformsContext.Provider value={persistentTransforms.current}>
+              {jsxFormContent}
+            </TransformsContext.Provider>
+          </>
         )}
       </div>
     </Spinner>

@@ -1,5 +1,6 @@
 import type {
   ComponentModels,
+  ComponentNode,
   LayoutNode,
 } from '@/features/layout/layoutModelSlice';
 import type { EditorFrameContext } from '@/features/ui/uiSlice';
@@ -16,7 +17,7 @@ export interface InputUIData {
   selectedComponentType: string;
   layout: Array<LayoutNode>;
   model?: ComponentModels;
-  node?: LayoutNode | null;
+  node?: ComponentNode | null;
   version: string;
   editorFrameContext: EditorFrameContext;
 }
