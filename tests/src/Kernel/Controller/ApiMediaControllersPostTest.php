@@ -230,8 +230,10 @@ class ApiMediaControllersPostTest extends CanvasKernelTestBase {
     $file = \reset($files);
     \assert($file instanceof FileInterface);
     // The space survives: it is stored, and the File entity is valid.
-    $this->assertStringEndsWith('/gracie big.jpg', $file->getFileUri());
-    $this->assertCount(0, $file->validate());
+    $uri = $file->getFileUri();
+    self::assertIsString($uri);
+    $this->assertStringEndsWith('/gracie big.jpg', $uri);
+    self::assertEntityIsValid($file);
   }
 
   public function testPostWithoutFile(): void {
