@@ -1,0 +1,20 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Inline image object without allowed schemes
+props:
+  type: object
+  properties:
+    image:
+      title: Image
+      type: object
+      required:
+        - src
+      properties:
+        src:
+          type: string
+          format: uri-reference
+          contentMediaType: image/*
+        alt:
+          type: string
+      examples:
+        - src: https://example.com/cat.png
+          alt: A cat

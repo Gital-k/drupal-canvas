@@ -172,6 +172,9 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
       'sdc.canvas_test_sdc.image-gallery-nonsensical' => [
         'The "maxItems" restriction on arrays (if set) must be at least 2, but got 1 on prop "images". Use a non-array type for single-value props.',
       ],
+      'sdc.canvas_test_sdc.image-inline-without-allowed-schemes' => [
+        'Prop "image/properties/src" targets "image/*" and must declare "x-allowed-schemes" as a non-empty list of URI schemes.',
+      ],
       'sdc.canvas_test_sdc.image-required-with-invalid-example' => [
         'Prop "image" has invalid example value: [src] The property src is required',
       ],
@@ -189,6 +192,9 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
       ],
       'sdc.canvas_test_sdc.image-uri-without-allowed-schemes' => [
         'Prop "image_url" targets "image/*" and must declare "x-allowed-schemes" as a non-empty list of URI schemes.',
+      ],
+      'sdc.canvas_test_sdc.image-uris-without-allowed-schemes' => [
+        'Prop "image_urls/items" targets "image/*" and must declare "x-allowed-schemes" as a non-empty list of URI schemes.',
       ],
       'sdc.canvas_test_sdc.obsolete' => [
         'Component has "obsolete" status',
