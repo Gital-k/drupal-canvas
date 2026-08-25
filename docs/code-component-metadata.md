@@ -1,7 +1,7 @@
 # Code Component metadata
 
-Code Component source directories contain an authored `component.yml` file. Canvas publishes a hand-authored JSON Schema
-for the current document envelope at
+Code Component and Canvas Headless codebases contain an authored `component.yml` file. Canvas publishes a hand-authored
+JSON Schema for the current document envelope at
 <https://git.drupalcode.org/project/canvas/-/raw/1.x/component-metadata.schema.json>.
 
 This is a rolling schema, not a versioned compatibility contract. Copies found in release tags are historical source
@@ -21,7 +21,7 @@ Only `name` and `machineName` are required. Authors may also provide:
 - `slots`; and
 - `dataDependencies.entityFields`.
 
-Canvas validates the raw YAML before applying defaults. It rejects unknown keys. Authors must not provide:
+Canvas CLI validates the raw YAML before applying defaults. It rejects unknown keys. Authors must not provide:
 
 - `type`, which Canvas derives from the component and project mode;
 - `dataDependencies.urls` or `dataDependencies.drupalSettings`, which Canvas derives from source analysis; or
