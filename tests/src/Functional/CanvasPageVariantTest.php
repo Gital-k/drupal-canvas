@@ -359,9 +359,6 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         // @see \Drupal\user\UserAccessControlHandler::checkAccess()
         'user',
       ],
-      // Anonymous users cannot read the referenced User's name, so the SDC's
-      // required `heading` prop stays NULL and rendering it throws.
-      expected_component_render_crash: TRUE,
     );
     // The branding block is rendered using Twig, no Astro island found.
     $this->assertSame([
@@ -420,9 +417,6 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         // @see \Drupal\user\UserAccessControlHandler::checkAccess()
         'user',
       ],
-      // Anonymous users cannot read the referenced User's name, so the SDC's
-      // required `heading` prop stays NULL and rendering it throws.
-      expected_component_render_crash: TRUE,
     );
     $assert_session->pageTextNotContains('Eddy the Admin');
 
@@ -484,9 +478,6 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         // @see \Drupal\user\UserAccessControlHandler::checkAccess()
         'user',
       ],
-      // Anonymous users cannot read the referenced User's name, so the SDC's
-      // required `heading` prop stays NULL and rendering it throws.
-      expected_component_render_crash: TRUE,
     );
     // The branding block is NOT rendered by Twig anymore, Astro island found,
     // using the branding Block component instance UUID.
@@ -541,9 +532,6 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         // @see \Drupal\user\UserAccessControlHandler::checkAccess()
         'user',
       ],
-      // Anonymous users cannot read the referenced User's name, so the SDC's
-      // required `heading` prop stays NULL and rendering it throws.
-      expected_component_render_crash: TRUE,
     );
     // Ensure the auto-saved component is NOT rendered on the front page.
     $this->assertRenderedJavaScriptComponent(
@@ -612,7 +600,7 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     ], $this->getRenderedComponentInstances());
   }
 
-  private function assertPageDisplayVariant(string $expected_page_display_variant_class, array $expected_cacheable_dependencies, array $expected_additional_cache_tags = [], array $expected_additional_cache_contexts = [], bool $expected_component_render_crash = FALSE): void {
+  private function assertPageDisplayVariant(string $expected_page_display_variant_class, array $expected_cacheable_dependencies, array $expected_additional_cache_tags = [], array $expected_additional_cache_contexts = []): void {
     $expected_baseline_cache_tags = [
       // These 3 cache tags originate from \Drupal\user\Form\UserLoginForm.
       'CACHE_MISS_IF_UNCACHEABLE_HTTP_METHOD:form',
@@ -684,17 +672,6 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     ], $expected_additional_cache_contexts);
     $optimized_cache_contexts = $this->container->get(CacheContextsManager::class)->optimizeTokens($expected_cache_contexts);
     $this->assertCacheContexts($optimized_cache_contexts, include_default_contexts: FALSE);
-    if ($expected_component_render_crash) {
-      // One component instance failed to render. The rest of the page is still
-      // delivered, but the response says so: a server error, cached nowhere —
-      // not by Drupal, not by a reverse proxy or CDN in front of it.
-      // @see \Drupal\canvas\EventSubscriber\ComponentRenderFailureSubscriber
-      $this->assertSession()->statusCodeEquals(500);
-      $this->assertSession()->responseHeaderEquals('X-Drupal-Cache-Max-Age', '0 (Uncacheable)');
-      $this->assertSession()->responseHeaderEquals('X-Drupal-Dynamic-Cache', 'UNCACHEABLE (poor cacheability)');
-      $this->assertSession()->responseHeaderEquals('X-Drupal-Cache', 'UNCACHEABLE (response policy)');
-      return;
-    }
     $this->assertSession()->responseHeaderEquals('X-Drupal-Cache-Max-Age', '-1 (Permanent)');
     $expected_dynamic_page_cache_miss = !\in_array('user', $expected_cache_contexts, TRUE)
       ? 'MISS'
