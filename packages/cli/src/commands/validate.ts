@@ -99,13 +99,14 @@ export function validateCommand(program: Command): void {
         const s = p.spinner();
         s.start('Validating components');
 
-        const { results: componentResults } = await validateComponents(
-          discoveryResult,
-          {
+        const { results: componentResults, warnings: validationWarnings } =
+          await validateComponents(discoveryResult, {
             fix: options.fix,
             apiService,
-          },
-        );
+          });
+        for (const warning of validationWarnings) {
+          p.log.warn(warning);
+        }
         for (const result of componentResults) {
           results.push({ ...result, itemType: 'Component' });
         }
