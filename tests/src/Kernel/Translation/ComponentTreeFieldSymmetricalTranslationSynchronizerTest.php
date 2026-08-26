@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Translation;
 
-// cspell:ignore Cliquez
+// cspell:ignore Cliquez Reparented
 
 use Drupal\canvas\ContentTranslation\ComponentTreeFieldSymmetricalTranslationSynchronizer;
 use Drupal\canvas\Entity\Page;
@@ -420,6 +420,113 @@ final class ComponentTreeFieldSymmetricalTranslationSynchronizerTest extends Con
     self::assertSame('_self', $old_fr_list->getComponentTreeItemByUuid($cta_uuid)?->getInputs()['target'],
       'Old revision FR target must remain unchanged.',
     );
+  }
+
+  /**
+   * Tests re-parenting an instance into a different parent and slot.
+   *
+   * Core pairs items using a hash of the *synchronized* properties, which for
+   * a component tree include `parent_uuid` and `slot`. Re-parenting therefore
+   * changes an instance's hash, so core treats a long-lived instance as newly
+   * created and merges it BY DELTA with whatever the non-default translation
+   * held in that position - a different component instance's inputs and label.
+   *
+   * Uses the 'two_column' SDC, which has a `width` prop that 'my-cta' does not,
+   * so leaked inputs surface as a validation error rather than a silent
+   * value swap.
+   *
+   * @see \Drupal\content_translation\FieldTranslationSynchronizer::synchronizeItems()
+   */
+  #[TestWith(['node', 'article', 'field_canvas_test'], 'bundle field (FieldConfig)')]
+  #[TestWith([Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID, 'components'], 'base field (BaseFieldOverride)')]
+  public function testReparentedInstanceKeepsItsOwnInputs(string $entity_type_id, string $bundle, string $field_name): void {
+    $this->setUpSymmetricalContentTranslation($entity_type_id, $bundle, $field_name);
+    $entity_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage($entity_type_id);
+
+    $outer_uuid = 'c3d4e5f6-a7b8-4012-8def-012345678901';
+    $inner_uuid = 'c3d4e5f6-a7b8-4012-8def-012345678902';
+    $first_uuid = 'c3d4e5f6-a7b8-4012-8def-012345678903';
+    $second_uuid = 'c3d4e5f6-a7b8-4012-8def-012345678904';
+
+    $container = static fn (string $uuid, ?string $parent, ?string $slot, int $width): array => [
+      'uuid' => $uuid,
+      'component_id' => 'sdc.canvas_test_sdc.two_column',
+      'component_version' => '::ACTIVE_VERSION_IN_SUT::',
+      'parent_uuid' => $parent,
+      'slot' => $slot,
+      'inputs' => ['width' => $width],
+    ];
+    $cta = static fn (string $uuid, string $parent, string $slot, string $text, string $href): array => [
+      'uuid' => $uuid,
+      'component_id' => 'sdc.canvas_test_sdc.my-cta',
+      'component_version' => '::ACTIVE_VERSION_IN_SUT::',
+      'parent_uuid' => $parent,
+      'slot' => $slot,
+      'inputs' => ['text' => $text, 'href' => $href, 'target' => '_self'],
+    ];
+
+    // A container nested inside a container, one CTA in each of its slots.
+    $entity = $this->createEntityWithDefaultTranslation($entity_type_id, $bundle, $field_name, $entity_storage, [
+      $container($outer_uuid, NULL, NULL, 50),
+      $container($inner_uuid, $outer_uuid, 'column_one', 25),
+      $cta($first_uuid, $inner_uuid, 'column_one', 'Click here', 'https://drupal.org'),
+      $cta($second_uuid, $inner_uuid, 'column_two', 'Read more', 'https://example.com'),
+    ]);
+    self::assertEntityIsValid($entity);
+    $entity->save();
+
+    // Translate both CTAs.
+    $translation = $entity->addTranslation('fr');
+    $this->container->get(BundleTranslationSettingsInterface::class)
+      ->getTranslationMetadata($translation)
+      ->setSource($entity->language()->getId());
+    $translation->set('title', 'French title')->set($field_name, self::populateActiveComponentVersionPlaceholders([
+      $container($outer_uuid, NULL, NULL, 50),
+      $container($inner_uuid, $outer_uuid, 'column_one', 25),
+      $cta($first_uuid, $inner_uuid, 'column_one', 'Cliquez ici', 'https://drupal.fr'),
+      $cta($second_uuid, $inner_uuid, 'column_two', 'Lire la suite', 'https://exemple.fr'),
+    ]));
+    $entity->save();
+
+    // Remove the inner container and re-parent both CTAs onto the outer one.
+    // Every delta shifts, and both CTAs change `parent_uuid` and `slot`.
+    $entity->set($field_name, self::populateActiveComponentVersionPlaceholders([
+      $container($outer_uuid, NULL, NULL, 50),
+      $cta($first_uuid, $outer_uuid, 'column_one', 'Click here', 'https://drupal.org'),
+      $cta($second_uuid, $outer_uuid, 'column_two', 'Read more', 'https://example.com'),
+    ]));
+    self::assertEntityIsValid($entity);
+    $entity->save();
+
+    self::assertNotNull($entity->id());
+    $stored = $entity_storage->loadUnchanged($entity->id());
+    self::assertInstanceOf(ContentEntityInterface::class, $stored);
+    foreach ([$entity, $stored] as $either) {
+      $fr_translation = $either->getTranslation('fr');
+      $fr_list = $fr_translation->get($field_name);
+      \assert($fr_list instanceof ComponentTreeItemList);
+
+      // No leaked keys: the CTA that moved must not carry the removed
+      // container's `width`.
+      self::assertSameInputs([
+        'text' => 'Cliquez ici',
+        'href' => 'https://drupal.fr',
+        'target' => '_self',
+      ], $fr_list->getComponentTreeItemByUuid($first_uuid)?->getInputs());
+      self::assertSameInputs([
+        'text' => 'Lire la suite',
+        'href' => 'https://exemple.fr',
+        'target' => '_self',
+      ], $fr_list->getComponentTreeItemByUuid($second_uuid)?->getInputs());
+      self::assertSameInputs(['width' => 50], $fr_list->getComponentTreeItemByUuid($outer_uuid)?->getInputs());
+
+      self::assertNull($fr_list->getComponentTreeItemByUuid($inner_uuid), 'Removed instance must be absent.');
+      self::assertResolvedAndStoredInputsAreIdentical($fr_list);
+      // A leaked key is only reported when the translation itself is
+      // validated: ContentEntityBase::validate() covers the active
+      // translation only.
+      self::assertEntityIsValid($fr_translation);
+    }
   }
 
   private static function assertResolvedAndStoredInputsAreIdentical(ComponentTreeItemList $tree): void {
