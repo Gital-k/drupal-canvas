@@ -13,6 +13,7 @@ use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
 use Drupal\Core\Entity\Plugin\DataType\EntityReference;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItemInterface;
+use Drupal\Core\Http\Exception\CacheableNotFoundHttpException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\Attribute\DataType;
 use Drupal\Core\TypedData\Plugin\DataType\Uri;
@@ -50,8 +51,16 @@ class ComputedEntityCanonicalRelativeUrl extends Uri implements DependentPluginI
     $entity_reference_property = $field_item->get('entity');
     \assert($entity_reference_property instanceof EntityReference);
     $referenced_entity_adapter = $entity_reference_property->getTarget();
+    // The referenced entity may failed to load for some reason — typically
+    // because it was deleted.
+    if ($referenced_entity_adapter === NULL) {
+      // Best-effort attempt to construct the cache tag of the referenced
+      // entity that became impossible to load.
+      // @see \Drupal\Core\Entity\EntityBase::getCacheTagsToInvalidate()
+      $likely_entity_cache_tag = sprintf('%s:%s', $entity_reference_property->getTargetDefinition(), $entity_reference_property->getTargetIdentifier());
+      throw new CacheableNotFoundHttpException((new CacheableMetadata())->setCacheTags([$likely_entity_cache_tag]));
+    }
     \assert($referenced_entity_adapter instanceof EntityAdapter);
-
     return $referenced_entity_adapter->getEntity();
   }
 
@@ -68,9 +77,19 @@ class ComputedEntityCanonicalRelativeUrl extends Uri implements DependentPluginI
   private function computeValue(): ?MaybeUrl {
     \assert($this->isComputed === FALSE);
 
-    $referenced_entity = $this->getReferencedEntity();
-    if ($referenced_entity === NULL) {
-      $this->cacheability = new CacheableMetadata();
+
+    try {
+      $referenced_entity = $this->getReferencedEntity();
+      if ($referenced_entity === NULL) {
+        $this->cacheability = new CacheableMetadata();
+        return NULL;
+      }
+    }
+    catch (CacheableNotFoundHttpException $e) {
+      // Ensure that referenced-but-deleted entities' cacheability is still
+      // respected, so that if they are recreated, cached results are re-
+      // computed.
+      $this->cacheability = CacheableMetadata::createFromObject($e);
       return NULL;
     }
 
@@ -128,7 +147,14 @@ class ComputedEntityCanonicalRelativeUrl extends Uri implements DependentPluginI
    *   EntityReferenceItem::calculateDependencies()
    */
   public function calculateDependencies(): array {
-    $referenced_entity = $this->getReferencedEntity();
+    try {
+      $referenced_entity = $this->getReferencedEntity();
+    }
+    catch (CacheableNotFoundHttpException $e) {
+      // Even though this is an entity reference field with an invalid reference
+      // it should not break content/config import/export.
+      $referenced_entity = NULL;
+    }
     return $referenced_entity === NULL
       ? []
       : ['content' => [$referenced_entity->getConfigDependencyName()]];
