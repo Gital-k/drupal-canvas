@@ -906,7 +906,10 @@ test.describe('brand kit colors', () => {
     await expect(redSwatch).toHaveCSS('background-color', 'rgb(0, 0, 255)');
   });
 
-  test('shows a new color before the create completes', async ({
+  // A single scenario covers the held create and the rejected edit: the
+  // site install in the setup dominates the run time, so the two flows share
+  // one, without weakening what either asserts.
+  test('shows a new color before the create completes and rolls back a rejected edit', async ({
     page,
     drupal,
     canvas,
@@ -946,15 +949,18 @@ test.describe('brand kit colors', () => {
     );
     await expect(page.locator(POP_SEL)).toBeHidden();
 
+    // Let the create and the reconcile refetch it triggers settle, so the
+    // list is not re-rendering under the second flow's clicks.
+    const reconciled = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        response.url().includes('/canvas/api/v0/config/brand_kit/'),
+    );
     releaseWrite();
+    await reconciled;
     await expect(page.locator(SEL.row('Impatient Amber'))).toBeVisible();
-  });
 
-  test('rolls back a rejected color edit', async ({ page, drupal, canvas }) => {
-    await drupal.login({ username: 'colormaster', password: 'colormaster' });
-    await canvas.openCanvasRoot();
-    await canvas.openBrandKitPanel();
-
+    // Second flow: a rejected edit rolls back.
     // Capture the stored color rather than hard-coding the hsl() conversion,
     // so this asserts "restored to what it was" without depending on how the
     // browser rounds the components.
