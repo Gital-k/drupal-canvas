@@ -31,6 +31,7 @@
         "jangregor/phpstan-prophecy": "2.3.0",
         "league/openapi-psr7-validator": "^0.22.0",
         "mglaman/phpstan-drupal": "2.0.15",
+        "palantirnet/drupal-rector": "^1.0@beta",
         "phpat/phpat": "0.12.4",
         "phpstan/phpstan": "2.2.3",
         "phpstan/phpstan-strict-rules": "2.0.11",
@@ -53,6 +54,15 @@
         "fix:phpcbf": "@phpcbf",
         "fix": [
             "@fix:phpcbf"
+        ],
+        "lint:chase-upstream:rector-core": "ROOT=$(composer run composer-root) && export RECTOR_MIN_CORE=$(php $(pwd)/scripts/resolve-min-core.php $(pwd) ${ROOT}/vendor/autoload.php) && composer --working-dir=${ROOT} exec rector -- process --config $(pwd)/rector.php --dry-run $(pwd)",
+        "lint:chase-upstream": [
+            "@lint:chase-upstream:rector-core"
+        ],
+        "chase-upstream:rector-core": "ROOT=$(composer run composer-root) && export RECTOR_MIN_CORE=$(php $(pwd)/scripts/resolve-min-core.php $(pwd) ${ROOT}/vendor/autoload.php) && composer --working-dir=${ROOT} exec rector -- process --config $(pwd)/rector.php $(pwd)",
+        "chase-upstream": [
+            "@chase-upstream:rector-core",
+            "@fix"
         ]
     },
     "scripts-descriptions": {
@@ -62,6 +72,10 @@
         "phpcbf": "(deprecated), use `fix:phpcbf`.",
         "phpstan": "(deprecated), use `lint:phpstan`.",
         "lint:phpcs": "Runs PHPCS using Canvas' rules, generates CI artifact.",
+        "lint:chase-upstream:rector-core": "Reports (dry-run) upstream Drupal core changes Rector can chase, keeping BC down to Canvas' minimum supported core.",
+        "lint:chase-upstream": "Reports upstream Drupal core changes Rector can chase, without modifying files.",
+        "chase-upstream:rector-core": "Applies Rector rules that chase upstream Drupal core changes, keeping BC down to Canvas' minimum supported core.",
+        "chase-upstream": "Applies Rector rules that chase upstream Drupal core changes, then runs phpcbf.",
         "fix:phpcbf": "Fixes all auto-fixable PHPCS errors.",
         "lint:phpstan": "Runs PHPStan using Canvas' rules, generates CI artifact.",
         "phpstan-regenerate-ignores-for-non-min-core-version-features": "Regenerates PHPStan baseline for Canvas-provided features that require a core version beyond the minimum supported version.",
