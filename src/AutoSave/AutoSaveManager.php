@@ -1129,8 +1129,10 @@ class AutoSaveManager implements EventSubscriberInterface {
       // Advance `original_hash` before `saveEntity()` so the preservation
       // guard in `saveEntity()` picks up the already-advanced hash in a
       // single write.
-      $this->setStoredEntityHash(
-        self::getAutoSaveKey($autoSaveEntity),
+      // Key-value-staged entries carry the hash themselves; workspace-staged
+      // entries record it in the staging metadata.
+      $this->workspaceAutoSave->advanceStagedEntryOriginalHash(
+        $autoSaveEntity,
         // Hash the freshly-saved stored entity, not the auto-save draft.
         self::generateHash(self::normalizeEntity($entity)),
       );
@@ -1171,23 +1173,6 @@ class AutoSaveManager implements EventSubscriberInterface {
       return $entity->isNew();
     }
     return (string) $entity->label() == ApiContentControllers::defaultTitle($entity->getEntityType()) || str_ends_with((string) $entity->label(), self::ENTITY_DUPLICATE_SUFFIX);
-  }
-
-  /**
-   * Sets $current_hash into the stored auto-save item's original_hash key.
-   *
-   * Callers are responsible for any cache invalidation that follows, since the
-   * appropriate scope differs per call site.
-   *
-   * @param AutoSaveEntry|null $auto_save_item
-   */
-  private function setStoredEntityHash(string $auto_save_item_key, string $current_hash, ?array $auto_save_item = NULL): void {
-    if (\is_null($auto_save_item)) {
-      $auto_save_item = $this->autoSaveStore->get($auto_save_item_key);
-      \assert(!\is_null($auto_save_item));
-    }
-    $auto_save_item[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] = $current_hash;
-    $this->autoSaveStore->set($auto_save_item_key, $auto_save_item);
   }
 
 }
