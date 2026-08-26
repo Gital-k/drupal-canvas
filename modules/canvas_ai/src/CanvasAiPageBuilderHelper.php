@@ -477,8 +477,12 @@ class CanvasAiPageBuilderHelper {
   /**
    * Gets the component context from the config.
    *
+   * Only enabled sources are returned. The shipped default has every source
+   * present but disabled, so callers fall back to the live component list
+   * until an administrator enables a source on the settings form.
+   *
    * @return array
-   *   The component context array.
+   *   The component context array, keyed by source plugin id.
    */
   public function getComponentContextFromConfig(): array {
     $config = $this->configFactory->get('canvas_ai.component_description.settings');

@@ -1,0 +1,14 @@
+langcode: en
+component_context:
+  block:
+    enabled: false
+    data: |
+      {}
+  js:
+    enabled: false
+    data: |
+      {}
+  sdc:
+    enabled: false
+    data: |
+      {}
