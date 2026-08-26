@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\Core\Extension\ModuleExtensionList;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use JsonSchema\Constraints\Constraint;
 use JsonSchema\Validator;
@@ -18,12 +17,12 @@ use Symfony\Component\Yaml\Yaml;
  */
 #[Group('canvas')]
 #[RunTestsInSeparateProcesses]
-class ComponentMetadataSchemaTest extends KernelTestBase {
+class ComponentMetadataSchemaTest extends CanvasKernelTestBase {
 
   /**
    * {@inheritdoc}
    */
-  protected static $modules = CanvasKernelTestBase::CANVAS_KERNEL_TEST_MINIMAL_MODULES;
+  protected static $modules = self::CANVAS_KERNEL_TEST_MINIMAL_MODULES;
 
   /**
    * Tests the shared metadata fixtures.
