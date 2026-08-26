@@ -11,6 +11,7 @@ use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\Plugin\Validation\Constraint\EntityChangedConstraint;
+use Drupal\workspaces\WorkspaceManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -48,8 +49,8 @@ final class CanvasAwareEntityChangedConstraintValidator extends ConstraintValida
    */
   public static function create(ContainerInterface $container): static {
     return new static(
-      $container->get('entity_type.manager'),
-      $container->has('workspaces.manager') ? $container->get('workspaces.manager') : NULL,
+      $container->get(EntityTypeManagerInterface::class),
+      $container->has(WorkspaceManagerInterface::class) ? $container->get(WorkspaceManagerInterface::class) : NULL,
     );
   }
 

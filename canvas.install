@@ -10,6 +10,8 @@ use Drupal\canvas\Entity\CanvasAutoSaveSnapshot;
 use Drupal\canvas\Health\HealthCheck;
 use Drupal\canvas\Health\HealthRecords;
 use Drupal\Core\Datetime\DateFormatterInterface;
+use Drupal\Core\Entity\EntityLastInstalledSchemaRepositoryInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Extension\Requirement\RequirementSeverity;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
@@ -201,7 +203,7 @@ function canvas_update_11200(): void {
  */
 function canvas_update_11201(): void {
   /** @var \Drupal\Core\Entity\EntityLastInstalledSchemaRepositoryInterface $repository */
-  $repository = \Drupal::service('entity.last_installed_schema.repository');
+  $repository = \Drupal::service(EntityLastInstalledSchemaRepositoryInterface::class);
   if ($repository->getLastInstalledDefinition(CanvasAutoSaveSnapshot::ENTITY_TYPE_ID) === NULL) {
     $definition = \Drupal::entityTypeManager()->getDefinition(CanvasAutoSaveSnapshot::ENTITY_TYPE_ID);
     \Drupal::entityDefinitionUpdateManager()->installEntityType($definition);
@@ -222,6 +224,6 @@ function _canvas_ensure_workspaces_module_enabled(): void {
     return;
   }
   /** @var \Drupal\Core\Extension\ModuleInstallerInterface $installer */
-  $installer = \Drupal::service('module_installer');
+  $installer = \Drupal::service(ModuleInstallerInterface::class);
   $installer->install(['workspaces']);
 }

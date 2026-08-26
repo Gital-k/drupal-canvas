@@ -51,6 +51,7 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
 use Drupal\user\UserInterface;
+use Drupal\workspaces\WorkspaceManagerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
@@ -1429,7 +1430,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     // storage fetched before it keeps serving the entity from its own caches,
     // which would hide anything the publish request wrote.
     self::assertNotNull($page->id());
-    $saved_page = $this->container->get('entity_type.manager')
+    $saved_page = $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage('canvas_page')
       ->loadUnchanged($page->id());
     \assert($saved_page instanceof Page);
@@ -1575,7 +1576,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         $this->container->get(ComponentTreeLoader::class),
         $this->container->get(ModuleHandlerInterface::class),
         $this->container->get(WorkspaceAutoSave::class),
-        workspaceManager: $this->container->get('workspaces.manager'),
+        workspaceManager: $this->container->get(WorkspaceManagerInterface::class),
     ));
 
     $response = $this->makePublishAllRequest([

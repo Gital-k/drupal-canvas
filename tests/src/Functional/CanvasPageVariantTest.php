@@ -674,7 +674,7 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     // workspaces adds the required 'workspace' cache context to every render
     // array.
     // @see \Drupal\workspaces\WorkspacesServiceProvider
-    if ($this->container->get('module_handler')->moduleExists('workspaces')) {
+    if ($this->container->get(ModuleHandlerInterface::class)->moduleExists('workspaces')) {
       $expected_cache_contexts[] = 'workspace';
     }
     $optimized_cache_contexts = $this->container->get(CacheContextsManager::class)->optimizeTokens($expected_cache_contexts);
