@@ -25,6 +25,21 @@ examples:
   - Hello, world!
 ```
 
+### Multiline text
+
+Plain text spanning multiple lines, entered in a textarea. Stored as a string
+value. The `pattern` is what distinguishes it from `Text`: it allows newline
+characters, and is the only pattern Canvas supports.
+
+```yaml
+type: string
+pattern: (.|\r?\n)*
+examples:
+  - |
+    Hello, world!
+    This text spans multiple lines.
+```
+
 ### Formatted text
 
 Rich text content with HTML formatting support, displayed in a block context.

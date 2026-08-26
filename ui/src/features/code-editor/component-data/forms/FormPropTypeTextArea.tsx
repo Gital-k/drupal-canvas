@@ -18,14 +18,23 @@ import type { CodeComponentProp } from '@/types/CodeComponent';
 
 import styles from '@/features/code-editor/component-data/FormElement.module.css';
 
-export default function FormPropTypeFormattedText({
+/**
+ * Textarea widget shared by the prop types whose value spans multiple lines.
+ *
+ * Used by both the `formattedText` and `multilineText` prop types, which differ
+ * only in the schema they serialize to and in the example value prefilled when
+ * the prop is required. That is what `derivedType` keys into DEFAULT_EXAMPLES for.
+ */
+export default function FormPropTypeTextArea({
   id,
   example,
   isDisabled = false,
   required,
+  derivedType,
 }: Pick<CodeComponentProp, 'id' | 'example'> & {
   isDisabled?: boolean;
   required: boolean;
+  derivedType: 'formattedText' | 'multilineText';
 }) {
   const dispatch = useAppDispatch();
   const { showRequiredError, setShowRequiredError } = useRequiredProp(
@@ -35,11 +44,11 @@ export default function FormPropTypeFormattedText({
       dispatch(
         updateProp({
           id,
-          updates: { example: DEFAULT_EXAMPLES.formattedText },
+          updates: { example: DEFAULT_EXAMPLES[derivedType] },
         }),
       );
     },
-    [dispatch, id],
+    [dispatch, id, derivedType],
   );
 
   return (

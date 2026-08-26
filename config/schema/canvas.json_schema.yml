@@ -139,6 +139,18 @@ canvas.json_schema.prop_shape.string:
             - uri-reference
             - iri
             - iri-reference
+    pattern:
+      requiredKey: false
+      type: string
+      label: 'Pattern'
+      constraints:
+        Choice:
+          # Only the catch-all "any character, including newlines" pattern is
+          # supported: it is the only one Canvas can match to a storable prop
+          # shape (a `string_long` field using the `string_textarea` widget).
+          # @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
+          choices:
+            - '(.|\r?\n)*'
     contentMediaType:
       requiredKey: false
       type: string
