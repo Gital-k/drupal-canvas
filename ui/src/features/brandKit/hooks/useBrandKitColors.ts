@@ -25,8 +25,9 @@ export const useBrandKitColors = () => {
   } = useGetAutoSaveQuery(BRAND_KIT_ID);
 
   // Colors intentionally come from the canonical Brand kit vs autosave: the
-  // draft can only repeat or lag this list, and a lagging response would undo
-  // an in-flight optimistic edit.
+  // draft re-derives them from the same `canvas.color.*` entities, so it can
+  // only repeat or lag this list, and a lagging read would undo an optimistic
+  // edit.
   const sourceColors = useMemo(
     () => canonicalBrandKit?.colors ?? [],
     [canonicalBrandKit?.colors],

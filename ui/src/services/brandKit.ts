@@ -179,7 +179,7 @@ export const brandKitApi = createApi({
       },
       invalidatesTags: [
         { type: 'BrandKits', id: 'LIST' },
-        { type: 'BrandKits', id: 'global' },
+        { type: 'BrandKits', id: BRAND_KIT_ID },
       ],
     }),
     updateColor: builder.mutation<
@@ -223,7 +223,7 @@ export const brandKitApi = createApi({
       }),
       invalidatesTags: [
         { type: 'BrandKits', id: 'LIST' },
-        { type: 'BrandKits', id: 'global' },
+        { type: 'BrandKits', id: BRAND_KIT_ID },
       ],
     }),
     getColorUsageDetails: builder.query<ColorUsageDetailsResponse, string>({
