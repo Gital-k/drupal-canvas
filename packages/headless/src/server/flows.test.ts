@@ -19,6 +19,9 @@ const FLAG_COOKIE = '__test_bypass';
 const validClaims = {
   path: '/node/1',
   resourceVersion: 'rel:working-copy',
+  previewContext: {
+    viewMode: 'teaser',
+  },
   sub: '42',
   renewUrl: 'https://drupal.example/canvas-headless/renew',
 };
@@ -128,6 +131,7 @@ describe('redeemAssertion', () => {
       expect(result.draftData).toMatchObject({
         path: '/node/1',
         resourceVersion: 'rel:working-copy',
+        previewContext: validClaims.previewContext,
         sub: '42',
         renewUrl: validClaims.renewUrl,
         accessToken: 'access-token-value',
@@ -542,7 +546,13 @@ describe('fetchPage', () => {
     const { server, seedSession } = makeServer(
       fetchImpl as unknown as typeof fetch,
     );
-    seedSession(liveDraftData());
+    seedSession(
+      liveDraftData({
+        previewContext: {
+          viewMode: 'teaser',
+        },
+      }),
+    );
 
     await expect(server.fetchPage('/example')).resolves.toEqual({
       ...page,
@@ -550,7 +560,7 @@ describe('fetchPage', () => {
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       new URL(
-        'https://drupal.example/canvas/content-api?requestUri=%2Fexample',
+        'https://drupal.example/canvas/content-api?requestUri=%2Fexample&viewMode=teaser',
       ),
       expect.objectContaining({
         headers: {
@@ -559,6 +569,30 @@ describe('fetchPage', () => {
         },
       }),
     );
+  });
+
+  it('fetches a component through the existing entity draft session', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(Response.json(page));
+    const { server, seedSession } = makeServer(
+      fetchImpl as unknown as typeof fetch,
+    );
+    seedSession(
+      liveDraftData({
+        path: '/example?language=fr',
+      }),
+    );
+
+    await server.fetchComponentPreview('js.example');
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      new URL(
+        'https://drupal.example/canvas/content-api?requestUri=%2Fexample%3Flanguage%3Dfr&componentId=js.example',
+      ),
+      expect.any(Object),
+    );
+    expect(await server.getDraftData()).toMatchObject({
+      path: '/example?language=fr',
+    });
   });
 
   it('keeps an expired draft session anonymous and marker-free', async () => {

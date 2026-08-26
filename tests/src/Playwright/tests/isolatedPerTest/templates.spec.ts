@@ -43,8 +43,10 @@ test.describe('Templates - General', () => {
     await canvas.openTemplatesPanel();
 
     await expect(page.locator('.primaryPanelContent')).toMatchAriaSnapshot(`
-      - button "Add new template":
+      - button "New content template":
         - img
+      - button "Page templates" [expanded]
+      - region "Page templates"
     `);
 
     await canvas.addTemplate('Page', 'Full content');

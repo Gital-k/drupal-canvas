@@ -1,6 +1,9 @@
 {
   "name": "@drupal-canvas/headless-tanstack-start",
-  "version": "0.0.3",
+  "version": "0.4.0",
+  "engines": {
+    "node": ">=22.19.0 <23 || >=24.5.0"
+  },
   "description": "TanStack Start adapter for the Drupal Canvas Headless SDK.",
   "license": "MIT",
   "repository": {
@@ -36,6 +39,11 @@
       "types": "./src/client/index.ts",
       "default": "./src/client/index.ts"
     },
+    "./head": {
+      "import": "./src/head.ts",
+      "types": "./src/head.ts",
+      "default": "./src/head.ts"
+    },
     "./vite": {
       "import": "./src/vite.ts",
       "types": "./src/vite.ts",
@@ -45,6 +53,11 @@
       "import": "./src/canvas-component-tree.tsx",
       "types": "./src/canvas-component-tree.tsx",
       "default": "./src/canvas-component-tree.tsx"
+    },
+    "./ComponentPreview": {
+      "import": "./src/component-preview.tsx",
+      "types": "./src/component-preview.tsx",
+      "default": "./src/component-preview.tsx"
     }
   },
   "scripts": {
@@ -52,8 +65,8 @@
     "type-check": "tsc --noEmit --pretty"
   },
   "dependencies": {
-    "@drupal-canvas/headless": "^0.1.1",
-    "@drupal-canvas/headless-react": "^0.1.1"
+    "@drupal-canvas/headless": "^0.5.0",
+    "@drupal-canvas/headless-react": "^0.3.1"
   },
   "peerDependencies": {
     "@tanstack/react-router": ">=1.130.0",

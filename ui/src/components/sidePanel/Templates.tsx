@@ -11,6 +11,7 @@ import {
 } from '@/components/form/components/Accordion';
 import TemplateList from '@/components/list/TemplateList';
 import PermissionCheck from '@/components/PermissionCheck';
+import PageVariants from '@/components/sidePanel/PageVariants';
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import {
@@ -29,8 +30,10 @@ const Templates = () => {
     canvasSettings?.contentTemplateEntityTypes ??
     ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
   const entityTypeIds = Object.keys(supportedEntityTypes);
-  const [openEntityTypes, setOpenEntityTypes] =
-    useState<string[]>(entityTypeIds);
+  const [openEntityTypes, setOpenEntityTypes] = useState<string[]>([
+    ...entityTypeIds,
+    'page-templates',
+  ]);
   const { data } = useGetContentTemplatesQuery();
 
   const visibleEntityTypeIds = entityTypeIds.filter((entityTypeId) => {
@@ -58,18 +61,31 @@ const Templates = () => {
         </Flex>
       </PermissionCheck>
       <AccordionRoot value={openEntityTypes}>
-        {visibleEntityTypeIds.map((entityTypeId) => (
+        <PermissionCheck hasPermission="contentTemplates">
+          {visibleEntityTypeIds.map((entityTypeId) => (
+            <AccordionDetails
+              key={entityTypeId}
+              value={entityTypeId}
+              title={supportedEntityTypes[entityTypeId].bundleCollectionLabel}
+              onTriggerClick={() => onClickHandler(entityTypeId)}
+            >
+              <ErrorBoundary title="An unexpected error has occurred while fetching templates.">
+                <TemplateList entityTypeId={entityTypeId} />
+              </ErrorBoundary>
+            </AccordionDetails>
+          ))}
+        </PermissionCheck>
+        <PermissionCheck hasPermission="pageVariants">
           <AccordionDetails
-            key={entityTypeId}
-            value={entityTypeId}
-            title={supportedEntityTypes[entityTypeId].bundleCollectionLabel}
-            onTriggerClick={() => onClickHandler(entityTypeId)}
+            value="page-templates"
+            title="Page templates"
+            onTriggerClick={() => onClickHandler('page-templates')}
           >
-            <ErrorBoundary title="An unexpected error has occurred while fetching templates.">
-              <TemplateList entityTypeId={entityTypeId} />
+            <ErrorBoundary title="An unexpected error has occurred while fetching page templates.">
+              <PageVariants />
             </ErrorBoundary>
           </AccordionDetails>
-        ))}
+        </PermissionCheck>
       </AccordionRoot>
     </>
   );
@@ -87,7 +103,7 @@ const AddTemplateButton = () => {
         onClick={() => setIsOpen(true)}
       >
         <PlusIcon />
-        Add new template
+        New content template
       </Button>
       {isOpen && <AddTemplateDialog isOpen={isOpen} setIsOpen={setIsOpen} />}
     </>

@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { Option } from 'commander';
 import yaml from 'js-yaml';
+import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
 import { discoverCanvasProject } from '@drupal-canvas/discovery';
 import { resolveHostGlobalCssPath } from '@drupal-canvas/vite-compat';
@@ -25,8 +26,8 @@ import { printCommandIntro } from '../utils/command-intro';
 import { appendCommandSummarySection } from '../utils/command-summary';
 import { contentTemplateToAuthored } from '../utils/content-templates';
 import { ensureTailwindImportAtTop } from '../utils/ensure-global-css-tailwind-import';
+import { pageVariantToAuthoredSpec } from '../utils/page-variants';
 import { pageToAuthoredSpec } from '../utils/pages';
-import { regionToAuthoredSpec } from '../utils/regions';
 import {
   COMMAND_RESULT_REPORT_OPTIONS,
   reportResults,
@@ -36,7 +37,7 @@ import type {
   DiscoveredComponent,
   DiscoveredContentTemplate,
   DiscoveredPage,
-  DiscoveredRegion,
+  DiscoveredPageTemplate,
 } from '@drupal-canvas/discovery';
 import type {
   AssetLibraryBundledSource,
@@ -48,7 +49,7 @@ import type { Component } from '../types/Component';
 import type { ContentTemplateListItem } from '../types/ContentTemplate';
 import type { Metadata } from '../types/Metadata';
 import type { PageListItem } from '../types/Page';
-import type { RegionListItem } from '../types/Region';
+import type { PageVariant } from '../types/PageVariant';
 import type { Result } from '../types/Result';
 import type { CommandSummaryResource } from '../utils/command-summary';
 
@@ -59,10 +60,9 @@ interface PullOptions {
   scope?: string;
   includePages?: boolean;
   includeContentTemplates?: boolean;
-  includeRegions?: boolean;
   pages?: boolean;
   contentTemplates?: boolean;
-  regions?: boolean;
+  pageTemplates?: boolean;
   includeBrandKit?: boolean;
   dir?: string;
   yes?: boolean;
@@ -186,6 +186,29 @@ async function resolveAssetPullDestination(
   return destination;
 }
 
+function sourceCanUseJsx(source: string): boolean {
+  try {
+    parse(source, {
+      sourceType: 'module',
+      plugins: ['jsx'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getPulledJsPath(existingPath: string, source: string): string {
+  const extension = path.extname(existingPath).toLowerCase();
+  if (
+    (extension === '.js' || extension === '.jsx') &&
+    !sourceCanUseJsx(source)
+  ) {
+    return `${existingPath.slice(0, -extension.length)}.tsx`;
+  }
+  return existingPath;
+}
+
 export function buildSkippedLocalOnlyPullResources(
   localOnlyCount: number,
   deleteLocalOnly: boolean,
@@ -212,6 +235,7 @@ export function createComponentsPullTask(
   let components: Record<string, Component> = {};
   const localComponentMap = new Map<string, DiscoveredComponent>();
   let localOnlyComponents: DiscoveredComponent[] = [];
+  let preferJsxForNewComponents = false;
 
   function buildMetadata(component: Component): Metadata {
     const metadata: Metadata = {
@@ -278,6 +302,15 @@ export function createComponentsPullTask(
       for (const discovered of discoveryResult.components) {
         localComponentMap.set(discovered.name, discovered);
       }
+      preferJsxForNewComponents =
+        discoveryResult.components.length > 0 &&
+        discoveryResult.components.every((component) => {
+          if (!component.jsEntryPath) {
+            return false;
+          }
+          const extension = path.extname(component.jsEntryPath).toLowerCase();
+          return extension === '.js' || extension === '.jsx';
+        });
 
       const remoteMachineNames = new Set(
         Object.values(components).map((c) => c.machineName),
@@ -330,17 +363,35 @@ export function createComponentsPullTask(
             }
 
             const dir = path.dirname(discovered.metadataPath);
+            const existingJsPath = discovered.jsEntryPath;
+            const defaultJsPath = existingJsPath ?? path.join(dir, 'index.tsx');
+            const pulledJsPath = component.sourceCodeJs
+              ? getPulledJsPath(defaultJsPath, component.sourceCodeJs)
+              : defaultJsPath;
             await writeComponentFiles(component, {
               metadataPath: discovered.metadataPath,
-              jsPath: discovered.jsEntryPath ?? path.join(dir, 'index.tsx'),
+              jsPath: pulledJsPath,
               cssPath: discovered.cssEntryPath ?? path.join(dir, 'index.css'),
             });
+            if (existingJsPath && pulledJsPath !== existingJsPath) {
+              await fs.rm(existingJsPath);
+            }
           } else {
             const dir = path.join(componentDir, component.machineName);
             await fs.mkdir(dir, { recursive: true });
+            const defaultExtension =
+              preferJsxForNewComponents &&
+              component.sourceCodeJs &&
+              sourceCanUseJsx(component.sourceCodeJs)
+                ? '.jsx'
+                : '.tsx';
+            const defaultJsPath = path.join(dir, `index${defaultExtension}`);
+            const pulledJsPath = component.sourceCodeJs
+              ? getPulledJsPath(defaultJsPath, component.sourceCodeJs)
+              : defaultJsPath;
             await writeComponentFiles(component, {
               metadataPath: path.join(dir, 'component.yml'),
-              jsPath: path.join(dir, 'index.tsx'),
+              jsPath: pulledJsPath,
               cssPath: path.join(dir, 'index.css'),
             });
           }
@@ -620,40 +671,43 @@ export function createContentTemplatesPullTask(
   };
 }
 
-export function createRegionsPullTask(
+export function createPageTemplatesPullTask(
   apiService: ApiService,
-  regionsDir: string,
+  pageTemplatesDir: string,
   skipOverwrite: boolean,
 ): PullTask {
-  let regions: Record<string, RegionListItem> = {};
-  const localRegionMap = new Map<string, DiscoveredRegion>();
+  let pageVariants: Record<string, PageVariant> = {};
+  let defaultVariantId: string | null = null;
+  const localPageTemplateMap = new Map<string, DiscoveredPageTemplate>();
 
   return {
-    startLabel: 'Pulling global regions',
-    stopLabel: 'Pulled global regions',
+    startLabel: 'Pulling page templates',
+    stopLabel: 'Pulled page templates',
 
     async prepare(): Promise<PullTaskPrepareResult> {
-      const [fetched, discoveryResult] = await Promise.all([
-        apiService.listRegions(),
-        discoverCanvasProject({ regionsRoot: regionsDir }),
+      const [fetched, defaultVariant, discoveryResult] = await Promise.all([
+        apiService.listPageVariants(),
+        apiService.getDefaultPageVariant(),
+        discoverCanvasProject({ pageTemplatesRoot: pageTemplatesDir }),
       ]);
 
-      regions = fetched;
-      for (const discovered of discoveryResult.regions) {
-        localRegionMap.set(discovered.region, discovered);
+      pageVariants = fetched;
+      defaultVariantId = defaultVariant.default_page_variant;
+      for (const discovered of discoveryResult.pageTemplates) {
+        localPageTemplateMap.set(discovered.id, discovered);
       }
 
-      const total = Object.keys(regions).length;
+      const total = Object.keys(pageVariants).length;
       if (total === 0) return { summaryLines: [], localOnlyCount: 0 };
 
-      const existingCount = Object.values(regions).filter((r) =>
-        localRegionMap.has(r.region),
+      const existingCount = Object.values(pageVariants).filter((variant) =>
+        localPageTemplateMap.has(variant.id),
       ).length;
       const newCount = total - existingCount;
 
       return {
         summaryLines: [
-          formatSummaryLine('Global regions', total, newCount, existingCount),
+          formatSummaryLine('Page templates', total, newCount, existingCount),
         ],
         localOnlyCount: 0,
       };
@@ -662,42 +716,49 @@ export function createRegionsPullTask(
     async execute(): Promise<PullTaskResult> {
       const results: Result[] = [];
 
-      for (const listItem of Object.values(regions)) {
+      for (const variant of Object.values(pageVariants)) {
         try {
-          const discovered = localRegionMap.get(listItem.region);
+          const discovered = localPageTemplateMap.get(variant.id);
           if (discovered && skipOverwrite) {
             results.push({
-              itemName: listItem.region,
+              itemName: variant.id,
               success: true,
               details: [{ content: 'Skipped (already exists)' }],
             });
             continue;
           }
 
-          const region = await apiService.getRegion(listItem.id);
-
-          const nonJsComponents = region.component_tree.filter(
-            (c) => !c.component_id.startsWith('js.'),
+          // The intrinsic "Page content" marker is part of every variant and
+          // round-trips like any other component; everything else must be a
+          // code component for the authored codebase to build it.
+          const unsupportedComponents = variant.component_tree.filter(
+            (c) =>
+              !c.component_id.startsWith('js.') &&
+              !c.component_id.startsWith('marker.'),
           );
-          if (nonJsComponents.length > 0) {
+          if (unsupportedComponents.length > 0) {
             const unsupported = [
-              ...new Set(nonJsComponents.map((c) => c.component_id)),
+              ...new Set(unsupportedComponents.map((c) => c.component_id)),
             ].join(', ');
             results.push({
-              itemName: region.region,
+              itemName: variant.id,
               success: false,
               details: [
                 {
-                  content: `Skipped: contains unsupported components (${unsupported}). Only code components are supported.`,
+                  content: `Skipped: contains unsupported components (${unsupported}). Only code components and the page content marker are supported.`,
                 },
               ],
             });
             continue;
           }
 
-          const localData = regionToAuthoredSpec(region);
+          const localData = pageVariantToAuthoredSpec(
+            variant,
+            variant.id === defaultVariantId,
+          );
           const filePath =
-            discovered?.path ?? path.join(regionsDir, `${region.region}.json`);
+            discovered?.path ??
+            path.join(pageTemplatesDir, `${variant.id}.json`);
           await fs.mkdir(path.dirname(filePath), { recursive: true });
           await fs.writeFile(
             filePath,
@@ -705,10 +766,10 @@ export function createRegionsPullTask(
             'utf-8',
           );
 
-          results.push({ itemName: region.region, success: true });
+          results.push({ itemName: variant.id, success: true });
         } catch (error) {
           results.push({
-            itemName: listItem.region,
+            itemName: variant.id,
             success: false,
             details: [
               {
@@ -721,8 +782,8 @@ export function createRegionsPullTask(
 
       return {
         results,
-        title: 'Pulled global regions',
-        label: 'Global region',
+        title: 'Pulled page templates',
+        label: 'Page template',
       };
     },
   };
@@ -1064,21 +1125,15 @@ export function pullCommand(program: Command): void {
         .argParser(parseBooleanOption)
         .default(undefined),
     )
-    .addOption(
-      new Option(
-        '--include-regions [enabled]',
-        'Include global regions in the pull operation',
-      )
-        .preset('true')
-        .argParser(parseBooleanOption)
-        .default(undefined),
-    )
     .option('--no-pages', 'Exclude pages from the pull operation')
     .option(
       '--no-content-templates',
       'Exclude content templates from the pull operation',
     )
-    .option('--no-regions', 'Exclude global regions from the pull operation')
+    .option(
+      '--no-page-templates',
+      'Exclude page templates from the pull operation',
+    )
     .addOption(
       new Option(
         '--include-brand-kit [enabled]',
@@ -1108,7 +1163,7 @@ export function pullCommand(program: Command): void {
         const apiService = await createApiService();
         const includesPages = config.includePages;
         const includesContentTemplates = config.includeContentTemplates;
-        const includesRegions = config.includeRegions;
+        const includesPageTemplates = config.includePageTemplates;
         const includesBrandKit = config.includeBrandKit;
 
         // Build pull tasks.
@@ -1141,11 +1196,11 @@ export function pullCommand(program: Command): void {
           );
         }
 
-        if (includesRegions) {
+        if (includesPageTemplates) {
           tasks.push(
-            createRegionsPullTask(
+            createPageTemplatesPullTask(
               apiService,
-              config.regionsDir,
+              config.pageTemplatesDir,
               options.skipOverwrite ?? false,
             ),
           );

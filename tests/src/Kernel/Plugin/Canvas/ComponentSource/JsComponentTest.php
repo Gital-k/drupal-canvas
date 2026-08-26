@@ -47,6 +47,7 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
+use Drupal\Core\Render\AttachmentsInterface;
 use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
@@ -54,6 +55,7 @@ use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
+use Drupal\filter\Entity\FilterFormat;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\link\LinkItemInterface;
 use Drupal\link\LinkTitleVisibility;
@@ -65,6 +67,7 @@ use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
 use Drupal\Tests\canvas\Traits\ComponentTreeItemInstantiatorTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use Drupal\text\TextProcessed;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\Attributes\Group;
@@ -968,6 +971,51 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     }
   }
 
+  /**
+   * A prop's `#attached` assets reach the rendered code component.
+   *
+   * @see \Drupal\filter_test\Plugin\Filter\FilterTestAssets
+   * @legacy-covers ::renderComponent
+   */
+  public function testRenderComponentKeepsPropAttachments(): void {
+    // A text format whose filter attaches an asset library but leaves the text
+    // unchanged; it stands in for a filter that needs assets to render.
+    $this->enableModules(['filter_test']);
+    FilterFormat::create([
+      'format' => 'assets',
+      'name' => 'Assets',
+      'filters' => ['filter_test_assets' => ['status' => TRUE]],
+    ])->save();
+    $this->generateComponentConfig();
+
+    $component = Component::load('js.canvas_test_code_components_interactive');
+    self::assertInstanceOf(ComponentInterface::class, $component);
+    $source = $component->getComponentSource();
+    self::assertInstanceOf(JsComponent::class, $source);
+
+    // The formatted-text value runs through the assets format, so it carries
+    // the filter's library.
+    $name = StaticPropSource::parse([
+      'sourceType' => 'static:field_item:text_long',
+      'expression' => 'ℹ︎text_long␟processed',
+      'value' => ['value' => '<p>Hello, world</p>', 'format' => 'assets'],
+      'sourceTypeSettings' => ['instance' => ['allowed_formats' => ['assets']]],
+    ])->evaluate(NULL, is_required: TRUE);
+    $inputs = [JsComponent::EXPLICIT_INPUT_NAME => ['name' => $name]];
+
+    $island = $source->renderComponent($inputs, $source->getSlotDefinitions(), 'test-uuid');
+    // Core >= 11.4.4 exposes a processed-text property's assets, so the filter's
+    // library reaches the component; older core cannot, so it is absent.
+    // @see \Drupal\text\TextProcessed::getAttachments()
+    // @todo Unconditionally execute the if branch and delete the else branch once Canvas depends on Drupal 11.4.4
+    if (is_a(TextProcessed::class, AttachmentsInterface::class, TRUE)) {
+      self::assertContains('filter/caption', $island['#attached']['library']);
+    }
+    else {
+      self::assertNotContains('filter/caption', $island['#attached']['library'] ?? []);
+    }
+  }
+
   public function testRenderJsComponentPreloadsGlobalFonts(): void {
     $this->generateComponentConfig();
 
@@ -1147,12 +1195,13 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
       self::assertSame(Cache::PERMANENT, $g->getCacheMaxAge());
     };
 
-    // Assert that the two example videos Canvas ships with are rewritten to include
+    // Assert that the example assets Canvas ships with are rewritten to include
     // the relative path on the current site.
     $module_path = \Drupal::service(ModuleExtensionList::class)->getPath('canvas');
-    foreach ([JsComponent::EXAMPLE_VIDEO_HORIZONTAL, JsComponent::EXAMPLE_VIDEO_VERTICAL] as $shipped_video_file) {
-      $generated_url = $source->rewriteExampleUrl($shipped_video_file);
-      self::assertSame(\base_path() . $module_path . $shipped_video_file, $generated_url->getGeneratedUrl());
+    self::assertCount(3, JsComponent::EXAMPLE_URL_ALLOW_LIST);
+    foreach (JsComponent::EXAMPLE_URL_ALLOW_LIST as $shipped_example_file) {
+      $generated_url = $source->rewriteExampleUrl($shipped_example_file);
+      self::assertSame(\base_path() . $module_path . $shipped_example_file, $generated_url->getGeneratedUrl());
       $assert_cacheability($generated_url);
     }
 
@@ -1164,18 +1213,21 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
     // Assert that any other `/ui/assets/…` URL is disallowed, not even one to
     // the containing directory.
     // Rationale: avoid security concerns by not relying on file_exists(),
-    // potential bypasses of that, and instead only have 2 allowed examples.
-    try {
-      self::assertSame('/ui/assets/videos', dirname(JsComponent::EXAMPLE_VIDEO_VERTICAL));
-      $source->rewriteExampleUrl('/ui/assets/videos');
-      $this->fail();
-    }
-    catch (\InvalidArgumentException $e) {
-      self::assertSame('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.', $e->getMessage());
+    // potential bypasses of that, and instead only allow the listed examples.
+    self::assertSame('/ui/assets/videos', dirname(JsComponent::EXAMPLE_VIDEO_VERTICAL));
+    self::assertSame('/ui/assets/documents', dirname(JsComponent::EXAMPLE_DOCUMENT));
+    foreach (['/ui/assets/videos', '/ui/assets/documents'] as $example_directory) {
+      try {
+        $source->rewriteExampleUrl($example_directory);
+        $this->fail();
+      }
+      catch (\InvalidArgumentException $e) {
+        self::assertSame('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.', $e->getMessage());
+      }
     }
 
-    // Assert that neither a prefix nor a suffix is tolerated: only these exact
-    // 2 strings are allowed.
+    // Assert that neither a prefix nor a suffix is tolerated: only the exact
+    // allow-listed strings are allowed.
     // Rationale: configuration management DX is degraded if the example is
     // environment-dependent (Drupal served from root vs subdir, Canvas module
     // installation location).

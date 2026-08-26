@@ -131,7 +131,12 @@ export function CanvasComponentsMixin<
         : undefined;
       await componentLocator.hover();
       await componentLocator.getByLabel('Open contextual menu').click();
-      await this.page.getByText('Insert').click();
+      const insertItem = this.page.getByRole('menuitem', { name: 'Insert' });
+      await expect(insertItem).toBeVisible();
+      await insertItem.click();
+      // The modal menu closing confirms the item's click handler ran (a click
+      // landing during a re-render can be swallowed, leaving the menu open).
+      await expect(insertItem).toBeHidden();
 
       if (waitForVisible && initialCount !== undefined) {
         await expect(this.page.locator(previewSelector)).toHaveCount(
@@ -586,10 +591,22 @@ export function CanvasComponentsMixin<
       });
     }
 
-    async clickPreviewComponent(componentId: string) {
-      const component = this.page.locator(
-        `#canvasPreviewOverlay [data-canvas-component-id="${componentId}"]`,
-      );
+    /**
+     * Selects a component instance in the preview.
+     *
+     * Pass options.index to pick one of several instances of the same
+     * component, in preview order.
+     */
+    async clickPreviewComponent(
+      componentId: string,
+      options: { index?: number } = {},
+    ) {
+      const { index = 0 } = options;
+      const component = this.page
+        .locator(
+          `#canvasPreviewOverlay [data-canvas-component-id="${componentId}"]`,
+        )
+        .nth(index);
 
       // Directly trigger click events via JavaScript because of webkit
       await component.evaluate((el) => {

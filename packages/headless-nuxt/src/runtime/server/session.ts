@@ -1,19 +1,14 @@
 import { getCookie } from 'h3';
-import { isDraftSessionExpired } from '@drupal-canvas/headless';
+import { isDraftSessionExpired, isPageRedirect } from '@drupal-canvas/headless';
 import {
   createDraftServer,
-  isPageRedirect,
   resolveDraftConfig,
 } from '@drupal-canvas/headless/server';
 
 import { createNuxtDraftAdapter, NUXT_DRAFT_FLAG_COOKIE_NAME } from './adapter';
 
-import type { DraftData } from '@drupal-canvas/headless';
-import type {
-  DraftConfig,
-  DraftServer,
-  PageResult,
-} from '@drupal-canvas/headless/server';
+import type { DraftData, PageResult } from '@drupal-canvas/headless';
+import type { DraftConfig, DraftServer } from '@drupal-canvas/headless/server';
 import type { H3Event } from 'h3';
 
 // One draft server per request event. All state lives in the request's
@@ -86,6 +81,14 @@ export function fetchPage(
   return getDraftServer(event).fetchPage(path);
 }
 
+/** Fetches one component preview through the current draft session. */
+export function fetchComponentPreview(
+  event: H3Event,
+  componentId: string,
+): Promise<PageResult | null> {
+  return getDraftServer(event).fetchComponentPreview(componentId);
+}
+
 export { isDraftSessionExpired, isPageRedirect, NUXT_DRAFT_FLAG_COOKIE_NAME };
 export type {
   DrupalRoute,
@@ -94,4 +97,4 @@ export type {
   PageHead,
   PageRedirect,
   PageResult,
-} from '@drupal-canvas/headless/server';
+} from '@drupal-canvas/headless';

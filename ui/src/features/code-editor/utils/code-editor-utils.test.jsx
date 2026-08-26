@@ -184,6 +184,28 @@ describe('Code editor utilities', () => {
         'videoGalleryWithExampleValue',
       ]);
     });
+
+    it('of type document', () => {
+      const result = serializeProps([
+        deserializedPropsFixture[30],
+        deserializedPropsFixture[31],
+      ]);
+      matchSerializedProps(result, [
+        'documentWithNoExampleValue',
+        'documentWithExampleValue',
+      ]);
+    });
+
+    it('of type document library (multi-value)', () => {
+      const result = serializeProps([
+        deserializedPropsFixture[32],
+        deserializedPropsFixture[33],
+      ]);
+      matchSerializedProps(result, [
+        'documentLibraryWithNoExampleValue',
+        'documentLibraryWithExampleValue',
+      ]);
+    });
   });
 
   describe('deserialize props', () => {
@@ -265,6 +287,22 @@ describe('Code editor utilities', () => {
         serializedPropsFixture.videoGalleryWithExampleValue,
       ]);
       matchDeserializedProps(result, [28, 29]);
+    });
+
+    it('of type document', () => {
+      const result = deserializeProps([
+        serializedPropsFixture.documentWithNoExampleValue,
+        serializedPropsFixture.documentWithExampleValue,
+      ]);
+      matchDeserializedProps(result, [30, 31]);
+    });
+
+    it('of type document library (multi-value)', () => {
+      const result = deserializeProps([
+        serializedPropsFixture.documentLibraryWithNoExampleValue,
+        serializedPropsFixture.documentLibraryWithExampleValue,
+      ]);
+      matchDeserializedProps(result, [32, 33]);
     });
 
     it('of type link', () => {
@@ -420,7 +458,7 @@ describe('Code editor utilities', () => {
 
 describe('Code editor preview utilities', () => {
   it('extracts values from props for preview', () => {
-    expect(getPropValuesForPreview(deserializedPropsFixture)).toEqual({
+    expect(getPropValuesForPreview(deserializedPropsFixture, null)).toEqual({
       stringWithNoExampleValue: '',
       stringWithExampleValue: 'Drupal Canvas',
       integerWithNoExampleValue: 0,
@@ -461,6 +499,25 @@ describe('Code editor preview utilities', () => {
       dateWithExampleValue: '2026-01-15',
       dateTimeWithNoExampleValue: '',
       dateTimeWithExampleValue: '2026-01-15T12:34:56.789Z',
+      documentWithNoExampleValue: '',
+      documentWithExampleValue: {
+        src: '/modules/contrib/canvas/ui/assets/documents/sample.pdf',
+        filename: 'sample.pdf',
+        mimetype: 'application/pdf',
+      },
+      documentLibraryWithNoExampleValue: [],
+      documentLibraryWithExampleValue: [
+        {
+          src: '/modules/contrib/canvas/ui/assets/documents/sample.pdf',
+          filename: 'sample.pdf',
+          mimetype: 'application/pdf',
+        },
+        {
+          src: '/modules/contrib/canvas/ui/assets/documents/sample.pdf',
+          filename: 'sample.pdf',
+          mimetype: 'application/pdf',
+        },
+      ],
       videoGalleryWithNoExampleValue: [],
       videoGalleryWithExampleValue: [
         {
@@ -476,8 +533,147 @@ describe('Code editor preview utilities', () => {
   });
 
   it('handles empty props when extracting values for preview', () => {
-    const result = getPropValuesForPreview([]);
+    const result = getPropValuesForPreview([], null);
     expect(result).toEqual({});
+  });
+
+  it('resolves color props with hex value for preview', () => {
+    const colorProp = {
+      id: 'test-color-1',
+      name: 'Test Color Hex',
+      type: 'string',
+      derivedType: 'color',
+      example: '#ff0000ff',
+      $ref: 'json-schema-definitions://canvas.module/color',
+      'x-canvas-color-picker': 'kit-and-free',
+    };
+    const result = getPropValuesForPreview([colorProp], null);
+    expect(result.testColorHex).toEqual({
+      value: {
+        colorSpace: 'srgb',
+        components: [1, 0, 0],
+        alpha: 1,
+        hex: '#ff0000',
+      },
+      cssColorValue: 'rgb(255, 0, 0)',
+      cssVariable: null,
+      colorName: null,
+    });
+  });
+
+  it('resolves color props with canvas-color ref for preview', () => {
+    const brandKitColors = [
+      {
+        id: 'abc-123',
+        name: 'Brand Red',
+        cssVariable: '--brand-red',
+        value: {
+          colorSpace: 'srgb',
+          components: [1, 0, 0],
+          alpha: 0.8,
+          hex: '#ff0000',
+        },
+        weight: 0,
+      },
+    ];
+    const colorProp = {
+      id: 'test-color-2',
+      name: 'Test Color Brand',
+      type: 'string',
+      derivedType: 'color',
+      example: 'canvas-color:abc-123',
+      $ref: 'json-schema-definitions://canvas.module/color',
+      'x-canvas-color-picker': 'kit-only',
+    };
+    const result = getPropValuesForPreview([colorProp], brandKitColors);
+    expect(result.testColorBrand).toEqual({
+      value: {
+        colorSpace: 'srgb',
+        components: [1, 0, 0],
+        alpha: 0.8,
+        hex: '#ff0000',
+      },
+      cssColorValue: 'rgba(255, 0, 0, 0.80)',
+      cssVariable: '--brand-red',
+      colorName: 'Brand Red',
+    });
+  });
+
+  it('returns null for color props with missing brand kit color', () => {
+    const brandKitColors = [];
+    const colorProp = {
+      id: 'test-color-3',
+      name: 'Test Color Missing',
+      type: 'string',
+      derivedType: 'color',
+      example: 'canvas-color:non-existent-uuid',
+      $ref: 'json-schema-definitions://canvas.module/color',
+      'x-canvas-color-picker': 'kit-only',
+    };
+    const result = getPropValuesForPreview([colorProp], brandKitColors);
+    expect(result.testColorMissing).toBeNull();
+  });
+
+  it('returns null for color props with empty example', () => {
+    const colorProp = {
+      id: 'test-color-4',
+      name: 'Test Color Empty',
+      type: 'string',
+      derivedType: 'color',
+      example: '',
+      $ref: 'json-schema-definitions://canvas.module/color',
+      'x-canvas-color-picker': 'free-only',
+    };
+    const result = getPropValuesForPreview([colorProp], null);
+    expect(result.testColorEmpty).toBeNull();
+  });
+
+  it('resolves color props with HSL value for preview', () => {
+    const colorProp = {
+      id: 'test-color-5',
+      name: 'Test Color HSL',
+      type: 'string',
+      derivedType: 'color',
+      example: 'hsl(120, 100%, 50%)',
+      $ref: 'json-schema-definitions://canvas.module/color',
+      'x-canvas-color-picker': 'kit-and-free',
+    };
+    const result = getPropValuesForPreview([colorProp], null);
+    expect(result.testColorHsl).toEqual({
+      value: {
+        colorSpace: 'hsl',
+        components: [120, 100, 50],
+        alpha: null,
+        hex: null,
+      },
+      cssColorValue: 'hsl(120, 100%, 50%)',
+      cssVariable: null,
+      colorName: null,
+    });
+  });
+
+  it('resolves color props with HSLA value for preview', () => {
+    const colorProp = {
+      id: 'test-color-6',
+      name: 'Test Color HSLA',
+      type: 'string',
+      derivedType: 'color',
+      example: 'hsla(240, 50%, 75%, 0.50)',
+      $ref: 'json-schema-definitions://canvas.module/color',
+      'x-canvas-color-picker': 'kit-and-free',
+    };
+    const result = getPropValuesForPreview([colorProp], null);
+    expect(result.testColorHsla).toEqual({
+      value: {
+        colorSpace: 'hsl',
+        components: [240, 50, 75],
+        alpha: 0.5,
+        hex: null,
+      },
+      cssColorValue: 'hsla(240, 50%, 75%, 0.50)',
+      cssVariable: null,
+      colorName: null,
+    });
   });
 });
 
