@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Functional\Update;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSave\Workspace\WorkspaceAutoSave;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
@@ -136,16 +137,25 @@ final class AutoSaveRehashItemsUpdateTest extends CanvasUpdatePathTestBase {
     self::assertArrayHasKey(AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY, $before[$page2_auto_save_key]);
     self::assertSame($item_with_original_hash[AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY], $before[$page2_auto_save_key][AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY]);
 
-    // Run all pending updates (includes 0023).
+    // Run all pending updates: 0026 rehashes the key-value items in place,
+    // then 0031 migrates them into workspace staging and removes the
+    // key-value rows.
+    // @see canvas_post_update_0026_rehash_auto_save_items()
+    // @see canvas_post_update_0031_migrate_auto_save_to_workspace()
     $this->runUpdates();
 
     // Re-obtain services after the update path rebuilds the container.
     $keyvalue_factory = \Drupal::service('keyvalue');
     \assert($keyvalue_factory instanceof KeyValueFactoryInterface);
     $auto_save_store = $keyvalue_factory->get(AutoSaveManager::AUTO_SAVE_STORE);
+    self::assertNull($auto_save_store->get($page1_auto_save_key));
+    self::assertNull($auto_save_store->get($page2_auto_save_key));
 
-    $after = $auto_save_store->getAll();
-    self::assertIsArray($after);
+    $auto_save_manager = \Drupal::service(AutoSaveManager::class);
+    \assert($auto_save_manager instanceof AutoSaveManager);
+    $workspace_auto_save = \Drupal::service(WorkspaceAutoSave::class);
+    \assert($workspace_auto_save instanceof WorkspaceAutoSave);
+    $after = $auto_save_manager->getAllAutoSaveList(FALSE, FALSE);
     self::assertArrayHasKey($page1_auto_save_key, $after);
     self::assertArrayHasKey($page2_auto_save_key, $after);
 
@@ -156,15 +166,23 @@ final class AutoSaveRehashItemsUpdateTest extends CanvasUpdatePathTestBase {
       self::assertNotEmpty($after[$key]['data_hash']);
     }
 
+    // The rehashed original_hash travels with the entry into the workspace
+    // staging metadata.
+    // @see \Drupal\canvas\AutoSave\Workspace\WorkspaceAutoSave::importLegacyArray()
+    $page1_metadata = $workspace_auto_save->getStagedEntryMetadata($page1_auto_save_key);
+    $page2_metadata = $workspace_auto_save->getStagedEntryMetadata($page2_auto_save_key);
+    self::assertIsArray($page1_metadata);
+    self::assertIsArray($page2_metadata);
+
     // Update hook computed original_hash for the page 1 auto-save item, which
     // did not have it before.
-    self::assertArrayHasKey(AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY, $after[$page1_auto_save_key]);
-    self::assertNotEmpty($after[$page1_auto_save_key][AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY], 'original_hash must be recomputed by the rehash update.');
+    self::assertArrayHasKey(AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY, $page1_metadata);
+    self::assertNotEmpty($page1_metadata[AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY], 'original_hash must be computed by the rehash update.');
 
     // Update hook recomputed original_hash for the page 2 auto-save item.
-    self::assertArrayHasKey(AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY, $after[$page2_auto_save_key]);
-    self::assertNotSame($before[$page2_auto_save_key][AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY], $after[$page2_auto_save_key][AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY], 'original_hash must be recomputed by the rehash update.');
-    self::assertNotEmpty($after[$page2_auto_save_key][AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY], 'original_hash must be recomputed by the rehash update.');
+    self::assertArrayHasKey(AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY, $page2_metadata);
+    self::assertNotSame($before[$page2_auto_save_key][AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY], $page2_metadata[AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY]);
+    self::assertNotEmpty($page2_metadata[AutoSaveManager::AUTO_SAVE_STORED_ENTITY_HASH_KEY], 'original_hash must be recomputed by the rehash update.');
   }
 
 }
