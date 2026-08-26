@@ -230,10 +230,8 @@ const ColorFormPopover = ({
   const isRetryRef = useRef(false);
   const isOpenedRef = useRef(false);
 
-  // Initialize once per opening rather than on every render where `color`
-  // changes. A save applies to the Brand kit cache before its request settles,
-  // so `color` moves underneath a form that is being reopened on a rejection,
-  // and re-initializing would discard the values needed to retry.
+  // Initialize once per open cycle so optimistic cache updates do not
+  // overwrite retry values after a failed save.
   useEffect(() => {
     if (!open) {
       isOpenedRef.current = false;
@@ -300,9 +298,8 @@ const ColorFormPopover = ({
 
     const cssVariable = `--${variableName.startsWith('--') ? variableName.slice(2) : variableName}`;
 
-    // The row is added or updated in the list before the request is sent, so
-    // there is nothing here to wait for. Close now; a rejection reopens this
-    // form on these values with the error.
+    // Close immediately because optimistic updates already changed the list;
+    // failed saves reopen with the same values and error.
     onOpenChange(false);
 
     try {

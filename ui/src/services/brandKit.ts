@@ -155,11 +155,8 @@ export const brandKitApi = createApi({
         body,
       }),
       async onQueryStarted(color, { dispatch, queryFulfilled }) {
-        // The server assigns the id, so the row is rendered under a stand-in
-        // until the response carries the real one. Only this list reads it in
-        // that window, and it is swapped rather than left to the reconcile
-        // refetch so the row is never actionable under an id the server does
-        // not know.
+        // Insert a temporary row with a fake client id, then replace it with
+        // the server row so the UI never keeps a fake id.
         const pendingId = `pending-${uuidv4()}`;
         const patchResult = dispatch(
           patchColors((colors) => {
@@ -207,9 +204,8 @@ export const brandKitApi = createApi({
         );
         try {
           await queryFulfilled;
-          // A color prop resolves to a literal value server-side, so a
-          // component can bake the old color into its rendered markup. Only a
-          // re-render picks that up.
+          // Trigger a server preview refresh so it immediately picks up color
+          // edits: a color prop resolves to a literal baked into the markup.
           dispatch(setUpdatePreview(true));
         } catch {
           patchResult.undo();

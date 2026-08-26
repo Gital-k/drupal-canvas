@@ -24,12 +24,9 @@ export const useBrandKitColors = () => {
     error: autoSaveError,
   } = useGetAutoSaveQuery(BRAND_KIT_ID);
 
-  // Colors come from the canonical entry alone. They are separate
-  // `canvas.color.*` entities rather than part of the Brand kit's own config,
-  // so the auto-save draft derives them from those same entities on every read:
-  // it can only repeat the canonical list, or lag it by a response. Preferring
-  // the draft would buy nothing and would race an in-flight optimistic write,
-  // whose patch this response would replace with the pre-edit color.
+  // Colors intentionally come from the canonical Brand kit vs autosave: the
+  // draft can only repeat or lag this list, and a lagging response would undo
+  // an in-flight optimistic edit.
   const sourceColors = useMemo(
     () => canonicalBrandKit?.colors ?? [],
     [canonicalBrandKit?.colors],
