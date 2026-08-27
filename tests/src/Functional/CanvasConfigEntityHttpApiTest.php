@@ -2779,7 +2779,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // That access check runs while the Canvas auto-save workspace is active,
     // which adds the workspace's cache tag as well.
     // @see \Drupal\workspaces\Hook\EntityAccess::bypassAccessResult()
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:bunny', 'node_list:llama', 'user.node_grants:view', 'workspace:canvas_default'], 'UNCACHEABLE (request policy)', 'MISS');
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:bunny', 'node_list:llama', 'workspace:canvas_default'], 'UNCACHEABLE (request policy)', 'MISS');
     // Change the expectation from `NULL` to the entity ID.
     $expected_list_normalization['node']['bundles']['llama']['viewModes']['full']['suggestedPreviewEntityId'] = (int) $node->id();
     $this->assertSame($expected_list_normalization, $body);
@@ -2795,7 +2795,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // Re-retrieve empty list: 200. Dynamic Page Cache miss. Note that the cache
     // tag related to the `bunny` NodeType has disappeared.
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:llama', 'user.node_grants:view', 'workspace:canvas_default'], 'UNCACHEABLE (request policy)', 'MISS');
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:llama', 'workspace:canvas_default'], 'UNCACHEABLE (request policy)', 'MISS');
     unset($expected_list_normalization['node']['bundles']['bunny']['viewModes']['full']);
     $this->assertSame($expected_list_normalization, $body);
 
@@ -2812,7 +2812,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'editFieldsUrl' => NULL,
     ];
     ksort($expected_list_normalization['node']['bundles']);
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:llama', 'user.node_grants:view', 'workspace:canvas_default'], 'UNCACHEABLE (request policy)', 'MISS');
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:llama', 'workspace:canvas_default'], 'UNCACHEABLE (request policy)', 'MISS');
     $this->assertSame($expected_list_normalization, $body);
 
     // PATCH the existing llama template (CLI push path).
