@@ -371,12 +371,24 @@ class AutoSaveManager implements EventSubscriberInterface {
       // @see \Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem::preSave()
       // @see \Drupal\metatag\Plugin\Field\FieldWidget\MetatagFirehose::formElement()
       if ($items->getFieldDefinition()->getType() === 'metatag') {
+        // Guard against a transitional state where the metatag field type is
+        // still registered (e.g. during uninstall) but the module functions are
+        // no longer available. In normal operation metatag is always loaded
+        // when this field type exists.
         $metatag_defaults = \function_exists('metatag_get_default_tags')
           ? \metatag_get_default_tags($entity) ?? []
           : [];
         $values = [];
+        // Canvas only defines this as a single-cardinality field (delta 0).
+        // Delta keys are preserved here to match the stored entity's structure;
+        // revisit if cardinality ever changes.
         foreach ($items->getValue() as $delta => $item) {
-          $tags = Json::decode($item['value'] ?? '[]') ?? [];
+          // Use metatag_data_decode() rather than Json::decode() to handle
+          // legacy serialized blobs (Metatag v1 stored serialized arrays).
+          // @see metatag_data_decode()
+          $tags = \function_exists('metatag_data_decode')
+            ? \metatag_data_decode($item['value'] ?? '')
+            : (Json::decode($item['value'] ?? '[]') ?? []);
           // Match ::preSave()'s loose comparison.
           $tags = \array_filter(
             $tags,
