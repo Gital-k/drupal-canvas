@@ -246,7 +246,7 @@ final class WorkspaceAutoSave {
       }
       $this->applyRecordedDraftPath($active, $key);
       $hash = AutoSaveManager::generateHashFromData(AutoSaveManager::normalizeEntity($active));
-      $unchanged_hash = AutoSaveManager::generateHashFromData(AutoSaveManager::normalizeEntity($original));
+      $unchanged_hash = $this->hashOutsideWorkspace($original);
       if (\hash_equals($unchanged_hash, $hash) && !$this->hasStoredFormViolations($key)) {
         return AutoSaveEntity::empty();
       }
@@ -790,7 +790,7 @@ final class WorkspaceAutoSave {
             $this->applyRecordedDraftPath($translation, $key);
             $data_hash = AutoSaveManager::generateHashFromData(AutoSaveManager::normalizeEntity($translation));
             if ($canonical instanceof ContentEntityInterface && $canonical->hasTranslation($langcode)) {
-              $canonical_hash = AutoSaveManager::generateHashFromData(AutoSaveManager::normalizeEntity($canonical->getTranslation($langcode)));
+              $canonical_hash = $this->hashOutsideWorkspace($canonical->getTranslation($langcode));
               if (\hash_equals($canonical_hash, $data_hash) && !$this->hasStoredFormViolations($key)) {
                 continue;
               }
@@ -1076,6 +1076,22 @@ final class WorkspaceAutoSave {
       $auto_save_start_revision .= '-' . $saved_entity->getChangedTime();
     }
     return $auto_save_start_revision;
+  }
+
+  /**
+   * Hashes an entity's normalized data outside any workspace.
+   *
+   * Computed fields such as the path alias resolve against the active
+   * workspace, so hashing a Live copy while the auto-save workspace is active
+   * (every Canvas API request) would fold staged state into it: a draft whose
+   * only change is the alias would look identical to Live, and conflict
+   * detection would report the Live copy as externally changed.
+   *
+   * @see ::loadUnchangedOutsideWorkspace()
+   */
+  public function hashOutsideWorkspace(EntityInterface $entity): string {
+    $hash = static fn (): string => AutoSaveManager::generateHashFromData(AutoSaveManager::normalizeEntity($entity));
+    return $this->workspaceManager === NULL ? $hash() : $this->workspaceManager->executeOutsideWorkspace($hash);
   }
 
   /**

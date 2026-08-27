@@ -454,7 +454,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     if ($original === NULL) {
       return NULL;
     }
-    return self::generateHash(self::normalizeEntity($original));
+    return $this->workspaceAutoSave->hashOutsideWorkspace($original);
   }
 
   public function getAutoSaveEntity(EntityInterface $entity, bool $bypass_cache = FALSE): AutoSaveEntity {
@@ -803,7 +803,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert(!\is_null($entity));
 
     // Compare the original_hash in auto-save entry vs latest entity hash.
-    if ($entry[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === self::generateHash(self::normalizeEntity($entity))) {
+    if ($entry[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === $this->workspaceAutoSave->hashOutsideWorkspace($entity)) {
       // Hashes are matching - no conflict.
       return NULL;
     }
@@ -876,7 +876,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert(!$entity->isNew());
     $stored = $this->workspaceAutoSave->loadUnchangedOutsideWorkspace($entity->getEntityTypeId(), (string) $entity->id());
     \assert(!\is_null($stored));
-    $current_hash = self::generateHash(self::normalizeEntity($stored));
+    $current_hash = $this->workspaceAutoSave->hashOutsideWorkspace($stored);
     /** @var AutoSaveEntry $auto_save_data */
 
     if ($auto_save_data[self::AUTO_SAVE_STORED_ENTITY_HASH_KEY] === $current_hash) {

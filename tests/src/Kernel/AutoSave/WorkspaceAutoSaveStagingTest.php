@@ -335,6 +335,38 @@ final class WorkspaceAutoSaveStagingTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Live copies are hashed outside the workspace, whatever the active context.
+   *
+   * Computed fields such as the path alias resolve against the active
+   * workspace, so hashing the Live copy while the auto-save workspace is
+   * active (every Canvas API request) would fold the staged alias into it: a
+   * draft whose only change is the alias would look identical to Live and
+   * vanish from the pending changes, and conflict detection would report the
+   * Live copy as externally changed.
+   */
+  public function testLiveCopyIsHashedOutsideTheWorkspace(): void {
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $manager = $this->autoSaveManager();
+    $page = Page::create(['title' => 'Live title', 'path' => ['alias' => '/live-alias']]);
+    $page->save();
+    $key = AutoSaveManager::getAutoSaveKey($page);
+
+    $draft = clone $page;
+    // Carry the alias id so the staged save revises the Live alias in place.
+    // @see \Drupal\canvas\Controller\ApiContentControllers::patch()
+    $draft->set('path', ['alias' => '/draft-alias', 'pid' => $page->get('path')->pid]);
+    $manager->saveEntity($draft);
+    self::assertNotSame(0, $this->trackedRevisionCount('path_alias', '1'), 'The alias change is staged in the workspace.');
+
+    $workspace_manager = $this->container->get(WorkspaceManagerInterface::class);
+    $list = $workspace_manager->executeInWorkspace(AutoSaveWorkspace::ID, static fn (): array => $manager->getAllAutoSaveList(with_entities: FALSE, with_conflicts: TRUE));
+    self::assertArrayHasKey($key, $list, 'A draft whose only change is the alias is a pending change, also when listed inside the workspace.');
+    self::assertArrayNotHasKey(AutoSaveManager::AUTO_SAVE_CONFLICT_KEY, $list[$key], 'The staged alias is not an external change to the Live copy.');
+    self::assertNull($workspace_manager->executeInWorkspace(AutoSaveWorkspace::ID, static fn (): ?string => $manager->getUnresolvedConflictForEntity($page)));
+    self::assertNull($manager->getUnresolvedConflictForEntity($page));
+  }
+
+  /**
    * The Canvas workspace provider locks the workspace down.
    */
   public function testWorkspaceProviderAccess(): void {
