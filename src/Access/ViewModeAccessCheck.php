@@ -49,7 +49,9 @@ class ViewModeAccessCheck implements AccessInterface {
     // @phpstan-ignore-next-line method.notFound
     $access = $this->inner->access($route, $route_match, $account, $view_mode_name, $bundle);
     // AccessResultInterface does not declare addCacheableDependency(), so the
-    // decorated access checker is only allowed to return a refinable result.
+    // decorated access checker is only allowed to return an access result that
+    // is also refinable.
+    \assert($access instanceof AccessResultInterface);
     \assert($access instanceof RefinableCacheableDependencyInterface);
     return $access->addCacheableDependency($cacheable_metadata);
   }

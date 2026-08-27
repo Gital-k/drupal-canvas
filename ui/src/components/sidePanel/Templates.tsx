@@ -213,7 +213,9 @@ const AddTemplateDialog = ({ isOpen, setIsOpen }: TemplateDialogProps) => {
     [data, selectedContentType, selectedEntityType],
   );
 
-  const entityBundleLabels = selectedEntityType
+  // `canvasSettings` is untyped at runtime, so annotate what the controller
+  // guarantees: a map of bundle machine name to bundle label.
+  const entityBundleLabels: Record<string, string> = selectedEntityType
     ? (canvasSettings?.entityTypeLabels?.[selectedEntityType] ?? {})
     : {};
   const showEntityTypeDropdown = entityTypeIds.length > 1;
