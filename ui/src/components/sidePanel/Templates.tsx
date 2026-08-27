@@ -36,13 +36,17 @@ const Templates = () => {
   ]);
   const { data } = useGetContentTemplatesQuery();
 
-  const visibleEntityTypeIds = entityTypeIds.filter((entityTypeId) => {
-    if (!data) return true;
-    const bundles = data[entityTypeId]?.bundles ?? {};
-    return Object.values(bundles).some(
-      (bundle) => Object.keys(bundle.viewModes).length > 0,
-    );
-  });
+  // Only entity types that actually have at least one template are listed.
+  // Until the templates have loaded nothing is known, so render nothing rather
+  // than every entity type: otherwise every empty accordion flashes on screen
+  // and then disappears once the response arrives.
+  const visibleEntityTypeIds = data
+    ? entityTypeIds.filter((entityTypeId) =>
+        Object.values(data[entityTypeId]?.bundles ?? {}).some(
+          (bundle) => Object.keys(bundle.viewModes).length > 0,
+        ),
+      )
+    : [];
 
   const onClickHandler = (categoryName: string) => {
     setOpenEntityTypes((state) => {
@@ -209,10 +213,9 @@ const AddTemplateDialog = ({ isOpen, setIsOpen }: TemplateDialogProps) => {
     [data, selectedContentType, selectedEntityType],
   );
 
-  const entityBundleLabels =
-    typeof selectedEntityType === 'string' &&
-    canvasSettings?.entityTypeLabels?.[selectedEntityType];
-  const bundleLabelType = typeof entityBundleLabels;
+  const entityBundleLabels = selectedEntityType
+    ? (canvasSettings?.entityTypeLabels?.[selectedEntityType] ?? {})
+    : {};
   const showEntityTypeDropdown = entityTypeIds.length > 1;
   return (
     <Dialog
@@ -311,12 +314,11 @@ const AddTemplateDialog = ({ isOpen, setIsOpen }: TemplateDialogProps) => {
                 style={{ width: '100%' }}
               />
               <Select.Content>
-                {bundleLabelType === 'object' &&
-                  Object.entries(entityBundleLabels).map(([type, label]) => (
-                    <Select.Item key={type} value={type}>
-                      {String(label)}
-                    </Select.Item>
-                  ))}
+                {Object.entries(entityBundleLabels).map(([type, label]) => (
+                  <Select.Item key={type} value={type}>
+                    {label}
+                  </Select.Item>
+                ))}
               </Select.Content>
             </Select.Root>
           </Flex>

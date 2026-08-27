@@ -132,9 +132,11 @@ final class ContentTemplateHooks {
   public function preprocessMenuLocalTask(array &$variables): void {
     $url = $variables['element']['#link']['url'] ?? NULL;
 
-    // Only proceed if this is a routed URL on a view mode display route for a
-    // supported entity type.
-    if (!$url?->isRouted()) {
+    // Only proceed if this is a routed URL on a view mode display route. The
+    // route name is matched by convention, so nothing guarantees the route
+    // carries the parameters Field UI's routes carry: bail out rather than
+    // fail on any route that merely shares the naming pattern.
+    if (!$url instanceof Url || !$url->isRouted()) {
       return;
     }
     $url_route_name = $url->getRouteName();
@@ -143,7 +145,9 @@ final class ContentTemplateHooks {
     }
 
     $entity_type_id = $this->routeMatch->getParameter('entity_type_id');
-    \assert(\is_string($entity_type_id));
+    if (!\is_string($entity_type_id) || !$this->entityTypeManager->hasDefinition($entity_type_id)) {
+      return;
+    }
     $bundle_entity_type = $this->entityTypeManager
       ->getDefinition($entity_type_id)->getBundleEntityType();
 
@@ -151,7 +155,10 @@ final class ContentTemplateHooks {
     // Entity types without a bundle entity type (for example, user) have a
     // single implicit bundle equal to the entity type ID, and their Field UI
     // routes carry no bundle route parameter.
-    $bundle = $bundle_entity_type !== NULL ? $route_parameters[$bundle_entity_type] : $entity_type_id;
+    $bundle = $bundle_entity_type !== NULL ? ($route_parameters[$bundle_entity_type] ?? NULL) : $entity_type_id;
+    if (!\is_string($bundle)) {
+      return;
+    }
     $view_mode_id = $route_parameters['view_mode_name'] ?? EntityDisplayRepositoryInterface::DEFAULT_DISPLAY_MODE;
 
     // Check if a Canvas template exists.

@@ -8,6 +8,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
@@ -46,8 +47,11 @@ class ViewModeAccessCheck implements AccessInterface {
     // AccessInterface does not declare access(). Possibly will be fixed in
     // https://www.drupal.org/node/2266817.
     // @phpstan-ignore-next-line method.notFound
-    return $this->inner->access($route, $route_match, $account, $view_mode_name, $bundle)
-      ->addCacheableDependency($cacheable_metadata);
+    $access = $this->inner->access($route, $route_match, $account, $view_mode_name, $bundle);
+    // AccessResultInterface does not declare addCacheableDependency(), so the
+    // decorated access checker is only allowed to return a refinable result.
+    \assert($access instanceof RefinableCacheableDependencyInterface);
+    return $access->addCacheableDependency($cacheable_metadata);
   }
 
   /**

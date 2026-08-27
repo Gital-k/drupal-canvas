@@ -141,7 +141,6 @@ HTML;
     $all_definitions = $this->entityTypeManager->getDefinitions();
     foreach ($all_definitions as $entity_type_id => $entity_type_definition) {
       $is_template_supported = $this->contentTemplateRepository->isSupportedEntityType($entity_type_definition);
-      $bundles = $this->entityTypeBundleInfo->getBundleInfo($entity_type_id);
       if ($is_template_supported) {
         $has_bundle_support = $entity_type_definition->hasKey('bundle');
         $content_template_entity_types[$entity_type_id] = [
@@ -151,6 +150,7 @@ HTML;
         ];
       }
       if ($is_template_supported || $entity_type_definition->entityClassImplements(ComponentTreeEntityInterface::class)) {
+        $bundles = $this->entityTypeBundleInfo->getBundleInfo($entity_type_id);
         $entity_types_with_keys[$entity_type_id] = $entity_type_definition->getKeys();
         $entity_type_labels[$entity_type_id] = \array_map(fn($bundle) => $bundle['label'], $bundles);
       }
