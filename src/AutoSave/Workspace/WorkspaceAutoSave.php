@@ -155,6 +155,27 @@ final class WorkspaceAutoSave {
   }
 
   /**
+   * Marks an entity reconstructed from stored draft data as already stored.
+   *
+   * Auto-saves only exist for entities that have already been saved, but
+   * ::create() flags the reconstruction as new and pre-marks it as a new
+   * revision: a plain save would insert the entity and its stored revision id
+   * again, and a later setNewRevision(TRUE) (workspaces' entity_presave,
+   * Page::preSave()) would be a no-op that skips clearing the revision key.
+   * Treat the reconstruction as the loaded revision instead, so that
+   * transition runs and a fresh revision id is assigned.
+   *
+   * @see \Drupal\canvas\AutoSave\AutoSaveManager::createEntityFromAutoSaveEntry()
+   */
+  private static function markAsStoredRevision(EntityInterface $staged): void {
+    $staged->enforceIsNew(FALSE);
+    if ($staged instanceof RevisionableInterface && $staged->getEntityType()->hasKey('revision')) {
+      $staged->updateLoadedRevisionId();
+      $staged->setNewRevision(FALSE);
+    }
+  }
+
+  /**
    * Entity to use when building the layout API response (tree + preview HTML).
    */
   public function getEntityForLayoutEditing(ContentEntityInterface $entity): ContentEntityInterface {
@@ -252,14 +273,7 @@ final class WorkspaceAutoSave {
           $staged->set($key, $entity->get($key)->value);
         }
       }
-      $staged->enforceIsNew(FALSE);
-      $staged->updateLoadedRevisionId();
-      // ::create() pre-marks the entity as a new revision, which makes the
-      // later setNewRevision(TRUE) in workspaces' entity_presave a no-op
-      // that skips clearing the revision key; the save would then insert a
-      // duplicate of the grafted revision id. Reset the flag so that
-      // transition runs and a fresh revision id is assigned.
-      $staged->setNewRevision(FALSE);
+      self::markAsStoredRevision($staged);
     }
     // Pass the legacy entry through so its metadata (owner, updated,
     // original_hash, conflict retention) survives the migration.
@@ -538,6 +552,7 @@ final class WorkspaceAutoSave {
       if ($snapshot !== NULL) {
         $data = \json_decode($snapshot->getPayload(), TRUE, 512, JSON_THROW_ON_ERROR);
         $staged = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->create($data);
+        self::markAsStoredRevision($staged);
         $auto_save_entity = new AutoSaveEntity($staged, $snapshot->getDataHash(), $snapshot->getClientInstanceId(), (int) ($snapshot->getChangedTime() ?? $this->time->getRequestTime()));
         $this->cache->set($key, $auto_save_entity, tags: [AutoSaveManager::CACHE_TAG]);
         return $auto_save_entity;
@@ -562,8 +577,10 @@ final class WorkspaceAutoSave {
     if (!\is_array($auto_save_data) || !isset($auto_save_data['data'], $auto_save_data['entity_type'])) {
       return AutoSaveEntity::empty();
     }
+    $staged = $this->entityTypeManager->getStorage($auto_save_data['entity_type'])->create($auto_save_data['data']);
+    self::markAsStoredRevision($staged);
     $auto_save_entity = new AutoSaveEntity(
-      $this->entityTypeManager->getStorage($auto_save_data['entity_type'])->create($auto_save_data['data']),
+      $staged,
       $auto_save_data['data_hash'],
       $auto_save_data['client_id'] ?? NULL,
       isset($auto_save_data['updated']) ? (int) $auto_save_data['updated'] : NULL,
@@ -582,6 +599,7 @@ final class WorkspaceAutoSave {
     }
     $storage = $this->entityTypeManager->getStorage($row['entity_type']);
     $staged = $storage->create($row['data']);
+    self::markAsStoredRevision($staged);
     return new AutoSaveEntity($staged, $row['data_hash'], $row['client_id'] ?? NULL, isset($row['updated']) ? (int) $row['updated'] : NULL);
   }
 
