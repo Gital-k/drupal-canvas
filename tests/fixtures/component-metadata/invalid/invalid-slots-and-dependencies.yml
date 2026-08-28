@@ -1,7 +1,7 @@
 name: Invalid slots and dependencies
 machineName: invalid-slots-and-dependencies
 slots:
-  x:
+  body:
     title: ''
     extra: rejected
 dataDependencies:

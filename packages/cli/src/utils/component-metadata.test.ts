@@ -82,6 +82,7 @@ describe('component metadata', () => {
     ['eslint-invalid', 'empty-string-examples.yml'],
     ['target-invalid', 'relative-image-examples.yml'],
     ['target-invalid', 'implementation-relationships.yml'],
+    ['target-invalid', 'unsupported-prop-shapes.yml'],
   ])(
     'leaves non-schema rules in %s/%s to their owner',
     async (fixtureDirectory, fixtureName) => {

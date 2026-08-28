@@ -1,9 +1,7 @@
-name: Invalid prop shapes
-machineName: invalid-prop-shapes
+name: Unsupported prop shapes
+machineName: unsupported-prop-shapes
 props:
   properties:
-    missingTitle:
-      type: string
     unsupportedKeyword:
       type: boolean
       title: Unsupported keyword
