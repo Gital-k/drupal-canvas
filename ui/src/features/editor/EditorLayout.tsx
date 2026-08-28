@@ -25,6 +25,8 @@ import { PAGE_VARIANT_ENTITY_TYPE } from '@/services/pageVariants';
 import type React from 'react';
 
 import styles from '@/features/editor/EditorLayout.module.css';
+import { HamburgerMenuIcon } from '@radix-ui/react-icons';
+import { IconButton } from '@radix-ui/themes/components/index';
 
 interface EditorLayoutProps {
   context: EditorFrameContext;
@@ -58,6 +60,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
   const rightWidthPxRef = useRef(rightWidthPx);
   const layoutRef = useRef<HTMLDivElement>(null);
   const rightColumnRef = useRef<HTMLDivElement>(null);
+  const rightColumnMenuRef = useRef<HTMLDivElement>(null);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
   const pointerIdRef = useRef<number>(-1);
   const isDraggingRef = useRef(false);
@@ -155,6 +158,9 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
     if (rightColumnRef.current) {
       rightColumnRef.current.style.display = visible ? 'block' : 'none';
     }
+    if (rightColumnMenuRef.current) {
+      rightColumnMenuRef.current.style.display = !visible ? 'block' : 'none';
+    }
   };
 
   useEffect(() => {
@@ -167,6 +173,11 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
   const showHandle = !isPanelHidden;
 
   const resizeCursor = getResizeCursor(rightWidthPx);
+
+  const toggleRightPanel = () => {
+    setRightPanelVisibility(true);
+  };
+
 
   return (
     <div ref={layoutRef} className={styles.layout}>
@@ -186,6 +197,16 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
           aria-valuemax={SIDEBAR_MAX_PX}
         />
       )}
+      <div ref={rightColumnMenuRef}>
+         <IconButton
+            aria-label="Import components"
+            data-testid="canvas-import-button"
+            className="menu-btn"
+            onClick={toggleRightPanel}
+          >
+            <HamburgerMenuIcon />
+          </IconButton>
+      </div>
       <div
         ref={rightColumnRef}
         className={clsx(styles.rightColumn, {
