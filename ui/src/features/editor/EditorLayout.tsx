@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useParams } from 'react-router-dom';
+import { HamburgerMenuIcon } from '@radix-ui/react-icons';
+import { IconButton } from '@radix-ui/themes/components/index';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ContextualPanel from '@/components/panel/ContextualPanel';
@@ -25,8 +27,6 @@ import { PAGE_VARIANT_ENTITY_TYPE } from '@/services/pageVariants';
 import type React from 'react';
 
 import styles from '@/features/editor/EditorLayout.module.css';
-import { HamburgerMenuIcon } from '@radix-ui/react-icons';
-import { IconButton } from '@radix-ui/themes/components/index';
 
 interface EditorLayoutProps {
   context: EditorFrameContext;
@@ -178,7 +178,6 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
     setRightPanelVisibility(true);
   };
 
-
   return (
     <div ref={layoutRef} className={styles.layout}>
       <div className={styles.center}>
@@ -198,14 +197,14 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
         />
       )}
       <div ref={rightColumnMenuRef}>
-         <IconButton
-            aria-label="Import components"
-            data-testid="canvas-import-button"
-            className="menu-btn"
-            onClick={toggleRightPanel}
-          >
-            <HamburgerMenuIcon />
-          </IconButton>
+        <IconButton
+          aria-label="Import components"
+          data-testid="canvas-import-button"
+          className="menu-btn"
+          onClick={toggleRightPanel}
+        >
+          <HamburgerMenuIcon />
+        </IconButton>
       </div>
       <div
         ref={rightColumnRef}
