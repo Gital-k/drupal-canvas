@@ -354,13 +354,15 @@ const dateTime: Transformer<
     }
 
     try {
-      return new Date(`${dateString} ${timeString}+0000`).toISOString();
+      // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
+      // Use `T` separator without a timezone offset so the browser interprets
+      // the date+time in the user's local timezone (matching what Drupal's
+      // datetime widget renders). `.toISOString()` then correctly converts to
+      // UTC for the server.
+      return new Date(`${dateString}T${timeString}`).toISOString();
     } catch (e) {
       return null;
     }
-
-    // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
-    return new Date(`${dateString} ${timeString}+0000`).toISOString();
   });
   if (options.multiple) {
     return returnValue.filter(Boolean);

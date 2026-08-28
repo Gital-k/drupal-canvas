@@ -705,8 +705,8 @@ describe('Transforms - dateRange', () => {
         dateTimeFieldData,
       ),
     ).to.deep.equal({
-      value: '2026-05-02T07:21:35.000Z',
-      end_value: '2026-06-02T09:45:12.000Z',
+      value: new Date('2026-05-02T07:21:35').toISOString(),
+      end_value: new Date('2026-06-02T09:45:12').toISOString(),
     });
   });
 });
