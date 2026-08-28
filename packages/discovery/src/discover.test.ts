@@ -420,13 +420,13 @@ describe('discoverCanvasProject', () => {
 
     await writeFile(
       path.join(root, 'src/card/component.yml'),
-      'machineName: shared-name',
+      ['name: Card', 'machineName: shared-name'].join('\n'),
     );
     await writeFile(path.join(root, 'src/card/index.ts'), 'export default {};');
 
     await writeFile(
       path.join(root, 'src/button/component.yml'),
-      'machineName: shared-name',
+      ['name: Button', 'machineName: shared-name'].join('\n'),
     );
     await writeFile(
       path.join(root, 'src/button/index.ts'),
