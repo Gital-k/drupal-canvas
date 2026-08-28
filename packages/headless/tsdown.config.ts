@@ -43,7 +43,6 @@ export default defineConfig({
       'fast-uri',
       'glob',
       'ignore',
-      'js-yaml',
       'json-schema-traverse',
       'nearley',
       'schemes',
