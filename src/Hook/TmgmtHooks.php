@@ -11,12 +11,16 @@ use Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor;
 use Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityFormInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Render\Element;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\tmgmt\Data;
 use Drupal\tmgmt\JobItemInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Hook implementations for TMGMT integration.
@@ -25,6 +29,10 @@ final readonly class TmgmtHooks {
 
   public function __construct(
     private ModuleHandlerInterface $moduleHandler,
+    private EntityTypeManagerInterface $entityTypeManager,
+    // TMGMT is an optional dependency: NULL when the module is not installed.
+    #[Autowire(service: 'tmgmt.data')]
+    private ?Data $tmgmtData = NULL,
   ) {}
 
   /**
@@ -88,12 +96,12 @@ final readonly class TmgmtHooks {
    * @see \Drupal\tmgmt\Form\JobItemForm::buildSource()
    */
   #[Hook('tmgmt_data_item_text_output_alter')]
-  public static function tmgmtDataItemTextOutputAlter(string &$source_text, string &$translation_text, array $context): void {
+  public function tmgmtDataItemTextOutputAlter(string &$source_text, string &$translation_text, array $context): void {
     $job_item = $context['job_item'] ?? NULL;
     if (!$job_item instanceof JobItemInterface) {
       return;
     }
-    $entity = self::getContentJobItemEntity($job_item);
+    $entity = $this->getContentJobItemEntity($job_item);
     if ($entity === NULL || self::getComponentTreeFieldNames($entity) === []) {
       return;
     }
@@ -146,7 +154,7 @@ final readonly class TmgmtHooks {
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::validateComponentInput()
    */
   #[Hook('form_tmgmt_job_item_edit_form_alter')]
-  public static function formTmgmtJobItemEditFormAlter(array &$form, FormStateInterface $form_state): void {
+  public function formTmgmtJobItemEditFormAlter(array &$form, FormStateInterface $form_state): void {
     $form_object = $form_state->getFormObject();
     if (!$form_object instanceof EntityFormInterface) {
       return;
@@ -155,7 +163,7 @@ final readonly class TmgmtHooks {
     if (!$item instanceof JobItemInterface) {
       return;
     }
-    $entity = self::getContentJobItemEntity($item);
+    $entity = $this->getContentJobItemEntity($item);
     if ($entity === NULL) {
       return;
     }
@@ -169,12 +177,12 @@ final readonly class TmgmtHooks {
       return;
     }
 
-    /** @var \Drupal\tmgmt\Data $data_service */
-    $data_service = \Drupal::service('tmgmt.data');
+    // This hook only fires for TMGMT's own form, so the service exists.
+    \assert($this->tmgmtData !== NULL);
     $maskable_row_paths = [];
     foreach ($row_paths as [$group_key, $parent_key, $field_key]) {
       $row = &$form['review'][$group_key][$parent_key][$field_key];
-      $data_item = $item->getData($data_service->ensureArrayKey($field_key));
+      $data_item = $item->getData($this->tmgmtData->ensureArrayKey($field_key));
 
       // tmgmtDataItemTextOutputAlter() blanked the sentinel, so TMGMT built no
       // source element for this row; show why instead of an empty cell.
@@ -182,7 +190,7 @@ final readonly class TmgmtHooks {
       if (($data_item['#text'] ?? '') === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL && !isset($row['source'])) {
         $row['source'] = [
           '#type' => 'item',
-          '#markup' => t('This field is empty in the source language.'),
+          '#markup' => new TranslatableMarkup('This field is empty in the source language.'),
         ];
       }
 
@@ -278,15 +286,14 @@ final readonly class TmgmtHooks {
    *   The source entity, or NULL if the job item is not a content job item or
    *   its entity cannot be loaded.
    */
-  private static function getContentJobItemEntity(JobItemInterface $item): ?FieldableEntityInterface {
+  private function getContentJobItemEntity(JobItemInterface $item): ?FieldableEntityInterface {
     if ($item->getPlugin() !== 'content') {
       return NULL;
     }
-    $entity_type_manager = \Drupal::entityTypeManager();
-    if (!$entity_type_manager->hasDefinition($item->getItemType())) {
+    if (!$this->entityTypeManager->hasDefinition($item->getItemType())) {
       return NULL;
     }
-    $entity = $entity_type_manager->getStorage($item->getItemType())->load($item->getItemId());
+    $entity = $this->entityTypeManager->getStorage($item->getItemType())->load($item->getItemId());
     return $entity instanceof FieldableEntityInterface ? $entity : NULL;
   }
 
@@ -324,7 +331,9 @@ final readonly class TmgmtHooks {
       }
       $item = $field->offsetGet((int) $delta);
       \assert($item instanceof ComponentTreeItem);
-      $source = $item->getComponent()?->getComponentSource();
+      // Inspect the Component version the tree item uses, not the active one:
+      // a prop may have become (or stopped being) required in a newer version.
+      $source = $item->getComponent()?->loadVersion($item->getComponentVersion())->getComponentSource();
       // Only JSON-schema-based component sources declare required props.
       if (!$source instanceof JsonSchemaPropsComponentSourceBase) {
         return FALSE;
@@ -337,6 +346,18 @@ final readonly class TmgmtHooks {
 
   /**
    * Finds the review form rows that belong to component_tree fields.
+   *
+   * TMGMT's JobItemForm nests review rows three levels deep under
+   * $form['review'], hence the three nested loops (the same traversal TMGMT
+   * itself uses in ::validateJobItem()):
+   * 1. group key: the top-level data key, i.e. the field name of the source
+   *    entity (e.g. "components").
+   * 2. parent key: the flattened data key minus its last segment, i.e. all
+   *    rows that share a parent are grouped (e.g. "components|0" for every
+   *    prop of the first tree item; "_none" for non-nested rows).
+   * 3. field key: the full '|'-joined flattened data key of one row (e.g.
+   *    "components|0|heading"), whose children are the row's 'source' and
+   *    'translation' elements.
    *
    * @param array<string, mixed> $form
    *   The form array.
