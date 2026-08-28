@@ -36,6 +36,7 @@ function getComponentsToValidate(
 function createValidationPayload(
   component: DiscoveredComponent,
   metadata: Metadata,
+  external: boolean,
 ) {
   const common = {
     metadata,
@@ -43,7 +44,7 @@ function createValidationPayload(
     componentName: component.name,
     dataDependencies: {},
   };
-  return component.type === 'external'
+  return external
     ? createComponentPayload({ ...common, type: 'external' })
     : createComponentPayload({
         ...common,
@@ -61,6 +62,7 @@ async function validateComponent(
   component: DiscoveredComponent,
   options: {
     fix: boolean;
+    external: boolean;
     remoteValidation?: Pick<ApiService, 'validateCodeComponentPayload'>;
   },
 ): Promise<{ result: Result; remoteUnsupported: boolean }> {
@@ -99,7 +101,7 @@ async function validateComponent(
     if (options.remoteValidation && localLintIsValid) {
       try {
         await options.remoteValidation.validateCodeComponentPayload(
-          createValidationPayload(component, metadata),
+          createValidationPayload(component, metadata, options.external),
         );
       } catch (error) {
         if (
@@ -139,6 +141,7 @@ export async function validateComponents(
   options: {
     fix?: boolean;
     apiService?: Pick<ApiService, 'validateCodeComponentPayload'>;
+    externalComponents?: boolean;
   } = {},
 ): Promise<{ results: Result[]; warnings: string[] }> {
   const results: Result[] = [];
@@ -154,6 +157,7 @@ export async function validateComponents(
   for (const component of components) {
     const outcome = await validateComponent(component, {
       fix: options.fix ?? false,
+      external: options.externalComponents ?? false,
       remoteValidation,
     });
     results.push(outcome.result);
