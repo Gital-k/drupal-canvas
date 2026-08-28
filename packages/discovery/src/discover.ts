@@ -5,7 +5,8 @@ import { glob } from 'glob';
 import ignore from 'ignore';
 import { load as parseYaml } from 'js-yaml';
 
-import { findDuplicateMachineNames, loadComponentsMetadata } from './metadata';
+import { findDuplicateMachineNames, loadComponentMetadata } from './metadata';
+import { ComponentMetadataValidationError } from './metadata-validation';
 
 import type {
   DiscoveredComponent,
@@ -525,9 +526,30 @@ export async function discoverCanvasProject(
     },
   };
 
-  // Check for duplicate machine names across components.
-  const metadata = await loadComponentsMetadata(result);
-  const duplicateWarnings = findDuplicateMachineNames(components, metadata);
+  // Invalid metadata is reported by consumers when they load it. Discovery
+  // remains available so editors and validation commands can surface those
+  // errors without stopping file watching or skipping the remaining files.
+  const validMetadataEntries = (
+    await Promise.all(
+      components.map(async (component) => {
+        try {
+          return {
+            component,
+            metadata: await loadComponentMetadata(component, projectRoot),
+          };
+        } catch (error) {
+          if (error instanceof ComponentMetadataValidationError) {
+            return null;
+          }
+          throw error;
+        }
+      }),
+    )
+  ).filter((entry) => entry !== null);
+  const duplicateWarnings = findDuplicateMachineNames(
+    validMetadataEntries.map(({ component }) => component),
+    validMetadataEntries.map(({ metadata }) => metadata),
+  );
   warnings.push(...duplicateWarnings);
 
   return result;
