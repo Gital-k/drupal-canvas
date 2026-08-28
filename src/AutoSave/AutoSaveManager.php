@@ -21,7 +21,6 @@ use Drupal\canvas\Health\HealthRecords;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\Component\Datetime\TimeInterface;
-use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\SortArray;
 use Drupal\content_moderation\Plugin\Field\ModerationStateFieldItemList;
 use Drupal\Core\Cache\CacheBackendInterface;
@@ -45,6 +44,7 @@ use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\KeyValueStore\KeyValueStoreInterface;
 use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem;
 use Drupal\path\Plugin\Field\FieldType\PathFieldItemList;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -356,54 +356,40 @@ class AutoSaveManager implements EventSubscriberInterface {
           continue;
         }
       }
-      // Canonicalize metatag values before hashing: transform each item into
-      // what MetatagFieldItem::preSave() would store on a real entity save,
-      // because auto-saving bypasses ::preSave(). Without this, an unchanged
-      // editor round-trip hashes differently than the stored entity, in two
-      // ways. First, the field stores its tags as one order-sensitive JSON
-      // string: ::preSave() sorts them by key, but the metatag_firehose widget
-      // re-emits them in form order. Second, ::preSave() strips tags matching
-      // metatag's config defaults, but the widget prefills those very defaults
-      // into empty tags, so a page stored without metatag data (e.g. created
-      // before the metatag module was installed) echoes them back on every
-      // layout POST — and publishing that difference can never converge,
-      // because ::preSave() strips the tags again.
+      // Canonicalize metatag values before hashing: run each item through
+      // MetatagFieldItem::preSave() so it holds what a real entity save would
+      // store. Values arriving from the editor have never been processed by
+      // ::preSave() — persisting an auto-save entry does not run it — while the
+      // stored entity's values were processed by it on the last real save.
+      // Without that asymmetry removed, an unchanged editor round-trip hashes
+      // differently than the stored entity, in two ways. First, the field
+      // stores its tags as one order-sensitive JSON string: ::preSave() sorts
+      // them by key, but the metatag_firehose widget re-emits them in form
+      // order. Second, ::preSave() strips tags matching metatag's config
+      // defaults, but the widget prefills those very defaults into empty tags,
+      // so a page stored without metatag data (e.g. created before the metatag
+      // module was installed) echoes them back on every layout POST — and
+      // publishing that difference can never converge, because ::preSave()
+      // strips the tags again.
       // @see \Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem::preSave()
       // @see \Drupal\metatag\Plugin\Field\FieldWidget\MetatagFirehose::formElement()
       if ($items->getFieldDefinition()->getType() === 'metatag') {
-        // Guard against a transitional state where the metatag field type is
-        // still registered (e.g. during uninstall) but the module functions are
-        // no longer available. In normal operation metatag is always loaded
-        // when this field type exists.
-        $metatag_defaults = \function_exists('metatag_get_default_tags')
-          ? \metatag_get_default_tags($entity) ?? []
-          : [];
         $values = [];
-        // Canvas only defines this as a single-cardinality field (delta 0).
-        // Delta keys are preserved here to match the stored entity's structure;
-        // revisit if cardinality ever changes.
-        foreach ($items->getValue() as $delta => $item) {
-          // Use metatag_data_decode() rather than Json::decode() to handle
-          // legacy serialized blobs (Metatag v1 stored serialized arrays).
-          // @see metatag_data_decode()
-          $tags = \function_exists('metatag_data_decode')
-            ? \metatag_data_decode($item['value'] ?? '')
-            : (Json::decode($item['value'] ?? '[]') ?? []);
-          // Match ::preSave()'s loose comparison.
-          $tags = \array_filter(
-            $tags,
-            static fn (mixed $tag_value, string $tag_id): bool => !isset($metatag_defaults[$tag_id]) || $tag_value != $metatag_defaults[$tag_id],
-            \ARRAY_FILTER_USE_BOTH,
-          );
-          if ($tags === []) {
-            continue;
+        foreach ($items as $delta => $item) {
+          \assert($item instanceof MetatagFieldItem);
+          // ::preSave() only rewrites the item's own value; cloning first
+          // keeps the live entity untouched, because Map::__clone deep-clones
+          // the property objects.
+          $item = clone $item;
+          $item->preSave();
+          // ::preSave() reduces an item holding only default tags to the
+          // encoding of an empty array, which ::isEmpty() reports as empty;
+          // skipping such items matches an entity stored without metatag
+          // data.
+          if (!$item->isEmpty()) {
+            $values[$delta] = TypedDataHelper::castRawPhpTypes($item);
           }
-          \ksort($tags);
-          $values[$delta] = ['value' => Json::encode($tags)];
         }
-        // Items holding only default tags canonicalize to nothing; treat the
-        // field like an empty one so it matches an entity stored without
-        // metatag data.
         if ($values !== []) {
           $normalized[$items->getName()] = $values;
         }
