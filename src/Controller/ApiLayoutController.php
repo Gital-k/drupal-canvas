@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSave\Workspace\WorkspaceAutoSave;
 use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ClientDataToEntityConverter;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
@@ -61,6 +62,7 @@ final class ApiLayoutController {
 
   public function __construct(
     private readonly AutoSaveManager $autoSaveManager,
+    private readonly WorkspaceAutoSave $workspaceAutoSave,
     private readonly ThemeManagerInterface $themeManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly FormBuilderInterface $formBuilder,
@@ -120,6 +122,12 @@ final class ApiLayoutController {
         \assert($entity instanceof ContentEntityInterface || $entity instanceof ComponentTreeConfigEntityBase);
       }
     }
+    elseif ($entity instanceof ContentEntityInterface) {
+      // The published version was explicitly requested. Route upcasting
+      // happens with the auto-save workspace active, so the upcast entity can
+      // be the workspace-staged revision; reload the Live version.
+      $entity = $this->loadLiveVersion($entity);
+    }
 
     $model = [];
     // Build the content region.
@@ -146,10 +154,9 @@ final class ApiLayoutController {
       // an object and not empty array.
       'model' => empty($model) ? new \stdClass() : $model,
       'isNew' => $is_new,
-      'autoSaves' => $this->getAutoSaveHashes(array_merge(
-        [$entity],
-        self::getEditableRegions($entity),
-      )),
+      'autoSaves' => $this->getAutoSaveHashesAfterFlush(
+        array_merge([$entity], self::getEditableRegions($entity)),
+      ),
     ];
     $available_translations = [];
     $links = [];
@@ -219,7 +226,7 @@ final class ApiLayoutController {
       $data['resolvedPageVariant'] = $this->pageVariantResolver->resolve($entity)?->id();
 
       // Determine if there's an unsaved status change by comparing the current
-      // entity (which may be autosaved) with the original stored entity.
+      // entity (which may be auto-saved) with the original stored entity.
       $data['hasUnsavedStatusChange'] = FALSE;
       if ($original_entity instanceof EntityPublishedInterface
         && $entity !== $original_entity) {
@@ -423,10 +430,9 @@ final class ApiLayoutController {
       // Config entities have no entity form; keep the response shape uniform.
       $data['entity_form_fields'] = new \stdClass();
     }
-    $data['autoSaves'] = $this->getAutoSaveHashes(array_merge(
-      [$entity],
-      self::getEditableRegions($entity),
-    ));
+    $data['autoSaves'] = $this->getAutoSaveHashesAfterFlush(
+      array_merge([$entity], self::getEditableRegions($entity)),
+    );
     return new PreviewEnvelope(
       $this->buildPreviewRenderable($entity, $preview_entity),
       additionalData: $data
@@ -524,12 +530,21 @@ final class ApiLayoutController {
     return new PreviewEnvelope(
       $this->buildPreviewRenderable($entity, $preview_entity),
       additionalData: [
-        'autoSaves' => $this->getAutoSaveHashes(array_merge(
-          [$entity],
-          self::getEditableRegions($entity),
-        )),
+        'autoSaves' => $this->getAutoSaveHashesAfterFlush(
+          array_merge([$entity], self::getEditableRegions($entity)),
+        ),
       ],
     );
+  }
+
+  /**
+   * @param array<int, \Drupal\Core\Entity\EntityInterface> $entities
+   *
+   * @return array<string, array{autoSaveStartingPoint: int|string|null, hash: string|null}>
+   */
+  private function getAutoSaveHashesAfterFlush(array $entities): array {
+    $this->autoSaveManager->flushDeferredContentEntities($entities);
+    return $this->getAutoSaveHashes($entities);
   }
 
   private function buildPreviewRenderable(FieldableEntityInterface|ComponentTreeConfigEntityBase $entity, ?FieldableEntityInterface $preview_entity = NULL): array {
@@ -570,8 +585,29 @@ final class ApiLayoutController {
         return (string) $auto_save_data->entity->label();
       }
     }
+    elseif ($entity instanceof ContentEntityInterface) {
+      // The published version was explicitly requested; the upcast entity can
+      // be the workspace-staged revision.
+      $entity = $this->loadLiveVersion($entity);
+    }
 
     return (string) $entity->label();
+  }
+
+  /**
+   * Loads the Live version of an entity, keeping the requested translation.
+   *
+   * Route upcasting during Canvas API requests happens with the auto-save
+   * workspace active, so an upcast entity with staged edits resolves to the
+   * staged revision even when the caller needs the published version.
+   */
+  private function loadLiveVersion(ContentEntityInterface $entity): ContentEntityInterface {
+    $live = $this->workspaceAutoSave->loadUnchangedOutsideWorkspace($entity->getEntityTypeId(), (string) $entity->id());
+    if (!$live instanceof ContentEntityInterface) {
+      return $entity;
+    }
+    $langcode = $entity->language()->getId();
+    return $live->hasTranslation($langcode) ? $live->getTranslation($langcode) : $live;
   }
 
   /**

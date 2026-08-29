@@ -70,7 +70,25 @@ final class ApiContentControllers extends ApiControllerBase {
     #[Autowire(service: 'transliteration')]
     private readonly TransliterationInterface $transliteration,
     private readonly HomePageHelper $homePageHelper,
+    /**
+     * @var \Drupal\workspaces\WorkspaceManagerInterface|null
+     */
+    #[Autowire(service: 'workspaces.manager')]
+    private readonly ?object $workspaceManager = NULL,
   ) {}
+
+  /**
+   * Runs $callable outside the auto-save workspace.
+   *
+   * The auto-save workspace is active during Canvas API requests, so reads
+   * and writes that must target Live (listings, deletes, duplicates) have to
+   * explicitly step outside it.
+   */
+  private function executeOutsideWorkspace(callable $callable): mixed {
+    return $this->workspaceManager !== NULL
+      ? $this->workspaceManager->executeOutsideWorkspace($callable)
+      : $callable();
+  }
 
   /**
    * Returns a single Canvas page with its component tree field.
@@ -104,37 +122,49 @@ final class ApiContentControllers extends ApiControllerBase {
     // them.
     // @see \Drupal\canvas\EventSubscriber\ApiExceptionSubscriber
 
-    // Ensure the path field carries the existing PID so Drupal updates the
-    // alias in place rather than creating a duplicate.
-    if (isset($body['path'])) {
-      $existing_pid = $canvas_page->get('path')->first()?->getValue()['pid'] ?? NULL;
-      $body['path'] = ['alias' => $body['path'], 'pid' => $existing_pid];
-    }
+    // This endpoint updates the Live entity: with the auto-save workspace
+    // active for Canvas API requests, an unscoped save would be redirected
+    // into a workspace-pending revision (replacing the staged draft), and the
+    // alias and changed-time lookups below would resolve staged state instead
+    // of Live.
+    // @see ::executeOutsideWorkspace()
+    $validation_errors_response = $this->executeOutsideWorkspace(function () use ($body, $canvas_page): ?JsonResponse {
+      // Ensure the path field carries the existing PID so Drupal updates the
+      // alias in place rather than creating a duplicate.
+      if (isset($body['path'])) {
+        $existing_pid = $canvas_page->get('path')->first()?->getValue()['pid'] ?? NULL;
+        $body['path'] = ['alias' => $body['path'], 'pid' => $existing_pid];
+      }
 
-    if (\array_key_exists('pageVariant', $body)) {
-      $body['page_variant'] = $body['pageVariant'] !== '' ? $body['pageVariant'] : NULL;
-    }
+      if (\array_key_exists('pageVariant', $body)) {
+        $body['page_variant'] = $body['pageVariant'] !== '' ? $body['pageVariant'] : NULL;
+      }
 
-    foreach (['title', 'status', 'path', 'components', 'description', 'page_variant'] as $field_name) {
-      if (!\array_key_exists($field_name, $body)) {
-        continue;
+      foreach (['title', 'status', 'path', 'components', 'description', 'page_variant'] as $field_name) {
+        if (!\array_key_exists($field_name, $body)) {
+          continue;
+        }
+        $field_access = $canvas_page->get($field_name)->access(operation: 'edit', return_as_object: TRUE);
+        if ($field_access->isForbidden()) {
+          throw new CacheableAccessDeniedHttpException(
+            (new CacheableMetadata())->addCacheableDependency($field_access),
+            \sprintf('Unable to update field %s for entity "%s".', $field_name, $canvas_page->id()),
+          );
+        }
+        $canvas_page->set($field_name, $body[$field_name]);
       }
-      $field_access = $canvas_page->get($field_name)->access(operation: 'edit', return_as_object: TRUE);
-      if ($field_access->isForbidden()) {
-        throw new CacheableAccessDeniedHttpException(
-          (new CacheableMetadata())->addCacheableDependency($field_access),
-          \sprintf('Unable to update field %s for entity "%s".', $field_name, $canvas_page->id()),
-        );
+      $violations = $canvas_page->validate();
+      if ($violations->count() > 0) {
+        if ($validation_errors_response = self::createJsonResponseFromViolationSets($violations)) {
+          return $validation_errors_response;
+        }
       }
-      $canvas_page->set($field_name, $body[$field_name]);
+      $canvas_page->save();
+      return NULL;
+    });
+    if ($validation_errors_response !== NULL) {
+      return $validation_errors_response;
     }
-    $violations = $canvas_page->validate();
-    if ($violations->count() > 0) {
-      if ($validation_errors_response = self::createJsonResponseFromViolationSets($violations)) {
-        return $validation_errors_response;
-      }
-    }
-    $canvas_page->save();
 
     // The response is never cacheable, so it will be discarded.
     $data = $this->normalizeWithMetadataAndComponents($canvas_page, new CacheableMetadata());
@@ -196,7 +226,13 @@ final class ApiContentControllers extends ApiControllerBase {
           return $validation_errors_response;
         }
       }
-      $new->save();
+      // The created entity is a new Live entity, not a workspace-staged
+      // draft: saving it inside the active auto-save workspace would track
+      // its initial (default) revision in the workspace, and discarding that
+      // staging later would fail because a default revision cannot be
+      // deleted.
+      // @see \Drupal\canvas\AutoSave\Workspace\WorkspaceAutoSave::discardWorkspaceStagedContentEntity()
+      $this->executeOutsideWorkspace(static fn () => $new->save());
     }
     \assert($new instanceof ContentEntityInterface && $new instanceof EntityPublishedInterface);
     $data = $this->normalizeWithMetadataAndComponents($new, new CacheableMetadata());
@@ -219,8 +255,10 @@ final class ApiContentControllers extends ApiControllerBase {
    *
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
-  public static function delete(ContentEntityInterface $canvas_page): JsonResponse {
-    $canvas_page->delete();
+  public function delete(ContentEntityInterface $canvas_page): JsonResponse {
+    // Deleting a workspace-supported entity is forbidden while a workspace is
+    // active; this endpoint deletes the Live entity.
+    $this->executeOutsideWorkspace(static fn () => $canvas_page->delete());
     return new JsonResponse(status: Response::HTTP_NO_CONTENT);
   }
 
@@ -238,6 +276,17 @@ final class ApiContentControllers extends ApiControllerBase {
     if ($entity_type !== Page::ENTITY_TYPE_ID) {
       throw new BadRequestHttpException('Only the `canvas_page` content entity type is supported right now, will be generalized in a child issue of https://www.drupal.org/project/canvas/issues/3498525.');
     }
+    // The listing reflects Live values; staged changes surface separately per
+    // item (e.g. autoSaveLabel, autoSavePath). Without stepping outside the
+    // auto-save workspace, workspace-aware entity queries and loads would
+    // present draft values as the stored ones.
+    return $this->executeOutsideWorkspace(fn (): CacheableJsonResponse => $this->doList($entity_type, $request));
+  }
+
+  /**
+   * @see ::list()
+   */
+  private function doList(string $entity_type, Request $request): CacheableJsonResponse {
     $storage = $this->entityTypeManager->getStorage($entity_type);
 
     $query_cacheability = (new CacheableMetadata())
@@ -634,7 +683,8 @@ final class ApiContentControllers extends ApiControllerBase {
     $duplicate->set($entity_key, $duplicate->label() . AutoSaveManager::ENTITY_DUPLICATE_SUFFIX);
     \assert($duplicate instanceof EntityPublishedInterface);
     $duplicate->setUnpublished();
-    $duplicate->save();
+    // The duplicate is a new Live entity, not a workspace-staged draft.
+    $this->executeOutsideWorkspace(static fn () => $duplicate->save());
 
     // Delete temp data for the duplicate, it should not have it at this point.
     // Everything is saved.
