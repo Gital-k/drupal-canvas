@@ -21,6 +21,24 @@ final class StructuredDataPropExpression {
   }
 
   /**
+   * Whether an object expression string is rooted at an entity, not a field.
+   *
+   * A field-rooted object carries a field header (`␝<field>␞…`) before the
+   * object body; an entity-rooted object goes straight from the entity type to
+   * the property prefix (`␟`). So the object is entity-rooted exactly when the
+   * first property prefix precedes the first field prefix (or there is no field
+   * prefix at all). Any `␝` that appears does so inside a nested reference
+   * property, always after that first `␟`.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\EntityObjectPropsExpression
+   */
+  private static function isEntityRootedObject(string $representation): bool {
+    $field_pos = mb_strpos($representation, StructuredDataPropExpressionInterface::PREFIX_FIELD_LEVEL);
+    $prop_pos = mb_strpos($representation, StructuredDataPropExpressionInterface::PREFIX_PROPERTY_LEVEL);
+    return $field_pos === FALSE || ($prop_pos !== FALSE && $prop_pos < $field_pos);
+  }
+
+  /**
    * Maps a string representation back to a structured data expression object.
    *
    * @param string $representation
@@ -67,7 +85,12 @@ final class StructuredDataPropExpression {
     return match ($root_expr_symbol_first) {
       // Field instances (require a host entity as context).
       StructuredDataPropExpressionInterface::PREFIX_ENTITY_LEVEL => match (TRUE) {
-        $root_expr_symbol_last === StructuredDataPropExpressionInterface::SUFFIX_OBJECT => FieldObjectPropsExpression::fromString($representation),
+        // An object with a field header (`␝<field>␞` before the body) is rooted
+        // at one field; without one (`␟{` right after the entity type) it spans
+        // multiple fields of the entity.
+        $root_expr_symbol_last === StructuredDataPropExpressionInterface::SUFFIX_OBJECT => self::isEntityRootedObject($representation)
+          ? EntityObjectPropsExpression::fromString($representation)
+          : FieldObjectPropsExpression::fromString($representation),
         $root_expr_symbol_next === StructuredDataPropExpressionInterface::PREFIX_ENTITY_LEVEL => ReferenceFieldPropExpression::fromString($representation),
         default => FieldPropExpression::fromString($representation)
       },

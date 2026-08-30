@@ -237,6 +237,20 @@ expression names alone. After the component metadata exists locally, run
 shape that component code should consume. Reference expressions can create
 nested objects and include metadata keys such as `__type`.
 
+When an expression descends into a reference field that targets several
+bundles, the nested object's keys depend on the bundle of the entity actually
+referenced: each bundle surfaces only the fields selected for it. A selection
+reading a blog post's `title` and `subtitle` but only a news item's `title`
+yields `{__type: 'blog_post', label, subtitle}` for one and
+`{__type: 'news_item', label}` for the other. Branch on `__type` and treat
+every other key as optional.
+
+If you also pick a property of the reference field itself, such as `target_id`,
+that object is nested one level deeper under the reserved key `__entity`,
+alongside the property you picked — for example
+`{__entity: {__type: 'blog_post', label}, target_id: 7}`. Keys starting with
+`__` are always added by Canvas and never come from a field.
+
 ## Slot metadata
 
 Slots are defined under the `slots` key. Each slot key becomes the slot name
