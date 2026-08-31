@@ -6,6 +6,7 @@ namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\canvas\Tmgmt\ComponentInputsConfigProcessor;
 use Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor;
 use Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor;
@@ -30,6 +31,7 @@ final readonly class TmgmtHooks {
   public function __construct(
     private ModuleHandlerInterface $moduleHandler,
     private EntityTypeManagerInterface $entityTypeManager,
+    private ComponentTreeLoader $componentTreeLoader,
     // TMGMT is an optional dependency: NULL when the module is not installed.
     #[Autowire(service: 'tmgmt.data')]
     private ?Data $tmgmtData = NULL,
@@ -80,8 +82,8 @@ final readonly class TmgmtHooks {
    * builds no source textarea at all, and formTmgmtJobItemEditFormAlter()
    * replaces it with an explanatory message.
    *
-   * Only content job items whose entity carries a component_tree field are
-   * altered. Config job items (ContentTemplate, PageRegion, via
+   * Only content job items whose entity has a Canvas field are altered.
+   * Config job items (ContentTemplate, PageRegion, via
    * ComponentInputsConfigProcessor) still show the sentinel.
    *
    * @todo Extend the sentinel handling to config job items in https://git.drupalcode.org/project/canvas/-/work_items/3592014
@@ -102,7 +104,7 @@ final readonly class TmgmtHooks {
       return;
     }
     $entity = $this->getContentJobItemEntity($job_item);
-    if ($entity === NULL || self::getComponentTreeFieldNames($entity) === []) {
+    if ($entity === NULL || $this->getCanvasFieldName($entity) === NULL) {
       return;
     }
     if ($source_text === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL) {
@@ -114,22 +116,24 @@ final readonly class TmgmtHooks {
   }
 
   /**
-   * Gets the names of the component_tree fields on an entity.
+   * Gets the name of the Canvas field on an entity, if any.
    *
    * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The entity.
    *
-   * @return list<string>
-   *   The component_tree field names; empty if the entity has none.
+   * @return string|null
+   *   The Canvas field name, or NULL if the entity has none or its entity type
+   *   or bundle is not (yet) supported by Canvas.
+   *
+   * @see \Drupal\canvas\Storage\ComponentTreeLoader::getCanvasFieldName()
    */
-  private static function getComponentTreeFieldNames(FieldableEntityInterface $entity): array {
-    $field_names = [];
-    foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
-      if ($definition->getType() === ComponentTreeItem::PLUGIN_ID) {
-        $field_names[] = $field_name;
-      }
+  private function getCanvasFieldName(FieldableEntityInterface $entity): ?string {
+    try {
+      return $this->componentTreeLoader->getCanvasFieldName($entity);
     }
-    return $field_names;
+    catch (\LogicException) {
+      return NULL;
+    }
   }
 
   /**
@@ -167,12 +171,12 @@ final readonly class TmgmtHooks {
     if ($entity === NULL) {
       return;
     }
-    $component_tree_field_names = self::getComponentTreeFieldNames($entity);
-    if ($component_tree_field_names === []) {
+    $field_name = $this->getCanvasFieldName($entity);
+    if ($field_name === NULL) {
       return;
     }
 
-    $row_paths = self::getComponentTreeRowPaths($form, $component_tree_field_names);
+    $row_paths = self::getComponentTreeRowPaths($form, $field_name);
     if ($row_paths === []) {
       return;
     }
@@ -194,7 +198,7 @@ final readonly class TmgmtHooks {
         ];
       }
 
-      if (!self::rowIsRequiredProp($entity, $component_tree_field_names, $field_key)) {
+      if (!self::rowIsRequiredProp($entity, $field_name, $field_key)) {
         $maskable_row_paths[] = [$group_key, $parent_key, $field_key];
       }
       unset($row);
@@ -306,46 +310,43 @@ final readonly class TmgmtHooks {
    *
    * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The source entity.
-   * @param list<string> $component_tree_field_names
-   *   The component_tree field names on the source entity.
+   * @param string $field_name
+   *   The Canvas field name on the source entity.
    * @param string $field_key
    *   The '|'-joined flattened TMGMT data key, e.g. "components|0|heading" or
    *   "components|0|cta1href|uri".
    *
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::validateComponentInput()
    */
-  private static function rowIsRequiredProp(FieldableEntityInterface $entity, array $component_tree_field_names, string $field_key): bool {
-    foreach ($component_tree_field_names as $field_name) {
-      if (!\str_starts_with($field_key, $field_name . '|')) {
-        continue;
-      }
-      // "<field_name>|<delta>|<prop>[|<nested…>]".
-      $segments = \explode('|', \substr($field_key, \strlen($field_name) + 1));
-      if (\count($segments) < 2) {
-        return FALSE;
-      }
-      [$delta, $prop_name] = $segments;
-      $field = $entity->get($field_name);
-      if (!$field->offsetExists((int) $delta)) {
-        return FALSE;
-      }
-      $item = $field->offsetGet((int) $delta);
-      \assert($item instanceof ComponentTreeItem);
-      // Inspect the Component version the tree item uses, not the active one:
-      // a prop may have become (or stopped being) required in a newer version.
-      $source = $item->getComponent()?->loadVersion($item->getComponentVersion())->getComponentSource();
-      // Only JSON-schema-based component sources declare required props.
-      if (!$source instanceof JsonSchemaPropsComponentSourceBase) {
-        return FALSE;
-      }
-      $prop_field_definitions = $source->getConfiguration()['prop_field_definitions'] ?? [];
-      return (bool) ($prop_field_definitions[$prop_name]['required'] ?? FALSE);
+  private static function rowIsRequiredProp(FieldableEntityInterface $entity, string $field_name, string $field_key): bool {
+    if (!\str_starts_with($field_key, $field_name . '|')) {
+      return FALSE;
     }
-    return FALSE;
+    // "<field_name>|<delta>|<prop>[|<nested…>]".
+    $segments = \explode('|', \substr($field_key, \strlen($field_name) + 1));
+    if (\count($segments) < 2) {
+      return FALSE;
+    }
+    [$delta, $prop_name] = $segments;
+    $field = $entity->get($field_name);
+    if (!$field->offsetExists((int) $delta)) {
+      return FALSE;
+    }
+    $item = $field->offsetGet((int) $delta);
+    \assert($item instanceof ComponentTreeItem);
+    // Inspect the Component version the tree item uses, not the active one:
+    // a prop may have become (or stopped being) required in a newer version.
+    $source = $item->getComponent()?->loadVersion($item->getComponentVersion())->getComponentSource();
+    // Only JSON-schema-based component sources declare required props.
+    if (!$source instanceof JsonSchemaPropsComponentSourceBase) {
+      return FALSE;
+    }
+    $prop_field_definitions = $source->getConfiguration()['prop_field_definitions'] ?? [];
+    return (bool) ($prop_field_definitions[$prop_name]['required'] ?? FALSE);
   }
 
   /**
-   * Finds the review form rows that belong to component_tree fields.
+   * Finds the review form rows that belong to the Canvas field.
    *
    * TMGMT's JobItemForm nests review rows three levels deep under
    * $form['review'], hence the three nested loops (the same traversal TMGMT
@@ -361,8 +362,8 @@ final readonly class TmgmtHooks {
    *
    * @param array<string, mixed> $form
    *   The form array.
-   * @param list<string> $component_tree_field_names
-   *   The component_tree field names on the source entity.
+   * @param string $field_name
+   *   The Canvas field name on the source entity.
    *
    * @return list<array{string, string, string}>
    *   [group key, parent key, field key] paths under $form['review'], where
@@ -371,7 +372,7 @@ final readonly class TmgmtHooks {
    *
    * @see \Drupal\tmgmt\Form\JobItemForm::reviewFormElement()
    */
-  private static function getComponentTreeRowPaths(array $form, array $component_tree_field_names): array {
+  private static function getComponentTreeRowPaths(array $form, string $field_name): array {
     $paths = [];
     if (!isset($form['review'])) {
       return [];
@@ -382,11 +383,8 @@ final readonly class TmgmtHooks {
           if (!isset($form['review'][$group_key][$parent_key][$field_key]['translation'])) {
             continue;
           }
-          foreach ($component_tree_field_names as $field_name) {
-            if ($field_key === $field_name || \str_starts_with((string) $field_key, $field_name . '|')) {
-              $paths[] = [(string) $group_key, (string) $parent_key, (string) $field_key];
-              break;
-            }
+          if ($field_key === $field_name || \str_starts_with((string) $field_key, $field_name . '|')) {
+            $paths[] = [(string) $group_key, (string) $parent_key, (string) $field_key];
           }
         }
       }
