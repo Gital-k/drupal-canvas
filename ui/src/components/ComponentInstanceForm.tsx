@@ -80,7 +80,7 @@ const ComponentInstanceFormRenderer: React.FC<
     components,
   } = inputAndUiData;
   const selectedComponentName =
-    selectedComponentType && components
+    selectedComponentType && components && components[selectedComponentType]
       ? components[selectedComponentType].name
       : '';
   const [jsxFormContent, setJsxFormContent] =
