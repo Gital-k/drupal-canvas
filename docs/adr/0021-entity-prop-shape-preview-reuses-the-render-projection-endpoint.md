@@ -1,4 +1,4 @@
-# 17. Entity reference prop shape preview reuses the render projection endpoint
+# 21. Entity reference prop shape preview reuses the render projection endpoint
 
 Date: 2026-07-10
 
