@@ -373,6 +373,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       // strips the tags again.
       // @see \Drupal\metatag\Plugin\Field\FieldType\MetatagFieldItem::preSave()
       // @see \Drupal\metatag\Plugin\Field\FieldWidget\MetatagFirehose::formElement()
+      // @todo Generalize handling of field types whose ::preSave() canonicalizes the stored value in https://git.drupalcode.org/project/canvas/-/work_items/3592013
       if ($items->getFieldDefinition()->getType() === 'metatag') {
         $values = [];
         foreach ($items as $delta => $item) {
