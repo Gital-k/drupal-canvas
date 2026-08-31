@@ -241,6 +241,9 @@ final class ComponentTreeFieldProcessor extends DefaultFieldProcessor implements
    *
    * @return mixed
    *   The updated value with translations written in at the correct depth.
+   *
+   * @see \Drupal\canvas\Hook\TmgmtHooks::maskEmptyComponentTreeTranslations()
+   * @see \Drupal\canvas\Hook\TmgmtHooks::tmgmtDataItemTextOutputAlter()
    */
   private static function writeNestedTranslationsToInputs(array $tmgmt_data, mixed $existing, bool &$found): mixed {
     if (\array_key_exists('#translate', $tmgmt_data) && $tmgmt_data['#translate'] === TRUE) {
