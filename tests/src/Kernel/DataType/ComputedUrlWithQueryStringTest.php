@@ -13,6 +13,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests that a URL with a query string survives a broken entity reference.
+ */
 #[CoversClass(ComputedUrlWithQueryString::class)]
 #[Group('canvas')]
 #[Group('canvas_data_model')]

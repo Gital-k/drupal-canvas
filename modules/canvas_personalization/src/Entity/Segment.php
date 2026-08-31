@@ -21,6 +21,13 @@ use Drupal\Core\Plugin\FilteredPluginManagerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
+/**
+ * Defines a segment: a named set of conditions describing an audience.
+ *
+ * The conditions are condition plugins, so a segment matches a request the way
+ * block visibility conditions do. Weight orders segments, because the first
+ * matching segment decides which variant a visitor sees.
+ */
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
   label: new TranslatableMarkup("Personalization Segment"),

@@ -12,6 +12,15 @@ use Drupal\Core\Entity\EntityAccessControlHandler;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
+/**
+ * Groups Canvas config entities of one type for display in the UI.
+ *
+ * A folder is identified by its UUID rather than a machine name, because its
+ * name is editable. Which config entity type it groups is immutable, so items
+ * of different types never end up in one folder.
+ *
+ * @see \Drupal\canvas\Entity\FolderItemInterface
+ */
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
   label: new TranslatableMarkup('Folder'),

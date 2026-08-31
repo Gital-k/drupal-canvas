@@ -9,6 +9,15 @@ use Drupal\Core\Routing\RouteSubscriberBase;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Routing\RouteCollection;
 
+/**
+ * Allows this module's authentication provider on Canvas' external API routes.
+ *
+ * Canvas' routes declare no `_auth` option, so every global authentication
+ * provider may authenticate on them. Naming providers explicitly would restrict
+ * the route to that list, so the existing global providers are collected and
+ * `canvas_oauth` is put in front of them. Simple OAuth's `oauth2` provider is
+ * left out, being redundant with `canvas_oauth`.
+ */
 class CanvasOauthRouteSubscriber extends RouteSubscriberBase {
 
   /**

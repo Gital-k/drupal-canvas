@@ -12,6 +12,14 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
+/**
+ * Tests auto-save conflict detection for the layout of a Canvas page.
+ *
+ * The test cases come from the shared trait; this class only supplies the
+ * entity, the permissions and how to read and write the auto-saved title.
+ *
+ * @see \Drupal\Tests\canvas\Kernel\AutoSave\AutoSaveConflictTestTrait
+ */
 #[Group('canvas')]
 #[Group('canvas_auto_save')]
 #[RunTestsInSeparateProcesses]

@@ -18,6 +18,13 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\file\FileInterface;
 use Drupal\file\FileUsage\FileUsageInterface;
 
+/**
+ * Defines an in-browser code library: CSS and JS shared by code components.
+ *
+ * Holds the global styles and scripts loaded alongside every code component,
+ * together with the import map and bundled sources needed to build them in the
+ * browser.
+ */
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
   label: new TranslatableMarkup('In-browser code library'),

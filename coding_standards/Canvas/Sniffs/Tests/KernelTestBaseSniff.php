@@ -26,6 +26,16 @@ use SlevomatCodingStandard\Helpers\NamespaceHelper;
 use SlevomatCodingStandard\Helpers\ReferencedName;
 use SlevomatCodingStandard\Helpers\ReferencedNameHelper;
 
+/**
+ * Requires kernel tests to extend Canvas' own kernel test base class.
+ *
+ * Only classes under `tests/src/Kernel` whose name ends in `Test` are checked,
+ * so helper classes declared alongside a test are left alone. Two allowlists
+ * cover the legitimate exceptions: tests reaching the base class through
+ * another Canvas test, and tests extending a core or contrib base class.
+ *
+ * @see \Drupal\Tests\canvas\Kernel\CanvasKernelTestBase
+ */
 class KernelTestBaseSniff implements Sniff {
 
 

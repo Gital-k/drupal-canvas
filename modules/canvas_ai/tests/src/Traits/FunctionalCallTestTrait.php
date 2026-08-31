@@ -6,6 +6,9 @@ namespace Drupal\Tests\canvas_ai\Traits;
 
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 
+/**
+ * Helpers for asserting on the output of AI function calls.
+ */
 trait FunctionalCallTestTrait {
 
   protected static function normalizeErrorString(string $error): string {

@@ -24,6 +24,12 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Validator\Constraints\NotEqualTo;
 use Symfony\Component\Validator\Constraints\Unique;
 
+/**
+ * Hook implementations that do not belong to one Canvas subsystem.
+ *
+ * Covers theme and toolbar registration, page attachments, menu links, and the
+ * alterations Canvas makes to core forms and validation constraints.
+ */
 class ModuleHooks {
 
   use StringTranslationTrait;

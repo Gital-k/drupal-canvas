@@ -6,6 +6,9 @@ namespace Drupal\Tests\canvas\Traits;
 
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
+/**
+ * Converts a constraint violation list into an array for comparison.
+ */
 trait ConstraintViolationsTestTrait {
 
   /**

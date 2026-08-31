@@ -7,6 +7,12 @@ namespace Drupal\canvas\Plugin\Adapter;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
+/**
+ * Counts the whole days between two dates.
+ *
+ * Both dates are read in UTC. When no newer date is given, the count runs to
+ * the current time.
+ */
 #[Adapter(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Count days'),

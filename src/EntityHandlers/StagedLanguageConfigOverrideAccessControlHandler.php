@@ -11,6 +11,12 @@ use Drupal\Core\Entity\EntityHandlerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
 
+/**
+ * Controls access to staged language config overrides via their target.
+ *
+ * Anyone with access to the Canvas UI may `view` an override; changing one
+ * requires permission to update the configuration being overridden.
+ */
 final class StagedLanguageConfigOverrideAccessControlHandler extends EntityAccessControlHandler implements EntityHandlerInterface {
 
   use StagedConfigEntityAccessControlTrait;

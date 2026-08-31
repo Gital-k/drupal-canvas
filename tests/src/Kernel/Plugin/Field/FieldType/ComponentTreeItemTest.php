@@ -29,6 +29,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests the component tree field item and the validation of its values.
+ *
+ * Covers the rejections a stored instance must produce — an unknown parent,
+ * an unknown slot, an unknown version — and the dependencies it calculates.
+ */
 #[CoversClass(ComponentTreeItem::class)]
 #[CoversClass(ValidComponentTreeItemConstraintValidator::class)]
 #[Group('canvas')]

@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+/**
+ * Machine-readable error codes returned by the Canvas HTTP API.
+ *
+ * The UI matches on the code to decide how to recover, and shows the message
+ * from ::getMessage() to the user. Most cases describe a race between
+ * concurrent editors rather than invalid input.
+ */
 enum ErrorCodesEnum: int {
 
   case UnexpectedItemInPublishRequest = 1;

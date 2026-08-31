@@ -15,6 +15,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests discovery of Canvas extensions from module YAML definitions.
+ *
+ * Covers several extensions declared by one module, the extension types, and
+ * the definitions that must be rejected as invalid.
+ */
 #[Group('canvas')]
 #[CoversClass(CanvasExtensionPluginManager::class)]
 #[RunTestsInSeparateProcesses]

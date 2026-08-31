@@ -29,6 +29,12 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Tests uploading media through the Canvas HTTP API.
+ *
+ * Covers a valid upload plus the rejections: no file, a file failing
+ * validation, and a non-image whose extension is nonetheless allowed.
+ */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
 #[CoversClass(ApiMediaControllers::class)]

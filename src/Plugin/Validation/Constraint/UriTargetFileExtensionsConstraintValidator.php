@@ -8,6 +8,14 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 
+/**
+ * Validates nothing: the constraint it serves only carries metadata.
+ *
+ * Symfony requires a validator for every constraint, so this exists to satisfy
+ * that contract.
+ *
+ * @see \Drupal\canvas\Plugin\Validation\Constraint\UriTargetFileExtensionsConstraint
+ */
 final class UriTargetFileExtensionsConstraintValidator extends ConstraintValidator {
 
   /**

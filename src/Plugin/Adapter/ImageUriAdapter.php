@@ -10,6 +10,9 @@ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\file\FileInterface;
 
+/**
+ * Turns a stream wrapper image URI into a URL a browser can request.
+ */
 #[Adapter(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Extract image URL'),

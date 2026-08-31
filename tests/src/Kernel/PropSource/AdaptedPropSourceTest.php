@@ -14,6 +14,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests a prop source that runs its value through an adapter plugin.
+ */
 #[CoversClass(AdaptedPropSource::class)]
 #[Group('canvas')]
 #[Group('canvas_data_model')]

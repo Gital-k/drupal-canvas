@@ -13,6 +13,14 @@ use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 
+/**
+ * Maps the props of an object-typed component input onto entity fields.
+ *
+ * Every mapped expression must start from the same field item, so one object is
+ * assembled from a single field value rather than from several.
+ *
+ * @see \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression
+ */
 final class FieldObjectPropsExpression implements EntityFieldBasedPropExpressionInterface, ObjectPropExpressionInterface {
 
   use CompoundExpressionTrait;

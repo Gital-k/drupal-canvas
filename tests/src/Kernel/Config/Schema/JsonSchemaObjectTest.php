@@ -13,6 +13,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
+/**
+ * Tests deriving config schema from the JSON schema of a code component.
+ */
 #[CoversClass(JsonSchemaObject::class)]
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]

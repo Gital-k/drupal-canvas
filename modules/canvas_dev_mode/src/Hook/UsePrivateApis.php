@@ -8,7 +8,6 @@ use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Hook\Order\Order;
 
 /**
- * @file
  * Hook implementations that make private APIs available ahead of being ready.
  *
  * ⚠️ Installing this module and developing against private (alpha) APIs does

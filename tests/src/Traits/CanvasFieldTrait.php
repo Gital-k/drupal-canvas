@@ -14,6 +14,12 @@ use Drupal\media\Entity\Media;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\TestFileCreationTrait;
 
+/**
+ * Fixtures and assertions for the component tree field's stored values.
+ *
+ * Provides the client-side JSON a request would carry, the server-side values
+ * it should convert into, and the images and files those values reference.
+ */
 trait CanvasFieldTrait {
 
   use AutoSaveManagerTestTrait;

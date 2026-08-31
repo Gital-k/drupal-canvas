@@ -6,6 +6,12 @@ namespace Drupal\canvas\Extension;
 
 use Drupal\Core\Plugin\PluginBase;
 
+/**
+ * A Canvas extension discovered from a module's YAML definition.
+ *
+ * Values come straight from the plugin definition and are cast to strings,
+ * because YAML discovery may hand back translatable markup objects.
+ */
 class CanvasExtension extends PluginBase implements CanvasExtensionInterface {
 
   /**

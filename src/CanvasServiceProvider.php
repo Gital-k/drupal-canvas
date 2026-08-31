@@ -25,6 +25,16 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Validator\Constraints\RegexValidator;
 
+/**
+ * Registers and overrides services that cannot be declared statically.
+ *
+ * Covers service registrations that depend on which modules are installed, and
+ * overrides of core and third-party services: the JSON Schema validator is
+ * pinned to draft-07 with Canvas' own constraint classes, matching the UI, and
+ * Symfony's regex validator is replaced.
+ *
+ * @see \Drupal\canvas\Validation\JitSafeRegexValidator
+ */
 class CanvasServiceProvider extends ServiceProviderBase {
 
   /**

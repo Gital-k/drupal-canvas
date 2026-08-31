@@ -14,6 +14,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests extraction of the stored inputs of every instance in a component tree.
+ */
 #[Group('canvas')]
 #[CoversClass(ComponentTreeInputExtractor::class)]
 #[RunTestsInSeparateProcesses]

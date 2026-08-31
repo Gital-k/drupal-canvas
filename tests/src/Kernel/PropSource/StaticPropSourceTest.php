@@ -32,6 +32,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests a prop source holding a value stored on the component instance.
+ *
+ * A static value is language independent, except where it references an entity
+ * that has translations of its own.
+ */
 #[CoversClass(StaticPropSource::class)]
 #[Group('canvas')]
 #[Group('canvas_data_model')]

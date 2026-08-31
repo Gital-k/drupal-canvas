@@ -45,6 +45,14 @@ use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
+/**
+ * Serves the HTML shell that boots the Canvas UI.
+ *
+ * The response contains only the assets and drupalSettings the React
+ * application needs; everything else is fetched over the Canvas HTTP API. The
+ * shell is rendered in the admin theme, with the site's front-end theme left
+ * untouched for the previews rendered inside it.
+ */
 final class CanvasController {
 
   public function __construct(

@@ -8,6 +8,9 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\Attribute\Constraint;
 use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 
+/**
+ * Validates every translation of a Canvas config entity, not just the original.
+ */
 #[Constraint(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Canvas config entity translations are valid', [], ['context' => 'Validation']),

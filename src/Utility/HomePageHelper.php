@@ -7,6 +7,14 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 
+/**
+ * Determines whether an entity is the site's home page.
+ *
+ * Staged home page changes count: an entity that is about to become the home
+ * page is treated as the home page already.
+ *
+ * @see \Drupal\canvas\Entity\StagedConfigUpdate
+ */
 final class HomePageHelper {
 
   public function __construct(private ConfigFactoryInterface $configFactory, private EntityTypeManagerInterface $entityTypeManager) {}

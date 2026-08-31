@@ -17,6 +17,15 @@ use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 
+/**
+ * Resolves JavaScript assets, dropping assets reachable via several libraries.
+ *
+ * Canvas ships libraries that mirror core ones with admin theme overrides
+ * applied, so one asset can be reached through more than one library. Core's
+ * resolver skips already-loaded libraries but not the assets inside them.
+ *
+ * @see ::getCanvasJsAssets()
+ */
 final class AssetResolver extends CoreAssetResolver {
 
   protected AssetResolverInterface $assetResolver;

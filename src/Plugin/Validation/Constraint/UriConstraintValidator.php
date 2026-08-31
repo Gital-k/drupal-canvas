@@ -10,6 +10,12 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 
+/**
+ * Validates that a value is a URI, optionally allowing relative references.
+ *
+ * `temporary://` is always accepted: it occurs while a file is being uploaded
+ * and is never a permanently stored value.
+ */
 final class UriConstraintValidator extends ConstraintValidator {
 
   /**

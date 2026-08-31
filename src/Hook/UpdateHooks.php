@@ -9,6 +9,14 @@ use Drupal\Core\Config\ConfigInstallerInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\field\Entity\FieldConfig;
 
+/**
+ * Hook implementations that update stored config to the current data model.
+ *
+ * Runs on presave so entities are migrated as they are saved, including during
+ * config import, where dependencies also have to be recalculated.
+ *
+ * @see \Drupal\canvas\CanvasConfigUpdater
+ */
 final class UpdateHooks {
 
   public function __construct(

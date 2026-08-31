@@ -9,6 +9,9 @@ use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests that Canvas adds its links to Drupal's navigation.
+ */
 #[Group('canvas')]
 #[RunTestsInSeparateProcesses]
 final class NavigationIntegrationTest extends CanvasKernelTestBase {

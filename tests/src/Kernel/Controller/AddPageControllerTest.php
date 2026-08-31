@@ -19,6 +19,12 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
+/**
+ * Tests creating a page through the add route.
+ *
+ * The route both creates an entity and redirects, so it is checked for the
+ * required permission and for CSRF protection.
+ */
 #[Group('canvas')]
 #[CoversClass(AddPageController::class)]
 #[RunTestsInSeparateProcesses]

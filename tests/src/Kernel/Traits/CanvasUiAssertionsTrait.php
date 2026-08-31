@@ -6,6 +6,9 @@ namespace Drupal\Tests\canvas\Kernel\Traits;
 
 use Drupal\canvas\CodeComponentDataProvider;
 
+/**
+ * Asserts that a response contains the mount point of the Canvas UI.
+ */
 trait CanvasUiAssertionsTrait {
 
   /**

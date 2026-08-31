@@ -12,6 +12,12 @@ use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
 use Drupal\KernelTests\Core\Config\ConfigEntityValidationTestBase;
 
+/**
+ * Config entity validation base class with stricter required-value checks.
+ *
+ * Extends core's base class so Canvas config entities are also checked for
+ * required properties left empty and for properties that must never change.
+ */
 abstract class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBase {
 
   use SchemaCheckTrait;

@@ -19,6 +19,15 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
+/**
+ * Controls access to Canvas config entities, guarding deletion.
+ *
+ * Deletion is forbidden while other configuration still depends on the entity.
+ * Dependents whose entity type can absorb the removal in
+ * ::onDependencyRemoval() are ignored, so only unresolvable dependencies block.
+ *
+ * @see ::getEntityTypesAllowedToDependOnDeletedEntities()
+ */
 class CanvasConfigEntityAccessControlHandler extends EntityAccessControlHandler implements EntityHandlerInterface {
 
   public function __construct(

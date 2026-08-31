@@ -10,6 +10,13 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
+/**
+ * Serves an entity form for embedding in the Canvas UI.
+ *
+ * On the initial GET the form is built from the auto-saved entity when one
+ * exists, so the editor sees pending changes; later AJAX requests use the
+ * values already in form state. Requires the canvas_stark theme.
+ */
 final class EntityFormController extends ControllerBase {
 
   use EntityFormTrait;

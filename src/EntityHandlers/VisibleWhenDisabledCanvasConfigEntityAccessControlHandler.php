@@ -20,6 +20,14 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
+/**
+ * Keeps disabled Canvas config entities viewable, and guards deletion by usage.
+ *
+ * Unlike the parent handler, `view` is granted to anyone with access to the
+ * Canvas UI even when the entity is disabled, so the UI can still show it.
+ * Deleting a code component is additionally forbidden while the component it
+ * backs is used in auto-save, the default revision or the latest revision.
+ */
 final class VisibleWhenDisabledCanvasConfigEntityAccessControlHandler extends CanvasConfigEntityAccessControlHandler {
 
   public function __construct(

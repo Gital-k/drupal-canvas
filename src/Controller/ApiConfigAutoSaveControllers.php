@@ -14,6 +14,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
+/**
+ * HTTP API controllers for the auto-save state of Canvas config entities.
+ *
+ * Reads and updates the pending (unpublished) version of a config entity, and
+ * serves the CSS and JS of those config entities that carry assets.
+ */
 final class ApiConfigAutoSaveControllers extends ApiControllerBase {
 
   use AutoSaveValidateTrait;

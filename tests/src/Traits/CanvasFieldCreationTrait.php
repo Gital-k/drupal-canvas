@@ -7,6 +7,9 @@ namespace Drupal\Tests\canvas\Traits;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 
+/**
+ * Creates a component tree field on an entity type and bundle.
+ */
 trait CanvasFieldCreationTrait {
 
   protected function createComponentTreeField(string $entity_type_id, string $bundle, string $field_name): void {

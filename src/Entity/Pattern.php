@@ -16,6 +16,12 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
+/**
+ * Defines a pattern: a reusable, named fragment of a component tree.
+ *
+ * Instantiating a pattern copies its components into the page being edited, so
+ * later edits to the pattern do not propagate to pages already using it.
+ */
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
   label: new TranslatableMarkup('Pattern'),

@@ -14,6 +14,14 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\ConstraintViolationList;
 
+/**
+ * Validates a single component instance in a component tree.
+ *
+ * The raw structure is checked first; when that fails, the in-depth checks are
+ * skipped, because their violations would only restate the structural problem.
+ * Accepts both a field item and its array form, so config-defined trees can be
+ * validated too.
+ */
 final class ValidComponentTreeItemConstraintValidator extends ConstraintValidator {
 
   use ConfigComponentTreeTrait;

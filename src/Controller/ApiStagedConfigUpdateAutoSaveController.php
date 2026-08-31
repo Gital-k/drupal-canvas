@@ -14,6 +14,14 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
+/**
+ * HTTP API controller that stages a config update for later publishing.
+ *
+ * Creates a staged config update entity in auto-save, so a change to simple
+ * configuration can be reviewed and published alongside content changes.
+ *
+ * @see \Drupal\canvas\Entity\StagedConfigUpdate
+ */
 class ApiStagedConfigUpdateAutoSaveController extends ApiControllerBase {
 
   public function __construct(

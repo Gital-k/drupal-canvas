@@ -39,6 +39,12 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests a prop source reading its value from a field on the host entity.
+ *
+ * Covers what happens when the field, delta or adapter it names is absent, and
+ * the cacheability and language handling of the values it does produce.
+ */
 #[CoversClass(EntityFieldPropSource::class)]
 #[CoversMethod(PropSource::class, 'parse')]
 #[Group('canvas')]

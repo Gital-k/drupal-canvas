@@ -7,6 +7,9 @@ namespace Drupal\canvas\Plugin\Adapter;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
+/**
+ * Formats a UNIX timestamp as a date.
+ */
 #[Adapter(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('UNIX timestamp to date'),

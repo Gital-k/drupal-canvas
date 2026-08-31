@@ -8,6 +8,9 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\Attribute\Constraint;
 use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 
+/**
+ * Validates that an exposed slot points at a slot the component really has.
+ */
 #[Constraint(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Validates an exposed slot', [], ['context' => 'Validation']),

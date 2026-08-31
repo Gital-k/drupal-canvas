@@ -22,6 +22,13 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\Attribute\DataType;
 use Drupal\Core\TypedData\Plugin\DataType\Uri;
 
+/**
+ * Computes a URL with a query string, from prop expressions in its settings.
+ *
+ * The `url` setting holds the prop expression producing the base URL, and
+ * `query_parameters` the expressions producing each query string parameter.
+ * Cacheability is collected from every expression that is evaluated.
+ */
 #[DataType(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup("URI template")

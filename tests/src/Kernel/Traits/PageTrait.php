@@ -7,6 +7,9 @@ namespace Drupal\Tests\canvas\Kernel\Traits;
 use Drupal\canvas\Entity\Page;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 
+/**
+ * Installs the page entity schema and asserts pages save without violations.
+ */
 trait PageTrait {
 
   use ConstraintViolationsTestTrait;

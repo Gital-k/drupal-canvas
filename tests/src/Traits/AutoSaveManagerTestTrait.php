@@ -16,6 +16,9 @@ use Drupal\file\Entity\File;
 use Drupal\image\ImageStyleInterface;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 
+/**
+ * Helpers for inspecting auto-save entries the way the client sees them.
+ */
 trait AutoSaveManagerTestTrait {
 
   protected const string NEW_PAGE_TITLE = 'Untitled page';

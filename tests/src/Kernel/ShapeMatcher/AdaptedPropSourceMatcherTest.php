@@ -18,6 +18,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests which adapters are offered for a given component input shape.
+ */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(AdaptedPropSourceMatcher::class)]
 #[Group('canvas')]
