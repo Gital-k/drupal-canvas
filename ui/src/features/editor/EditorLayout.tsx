@@ -163,11 +163,11 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
     }
   };
 
-  useEffect(() => {
-    if (selectedComponent) {
-      setRightPanelVisibility(true);
-    }
-  }, [selectedComponent]);
+  // useEffect(() => {
+  //   if (selectedComponent) {
+  //     setRightPanelVisibility(true);
+  //   }
+  // }, [selectedComponent]);
 
   const effectiveRightWidth = isPanelHidden ? 0 : rightWidthPx;
   const showHandle = !isPanelHidden;
