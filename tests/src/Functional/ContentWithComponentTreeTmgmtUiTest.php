@@ -275,7 +275,8 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
    *
    * AC1: REQUIRED prop ("heading") left blank → TMGMT's "The field is empty."
    *      error remains: Canvas rejects an empty required prop in any language,
-   *      so the translator must provide a value.
+   *      so the translator must provide a value. The same applies to a nested
+   *      row of a required prop ("cta1href|uri").
    * AC2: Source has value, real translation provided → translated value
    *      stored.
    * AC3: Source is empty (message shown instead of a source textarea),
@@ -289,6 +290,10 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
    *      a composite input, next to a really translated sibling item → the
    *      echoed item is refilled from the default translation; no NULL leaks
    *      into the stored composite value.
+   * AC7: A translator plugin echoing the exact ∅ sentinel back for a scalar
+   *      prop → discarded; the default translation's value is stored.
+   * AC8: A translation that merely CONTAINS the sentinel (tmgmt_test's
+   *      translator returns "fr: ∅" for an empty source) → stored verbatim.
    *
    * Falling back to the default translation's value is intentionally NOT
    * supported here; that is a separate design discussion.
@@ -315,6 +320,8 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
             'heading' => 'Welcome',
             // AC5: non-empty source that will be explicitly emptied in French.
             'subheading' => 'Sub',
+            // AC7: non-empty source whose "translation" is the echoed sentinel.
+            'cta1' => 'View',
             'cta1href' => ['uri' => 'https://example.com', 'options' => []],
             'cta2' => 'Learn more',
           ],
@@ -384,7 +391,18 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     foreach ($source_cells as $source_cell) {
       self::assertStringNotContainsString('∅', $source_cell->getText());
     }
-    $assert->pageTextContains('This field is empty in the source language.');
+    // AC3: empty-source rows have no source textarea, only the message; rows
+    // with a source value have the textarea and no message.
+    $empty_message = 'This field is empty in the source language.';
+    $source_cell_xpath = "//textarea[@name='%s[translation]']/ancestor::tr[1]/td[contains(@class, 'tmgmt-ui-data-item-source')]";
+    foreach (["components|{$block_delta}|label", "components|{$block_delta}|name", "components|{$deep_delta}|label"] as $empty_source_key) {
+      $assert->elementNotExists('css', "textarea[name='{$empty_source_key}[source]']");
+      $assert->elementTextContains('xpath', \sprintf($source_cell_xpath, $empty_source_key), $empty_message);
+    }
+    foreach (["components|{$hero_delta}|heading", "components|{$hero_delta}|subheading"] as $filled_source_key) {
+      $assert->elementExists('css', "textarea[name='{$filled_source_key}[source]']");
+      $assert->elementTextNotContains('xpath', \sprintf($source_cell_xpath, $filled_source_key), $empty_message);
+    }
 
     $translations = [
       // AC1: required prop left blank — must keep TMGMT's error.
@@ -394,8 +412,12 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
       // AC5: optional prop with a non-empty source left blank — explicitly
       // empty, no error.
       "components|{$hero_delta}|subheading[translation]" => '',
-      // Override auto-prefixed URI to keep it valid (cta1href is required).
-      "components|{$hero_delta}|cta1href|uri[translation]" => 'https://fr.example.com',
+      // AC7: a translator plugin echoing the exact sentinel back for a scalar
+      // prop with a non-empty source.
+      "components|{$hero_delta}|cta1[translation]" => '∅',
+      // AC1: nested row of a required prop left blank — must keep TMGMT's
+      // error too.
+      "components|{$hero_delta}|cta1href|uri[translation]" => '',
       // AC3: label source is empty; left blank — stays empty, ∅ never stored.
       "components|{$block_delta}|label[translation]" => '',
       // AC4: name source is empty; provide a real French value.
@@ -404,7 +426,8 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
       // of a composite input while its sibling gets a real translation. The
       // echoed item must be refilled from the default translation — no NULL
       // may leak into the stored composite value.
-      "components|{$deep_delta}|label[translation]" => '',
+      // AC8: this empty-source row is deliberately NOT overridden, so the test
+      // translator's "fr: ∅" (contains, but is not, the sentinel) is kept.
       "components|{$deep_delta}|deeply_nested_translatable|0|bar[translation]" => '∅',
       "components|{$deep_delta}|deeply_nested_translatable|1|bar[translation]" => 'Traduit',
     ];
@@ -422,7 +445,9 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     $this->submitForm($translations, 'Validate');
     $assert->pageTextContains('The field is empty.');
     $assert->elementExists('css', "textarea[name='components|{$hero_delta}|heading[translation]'].error");
+    $assert->elementExists('css', "textarea[name='components|{$hero_delta}|cta1href|uri[translation]'].error");
     $assert->elementNotExists('css', "textarea[name='components|{$hero_delta}|subheading[translation]'].error");
+    $assert->elementNotExists('css', "textarea[name='components|{$hero_delta}|cta1[translation]'].error");
     $assert->elementNotExists('css', "textarea[name='components|{$block_delta}|label[translation]'].error");
     // The masking of empty translations for TMGMT's validation must never
     // leak the sentinel into the re-rendered textareas.
@@ -431,6 +456,7 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     // With the required prop translated, validation passes: no error for the
     // blank (explicitly empty) optional rows.
     $translations["components|{$hero_delta}|heading[translation]"] = 'Bienvenue';
+    $translations["components|{$hero_delta}|cta1href|uri[translation]"] = 'https://fr.example.com';
     $this->submitForm($translations, 'Validate');
     $assert->pageTextNotContains('The field is empty.');
     $assert->pageTextContains('Validation completed successfully.');
@@ -447,9 +473,19 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     self::assertNotNull($hero_item);
     $hero_inputs = $hero_item->getInputs();
 
-    // AC1: the required prop had to be translated to pass validation.
+    // AC1: the required prop and the nested row of a required prop had to be
+    // translated to pass validation.
     self::assertSame('Bienvenue', $hero_inputs['heading'] ?? NULL,
       'AC1: A required prop must carry the provided translation.'
+    );
+    self::assertSame('https://fr.example.com', $hero_inputs['cta1href']['uri'] ?? NULL,
+      'AC1: A nested row of a required prop must carry the provided translation.'
+    );
+
+    // AC7: the exact-sentinel echo for a scalar prop is discarded and the
+    // default translation's value is stored.
+    self::assertSame('View', $hero_inputs['cta1'] ?? NULL,
+      'AC7: A discarded sentinel echo for a scalar prop must be refilled from the default translation.'
     );
 
     // AC2: real translation stored verbatim.
@@ -472,25 +508,31 @@ class ContentWithComponentTreeTmgmtUiTest extends FunctionalTestBase {
     self::assertSame('', $block_inputs['label'] ?? NULL,
       'AC3: An empty-source field left blank must stay empty.'
     );
-    foreach ($hero_inputs + $block_inputs as $key => $value) {
-      self::assertNotSame(
-        '∅',
-        $value,
-        "The ∅ sentinel must never appear as a stored input value (key: $key)."
-      );
-    }
 
     // AC4: real French value stored for an empty-source field.
     self::assertSame('Bonjour', $block_inputs['name'],
       'AC4: A real translation for an empty-source field must be stored.'
     );
 
-    // AC6: the exact-sentinel echo for item 0 is discarded and the whole item
-    // is refilled from the default translation; the sibling item keeps its
-    // real translation. No NULL leaks into the stored composite value.
     $deep_item = $fr_tree->getComponentTreeItemByUuid($uuid_deep);
     self::assertNotNull($deep_item);
     $deep_inputs = $deep_item->getInputs();
+
+    // AC8: a translation that merely contains the sentinel is stored verbatim.
+    self::assertSame('fr: ∅', $deep_inputs['label'] ?? NULL,
+      'AC8: A translation containing (but not equal to) the sentinel must be stored verbatim.'
+    );
+
+    // The sentinel must never be stored, at any depth, in any item.
+    foreach (['hero' => $hero_inputs, 'block' => $block_inputs, 'deep' => $deep_inputs] as $label => $inputs) {
+      \array_walk_recursive($inputs, static function (mixed $value, int|string $key) use ($label): void {
+        self::assertNotSame('∅', $value, "The ∅ sentinel must never appear as a stored input value ($label: $key).");
+      });
+    }
+
+    // AC6: the exact-sentinel echo for item 0 is discarded and the whole item
+    // is refilled from the default translation; the sibling item keeps its
+    // real translation. No NULL leaks into the stored composite value.
     self::assertSame(
       [
         ['foo' => 'Huh?', 'bar' => 'Gitane'],
