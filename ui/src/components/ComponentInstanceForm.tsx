@@ -79,10 +79,7 @@ const ComponentInstanceFormRenderer: React.FC<
     editorFrameContext,
     components,
   } = inputAndUiData;
-  const selectedComponentName = selectedComponentType
-    .split('.')[2]
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (letter: string) => letter.toUpperCase());
+  const selectedComponentName = components?.[selectedComponentType].name;
   const [jsxFormContent, setJsxFormContent] =
     useState<React.ReactElement | null>(null);
   const [currentComponentId, setCurrentComponentId] = useState<string | null>(
