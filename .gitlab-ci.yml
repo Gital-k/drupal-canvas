@@ -377,11 +377,13 @@ lint (php):
     - !reference [ .test_runner ]
     - run_test "composer validate" "composer validate --strict"
     - run_test "phpcs" "composer run phpcs"
+    # PHPStan emits a single output format per run, so the machine-readable report needs its own run. Generate it
+    # BEFORE the human-readable run, because `.test_summary` exits the script as soon as any check failed: emitting it
+    # afterwards lost the report in exactly the case a reviewer needs it — a failing analysis. PHPStan's result cache
+    # makes this second run cheap (measured: ~40s cold, ~5s warm), so the order costs nothing.
+    - mkdir -p test-results && composer run phpstan -- --error-format=junit > test-results/phpstan.xml || true
     - run_test "phpstan" "composer run phpstan"
     - !reference [ .test_summary ]
-    # PHPStan doesn't allow multiple outputs, but it will cache the result. Use the cache to expose in GitLab CI's UI.
-    # @todo Remove this in https://www.drupal.org/project/canvas/issues/3591277
-    - mkdir -p test-results && composer run phpstan -- --error-format=junit > test-results/phpstan.xml || true
     # Regenerate PHPStan baseline for Canvas-provided features that require a core version beyond the minimum supported
     # core version.
     # (Manual additions belong in phpstan.neon; this file should be purely auto-generated ignores.)
