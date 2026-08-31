@@ -8,6 +8,7 @@ use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
@@ -25,6 +26,7 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
@@ -462,16 +464,15 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   public function normalizeForClientSide(): ClientSideRepresentation {
     $entity_type_manager = $this->entityTypeManager();
     \assert(\is_string($this->content_entity_type_id));
-    $content_entity_type = $entity_type_manager->getDefinition($this->content_entity_type_id);
     $storage = $entity_type_manager->getStorage($this->getTargetEntityTypeId());
 
     // Determine the preview entity (if any), and ensure correct cacheability:
     // - for the query in ::getSuggestedPreviewEntity()
     // - for the access checking here
-    $preview_entity = $this->getSuggestedPreviewEntity();
     $preview_entity_cacheability = (new CacheableMetadata())
       ->addCacheContexts($storage->getEntityType()->getListCacheContexts())
       ->addCacheTags($storage->getEntityType()->getBundleListCacheTags($this->getTargetBundle()));
+    $preview_entity = $this->getSuggestedPreviewEntity($preview_entity_cacheability);
     if ($preview_entity !== NULL) {
       $preview_entity_access = $preview_entity->access('view', return_as_object: TRUE);
       $preview_entity_cacheability->addCacheableDependency($preview_entity_access);
@@ -506,11 +507,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       ],
       preview: NULL,
     )
-      ->addCacheableDependency($preview_entity_cacheability)
-      // Cacheability metadata for the suggested preview entity.
-      ->addCacheContexts($content_entity_type->getListCacheContexts())
-      // @phpstan-ignore-next-line argument.type
-      ->addCacheTags($content_entity_type->getBundleListCacheTags($this->content_entity_type_bundle));
+      ->addCacheableDependency($preview_entity_cacheability);
   }
 
   public static function createFromClientSide(array $data): static {
@@ -560,7 +557,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     // Nothing to do.
   }
 
-  public static function getPreviewSuggestionQuery(string $entity_type_id, string $bundle, int $limit): QueryInterface {
+  public static function getPreviewSuggestionQuery(string $entity_type_id, string $bundle, int $limit, RefinableCacheableDependencyInterface $cacheability, ?string $search = NULL): QueryInterface {
     $entity_type_manager = \Drupal::entityTypeManager();
     $entity_definition = $entity_type_manager->getDefinition($entity_type_id);
 
@@ -574,6 +571,23 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       \assert(\is_string($bundle_key));
       $entity_query->condition($bundle_key, $bundle);
     }
+    if ($search !== NULL && $search !== '' && ($label_key = $entity_definition->getKey('label'))) {
+      $entity_query->condition($label_key, $search, 'CONTAINS');
+    }
+    // Language-neutral content always qualifies; content in other languages
+    // is filtered out, so that on a multilingual site, the small
+    // (`$limit`-capped) candidate list isn't crowded out by entities in a
+    // language the developer isn't working in.
+    // @see \Drupal\path_alias\AliasRepository::addLanguageFallback()
+    if ($langcode_key = $entity_definition->getKey('langcode')) {
+      $negotiated_language = NegotiatedLanguage::negotiateFromConfigAndContext();
+      $cacheability->addCacheableDependency($negotiated_language);
+      $entity_query->condition($langcode_key, [
+        $negotiated_language->language->getId(),
+        LanguageInterface::LANGCODE_NOT_SPECIFIED,
+        LanguageInterface::LANGCODE_NOT_APPLICABLE,
+      ], 'IN');
+    }
 
     // @todo Remove conditionality in https://www.drupal.org/i/3498525
     if ($entity_definition->entityClassImplements(EntityChangedInterface::class)) {
@@ -585,13 +599,14 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     return $entity_query;
   }
 
-  private function getSuggestedPreviewEntity(): ?ContentEntityInterface {
+  private function getSuggestedPreviewEntity(RefinableCacheableDependencyInterface $cacheability): ?ContentEntityInterface {
     \assert($this->content_entity_type_id !== NULL);
 
     $query = self::getPreviewSuggestionQuery(
       $this->getTargetEntityTypeId(),
       $this->getTargetBundle(),
-      1
+      1,
+      $cacheability,
     );
     $results = $query->execute();
     \assert(\is_array($results));
