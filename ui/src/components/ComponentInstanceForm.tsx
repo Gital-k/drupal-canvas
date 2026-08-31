@@ -43,8 +43,6 @@ import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import { isPropSourceComponent } from '@/types/Component';
 import parseHyperscriptifyTemplate from '@/utils/parse-hyperscriptify-template';
 
-import useGetComponentName from '../hooks/useGetComponentName';
-
 import type {
   ComponentModel,
   EvaluatedComponentModel,
@@ -79,10 +77,12 @@ const ComponentInstanceFormRenderer: React.FC<
     selectedComponentType,
     selectedComponent,
     editorFrameContext,
-    node: selectedNode,
     components,
   } = inputAndUiData;
-  const selectedComponentName = useGetComponentName(selectedNode ?? null);
+  const selectedComponentName = selectedComponentType
+    .split('.')[2]
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter: string) => letter.toUpperCase());
   const [jsxFormContent, setJsxFormContent] =
     useState<React.ReactElement | null>(null);
   const [currentComponentId, setCurrentComponentId] = useState<string | null>(
