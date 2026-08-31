@@ -87,6 +87,10 @@ vi.mock('@/app/hooks', async () => {
           },
         },
         ui: uiInitialState,
+        workspaces: {
+          activeWorkspaceId: null,
+          isAddWorkspaceModalOpen: false,
+        },
       }),
   };
 });
@@ -151,6 +155,34 @@ vi.mock('@/services/preview', () => ({
   useQueuedPostPreviewMutation: () => [vi.fn(), { isLoading: false }],
   useUpdateComponentMutation: () => [vi.fn(), { isLoading: false }],
 }));
+
+vi.mock('@/services/workspacesApi', () => ({
+  useGetWorkspacesQuery: () => ({
+    data: undefined,
+  }),
+  useGetWorkspaceChangesQuery: () => ({
+    data: [],
+    error: undefined,
+    refetch: mocks.refetch,
+    isFetching: false,
+  }),
+}));
+
+vi.mock('@/utils/drupal-globals', async (importOriginal) => {
+  const actual = await importOriginal<{
+    setCanvasDrupalSetting: (property: string, value: unknown) => void;
+
+    [key: string]: any;
+  }>();
+  return {
+    ...actual,
+    getCanvasSettings: () => ({
+      permissions: {
+        devWorkspaces: false,
+      },
+    }),
+  };
+});
 
 describe('UnpublishedChanges', () => {
   beforeEach(() => {

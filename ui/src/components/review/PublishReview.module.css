@@ -34,6 +34,23 @@
   margin: 0 !important;
 }
 
+.workspaceActionsWrapper {
+  display: flex;
+}
+
+.workspaceActionsMainButton {
+  flex: 1;
+  justify-content: center !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.workspaceActionsDropdownTrigger {
+  margin-left: 1px !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
 .loading {
   padding-right: 10px;
 }

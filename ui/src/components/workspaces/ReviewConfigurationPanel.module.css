@@ -1,0 +1,58 @@
+.reviewerInput {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--gray-12);
+  border: 1px solid var(--gray-6);
+  border-radius: var(--radius-2);
+  outline: none;
+  background-color: var(--gray-1);
+  font-size: var(--font-size-2);
+  line-height: var(--line-height-2);
+}
+
+.reviewerInput:focus {
+  border-color: var(--blue-8);
+  box-shadow: 0 0 0 1px var(--blue-8);
+}
+
+.reviewerInput:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background-color: var(--gray-3);
+}
+
+.reviewerInput::placeholder {
+  color: var(--gray-9);
+}
+
+.removeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: var(--space-1);
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  opacity: 0.7;
+  color: currentColor;
+  border: none;
+  background: transparent;
+}
+
+.removeButton:hover {
+  opacity: 1;
+}
+
+.removeButton svg {
+  width: 12px;
+  height: 12px;
+}
+
+.sendButton {
+  justify-content: center;
+  width: 100%;
+}
+
+.sendButton[disabled]:not([data-disabled]) {
+  cursor: not-allowed;
+}

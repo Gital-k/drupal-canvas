@@ -33,6 +33,7 @@ import {
   setLatestUndoRedoActionId,
   uiSlice,
 } from '@/features/ui/uiSlice';
+import { workspacesSlice } from '@/features/workspaces/workspacesSlice';
 import { assetLibraryApi } from '@/services/assetLibrary';
 import { brandKitApi } from '@/services/brandKit';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
@@ -49,6 +50,7 @@ import { patternApi } from '@/services/patterns';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { personalizationApi } from '@/services/personalization';
 import { previewApi } from '@/services/preview';
+import { workspacesApi } from '@/services/workspacesApi';
 import { rtkQueryErrorHandler } from '@/utils/rtkQuery-error';
 
 import type { Action, Middleware, ThunkAction } from '@reduxjs/toolkit';
@@ -174,6 +176,8 @@ const rootReducer = combineSlices(
   previewSlice,
   queryErrorSlice,
   personalizationSlice,
+  workspacesApi,
+  workspacesSlice,
 );
 // Infer the `RootState` type from the root reducer
 export type RootState = ReturnType<typeof rootReducer>;
@@ -263,6 +267,7 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
         pendingChangesApi.middleware,
         contentApi.middleware,
         contentEntityReferenceApi.middleware,
+        workspacesApi.middleware,
         rtkQueryErrorHandler, // Add the error handling middleware
       );
     },

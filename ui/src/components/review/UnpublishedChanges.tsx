@@ -31,6 +31,7 @@ import {
   clearSelection,
   selectSelectedComponentUuid,
 } from '@/features/ui/uiSlice';
+import { selectActiveWorkspaceId } from '@/features/workspaces/workspacesSlice';
 import { brandKitApi } from '@/services/brandKit';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import { contentApi, useGetContentListQuery } from '@/services/content';
@@ -42,7 +43,15 @@ import {
   useQueuedPostPreviewMutation,
   useUpdateComponentMutation,
 } from '@/services/preview';
+import {
+  useGetWorkspaceChangesQuery,
+  useGetWorkspacesQuery,
+  usePublishWorkspaceActionMutation,
+} from '@/services/workspacesApi';
+import { getCanvasSettings } from '@/utils/drupal-globals';
+import { hasPermission } from '@/utils/permissions';
 
+import type { WorkspaceAction } from '@/components/review/PublishReview';
 import type { UnpublishedChange } from '@/types/Review';
 
 const REFETCH_INTERVAL_MS = 10000;
@@ -64,6 +73,27 @@ const UnpublishedChanges = () => {
   const [pollingInterval, setPollingInterval] =
     useState<number>(REFETCH_INTERVAL_MS);
   const [reviewOpen, setReviewOpen] = useState(false);
+
+  const [publishWorkspaceAction] = usePublishWorkspaceActionMutation();
+
+  // Workspace integration: read active workspace and devWorkspaces flag
+  const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId);
+  const devWorkspaces =
+    getCanvasSettings()?.permissions?.devWorkspaces ?? false;
+  const isInWorkspace =
+    devWorkspaces && activeWorkspaceId !== null && activeWorkspaceId !== 'live';
+
+  // Get workspace data to resolve workspace name
+  const { data: workspaces } = useGetWorkspacesQuery(undefined, {
+    skip: !devWorkspaces,
+  });
+
+  const activeWorkspace = useMemo(
+    () => workspaces?.find((w) => w.id === activeWorkspaceId),
+    [workspaces, activeWorkspaceId],
+  );
+
+  // Fetch global pending changes when NOT in a workspace
   const {
     data: changes,
     error,
@@ -72,6 +102,19 @@ const UnpublishedChanges = () => {
   } = useGetAllPendingChangesQuery(undefined, {
     pollingInterval: pollingInterval,
     skipPollingIfUnfocused: true,
+    skip: isInWorkspace,
+  });
+
+  // Fetch workspace-scoped changes when in a workspace
+  const {
+    data: workspaceChanges,
+    error: workspaceChangesError,
+    refetch: refetchWorkspaceChanges,
+    isFetching: isFetchingWorkspaceChanges,
+  } = useGetWorkspaceChangesQuery(activeWorkspaceId ?? 'live', {
+    pollingInterval: pollingInterval,
+    skipPollingIfUnfocused: true,
+    skip: !isInWorkspace,
   });
   const { entityType, entityId, codeComponentId } = useParams();
   const location = useLocation();
@@ -93,40 +136,74 @@ const UnpublishedChanges = () => {
   const conflictUxEnabled = isConflictUxEnabled();
 
   // If either the selected component or the preview layout is being updated, disable the Publish button.
-  const isUpdating = isUpdatingComponent || isUpdatingPreview;
+  const isUpdating =
+    isUpdatingComponent || isUpdatingPreview || isFetchingWorkspaceChanges;
 
   useEffect(() => {
     if (error) {
       showBoundary(error);
     }
-  }, [error, showBoundary]);
+    if (workspaceChangesError) {
+      showBoundary(workspaceChangesError);
+    }
+  }, [error, workspaceChangesError, showBoundary]);
 
-  const unpublishedChanges: UnpublishedChange[] = useMemo(
-    () =>
-      Object.entries(changes || {})
-        .map(([pointer, change]) => ({
-          ...change,
-          pointer,
+  // Map workspace changes to UnpublishedChange format when in a workspace
+  const unpublishedChanges: UnpublishedChange[] = useMemo(() => {
+    if (isInWorkspace) {
+      // Map WorkspacePendingChange to UnpublishedChange format
+      return (workspaceChanges || [])
+        .map((change) => ({
+          entity_type: change.entityType,
+          entity_id: change.entityId,
+          label: change.label,
+          updated: change.updated,
+          owner: {
+            name: change.owner.name,
+            avatar: change.owner.avatarUrl ?? null,
+            uri: '',
+            id: parseInt(change.owner.id) || 0,
+          },
+          data_hash: '',
+          langcode: '',
+          pointer: `${change.entityType}:${change.entityId}`,
         }))
-        .sort((a, b) => b.updated - a.updated),
-    [changes],
-  );
+        .sort((a, b) => b.updated - a.updated);
+    }
+    // Original behavior for global pending changes
+    return Object.entries(changes || {})
+      .map(([pointer, change]) => ({
+        ...change,
+        pointer,
+      }))
+      .sort((a, b) => b.updated - a.updated);
+  }, [isInWorkspace, workspaceChanges, changes]);
 
   useEffect(() => {
-    if (previousPendingChanges) refetch();
-  }, [previousPendingChanges, refetch]);
+    if (previousPendingChanges) {
+      if (isInWorkspace) {
+        refetchWorkspaceChanges();
+      } else {
+        refetch();
+      }
+    }
+  }, [previousPendingChanges, refetch, refetchWorkspaceChanges, isInWorkspace]);
 
   const onOpenChangeHandler = useCallback(
     (open: boolean): void => {
       setReviewOpen(open);
       if (open) {
         setPollingInterval(0);
-        refetch();
+        if (isInWorkspace) {
+          refetchWorkspaceChanges();
+        } else {
+          refetch();
+        }
       } else {
         setPollingInterval(REFETCH_INTERVAL_MS);
       }
     },
-    [refetch],
+    [refetch, refetchWorkspaceChanges, isInWorkspace],
   );
 
   useEffect(() => {
@@ -264,14 +341,60 @@ const UnpublishedChanges = () => {
     return map;
   }, [pageItems]);
 
+  const canPublish = hasPermission('publishChanges');
+
+  // Create workspace actions when in a workspace
+  const workspaceActions: WorkspaceAction[] = useMemo(() => {
+    if (!isInWorkspace || !activeWorkspaceId) {
+      return [];
+    }
+    const actions: WorkspaceAction[] = [];
+    if (canPublish) {
+      actions.push({
+        label: 'Publish now',
+        onSelect: () => {
+          void publishWorkspaceAction({
+            workspaceId: activeWorkspaceId,
+            action: 'publish',
+          });
+        },
+      });
+      actions.push({
+        label: 'Schedule publish',
+        onSelect: () => {
+          // @todo Stub for now - no date picker yet (Chunk 7 follow-up)
+          void publishWorkspaceAction({
+            workspaceId: activeWorkspaceId,
+            action: 'schedule',
+          });
+        },
+      });
+    }
+    actions.push({
+      label: 'Send for review',
+      onSelect: () => {
+        // This triggers the review configuration panel via PublishReview's internal state
+        // The action is handled in PublishReview by opening the panel
+      },
+      disabled: false,
+    });
+    return actions;
+  }, [isInWorkspace, activeWorkspaceId, canPublish, publishWorkspaceAction]);
+
   return (
     <PublishReview
       open={reviewOpen}
       isUpdating={isUpdating}
-      isFetching={isFetching}
+      isFetching={isInWorkspace ? isFetchingWorkspaceChanges : isFetching}
       changes={unpublishedChanges}
       conflictCount={conflictCount}
       errors={errorResponse}
+      workspaceName={activeWorkspace?.name ?? null}
+      workspaceActions={
+        isInWorkspace && workspaceActions.length > 0
+          ? workspaceActions
+          : undefined
+      }
       onOpenChangeCallback={onOpenChangeHandler}
       onPublishClick={onPublishClick}
       onDiscardClick={onDiscardClick}
@@ -285,7 +408,20 @@ const UnpublishedChanges = () => {
           navigate(getConflictRouteForChange(change));
           return;
         }
-        refetch();
+        if (isInWorkspace) {
+          refetchWorkspaceChanges();
+        } else {
+          refetch();
+        }
+      }}
+      onSendForReview={(reviewerIds) => {
+        if (isInWorkspace && activeWorkspaceId) {
+          void publishWorkspaceAction({
+            workspaceId: activeWorkspaceId,
+            action: 'review',
+            reviewerIds,
+          });
+        }
       }}
       isPublishing={isPublishing}
       isDiscarding={isDiscarding}
