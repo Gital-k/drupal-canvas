@@ -185,16 +185,22 @@ describe('content entity reference props', () => {
 
   it('parsePropValueForPreview passes the resolved payload through, defaulting to null', () => {
     expect(
-      parsePropValueForPreview({
-        ...cerProp,
-        previewResolvedValue: { __type: 'article', label: 'Hello' },
-      }),
+      parsePropValueForPreview(
+        {
+          ...cerProp,
+          previewResolvedValue: { __type: 'article', label: 'Hello' },
+        },
+        null,
+      ),
     ).toEqual({ __type: 'article', label: 'Hello' });
     // An unset/unresolved reference is null, never undefined: the runtime
     // payload contract for components.
-    expect(parsePropValueForPreview(cerProp)).toBeNull();
+    expect(parsePropValueForPreview(cerProp, null)).toBeNull();
     expect(
-      parsePropValueForPreview({ ...cerProp, previewResolvedValue: null }),
+      parsePropValueForPreview(
+        { ...cerProp, previewResolvedValue: null },
+        null,
+      ),
     ).toBeNull();
   });
 
