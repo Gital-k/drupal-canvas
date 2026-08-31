@@ -8,10 +8,13 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Url;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\user\UserInterface;
@@ -667,6 +670,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_cache_contexts: [
         'user.node_grants:view',
         'user.permissions',
+        'url.query_args:search',
       ],
       expected_cache_tags: [
         'http_response',
@@ -702,6 +706,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_cache_contexts: [
         'user.node_grants:view',
         'user.permissions',
+        'url.query_args:search',
       ],
       expected_cache_tags: [
         'http_response',
@@ -731,6 +736,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_cache_contexts: [
         'user.node_grants:view',
         'user.permissions',
+        'url.query_args:search',
       ],
       expected_cache_tags: [
         'http_response',
@@ -760,6 +766,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_cache_contexts: [
         'user.node_grants:view',
         'user.permissions',
+        'url.query_args:search',
       ],
       expected_cache_tags: [
         'http_response',
@@ -826,6 +833,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_status: Response::HTTP_OK,
       expected_cache_contexts: [
         'user',
+        'url.query_args:search',
       ],
       expected_cache_tags: [
         'http_response',
@@ -859,6 +867,268 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       4 => ['id' => '4', 'label' => 'Entity 4'],
     ];
     $this->assertSame($expected, $json);
+
+    // The `search` parameter narrows the query by a label substring match.
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle")
+        ->setOption('query', ['search' => 'Updated']),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.node_grants:view',
+        'user.permissions',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':3',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    $this->assertSame([3 => ['id' => '3', 'label' => 'Updated article']], $json);
+
+    // A search matching several labels returns all of them.
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle")
+        ->setOption('query', ['search' => 'New Entity']),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.node_grants:view',
+        'user.permissions',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':10',
+        $content_entity_type_id . ':11',
+        $content_entity_type_id . ':9',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    $this->assertSame([
+      11 => ['id' => '11', 'label' => 'New Entity 11'],
+      10 => ['id' => '10', 'label' => 'New Entity 10'],
+      9 => ['id' => '9', 'label' => 'New Entity 9'],
+    ], $json);
+
+    // A search matching nothing returns an empty list.
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle")
+        ->setOption('query', ['search' => 'zzz-no-match']),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.node_grants:view',
+        'user.permissions',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    $this->assertSame([], $json);
+
+    // A language-neutral entity always qualifies: the current-content-language
+    // narrowing only filters out entities in *other* languages, never those
+    // with langcode LANGCODE_NOT_SPECIFIED or LANGCODE_NOT_APPLICABLE.
+    $entity_storage->create([
+      'title' => 'Language-neutral entity',
+      'type' => $bundle,
+      'langcode' => LanguageInterface::LANGCODE_NOT_SPECIFIED,
+      'changed' => \time() + 30000,
+    ])->save();
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle"),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':1',
+        $content_entity_type_id . ':10',
+        $content_entity_type_id . ':11',
+        $content_entity_type_id . ':12',
+        $content_entity_type_id . ':2',
+        $content_entity_type_id . ':3',
+        $content_entity_type_id . ':6',
+        $content_entity_type_id . ':7',
+        $content_entity_type_id . ':8',
+        $content_entity_type_id . ':9',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'UNCACHEABLE (poor cacheability)',
+    );
+    $this->assertSame([
+      12 => ['id' => '12', 'label' => 'Language-neutral entity'],
+      11 => ['id' => '11', 'label' => 'New Entity 11'],
+      10 => ['id' => '10', 'label' => 'New Entity 10'],
+      9 => ['id' => '9', 'label' => 'New Entity 9'],
+      8 => ['id' => '8', 'label' => 'Unpublished Entity 2'],
+      7 => ['id' => '7', 'label' => 'Unpublished Entity 1'],
+      3 => ['id' => '3', 'label' => 'Updated article'],
+      6 => ['id' => '6', 'label' => 'Entity LAST'],
+      1 => ['id' => '1', 'label' => 'Entity 1'],
+      2 => ['id' => '2', 'label' => 'Entity 2'],
+    ], $json);
+
+    // `%` and `_` in the search match literally, they are not LIKE wildcards.
+    // Unescaped, `%` (match anything) or `_` (match any one character) would
+    // match every entity; only the entity whose label contains the literal
+    // character may be returned. Old `changed` timestamps keep these two out
+    // of the unfiltered top-10 list.
+    $entity_storage->create([
+      'title' => '100% organic',
+      'type' => $bundle,
+      'changed' => \time() - 90000,
+    ])->save();
+    $entity_storage->create([
+      'title' => 'literal under_score',
+      'type' => $bundle,
+      'changed' => \time() - 95000,
+    ])->save();
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle")
+        ->setOption('query', ['search' => '%']),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.node_grants:view',
+        'user.permissions',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':13',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    $this->assertSame([13 => ['id' => '13', 'label' => '100% organic']], $json);
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle")
+        ->setOption('query', ['search' => '_']),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.node_grants:view',
+        'user.permissions',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':14',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    $this->assertSame([14 => ['id' => '14', 'label' => 'literal under_score']], $json);
+
+    // A whitespace-only search means "no search", not "match nothing": the
+    // unfiltered list is returned.
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle")
+        ->setOption('query', ['search' => ' ']),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':1',
+        $content_entity_type_id . ':10',
+        $content_entity_type_id . ':11',
+        $content_entity_type_id . ':12',
+        $content_entity_type_id . ':2',
+        $content_entity_type_id . ':3',
+        $content_entity_type_id . ':6',
+        $content_entity_type_id . ':7',
+        $content_entity_type_id . ':8',
+        $content_entity_type_id . ':9',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'UNCACHEABLE (poor cacheability)',
+    );
+    $this->assertSame([
+      12 => ['id' => '12', 'label' => 'Language-neutral entity'],
+      11 => ['id' => '11', 'label' => 'New Entity 11'],
+      10 => ['id' => '10', 'label' => 'New Entity 10'],
+      9 => ['id' => '9', 'label' => 'New Entity 9'],
+      8 => ['id' => '8', 'label' => 'Unpublished Entity 2'],
+      7 => ['id' => '7', 'label' => 'Unpublished Entity 1'],
+      3 => ['id' => '3', 'label' => 'Updated article'],
+      6 => ['id' => '6', 'label' => 'Entity LAST'],
+      1 => ['id' => '1', 'label' => 'Entity 1'],
+      2 => ['id' => '2', 'label' => 'Entity 2'],
+    ], $json);
+
+    // On a multilingual site, entities in another language are filtered out of
+    // the candidates, and labels come from the translation matching the
+    // negotiated content language, not from the default translation.
+    \Drupal::service(ModuleInstallerInterface::class)->install(['language']);
+    $this->rebuildContainer();
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    /** @var \Drupal\node\NodeInterface $translated_entity */
+    $translated_entity = $entity_storage->create([
+      'title' => 'English title',
+      'type' => $bundle,
+      'changed' => \time() + 40000,
+    ]);
+    $translated_entity->addTranslation('fr', [
+      'title' => 'French title',
+      'changed' => \time() + 40000,
+    ]);
+    $translated_entity->save();
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/fr/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle"),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'languages:language_content',
+        'user.node_grants:view',
+        'user.permissions',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':12',
+        $content_entity_type_id . ':15',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    // Only the entity with a French translation and the language-neutral one
+    // qualify; the French label is returned for the translated entity, while
+    // the language-neutral entity falls back to its only translation.
+    $this->assertSame([
+      15 => ['id' => '15', 'label' => 'French title'],
+      12 => ['id' => '12', 'label' => 'Language-neutral entity'],
+    ], $json);
   }
 
   /**
@@ -912,6 +1182,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_cache_contexts: [
         'user.node_grants:view',
         'user.permissions',
+        'url.query_args:search',
       ],
       expected_cache_tags: [
         'http_response',
@@ -932,6 +1203,52 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       3 => ['id' => '3', 'label' => 'Published Entity 3'],
     ];
     $this->assertSame($expected, $json);
+
+    // A `search` matching an entity the user cannot view never surfaces it:
+    // access is filtered server-side, after the search query narrows the
+    // candidates. The user owns the unpublished entities but lacks 'view own
+    // unpublished content', so they still cannot see them via search.
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle")
+        ->setOption('query', ['search' => 'Unpublished Entity']),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.node_grants:view',
+        'user.permissions',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    $this->assertSame([], $json);
+
+    // The same search narrowing does surface an entity the user can view.
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle")
+        ->setOption('query', ['search' => 'Published Entity 1']),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.node_grants:view',
+        'user.permissions',
+        'url.query_args:search',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':1',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    $this->assertSame([1 => ['id' => '1', 'label' => 'Published Entity 1']], $json);
   }
 
   /**

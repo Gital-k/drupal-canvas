@@ -375,7 +375,7 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
    * Returns NULL when the field has no surviving properties AND no walkable
    * target (so the UI has nothing to render for it).
    *
-   * @return array{name: string, label: string, hasChildren: bool, properties: list<array{name: string, label: string, expression: string}>, targetEntityType?: string, targetBundles?: array<string, array{label: string, labelExpression: string}>}|null
+   * @return array{name: string, label: string, hasChildren: bool, developerFacingKey: string, properties: list<array{name: string, label: string, expression: string, type: string}>, targetEntityType?: string, targetBundles?: array<string, array{label: string, labelExpression: string}>}|null
    */
   private function buildFieldEntry(FieldDefinitionInterface $field_definition, BetterEntityDataDefinition $host_entity_definition, ?EntityFieldBasedPropExpressionInterface $parent_expression): ?array {
     $field_name = $field_definition->getName();
@@ -494,6 +494,7 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
         'name' => $property_name,
         'label' => $label,
         'expression' => (string) $composed,
+        'type' => $property_definition->getDataType(),
       ];
     }
 
@@ -504,10 +505,19 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       return NULL;
     }
 
+    // The payload key JsComponent::buildReferencePayload() actually uses for
+    // this field: entity keys (e.g. node's `title` field) are normalized to
+    // their generic key name (e.g. `label`), same as every other entity
+    // type's label-equivalent field, so components stay entity-agnostic.
+    // Reuses the exact canonical logic instead of re-deriving it.
+    // @see \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedExpressionTrait::getDeveloperFacingKey()
+    $developer_facing_key = (new FieldPropExpression($host_entity_definition, $field_name, NULL, $field_name))->getDeveloperFacingKey();
+
     $output = [
       'name' => $field_name,
       'label' => (string) $field_definition->getLabel(),
       'hasChildren' => $has_walkable_target,
+      'developerFacingKey' => $developer_facing_key,
       'properties' => $properties,
     ];
     if ($has_walkable_target) {
