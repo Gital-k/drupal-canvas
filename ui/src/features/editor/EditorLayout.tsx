@@ -154,6 +154,12 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
     };
   }, [handlePointerMove, handlePointerUp]);
 
+  useEffect(() => {
+    if (rightColumnMenuRef.current) {
+      rightColumnMenuRef.current.style.display = 'none';
+    }
+  }, []);
+
   const setRightPanelVisibility = (visible: boolean) => {
     if (rightColumnRef.current) {
       rightColumnRef.current.style.display = visible ? 'block' : 'none';
@@ -192,8 +198,8 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
       )}
       <div ref={rightColumnMenuRef}>
         <IconButton
-          aria-label="Import components"
-          data-testid="canvas-import-button"
+          aria-label="Open right panel"
+          data-testid="canvas-right-panel-menu-button"
           className="menu-btn"
           onClick={toggleRightPanel}
         >

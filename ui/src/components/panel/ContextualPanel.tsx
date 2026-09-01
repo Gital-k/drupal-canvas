@@ -96,7 +96,10 @@ const ContextualPanel: React.FC<ContextualPanelProps> = ({
         data-testid={`canvas-contextual-panel-${selectedComponent}`}
       >
         <Flex align="end" justify="end" pr="4">
-          <Cross1Icon onClick={() => setPanelVisibility(false)} />
+          <Cross1Icon
+            data-testid="canvas-contextual-panel--close-icon"
+            onClick={() => setPanelVisibility(false)}
+          />
         </Flex>
         <ErrorBoundary>
           <Tabs.Root
