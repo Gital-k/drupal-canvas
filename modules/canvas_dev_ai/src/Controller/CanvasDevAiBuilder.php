@@ -62,6 +62,18 @@ final class CanvasDevAiBuilder extends ControllerBase {
   private const NUDGE = 'Continue with the next section by calling place_components, or state that the page is complete.';
 
   /**
+   * The argument keys that identify a tool call the model wrote as answer text.
+   *
+   * Only the tools that write to the page are listed, and only by their own
+   * argument key: matching any JSON body would truncate an answer that merely
+   * quotes one, and set_page_value's 'key'/'value' are too generic to tell a
+   * stray tool call apart from prose.
+   *
+   * @see self::stripToolCall()
+   */
+  private const TOOL_CALL_KEYS = ['operations', 'component_edits'];
+
+  /**
    * Ends the agent's answer when it stopped without a tool call on purpose.
    *
    * A build hop that stops for the metadata gate or to close the turn looks
@@ -677,7 +689,7 @@ final class CanvasDevAiBuilder extends ControllerBase {
     }
     else {
       $answer = (string) $agent->solve();
-      $response['message'] = self::stripEndOfTurn($answer);
+      $response['message'] = $this->stripToolCall(self::stripEndOfTurn($answer));
       // The poller recorded the answer as the model wrote it, so the untouched
       // text is what has to be found in the narration to strip it from there.
       $response['progress'] = self::stripEndOfTurn($this->getAiProgressWithoutAnswer($job_id, $answer));
@@ -696,6 +708,37 @@ final class CanvasDevAiBuilder extends ControllerBase {
    */
   private static function stripEndOfTurn(string $answer): string {
     return trim(str_replace(self::END_OF_TURN, '', $answer));
+  }
+
+  /**
+   * Removes a tool call the model wrote into its answer instead of calling.
+   *
+   * A model that ends a hop with narration sometimes appends the JSON body of
+   * the call it meant to make: "Adding the Campus life section
+   * now.{"operations":[…". The chat would display that verbatim. The body is
+   * often cut off mid-string, so it cannot be recognized by decoding it.
+   *
+   * @param string $answer
+   *   The agent's answer to the user.
+   *
+   * @return string
+   *   The answer, up to the JSON body when it carries one.
+   */
+  private function stripToolCall(string $answer): string {
+    // A body is only taken for a tool call when it opens on the argument key
+    // of a tool that writes to the page and runs to the end of the answer,
+    // and only when readable text comes first: an answer that is nothing but
+    // a JSON body is left alone, having nothing to show in its place. The
+    // leading match is greedy, so an answer that quotes such a body and then
+    // carries on keeps everything up to the last one.
+    $keys = implode('|', \array_map('preg_quote', self::TOOL_CALL_KEYS));
+    if (preg_match('/^(?<answer>.*\S)\s*(?<call>\{\s*"(?:' . $keys . ')"\s*:.*)$/s', $answer, $matches) !== 1) {
+      return $answer;
+    }
+    $this->getLogger('canvas_dev_ai')->warning('The model wrote a tool call into its answer instead of calling the tool: @call', [
+      '@call' => $matches['call'],
+    ]);
+    return $matches['answer'];
   }
 
   /**

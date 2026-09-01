@@ -346,6 +346,66 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
   }
 
   /**
+   * A tool call written into the answer text is stripped out and logged.
+   *
+   * Instead of calling the tool, the model sometimes appends the call's JSON
+   * body to its narration, which the chat would otherwise display verbatim.
+   * Only a body opening on the argument key of a tool that writes to the page
+   * counts, so an answer that happens to carry other JSON is left alone.
+   */
+  #[DataProvider('toolCallInAnswerProvider')]
+  public function testToolCallWrittenIntoTheAnswerIsStripped(string $answer, string $expected_message, ?string $expected_log): void {
+    $this->installCanvasDevAi();
+
+    $logger = new TestLogger();
+    $this->container->get(LoggerChannelFactoryInterface::class)
+      ->get('canvas_dev_ai')
+      ->addLogger($logger);
+
+    $this->setUpAgentManager($this->mockAgent(finished: TRUE, answer: $answer));
+
+    $response = $this->hop([
+      'messages' => [['role' => 'user', 'text' => 'Approved']],
+    ]);
+
+    $this->assertSame($expected_message, $response['message']);
+    // The logged message is the placeholder template; the call is in the
+    // context.
+    $this->assertSame(
+      $expected_log !== NULL,
+      $logger->hasRecordThatPasses(
+        static fn (array $record): bool => ($record['context']['@call'] ?? NULL) === $expected_log,
+        RfcLogLevel::WARNING,
+      ),
+    );
+  }
+
+  /**
+   * Answers carrying a JSON body, and what the user is shown of each.
+   */
+  public static function toolCallInAnswerProvider(): array {
+    return [
+      // The body is cut off mid-string, which is how it was observed.
+      'placement body' => [
+        'Adding the Campus life section to finish the page body now.{"operations":[{"target":"content"',
+        'Adding the Campus life section to finish the page body now.',
+        '{"operations":[{"target":"content"',
+      ],
+      'edit body' => [
+        'Changing the hero heading now.{"component_edits":[',
+        'Changing the hero heading now.',
+        '{"component_edits":[',
+      ],
+      // No tool writes to the page under this key, so it is the model talking.
+      'unrelated json' => [
+        'The theme applies {"colorScheme":"dark"} to the wrapper.',
+        'The theme applies {"colorScheme":"dark"} to the wrapper.',
+        NULL,
+      ],
+    ];
+  }
+
+  /**
    * Installs canvas_dev_ai and prepares the session state the hops need.
    */
   private function installCanvasDevAi(): void {
