@@ -79,10 +79,7 @@ const ComponentInstanceFormRenderer: React.FC<
     editorFrameContext,
     components,
   } = inputAndUiData;
-  const selectedComponentName =
-    selectedComponentType && components && components[selectedComponentType]
-      ? components[selectedComponentType].name
-      : '';
+  const selectedComponentName = components?.[selectedComponentType]?.name ?? '';
   const [jsxFormContent, setJsxFormContent] =
     useState<React.ReactElement | null>(null);
   const [currentComponentId, setCurrentComponentId] = useState<string | null>(
