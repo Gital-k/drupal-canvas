@@ -1,0 +1,8 @@
+type: module
+name: Drupal Canvas Paragraphs
+description: 'Paragraphs source for Drupal Canvas.'
+package: Drupal Canvas
+core_version_requirement: ^10 || ^11
+dependencies:
+  - canvas:canvas
+  - paragraphs:paragraphs
