@@ -126,24 +126,38 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
       $all_errors = [];
       $current_layout = $this->tempStore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '';
       foreach ($this->getContextValue('operations') as $index => $operation) {
+        $errors = [];
         try {
           $operation['components'] = Yaml::parse($operation['components'] ?? '');
         }
         catch (ParseException $e) {
           // A raw parse error gives the model nothing to act on, so it retries
           // the same payload; tell it how to fix the YAML instead.
-          $all_errors['Operation ' . $index][] = \sprintf("The components value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
-          continue;
+          $errors[] = \sprintf("The components value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
         }
-        $all_errors = array_merge($all_errors, $this->validatePlacementParams($operation, $index, $current_layout));
+        $errors = \array_merge($errors, $this->validatePlacementParams($operation, $current_layout));
         if (\is_array($operation['components'])) {
-          $this->responseValidator->validateComponentStructure($operation['components']);
+          try {
+            $this->responseValidator->validateComponentStructure($operation['components']);
+          }
+          catch (\Throwable $e) {
+            // A component structure the validator cannot even walk raises a
+            // TypeError rather than a violation, which \Exception would miss.
+            $errors[] = $e->getMessage();
+          }
+        }
+        if ($errors !== []) {
+          $all_errors['Operation ' . $index] = $errors;
+          continue;
         }
         $operations[] = $operation;
       }
 
-      if (!empty($all_errors)) {
-        throw new \Exception(Yaml::dump($all_errors));
+      if ($all_errors !== []) {
+        $message = $this->responseValidator->formatErrors($all_errors);
+        $this->loggerFactory->get('canvas_ai')->error($message);
+        $this->setOutput($message);
+        return;
       }
 
       // Once validated, convert the operations to the structure (with
@@ -175,62 +189,58 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
    *
    * @param array $operation
    *   The operation to validate, with its components block already parsed.
-   * @param int $index
-   *   The index of the operation, used for error messages.
    * @param string $current_layout
    *   The current layout JSON string, used to resolve the target region.
    *
-   * @return array
-   *   An array of validation errors, keyed by operation, or empty if valid.
+   * @return list<string>
+   *   The validation errors found, or an empty list if the operation is valid.
    */
-  private function validatePlacementParams(array $operation, int $index, string $current_layout): array {
+  private function validatePlacementParams(array $operation, string $current_layout): array {
     $errors = [];
-    $error_key = 'Operation ' . $index;
 
-    if (!isset($operation['target']) || !\is_string($operation['target']) || $operation['target'] === '') {
-      $errors[$error_key][] = 'The target key is missing in the operation.';
-      return $errors;
+    $target = $operation['target'] ?? NULL;
+    $has_target = \is_string($target) && $target !== '';
+    if (!$has_target) {
+      $errors[] = 'The target key is missing in the operation.';
     }
 
-    if (!isset($operation['placement']) || !\in_array($operation['placement'], ['above', 'below', 'inside'], TRUE)) {
-      $errors[$error_key][] = 'The placement key is missing or invalid in the operation.';
-      return $errors;
+    $placement = $operation['placement'] ?? NULL;
+    if (!\in_array($placement, ['above', 'below', 'inside'], TRUE)) {
+      $errors[] = 'The placement key is missing or invalid in the operation.';
     }
 
     // A target naming a region must match a region present in the layout. A
     // target containing a slash names a `parent_uuid/slot_name` pair instead,
     // whose parent is resolved during nodePath calculation.
-    if (strpos($operation['target'], '/') === FALSE) {
-      $region_error = $this->pageBuilderHelper->validateRegionExists($operation['target'], $current_layout);
+    if ($has_target && strpos($target, '/') === FALSE) {
+      $region_error = $this->pageBuilderHelper->validateRegionExists($target, $current_layout);
       if ($region_error !== NULL) {
-        $errors[$error_key][] = $region_error;
-        return $errors;
+        $errors[] = $region_error;
       }
     }
 
-    $placement = $operation['placement'];
     // If placement is 'above' or 'below', reference_uuid must be provided.
     if (\in_array($placement, ['above', 'below'], TRUE) && empty($operation['reference_uuid'])) {
-      $errors[$error_key][] = 'The reference_uuid must be provided for above/below placement.';
+      $errors[] = 'The reference_uuid must be provided for above/below placement.';
     }
 
     // If placement is 'inside', reference_uuid is not needed and the target
     // must not already contain child components.
     if ($placement === 'inside') {
       if (!empty($operation['reference_uuid'])) {
-        $errors[$error_key][] = 'The reference_uuid is not required for inside placement.';
+        $errors[] = 'The reference_uuid is not required for inside placement.';
       }
-      if ($this->pageBuilderHelper->hasChildComponents($operation['target'])) {
-        $errors[$error_key][] = 'The target ' . $operation['target'] . ' has "inside" placement specified, but it contains child components. Select any child component in the target and use "above" or "below" placement instead.';
+      if ($has_target && $this->pageBuilderHelper->hasChildComponents($target)) {
+        $errors[] = 'The target ' . $target . ' has "inside" placement specified, but it contains child components. Select any child component in the target and use "above" or "below" placement instead.';
       }
     }
 
     // Operation must contain components, as a parseable YAML list.
-    if (!\is_array($operation['components'])) {
-      $errors[$error_key][] = 'The components value must be a YAML list.';
+    if (!\is_array($operation['components'] ?? NULL)) {
+      $errors[] = 'The components value must be a YAML list.';
     }
     elseif ($operation['components'] === []) {
-      $errors[$error_key][] = 'The operation must contain components.';
+      $errors[] = 'The operation must contain components.';
     }
 
     return $errors;
