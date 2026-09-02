@@ -12,12 +12,18 @@ import styles from './List.module.css';
 interface UncategorizedDropZoneProps {
   itemType: string;
   hasItems: boolean;
+  /**
+   * Drag origins this zone accepts. The component library's items by default;
+   * the Pages panel passes its own.
+   */
+  origins?: string[];
   children: React.ReactNode;
 }
 
 const UncategorizedDropZone: React.FC<UncategorizedDropZoneProps> = ({
   itemType,
   hasItems,
+  origins = ['library', 'code'],
   children,
 }) => {
   const { previewDragging } = useAppSelector(selectDragging);
@@ -28,14 +34,14 @@ const UncategorizedDropZone: React.FC<UncategorizedDropZoneProps> = ({
     id: `uncategorized-${itemType}`,
     data: {
       destination: 'uncategorized',
-      accepts: ['library', 'code'],
+      accepts: origins,
     },
     disabled: !administerFolders || previewDragging,
   });
 
   const isValidDrag =
     active?.data?.current &&
-    ['library', 'code'].includes(active.data.current.origin) &&
+    origins.includes(active.data.current.origin) &&
     active.data.current.type !== 'folder';
 
   return (

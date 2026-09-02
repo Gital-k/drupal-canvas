@@ -8,6 +8,7 @@ export interface ContentStub {
   hasUnsavedStatusChange?: boolean;
   autoSaveLabel: string | null;
   autoSavePath: string;
+  folder?: string | null;
   links: {
     'delete-form'?: string;
     'edit-form'?: string;
