@@ -130,9 +130,7 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
           try {
             $this->responseValidator->validateComponentStructure($operation['components']);
           }
-          catch (\Throwable $e) {
-            // A component structure the validator cannot even walk raises a
-            // TypeError rather than a violation, which \Exception would miss.
+          catch (\Exception $e) {
             $errors[] = $e->getMessage();
           }
         }
@@ -145,7 +143,7 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
 
       if ($all_errors !== []) {
         $message = $this->responseValidator->formatErrors($all_errors);
-        $this->loggerFactory->get('canvas_ai')->error($message);
+        $this->loggerFactory->get('canvas_ai')->warning($message);
         $this->setOutput($message);
         return;
       }

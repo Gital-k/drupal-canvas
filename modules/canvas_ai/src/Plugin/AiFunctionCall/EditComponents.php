@@ -141,8 +141,7 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
           try {
             $this->responseValidator->validateComponentStructure([[$component['component_id'] => ['props' => $merged_props]]]);
           }
-          catch (\Throwable $e) {
-            // Catches any validator failure, including a TypeError, as an edit error.
+          catch (\Exception $e) {
             $errors[] = $e->getMessage();
           }
         }
@@ -156,7 +155,7 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
 
       if ($all_errors !== []) {
         $message = $this->responseValidator->formatErrors($all_errors);
-        $this->loggerFactory->get('canvas_ai')->error($message);
+        $this->loggerFactory->get('canvas_ai')->warning($message);
         $this->setOutput($message);
         return;
       }
