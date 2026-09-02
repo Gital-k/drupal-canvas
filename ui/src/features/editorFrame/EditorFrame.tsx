@@ -475,7 +475,7 @@ const EditorFrame: React.FC = () => {
    */
   useGesture(
     {
-      onWheel: ({ event, delta: [dx, dy], ctrlKey, metaKey }) => {
+      onWheel: ({ event, delta: [dx, dy], ctrlKey, metaKey, shiftKey }) => {
         event.preventDefault();
 
         if (ctrlKey || metaKey) {
@@ -498,8 +498,9 @@ const EditorFrame: React.FC = () => {
           // Free-form panning mode
           if (editorPaneRef.current) {
             dispatch(setIsPanning(true));
-            editorPaneRef.current.scrollLeft += dx;
-            editorPaneRef.current.scrollTop += dy;
+            // Shift+scroll: mouse wheel sends deltaY only; map it to horizontal scroll.
+            editorPaneRef.current.scrollLeft += shiftKey ? dy : dx;
+            editorPaneRef.current.scrollTop += shiftKey ? 0 : dy;
             debouncedScrollPosUpdate();
             debouncedIsPanningUpdate();
           }
@@ -610,6 +611,7 @@ const EditorFrame: React.FC = () => {
           [styles.isPanning]: isPanning,
           [styles.panningMode]: panningMode,
         })}
+        data-testid="canvas-editor-pane"
         onMouseDown={handleMouseDown}
         onScroll={handlePaneScroll}
         ref={editorPaneRef}

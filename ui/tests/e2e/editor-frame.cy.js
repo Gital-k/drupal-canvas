@@ -156,6 +156,47 @@ describe('Drupal Canvas editor frame controls/navigation', () => {
     cy.findByTestId('canvas-editor-frame-controls').findByText('75%');
   });
 
+  it('Can pan horizontally with Shift+scroll', () => {
+    cy.loadURLandWaitForCanvasLoaded();
+
+    // The editor pane has 80vw padding on each side, so horizontal scroll is
+    // always available without needing to zoom first.
+    cy.findByTestId('canvas-editor-pane').then(($pane) => {
+      cy.wrap($pane[0].scrollLeft).as('initialScrollLeft');
+      cy.wrap($pane[0].scrollTop).as('initialScrollTop');
+    });
+
+    cy.log('Shift+scroll maps deltaY to scrollLeft (horizontal pan)');
+    cy.findByTestId('canvas-editor-frame').triggerMouseWheelWithShift(100);
+
+    cy.get('@initialScrollLeft').then((initialScrollLeft) => {
+      cy.get('@initialScrollTop').then((initialScrollTop) => {
+        cy.findByTestId('canvas-editor-pane').should(($pane) => {
+          expect($pane[0].scrollLeft).to.equal(initialScrollLeft + 100);
+          expect($pane[0].scrollTop).to.equal(initialScrollTop);
+        });
+      });
+    });
+
+    cy.log('Normal scroll (no shift) changes scrollTop, not scrollLeft');
+    cy.findByTestId('canvas-editor-pane').then(($pane) => {
+      cy.wrap($pane[0].scrollLeft).as('scrollLeftBeforeNormal');
+      cy.wrap($pane[0].scrollTop).as('scrollTopBeforeNormal');
+    });
+
+    // dx=0, dy=100 → scrollLeft unchanged, scrollTop +100
+    cy.findByTestId('canvas-editor-frame').triggerMouseWheel(0, 100);
+
+    cy.get('@scrollLeftBeforeNormal').then((scrollLeftBefore) => {
+      cy.get('@scrollTopBeforeNormal').then((scrollTopBefore) => {
+        cy.findByTestId('canvas-editor-pane').should(($pane) => {
+          expect($pane[0].scrollLeft).to.equal(scrollLeftBefore);
+          expect($pane[0].scrollTop).to.equal(scrollTopBefore + 100);
+        });
+      });
+    });
+  });
+
   it('Can zoom the editor frame with the mouse', () => {
     cy.loadURLandWaitForCanvasLoaded();
 

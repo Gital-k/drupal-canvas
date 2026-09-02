@@ -751,6 +751,40 @@ Cypress.Commands.add(
   },
 );
 
+// Simulates the user using the mousewheel while holding the Shift key
+Cypress.Commands.add(
+  'triggerMouseWheelWithShift',
+  { prevSubject: 'element' },
+  (subject, deltaY) => {
+    const event = new WheelEvent('wheel', {
+      deltaY: deltaY,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+      view: window,
+    });
+    subject[0].dispatchEvent(event);
+    return cy.wrap(subject); // Ensure the command is chainable
+  },
+);
+
+// Simulates the user using the mousewheel without any modifier key
+Cypress.Commands.add(
+  'triggerMouseWheel',
+  { prevSubject: 'element' },
+  (subject, deltaX, deltaY) => {
+    const event = new WheelEvent('wheel', {
+      deltaX: deltaX,
+      deltaY: deltaY,
+      bubbles: true,
+      cancelable: true,
+      view: window,
+    });
+    subject[0].dispatchEvent(event);
+    return cy.wrap(subject); // Ensure the command is chainable
+  },
+);
+
 /**
  * Loads the Canvas page and waits to ensure initial backend requests have been returned and that the preview
  * iFrame is initialized and ready to be interacted with.
