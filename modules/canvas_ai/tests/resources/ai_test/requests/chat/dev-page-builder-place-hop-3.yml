@@ -394,10 +394,13 @@ request:
             - value
   chat_structured_json_schema: {  }
   chat_strict_schema: false
+# The closing line carries the end-of-turn marker, which is what keeps the
+# controller from nudging this hop for another section; the user never sees it.
+# @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::endedOnPurpose()
 response:
   normalized:
     role: assistant
-    text: 'The hero and its heading are in place.'
+    text: "The hero and its heading are in place.\n##END_OF_TURN##"
     images: {  }
     remote_files: {  }
     tools: null

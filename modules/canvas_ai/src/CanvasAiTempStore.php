@@ -24,6 +24,14 @@ class CanvasAiTempStore {
   private const AGENT_STATE_KEY_PREFIX = 'agent_state_';
 
   /**
+   * Key prefix for the nudge count of a chat turn, keyed by job ID.
+   *
+   * Kept out of the agent state because the agent's ::fromArray() drops any
+   * key it does not know.
+   */
+  private const NUDGE_COUNT_KEY_PREFIX = 'nudge_count_';
+
+  /**
    * The private tempstore object.
    *
    * @var \Drupal\Core\TempStore\PrivateTempStore
@@ -120,6 +128,45 @@ class CanvasAiTempStore {
    */
   public function deleteStoredAgentState(string $job_id): void {
     $this->tempStore->delete(self::AGENT_STATE_KEY_PREFIX . $job_id);
+  }
+
+  /**
+   * Gets how many nudges a chat turn has been given.
+   *
+   * @param string $job_id
+   *   The job ID identifying the chat turn.
+   *
+   * @return int
+   *   The nudge count, 0 while the turn has not been given any.
+   */
+  public function getNudgeCount(string $job_id): int {
+    return (int) $this->tempStore->get(self::NUDGE_COUNT_KEY_PREFIX . $job_id);
+  }
+
+  /**
+   * Stores how many nudges a chat turn has been given.
+   *
+   * @param string $job_id
+   *   The job ID identifying the chat turn.
+   * @param int $count
+   *   The nudge count.
+   *
+   * @throws \Drupal\Core\TempStore\TempStoreException
+   */
+  public function setNudgeCount(string $job_id, int $count): void {
+    $this->tempStore->set(self::NUDGE_COUNT_KEY_PREFIX . $job_id, $count);
+  }
+
+  /**
+   * Removes the nudge count of a chat turn.
+   *
+   * @param string $job_id
+   *   The job ID identifying the chat turn.
+   *
+   * @throws \Drupal\Core\TempStore\TempStoreException
+   */
+  public function deleteNudgeCount(string $job_id): void {
+    $this->tempStore->delete(self::NUDGE_COUNT_KEY_PREFIX . $job_id);
   }
 
 }

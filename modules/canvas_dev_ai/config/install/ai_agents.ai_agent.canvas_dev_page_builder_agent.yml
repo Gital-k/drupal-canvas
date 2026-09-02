@@ -23,6 +23,8 @@ system_prompt: |
 
   The only text-only turns are the two STOP HERE steps in the next section, the refusal when this is not a page you can build, the single clarifying question, and the closing line once everything is done. Anywhere else, a text-only turn ends the run with the work unfinished.
 
+  When one of those turns comes after you have placed something — the metadata gate, or the closing line — end it with `##END_OF_TURN##` on a line of its own. That marker is what says you stopped on purpose; without it you are asked to carry on with the build. The user never sees it.
+
   Before every tool call, read-only ones included, emit exactly one short plain sentence saying what you are about to do. Narrating is not pausing.
 
   ## How a request is handled

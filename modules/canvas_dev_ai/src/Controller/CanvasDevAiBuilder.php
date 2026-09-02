@@ -48,6 +48,49 @@ final class CanvasDevAiBuilder extends ControllerBase {
   private const NOT_PLACEABLE = ' Components cannot be placed or edited here, because this is not a Canvas page.';
 
   /**
+   * The plugin ID of the tool that puts components on the page.
+   *
+   * @see \Drupal\canvas_ai\Plugin\AiFunctionCall\PlaceComponents
+   */
+  private const PLACE_COMPONENTS = 'canvas_ai:place_components';
+
+  /**
+   * Sent to an agent that stopped mid-build, to get the next section placed.
+   *
+   * @see self::appendNudge()
+   */
+  private const NUDGE = 'Continue with the next section by calling place_components, or state that the page is complete.';
+
+  /**
+   * The argument keys that identify a tool call the model wrote as answer text.
+   *
+   * Only the tools that write to the page are listed, and only by their own
+   * argument key: matching any JSON body would truncate an answer that merely
+   * quotes one, and set_page_value's 'key'/'value' are too generic to tell a
+   * stray tool call apart from prose.
+   *
+   * @see self::stripToolCall()
+   */
+  private const TOOL_CALL_KEYS = ['operations', 'component_edits'];
+
+  /**
+   * Ends the agent's answer when it stopped without a tool call on purpose.
+   *
+   * A build hop that stops for the metadata gate or to close the turn looks
+   * exactly like one that stopped by accident: both placed a section and then
+   * answered with text and no further call. The agent is instructed to mark
+   * the deliberate ones, which is what keeps them from being nudged.
+   *
+   * @see canvas_dev_ai/config/install/ai_agents.ai_agent.canvas_dev_page_builder_agent.yml
+   */
+  private const END_OF_TURN = '##END_OF_TURN##';
+
+  /**
+   * The number of nudges one turn may be given.
+   */
+  private const MAX_NUDGES = 2;
+
+  /**
    * The prompt keys the client must send on every request.
    */
   private const REQUIRED_PROMPT_KEYS = [
@@ -159,23 +202,46 @@ final class CanvasDevAiBuilder extends ControllerBase {
     // quickly and the frontend drives the next hop.
     $agent->setLooped(FALSE);
 
+    $nudges = $this->canvasAiTempStore->getNudgeCount($job_id);
     try {
       $solvability = $agent->determineSolvability();
     }
     catch (\Exception $e) {
       // Drop any half-serialized state so the next turn starts clean.
       $this->canvasAiTempStore->deleteStoredAgentState($job_id);
+      $this->canvasAiTempStore->deleteNudgeCount($job_id);
       return $this->buildErrorResponse($e->getMessage(), $job_id);
+    }
+
+    // A build hop that answers with narration only leaves the agent finished,
+    // which would close the turn on "Adding the next section now…" with
+    // nothing placed for it. Park a nudge on the chat history instead. The
+    // finished flag is not serialized, so storing the state is enough to keep
+    // the turn open, and the frontend drives the nudged hop like any other:
+    // one model call per request, with the cap spent across the turn.
+    $nudged = $solvability === AiAgentInterface::JOB_SOLVABLE && self::shouldNudge($agent, $nudges);
+    if ($nudged) {
+      $nudges++;
+      self::appendNudge($agent);
     }
 
     // Persist the agent while it still has work to do, so the next hop resumes
     // it. should_continue tells the frontend whether to send that next hop.
-    $should_continue = !$agent->isFinished();
+    $should_continue = $nudged || !$agent->isFinished();
     if ($should_continue) {
       $this->canvasAiTempStore->setStoredAgentState($job_id, $agent->toArray());
+      $this->canvasAiTempStore->setNudgeCount($job_id, $nudges);
     }
     else {
+      // The turn ends on a hop that stopped without marking the end, so the
+      // nudges it was given never got the build going again.
+      if ($nudges > 0 && !self::endedOnPurpose($agent)) {
+        $this->getLogger('canvas_dev_ai')->warning('The build hop ended without a tool call after @count nudges.', [
+          '@count' => $nudges,
+        ]);
+      }
       $this->canvasAiTempStore->deleteStoredAgentState($job_id);
+      $this->canvasAiTempStore->deleteNudgeCount($job_id);
     }
 
     if ($solvability === AiAgentInterface::JOB_SOLVABLE) {
@@ -410,6 +476,67 @@ final class CanvasDevAiBuilder extends ControllerBase {
   }
 
   /**
+   * Whether the hop stalled mid-build and the turn has a nudge left to spend.
+   *
+   * @param \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper $agent
+   *   The agent that ran the hop.
+   * @param int $nudges
+   *   The nudges the turn has been given so far.
+   *
+   * @return bool
+   *   TRUE when the hop ended without a tool call, did not mark the end, and
+   *   the turn has placed something to continue from.
+   */
+  private static function shouldNudge(AiAgentEntityWrapper $agent, int $nudges): bool {
+    return $agent->isFinished()
+      && $nudges < self::MAX_NUDGES
+      && !self::endedOnPurpose($agent)
+      && self::hasPlaced($agent);
+  }
+
+  /**
+   * Parks the nudge that asks a stalled agent for the section it narrated.
+   *
+   * @param \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper $agent
+   *   The agent that ended its hop without a tool call.
+   */
+  private static function appendNudge(AiAgentEntityWrapper $agent): void {
+    $history = $agent->getChatHistory();
+    $history[] = new ChatMessage('system', self::NUDGE);
+    $agent->setChatHistory($history);
+  }
+
+  /**
+   * Whether this turn has put any component on the page.
+   *
+   * The agent's restored state rebuilds the tool results of the whole turn
+   * from the stored chat history, so the hop that is running answers this for
+   * every hop before it too.
+   *
+   * @param \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper $agent
+   *   The agent that ran the hop.
+   *
+   * @return bool
+   *   TRUE when a placement call has run during this turn.
+   */
+  private static function hasPlaced(AiAgentEntityWrapper $agent): bool {
+    return $agent->getToolResultsByPluginId(self::PLACE_COMPONENTS, TRUE) !== [];
+  }
+
+  /**
+   * Whether the agent marked the answer that ended its hop as deliberate.
+   *
+   * @param \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper $agent
+   *   The agent that ran the hop.
+   *
+   * @return bool
+   *   TRUE when the answer carries the end-of-turn marker.
+   */
+  private static function endedOnPurpose(AiAgentEntityWrapper $agent): bool {
+    return str_contains((string) $agent->solve(), self::END_OF_TURN);
+  }
+
+  /**
    * Explains why the agent gave up on the turn.
    *
    * The agent returns JOB_NOT_SOLVABLE when it ran out of loops or when the
@@ -555,14 +682,63 @@ final class CanvasDevAiBuilder extends ControllerBase {
       }
     }
     // Only the final hop carries a message: the agent's answer to the user.
+    // The marker comes off the narration either way, so a hop that stops for
+    // the metadata gate cannot show it to the user.
     if ($should_continue) {
-      $response['progress'] = $this->getAiProgress($job_id);
+      $response['progress'] = self::stripEndOfTurn($this->getAiProgress($job_id));
     }
     else {
-      $response['message'] = $agent->solve();
-      $response['progress'] = $this->getAiProgressWithoutAnswer($job_id, $response['message']);
+      $answer = (string) $agent->solve();
+      $response['message'] = $this->stripToolCall(self::stripEndOfTurn($answer));
+      // The poller recorded the answer as the model wrote it, so the untouched
+      // text is what has to be found in the narration to strip it from there.
+      $response['progress'] = self::stripEndOfTurn($this->getAiProgressWithoutAnswer($job_id, $answer));
     }
     return new JsonResponse($this->canvasAiPageBuilderHelper->processCanvasPageFields($response));
+  }
+
+  /**
+   * Removes the end-of-turn marker from the answer the user is shown.
+   *
+   * @param string $answer
+   *   The agent's answer to the user.
+   *
+   * @return string
+   *   The answer, without the marker.
+   */
+  private static function stripEndOfTurn(string $answer): string {
+    return trim(str_replace(self::END_OF_TURN, '', $answer));
+  }
+
+  /**
+   * Removes a tool call the model wrote into its answer instead of calling.
+   *
+   * A model that ends a hop with narration sometimes appends the JSON body of
+   * the call it meant to make: "Adding the Campus life section
+   * now.{"operations":[…". The chat would display that verbatim. The body is
+   * often cut off mid-string, so it cannot be recognized by decoding it.
+   *
+   * @param string $answer
+   *   The agent's answer to the user.
+   *
+   * @return string
+   *   The answer, up to the JSON body when it carries one.
+   */
+  private function stripToolCall(string $answer): string {
+    // A body is only taken for a tool call when it opens on the argument key
+    // of a tool that writes to the page and runs to the end of the answer,
+    // and only when readable text comes first: an answer that is nothing but
+    // a JSON body is left alone, having nothing to show in its place. The
+    // leading match is greedy, so an answer that quotes such a body and then
+    // carries on keeps everything up to the last one.
+    $keys = implode('|', \array_map('preg_quote', self::TOOL_CALL_KEYS));
+    if (preg_match('/^(?<answer>.*\S)\s*(?<call>\{\s*"(?:' . $keys . ')"\s*:.*)$/s', $answer, $matches) !== 1) {
+      return $answer;
+    }
+    $this->getLogger('canvas_dev_ai')->warning('The model wrote a tool call into its answer instead of calling the tool: @call', [
+      '@call' => $matches['call'],
+    ]);
+    return $matches['answer'];
   }
 
   /**

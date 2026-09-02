@@ -4,22 +4,28 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel;
 
+use ColinODell\PsrTestLogger\TestLogger;
+use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai_agents\Entity\AiAgent;
 use Drupal\ai_agents\PluginBase\AiAgentEntityWrapper;
 use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\PluginManager\AiAgentManager;
 use Drupal\canvas_ai\CanvasAiPermissions;
 use Drupal\canvas_ai\CanvasAiTempStore;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface;
 use Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder;
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Logger\RfcLogLevel;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas_ai\Kernel\Traits\CanvasAiDevHopTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -36,6 +42,13 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
   use CanvasAiDevHopTrait;
   use RequestTrait;
   use UserCreationTrait;
+
+  /**
+   * Every chat history the agent under test was given, in write order.
+   *
+   * @var array<int, array<int, \Drupal\ai\OperationType\Chat\ChatMessage>>
+   */
+  private array $chatHistoryWrites = [];
 
   /**
    * {@inheritdoc}
@@ -180,6 +193,301 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
     self::assertFalse($response['status']);
     self::assertSame('The request could not be completed. Please try again.', $response['message']);
     self::assertFalse($response['should_continue']);
+  }
+
+  /**
+   * A build hop that stops narrating is nudged into placing the next section.
+   *
+   * The hop places a section and then answers with text and no further call,
+   * which finishes the agent. Without the nudge the turn would close there,
+   * leaving the narrated section unbuilt. The nudge is parked on the stored
+   * chat history rather than run here, so the hop stays one model call.
+   *
+   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::appendNudge()
+   */
+  public function testTextOnlyBuildHopIsNudgedIntoTheNextPlacement(): void {
+    $this->installCanvasDevAi();
+
+    $placement = $this->mockPlacement(['operations' => [['operation' => 'ADD']]]);
+    $agent = $this->mockAgent(
+      finished: TRUE,
+      answer: 'Adding the Campus life section now.',
+      placements: [$placement],
+    );
+    $this->setUpAgentManager($agent);
+
+    $response = $this->hop([
+      'messages' => [['role' => 'user', 'text' => 'Approved']],
+    ]);
+
+    $this->assertTrue($response['status']);
+    // The agent is finished, but the parked nudge keeps the turn open so the
+    // frontend sends the hop that acts on it.
+    $this->assertTrue($response['should_continue']);
+    // The placement this hop made is reported, and the narration shows as
+    // progress rather than closing the turn as the answer.
+    $this->assertSame([['operation' => 'ADD']], $response['operations']);
+    $this->assertArrayNotHasKey('message', $response);
+    // The nudge is appended to the history the next hop resumes from.
+    $history = $this->lastChatHistoryWrite();
+    $this->assertCount(2, $history, 'The nudge is appended, not replacing the history.');
+    $nudge = end($history);
+    $this->assertInstanceOf(ChatMessage::class, $nudge);
+    $this->assertSame('system', $nudge->getRole());
+    $this->assertSame('Continue with the next section by calling place_components, or state that the page is complete.', $nudge->getText());
+    // The next hop of this turn must know a nudge was spent.
+    $temp_store = $this->container->get(CanvasAiTempStore::class);
+    $this->assertSame(1, $temp_store->getNudgeCount('test-request'));
+    $this->assertNotNull($temp_store->getStoredAgentState('test-request'));
+  }
+
+  /**
+   * A hop that marks the end of the turn is not nudged, and hides the marker.
+   *
+   * Both text-only turns that legitimately follow a placement carry the
+   * marker: the closing line, and the metadata gate that pauses mid-build for
+   * the user. Neither may be nudged, and neither may show the marker.
+   *
+   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::endedOnPurpose()
+   */
+  #[DataProvider('markedEndOfTurnProvider')]
+  public function testMarkedEndOfTurnIsNotNudged(string $answer, string $expected_message): void {
+    $this->installCanvasDevAi();
+
+    $agent = $this->mockAgent(
+      finished: TRUE,
+      answer: $answer,
+      placements: [$this->mockPlacement([])],
+    );
+    $this->setUpAgentManager($agent);
+
+    $response = $this->hop([
+      'messages' => [['role' => 'user', 'text' => 'Approved']],
+    ]);
+
+    $this->assertFalse($response['should_continue']);
+    $this->assertSame($expected_message, $response['message']);
+    // The turn is over, so it leaves no nudge count behind for the next one.
+    $this->assertSame(0, $this->container->get(CanvasAiTempStore::class)->getNudgeCount('test-request'));
+  }
+
+  /**
+   * The marked text-only turns that come after a placement.
+   */
+  public static function markedEndOfTurnProvider(): array {
+    return [
+      'closing line' => [
+        "That's the page built — every section is in place. ##END_OF_TURN##",
+        "That's the page built — every section is in place.",
+      ],
+      'metadata gate' => [
+        "The sections are in place. Shall I set the page title and description?\n##END_OF_TURN##",
+        'The sections are in place. Shall I set the page title and description?',
+      ],
+    ];
+  }
+
+  /**
+   * A text-only hop that placed nothing is left alone.
+   *
+   * The plan and approval gates are text-only by design. They come before any
+   * placement, which is what tells them apart from a build that stopped.
+   */
+  public function testTextOnlyHopWithoutPlacementsIsNotNudged(): void {
+    $this->installCanvasDevAi();
+
+    $plan = 'Here is the plan: 1) Hero. 2) Programs. Shall I build it?';
+    $this->setUpAgentManager($this->mockAgent(finished: TRUE, answer: $plan));
+
+    $response = $this->hop([
+      'messages' => [['role' => 'user', 'text' => 'Create me a landing page for a university site']],
+    ]);
+
+    $this->assertFalse($response['should_continue']);
+    $this->assertSame($plan, $response['message']);
+    $this->assertSame(0, $this->container->get(CanvasAiTempStore::class)->getNudgeCount('test-request'));
+  }
+
+  /**
+   * The nudges run out after two, and the turn ends where the model stopped.
+   *
+   * The cap is spent across the turn, so a hop arriving with it exhausted is
+   * the one that has to end the turn.
+   */
+  public function testNudgesAreCappedPerTurn(): void {
+    $this->installCanvasDevAi();
+
+    $logger = new TestLogger();
+    $this->container->get(LoggerChannelFactoryInterface::class)
+      ->get('canvas_dev_ai')
+      ->addLogger($logger);
+
+    // The two nudges the earlier hops of this turn were given.
+    $temp_store = $this->container->get(CanvasAiTempStore::class);
+    $temp_store->setNudgeCount('test-request', 2);
+
+    $this->setUpAgentManager($this->mockAgent(
+      finished: TRUE,
+      answer: 'Adding the Campus life section now.',
+      placements: [$this->mockPlacement([])],
+    ));
+
+    $response = $this->hop([
+      'messages' => [['role' => 'user', 'text' => 'Approved']],
+    ]);
+
+    $this->assertFalse($response['should_continue']);
+    $this->assertSame('Adding the Campus life section now.', $response['message']);
+    $this->assertSame(0, $temp_store->getNudgeCount('test-request'));
+    $this->assertTrue(
+      $logger->hasRecordThatContains('The build hop ended without a tool call after', RfcLogLevel::WARNING),
+      'Running out of nudges is logged.',
+    );
+  }
+
+  /**
+   * A tool call written into the answer text is stripped out and logged.
+   *
+   * Instead of calling the tool, the model sometimes appends the call's JSON
+   * body to its narration, which the chat would otherwise display verbatim.
+   * Only a body opening on the argument key of a tool that writes to the page
+   * counts, so an answer that happens to carry other JSON is left alone.
+   */
+  #[DataProvider('toolCallInAnswerProvider')]
+  public function testToolCallWrittenIntoTheAnswerIsStripped(string $answer, string $expected_message, ?string $expected_log): void {
+    $this->installCanvasDevAi();
+
+    $logger = new TestLogger();
+    $this->container->get(LoggerChannelFactoryInterface::class)
+      ->get('canvas_dev_ai')
+      ->addLogger($logger);
+
+    $this->setUpAgentManager($this->mockAgent(finished: TRUE, answer: $answer));
+
+    $response = $this->hop([
+      'messages' => [['role' => 'user', 'text' => 'Approved']],
+    ]);
+
+    $this->assertSame($expected_message, $response['message']);
+    // The logged message is the placeholder template; the call is in the
+    // context.
+    $this->assertSame(
+      $expected_log !== NULL,
+      $logger->hasRecordThatPasses(
+        static fn (array $record): bool => ($record['context']['@call'] ?? NULL) === $expected_log,
+        RfcLogLevel::WARNING,
+      ),
+    );
+  }
+
+  /**
+   * Answers carrying a JSON body, and what the user is shown of each.
+   */
+  public static function toolCallInAnswerProvider(): array {
+    return [
+      // The body is cut off mid-string, which is how it was observed.
+      'placement body' => [
+        'Adding the Campus life section to finish the page body now.{"operations":[{"target":"content"',
+        'Adding the Campus life section to finish the page body now.',
+        '{"operations":[{"target":"content"',
+      ],
+      'edit body' => [
+        'Changing the hero heading now.{"component_edits":[',
+        'Changing the hero heading now.',
+        '{"component_edits":[',
+      ],
+      // No tool writes to the page under this key, so it is the model talking.
+      'unrelated json' => [
+        'The theme applies {"colorScheme":"dark"} to the wrapper.',
+        'The theme applies {"colorScheme":"dark"} to the wrapper.',
+        NULL,
+      ],
+    ];
+  }
+
+  /**
+   * Installs canvas_dev_ai and prepares the session state the hops need.
+   */
+  private function installCanvasDevAi(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
+    $this->refreshContainer();
+    $this->setUpAiDevHops();
+  }
+
+  /**
+   * Builds an agent that reports one hop's outcome.
+   *
+   * @param bool $finished
+   *   Whether the agent has nothing parked, which ends the hop.
+   * @param string $answer
+   *   The text the model answered with.
+   * @param array $placements
+   *   The placement tool results of this hop, if any.
+   *
+   * @return \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper&\PHPUnit\Framework\MockObject\MockObject
+   *   The agent.
+   */
+  private function mockAgent(bool $finished, string $answer, array $placements = []): AiAgentEntityWrapper {
+    $agent = $this->createMock(AiAgentEntityWrapper::class);
+    $agent->method('determineSolvability')->willReturn(AiAgentInterface::JOB_SOLVABLE);
+    $agent->method('isFinished')->willReturn($finished);
+    $agent->method('solve')->willReturn($answer);
+    $agent->method('getToolResults')->willReturn($placements);
+    $agent->method('getToolResultsByPluginId')
+      ->with('canvas_ai:place_components', TRUE)
+      ->willReturn($placements);
+    $agent->method('toArray')->willReturn(['looped' => 1]);
+    // The history a nudge is appended to, so appending is observable.
+    $agent->method('getChatHistory')->willReturn([new ChatMessage('user', 'Approved')]);
+    $agent->method('setChatHistory')->willReturnCallback(
+      function (array $history): void {
+        $this->chatHistoryWrites[] = $history;
+      },
+    );
+    return $agent;
+  }
+
+  /**
+   * The chat history the agent under test was given last.
+   *
+   * @return array<int, \Drupal\ai\OperationType\Chat\ChatMessage>
+   *   The messages of that history, in order.
+   */
+  private function lastChatHistoryWrite(): array {
+    $this->assertNotEmpty($this->chatHistoryWrites, 'The agent was given a chat history.');
+    return end($this->chatHistoryWrites);
+  }
+
+  /**
+   * Builds a placement tool result carrying the given structured output.
+   *
+   * @param array $operations
+   *   The structured output the client applies to the page.
+   *
+   * @return \Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface&\PHPUnit\Framework\MockObject\MockObject
+   *   The tool result.
+   */
+  private function mockPlacement(array $operations): BuilderResponseFunctionCallInterface {
+    $placement = $this->createMock(BuilderResponseFunctionCallInterface::class);
+    $placement->method('getPluginId')->willReturn('canvas_ai:place_components');
+    $placement->method('getStructuredOutput')->willReturn($operations);
+    return $placement;
+  }
+
+  /**
+   * Hands the controller the agent that runs this request's single hop.
+   *
+   * @param \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper $agent
+   *   The agent. Exactly one instance is expected, which asserts that the
+   *   request runs one hop however it ends.
+   */
+  private function setUpAgentManager(AiAgentEntityWrapper $agent): void {
+    $agent_manager = $this->createMock(AiAgentManager::class);
+    $agent_manager->method('hasDefinition')->willReturn(TRUE);
+    $agent_manager->expects($this->once())
+      ->method('createInstance')
+      ->willReturn($agent);
+    $this->container->set('plugin.manager.ai_agents', $agent_manager);
   }
 
   /**
