@@ -268,6 +268,11 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
    *   TRUE when a negotiation method read the language off the request.
    */
   private function requestNamedALanguage(): bool {
+    // Without the language module there is one language, nothing negotiates it,
+    // and the negotiation plugins dereferenced below are not autoloadable.
+    if (!$this->moduleHandler->moduleExists('language')) {
+      return FALSE;
+    }
     if (!$this->languageManager instanceof ConfigurableLanguageManagerInterface) {
       return FALSE;
     }
