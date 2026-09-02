@@ -1887,19 +1887,20 @@ paths:
         '404':
           description: Content entity not found.
     patch:
-      summary: Updates a single content entity with its component tree.
+      summary: Updates a single content entity, in whole or in part.
       parameters:
         - $ref: '#/components/parameters/entityId'
       requestBody:
-        description: Updates a single content entity with its component tree.
-        required: true
-        $ref: '#/components/requestBodies/NewContentRequest'
+        $ref: '#/components/requestBodies/ContentPatchRequest'
       responses:
         '200':
           description: Content entity updated successfully.
           $ref: '#/components/responses/ContentEntityResponse'
         '404':
           description: Content entity not found.
+        '422':
+          description: The submitted values failed validation.
+          $ref: '#/components/responses/ClientErrorResponse'
         '409':
           description: Conflict because existing auto-saved data exists.
           content:
@@ -1986,6 +1987,7 @@ paths:
                         - title
                         - status
                         - path
+                        - folder
                         - autoSaveLabel
                         - autoSavePath
                         - internalPath
@@ -2007,6 +2009,10 @@ paths:
                         status:
                           type: boolean
                           description: The page status.
+                        folder:
+                          type: [string, "null"]
+                          format: uuid
+                          description: The Folder this page is organized into; null when it is in no folder.
                         autoSaveLabel:
                           type: [string, "null"]
                           description: The auto-save title.
@@ -2071,6 +2077,7 @@ paths:
                         title: Home
                         status: true
                         path: /home
+                        folder: null
                         autoSaveLabel: Homer
                         autoSavePath: /updated-path
                         internalPath: /page/1
@@ -2081,6 +2088,7 @@ paths:
                         title: About
                         status: false
                         path: /about
+                        folder: null
                         autoSaveLabel: About who?
                         autoSavePath: /page/1
                         internalPath: /page/2
@@ -5403,7 +5411,10 @@ components:
       additionalProperties: false
     FolderType:
       type: string
+      # Config entity types organized through the folder's `items`, plus the
+      # content entity types that reference their folder themselves.
       enum:
+        - canvas_page
         - color
         - component
         - js_component
@@ -5649,6 +5660,7 @@ components:
         - autoSaveLabel
         - autoSavePath
         - internalPath
+        - folder
         - components
         - pageVariant
         - links
@@ -5684,6 +5696,10 @@ components:
         description:
           type: string
           description: The meta description.
+        folder:
+          type: [ string, "null" ]
+          format: uuid
+          description: The Folder this page is organized into; null when it is in no folder.
         pageVariant:
           type: [ string, "null" ]
           description: The selected page variant machine name. Null uses the site default.
@@ -5743,6 +5759,7 @@ components:
           components: [ ]
           description: The home page of the site.
           pageVariant: null
+          folder: null
           links:
             edit-form: /canvas/editor/canvas_page/1
         -
@@ -5773,6 +5790,7 @@ components:
               label: null
           description: Learn more about us.
           pageVariant: marketing
+          folder: 7c2c1f5c-8c9a-4a0e-9a6f-2f8b2d9c1a10
           links:
             edit-form: "/canvas/editor/canvas_page/1"
     DuplicateContentRequestBody:
@@ -5813,45 +5831,88 @@ components:
         description:
           type: string
           description: The meta description.
+        folder:
+          type: [ string, "null" ]
+          format: uuid
+          description: The Folder this page is organized into; null when it is in no folder.
         pageVariant:
           type: [ string, "null" ]
           description: The selected page variant machine name. Null uses the site default.
         components:
-          type: array
+          $ref: '#/components/schemas/StoredComponentTree'
+    ContentPatchRequestBody:
+      type: object
+      additionalProperties: false
+      description: >
+        Any subset of a content entity's writable fields. Omitted fields are
+        left unchanged, so a client can, for example, move a page between
+        folders without resending its component tree.
+      properties:
+        title:
+          type: string
+          description: The page title.
+        status:
+          type: boolean
+          description: The page status.
+        path:
+          type: string
+          format: uri-reference
+          title: The processed path
+        description:
+          type: string
+          description: The meta description.
+        folder:
+          type: [ string, "null" ]
+          format: uuid
+          description: The Folder this page is organized into; null when it is in no folder.
+        pageVariant:
+          type: [ string, "null" ]
+          description: The selected page variant machine name. Null uses the site default.
+        components:
+          $ref: '#/components/schemas/StoredComponentTree'
+        autoSaves:
+          $ref: '#/components/schemas/AutoSaveConcurrencyControl'
+        clientInstanceId:
+          type: string
           description: >
-            The stored component tree as a flat array of items. Each
-            item references its parent via parent_uuid, matching the
-            data shape exposed by JSON:API or GraphQL.
-          items:
-            type: object
-            required:
-              - uuid
-              - component_id
-              - component_version
-            properties:
-              uuid:
-                type: string
-                format: uuid
-                description: Unique identifier of this component instance.
-              component_id:
-                type: string
-                description: The component config entity ID (e.g. "sdc.my_theme.hero").
-              component_version:
-                type: string
-                description: The component version hash.
-              parent_uuid:
-                type: [ 'null', string ]
-                format: uuid
-                description: UUID of the parent component (null for root items).
-              slot:
-                type: [ 'null', string ]
-                description: The slot name in the parent component (null for root items).
-              inputs:
-                type: [ 'null', object ]
-                description: The component input values (prop sources).
-              label:
-                type: [ 'null', string ]
-                description: Optional label for the component instance.
+            Client instance ID. The UI injects this into every mutation body so
+            the server can recognize concurrent edits.
+    StoredComponentTree:
+      type: array
+      description: >
+        The stored component tree as a flat array of items. Each
+        item references its parent via parent_uuid, matching the
+        data shape exposed by JSON:API or GraphQL.
+      items:
+        type: object
+        required:
+          - uuid
+          - component_id
+          - component_version
+        properties:
+          uuid:
+            type: string
+            format: uuid
+            description: Unique identifier of this component instance.
+          component_id:
+            type: string
+            description: The component config entity ID (e.g. "sdc.my_theme.hero").
+          component_version:
+            type: string
+            description: The component version hash.
+          parent_uuid:
+            type: [ 'null', string ]
+            format: uuid
+            description: UUID of the parent component (null for root items).
+          slot:
+            type: [ 'null', string ]
+            description: The slot name in the parent component (null for root items).
+          inputs:
+            type: [ 'null', object ]
+            description: The component input values (prop sources).
+          label:
+            type: [ 'null', string ]
+            description: Optional label for the component instance.
     DuplicatedContentEntity:
       type: object
       required:
@@ -6256,3 +6317,10 @@ components:
             application/json:
               schema:
                 $ref: '#/components/schemas/NewContentRequestBody'
+    ContentPatchRequest:
+      description: Any subset of the entity's writable fields; omitted fields are left unchanged.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ContentPatchRequestBody'

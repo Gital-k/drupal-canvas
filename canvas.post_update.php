@@ -10,6 +10,7 @@ use Drupal\canvas\Entity\Color;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Folder;
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Entity\Pattern;
@@ -27,6 +28,7 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\RevisionableStorageInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Site\Settings;
 use Drupal\Core\TempStore\SharedTempStoreFactory;
 use Drupal\field\Entity\FieldConfig;
@@ -794,4 +796,18 @@ function canvas_post_update_0030_page_variant_selection_options(): void {
   // varchar column); only the field type and its settings change.
   $storage_definitions = \Drupal::service(EntityFieldManagerInterface::class)->getFieldStorageDefinitions('canvas_page');
   $update_manager->updateFieldStorageDefinition($storage_definitions['page_variant']);
+}
+
+/**
+ * Installs the `folder` base field on Canvas pages.
+ */
+function canvas_post_update_0031_page_folder_field(): void {
+  $definition = BaseFieldDefinition::create('entity_reference')
+    ->setLabel(t('Folder'))
+    ->setDescription(t('The folder this page is organized into in the Pages panel.'))
+    ->setSetting('target_type', Folder::ENTITY_TYPE_ID)
+    ->setRevisionable(FALSE)
+    ->setTranslatable(FALSE);
+  \Drupal::entityDefinitionUpdateManager()
+    ->installFieldStorageDefinition('folder', Page::ENTITY_TYPE_ID, 'canvas', $definition);
 }

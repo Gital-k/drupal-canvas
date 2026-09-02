@@ -112,6 +112,7 @@ class ApiContentControllersGetTest extends CanvasKernelTestBase {
         'hasUnsavedStatusChange' => FALSE,
         'path' => '/test-page',
         'internalPath' => '/page/1',
+        'folder' => NULL,
         'autoSaveLabel' => NULL,
         'autoSavePath' => NULL,
         'components' => [],
@@ -167,6 +168,7 @@ class ApiContentControllersGetTest extends CanvasKernelTestBase {
         'hasUnsavedStatusChange' => FALSE,
         'path' => '/components-page',
         'internalPath' => '/page/1',
+        'folder' => NULL,
         'autoSaveLabel' => NULL,
         'autoSavePath' => NULL,
         'components' => [

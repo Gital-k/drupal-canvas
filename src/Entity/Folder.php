@@ -8,6 +8,7 @@ use Drupal\canvas\ClientSideRepresentation;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityAccessControlHandler;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -135,6 +136,12 @@ final class Folder extends ConfigEntityBase implements CanvasHttpApiEligibleConf
    */
   public function calculateDependencies(): static {
     parent::calculateDependencies();
+    // A folder organizing content entities has no items: membership lives on
+    // the content entity itself, because config must not depend on content.
+    // @see \Drupal\canvas\Entity\FolderTargetInterface
+    if ($this->targetsContentEntityType()) {
+      return $this;
+    }
     // Each item is the ID of a config entity of type $this->configEntityTypeId.
     // Declare an explicit config dependency so that core's dependency removal
     // machinery calls ::onDependencyRemoval() when any item is deleted.
@@ -143,6 +150,17 @@ final class Folder extends ConfigEntityBase implements CanvasHttpApiEligibleConf
       $this->addDependency('config', $prefix . '.' . $item_id);
     }
     return $this;
+  }
+
+  /**
+   * Whether this folder organizes content entities rather than config.
+   *
+   * @return bool
+   *   TRUE when the target entity type is a content entity type.
+   */
+  public function targetsContentEntityType(): bool {
+    $entity_type = \Drupal::entityTypeManager()->getDefinition($this->configEntityTypeId, FALSE);
+    return $entity_type instanceof ContentEntityTypeInterface;
   }
 
   /**

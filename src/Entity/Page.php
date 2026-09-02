@@ -89,7 +89,7 @@ use Drupal\views\EntityViewsData;
     ],
   )
 ]
-final class Page extends EditorialContentEntityBase implements EntityOwnerInterface, ComponentTreeEntityInterface {
+final class Page extends EditorialContentEntityBase implements EntityOwnerInterface, ComponentTreeEntityInterface, FolderTargetInterface {
 
   use EntityOwnerTrait;
   public const string ENTITY_TYPE_ID = 'canvas_page';
@@ -158,6 +158,18 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
         'type' => 'options_select',
       ])
       ->setDisplayConfigurable('form', TRUE);
+    $fields['folder'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(t('Folder'))
+      ->setDescription(t('The folder this page is organized into in the Pages panel.'))
+      ->setSetting('target_type', Folder::ENTITY_TYPE_ID)
+      // Organizing pages is not versioned content: moving a page between
+      // folders applies to every revision and every translation, exactly like
+      // moving a component between library folders.
+      ->setRevisionable(FALSE)
+      ->setTranslatable(FALSE)
+      ->addPropertyConstraints('target_id', [
+        'FolderTargetEntityType' => [],
+      ]);
     // @see path_entity_base_field_info().
     $fields['path'] = BaseFieldDefinition::create('path')
       ->setLabel(t('URL alias'))
