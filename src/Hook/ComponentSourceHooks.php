@@ -43,6 +43,7 @@ readonly final class ComponentSourceHooks {
     private ThemeInstallerInterface $themeInstaller,
     #[Autowire(service: 'kernel')]
     private DrupalKernelInterface $kernel,
+    private ConfigInstallerInterface $configInstaller,
   ) {}
 
   const ASSET_LIBRARY_METHOD_MAPPING = [
@@ -100,7 +101,7 @@ readonly final class ComponentSourceHooks {
    */
   #[Hook('themes_installed')]
   public function themesInstalled(): void {
-    if (\Drupal::service(ConfigInstallerInterface::class)->isSyncing() && !ComponentSourceManager::isRecipeApplying()) {
+    if ($this->configInstaller->isSyncing() && !ComponentSourceManager::isRecipeApplying()) {
       return;
     }
     $component_source_manager = $this->kernel->getContainer()->get(ComponentSourceManager::class);

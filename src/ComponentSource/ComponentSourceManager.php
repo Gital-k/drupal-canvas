@@ -101,7 +101,6 @@ final class ComponentSourceManager extends DefaultPluginManager {
     if (\in_array('installRecipeConfig', array_column(debug_backtrace(), 'function'), TRUE)) {
       // Assert the bug is still present. This will start failing as soon as the
       // upstream bug is fixed.
-      // @phpstan-ignore-next-line function.alreadyNarrowedType
       \assert(!$this->configInstaller->isSyncing());
       return $this;
     }
