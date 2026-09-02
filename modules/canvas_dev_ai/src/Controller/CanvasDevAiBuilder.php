@@ -560,6 +560,7 @@ final class CanvasDevAiBuilder extends ControllerBase {
     }
     else {
       $response['message'] = $agent->solve();
+      \assert(\is_string($response['message']));
       $response['progress'] = $this->getAiProgressWithoutAnswer($job_id, $response['message']);
     }
     return new JsonResponse($this->canvasAiPageBuilderHelper->processCanvasPageFields($response));

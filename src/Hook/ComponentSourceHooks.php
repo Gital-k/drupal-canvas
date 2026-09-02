@@ -12,6 +12,7 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Asset\AttachedAssetsInterface;
 use Drupal\Core\Asset\LibraryDependencyResolverInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\ConfigInstallerInterface;
 use Drupal\Core\DrupalKernelInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Hook\Attribute\Hook;
@@ -42,6 +43,7 @@ readonly final class ComponentSourceHooks {
     private ThemeInstallerInterface $themeInstaller,
     #[Autowire(service: 'kernel')]
     private DrupalKernelInterface $kernel,
+    private ConfigInstallerInterface $configInstaller,
   ) {}
 
   const ASSET_LIBRARY_METHOD_MAPPING = [
@@ -75,7 +77,7 @@ readonly final class ComponentSourceHooks {
     if (\in_array('canvas', $modules, TRUE)) {
       $this->themeInstaller->install(['canvas_stark']);
     }
-    if ($is_syncing) {
+    if ($is_syncing && !ComponentSourceManager::isRecipeApplying()) {
       return;
     }
     // Generate via the container's *current* ComponentSourceManager rather
@@ -89,6 +91,19 @@ readonly final class ComponentSourceHooks {
     // shapes get written to the cache that outlives the install (the other one
     // will never have its ::destruct() called).
     // @see \Drupal\canvas\PropShape\PersistentPropShapeRepository
+    $component_source_manager = $this->kernel->getContainer()->get(ComponentSourceManager::class);
+    \assert($component_source_manager instanceof ComponentSourceManager);
+    $component_source_manager->generateComponents();
+  }
+
+  /**
+   * Implements hook_themes_installed().
+   */
+  #[Hook('themes_installed')]
+  public function themesInstalled(): void {
+    if ($this->configInstaller->isSyncing() && !ComponentSourceManager::isRecipeApplying()) {
+      return;
+    }
     $component_source_manager = $this->kernel->getContainer()->get(ComponentSourceManager::class);
     \assert($component_source_manager instanceof ComponentSourceManager);
     $component_source_manager->generateComponents();

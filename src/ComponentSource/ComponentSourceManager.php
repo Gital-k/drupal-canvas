@@ -23,6 +23,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Plugin\DefaultPluginManager;
+use Drupal\Core\Recipe\RecipeRunner;
 use Drupal\Core\Update\UpdateKernel;
 
 /**
@@ -90,7 +91,7 @@ final class ComponentSourceManager extends DefaultPluginManager {
     // Do not auto-create/update Canvas configuration when syncing config o
     // deploying.
     // @todo Introduce a "Canvas development mode" similar to Twig's: https://www.drupal.org/node/3359728
-    if ($this->configInstaller->isSyncing()) {
+    if ($this->configInstaller->isSyncing() && !self::isRecipeApplying()) {
       return $this;
     }
     // @todo Fix upstream core bug in Recipes: it inconsistently claims to be
@@ -100,7 +101,6 @@ final class ComponentSourceManager extends DefaultPluginManager {
     if (\in_array('installRecipeConfig', array_column(debug_backtrace(), 'function'), TRUE)) {
       // Assert the bug is still present. This will start failing as soon as the
       // upstream bug is fixed.
-      // @phpstan-ignore-next-line function.alreadyNarrowedType
       \assert(!$this->configInstaller->isSyncing());
       return $this;
     }
@@ -124,6 +124,18 @@ final class ComponentSourceManager extends DefaultPluginManager {
       $this->generateComponentsForSource($source_definition_id, $discovery, $existing_components, $source_specific_ids);
     }
     return $this;
+  }
+
+  /**
+   * Returns whether a recipe is being applied.
+   */
+  public static function isRecipeApplying(): bool {
+    // A recipe is applying if RecipeRunner is anywhere in the backtrace, either
+    // as an object or statically.
+    return array_any(debug_backtrace(), function (array $call): bool {
+      $class = isset($call['object']) ? get_class($call['object']) : ($call['class'] ?? NULL);
+      return $class === RecipeRunner::class;
+    });
   }
 
   /**

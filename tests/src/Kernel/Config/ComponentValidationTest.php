@@ -52,7 +52,6 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
     'sdc',
     'canvas_test_sdc',
     // Provides the `heading` SDC with a `number` + `enum` (→ `list_float`) prop.
@@ -97,6 +96,11 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    // Canvas needs to be installed AFTER Stark, which is installed by
+    // the parent class. Otherwise, Canvas will try to generate components
+    // for Stark when it is installed, but that will fail because Canvas's
+    // configuration hasn't been installed yet.
+    $this->enableModules(['canvas']);
     $this->installConfig('canvas');
 
     // TRICKY: creating the first Component config entity (for an SDC) triggers
