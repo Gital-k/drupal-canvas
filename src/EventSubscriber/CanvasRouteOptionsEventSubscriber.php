@@ -95,7 +95,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
    * A request that names no language at all is the editor, which edits the
    * entity's source translation rather than the site default language.
    *
-   * @see ::getUnrequestedLangcode()
+   * @see ::getSourceLangcode()
    *
    * This is an event subscriber rather than a `#[LanguageNegotiation]` plugin
    * because the goal is not to negotiate a language — it is to defer to the
@@ -122,7 +122,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
     }
     $langcode = $request->query->get(ApiLayoutController::PREVIEW_LANGCODE_QUERY_KEY);
     if (!\is_string($langcode) || $langcode === '') {
-      $langcode = $this->getUnrequestedLangcode();
+      $langcode = $this->getSourceLangcode();
       if ($langcode === NULL) {
         return;
       }
@@ -226,7 +226,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
   }
 
   /**
-   * The source langcode to serve when the request did not ask for a language.
+   * The langcode of the source translation, when no language was asked for.
    *
    * A layout request that names no language — no `canvas_preview_langcode`
    * hint, and negotiation landing on the site default language because nothing
@@ -241,7 +241,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
    *   for a language, or the route carries no translatable entity — config
    *   entities have a single language, so there is nothing to redirect to.
    */
-  private function getUnrequestedLangcode(): ?string {
+  private function getSourceLangcode(): ?string {
     // Anything other than the site default language was selected by the URL,
     // the session or the domain, so it was asked for: honor it.
     if ($this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId() !== $this->languageManager->getDefaultLanguage()->getId()) {
