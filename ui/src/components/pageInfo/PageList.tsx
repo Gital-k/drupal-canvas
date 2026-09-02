@@ -312,6 +312,7 @@ const PageListItem = ({
           {...(canBeFiled ? dragAttributes : {})}
           {...(canBeFiled ? dragListeners : {})}
           role={undefined}
+          data-canvas-page-title={item.autoSaveLabel || item.title}
           ref={canBeFiled ? setDragRef : undefined}
         >
           <SidebarNode
