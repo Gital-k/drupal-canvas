@@ -62,8 +62,6 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     // The two only modules Drupal truly requires.
     'system',
     'user',
-    // The module being tested.
-    'canvas',
     // Modules providing used Components (and their ComponentSource plugins).
     'block',
     'canvas_test_sdc',
@@ -97,6 +95,11 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
    */
   protected function setUp(): void {
     parent::setUp();
+    // Canvas needs to be installed AFTER Stark, which is installed by
+    // the parent class. Otherwise, Canvas will try to generate components
+    // for Stark when it is installed, but that will fail because Canvas's
+    // configuration hasn't been installed yet.
+    $this->enableModules(['canvas']);
 
     $this->installEntitySchema('node');
     $this->installConfig('node');
