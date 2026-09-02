@@ -113,37 +113,57 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
       throw new \Exception('The current user does not have the right permissions to run this tool.');
     }
     try {
-      // The context-definition schema guarantees a non-empty component_edits
-      // list (validateContexts() rejects an empty/absent value before execute),
-      // but its ComplexToolItems check does not descend into each record, so
-      // the per-edit shape is guarded here.
+      $current_layout = Json::decode($this->canvasAiTempStore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '');
+      $current_layout = \is_array($current_layout) ? $current_layout : [];
+      $components_by_uuid = $this->pageBuilderHelper->getComponentsByUuid($current_layout);
+
+      // Validates and applies each edit, accumulating every edit's errors
+      // instead of stopping at the first invalid one.
       $component_updates = [];
-      foreach ($this->getContextValue('component_edits') as $edit) {
+      $all_errors = [];
+      foreach ($this->getContextValue('component_edits') as $index => $edit) {
+        $errors = [];
         $uuid = $edit['component_uuid'] ?? NULL;
-        $props = Yaml::parse($edit['props'] ?? '');
-        if (!\is_string($uuid) || !$props) {
-          throw new \Exception('Each edit must provide a "component_uuid" and its prop changes.');
+        $props = NULL;
+        try {
+          $props = Yaml::parse($edit['props'] ?? '');
         }
-        // A scalar parses fine but is not a props map; the client would spread
-        // it into the component's values character by character.
-        if (!\is_array($props)) {
-          throw new \Exception(\sprintf('The props value for component %s must be a YAML mapping of prop names to values, one "prop_name: value" pair per line.', $uuid));
+        catch (ParseException $e) {
+          // Replaces the raw YAML parse error with instructions to quote string values.
+          $errors[] = \sprintf("The props value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
+        }
+        $errors = \array_merge($errors, $this->validateEditParams($uuid, $props, $components_by_uuid));
+
+        if (\is_array($props) && \is_string($uuid) && isset($components_by_uuid[$uuid])) {
+          $component = $components_by_uuid[$uuid];
+          // Merges the edit's props over the component's existing props.
+          $merged_props = $props + $component['props'];
+          try {
+            $this->responseValidator->validateComponentStructure([[$component['component_id'] => ['props' => $merged_props]]]);
+          }
+          catch (\Throwable $e) {
+            // Catches any validator failure, including a TypeError, as an edit error.
+            $errors[] = $e->getMessage();
+          }
+        }
+
+        if ($errors !== []) {
+          $all_errors['Edit ' . $index] = $errors;
+          continue;
         }
         $component_updates[$uuid] = $props;
       }
 
-      $this->validateComponentUpdates($component_updates);
+      if ($all_errors !== []) {
+        $message = $this->responseValidator->formatErrors($all_errors);
+        $this->loggerFactory->get('canvas_ai')->error($message);
+        $this->setOutput($message);
+        return;
+      }
 
       // The frontend applies these updates to the page on the next hop.
       $this->setStructuredOutput(['component_updates' => $component_updates]);
       $this->setOutput("The updates were applied successfully.\n" . Yaml::dump($component_updates));
-    }
-    catch (ParseException $e) {
-      // A raw parse error gives the model nothing to act on, so it retries
-      // the same payload; tell it how to fix the YAML instead.
-      $message = \sprintf("The props value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
-      $this->loggerFactory->get('canvas_ai')->error($message);
-      $this->setOutput(\sprintf('Failed to edit components: %s', $message));
     }
     catch (\Exception $e) {
       $this->loggerFactory->get('canvas_ai')->error($e->getMessage());
@@ -152,40 +172,37 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
   }
 
   /**
-   * Validates the agent-supplied prop updates against the current layout.
+   * Validates the component_uuid and props of a single edit.
    *
-   * @param array $component_updates
-   *   The parsed updates, keyed by component UUID with prop_name => value pairs.
+   * @param mixed $uuid
+   *   The edit's component_uuid value.
+   * @param mixed $props
+   *   The edit's parsed props value.
+   * @param array $components_by_uuid
+   *   The current page's components, keyed by UUID.
    *
-   * @throws \Exception
-   *   When an edited UUID is not present on the page.
-   * @throws \Drupal\canvas\Exception\ConstraintViolationException
-   *   When the merged prop values fail validation.
+   * @return list<string>
+   *   The validation errors found, or an empty list if the edit is valid.
    */
-  private function validateComponentUpdates(array $component_updates): void {
-    $current_layout = Json::decode($this->canvasAiTempStore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '');
-    $current_layout = \is_array($current_layout) ? $current_layout : [];
-    $components_by_uuid = $this->pageBuilderHelper->getComponentsByUuid($current_layout);
-
+  private function validateEditParams(mixed $uuid, mixed $props, array $components_by_uuid): array {
     $errors = [];
-    $component_groups = [];
-    foreach ($component_updates as $uuid => $prop_updates) {
-      if (!isset($components_by_uuid[$uuid])) {
-        $errors[] = \sprintf('Component %s was not found on the page.', $uuid);
-        continue;
-      }
-      $component = $components_by_uuid[$uuid];
-      // Merge over existing props so validation does not treat a partial edit
-      // as dropping the component's other required props.
-      $merged_props = (\is_array($prop_updates) ? $prop_updates : []) + $component['props'];
-      $component_groups[] = [$component['component_id'] => ['props' => $merged_props]];
+
+    $has_uuid = \is_string($uuid) && $uuid !== '';
+    if (!$has_uuid) {
+      $errors[] = 'The component_uuid key is missing in the edit.';
+    }
+    elseif (!isset($components_by_uuid[$uuid])) {
+      $errors[] = \sprintf('Component %s was not found on the page.', $uuid);
     }
 
-    if ($errors !== []) {
-      throw new \Exception(implode("\n", $errors));
+    if (!\is_array($props)) {
+      $errors[] = 'The props value must be a YAML mapping of prop names to values, one "prop_name: value" pair per line.';
+    }
+    elseif ($props === []) {
+      $errors[] = 'The edit must contain at least one prop change.';
     }
 
-    $this->responseValidator->validateComponentStructure($component_groups);
+    return $errors;
   }
 
 }
