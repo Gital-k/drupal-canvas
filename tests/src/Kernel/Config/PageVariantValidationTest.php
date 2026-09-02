@@ -60,7 +60,14 @@ class PageVariantValidationTest extends BetterConfigEntityValidationTestBase {
    * {@inheritdoc}
    */
   protected function setUp(): void {
+    // Canvas needs to be installed AFTER Stark, which is installed by
+    // the parent class. Otherwise, Canvas will try to generate components
+    // for Stark when it is installed, but that will fail because Canvas's
+    // configuration hasn't been installed yet.
+    static::$modules = array_diff(static::$modules, ['canvas']);
+
     parent::setUp();
+    $this->enableModules(['canvas']);
     // Installs the "Page content" marker component and `canvas.settings`.
     // @see config/install/canvas.component.marker.page_content.yml
     $this->installConfig(['canvas']);
