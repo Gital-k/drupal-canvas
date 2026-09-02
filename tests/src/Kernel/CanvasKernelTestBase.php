@@ -100,6 +100,11 @@ abstract class CanvasKernelTestBase extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    // Canvas' default config includes:
+    // - an image style needed by many tests.
+    // - the global asset library
+    // - …
+    $this->installConfig(['canvas']);
     $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
     $this->installConfig([
       // Needed for date formats.
@@ -107,11 +112,6 @@ abstract class CanvasKernelTestBase extends KernelTestBase {
       // @see core/modules/system/config/install/core.date_format.html_datetime.yml
       // @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeDefaultWidget::formElement()
       'system',
-      // Canvas' default config includes:
-      // - an image style needed by many tests.
-      // - the global asset library
-      // - …
-      'canvas',
     ]);
   }
 
