@@ -6,6 +6,7 @@ namespace Drupal\Tests\canvas_personalization\Kernel\Config;
 
 use Drupal\canvas_personalization\Entity\Segment;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Config\BetterConfigEntityValidationTestBase;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
@@ -37,32 +38,32 @@ class SegmentValidationTest extends BetterConfigEntityValidationTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    // The two only modules Drupal truly requires.
-    'system',
-    'user',
+    ...CanvasKernelTestBase::CANVAS_KERNEL_TEST_MINIMAL_MODULES,
     // The module being tested.
-    'canvas',
     'canvas_personalization',
     // Modules providing used Components (and their ComponentSource plugins).
-    'block',
     'sdc_test',
     'canvas_test_sdc',
     // Canvas's dependencies (modules providing field types + widgets).
     'field',
-    'file',
-    'image',
-    'link',
-    'media',
     'node',
-    'options',
-    'text',
   ];
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
+    // Canvas needs to be installed AFTER Stark, which is installed by
+    // the parent class. Otherwise, Canvas will try to generate components
+    // for Stark when it is installed, but that will fail because Canvas's
+    // configuration hasn't been installed yet.
+    static::$modules = array_diff(static::$modules, ['canvas']);
+
     parent::setUp();
+    $this->enableModules(['canvas']);
+    $this->installConfig(['canvas']);
+    $this->installEntitySchema('path_alias');
+
     $this->entity = Segment::create([
       'id' => 'test_segment',
       'label' => 'Test segment',
