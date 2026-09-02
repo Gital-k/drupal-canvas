@@ -15,6 +15,7 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\StagedConfigUpdate;
+use Drupal\canvas\FolderPermissions;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\Component\Datetime\Time;
@@ -24,6 +25,7 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
@@ -287,12 +289,18 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     self::assertArrayHasKey('title', $entry['data']);
     self::assertArrayNotHasKey('folder', $entry['data']);
 
-    // Meanwhile the page is filed from the Pages panel: a live save.
+    // Meanwhile the page is filed from the Pages panel: a live save, by an
+    // editor allowed to move it there.
+    $drafter = $this->container->get(AccountProxyInterface::class)->getAccount();
+    $site_wide_editor = $this->createUser([Page::EDIT_PERMISSION]);
+    self::assertNotFalse($site_wide_editor);
+    $this->setCurrentUser($site_wide_editor);
     $filed = $storage->loadUnchanged($page_id);
     \assert($filed instanceof Page);
     $filed->set('folder', $folder->id());
     self::assertEntityIsValid($filed);
     $filed->save();
+    $this->setCurrentUser($drafter);
 
     // Filing did not touch the draft, nor make it look updated externally.
     self::assertNull($autoSave->getUnresolvedConflictForEntity($filed));
@@ -300,6 +308,19 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     \assert($reconstructed instanceof Page);
     self::assertSame('Spring sale, extended', $reconstructed->label());
     self::assertSame($folder->id(), $reconstructed->get('folder')->target_id);
+
+    // So publishing it does not count as moving the page: an editor whose only
+    // permission is scoped to this folder may publish the draft.
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\FolderMembershipAccessConstraint
+    $publisher = $this->container->get(AccountProxyInterface::class)->getAccount();
+    $folder_editor = $this->createUser([
+      FolderPermissions::permission('edit', Page::ENTITY_TYPE_ID, (string) $folder->id()),
+      AutoSaveManager::PUBLISH_PERMISSION,
+    ]);
+    self::assertNotFalse($folder_editor);
+    $this->setCurrentUser($folder_editor);
+    self::assertEntityIsValid($reconstructed);
+    $this->setCurrentUser($publisher);
 
     // Publishing the draft keeps the page where it was filed.
     $reconstructed->save();

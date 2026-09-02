@@ -167,6 +167,10 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
       // moving a component between library folders.
       ->setRevisionable(FALSE)
       ->setTranslatable(FALSE)
+      // Folders of pages are access boundaries, so who may move a page between
+      // them depends on the folder permissions they hold.
+      // @see \Drupal\canvas\FolderPermissions
+      ->addConstraint('FolderMembershipAccess')
       ->addPropertyConstraints('target_id', [
         'FolderTargetEntityType' => [],
       ]);

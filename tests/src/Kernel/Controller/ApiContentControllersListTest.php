@@ -448,6 +448,17 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
     $without_folder = array_filter($data, static fn(array $row) => $row['id'] !== (int) $filed_page->id());
     self::assertNotEmpty($without_folder);
     self::assertNull(reset($without_folder)['folder']);
+
+    // A user who cannot see the folder is not told which pages are in it: to
+    // them the page is uncategorized, which is also how the Pages panel
+    // renders a page whose folder it was not served.
+    // @see \Drupal\canvas\Entity\FolderAccessControlHandler
+    $this->setUpCurrentUser([], ['access content']);
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = array_column(json_decode($content, TRUE)['data'], NULL, 'id');
+    self::assertNull($data[(int) $filed_page->id()]['folder']);
     // Renaming the folder must invalidate the listing.
     self::assertContains('config:canvas.folder.' . $folder->id(), $response->getCacheableMetadata()->getCacheTags());
   }

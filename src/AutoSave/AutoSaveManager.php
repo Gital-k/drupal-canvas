@@ -176,8 +176,7 @@ class AutoSaveManager implements EventSubscriberInterface {
   public static function isFolderMembershipField(EntityInterface $entity, FieldDefinitionInterface $field_definition): bool {
     return $entity instanceof FolderTargetInterface
       && $entity instanceof ContentEntityInterface
-      && $field_definition->getType() === 'entity_reference'
-      && $field_definition->getSetting('target_type') === Folder::ENTITY_TYPE_ID;
+      && Folder::isMembershipField($field_definition);
   }
 
   /**

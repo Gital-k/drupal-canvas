@@ -1212,8 +1212,9 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
       'POST' => "The 'create canvas_page' permission is required.",
       'DELETE' => "The 'delete canvas_page' permission is required.",
       'PATCH' => "The 'edit canvas_page' permission is required.",
-      // GET method
-      default => "The 'edit canvas_page' permission is required.",
+      // GET method: the list is available to whoever may use the Canvas UI.
+      // @see \Drupal\canvas\Access\CanvasUiAccessCheck
+      default => 'Requires >=1 content entity type with a Canvas field that can be created or edited.',
     };
     $this->assertSame(
       ['errors' => [$error]],

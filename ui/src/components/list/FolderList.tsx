@@ -5,6 +5,7 @@ import { Flex, Text, TextField } from '@radix-ui/themes';
 import SidebarFolder from '@/components/sidePanel/SidebarFolder';
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import { validateFolderNameClientSide } from '@/features/validation/validation';
+import { usePermissionCheck } from '@/hooks/usePermissionCheck';
 import {
   useDeleteFolderMutation,
   useUpdateFolderMutation,
@@ -52,6 +53,9 @@ const FolderList = ({
 }) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [folderName, setFolderName] = useState(folder.name);
+  // Folders of pages are also visible to editors holding a permission scoped
+  // to them, who may file pages into them but not rename or delete them.
+  const administerFolders = usePermissionCheck({ hasPermission: 'folders' });
   const [validationError, setValidationError] = useState('');
   const [isFolderOpen, setIsFolderOpen] = useState(true);
   const [updateFolder, { isLoading, isError, error, reset, isSuccess }] =
@@ -217,28 +221,34 @@ const FolderList = ({
     }
   }, [folder.id, deleteFolder, resetDelete, hasItems, isDeleting]);
 
+  const hasMenuItems = administerFolders || Boolean(extraMenuItems);
   const menuItems = (
     <>
       {extraMenuItems}
-      <UnifiedMenu.Item
-        data-testid="canvas-rename-folder-button"
-        onClick={() => setIsRenaming(true)}
-      >
-        Rename
-      </UnifiedMenu.Item>
-      <UnifiedMenu.Item
-        data-testid="canvas-delete-folder-button"
-        onClick={handleDelete}
-        disabled={isDeleting || hasItems}
-        color="red"
-        title={
-          hasItems
-            ? (deleteWarning ?? 'Cannot delete folder containing components')
-            : undefined
-        }
-      >
-        Delete folder
-      </UnifiedMenu.Item>
+      {administerFolders && (
+        <>
+          <UnifiedMenu.Item
+            data-testid="canvas-rename-folder-button"
+            onClick={() => setIsRenaming(true)}
+          >
+            Rename
+          </UnifiedMenu.Item>
+          <UnifiedMenu.Item
+            data-testid="canvas-delete-folder-button"
+            onClick={handleDelete}
+            disabled={isDeleting || hasItems}
+            color="red"
+            title={
+              hasItems
+                ? (deleteWarning ??
+                  'Cannot delete folder containing components')
+                : undefined
+            }
+          >
+            Delete folder
+          </UnifiedMenu.Item>
+        </>
+      )}
     </>
   );
 
@@ -303,7 +313,7 @@ const FolderList = ({
       nameSlot={nameSlot}
       errorSlot={errorSlot}
       count={getItemsLength()}
-      menuItems={isRenaming ? undefined : menuItems}
+      menuItems={isRenaming || !hasMenuItems ? undefined : menuItems}
       isOpen={isFolderOpen}
       onOpenChange={setIsFolderOpen}
       onNameDoubleClick={handleNameDoubleClick}

@@ -34,6 +34,8 @@ test.describe('Page folders', () => {
     await canvas.expectPageInFolder('Unsorted page', null);
   });
 
+  // The assertions live in the page object's expectPageInFolder().
+  // eslint-disable-next-line playwright/expect-expect
   test('Filing a page by dragging it and through its menu', async ({
     page,
     drupal,
@@ -137,7 +139,7 @@ test.describe('Page folders', () => {
     ).toBeVisible();
   });
 
-  test('Without "administer folders" the Pages panel falls back to a flat list', async ({
+  test('Without "administer folders" folders are visible but not manageable', async ({
     page,
     drupal,
     canvas,
@@ -147,6 +149,7 @@ test.describe('Page folders', () => {
     // forms, so they have to run before logging out.
     await drupal.loginAsAdmin();
     const canvasPage = await canvas.createCanvas({ title: 'Read-only page' });
+    await canvas.createCanvas({ title: 'Loose page' });
     await canvas.openPagesPanel();
     await canvas.addPageFolder('Managed elsewhere');
     await canvas.dragPageIntoFolder('Read-only page', 'Managed elsewhere');
@@ -171,20 +174,115 @@ test.describe('Page folders', () => {
 
     const panel = page.getByTestId('canvas-page-list-panel');
 
-    // A Folder is only viewable with `administer folders`, so this user is
-    // served none and the panel renders the same flat list it did before any
-    // folder existed — the page itself is still listed and editable.
-    await expect(
-      panel.locator('[data-canvas-page-title="Read-only page"]'),
-    ).toBeVisible();
-    await expect(panel.locator('[data-canvas-folder-name]')).toHaveCount(0);
-    await expect(
-      panel.getByTestId('canvas-uncategorized-drop-zone-canvas_page'),
-    ).toHaveCount(0);
+    // Whoever may edit pages is shown how they are organized: serving them no
+    // folder would render pages that are filed as if they were not.
+    await canvas.expectPageInFolder('Read-only page', 'Managed elsewhere');
+    await canvas.expectPageInFolder('Loose page', null);
 
-    // And nothing offers to create a folder.
+    // The folder is not theirs to rename, delete or re-order, so it carries no
+    // contextual menu at all …
+    await expect(
+      panel
+        .locator('[data-canvas-folder-name="Managed elsewhere"]')
+        .getByRole('button', { name: 'Open contextual menu' }),
+    ).toHaveCount(0);
+    // … and nothing offers to create one.
     await expect(panel.getByTestId('canvas-page-list-new-button')).toHaveCount(
       0,
     );
+  });
+
+  test('A folder permission scopes editing to the pages in that folder', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.loginAsAdmin();
+    const campaignPage = await canvas.createCanvas({ title: 'Campaign page' });
+    await canvas.createCanvas({ title: 'Archive page' });
+    await canvas.openPagesPanel();
+    await canvas.addPageFolder('Campaigns');
+    await canvas.addPageFolder('Archive');
+    await canvas.dragPageIntoFolder('Campaign page', 'Campaigns');
+    await canvas.dragPageIntoFolder('Archive page', 'Archive');
+
+    // One edit and one delete permission are generated per folder, and they
+    // carry the folder's ID: read the folders and the pages back rather than
+    // guessing UUIDs.
+    // @see \Drupal\canvas\FolderPermissions
+    const folderResponse = await page.request.get(
+      '/canvas/api/v0/config/folder',
+    );
+    expect(folderResponse.status()).toBe(200);
+    const folders: Record<string, { name: string }> =
+      await folderResponse.json();
+    const folderId = (name: string) =>
+      Object.keys(folders).find((id) => folders[id].name === name);
+    expect(folderId('Campaigns')).toBeTruthy();
+    expect(folderId('Archive')).toBeTruthy();
+    const contentResponse = await page.request.get(
+      '/canvas/api/v0/content/canvas_page',
+    );
+    expect(contentResponse.status()).toBe(200);
+    const listed: {
+      data: { id: number; title: string; autoSaveLabel?: string | null }[];
+    } = await contentResponse.json();
+    // A page created here is a draft, so its title lives in the auto-save
+    // label until it is published — which is what the Pages panel shows too.
+    const archivePageId = listed.data.find(
+      (row) => (row.autoSaveLabel ?? row.title) === 'Archive page',
+    )?.id;
+    expect(archivePageId).toBeTruthy();
+
+    // An editor of one folder and a remover of the other: no site-wide page
+    // permission of any kind.
+    await drupal.createRole({ name: 'canvas_campaign_editor' });
+    await drupal.addPermissions({
+      role: 'canvas_campaign_editor',
+      permissions: [
+        `edit canvas_page in folder ${folderId('Campaigns')}`,
+        `delete canvas_page in folder ${folderId('Archive')}`,
+      ],
+    });
+    const user = {
+      email: 'campaign.editor@example.com',
+      username: 'campaign_editor',
+      password: 'superstrongpassword1337',
+      roles: ['canvas_campaign_editor'],
+    };
+    await drupal.createUser(user);
+    await drupal.logout();
+    await drupal.login(user);
+
+    // The pages of the folder they edit are theirs to open: the Canvas editor
+    // loads one of them, with no site-wide permission behind it.
+    await canvas.openCanvas(campaignPage);
+    await canvas.openPagesPanel();
+    await canvas.expectPageInFolder('Campaign page', 'Campaigns');
+    // They may see both folders, because they hold a permission for each.
+    await canvas.expectPageInFolder('Archive page', 'Archive');
+
+    const panel = page.getByTestId('canvas-page-list-panel');
+    // Deleting the pages of a folder is not editing them, so that page is
+    // listed and locked: opening it would load an editor that cannot fetch
+    // its layout.
+    await expect(
+      panel.locator(
+        '[data-canvas-page-title="Archive page"] [data-canvas-page-locked="true"]',
+      ),
+    ).toBeVisible();
+    await expect(
+      panel.locator(
+        '[data-canvas-page-title="Campaign page"] [data-canvas-page-locked]',
+      ),
+    ).toHaveCount(0);
+    // And nothing offers to create a page or a folder.
+    await expect(panel.getByTestId('canvas-page-list-new-button')).toHaveCount(
+      0,
+    );
+
+    // Reaching that page's editor by URL says why instead of failing in a loop.
+    await page.goto(`/canvas/editor/canvas_page/${archivePageId}`);
+    await expect(page.getByTestId('canvas-no-edit-access')).toBeVisible();
   });
 });

@@ -13,6 +13,9 @@ use Drupal\Core\Config\StorageCacheInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\user\Entity\Role;
+use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -24,6 +27,7 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
+  use UserCreationTrait;
 
   protected static $modules = [
     'canvas',
@@ -124,6 +128,18 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
     $this->installEntitySchema('user');
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema('canvas_page');
+    // Filing a page into a folder is only valid for a user who may edit it
+    // there; a site-wide editor may file pages anywhere. The first user is the
+    // superuser, so validate as an ordinary second one — an active one, as the
+    // pages it creates reference it as their owner.
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\FolderMembershipAccessConstraint
+    User::create(['name' => 'superuser'])->save();
+    Role::create(['id' => 'page_editor', 'label' => 'Page editor'])
+      ->grantPermission(Page::EDIT_PERMISSION)
+      ->save();
+    $editor = User::create(['name' => 'page_editor', 'status' => 1, 'roles' => ['page_editor']]);
+    $editor->save();
+    $this->setCurrentUser($editor);
 
     // 1. A folder can organize a content entity type that opts in via
     // FolderTargetInterface, such as Canvas pages.

@@ -4,6 +4,7 @@ import {
   ChevronDownIcon,
   ClockIcon,
   FileTextIcon,
+  LockClosedIcon,
   MagnifyingGlassIcon,
   PlusIcon,
 } from '@radix-ui/react-icons';
@@ -261,9 +262,14 @@ const PageListItem = ({
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const title = `${item.autoSaveLabel || item.title} ${item.autoSavePath || item.path}`;
+  // Pages the user may see but not edit are listed — hiding them would make
+  // the list lie about what exists — but they lead nowhere: opening one would
+  // load an editor that cannot fetch its layout. They are greyed out, carry a
+  // lock and ignore clicks and drags instead.
+  const canEdit = hasPermission('edit', item);
   // The row can be dragged onto a folder to file the page there, which needs
   // the same rights as the "Move to folder" menu.
-  const canBeFiled = hasPermission('edit', item) && folders.length > 0;
+  const canBeFiled = canEdit && folders.length > 0;
   const {
     attributes: dragAttributes,
     listeners: dragListeners,
@@ -302,63 +308,80 @@ const PageListItem = ({
   const willBeUnpublished =
     !item.status && !item.isNew && item.hasUnsavedStatusChange;
 
+  const row = (
+    /* The drag props go on this wrapper, not on SidebarNode: SidebarNode
+       declares a forwarded ref but never attaches it, and dnd-kit needs a
+       real node. Same arrangement as the component library's ListItem. */
+    <div
+      {...(canBeFiled ? dragAttributes : {})}
+      {...(canBeFiled ? dragListeners : {})}
+      role={undefined}
+      data-canvas-page-title={item.autoSaveLabel || item.title}
+      ref={canBeFiled ? setDragRef : undefined}
+    >
+      <SidebarNode
+        draggable={canBeFiled}
+        disabled={!canEdit}
+        data-canvas-page-locked={!canEdit ? 'true' : undefined}
+        leadingContent={
+          !canEdit ? (
+            <Tooltip content="You do not have permission to edit this page">
+              <LockClosedIcon aria-label="Not editable" />
+            </Tooltip>
+          ) : undefined
+        }
+        title={title}
+        variant={isHomepage ? 'homepage' : 'page'}
+        selected={isSelected}
+        trailingContent={
+          !isMenuOpen && (isUnpublished || willBeUnpublished) ? (
+            willBeUnpublished ? (
+              <Tooltip content="Applies on next publish">
+                <Badge
+                  size="1"
+                  variant="solid"
+                  color={isSelected ? 'blue' : 'gray'}
+                >
+                  <Flex align="center" gap="1">
+                    <ClockIcon width="11" height="11" />
+                    Unpublish
+                  </Flex>
+                </Badge>
+              </Tooltip>
+            ) : (
+              <Badge
+                size="1"
+                variant="solid"
+                color={isSelected ? 'blue' : 'gray'}
+              >
+                Unpublished
+              </Badge>
+            )
+          ) : undefined
+        }
+        dropdownMenuContent={
+          dropdownMenuContent ? (
+            <UnifiedMenu.Content menuType="dropdown">
+              {dropdownMenuContent}
+            </UnifiedMenu.Content>
+          ) : null
+        }
+        onMenuOpenChange={setIsMenuOpen}
+        onClick={canEdit && onSelect ? () => onSelect(item) : undefined}
+        data-canvas-page-id={item.id}
+      />
+    </div>
+  );
+
+  // Without a single permitted operation there is nothing to put in a context
+  // menu, so the row does not open an empty one.
+  if (!dropdownMenuContent) {
+    return row;
+  }
+
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger>
-        {/* The drag props go on this wrapper, not on SidebarNode: SidebarNode
-            declares a forwarded ref but never attaches it, and dnd-kit needs a
-            real node. Same arrangement as the component library's ListItem. */}
-        <div
-          {...(canBeFiled ? dragAttributes : {})}
-          {...(canBeFiled ? dragListeners : {})}
-          role={undefined}
-          data-canvas-page-title={item.autoSaveLabel || item.title}
-          ref={canBeFiled ? setDragRef : undefined}
-        >
-          <SidebarNode
-            draggable={canBeFiled}
-            title={title}
-            variant={isHomepage ? 'homepage' : 'page'}
-            selected={isSelected}
-            trailingContent={
-              !isMenuOpen && (isUnpublished || willBeUnpublished) ? (
-                willBeUnpublished ? (
-                  <Tooltip content="Applies on next publish">
-                    <Badge
-                      size="1"
-                      variant="solid"
-                      color={isSelected ? 'blue' : 'gray'}
-                    >
-                      <Flex align="center" gap="1">
-                        <ClockIcon width="11" height="11" />
-                        Unpublish
-                      </Flex>
-                    </Badge>
-                  </Tooltip>
-                ) : (
-                  <Badge
-                    size="1"
-                    variant="solid"
-                    color={isSelected ? 'blue' : 'gray'}
-                  >
-                    Unpublished
-                  </Badge>
-                )
-              ) : undefined
-            }
-            dropdownMenuContent={
-              dropdownMenuContent ? (
-                <UnifiedMenu.Content menuType="dropdown">
-                  {dropdownMenuContent}
-                </UnifiedMenu.Content>
-              ) : null
-            }
-            onMenuOpenChange={setIsMenuOpen}
-            onClick={onSelect ? () => onSelect(item) : undefined}
-            data-canvas-page-id={item.id}
-          />
-        </div>
-      </ContextMenu.Trigger>
+      <ContextMenu.Trigger>{row}</ContextMenu.Trigger>
       <UnifiedMenu.Content menuType="context" align="start" side="right">
         {dropdownMenuContent}
       </UnifiedMenu.Content>

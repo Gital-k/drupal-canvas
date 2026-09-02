@@ -8,6 +8,7 @@ use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\FolderPermissions;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
@@ -274,10 +275,9 @@ final class ApiContentControllers extends ApiControllerBase {
       $id_key = $content_entity_type->getKey('id');
       \assert(\is_string($id_key));
 
-      $total_count = (int) $this->executeQueryInRenderContext(
-        $storage->getQuery()->accessCheck(TRUE)->count(),
-        $query_cacheability
-      );
+      $count_query = $storage->getQuery()->accessCheck(TRUE);
+      $this->restrictToViewable($count_query, $entity_type, $query_cacheability);
+      $total_count = (int) $this->executeQueryInRenderContext($count_query->count(), $query_cacheability);
 
       $entity_query = $storage->getQuery()
         ->accessCheck(TRUE)
@@ -288,6 +288,7 @@ final class ApiContentControllers extends ApiControllerBase {
         // paginated requests, causing duplicates or missing items.
         ->sort($id_key)
         ->range($offset, $limit);
+      $this->restrictToViewable($entity_query, $entity_type, $query_cacheability);
 
       $ids = $this->executeQueryInRenderContext($entity_query, $query_cacheability);
       \assert(\is_array($ids));
@@ -312,6 +313,13 @@ final class ApiContentControllers extends ApiControllerBase {
     $content_entities = $storage->loadMultiple($ids);
     $data = [];
     foreach ($content_entities as $content_entity) {
+      // Searched ids come from a selection plugin and the auto-save store
+      // rather than from the restricted query above, so they are filtered
+      // here. Search is not paginated, so dropping a row cannot make the
+      // remaining ones repeat.
+      if ($search !== NULL && !$content_entity->access('view')) {
+        continue;
+      }
       $data[] = $this->normalize($content_entity, $query_cacheability);
     }
 
@@ -371,6 +379,60 @@ final class ApiContentControllers extends ApiControllerBase {
   }
 
   /**
+   * Restricts a list query to the entities the current user may view.
+   *
+   * `accessCheck(TRUE)` filters nothing for a Canvas page: unlike a node it
+   * has no query access implementation, and the Pages panel is open to whoever
+   * may use the Canvas UI — which now includes editors scoped to a folder, who
+   * hold no site-wide page permission. Restricting the query rather than the
+   * rows it returns is what keeps `meta.count` and the pagination offsets
+   * honest: filtering afterwards makes the client ask for an offset that no
+   * longer means what it did, and rows repeat.
+   *
+   * @param \Drupal\Core\Entity\Query\QueryInterface $query
+   *   The list query to restrict.
+   * @param string $entity_type_id
+   *   The ID of the content entity type being listed.
+   * @param \Drupal\Core\Cache\CacheableMetadata $cacheability
+   *   The cacheability of the response, which this restriction varies by.
+   *
+   * @todo Generalize this into query access in https://www.drupal.org/project/canvas/issues/3498525
+   * @see \Drupal\canvas\Entity\PageAccessControlHandler::checkAccess()
+   * @see \Drupal\canvas\FolderPermissions
+   */
+  private function restrictToViewable(QueryInterface $query, string $entity_type_id, CacheableMetadata $cacheability): void {
+    $cacheability->addCacheContexts(['user.permissions']);
+    foreach (['create', 'edit', 'delete'] as $operation) {
+      if ($this->currentUser->hasPermission(FolderPermissions::siteWidePermission($operation, $entity_type_id))) {
+        // Such a user views every entity of this type, published or not.
+        return;
+      }
+    }
+
+    $viewable = $query->orConditionGroup();
+    $has_condition = FALSE;
+    $folder_ids = \array_merge(
+      FolderPermissions::folderIds($this->currentUser, 'edit', $entity_type_id),
+      FolderPermissions::folderIds($this->currentUser, 'delete', $entity_type_id),
+    );
+    if ($folder_ids !== []) {
+      $viewable->condition('folder', \array_values(\array_unique($folder_ids)), 'IN');
+      $has_condition = TRUE;
+    }
+    if ($this->currentUser->hasPermission('access content')) {
+      $viewable->condition('status', TRUE);
+      $has_condition = TRUE;
+    }
+    if (!$has_condition) {
+      // Nothing is viewable, and a condition that cannot hold says so to both
+      // the count query and the listing.
+      $query->condition('status', TRUE)->condition('status', FALSE);
+      return;
+    }
+    $query->condition($viewable);
+  }
+
+  /**
    * Normalizes content entity.
    *
    * @param \Drupal\Core\Entity\EntityPublishedInterface $content_entity
@@ -423,13 +485,21 @@ final class ApiContentControllers extends ApiControllerBase {
     \assert($content_entity instanceof ContentEntityInterface);
 
     // The folder this entity is organized into in the Pages panel, when its
-    // entity type supports folders. NULL when it is in no folder.
+    // entity type supports folders. NULL when it is in no folder — or when the
+    // folder is not viewable: folders of content entities are access
+    // boundaries, so membership is disclosed only to whoever may see the
+    // folder. The client renders an entity in an unknown folder as
+    // uncategorized either way.
+    // @see \Drupal\canvas\FolderPermissions
+    // @see \Drupal\canvas\Entity\FolderAccessControlHandler
     $folder = NULL;
     if ($content_entity->hasField('folder')) {
       $folder_entity = $content_entity->get('folder')->entity;
       if ($folder_entity instanceof Folder) {
+        $folder_access = $folder_entity->access('view', return_as_object: TRUE);
         $url_cacheability->addCacheableDependency($folder_entity);
-        $folder = $folder_entity->id();
+        $url_cacheability->addCacheableDependency($folder_access);
+        $folder = $folder_access->isAllowed() ? $folder_entity->id() : NULL;
       }
     }
 

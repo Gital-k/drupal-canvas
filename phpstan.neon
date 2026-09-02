@@ -140,6 +140,10 @@ services:
     tags:
       - shipmonk.deadCode.memberUsageProvider
   -
+    class: Canvas\PHPStan\UsageProvider\DrupalPermissionCallbacksUsageProvider
+    tags:
+      - shipmonk.deadCode.memberUsageProvider
+  -
     class: Canvas\PHPStan\UsageProvider\DrupalDynamicPropertyUsageProvider
     tags:
       - shipmonk.deadCode.memberUsageProvider

@@ -100,7 +100,12 @@ const SidebarFolder: React.FC<SidebarFolderProps> = ({
       weight,
     },
     // previewDragging is true when user drags from the editor frame - we disable dropping into folders in that case.
-    disabled: !administerFolders || previewDragging,
+    // Filing a page into a folder is governed by the page's own access, not by
+    // administering folders: an editor who may edit pages in this folder can
+    // drop one here, and the server refuses a page they could not edit there.
+    disabled:
+      previewDragging ||
+      (!administerFolders && active?.data?.current?.origin !== 'pages'),
   });
 
   // Combine drag and drop refs
