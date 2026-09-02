@@ -17,6 +17,10 @@ use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Routing\RoutingEvents;
 use Drupal\Core\Routing\TrustedRedirectResponse;
 use Drupal\Core\Url;
+use Drupal\language\ConfigurableLanguageManagerInterface;
+use Drupal\language\LanguageNegotiatorInterface;
+use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationSelected;
+use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUI;
 use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
@@ -229,8 +233,8 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
    * The langcode of the source translation, when no language was asked for.
    *
    * A layout request that names no language — no `canvas_preview_langcode`
-   * hint, and negotiation landing on the site default language because nothing
-   * in the URL, session or domain selected anything else — is the editor. The
+   * hint, and no URL prefix, session parameter or domain naming one — is the
+   * editor. The
    * editor edits the entity's source translation: the language it was created
    * in, which stops being the site default language as soon as a site builder
    * changes that setting. Serving the site default language there loads and
@@ -242,9 +246,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
    *   entities have a single language, so there is nothing to redirect to.
    */
   private function getSourceLangcode(): ?string {
-    // Anything other than the site default language was selected by the URL,
-    // the session or the domain, so it was asked for: honor it.
-    if ($this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId() !== $this->languageManager->getDefaultLanguage()->getId()) {
+    if ($this->requestNamedALanguage()) {
       return NULL;
     }
     $entity = $this->routeMatch->getParameter('entity');
@@ -252,6 +254,38 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
       return NULL;
     }
     return $entity->getUntranslated()->language()->getId();
+  }
+
+  /**
+   * Whether the request itself selected the content language.
+   *
+   * A URL prefix, a session parameter or a domain names a language; falling
+   * through to the site default language names nothing. `language-interface`
+   * means the content language follows the interface language, so the method
+   * that resolved that one decides.
+   *
+   * @return bool
+   *   TRUE when a negotiation method read the language off the request.
+   */
+  private function requestNamedALanguage(): bool {
+    if (!$this->languageManager instanceof ConfigurableLanguageManagerInterface) {
+      return FALSE;
+    }
+    foreach ([LanguageInterface::TYPE_CONTENT, LanguageInterface::TYPE_INTERFACE] as $type) {
+      // Negotiate first: the resolved method is only recorded as a side effect.
+      $this->languageManager->getCurrentLanguage($type);
+      $method = $this->languageManager->getNegotiatedLanguageMethod($type);
+      if ($method === LanguageNegotiationUI::METHOD_ID) {
+        // Defer to the interface language, negotiated on the next iteration.
+        continue;
+      }
+      return !\in_array($method, [
+        LanguageNegotiationSelected::METHOD_ID,
+        LanguageNegotiatorInterface::METHOD_ID,
+        NULL,
+      ], TRUE);
+    }
+    return FALSE;
   }
 
   /**
