@@ -42,6 +42,9 @@ class ApiUsageControllersTest extends HttpApiTestBase {
    */
   protected $defaultTheme = 'stark';
 
+  /**
+   * A user with every permission the HTTP API requires.
+   */
   protected readonly UserInterface $httpApiUser;
 
   protected function setUp(): void {

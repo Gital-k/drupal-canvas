@@ -22,6 +22,9 @@ use Symfony\Component\Validator\ConstraintViolationList;
 #[Group('canvas')]
 final class AutoSaveTempstoreToKeyValueUpdateTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

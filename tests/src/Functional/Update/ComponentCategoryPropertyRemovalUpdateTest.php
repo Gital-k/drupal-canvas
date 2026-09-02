@@ -19,6 +19,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class ComponentCategoryPropertyRemovalUpdateTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

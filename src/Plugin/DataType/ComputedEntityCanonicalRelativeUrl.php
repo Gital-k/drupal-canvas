@@ -29,6 +29,9 @@ class ComputedEntityCanonicalRelativeUrl extends Uri implements DependentPluginI
 
   public const string PLUGIN_ID = 'computed_entity_canonical_relative_url';
 
+  /**
+   * The computed URL, or NULL until it has been computed.
+   */
   private ?MaybeUrl $computedValue = NULL;
 
   /**

@@ -26,6 +26,9 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
  */
 final class HostEntityUrlPropSource extends PropSourceBase implements LinkablePropSourceInterface {
 
+  /**
+   * The RFC 8288 link relation type of the host entity URL to generate.
+   */
   public readonly string $rel;
 
   public function __construct(

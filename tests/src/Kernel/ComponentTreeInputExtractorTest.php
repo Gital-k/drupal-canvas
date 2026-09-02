@@ -21,6 +21,9 @@ final class ComponentTreeInputExtractorTest extends CanvasKernelTestBase {
 
   use PageTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'canvas_test_search',
     'views',

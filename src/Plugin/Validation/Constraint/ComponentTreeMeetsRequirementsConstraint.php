@@ -33,11 +33,34 @@ use Symfony\Component\Validator\Exception\MissingOptionsException;
 )]
 class ComponentTreeMeetsRequirementsConstraint extends SymfonyConstraint {
 
+  /**
+   * Violation message for a component required by `presence` but not found.
+   */
   public string $componentPresenceMessage = "The '@component_id' component must be present.";
+
+  /**
+   * Violation message for a component forbidden by `absence` but found.
+   */
   public string $componentAbsenceMessage = "The '@component_id' component must be absent.";
+
+  /**
+   * Violation message for a component interface required but not implemented.
+   */
   public string $componentInterfacePresenceMessage = "The '@component_interface' component interface must be present.";
+
+  /**
+   * Violation message for a component interface forbidden but implemented.
+   */
   public string $componentInterfaceAbsenceMessage = "The '@component_interface' component interface must be absent.";
+
+  /**
+   * Violation message for a prop source type required but not used.
+   */
   public string $propSourceTypePresenceMessage = "The '@prop_source_type_prefix' prop source type must be present.";
+
+  /**
+   * Violation message for a prop source type forbidden but used.
+   */
   public string $propSourceTypeAbsenceMessage = "The '@prop_source_type_prefix' prop source type must be absent.";
 
   /**

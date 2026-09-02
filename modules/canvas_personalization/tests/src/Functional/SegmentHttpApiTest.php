@@ -45,10 +45,19 @@ class SegmentHttpApiTest extends HttpApiTestBase {
    */
   protected $defaultTheme = 'stark';
 
+  /**
+   * A user with every permission the HTTP API requires.
+   */
   protected readonly UserInterface $httpApiUser;
 
+  /**
+   * The normalization the HTTP API is expected to return for a new segment.
+   */
   protected readonly array $expectedDefaultSegment;
 
+  /**
+   * A user missing some of the permissions the HTTP API requires.
+   */
   protected readonly UserInterface $limitedPermissionsUser;
 
   protected function setUp(): void {

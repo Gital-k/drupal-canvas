@@ -50,6 +50,9 @@ class JsonSchemaPropsComponentInstanceUpdaterTest extends CanvasKernelTestBase {
     'field',
   ];
 
+  /**
+   * The code component whose prop changes the updater must apply.
+   */
   private JavaScriptComponent $jsComponent;
 
   protected const string COMPONENT_INSTANCE_UUID = '2c6e91ae-23ac-433d-9bb8-687144464b34';

@@ -55,8 +55,14 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
     'canvas_oauth',
   ];
 
+  /**
+   * The page whose HTTP API responses the test asserts on.
+   */
   protected Page $page;
 
+  /**
+   * Path of the image file uploaded during the test.
+   */
   private string $testImagePath;
 
   /**

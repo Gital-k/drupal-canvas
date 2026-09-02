@@ -22,6 +22,9 @@ final class ComponentTrackingRequiredPropsUpdateTest extends CanvasUpdatePathTes
 
   use ComponentTreeItemListInstantiatorTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

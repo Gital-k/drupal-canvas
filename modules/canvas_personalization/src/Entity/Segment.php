@@ -103,6 +103,8 @@ final class Segment extends ConfigEntityBase implements SegmentInterface {
   /**
    * The condition plugin manager for instantiating the segmentation rules.
    */
+  // @todo Remove this ignore when https://www.drupal.org/project/coder/issues/3477601 lands: coder cannot see a docblock past a DNF type's parentheses, so it reports this documented property as undocumented.
+  // phpcs:ignore Drupal.Commenting.VariableComment.Missing
   protected (ExecutableManagerInterface&FilteredPluginManagerInterface)|NULL $conditionPluginManager;
 
   /**

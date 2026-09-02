@@ -90,6 +90,9 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
   use CreateTestJsComponentTrait;
   use ComponentTreeItemInstantiatorTrait;
 
+  /**
+   * The asset resolver, to assert which assets a component attaches.
+   */
   protected readonly AssetResolverInterface $assetResolver;
   /**
    * @see ::testRenderSdcWithOptionalObjectShape())

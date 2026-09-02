@@ -34,6 +34,9 @@ class ComputedUrlWithQueryString extends Uri implements DependentPluginInterface
 
   public const string PLUGIN_ID = 'computed_url_with_query_string';
 
+  /**
+   * The computed URL, unset until it has been computed.
+   */
   private GeneratedUrl $computedValue;
 
   /**

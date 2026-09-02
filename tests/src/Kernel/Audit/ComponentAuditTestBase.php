@@ -14,10 +14,16 @@ use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
  */
 abstract class ComponentAuditTestBase extends CanvasKernelTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'node',
   ];
 
+  /**
+   * The component tree that the audited entities are given.
+   */
   protected array $tree = [];
 
   protected function setUp(): void {

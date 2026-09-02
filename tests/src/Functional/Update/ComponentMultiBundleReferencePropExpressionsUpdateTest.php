@@ -38,6 +38,9 @@ final class ComponentMultiBundleReferencePropExpressionsUpdateTest extends Canva
   public const string EXPECTED_ORIGINAL_MULTI_BUNDLE_IMAGE_URI_EXPRESSION = 'ℹ︎entity_reference␟entity␜␜entity:media:baby_photos|image␝field_media_image_1|field_media_image␞␟entity␜␜entity:file␝uri␞␟value';
   public const string EXPECTED_ORIGINAL_MULTI_BUNDLE_IMAGE_URI_VERSION = '62229f4bf5a5c039';
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

@@ -20,6 +20,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 class CanvasAssetStorage extends ConfigEntityStorage implements EntityHandlerInterface {
 
+  /**
+   * The file system service.
+   */
   private FileSystemInterface $fileSystem;
 
   /**

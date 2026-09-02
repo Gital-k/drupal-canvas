@@ -20,7 +20,15 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 final class DayCountAdapter extends AdapterBase {
 
   public const string PLUGIN_ID = 'day_count';
+
+  /**
+   * The `oldest` input: the earlier date, in `Y-m-d` format.
+   */
   protected string $oldest;
+
+  /**
+   * The `newest` input: the later date in `Y-m-d` format, or NULL for now.
+   */
   protected ?string $newest = NULL;
 
   public function adapt(): EvaluationResult {

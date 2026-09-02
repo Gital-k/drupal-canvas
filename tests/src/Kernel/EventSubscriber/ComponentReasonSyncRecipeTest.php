@@ -44,7 +44,14 @@ final class ComponentReasonSyncRecipeTest extends CanvasKernelTestBase {
   use GenerateComponentConfigTrait;
   use RecipeTestTrait;
 
+  /**
+   * The repository whose stored incompatibility reasons are asserted on.
+   */
   private ComponentIncompatibilityReasonRepository $reasonRepository;
+
+  /**
+   * The entity type manager.
+   */
   private EntityTypeManagerInterface $entityTypeManager;
 
   /**

@@ -100,6 +100,9 @@ final class BrandKit extends ConfigEntityBase implements CanvasAssetInterface {
 
   public const string GLOBAL_ID = 'global';
 
+  /**
+   * The config entity ID; always `global`, as only one instance exists.
+   */
   protected string $id;
 
   /**

@@ -54,10 +54,24 @@ final class JsonapiSupportTest extends CanvasKernelTestBase {
     'serialization',
   ];
 
+  /**
+   * The user that the JSON:API requests are made as.
+   */
   private UserInterface $user;
+
+  /**
+   * The Page whose JSON:API representation is asserted on.
+   */
   private Page $page;
+
+  /**
+   * The ContentTemplate whose JSON:API representation is asserted on.
+   */
   private ContentTemplate $contentTemplate;
 
+  /**
+   * The PageRegion whose JSON:API representation is asserted on.
+   */
   private PageRegion $pageRegion;
 
   protected function setUp(): void {

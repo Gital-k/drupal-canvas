@@ -28,6 +28,9 @@ class ComponentTreeSymmetricalTranslationConstraint extends SymfonyConstraint {
 
   public const string PLUGIN_ID = 'ComponentTreeSymmetricalTranslation';
 
+  /**
+   * Violation message for a non-translatable input that a translation changed.
+   */
   public string $message = "Non-translatable component input key '%key' in component '%uuid' differs from the default translation in the '%langcode' translation.";
 
 }

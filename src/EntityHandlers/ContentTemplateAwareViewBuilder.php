@@ -38,10 +38,19 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
    */
   private EntityViewBuilderInterface $decorated;
 
+  /**
+   * The entity type manager.
+   */
   private EntityTypeManagerInterface $entityTypeManager;
 
+  /**
+   * The current route match.
+   */
   private RouteMatchInterface $routeMatch;
 
+  /**
+   * The auto-save manager.
+   */
   private AutoSaveManager $autoSaveManager;
 
   /**

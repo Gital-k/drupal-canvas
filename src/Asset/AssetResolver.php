@@ -19,6 +19,9 @@ use Drupal\Core\Theme\ThemeManagerInterface;
 
 final class AssetResolver extends CoreAssetResolver {
 
+  /**
+   * The decorated asset resolver.
+   */
   protected AssetResolverInterface $assetResolver;
 
   public function __construct(AssetResolverInterface $asset_resolver, LibraryDiscoveryInterface $library_discovery, LibraryDependencyResolverInterface $library_dependency_resolver, ModuleHandlerInterface $module_handler, ThemeManagerInterface $theme_manager, LanguageManagerInterface $language_manager, CacheBackendInterface $cache, ?ThemeHandlerInterface $theme_handler = NULL) {

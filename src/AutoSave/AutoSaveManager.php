@@ -96,6 +96,9 @@ class AutoSaveManager implements EventSubscriberInterface {
   ];
   const ENTITY_DUPLICATE_SUFFIX = ' (Copy)';
 
+  /**
+   * The key-value store holding the auto-saved drafts.
+   */
   private KeyValueStoreInterface $autoSaveStore;
 
   /**

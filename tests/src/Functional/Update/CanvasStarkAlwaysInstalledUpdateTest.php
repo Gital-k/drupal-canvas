@@ -18,6 +18,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class CanvasStarkAlwaysInstalledUpdateTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

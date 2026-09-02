@@ -20,12 +20,27 @@ use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
  */
 abstract class VersionedConfigEntityBase extends ConfigEntityBase implements VersionedConfigEntityInterface {
 
-  // phpcs:ignore Drupal.NamingConventions.ValidVariableName.LowerCamelName, Drupal.Commenting.VariableComment.Missing
+  /**
+   * The version that new consumers of this config entity get.
+   *
+   * @see ::getActiveVersion()
+   */
+  // phpcs:ignore Drupal.NamingConventions.ValidVariableName.LowerCamelName
   protected string $active_version;
 
-  // phpcs:ignore Drupal.NamingConventions.ValidVariableName.LowerCamelName, Drupal.Commenting.VariableComment.Missing
+  /**
+   * The values of the versioned properties, keyed by version.
+   *
+   * @see \Drupal\canvas\Entity\VersionedConfigEntityInterface::getVersions()
+   */
+  // phpcs:ignore Drupal.NamingConventions.ValidVariableName.LowerCamelName
   protected array $versioned_properties = [];
 
+  /**
+   * The version this instance was loaded at; the active version by default.
+   *
+   * @see ::loadVersion()
+   */
   protected string $loadedVersion;
 
   /**

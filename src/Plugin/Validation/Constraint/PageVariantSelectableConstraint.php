@@ -26,6 +26,9 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 )]
 final class PageVariantSelectableConstraint extends SymfonyConstraint {
 
+  /**
+   * Violation message for selecting a disabled page variant.
+   */
   public string $message = 'The page variant %variant is disabled and cannot be selected.';
 
 }

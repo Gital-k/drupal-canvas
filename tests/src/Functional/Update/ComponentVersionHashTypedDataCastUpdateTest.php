@@ -21,6 +21,9 @@ final class ComponentVersionHashTypedDataCastUpdateTest extends CanvasUpdatePath
 
   use ConstraintViolationsTestTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   private const string COMPONENT_ID = 'sdc.canvas_test_list_float.heading';

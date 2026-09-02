@@ -21,6 +21,9 @@ final class CanvasEntityByUuidConverterTest extends CanvasKernelTestBase {
 
   use PageTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     ...self::PAGE_TEST_MODULES,
   ];

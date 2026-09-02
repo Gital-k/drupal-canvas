@@ -27,6 +27,11 @@ final class Environment implements EnvironmentInterface {
    */
   public const string DEV_VERSION = 'dev';
 
+  /**
+   * The environment fingerprint, computed on first use.
+   *
+   * @see ::getFingerprint()
+   */
   private ?string $fingerprint = NULL;
 
   public function __construct(

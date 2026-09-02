@@ -24,6 +24,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas_data_model')]
 final class ConfigComponentTreeSequenceKeysUpdateTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

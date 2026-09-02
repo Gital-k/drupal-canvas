@@ -24,6 +24,9 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 )]
 final class SiteDefaultPageVariantEnabledConstraint extends SymfonyConstraint {
 
+  /**
+   * Violation message for disabling the page variant that is the site default.
+   */
   public string $message = 'The site default page variant cannot be disabled. Set another variant as the default first.';
 
 }

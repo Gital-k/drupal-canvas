@@ -17,6 +17,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class ContentCreatorVisibleCanvasConfigEntityAccessControlHandler extends CanvasConfigEntityAccessControlHandler {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $viewLabelOperation = TRUE;
 
   final public function __construct(

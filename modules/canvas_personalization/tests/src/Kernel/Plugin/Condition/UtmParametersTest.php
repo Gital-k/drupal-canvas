@@ -21,6 +21,9 @@ use Symfony\Component\HttpFoundation\Session\Session;
 #[Group('canvas_personalization')]
 class UtmParametersTest extends CanvasKernelTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'canvas_personalization',
   ];

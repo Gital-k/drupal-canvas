@@ -22,8 +22,14 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 )]
 final class PageVariantHasContentMarkerConstraint extends SymfonyConstraint {
 
+  /**
+   * Violation message for a page variant without a "Page content" placement.
+   */
   public string $missingMessage = 'A page variant must contain a "Page content" placement.';
 
+  /**
+   * Violation message for a page variant with several content placements.
+   */
   public string $multipleMessage = 'A page variant must contain only one "Page content" placement, but found @count.';
 
 }

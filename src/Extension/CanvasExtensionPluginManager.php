@@ -33,6 +33,9 @@ use Drupal\Core\Url;
  */
 final class CanvasExtensionPluginManager extends DefaultPluginManager implements CanvasExtensionPluginManagerInterface {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaults = [
     'icon' => '',
     'type' => CanvasExtensionTypeEnum::Canvas->value,

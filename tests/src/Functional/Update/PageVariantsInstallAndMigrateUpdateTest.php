@@ -24,6 +24,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class PageVariantsInstallAndMigrateUpdateTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

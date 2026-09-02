@@ -48,7 +48,14 @@ final class CanvasDoctorTest extends CanvasKernelTestBase {
     ...self::PAGE_TEST_MODULES,
   ];
 
+  /**
+   * The health check runner under test.
+   */
   private Doctor $validator;
+
+  /**
+   * The store the health check results are written to.
+   */
   private HealthRecords $healthRecords;
 
   /**

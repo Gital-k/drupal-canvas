@@ -28,6 +28,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[IgnoreDeprecations]
 final class ComponentDerivedSchemaMetadataUpdateTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

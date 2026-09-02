@@ -22,8 +22,14 @@ use Symfony\Component\Validator\Violation\ConstraintViolationBuilderInterface;
 #[CoversClass(ValidSlotNameConstraintValidator::class)]
 class ValidSlotNameConstraintValidatorTest extends UnitTestCase {
 
+  /**
+   * The validator under test.
+   */
   protected ValidSlotNameConstraintValidator $validator;
 
+  /**
+   * The mocked execution context, to assert which violations are added.
+   */
   protected ExecutionContextInterface&MockObject $context;
 
   /**

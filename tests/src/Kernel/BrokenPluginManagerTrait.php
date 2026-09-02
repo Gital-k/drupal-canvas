@@ -6,6 +6,9 @@ namespace Drupal\Tests\canvas\Kernel;
 
 trait BrokenPluginManagerTrait {
 
+  /**
+   * Plugin IDs to hide from the definitions, keyed by plugin ID.
+   */
   protected array $missingPlugins = [];
 
   public function markPluginAsMissing(string $pluginId): void {

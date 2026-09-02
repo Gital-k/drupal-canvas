@@ -37,6 +37,9 @@ final class ColorConfigImportValidatorTest extends CanvasKernelTestBase {
 
   private const string COMPONENT_ID = 'sdc.canvas_test_sdc.color-valid';
 
+  /**
+   * The Color entity that the imported config refers to.
+   */
   private Color $color;
 
   /**

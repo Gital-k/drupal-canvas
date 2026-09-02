@@ -105,6 +105,9 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    */
   protected const int DEFAULT_COMPONENT_INSTALL_COUNT = 15;
 
+  /**
+   * Messages logged since the last reset, collected by a test logger.
+   */
   protected array $logMessages = [];
 
   /**
@@ -129,8 +132,19 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   use ConstraintViolationsTestTrait;
   use GenerateComponentConfigTrait;
 
+  /**
+   * The Component config entity storage.
+   */
   protected readonly EntityStorageInterface $componentStorage;
+
+  /**
+   * The repository of reasons why components are incompatible.
+   */
   protected readonly ComponentIncompatibilityReasonRepository $componentReasonRepository;
+
+  /**
+   * The renderer.
+   */
   protected readonly RendererInterface $renderer;
 
   /**

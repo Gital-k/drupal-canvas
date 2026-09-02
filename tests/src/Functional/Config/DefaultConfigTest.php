@@ -26,6 +26,9 @@ class DefaultConfigTest extends FunctionalTestBase {
 
   use AssertConfigTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $configSchemaCheckerExclusions = [
     // The "all-props" test-only SDC is used to assess also prop shapes that are
     // not yet storable, and hence do not meet the requirements.

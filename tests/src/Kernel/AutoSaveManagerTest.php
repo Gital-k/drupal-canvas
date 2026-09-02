@@ -53,6 +53,9 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
 
   private const string UUID_IN_ROOT = '78c73c1d-4988-4f9b-ad17-f7e337d40c29';
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'language',
     'node',

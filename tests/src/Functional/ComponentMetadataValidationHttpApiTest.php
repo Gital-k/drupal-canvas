@@ -29,8 +29,14 @@ class ComponentMetadataValidationHttpApiTest extends HttpApiTestBase {
    */
   protected $defaultTheme = 'stark';
 
+  /**
+   * A user permitted to administer code components.
+   */
   protected UserInterface $codeComponentAdmin;
 
+  /**
+   * A user not permitted to administer code components.
+   */
   protected UserInterface $limitedUser;
 
   protected function setUp(): void {

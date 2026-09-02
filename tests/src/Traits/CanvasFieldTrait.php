@@ -23,8 +23,19 @@ trait CanvasFieldTrait {
   private const TEST_IMAGE_UUID = '13ad853b-7a5a-4bd7-a33e-559d7a07579d';
   private const TEST_BLOCK = '4a03b39a-daea-424e-8507-09e182aafa31';
 
+  /**
+   * An image file that a created component tree refers to.
+   */
   private File $referencedImage;
+
+  /**
+   * An image file that no created component tree refers to.
+   */
   private File $unreferencedImage;
+
+  /**
+   * A media entity wrapping an image file.
+   */
   private Media $mediaEntity;
 
   protected function getValidConvertedInputs(bool $dynamic_image = TRUE): array {

@@ -71,8 +71,14 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     'canvas_headless',
   ];
 
+  /**
+   * A user permitted to view the content the controller serves.
+   */
   private UserInterface $editor;
 
+  /**
+   * The OAuth consumer the test authenticates as.
+   */
   private Consumer $consumer;
 
   /**

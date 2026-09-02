@@ -121,6 +121,9 @@ final class ExternalComponentSyncTest extends CanvasKernelTestBase {
     };
     $this->container->get(LoggerChannelFactoryInterface::class)->addLogger($logs);
     $code_component_saves = new class() {
+      /**
+       * How many times the `heroBanner` code component was saved.
+       */
       public int $count = 0;
     };
     $this->container->get(EventDispatcherInterface::class)->addListener(

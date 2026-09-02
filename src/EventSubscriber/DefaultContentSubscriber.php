@@ -41,6 +41,9 @@ final class DefaultContentSubscriber implements EventSubscriberInterface {
 
   private const string EXPORT_ENTITY_REFERENCE_KEY = 'CANVAS_ENTITY_REFERENCE';
 
+  /**
+   * Component tree fields, keyed by entity type ID and then field name.
+   */
   private array $componentTreeFieldMap;
 
   public function __construct(

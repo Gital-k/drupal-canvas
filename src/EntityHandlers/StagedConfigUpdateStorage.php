@@ -16,6 +16,9 @@ final class StagedConfigUpdateStorage extends ConfigEntityStorage {
 
   use StagedConfigEntityStorageTrait;
 
+  /**
+   * The config action plugin manager.
+   */
   private ConfigActionManager $configActionManager;
 
   public static function createInstance(ContainerInterface $container, EntityTypeInterface $entity_type) {

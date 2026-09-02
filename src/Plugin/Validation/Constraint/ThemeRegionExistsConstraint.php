@@ -18,6 +18,9 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 )]
 class ThemeRegionExistsConstraint extends SymfonyConstraint {
 
+  /**
+   * Violation message for a region the theme does not define.
+   */
   public string $message = "Region '@region' does not exist in theme '@theme'.";
 
   /**

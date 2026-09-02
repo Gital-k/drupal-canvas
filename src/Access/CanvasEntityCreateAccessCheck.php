@@ -21,6 +21,9 @@ use Symfony\Component\Routing\Route;
  */
 final class CanvasEntityCreateAccessCheck extends EntityCreateAccessCheck implements AccessInterface {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $requirementsKey = '_canvas_entity_create_access';
 
   /**
