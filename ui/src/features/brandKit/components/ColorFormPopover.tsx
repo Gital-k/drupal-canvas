@@ -466,7 +466,7 @@ const ColorFormPopover = ({
                 </>
               )}
 
-              <Flex direction="column" gap="1" px="3">
+              <Flex direction="column" gap="1" px="3" className={styles.fieldLabelContainer}>
                 <label htmlFor="variableName" className={styles.fieldLabel}>
                   Variable name
                 </label>
@@ -616,7 +616,7 @@ const ColorFormPopover = ({
                   )}
 
                   {!isUsageLoading && (
-                    <Box px="3">
+                    <Box className={styles.infoBoxContainer} px="3">
                       <div
                         className={styles.infoBox}
                         data-testid="canvas-color-edit-info"
