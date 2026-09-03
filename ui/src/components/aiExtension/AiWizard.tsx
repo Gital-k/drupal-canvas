@@ -672,6 +672,9 @@ const DEEP_CHAT_AUXILIARY_STYLE = `
 const MemoDeepChat = memo(DeepChat);
 
 const AiWizard = () => {
+  const [initializationError, setInitializationError] = useState<string | null>(
+    null,
+  );
   const pageData = useAppSelector(selectPageData);
   const dispatch = useAppDispatch();
   const drupalSettings = getDrupalSettings();
@@ -845,8 +848,11 @@ const AiWizard = () => {
         }
         const token = await response.text();
         setCsrfToken(token);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to fetch CSRF token:', error);
+        setInitializationError(
+          "Failed to load AI panel. Check your browser's developer console for more details.",
+        );
         const event = new CustomEvent('canvas-csrf-token-error', {
           detail: {
             error,
@@ -1174,6 +1180,17 @@ const AiWizard = () => {
       chatEl.disableSubmitButton();
     }
   }, []);
+
+  if (initializationError) {
+    return (
+      <Flex direction="column" gap="1" className={styles.aiWizardError}>
+        <Text weight="bold">Something went wrong!</Text>
+        <Text size="2" color="red">
+          {initializationError}
+        </Text>
+      </Flex>
+    );
+  }
 
   return (
     csrfToken && (
