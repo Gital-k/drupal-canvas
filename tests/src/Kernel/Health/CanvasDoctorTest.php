@@ -8,6 +8,7 @@ use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\canvas\Command\DoctorCommand;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Health\Doctor;
 use Drupal\canvas\Health\Environment;
@@ -85,7 +86,7 @@ final class CanvasDoctorTest extends CanvasKernelTestBase {
    * Every system check returns the uniform result envelope; risk-status checks are surfaced as a risk (not a failure) by both the engine API and the CLI.
    */
   public function testSystemChecks(): void {
-    $envelope_keys = ['status', 'total', 'healthy', 'details', 'problems'];
+    $envelope_keys = ['status', 'total', 'healthy', 'cached', 'details', 'problems'];
     $updates_escaped_config = $this->validator->runSystemCheck(HealthCheck::UpdatesEscapedConfig);
     $updates_executed = $this->validator->runSystemCheck(HealthCheck::UpdatesExecuted);
     $code_tagged_releases = $this->validator->runSystemCheck(HealthCheck::CodeTaggedReleases);
@@ -100,6 +101,8 @@ final class CanvasDoctorTest extends CanvasKernelTestBase {
     self::assertSame('healthy', $updates_escaped_config['status']);
     self::assertSame([], $updates_escaped_config['details']['pending']);
     self::assertSame($updates_escaped_config['total'], $updates_escaped_config['healthy']);
+    // Nothing was cached yet: this is the check's first run in this test.
+    self::assertSame(0, $updates_escaped_config['cached']);
 
     // UpdatesExecuted: status reflects whether any post-updates are pending.
     self::assertSame(['schema_version', 'applied_post_updates', 'pending_post_updates'], \array_keys($updates_executed['details']));
@@ -174,6 +177,26 @@ final class CanvasDoctorTest extends CanvasKernelTestBase {
       $expected_cached = $item['key'] !== $content_key;
       self::assertSame($expected_cached, $item['cached']);
     }
+
+    // UpdatesEscapedConfig shares Config's exact per-entity reuse mechanics, via runSystemCheck() instead of a data-check generator.
+    $component_storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Component::ENTITY_TYPE_ID);
+    $component_ids = $component_storage->getQuery()->accessCheck(FALSE)->execute();
+    self::assertNotEmpty($component_ids);
+    $component_id = (string) \reset($component_ids);
+    // First run: nothing stored yet, so every item is freshly validated.
+    self::assertSame(0, $validator->runSystemCheck(HealthCheck::UpdatesEscapedConfig)['cached']);
+    // Second, identical run: every item is reused from the store.
+    $second_escaped = $validator->runSystemCheck(HealthCheck::UpdatesEscapedConfig);
+    self::assertSame($second_escaped['total'], $second_escaped['cached']);
+    // Cache off bypasses reads but still records: everything is revalidated, and the next plain run reuses again.
+    self::assertSame(0, $validator->runSystemCheck(HealthCheck::UpdatesEscapedConfig, FALSE)['cached']);
+    $after_no_cache = $validator->runSystemCheck(HealthCheck::UpdatesEscapedConfig);
+    self::assertSame($after_no_cache['total'], $after_no_cache['cached']);
+
+    // Saving one component bumps only its own cache tag: every other config entity stays reused.
+    $component_storage->load($component_id)->save();
+    $after_save = $validator->runSystemCheck(HealthCheck::UpdatesEscapedConfig);
+    self::assertSame($after_save['total'] - 1, $after_save['cached']);
   }
 
   /**

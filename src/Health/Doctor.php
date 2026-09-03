@@ -25,7 +25,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * @phpstan-type Violation array{message: string, property_path: string, code: string|null}
  * @phpstan-type Finding array{label: string, violations: list<Violation>}
  * @phpstan-type CheckItem array{check: string, entity_type: string, key: string, cached: bool, findings: list<Finding>}
- * @phpstan-type SystemCheckResult array{status: string, total: int, healthy: int, details: array<string, mixed>, problems: list<array{label: string, description: string}>}
+ * @phpstan-type SystemCheckResult array{status: string, total: int, healthy: int, cached: int, details: array<string, mixed>, problems: list<array{label: string, description: string}>}
  *
  * @internal
  * @see docs/adr/0017-data-health-validation-check-based-coverage-with-environment-fingerprinted-incremental-results.md
@@ -64,12 +64,19 @@ final class Doctor {
   /**
    * Runs one system check, returning the uniform result envelope.
    *
+   * @param bool $cache
+   *   TRUE (default) to reuse stored per-item results while still fresh;
+   *   FALSE to ignore them and revalidate every item. Only
+   *   HealthCheck::UpdatesEscapedConfig persists per-item results; every
+   *   other system check answers a single environment/state question with
+   *   nothing to cache, so this is ignored for them.
+   *
    * @return SystemCheckResult
    *
    * @throws \LogicException
    *   When $check is a data check.
    */
-  public function runSystemCheck(HealthCheck $check): array {
+  public function runSystemCheck(HealthCheck $check, bool $cache = TRUE): array {
     // Every case is listed with no `default`, so PHPStan fails when a new
     // HealthCheck case is added without being classified here. This keeps the
     // system/data split in sync with HealthCheck::isSystemCheck(); data checks
@@ -77,7 +84,7 @@ final class Doctor {
     return match ($check) {
       HealthCheck::CodeTaggedReleases => $this->runCodeTaggedReleasesCheck(),
       HealthCheck::UpdatesExecuted => $this->runUpdatesExecutedCheck(),
-      HealthCheck::UpdatesEscapedConfig => $this->runUpdatesEscapedConfigCheck(),
+      HealthCheck::UpdatesEscapedConfig => $this->runUpdatesEscapedConfigCheck($cache),
       HealthCheck::ComponentSourceSchemaEvolution => $this->runComponentSourceSchemaEvolutionCheck(),
       HealthCheck::Config,
       HealthCheck::Content,
@@ -94,18 +101,23 @@ final class Doctor {
    * risk leaves every item healthy; a failure reduces the healthy count and
    * marks the run a problem. Assumes one problem entry per unhealthy item.
    *
+   * @param int $cached
+   *   Items reused from a prior run instead of revalidated. Always 0 for a
+   *   system check with no per-item cache (only UpdatesEscapedConfig has
+   *   one).
    * @param list<array{label: string, description: string}> $problems
    * @param array<string, mixed> $details
    *
    * @return SystemCheckResult
    */
-  private static function systemCheckResult(HealthCheck $check, int $total, array $problems, array $details): array {
+  private static function systemCheckResult(HealthCheck $check, int $total, int $cached, array $problems, array $details): array {
     $failing = \count($problems);
     $is_risk = $check->findingsAreRisks();
     return [
       'status' => $failing === 0 ? 'healthy' : ($is_risk ? 'risk' : 'problem'),
       'total' => $total,
       'healthy' => $is_risk ? $total : $total - $failing,
+      'cached' => $cached,
       'details' => $details,
       'problems' => $problems,
     ];
@@ -121,7 +133,7 @@ final class Doctor {
       static fn (string $fn): array => ['label' => $fn, 'description' => 'pending post-update'],
       $pending,
     ));
-    return self::systemCheckResult(HealthCheck::UpdatesExecuted, \count($applied) + \count($pending), $problems, [
+    return self::systemCheckResult(HealthCheck::UpdatesExecuted, \count($applied) + \count($pending), 0, $problems, [
       'schema_version' => $this->environment->getCanvasSchemaVersion(),
       'applied_post_updates' => $applied,
       'pending_post_updates' => $pending,
@@ -144,7 +156,7 @@ final class Doctor {
       ],
       $dev_extensions,
     ));
-    return self::systemCheckResult(HealthCheck::CodeTaggedReleases, $this->environment->getInstalledExtensionCount(), $problems, ['dev_extensions' => $dev_extensions]);
+    return self::systemCheckResult(HealthCheck::CodeTaggedReleases, $this->environment->getInstalledExtensionCount(), 0, $problems, ['dev_extensions' => $dev_extensions]);
   }
 
   /**
@@ -153,9 +165,33 @@ final class Doctor {
    * Partial signal only: update paths implemented without a needs*() detector
    * are invisible here; update_path_executed is authoritative for those.
    *
+   * Reuses the same per-entity incremental cache as ::runConfigCheck(): both
+   * iterate the identical Config inventory, keyed by the same entity and the
+   * same cache-tag-checksum freshness signature, so an entity unchanged since
+   * its last check is skipped without being loaded.
+   *
+   * Most needs*() detectors read only the entity's own config payload, which
+   * that per-entity signature fully covers. One
+   * (CanvasConfigUpdater::needsComponentVersionHashRecomputationForListFloatDefaultValue())
+   * recomputes a hash from the component *source* (code), so a code change can
+   * flip its answer without touching the entity's config cache tag. That case
+   * is covered by the environment fingerprint HealthRecords::isFresh() also
+   * gates on — a code change ships as a new release, changing the fingerprint
+   * and invalidating every stored result. This is exactly the code-dependence
+   * the `config` check's own typed-data validation already has: no new
+   * staleness class is introduced here.
+   *
+   * @param bool $cache
+   *   TRUE (default) to reuse a stored per-entity result while still fresh;
+   *   FALSE to ignore it and reprobe every entity. Fresh outcomes are
+   *   recorded for later reuse either way.
+   *
    * @return SystemCheckResult
+   *
+   * @see ::process()
+   * @see ::runConfigCheck()
    */
-  private function runUpdatesEscapedConfigCheck(): array {
+  private function runUpdatesEscapedConfigCheck(bool $cache = TRUE): array {
     // A needs*() detector emits a deprecation when it finds outdated config, to
     // nudge developers during a real update run. This audit only probes, so
     // silence them here and restore in the finally below.
@@ -165,25 +201,43 @@ final class Doctor {
       // data-model migration; they share no interface, so reflect them out.
       $needs_methods = self::getConfigUpdaterNeedsMethods();
       $pending = [];
+      $cached_count = 0;
       foreach ($this->inventory->getItems(HealthCheck::Config) as $item) {
-        $entity = $this->entityTypeManager->getStorage($item->entityType->id())->load($item->entityId);
-        \assert($entity instanceof ConfigEntityInterface);
-        $pending_for_entity = [];
-        foreach ($needs_methods as $method) {
-          // Their signatures vary, so run only the detectors that accept
-          // exactly this entity: skip any that don't type-match $entity or that
-          // require more than the one entity argument.
-          if (!self::entityMatchesFirstParameter($entity, $method) || !self::hasExactlyOneRequiredParameter($method)) {
-            continue;
+        $entity_type_id = $item->entityType->id();
+        $config_name = $item->configName();
+        $key = \sprintf(self::KEY_FORMAT, $entity_type_id, $item->entityId);
+        // Freshness signal for result reuse: the SAME cache-tag checksum
+        // ::runConfigCheck() uses for this exact entity.
+        // @see ::process()
+        $signature = $this->cacheTagSignature(['config:' . $config_name]);
+        $storage = $this->entityTypeManager->getStorage($entity_type_id);
+        $check_item = $this->process($key, HealthCheck::UpdatesEscapedConfig, $entity_type_id, $signature, $cache, function () use ($storage, $item, $config_name, $needs_methods): array {
+          // Reached only on a cache miss.
+          $entity = $storage->load($item->entityId);
+          \assert($entity instanceof ConfigEntityInterface);
+          $pending_methods = [];
+          foreach ($needs_methods as $method) {
+            // Their signatures vary, so run only the detectors that accept
+            // exactly this entity: skip any that don't type-match $entity, or
+            // that require more than the one entity argument.
+            if (!self::entityMatchesFirstParameter($entity, $method) || !self::hasExactlyOneRequiredParameter($method)) {
+              continue;
+            }
+            // TRUE means this entity still needs that migration.
+            if ($method->invoke($this->configUpdater, $entity) === TRUE) {
+              $pending_methods[] = $method->getName();
+            }
           }
-          // TRUE means this entity still needs that migration.
-          $result = $method->invoke($this->configUpdater, $entity);
-          if ($result === TRUE) {
-            $pending_for_entity[] = $method->getName();
-          }
+          return $pending_methods === [] ? [] : [self::buildEscapedConfigFinding($config_name, $pending_methods)];
+        });
+        if ($check_item['cached']) {
+          $cached_count++;
         }
-        if ($pending_for_entity !== []) {
-          $pending[$entity->getConfigDependencyName()] = $pending_for_entity;
+        foreach ($check_item['findings'] as $finding) {
+          $pending_methods = \array_column($finding['violations'], 'code');
+          if ($pending_methods !== []) {
+            $pending[$config_name] = $pending_methods;
+          }
         }
       }
     }
@@ -195,7 +249,7 @@ final class Doctor {
     foreach ($pending as $config_name => $methods) {
       $problems[] = ['label' => $config_name, 'description' => \sprintf('pending: %s', \implode(', ', $methods))];
     }
-    return self::systemCheckResult(HealthCheck::UpdatesEscapedConfig, $total, $problems, ['pending' => $pending]);
+    return self::systemCheckResult(HealthCheck::UpdatesEscapedConfig, $total, $cached_count, $problems, ['pending' => $pending]);
   }
 
   /**
@@ -234,7 +288,7 @@ final class Doctor {
         'description' => 'no automatic instance updates — see https://www.drupal.org/node/3521221',
       ];
     }
-    return self::systemCheckResult(HealthCheck::ComponentSourceSchemaEvolution, \count($sources), $problems, [
+    return self::systemCheckResult(HealthCheck::ComponentSourceSchemaEvolution, \count($sources), 0, $problems, [
       'failing' => $failing,
       'sources' => $sources,
     ]);
@@ -567,6 +621,31 @@ final class Doctor {
       }
     }
     return ['label' => $label, 'violations' => self::normalizeViolations($violations)];
+  }
+
+  /**
+   * Builds a Finding recording a config entity's pending needs*() migrations.
+   *
+   * Reuses the generic Finding/Violation shape purely as this check's own
+   * cache-record format: `code` carries the migration method name, which
+   * ::runUpdatesEscapedConfigCheck() reassembles into its `pending` map. This
+   * is never exposed as-is; it is not the `details.failures` shape other
+   * checks store.
+   *
+   * @param string[] $pending_methods
+   *
+   * @return Finding
+   */
+  private static function buildEscapedConfigFinding(string $config_name, array $pending_methods): array {
+    $violations = \array_map(
+      static fn (string $method): array => [
+        'message' => \sprintf('pending: %s', $method),
+        'property_path' => '',
+        'code' => $method,
+      ],
+      $pending_methods,
+    );
+    return ['label' => $config_name, 'violations' => $violations];
   }
 
   /**

@@ -32,7 +32,7 @@ vendor/bin/dr canvas:doctor --all-checks
   System
   code_tagged_releases             ✅ healthy        63      63        0        100.0%      0.006s
   update_path_executed             ✅ healthy        33      33        0        100.0%      0.299s
-  update_path_escaped_config       ❌ 1 problem(s)   116     115       0        99.1%       0.184s     Manually re-save these config entities.
+  update_path_escaped_config       ❌ 1 problem(s)   116     115       112      99.1%       0.184s     Manually re-save these config entities.
   component_source_..._evolution   ⚠︎  1 risk(s)      3       3         0        100.0%      0.000s
  -------------------------------- ----------------- ------- --------- -------- ----------- ---------- ---------------------------------------------------------------------------------------------------------------------------------------
   Data
@@ -68,7 +68,7 @@ Checks — a **system** check answers one environment/state question; a **data**
 |-------|-------|-----------------|---------------|
 | `code_tagged_releases` | system | Every installed extension is at a tagged release; dev checkouts are an advisory **⚠️ risk** (disables result reuse, see below). | Never a failure by itself. |
 | `update_path_executed` | system | Installed schema version; applied vs. pending post-updates. | Pending post-update → results untrustworthy until `drush updatedb`. |
-| `update_path_escaped_config` | system | Config entities with a *detectable* pending `CanvasConfigUpdater::needs*()` migration — typically config that escaped the update path, e.g. imported from an old export after the post-updates already ran. Partial signal: update paths implemented without a `needs*()` detector are invisible here; `update_path_executed` is authoritative for those. | Entity still needs migration → re-save it (`preSave()` applies the pending migration). |
+| `update_path_escaped_config` | system | Config entities with a *detectable* pending `CanvasConfigUpdater::needs*()` migration — typically config that escaped the update path, e.g. imported from an old export after the post-updates already ran. Partial signal: update paths implemented without a `needs*()` detector are invisible here; `update_path_executed` is authoritative for those. The only system check with a per-item cache, reused the same way as `config`'s. | Entity still needs migration → re-save it (`preSave()` applies the pending migration). |
 | `component_source_supports_schema_evolution` | system | Component sources lacking a `ComponentInstanceUpdaterInterface` (auto-migrates existing instances to a new component version). A **risk (⚠️), not a failure**. | Never fails. Flags a schema change as breaking for that source. `block` is expected; `fallback` is excluded. See [change record](https://www.drupal.org/node/3521221). |
 | `config` | data | Every Canvas config entity; translations validated transitively (`CanvasConfigEntityTranslationsAreValidConstraint` merges each override onto the base config). | Entity or translation violates a constraint. |
 | `content` | data | The default revision of every content entity holding a `component_tree` field, and each translation. | A live entity violates a constraint. |
