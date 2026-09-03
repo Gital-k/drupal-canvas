@@ -466,7 +466,12 @@ const ColorFormPopover = ({
                 </>
               )}
 
-              <Flex direction="column" gap="1" px="3" className={styles.fieldLabelContainer}>
+              <Flex
+                direction="column"
+                gap="1"
+                px="3"
+                className={styles.fieldLabelContainer}
+              >
                 <label htmlFor="variableName" className={styles.fieldLabel}>
                   Variable name
                 </label>
