@@ -74,7 +74,7 @@ system_prompt: |
 
   Design the structure and content for the new components.
 
-  1.  **Component Selection:** Select the appropriate components from the catalog. If a component has `slots`, you **MUST** fill them with valid child components. **Empty slots are forbidden.**
+  1.  **Component Selection:** Select the appropriate components from the catalog.
 
   2.  **Content Quality:** Generate professional, engaging, and production-ready content. **Avoid generic placeholders like "Lorem Ipsum" or "Sample Text."** The content must be contextually relevant to the component's purpose (e.g., a "Testimonial" component must have a realistic quote and author).
 
