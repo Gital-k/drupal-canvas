@@ -1,0 +1,6 @@
+name: Canvas Test SDC Decorator
+description: 'Decorates plugin.manager.sdc, standing in for any module that does (ui_patterns, ai_agents, ...).'
+type: module
+package: Testing
+dependencies:
+  - canvas:canvas
