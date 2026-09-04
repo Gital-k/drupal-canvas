@@ -227,6 +227,71 @@ abstract class JsonSchemaPropsComponentSourceBaseTestBase extends ComponentSourc
   }
 
   /**
+   * Tests that ::clientModelToInput() refuses to store an unexpected prop.
+   *
+   * An unexpected prop has no entry in `prop_field_definitions`, hence no
+   * widget would ever have appeared for it and there is no default shape to
+   * collapse its value against. Storing it would break the guarantee that
+   * every stored `StaticPropSource` matches the shape dictated by the
+   * referenced `Component` version, so ::collapse() MUST reject it instead of
+   * falling back to storing it uncollapsed.
+   *
+   * @param string $source_id
+   *   The component source plugin ID (e.g. 'js', 'sdc').
+   * @param string $source_specific_id
+   *   The source-specific component ID.
+   * @param string $valid_prop_name
+   *   Name of a valid prop that exists on the component.
+   * @param array{sourceType: string, expression: string, value: mixed} $valid_prop_input
+   *   A complete, valid input array for that prop.
+   *
+   * @legacy-covers ::clientModelToInput
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::collapse()
+   * @see https://www.drupal.org/project/canvas/issues/3532414
+   */
+  #[DataProvider('providerComponentForValidateInputRejectsUnexpectedProps')]
+  public function testClientModelToInputRejectsUnexpectedProps(string $source_id, string $source_specific_id, string $valid_prop_name, array $valid_prop_input): void {
+    $this->generateComponentConfig();
+
+    $component_source_manager = $this->container->get(ComponentSourceManager::class);
+    \assert($component_source_manager instanceof ComponentSourceManager);
+    $component_source_definition = $component_source_manager->getDefinition($source_id);
+    \assert(\array_key_exists('discovery', $component_source_definition));
+    $discovery = $this->container->get(ClassResolverInterface::class)->getInstanceFromDefinition($component_source_definition['discovery']);
+    \assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+    $component = Component::load($discovery::getComponentConfigEntityId($source_specific_id));
+    self::assertInstanceOf(Component::class, $component);
+    $source = $component->getComponentSource();
+    self::assertInstanceOf(JsonSchemaPropsComponentSourceBase::class, $source);
+
+    // Guarantee the premise of this test: `textUnwanted` is not a prop of this
+    // version of the Component, so it has no prop field definition.
+    self::assertArrayNotHasKey('textUnwanted', $component->getSettings()['prop_field_definitions']);
+
+    // A client model containing both a valid prop and an unexpected one: the
+    // unexpected one must cause an exception rather than be stored.
+    $client_model = [
+      'source' => [
+        $valid_prop_name => $valid_prop_input,
+        'textUnwanted' => [
+          'sourceType' => 'static:field_item:string',
+          'value' => [['value' => 'Unwanted value']],
+          'expression' => 'ℹ︎string␟value',
+        ],
+      ],
+      'resolved' => [
+        $valid_prop_name => 'Valid value',
+        'textUnwanted' => 'Unwanted value',
+      ],
+    ];
+
+    $this->expectException(\OutOfRangeException::class);
+    $this->expectExceptionMessage("'textUnwanted' is not a prop on this version of the Component");
+    $source->clientModelToInput('07875b1b-b68c-4b90-955c-d6136ff8af93', $component, $client_model, NULL);
+  }
+
+  /**
    * Tests that explicitly removing an optional image prop value is preserved.
    *
    * When a user removes an optional image prop that has a default example
