@@ -8,10 +8,14 @@ use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\Page;
 use Drupal\Core\Config\StorageCacheInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\user\Entity\Role;
+use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -23,6 +27,7 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
+  use UserCreationTrait;
 
   protected static $modules = [
     'canvas',
@@ -115,13 +120,77 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
     ]);
   }
 
+  public function testContentEntityTypeTargetValidation(): void {
+    // The canvas_page entity type's field definitions resolve classes from
+    // the media and views modules, and saving a page touches users and path
+    // aliases.
+    $this->enableModules(['media', 'media_library', 'views', 'block', 'path_alias']);
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema('canvas_page');
+    // Filing a page into a folder is only valid for a user who may edit it
+    // there; a site-wide editor may file pages anywhere. The first user is the
+    // superuser, so validate as an ordinary second one — an active one, as the
+    // pages it creates reference it as their owner.
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\FolderMembershipAccessConstraint
+    User::create(['name' => 'superuser'])->save();
+    Role::create(['id' => 'page_editor', 'label' => 'Page editor'])
+      ->grantPermission(Page::EDIT_PERMISSION)
+      ->save();
+    $editor = User::create(['name' => 'page_editor', 'status' => 1, 'roles' => ['page_editor']]);
+    $editor->save();
+    $this->setCurrentUser($editor);
+
+    // 1. A folder can organize a content entity type that opts in via
+    // FolderTargetInterface, such as Canvas pages.
+    $page_folder = Folder::create([
+      'name' => 'Landing pages',
+      'configEntityTypeId' => Page::ENTITY_TYPE_ID,
+    ]);
+    $this->entity = $page_folder;
+    $this->assertValidationErrors([]);
+    $page_folder->save();
+
+    // 2. Content entities are not listed in `items`: membership lives on the
+    // content entity itself, in its `folder` field.
+    $page = Page::create(['title' => 'Test page', 'status' => TRUE]);
+    $page->save();
+    $page_folder->set('items', [$page->uuid()]);
+    $this->assertValidationErrors([
+      'items' => 'A folder of <em class="placeholder">canvas_page</em> entities must not list items: content entities reference their folder themselves.',
+      'items.0' => "The 'canvas.canvas_page." . $page->uuid() . "' config does not exist.",
+    ]);
+    $page_folder->set('items', []);
+
+    // 3. A page may reference a folder that organizes pages…
+    $page->set('folder', $page_folder->id());
+    self::assertCount(0, $page->validate());
+    $page->save();
+    self::assertSame($page_folder->id(), $page->get('folder')->target_id);
+
+    // 4. … but not a folder that organizes another entity type.
+    $page->set('folder', $this->entity->id());
+    $component_folder = Folder::create([
+      'name' => 'Components, not pages',
+      'configEntityTypeId' => Component::ENTITY_TYPE_ID,
+    ]);
+    $component_folder->save();
+    $page->set('folder', $component_folder->id());
+    $violations = $page->validate();
+    self::assertCount(1, $violations);
+    self::assertSame(
+      'The folder <em class="placeholder">Components, not pages</em> does not organize <em class="placeholder">canvas_page</em> entities.',
+      (string) $violations->get(0)->getMessage(),
+    );
+  }
+
   public function testConfigEntityTypeIdConstraintValidation(): void {
     $this->entity = Folder::create([
       'name' => 'Test folder, please ignore',
       'configEntityTypeId' => AssetLibrary::ENTITY_TYPE_ID,
     ]);
     $this->assertValidationErrors([
-      'configEntityTypeId' => 'The \'asset_library\' plugin must implement or extend Drupal\canvas\Entity\FolderItemInterface.',
+      'configEntityTypeId' => 'The \'asset_library\' plugin must implement or extend Drupal\canvas\Entity\FolderTargetInterface.',
     ]);
   }
 

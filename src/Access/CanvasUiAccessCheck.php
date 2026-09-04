@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Entity\Pattern;
+use Drupal\canvas\FolderPermissions;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\Core\Access\AccessResult;
@@ -95,6 +96,14 @@ class CanvasUiAccessCheck implements AccessInterface {
           $access = $access->orIf($entity_create_access->andIf($canvas_field_edit_access));
           // 2. edit such a content entity (and update the Canvas field)
           $access = $access->orIf($entity_update_access->andIf($canvas_field_edit_access));
+          // 3. edit the content entities filed into a folder, through that
+          //    folder's own permissions: such an editor holds no site-wide
+          //    permission, so the checks above deny both.
+          // @see \Drupal\canvas\FolderPermissions
+          $access = $access->orIf(
+            self::folderEditorAccess($account, $entity_type_id)
+              ->andIf($canvas_field_edit_access)
+          );
           // If we have access to edit a single Canvas-field in a single
           // bundle, or code components, we must grant access to Canvas and can
           // avoid extra checks.
@@ -105,6 +114,35 @@ class CanvasUiAccessCheck implements AccessInterface {
       }
     }
     return $access;
+  }
+
+  /**
+   * Checks whether the account edits content through a folder's permissions.
+   *
+   * A folder of content entities carries its own edit permission, so a folder
+   * editor holds no site-wide permission and every other check here denies
+   * them. The folder's ID is part of the permission name, which is why the
+   * roles' permission lists are what gets looked at: loading the folders
+   * instead would make every response that runs this check depend on the
+   * folder list.
+   *
+   * @param \Drupal\Core\Session\AccountInterface $account
+   *   The account to check.
+   * @param string $entity_type_id
+   *   The ID of the content entity type.
+   *
+   * @return \Drupal\Core\Access\AccessResult
+   *   Allowed when the account holds a folder-scoped permission to edit the
+   *   content of this entity type, neutral otherwise.
+   *
+   * @see \Drupal\canvas\FolderPermissions
+   */
+  private static function folderEditorAccess(AccountInterface $account, string $entity_type_id): AccessResult {
+    // Whether this holds depends on the account's permissions, nothing else: a
+    // folder appearing grants nobody anything until a role is given its
+    // permission, which changes the permissions hash.
+    return AccessResult::allowedIf(FolderPermissions::folderIds($account, 'edit', $entity_type_id) !== [])
+      ->cachePerPermissions();
   }
 
 }

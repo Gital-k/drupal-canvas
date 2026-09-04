@@ -1380,10 +1380,12 @@ canvas.folder.*:
       type: string
       label: 'Folder type'
       constraints:
-        # Accept only config entity types that implement FolderItemInterface.
+        # Accept only entity types that implement FolderTargetInterface: config
+        # entity types via FolderItemInterface (organized through `items`), and
+        # content entity types, which reference their folder themselves.
         PluginExists:
           manager: entity_type.manager
-          interface: Drupal\canvas\Entity\FolderItemInterface
+          interface: Drupal\canvas\Entity\FolderTargetInterface
     weight:
       type: weight
       label: 'Weight'
@@ -1401,6 +1403,10 @@ canvas.folder.*:
             configEntityTypeId: '%parent.%parent.configEntityTypeId'
       constraints:
         Unique: ~
+        # Folders of content entities must not list items: membership lives on
+        # the content entity itself, because config must not depend on content.
+        ContentTargetFolderItemsConstraint:
+          configEntityTypeId: '%parent.configEntityTypeId'
 
 canvas.color.*:
   type: config_entity

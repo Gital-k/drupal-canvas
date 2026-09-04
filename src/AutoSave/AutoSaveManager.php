@@ -12,6 +12,8 @@ use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Entity\ComponentTreeConfigEntityBase;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Folder;
+use Drupal\canvas\Entity\FolderTargetInterface;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Entity\StagedConfigUpdate;
@@ -158,6 +160,26 @@ class AutoSaveManager implements EventSubscriberInterface {
   }
 
   /**
+   * Whether a field records which Folder a content entity is organized into.
+   *
+   * Filing a page into a folder happens live from the Pages panel and applies
+   * to every revision, translation and draft at once — exactly like moving a
+   * component between library folders. Membership is therefore never part of
+   * an auto-save: it is not snapshotted, not hashed for change and conflict
+   * detection, and not overlaid onto the stored entity when a draft is
+   * reconstructed or published. Otherwise a draft taken before a page was
+   * filed would take it out of the folder again when published, and filing a
+   * page would flag every open draft of it as updated externally.
+   *
+   * @see \Drupal\canvas\Entity\FolderTargetInterface
+   */
+  public static function isFolderMembershipField(EntityInterface $entity, FieldDefinitionInterface $field_definition): bool {
+    return $entity instanceof FolderTargetInterface
+      && $entity instanceof ContentEntityInterface
+      && Folder::isMembershipField($field_definition);
+  }
+
+  /**
    * Converts an entity to array ready for storing in auto-save item.
    *
    * For content entities, exclude computed fields: only actually stored data
@@ -178,6 +200,9 @@ class AutoSaveManager implements EventSubscriberInterface {
       foreach ($entity->getFields(include_computed: TRUE) as $name => $field_item_list) {
         \assert($field_item_list instanceof FieldItemListInterface);
         if ($field_item_list->getFieldDefinition()->isComputed() && !self::isPersistedComputedField($field_item_list->getFieldDefinition())) {
+          continue;
+        }
+        if (self::isFolderMembershipField($entity, $field_item_list->getFieldDefinition())) {
           continue;
         }
         $values[$name] = TypedDataHelper::castRawPhpTypes($field_item_list);
@@ -337,6 +362,8 @@ class AutoSaveManager implements EventSubscriberInterface {
     // Exclude all computed properties except those that are user-editable and
     // persisted elsewhere on save (path aliases, moderation states).
     $fields = \array_filter($fields, static fn (FieldItemListInterface $field) => !$field->getFieldDefinition()->isComputed() || self::isPersistedComputedField($field->getFieldDefinition()));
+    // Folder membership is managed live, outside the draft.
+    $fields = \array_filter($fields, static fn (FieldItemListInterface $field) => !self::isFolderMembershipField($entity, $field->getFieldDefinition()));
 
     foreach (\array_keys($fields) as $name) {
       $items = $entity->get($name);
@@ -538,6 +565,11 @@ class AutoSaveManager implements EventSubscriberInterface {
       // persisted on save (e.g. path, moderation_state).
       // @see self::isPersistedComputedField()
       if ($field_definition->isComputed() && !self::isPersistedComputedField($field_definition)) {
+        continue;
+      }
+      // The stored entity's folder membership always wins: a draft never moves
+      // a page between folders.
+      if (self::isFolderMembershipField($stored, $field_definition)) {
         continue;
       }
       $target->set($field_name, $field->getValue());

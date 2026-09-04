@@ -153,10 +153,18 @@ export function CanvasNavigationMixin<TBase extends Constructor<CanvasBase>>(
     }
 
     async openPagesPanel() {
-      await this.page
-        .getByTestId('canvas-side-menu')
-        .getByLabel('Pages')
-        .click();
+      // The side-menu item toggles, so clicking it while the panel is already
+      // open closes it — which is what happens after a reload, since the panel
+      // reopens on its own. Only click when it is not already showing.
+      // The heading is only rendered while the panel is open, so its absence
+      // is what says the panel needs opening.
+      const pagesHeading = this.page.getByRole('heading', { name: 'Pages' });
+      if ((await pagesHeading.count()) === 0) {
+        await this.page
+          .getByTestId('canvas-side-menu')
+          .getByLabel('Pages')
+          .click();
+      }
       try {
         await expect(
           this.page.getByRole('heading', { name: 'Pages' }),

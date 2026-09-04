@@ -313,6 +313,33 @@ config entity type, must have a unique name (per config entity type), and can li
 type. Each such config config entity can only exist  in a single `Folder`.
 `Folder` config entities use the (configuration system-provided) UUID as their identifier.
 
+A `Folder` can also organize a content entity type (`canvas_page`). Config must not depend on content, so such a folder
+lists no `items`: each page references its folder itself, in its `folder` base field (see
+`\Drupal\canvas\Entity\FolderTargetInterface`).
+
+Folders of content entities double as access boundaries. For each one, `\Drupal\canvas\FolderPermissions` generates an
+`edit canvas_page in folder <ID>` and a `delete canvas_page in folder <ID>` permission that grant the operation on every
+page filed into it, without the site-wide `edit canvas_page` / `delete canvas_page` permissions. Holders of either may
+open the Canvas UI and list the pages they may view (the `canvas.api.content.list` route requires Canvas UI access, not
+`edit canvas_page`). A page can only be moved into a folder — or out of folders — by someone who could still edit it
+there (`FolderMembershipAccess` constraint). The generated permissions depend on their folder's config, so `user_role`
+config entities holding them depend on the folder and shed them when it is deleted, like per-bundle node permissions.
+
+Permissions are additive, here as everywhere in Drupal: a folder-scoped permission grants access, it cannot take any
+away. To confine a role to one folder, that role must not also hold the site-wide `edit canvas_page` / `delete
+canvas_page` permission.
+
+In the Pages panel, a page the user may see but not edit is listed greyed out and locked: hiding it would make the list
+lie about what exists, but opening it would load an editor whose layout request is refused. Opening such a page's URL
+directly says so too, instead of offering a retry that can never succeed.
+
+Who sees a folder of content entities (`\Drupal\canvas\Entity\FolderAccessControlHandler`): anyone who may create,
+edit or delete that content entity type anywhere, plus the holders of a permission scoped to that folder. Everyone else
+is served no folder and gets a flat list of the pages they may view — a partial tree would misrepresent where pages are.
+Creating, renaming, reordering and deleting folders stays behind `administer folders`, and folders of config entities
+(components, patterns, code components) remain visible to that permission only. A page's folder is reported by the HTTP
+API only to those who may see that folder.
+
 ⚠️ Still to be built:
 - A UI to create `Folder`s: https://www.drupal.org/project/canvas/issues/3540577
 - A UI to manage `Folder`s: https://www.drupal.org/project/canvas/issues/3540580

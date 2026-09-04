@@ -231,10 +231,14 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
         'DELETE',
         [],
       ],
+      // Listing pages takes Canvas UI access rather than a page permission, and
+      // this user has it through `create canvas_page`: the response lists the
+      // pages they may view.
+      // @see \Drupal\canvas\Access\CanvasUiAccessCheck
       'INDEX pages' => [
         'canvas.api.content.list',
         ['entity_type' => Page::ENTITY_TYPE_ID],
-        [Page::EDIT_PERMISSION],
+        [],
         'GET',
         [],
       ],

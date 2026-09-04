@@ -112,7 +112,12 @@ export const rtkQueryErrorHandler: Middleware =
     // RTK Query uses `createAsyncThunk` from redux-toolkit under the hood, so we're able to utilize these matchers.
     if (isRejectedWithValue(action)) {
       const rawError = action.payload as FetchBaseQueryError | SerializedError;
-      const normalizedError = normalizeError(rawError);
+      const endpointName = (action.meta as { arg?: { endpointName?: string } })
+        ?.arg?.endpointName;
+      const normalizedError = {
+        ...normalizeError(rawError),
+        ...(endpointName ? { endpointName } : {}),
+      };
 
       console.error('RTK Query error:', normalizedError);
 

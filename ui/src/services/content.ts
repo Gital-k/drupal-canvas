@@ -183,6 +183,24 @@ export const contentApi = createApi({
         }
       },
     }),
+    setContentFolder: builder.mutation<
+      void,
+      {
+        entityType: string;
+        entityId: string;
+        folder: string | null;
+      }
+    >({
+      // Filing is organizational, not editorial: it writes the live entity
+      // directly rather than staging an auto-save, exactly like moving a
+      // component between library folders applies immediately.
+      query: ({ entityType, entityId, folder }) => ({
+        url: `/canvas/api/v0/content/${entityType}/${entityId}`,
+        method: 'PATCH',
+        body: { folder },
+      }),
+      invalidatesTags: [{ type: 'Content', id: 'LIST' }],
+    }),
     updateContent: builder.mutation<void, UpdateContentRequest>({
       query: ({ entityType, entityId, status, conflictToResolve }) => ({
         url: `/canvas/api/v0/content/auto-save/${entityType}/${entityId}`,
@@ -293,6 +311,7 @@ export const contentApi = createApi({
 export const {
   useGetContentListQuery,
   useDeleteContentMutation,
+  useSetContentFolderMutation,
   useCreateContentMutation,
   useUpdateContentMutation,
   useGetStagedConfigQuery,

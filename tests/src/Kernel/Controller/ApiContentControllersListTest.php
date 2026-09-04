@@ -8,6 +8,7 @@ namespace Drupal\Tests\canvas\Kernel\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiContentControllers;
+use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
@@ -417,6 +418,49 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
       'internalPath' => '/' . $entity->toUrl()->getInternalPath(),
       'path' => $entity->toUrl()->toString(),
     ];
+  }
+
+  /**
+   * Tests that a page's folder is exposed in the list.
+   *
+   * @legacy-covers ::list
+   */
+  public function testFolderInList(): void {
+    $folder = Folder::create([
+      'name' => 'Landing pages',
+      'configEntityTypeId' => Page::ENTITY_TYPE_ID,
+    ]);
+    $folder->save();
+    $filed_page = Page::create([
+      'title' => 'Filed page',
+      'status' => TRUE,
+      'folder' => $folder->id(),
+    ]);
+    $filed_page->save();
+
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = array_column(json_decode($content, TRUE)['data'], NULL, 'id');
+
+    self::assertSame($folder->id(), $data[(int) $filed_page->id()]['folder']);
+    // A page in no folder reports none.
+    $without_folder = array_filter($data, static fn(array $row) => $row['id'] !== (int) $filed_page->id());
+    self::assertNotEmpty($without_folder);
+    self::assertNull(reset($without_folder)['folder']);
+
+    // A user who cannot see the folder is not told which pages are in it: to
+    // them the page is uncategorized, which is also how the Pages panel
+    // renders a page whose folder it was not served.
+    // @see \Drupal\canvas\Entity\FolderAccessControlHandler
+    $this->setUpCurrentUser([], ['access content']);
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = array_column(json_decode($content, TRUE)['data'], NULL, 'id');
+    self::assertNull($data[(int) $filed_page->id()]['folder']);
+    // Renaming the folder must invalidate the listing.
+    self::assertContains('config:canvas.folder.' . $folder->id(), $response->getCacheableMetadata()->getCacheTags());
   }
 
   /**

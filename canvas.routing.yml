@@ -371,7 +371,11 @@ canvas.api.content.list:
     _controller: 'Drupal\canvas\Controller\ApiContentControllers::list'
   requirements:
     _canvas_authentication_required: TRUE
-    _permission: 'edit canvas_page'
+    # Whoever may use the Canvas UI gets the Pages panel; the controller lists
+    # only the entities they may view. No single permission can express "may
+    # edit pages" anymore: folder editors hold none of the site-wide ones.
+    # @see \Drupal\canvas\FolderPermissions
+    _canvas_ui_access: 'TRUE'
   methods: [GET]
   options:
     _format: 'json'

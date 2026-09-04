@@ -199,7 +199,7 @@ const DragEventsHandler: React.FC = () => {
       ['folder', 'uncategorized'].includes(
         over.data?.current?.destination || '',
       ) &&
-      ['library', 'code', 'folder'].includes(origin)
+      ['library', 'code', 'folder', 'pages'].includes(origin)
     ) {
       // Handle drop into folder from library or folder reordering.
       handleFolderDrop(event);

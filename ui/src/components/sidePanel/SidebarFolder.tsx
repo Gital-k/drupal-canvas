@@ -65,6 +65,7 @@ const SidebarFolder: React.FC<SidebarFolderProps> = ({
   });
 
   // Draggable hook for folder reordering
+  const isDragDisabled = !administerFolders || !isDraggableProp;
   const {
     attributes,
     listeners,
@@ -80,8 +81,16 @@ const SidebarFolder: React.FC<SidebarFolderProps> = ({
       name,
       weight,
     },
-    disabled: !administerFolders || !isDraggableProp,
+    disabled: isDragDisabled,
   });
+
+  // dnd-kit marks a disabled draggable `aria-disabled`, which would announce a
+  // perfectly usable folder — and its collapse trigger — as disabled, and
+  // makes both unreachable to assistive tech and automation. A folder that
+  // simply cannot be dragged is not disabled, so its drag attributes and
+  // listeners are dropped instead of being spread while inert.
+  const dragAttributes = isDragDisabled ? {} : attributes;
+  const dragListeners = isDragDisabled ? {} : listeners;
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id,
@@ -91,7 +100,12 @@ const SidebarFolder: React.FC<SidebarFolderProps> = ({
       weight,
     },
     // previewDragging is true when user drags from the editor frame - we disable dropping into folders in that case.
-    disabled: !administerFolders || previewDragging,
+    // Filing a page into a folder is governed by the page's own access, not by
+    // administering folders: an editor who may edit pages in this folder can
+    // drop one here, and the server refuses a page they could not edit there.
+    disabled:
+      previewDragging ||
+      (!administerFolders && active?.data?.current?.origin !== 'pages'),
   });
 
   // Combine drag and drop refs
@@ -127,8 +141,8 @@ const SidebarFolder: React.FC<SidebarFolderProps> = ({
 
   const folderRow = (
     <Flex
-      {...listeners}
-      {...attributes}
+      {...dragListeners}
+      {...dragAttributes}
       role={undefined}
       data-canvas-folder-name={name}
       className={clsx(listStyles.folderTrigger, {
