@@ -11,6 +11,8 @@ import tseslint from 'typescript-eslint';
 import js from '@eslint/js';
 import vitest from '@vitest/eslint-plugin';
 
+// cspell:ignore quasis
+
 const drupalGlobals = {
   Drupal: true,
   drupalSettings: true,
@@ -48,6 +50,125 @@ const isolatedPerTestPlugin = {
             if (!found) {
               context.report({ node, messageId: 'missingImport' });
             }
+          },
+        };
+      },
+    },
+  },
+};
+
+const translationPlugin = {
+  rules: {
+    'require-translated-user-facing-strings': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description:
+            'Require user-facing strings in UI source to be wrapped in translation helpers.',
+        },
+        schema: [],
+        messages: {
+          untranslated:
+            'Wrap user-facing strings in translate()/translatePlural() (or Drupal.t()/Drupal.formatPlural()).',
+        },
+      },
+      create(context) {
+        const translatableAttributeNames = new Set([
+          'alt',
+          'aria-description',
+          'aria-label',
+          'aria-placeholder',
+          'aria-roledescription',
+          'label',
+          'placeholder',
+          'title',
+        ]);
+
+        const isMeaningfulString = (value) =>
+          typeof value === 'string' &&
+          value.trim().length > 0 &&
+          /[A-Za-z]/.test(value);
+
+        const isAllowedTranslationCallee = (callee) => {
+          if (callee.type === 'Identifier') {
+            return (
+              callee.name === 'translate' || callee.name === 'translatePlural'
+            );
+          }
+          if (
+            callee.type === 'MemberExpression' &&
+            !callee.computed &&
+            callee.object.type === 'Identifier' &&
+            callee.object.name === 'Drupal' &&
+            callee.property.type === 'Identifier'
+          ) {
+            return (
+              callee.property.name === 't' ||
+              callee.property.name === 'formatPlural'
+            );
+          }
+          return false;
+        };
+
+        const isArgumentOfAllowedTranslationCall = (node) => {
+          const parent = node.parent;
+          return (
+            parent?.type === 'CallExpression' &&
+            parent.arguments.includes(node) &&
+            isAllowedTranslationCallee(parent.callee)
+          );
+        };
+
+        const isUserFacingLiteralContext = (node) => {
+          const parent = node.parent;
+          const grandparent = parent?.parent;
+
+          if (
+            parent?.type === 'JSXAttribute' &&
+            parent.name?.type === 'JSXIdentifier' &&
+            translatableAttributeNames.has(parent.name.name)
+          ) {
+            return true;
+          }
+
+          if (
+            parent?.type === 'JSXExpressionContainer' &&
+            (grandparent?.type === 'JSXElement' ||
+              grandparent?.type === 'JSXFragment')
+          ) {
+            return true;
+          }
+
+          if (
+            parent?.type === 'CallExpression' &&
+            parent.arguments.includes(node) &&
+            parent.callee.type === 'Identifier' &&
+            ['alert', 'confirm', 'prompt'].includes(parent.callee.name)
+          ) {
+            return true;
+          }
+
+          return false;
+        };
+
+        return {
+          JSXText(node) {
+            if (isMeaningfulString(node.value)) {
+              context.report({ node, messageId: 'untranslated' });
+            }
+          },
+          Literal(node) {
+            if (!isMeaningfulString(node.value)) return;
+            if (isArgumentOfAllowedTranslationCall(node)) return;
+            if (!isUserFacingLiteralContext(node)) return;
+            context.report({ node, messageId: 'untranslated' });
+          },
+          TemplateLiteral(node) {
+            if (node.expressions.length > 0) return;
+            const text = node.quasis.map((q) => q.value.cooked ?? '').join('');
+            if (!isMeaningfulString(text)) return;
+            if (!isUserFacingLiteralContext(node)) return;
+            context.report({ node, messageId: 'untranslated' });
           },
         };
       },
@@ -182,6 +303,16 @@ export default defineConfig([
     },
     rules: {
       'isolated-per-test/require-isolated-per-test-import': 'error',
+    },
+  },
+  {
+    files: ['ui/src/**/*.{ts,tsx,js,jsx}'],
+    ignores: ['ui/src/**/*.test.*', 'ui/src/**/*.stories.*'],
+    plugins: {
+      translation: translationPlugin,
+    },
+    rules: {
+      'translation/require-translated-user-facing-strings': 'error',
     },
   },
   {

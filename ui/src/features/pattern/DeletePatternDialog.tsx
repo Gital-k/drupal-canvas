@@ -7,6 +7,7 @@ import {
   setDialogWithDataClosed,
 } from '@/features/ui/dialogSlice';
 import { useDeletePatternMutation } from '@/services/patterns';
+import { translate } from '@/utils/translate';
 
 import type { Pattern } from '@/types/Pattern';
 
@@ -42,7 +43,7 @@ const DeletePatternDialog = () => {
     <Dialog
       open={open}
       onOpenChange={handleOpenChange}
-      title="Delete pattern"
+      title={translate('Delete pattern')}
       description={`Are you sure you want to delete "${name}"? This action cannot be undone.`}
       error={
         isError

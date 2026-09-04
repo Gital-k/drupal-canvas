@@ -2,6 +2,7 @@ import { InfoCircledIcon } from '@radix-ui/react-icons';
 import { Callout, Flex } from '@radix-ui/themes';
 
 import PermissionCheck from '@/components/PermissionCheck';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 
@@ -17,14 +18,16 @@ const Welcome: React.FC<{ children?: React.ReactNode }> = () => {
             hasPermission="codeComponents"
             denied={
               <Callout.Text>
-                You do not have permission to access the code editor.
+                {translate(
+                  'You do not have permission to access the code editor.',
+                )}
               </Callout.Text>
             }
           >
             <Callout.Text>
-              Welcome to the Code Editor! To get started, select a component
-              from the panel on the left or create something new from the
-              dropdown at the top.
+              {translate(
+                'Welcome to the Code Editor! To get started, select a component from the panel on the left or create something new from the dropdown at the top.',
+              )}
             </Callout.Text>
           </PermissionCheck>
         </Callout.Root>

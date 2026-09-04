@@ -24,6 +24,7 @@ import {
   useDiscardPendingChangeMutation,
   useGetAllPendingChangesQuery,
 } from '@/services/pendingChangesApi';
+import { translate } from '@/utils/translate';
 
 import { ConflictResolutionView } from './ConflictResolutionView';
 
@@ -33,13 +34,14 @@ import type { PageVersionSelection } from '@/features/versionComparison/PageVers
 import styles from '@/features/versionComparison/VersionComparisonPage.module.css';
 
 const REVIEW_CHANGES_QUERY = 'reviewChanges=1';
-const RESOLUTION_ERROR_MESSAGE =
-  'Unable to resolve this conflict. Please try again.';
+const RESOLUTION_ERROR_MESSAGE = translate(
+  'Unable to resolve this conflict. Please try again.',
+);
 const showResolutionError = () => {
   const toastId = toast.error(RESOLUTION_ERROR_MESSAGE, {
     icon: <CrossCircledIcon style={{ color: 'var(--red-9)' }} />,
     action: {
-      label: <Cross2Icon aria-label="Dismiss notification" />,
+      label: <Cross2Icon aria-label={translate('Dismiss notification')} />,
       onClick: () => toast.dismiss(toastId),
     },
     style: {
@@ -270,9 +272,9 @@ const EnabledConflictResolutionPage = () => {
 
 const getReviewChangesButtonText = (count: number): string => {
   if (count === 1) {
-    return 'Review 1 change';
+    return translate('Review 1 change');
   }
-  return `Review ${count} changes`;
+  return translate('Review @count changes', { '@count': String(count) });
 };
 
 const ConflictResolutionLoadingState = ({
@@ -290,7 +292,7 @@ const ConflictResolutionLoadingState = ({
           className={styles.breadcrumbLink}
           onClick={onNavigateToCanvas}
         >
-          Canvas
+          {translate('Canvas')}
         </button>
         <Text size="1" color="gray">
           /
@@ -300,7 +302,7 @@ const ConflictResolutionLoadingState = ({
           className={styles.breadcrumbLink}
           onClick={onNavigateToConflict}
         >
-          Conflict
+          {translate('Conflict')}
         </button>
       </Flex>
     </div>
@@ -312,7 +314,7 @@ const ConflictResolutionLoadingState = ({
       gap="3"
     >
       <Spinner />
-      <Text size="2">Loading pending changes</Text>
+      <Text size="2">{translate('Loading pending changes')}</Text>
     </Flex>
   </div>
 );
@@ -338,7 +340,7 @@ const ResolvedConflictState = ({
           className={styles.breadcrumbLink}
           onClick={onNavigateToCanvas}
         >
-          Canvas
+          {translate('Canvas')}
         </button>
         <Text size="1" color="gray">
           /
@@ -348,18 +350,18 @@ const ResolvedConflictState = ({
           className={styles.breadcrumbLink}
           onClick={onNavigateToConflict}
         >
-          Conflict
+          {translate('Conflict')}
         </button>
         <Text size="1" color="gray">
           /
         </Text>
-        <Text size="1">All files resolved</Text>
+        <Text size="1">{translate('All files resolved')}</Text>
       </Flex>
       <IconButton
         variant="ghost"
         color="gray"
         highContrast
-        aria-label="Close"
+        aria-label={translate('Close')}
         onClick={onClose}
       >
         <Cross2Icon />
@@ -374,18 +376,19 @@ const ResolvedConflictState = ({
     >
       <CheckCircledIcon className={styles.emptyIcon} />
       <Text size="4" weight="medium">
-        Everything is up to date
+        {translate('Everything is up to date')}
       </Text>
       <Text size="2">
-        All conflicts have been resolved. Your changes are ready to be
-        published.
+        {translate(
+          'All conflicts have been resolved. Your changes are ready to be published.',
+        )}
       </Text>
       <Flex align="center" gap="2">
         <Button onClick={onReviewChanges} disabled={pendingChangesCount === 0}>
           {getReviewChangesButtonText(pendingChangesCount)}
         </Button>
         <Button variant="outline" onClick={onClose}>
-          Close
+          {translate('Close')}
         </Button>
       </Flex>
     </Flex>

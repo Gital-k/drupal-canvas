@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Progress } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import styles from './Preview.module.css';
 
 const PROGRESS_DELAY_MS = 500;
@@ -36,7 +38,7 @@ const PreviewProgress: React.FC<PreviewProgressProps> = ({ loading }) => {
 
   return (
     <Progress
-      aria-label="Loading Preview"
+      aria-label={translate('Loading Preview')}
       className={styles.progress}
       duration="1s"
     />

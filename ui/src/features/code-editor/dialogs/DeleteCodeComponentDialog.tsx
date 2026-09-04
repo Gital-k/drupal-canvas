@@ -14,6 +14,7 @@ import {
   useGetComponentUsageDetailsQuery,
   useGetComponentUsageListQuery,
 } from '@/services/componentAndLayout';
+import { translate, translatePlural } from '@/utils/translate';
 
 import type { ComponentUsageDetailsResponse } from '@/services/componentAndLayout';
 import type { CodeComponentSerialized } from '@/types/CodeComponent';
@@ -126,30 +127,42 @@ const DeleteCodeComponentDialog = () => {
   }, [isComponentUsageListError, componentUsageListError]);
 
   const deleteErrorOutput = {
-    title: 'Failed to delete component',
-    message: `An error ${
-      error && 'status' in error ? '(HTTP ' + error.status + ')' : ''
-    } occurred while deleting the component. Please check the browser console for more details.`,
-    resetButtonText: 'Try again',
+    title: translate('Failed to delete component'),
+    message: translate(
+      'An error @error occurred while deleting the component. Please check the browser console for more details.',
+      {
+        '@error':
+          error && 'status' in error ? '(HTTP ' + error.status + ')' : '',
+      },
+    ),
+    resetButtonText: translate('Try again'),
     onReset: handleDelete,
   };
 
   const componentUsageListErrorOutput = {
-    title: 'Failed to fetch component list',
-    message: `An error ${
-      componentUsageListError && 'status' in componentUsageListError
-        ? '(HTTP ' + componentUsageListError.status + ')'
-        : ''
-    } occurred while fetching the component usage list. Please check the browser console for more details.`,
+    title: translate('Failed to fetch component list'),
+    message: translate(
+      'An error @error occurred while fetching the component usage list. Please check the browser console for more details.',
+      {
+        '@error':
+          componentUsageListError && 'status' in componentUsageListError
+            ? '(HTTP ' + componentUsageListError.status + ')'
+            : '',
+      },
+    ),
   };
 
   const usageErrorOutput = {
-    title: 'Failed to fetch component usage details',
-    message: `An error ${
-      usageError && 'status' in usageError
-        ? '(HTTP ' + usageError.status + ')'
-        : ''
-    } occurred while fetching component usage. Please check the browser console for more details.`,
+    title: translate('Failed to fetch component usage details'),
+    message: translate(
+      'An error @error occurred while fetching component usage. Please check the browser console for more details.',
+      {
+        '@error':
+          usageError && 'status' in usageError
+            ? '(HTTP ' + usageError.status + ')'
+            : '',
+      },
+    ),
   };
 
   if (!selectedComponent) return null;
@@ -164,9 +177,12 @@ const DeleteCodeComponentDialog = () => {
       const length = statefulUsageDetails.content.length;
       pastRevisionsWarning = (
         <>
-          This will break <b>{length}</b> past version{length > 1 ? 's' : ''}.
-          Reverting to past versions that rely on this component will appear
-          broken.
+          {translatePlural(
+            length,
+            'This will break <b>@count</b> past version. Reverting to past versions that rely on this component will appear broken.',
+            'This will break <b>@count</b> past versions. Reverting to past versions that rely on this component will appear broken.',
+            { '@count': length.toString() },
+          )}
         </>
       );
     }
@@ -188,8 +204,12 @@ const DeleteCodeComponentDialog = () => {
 
   const description = (
     <>
-      You are about to permanently delete the <b>{selectedComponent.name}</b>{' '}
-      component.
+      {translate(
+        'You are about to permanently delete the <b>@name</b> component.',
+        {
+          '@name': selectedComponent.name,
+        },
+      )}
       {pastRevisionsWarning && (
         <>
           <br />
@@ -204,7 +224,7 @@ const DeleteCodeComponentDialog = () => {
       <Dialog
         open={isDeleteDialogOpen}
         onOpenChange={handleOpenChange}
-        title="Delete component"
+        title={translate('Delete component')}
         error={
           (isError && deleteErrorOutput) ||
           (isUsageError && usageErrorOutput) ||
@@ -212,8 +232,9 @@ const DeleteCodeComponentDialog = () => {
           undefined
         }
         footer={{
-          cancelText: 'Cancel',
-          confirmText: (!formImpactingErrors && 'Delete') || undefined,
+          cancelText: translate('Cancel'),
+          confirmText:
+            (!formImpactingErrors && translate('Delete')) || undefined,
           onConfirm: (!formImpactingErrors && handleDelete) || undefined,
           isConfirmDisabled: false,
           isConfirmLoading: isLoading,

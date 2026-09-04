@@ -16,6 +16,7 @@ import { setActivePanel } from '@/features/ui/primaryPanelSlice';
 import { validateCodeMachineNameClientSide } from '@/features/validation/validation';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useCreateCodeComponentMutation } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 
 const AddCodeComponentDialog = () => {
   const [componentName, setComponentName] = useState('');
@@ -96,20 +97,20 @@ const AddCodeComponentDialog = () => {
     <Dialog
       open={isAddDialogOpen}
       onOpenChange={handleOpenChange}
-      title="Create new code component"
+      title={translate('Create new code component')}
       error={
         isError
           ? {
-              title: 'Failed to create code component',
+              title: translate('Failed to create code component'),
               message: parse(extractErrorMessageFromApiResponse(error)),
-              resetButtonText: 'Try again',
+              resetButtonText: translate('Try again'),
               onReset: handleSave,
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Create',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Create'),
         onConfirm: handleSave,
         isConfirmDisabled: !componentName.trim() || !!validationError,
         isConfirmLoading: isLoading,
@@ -125,14 +126,14 @@ const AddCodeComponentDialog = () => {
       >
         <Flex direction="column" gap="2">
           <DialogFieldLabel htmlFor={'componentName'}>
-            Component name
+            {translate('Component name')}
           </DialogFieldLabel>
           <TextField.Root
             autoComplete="off"
             id={'componentName'}
             value={componentName}
             onChange={(e) => handleOnChange(e.target.value)}
-            placeholder="Enter a name"
+            placeholder={translate('Enter a name')}
             size="1"
           />
           {validationError && (

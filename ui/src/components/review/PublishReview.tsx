@@ -18,6 +18,7 @@ import ReviewErrors from '@/components/review/ReviewErrors';
 import { getReviewGroupKey } from '@/components/review/utils';
 import { Divider } from '@/features/code-editor/component-data/FormElement';
 import { isConflictUxEnabled } from '@/features/conflict/conflictUtils';
+import { translate, translatePlural } from '@/utils/translate';
 
 import ChangeList from './changes/ChangeList';
 import ConflictBanner from './ConflictBanner';
@@ -30,7 +31,7 @@ import type {
 
 import styles from './PublishReview.module.css';
 
-export const DEFAULT_TITLE = 'Unpublished changes';
+export const DEFAULT_TITLE = translate('Unpublished changes');
 
 interface PublishReviewProps {
   title?: string;
@@ -194,19 +195,27 @@ const PublishReview: React.FC<PublishReviewProps> = ({
 
   // The trigger button text changes based on the pending changes
   const triggerButtonText = useMemo(() => {
-    if (!changes?.length) return 'No changes';
-    if (changes.length === 1) return 'Review 1 change';
-    return `Review ${changes.length} changes`;
+    if (!changes?.length) return translate('No changes');
+    return translatePlural(
+      changes.length,
+      'Review 1 change',
+      'Review @count changes',
+    );
   }, [changes]);
 
   // The button caption changes based on the state of the review
   const buttonText = useMemo(() => {
-    if (isPublishing) return 'Publishing';
-    if (isBusy) return 'Please wait';
-    if (hasPublished) return 'Published';
-    if (!changes?.length) return 'No changes available';
-    if (!selectedAvailableChanges?.length) return 'No items selected';
-    return `Publish ${selectedAvailableChanges.length} selected`;
+    if (isPublishing) return translate('Publishing');
+    if (isBusy) return translate('Please wait');
+    if (hasPublished) return translate('Published');
+    if (!changes?.length) return translate('No changes available');
+    if (!selectedAvailableChanges?.length)
+      return translate('No items selected');
+    return translatePlural(
+      selectedAvailableChanges.length,
+      'Publish 1 selected',
+      'Publish @count selected',
+    );
   }, [isPublishing, isBusy, hasPublished, changes, selectedAvailableChanges]);
 
   const groups: UnpublishedChangeGroups = useMemo(() => {
@@ -299,7 +308,10 @@ const PublishReview: React.FC<PublishReviewProps> = ({
               </Heading>
             </Box>
             <Box>
-              <Popover.Close className={styles.close} aria-label="Close">
+              <Popover.Close
+                className={styles.close}
+                aria-label={translate('Close')}
+              >
                 <Cross2Icon />
               </Popover.Close>
             </Box>
@@ -317,10 +329,10 @@ const PublishReview: React.FC<PublishReviewProps> = ({
                   checked={allSelected === true}
                   onCheckedChange={handleSelectAll}
                   size="1"
-                  aria-label="Select all changes"
+                  aria-label={translate('Select all changes')}
                   data-testid="canvas-publish-review-select-all"
                 />
-                Select All
+                {translate('Select All')}
               </Flex>
             </Text>
           </Box>
@@ -334,8 +346,13 @@ const PublishReview: React.FC<PublishReviewProps> = ({
               <Box px="4" pt="4">
                 <Text size="1">
                   {changes.length
-                    ? `${selectedAvailableChanges.length} of ${changes?.length ?? 0} changes selected`
-                    : 'All changes published!'}
+                    ? translatePlural(
+                        selectedAvailableChanges.length,
+                        '1 of @total changes selected',
+                        '@count of @total changes selected',
+                        { '@total': changes?.length ?? 0 },
+                      )
+                    : translate('All changes published!')}
                 </Text>
               </Box>
               {conflictUxEnabled && conflictCount > 0 && (
@@ -393,7 +410,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
                   onClick={handleReviewSelectedChanges}
                   className={styles.reviewSelectedButton}
                 >
-                  Review selected changes
+                  {translate('Review selected changes')}
                 </Button>
               )}
             </Flex>

@@ -10,6 +10,7 @@ import {
   FormElement,
   Label,
 } from '@/features/code-editor/component-data/FormElement';
+import { translate } from '@/utils/translate';
 
 import type { CodeComponentSlot } from '@/types/CodeComponent';
 
@@ -26,7 +27,7 @@ export default function FormPropTypeSlot({
     <Flex direction="column" gap="4" flexGrow="1">
       <Divider />
       <FormElement>
-        <Label>Example HTML/JSX value</Label>
+        <Label>{translate('Example HTML/JSX value')}</Label>
         <div className={styles.editorWrapper}>
           <CodeMirror
             data-testid={`slot-example-${id}`}
@@ -36,7 +37,7 @@ export default function FormPropTypeSlot({
             extensions={[
               javascript({ jsx: true }),
               EditorView.contentAttributes.of({
-                'aria-label': 'Example HTML/JSX value',
+                'aria-label': translate('Example HTML/JSX value'),
               }),
             ]}
             onChange={(value) =>

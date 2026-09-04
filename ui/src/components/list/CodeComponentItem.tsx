@@ -15,6 +15,7 @@ import {
 } from '@/features/ui/codeComponentDialogSlice';
 import { selectActivePanel } from '@/features/ui/primaryPanelSlice';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
+import { translate } from '@/utils/translate';
 
 import type { CodeComponentSerialized } from '@/types/CodeComponent';
 import type { JSComponent } from '@/types/Component';
@@ -99,25 +100,29 @@ const CodeComponentItem: React.FC<CodeComponentItemProps> = ({
       {activePanel === 'library' && insertMenuItem}
       {isExternal ? (
         activePanel !== 'library' && (
-          <UnifiedMenu.Item disabled>No actions available</UnifiedMenu.Item>
+          <UnifiedMenu.Item disabled>
+            {translate('No actions available')}
+          </UnifiedMenu.Item>
         )
       ) : (
         <PermissionCheck
           hasPermission="codeComponents"
           denied={
             activePanel !== 'library' && (
-              <UnifiedMenu.Item disabled>No actions available</UnifiedMenu.Item>
+              <UnifiedMenu.Item disabled>
+                {translate('No actions available')}
+              </UnifiedMenu.Item>
             )
           }
         >
           <UnifiedMenu.Item onClick={handleRemoveFromComponentsClick}>
-            Remove from components
+            {translate('Remove from components')}
           </UnifiedMenu.Item>
           <UnifiedMenu.Item onClick={handleEditClick}>
-            Edit code
+            {translate('Edit code')}
           </UnifiedMenu.Item>
           <UnifiedMenu.Item onClick={handleRenameClick}>
-            Rename
+            {translate('Rename')}
           </UnifiedMenu.Item>
         </PermissionCheck>
       )}
@@ -129,14 +134,20 @@ const CodeComponentItem: React.FC<CodeComponentItemProps> = ({
     <PermissionCheck
       hasPermission="codeComponents"
       denied={
-        <UnifiedMenu.Item disabled>No actions available</UnifiedMenu.Item>
+        <UnifiedMenu.Item disabled>
+          {translate('No actions available')}
+        </UnifiedMenu.Item>
       }
     >
       {!isExternal && (
-        <UnifiedMenu.Item onClick={handleEditClick}>Edit code</UnifiedMenu.Item>
+        <UnifiedMenu.Item onClick={handleEditClick}>
+          {translate('Edit code')}
+        </UnifiedMenu.Item>
       )}
       {!isExternal && (
-        <UnifiedMenu.Item onClick={handleRenameClick}>Rename</UnifiedMenu.Item>
+        <UnifiedMenu.Item onClick={handleRenameClick}>
+          {translate('Rename')}
+        </UnifiedMenu.Item>
       )}
       {/* @todo: Add this item back in https://drupal.org/i/3524274.}
       {/* <UnifiedMenu.Item*/}
@@ -151,16 +162,18 @@ const CodeComponentItem: React.FC<CodeComponentItemProps> = ({
       {/* If the delete form is present, the component is safe to delete. */}
       {'links' in component && component?.links?.['delete-form'] ? (
         <UnifiedMenu.Item color="red" onClick={handleDeleteClick}>
-          Delete
+          {translate('Delete')}
         </UnifiedMenu.Item>
       ) : (
         <UnifiedMenu.Item color="gray" disabled={true}>
           <HoverCard.Root>
             <HoverCard.Trigger onClick={(e) => e.stopPropagation()}>
-              <Text as="span">Delete</Text>
+              <Text as="span">{translate('Delete')}</Text>
             </HoverCard.Trigger>
             <HoverCard.Content>
-              <Text as="p">Cannot delete components that are being used.</Text>
+              <Text as="p">
+                {translate('Cannot delete components that are being used.')}
+              </Text>
             </HoverCard.Content>
           </HoverCard.Root>
         </UnifiedMenu.Item>

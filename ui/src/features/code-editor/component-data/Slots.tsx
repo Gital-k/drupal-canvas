@@ -20,6 +20,7 @@ import {
 } from '@/features/code-editor/component-data/FormElement';
 import FormPropTypeSlot from '@/features/code-editor/component-data/forms/FormPropTypeSlot';
 import SortableList from '@/features/code-editor/component-data/SortableList';
+import { translate } from '@/utils/translate';
 
 import type { CodeComponentSlot } from '@/types/CodeComponent';
 
@@ -51,11 +52,13 @@ export default function Slots() {
     <Flex direction="column" flexGrow="1">
       <Box mb="4" width="100%" flexShrink="0" flexGrow="1">
         <FormElement>
-          <Label htmlFor={`slot-name-${slot.id}`}>Slot name</Label>
+          <Label htmlFor={`slot-name-${slot.id}`}>
+            {translate('Slot name')}
+          </Label>
           <TextField.Root
             autoComplete="off"
             id={`slot-name-${slot.id}`}
-            placeholder="Enter a name"
+            placeholder={translate('Enter a name')}
             value={slot.name}
             size="1"
             onChange={(e) =>
@@ -82,7 +85,9 @@ export default function Slots() {
             <QuestionMarkCircledIcon />
           </Callout.Icon>
           <Callout.Text>
-            Slots allow you to place other components inside of your component.
+            {translate(
+              'Slots allow you to place other components inside of your component.',
+            )}
           </Callout.Text>
         </Callout.Root>
       </Box>
@@ -95,9 +100,10 @@ export default function Slots() {
               <InfoCircledIcon />
             </Callout.Icon>
             <Callout.Text>
-              Changing the name of an existing slot is not allowed when a
-              component is added to <b>Components</b> in the Library. Remove
-              slot and create a new one instead.
+              {translate(
+                'Changing the name of an existing slot is not allowed when a component is added to @components in the Library. Remove slot and create a new one instead.',
+                { '@components': translate('Components') },
+              )}
             </Callout.Text>
           </Callout.Root>
         </Box>
@@ -110,8 +116,8 @@ export default function Slots() {
         renderContent={renderSlotContent}
         getItemId={(item) => item.id}
         data-testid="slot"
-        moveAriaLabel="Move slot"
-        removeAriaLabel="Remove slot"
+        moveAriaLabel={translate('Move slot')}
+        removeAriaLabel={translate('Remove slot')}
       />
     </>
   );

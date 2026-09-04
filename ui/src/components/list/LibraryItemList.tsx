@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Skeleton } from '@radix-ui/themes';
 
 import EmptyStateCallout from '@/components/EmptyStateCallout';
+import { translate } from '@/utils/translate';
 
 import FolderList, { folderfyComponents, sortFolderList } from './FolderList';
 import List from './List';
@@ -112,10 +113,17 @@ function LibraryItemList<T extends { id: string; name: string }>({
         title={
           searchTerm ? (
             <>
-              No results for "<strong>{searchTerm}</strong>" in {topLevelLabel}
+              {translate(
+                'No results for "{{searchTerm}}" in {{topLevelLabel}}',
+                { searchTerm, topLevelLabel },
+              )}
             </>
           ) : (
-            <>No items to show in {topLevelLabel}</>
+            <>
+              {translate('No items to show in {{topLevelLabel}}', {
+                topLevelLabel,
+              })}
+            </>
           )
         }
       />

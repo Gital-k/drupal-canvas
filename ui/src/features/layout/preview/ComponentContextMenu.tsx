@@ -23,6 +23,7 @@ import useEditorNavigation from '@/hooks/useEditorNavigation';
 import useGetComponentName from '@/hooks/useGetComponentName';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import { isMarkerComponentType } from '@/services/pageVariants';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { ReactNode } from 'react';
@@ -182,7 +183,9 @@ export const ComponentContextMenuContent: React.FC<
 
   return (
     <UnifiedMenu.Content
-      aria-label={`Context menu for ${componentName}`}
+      aria-label={translate('Context menu for @name', {
+        '@name': componentName,
+      })}
       menuType={menuType}
       align="start"
       side="right"
@@ -191,7 +194,7 @@ export const ComponentContextMenuContent: React.FC<
       {isCodeComponent && !isExternal && (
         <PermissionCheck hasPermission="codeComponents">
           <UnifiedMenu.Item onClick={handleEditCodeClick}>
-            Edit code
+            {translate('Edit code')}
           </UnifiedMenu.Item>
         </PermissionCheck>
       )}
@@ -199,35 +202,35 @@ export const ComponentContextMenuContent: React.FC<
 
       {!isMarker && (
         <UnifiedMenu.Item onClick={handleDuplicateClick} shortcut="⌘ D">
-          Duplicate
+          {translate('Duplicate')}
         </UnifiedMenu.Item>
       )}
       {!isMarker && (
         <UnifiedMenu.Item onClick={handleCopyClick} shortcut="⌘ C">
-          Copy
+          {translate('Copy')}
         </UnifiedMenu.Item>
       )}
       <UnifiedMenu.Item onClick={handlePasteClick} shortcut="⌘ V">
-        Paste
+        {translate('Paste')}
       </UnifiedMenu.Item>
       {!isMarker && (
         <PermissionCheck hasPermission="patterns">
           <UnifiedMenu.Separator />
           <UnifiedMenu.Item onClick={handleCreatePatternClick}>
-            Create pattern
+            {translate('Create pattern')}
           </UnifiedMenu.Item>
         </PermissionCheck>
       )}
       <UnifiedMenu.Separator />
 
       <UnifiedMenu.Sub>
-        <UnifiedMenu.SubTrigger>Move</UnifiedMenu.SubTrigger>
+        <UnifiedMenu.SubTrigger>{translate('Move')}</UnifiedMenu.SubTrigger>
         <UnifiedMenu.SubContent>
           <UnifiedMenu.Item onClick={handleMoveUpClick}>
-            Move up
+            {translate('Move up')}
           </UnifiedMenu.Item>
           <UnifiedMenu.Item onClick={handleMoveDownClick}>
-            Move down
+            {translate('Move down')}
           </UnifiedMenu.Item>
 
           <UnifiedMenu.Separator />
@@ -247,7 +250,7 @@ export const ComponentContextMenuContent: React.FC<
             color="red"
             onClick={handleDeleteClick}
           >
-            Delete
+            {translate('Delete')}
           </UnifiedMenu.Item>
         </>
       )}

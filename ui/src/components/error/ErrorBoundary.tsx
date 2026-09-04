@@ -11,6 +11,7 @@ import ErrorCard from '@/components/error/ErrorCard';
 import ErrorPage from '@/components/error/ErrorPage';
 import { usePostLogEntryMutation } from '@/services/log';
 import { getDrupalSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 const drupalSettings = getDrupalSettings();
 
@@ -51,7 +52,9 @@ const ErrorBoundary: React.FC<{
                       (window.location.href = drupalSettings.canvas.loginUrl)
                   : resetErrorBoundary
               }
-              resetButtonText={status === 401 ? 'Go to login' : resetButtonText}
+              resetButtonText={
+                status === 401 ? translate('Go to login') : resetButtonText
+              }
             />
           );
         }
@@ -86,7 +89,7 @@ const getRouteErrorMessage = (error: unknown): string => {
     return error;
   } else {
     console.error(error);
-    return 'Unknown error';
+    return translate('Unknown error');
   }
 };
 
@@ -105,7 +108,7 @@ export const RouteErrorBoundary: React.FC = () => {
   return (
     <ErrorPage>
       <ErrorCard
-        title="An unexpected error has occurred in a route."
+        title={translate('An unexpected error has occurred in a route.')}
         error={getRouteErrorMessage(error)}
       />
     </ErrorPage>
@@ -127,7 +130,7 @@ export const RouteAsyncErrorBoundary: React.FC = () => {
 
   return (
     <ErrorCard
-      title="An unexpected async error has occurred in a route."
+      title={translate('An unexpected async error has occurred in a route.')}
       error={getRouteErrorMessage(error)}
     />
   );

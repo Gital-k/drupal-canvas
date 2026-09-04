@@ -27,6 +27,8 @@ import type { ValueMode } from '@/types/CodeComponent';
 
 import './PropValuesSortableList.css';
 
+import { translate } from '@/utils/translate';
+
 interface SortableItemProps {
   id: string | number;
   children: ReactNode;
@@ -72,7 +74,7 @@ function SortableItem({
           {...attributes}
           {...listeners}
           className={`sortable-drag-handle ${isDisabled ? 'disabled' : ''}`}
-          aria-label="Drag to reorder"
+          aria-label={translate('Drag to reorder')}
           role="button"
           tabIndex={isDisabled ? -1 : 0}
         >
@@ -147,7 +149,7 @@ export function PropValuesSortableList({
                   size="1"
                   onClick={() => onRemove(index)}
                   disabled={isItemDisabled}
-                  aria-label="Remove value"
+                  aria-label={translate('Remove value')}
                   className={`trash-icon-button ${isItemDisabled ? 'disabled' : ''}`}
                 >
                   <TrashIcon />
@@ -164,10 +166,10 @@ export function PropValuesSortableList({
           variant="soft"
           onClick={onAdd}
           disabled={isDisabled}
-          aria-label="Add value"
+          aria-label={translate('Add value')}
         >
           <PlusIcon />
-          Add value
+          {translate('Add value')}
         </Button>
       )}
     </Flex>

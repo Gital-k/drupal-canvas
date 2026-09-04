@@ -7,6 +7,7 @@ import UnifiedMenu from '@/components/UnifiedMenu';
 import { setDialogWithDataOpen } from '@/features/ui/dialogSlice';
 import { selectActivePanel } from '@/features/ui/primaryPanelSlice';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { Pattern } from '@/types/Pattern';
@@ -61,15 +62,19 @@ const PatternItem: React.FC<{
       <PermissionCheck
         hasPermission="patterns"
         denied={
-          <UnifiedMenu.Item disabled>No actions available</UnifiedMenu.Item>
+          <UnifiedMenu.Item disabled>
+            {translate('No actions available')}
+          </UnifiedMenu.Item>
         }
       >
         <UnifiedMenu.Item onClick={handleEditClick}>
-          Edit pattern
+          {translate('Edit pattern')}
         </UnifiedMenu.Item>
-        <UnifiedMenu.Item onClick={handleRenameClick}>Rename</UnifiedMenu.Item>
+        <UnifiedMenu.Item onClick={handleRenameClick}>
+          {translate('Rename')}
+        </UnifiedMenu.Item>
         <UnifiedMenu.Item color="red" onClick={handleDeleteClick}>
-          Delete pattern
+          {translate('Delete pattern')}
         </UnifiedMenu.Item>
       </PermissionCheck>
     </>

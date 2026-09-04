@@ -1,8 +1,10 @@
 import { ExclamationTriangleIcon, ReloadIcon } from '@radix-ui/react-icons';
 import { AlertDialog, Box, Button, Flex } from '@radix-ui/themes';
 
-const DEFAULT_TITLE = 'An unexpected error has occurred.';
-const DEFAULT_RESET_BUTTON_TEXT = 'Try again';
+import { translate } from '@/utils/translate';
+
+const DEFAULT_TITLE = translate('An unexpected error has occurred.');
+const DEFAULT_RESET_BUTTON_TEXT = translate('Try again');
 
 const ErrorAlert: React.FC<{
   title?: string;

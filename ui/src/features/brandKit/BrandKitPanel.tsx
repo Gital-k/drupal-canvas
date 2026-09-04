@@ -2,6 +2,7 @@ import { Flex, Tabs } from '@radix-ui/themes';
 
 import BrandKitColorsSection from '@/features/brandKit/BrandKitColorsSection';
 import BrandKitFontsSection from '@/features/brandKit/BrandKitFontsSection';
+import { translate } from '@/utils/translate';
 
 import styles from './BrandKitPanel.module.css';
 
@@ -12,13 +13,13 @@ const BrandKitPanel = () => (
         value="colors"
         data-testid="canvas-brand-kit-colors-tab-select"
       >
-        Colors
+        {translate('Colors')}
       </Tabs.Trigger>
       <Tabs.Trigger
         value="fonts"
         data-testid="canvas-brand-kit-fonts-tab-select"
       >
-        Fonts
+        {translate('Fonts')}
       </Tabs.Trigger>
     </Tabs.List>
     <Flex py="2" className={styles.tabWrapper}>

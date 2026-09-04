@@ -11,6 +11,7 @@ import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
 import { useUpdateComponentMutation } from '@/services/preview';
+import { translate } from '@/utils/translate';
 
 import {
   buildModelWithItemRemoved,
@@ -255,12 +256,12 @@ const DrupalDatetimeMultivalueForm = ({
   // Build the combined display value.
   const combinedDisplayValue = (() => {
     if (!hasTime) {
-      return formatDateForDisplay(displayDate) || 'Empty';
+      return formatDateForDisplay(displayDate) || translate('Empty');
     }
     if (displayDate || displayTime) {
       return `${formatDateForDisplay(displayDate)}${displayDate && displayTime ? ', ' : ''}${formatTimeForDisplay(displayTime)}`;
     }
-    return 'Empty';
+    return translate('Empty');
   })();
 
   return (
@@ -314,7 +315,7 @@ const DrupalDatetimeMultivalueForm = ({
             <Text size="1" weight="medium" className={styles.popoverLabel}>
               {fieldLabel}
             </Text>
-            <Popover.Close aria-label="Close">
+            <Popover.Close aria-label={translate('Close')}>
               <Cross2Icon />
             </Popover.Close>
           </Flex>
@@ -333,7 +334,7 @@ const DrupalDatetimeMultivalueForm = ({
               disabled={!isRemoveButtonEnabled(triggerRowRef.current)}
             >
               <TrashIcon />
-              Remove
+              {translate('Remove')}
             </Button>
           </Flex>
         </Popover.Content>

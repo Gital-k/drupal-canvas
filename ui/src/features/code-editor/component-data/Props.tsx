@@ -60,12 +60,14 @@ import type {
 
 import './Props.css';
 
+import { translate } from '@/utils/translate';
+
 // Default example values when prop is required.
 export const DEFAULT_EXAMPLES: Record<string, string> = {
   text: 'Example text',
   integer: '0',
   number: '0',
-  formattedText: '<p>Example text</p>',
+  formattedText: '<p>{translate("Example text")}</p>',
   link: 'example',
   date: '2026-01-25',
   'date-time': '2026-01-25T12:00:00.000Z',
@@ -89,8 +91,9 @@ export const DEFAULT_ENUM_OPTIONS: Record<
   number: NUMBER_ENUM_OPTION,
 };
 
-export const REQUIRED_EXAMPLE_ERROR_MESSAGE =
-  'A required prop must have an example value.';
+export const REQUIRED_EXAMPLE_ERROR_MESSAGE = translate(
+  'A required prop must have an example value.',
+);
 
 export default function Props() {
   const dispatch = useAppDispatch();
@@ -175,11 +178,13 @@ export default function Props() {
         <Flex mb="4" gap="4" align="end" width="100%" wrap="wrap">
           <Box flexShrink="0" flexGrow="1">
             <FormElement>
-              <Label htmlFor={`prop-name-${prop.id}`}>Prop name</Label>
+              <Label htmlFor={`prop-name-${prop.id}`}>
+                {translate('Prop name')}
+              </Label>
               <TextField.Root
                 autoComplete="off"
                 id={`prop-name-${prop.id}`}
-                placeholder="Enter a name"
+                placeholder={translate('Enter a name')}
                 value={prop.name}
                 size="1"
                 onChange={(e) =>
@@ -196,7 +201,9 @@ export default function Props() {
           </Box>
           <Box flexShrink="0" minWidth="120px">
             <FormElement>
-              <Label htmlFor={`prop-type-${prop.id}`}>Type</Label>
+              <Label htmlFor={`prop-type-${prop.id}`}>
+                {translate('Type')}
+              </Label>
               <Select.Root
                 value={prop.derivedType as string}
                 size="1"
@@ -277,7 +284,9 @@ export default function Props() {
 
           {prop.derivedType !== 'contentEntityReference' && (
             <Flex direction="column" gap="2">
-              <Label htmlFor={`prop-required-${prop.id}`}>Required</Label>
+              <Label htmlFor={`prop-required-${prop.id}`}>
+                {translate('Required')}
+              </Label>
               <Switch
                 id={`prop-required-${prop.id}`}
                 checked={required.includes(propName)}
@@ -608,9 +617,13 @@ export default function Props() {
                 disabled={disabledPropIds.has(prop.id)}
               />
               <Label htmlFor={`prop-allow-multiple-${prop.id}`}>
-                Allow multiple values
+                {translate('Allow multiple values')}
               </Label>
-              <Tooltip content="Stores a list of values instead of a single value">
+              <Tooltip
+                content={translate(
+                  'Stores a list of values instead of a single value',
+                )}
+              >
                 <QuestionMarkCircledIcon />
               </Tooltip>
             </Flex>
@@ -662,10 +675,10 @@ export default function Props() {
                   />
                   <Select.Content>
                     <Select.Item value={VALUE_MODE_LIMITED}>
-                      Limited
+                      {translate('Limited')}
                     </Select.Item>
                     <Select.Item value={VALUE_MODE_UNLIMITED}>
-                      Unlimited
+                      {translate('Unlimited')}
                     </Select.Item>
                   </Select.Content>
                 </Select.Root>
@@ -736,7 +749,7 @@ export default function Props() {
                               disabledPropIds.has(prop.id) ||
                               (prop.limitedCount ?? 2) <= 2
                             }
-                            aria-label="Decrease count"
+                            aria-label={translate('Decrease count')}
                             style={{
                               border: 'none',
                               background: 'transparent',
@@ -791,7 +804,7 @@ export default function Props() {
                                 (prop.limitedCount ?? 2) >= maxLimit
                               );
                             })()}
-                            aria-label="Increase count"
+                            aria-label={translate('Increase count')}
                             style={{
                               border: 'none',
                               background: 'transparent',
@@ -853,9 +866,10 @@ export default function Props() {
               <InfoCircledIcon />
             </Callout.Icon>
             <Callout.Text>
-              Changing the name and type of an existing prop is not allowed when
-              a component is added to <b>Components</b> in the Library. Remove
-              prop and create a new one instead.
+              {translate(
+                'Changing the name and type of an existing prop is not allowed when a component is added to @components in the Library. Remove prop and create a new one instead.',
+                { '@components': translate('Components') },
+              )}
             </Callout.Text>
           </Callout.Root>
         </Box>
@@ -868,8 +882,8 @@ export default function Props() {
         renderContent={renderPropContent}
         getItemId={(item) => item.id}
         data-testid="prop"
-        moveAriaLabel="Move prop"
-        removeAriaLabel="Remove prop"
+        moveAriaLabel={translate('Move prop')}
+        removeAriaLabel={translate('Remove prop')}
       />
     </>
   );

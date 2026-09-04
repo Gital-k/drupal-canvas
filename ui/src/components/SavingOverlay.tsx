@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { useAppSelector } from '@/app/hooks';
 import { selectStatus } from '@/features/code-editor/codeEditorSlice';
+import { translate } from '@/utils/translate';
 
 import styles from '@/components/SavingOverlay.module.css';
 
@@ -20,7 +21,7 @@ const SavingOverlay = () => {
   useEffect(() => {
     if (blocker.state === 'blocked' && isProcessing) {
       // Show toast when blocked and processing.
-      toastIdRef.current = toast.loading('Saving changes');
+      toastIdRef.current = toast.loading(translate('Saving changes'));
     } else {
       // Dismiss toast and proceed with navigation.
       toast.dismiss(toastIdRef.current);

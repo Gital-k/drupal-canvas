@@ -52,6 +52,7 @@ import {
 import { useGetPatternsQuery } from '@/services/patterns';
 import { getCanvasSettings } from '@/utils/drupal-globals';
 import { getQueryErrorMessage } from '@/utils/error-handling';
+import { translate } from '@/utils/translate';
 
 import type { ReactElement } from 'react';
 import type { ContentStub } from '@/types/Content';
@@ -304,7 +305,7 @@ const PageInfo = () => {
         >
           <Button color="sky" variant="soft" size="1">
             <ChevronLeftIcon />
-            Back
+            {translate('Back')}
           </Button>
         </NavLink>
       ) : null}
@@ -320,7 +321,7 @@ const PageInfo = () => {
               {isHeadlessFrontends ? (
                 <>
                   <GlobeIcon />
-                  Headless frontends
+                  {translate('Headless frontends')}
                 </>
               ) : isCodeEditor ? (
                 <>
@@ -330,17 +331,17 @@ const PageInfo = () => {
               ) : isPatternContext ? (
                 <>
                   {iconMap['GlobalPatternName']}
-                  {patternName}
+                  {translate(patternName)}
                 </>
               ) : isTemplateRoute ? (
                 <>
                   {iconMap['Template']}
-                  {templateCaption || 'Template'}
+                  {templateCaption || translate('Template')}
                 </>
               ) : isPageVariantRoute ? (
                 <>
                   {iconMap['PageVariant']}
-                  {pageVariant?.label || entityId}
+                  {pageVariant?.label ? translate(pageVariant.label) : entityId}
                 </>
               ) : (
                 <>
@@ -350,8 +351,8 @@ const PageInfo = () => {
                   {title !== undefined
                     ? title
                       ? title
-                      : 'Untitled page'
-                    : 'No page selected'}
+                      : translate('Untitled page')
+                    : translate('No page selected')}
                 </>
               )}
               <ChevronDownIcon />
@@ -385,7 +386,9 @@ const PageInfo = () => {
             )}
             {pageItemsError && (
               <ErrorCard
-                title="An unexpected error has occurred while loading pages."
+                title={translate(
+                  'An unexpected error has occurred while loading pages.',
+                )}
                 error={getQueryErrorMessage(pageItemsError)}
               />
             )}

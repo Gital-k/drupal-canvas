@@ -24,6 +24,7 @@ import {
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import useReturnableLocation from '@/hooks/useReturnableLocation';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { translate } from '@/utils/translate';
 
 import type { EditorFrameContext } from '@/features/ui/uiSlice';
 
@@ -74,7 +75,9 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
       case 'entity':
         return (
           <ErrorBoundary
-            title="An unexpected error has occurred while fetching the layout."
+            title={translate(
+              'An unexpected error has occurred while fetching the layout.',
+            )}
             variant="alert"
             onReset={isUndoable ? dispatchUndo : undefined}
             resetButtonText={isUndoable ? 'Undo last action' : undefined}
@@ -85,7 +88,9 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
       case 'template':
         return (
           <ErrorBoundary
-            title="An error has occurred while fetching the template."
+            title={translate(
+              'An error has occurred while fetching the template.',
+            )}
             variant="alert"
             onReset={() => {
               if (entityType && bundle && viewMode) {
@@ -111,7 +116,9 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
       case 'pattern':
         return (
           <ErrorBoundary
-            title="An error has occurred while fetching the pattern."
+            title={translate(
+              'An error has occurred while fetching the pattern.',
+            )}
             variant="alert"
             onReset={() => {
               navigate('/', { replace: true });

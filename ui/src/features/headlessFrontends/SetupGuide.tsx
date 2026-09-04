@@ -1,6 +1,8 @@
 import { ExternalLinkIcon } from '@radix-ui/react-icons';
 import { Flex, Heading, Link, Text } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import CommandSnippet from './CommandSnippet';
 import PackageManagerSwitcher from './PackageManagerSwitcher';
 import SetupSection from './SetupSection';
@@ -35,7 +37,7 @@ const SetupGuide = ({
   <Flex direction="column" gap="7">
     <Flex direction="column" gap="3">
       <Heading as="h2" size="3">
-        Set up your codebase
+        {translate('Set up your codebase')}
       </Heading>
       <SetupSection
         packageManager={packageManager}
@@ -45,16 +47,18 @@ const SetupGuide = ({
 
     <Flex direction="column" gap="3">
       <Heading as="h2" size="3">
-        Keep using your existing components
+        {translate('Keep using your existing components')}
       </Heading>
       <Flex direction="column" gap="4" className={styles.sectionCard}>
         <Text size="1" color="gray">
-          Synchronize your existing components with your headless codebase:
+          {translate(
+            'Synchronize your existing components with your headless codebase:',
+          )}
         </Text>
         <Flex gap="3">
           <StepNumber>1</StepNumber>
           <Flex direction="column" gap="1" flexGrow="1">
-            <Text size="1">Set up the Canvas CLI:</Text>
+            <Text size="1">{translate('Set up the Canvas CLI:')}</Text>
             <Text size="1">
               <Link
                 href={CLI_DOCS_URL}
@@ -62,7 +66,7 @@ const SetupGuide = ({
                 rel="noreferrer"
                 data-testid="canvas-headless-cli-docs-link"
               >
-                Read and follow the Canvas CLI setup guide{' '}
+                {translate('Read and follow the Canvas CLI setup guide')}{' '}
                 <ExternalLinkIcon width="12" height="12" />
               </Link>
             </Text>
@@ -71,7 +75,7 @@ const SetupGuide = ({
         <Flex gap="3">
           <StepNumber>2</StepNumber>
           <Flex direction="column" gap="3" flexGrow="1">
-            <Text size="1">Pull your existing components:</Text>
+            <Text size="1">{translate('Pull your existing components:')}</Text>
             <PackageManagerSwitcher
               value={packageManager}
               onValueChange={onPackageManagerChange}

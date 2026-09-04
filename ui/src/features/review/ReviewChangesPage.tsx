@@ -28,6 +28,7 @@ import {
   useDiscardPendingChangeMutation,
   useGetAllPendingChangesQuery,
 } from '@/services/pendingChangesApi';
+import { translate } from '@/utils/translate';
 
 import type { PageVersionSelection } from '@/features/versionComparison/PageVersionComparisonView';
 import type {
@@ -334,8 +335,8 @@ const EnabledReviewChangesPage = () => {
           entityType={activeChange.entity_type}
           autoSaveUpdated={activeChange.updated}
           draftVersionKey={activeDraftVersionKey}
-          publishedVersionTitle="Old version"
-          newVersionTitle="New version"
+          publishedVersionTitle={translate('Old version')}
+          newVersionTitle={translate('New version')}
           selectedVersion={selectedVersion}
           onSelectVersion={setActiveVersionSelection}
           onNewEditClick={() =>

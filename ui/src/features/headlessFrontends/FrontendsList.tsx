@@ -33,6 +33,8 @@ import {
   Tooltip,
 } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import { checkFrontendConnection } from './checkFrontendConnection';
 
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -112,7 +114,7 @@ const FrontendsList = ({
             data-testid="canvas-headless-add-frontend"
           >
             <PlusIcon />
-            Add frontend
+            {translate('Add frontend')}
           </Button>
         </Flex>
       </SortableContext>
@@ -208,7 +210,7 @@ const FrontendRow = ({
       <Button
         {...attributes}
         {...listeners}
-        aria-label="Reorder frontend"
+        aria-label={translate('Reorder frontend')}
         disabled={disabled}
         variant="ghost"
         color="gray"
@@ -226,7 +228,7 @@ const FrontendRow = ({
         />
         <Button
           onClick={onRemove}
-          aria-label="Remove frontend"
+          aria-label={translate('Remove frontend')}
           disabled={disabled}
           variant="ghost"
           color="red"
@@ -251,17 +253,21 @@ const ConnectionStatusIndicator = ({
       <Flex gap="1" align="center">
         <Spinner size="1" />
         <Text size="1" color="gray">
-          Checking…
+          {translate('Checking…')}
         </Text>
       </Flex>
     );
   }
   if (status === 'unreachable') {
     return (
-      <Tooltip content="The URL did not respond. Check that the site is deployed and the URL is correct.">
+      <Tooltip
+        content={translate(
+          'The URL did not respond. Check that the site is deployed and the URL is correct.',
+        )}
+      >
         <Badge size="1" color="red" variant="soft">
           <CrossCircledIcon width="12" height="12" />
-          Unreachable
+          {translate('Unreachable')}
         </Badge>
       </Tooltip>
     );
@@ -269,11 +275,14 @@ const ConnectionStatusIndicator = ({
   if (status === 'setup-needed') {
     return (
       <Tooltip
-        aria-label="The site responded, but no Canvas adapter was found. Install the adapter for your framework — see the setup guide."
+        aria-label={translate(
+          'The site responded, but no Canvas adapter was found. Install the adapter for your framework — see the setup guide.',
+        )}
         content={
           <>
-            The site responded, but no Canvas adapter was found. Install the
-            adapter for your framework — see the{' '}
+            {translate(
+              'The site responded, but no Canvas adapter was found. Install the adapter for your framework — see the',
+            )}{' '}
             <Link
               href="#canvas-headless-setup-guide"
               className={styles.setupGuideTooltipLink}
@@ -282,7 +291,7 @@ const ConnectionStatusIndicator = ({
                 onOpenSetupGuide();
               }}
             >
-              setup guide
+              {translate('setup guide')}
             </Link>
             .
           </>
@@ -290,7 +299,7 @@ const ConnectionStatusIndicator = ({
       >
         <Badge size="1" color="amber" variant="soft">
           <ExclamationTriangleIcon width="12" height="12" />
-          Setup needed
+          {translate('Setup needed')}
         </Badge>
       </Tooltip>
     );
@@ -298,7 +307,7 @@ const ConnectionStatusIndicator = ({
   return (
     <Badge size="1" color="green" variant="soft">
       <CheckCircledIcon width="12" height="12" />
-      Ready
+      {translate('Ready')}
     </Badge>
   );
 };

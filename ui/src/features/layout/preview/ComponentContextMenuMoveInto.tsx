@@ -9,6 +9,7 @@ import {
   getDisplayNameForNode,
 } from '@/features/layout/layoutUtils';
 import { unsetHoveredComponent } from '@/features/ui/uiSlice';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type {
@@ -60,10 +61,12 @@ const SiblingSlotsSubMenu: React.FC<{
 
   return (
     <UnifiedMenu.Sub>
-      <UnifiedMenu.SubTrigger>Move into</UnifiedMenu.SubTrigger>
+      <UnifiedMenu.SubTrigger>{translate('Move into')}</UnifiedMenu.SubTrigger>
       <UnifiedMenu.SubContent>
         {siblingSlots.length === 0 && (
-          <UnifiedMenu.Item disabled>No sibling slots</UnifiedMenu.Item>
+          <UnifiedMenu.Item disabled>
+            {translate('No sibling slots')}
+          </UnifiedMenu.Item>
         )}
         {siblingSlots.map(({ slot, parentComponentName, slotDisplayName }) => (
           <UnifiedMenu.Item key={slot.id} onClick={handleMoveIntoSlot(slot.id)}>

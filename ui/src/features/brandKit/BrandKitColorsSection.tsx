@@ -29,6 +29,7 @@ import FolderNameInput from '@/features/brandKit/components/FolderNameInput';
 import { useBrandKitColors } from '@/features/brandKit/hooks/useBrandKitColors';
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import { useGetFoldersQuery } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 
 import type { FormEvent } from 'react';
 import type { Measurable } from '@radix-ui/rect';
@@ -149,9 +150,9 @@ const BrandKitColorsSection = () => {
         >
           <TextField.Root
             autoComplete="off"
-            placeholder="Search…"
+            placeholder={translate('Search…')}
             radius="medium"
-            aria-label="Search colors"
+            aria-label={translate('Search colors')}
             size="1"
             value={searchTerm}
             onChange={(e) => {
@@ -173,7 +174,7 @@ const BrandKitColorsSection = () => {
               data-testid="canvas-brand-kit-colors-new-button"
             >
               <PlusIcon />
-              New
+              {translate('New')}
               <ChevronDownIcon />
             </Button>
           </DropdownMenu.Trigger>
@@ -197,14 +198,14 @@ const BrandKitColorsSection = () => {
               data-testid="canvas-brand-kit-colors-new-color-button"
             >
               <ColorWheelIcon />
-              Color
+              {translate('Color')}
             </DropdownMenu.Item>
             <DropdownMenu.Item
               onClick={handleAddFolderClick}
               data-testid="canvas-brand-kit-colors-new-folder-button"
             >
               <FolderIcon />
-              Folder
+              {translate('Folder')}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Root>
@@ -231,13 +232,15 @@ const BrandKitColorsSection = () => {
           my="3"
           title={
             searchTerm
-              ? 'No results match your search.'
-              : 'No colors added yet.'
+              ? translate('No results match your search.')
+              : translate('No colors added yet.')
           }
           description={
             searchTerm
               ? ''
-              : 'Add colors to generate reusable CSS custom properties for the global brand kit.'
+              : translate(
+                  'Add colors to generate reusable CSS custom properties for the global brand kit.',
+                )
           }
         />
       )}
@@ -248,7 +251,7 @@ const BrandKitColorsSection = () => {
           <FolderList
             key={folder.id}
             folder={folder}
-            deleteWarning="Cannot delete folder containing colors"
+            deleteWarning={translate('Cannot delete folder containing colors')}
             extraMenuItems={
               <UnifiedMenu.Item
                 onClick={() => {
@@ -257,7 +260,7 @@ const BrandKitColorsSection = () => {
                 }}
                 data-testid="canvas-brand-kit-colors-folder-add-color-button"
               >
-                Add color
+                {translate('Add color')}
               </UnifiedMenu.Item>
             }
           >

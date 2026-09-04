@@ -27,6 +27,7 @@ import {
   useUpdateFolderMutation,
 } from '@/services/componentAndLayout';
 import { getColorAlpha, getColorHex } from '@/utils/brandKitColor';
+import { translate, translatePlural } from '@/utils/translate';
 
 import type { Measurable } from '@radix-ui/rect';
 import type { BrandKitColor, BrandKitColorValue } from '@/types/CodeComponent';
@@ -120,7 +121,9 @@ function formReducer(state: FormState, action: FormAction): FormState {
 
     case 'SET_COLOR_NAME': {
       const colorName = action.value;
-      const colorNameError = colorName.trim() ? '' : 'Color name is required.';
+      const colorNameError = colorName.trim()
+        ? ''
+        : translate('Color name is required.');
       // If the user has manually edited the variable name, leave it alone.
       if (state.variableNameTouched) {
         return { ...state, colorName, colorNameError };
@@ -156,7 +159,9 @@ function formReducer(state: FormState, action: FormAction): FormState {
       return {
         ...state,
         isColorValueValid: action.isValid,
-        colorValueError: action.isValid ? '' : 'Must be a valid color.',
+        colorValueError: action.isValid
+          ? ''
+          : translate('Must be a valid color.'),
       };
 
     case 'SET_FOLDER_ERROR':
@@ -165,11 +170,13 @@ function formReducer(state: FormState, action: FormAction): FormState {
     case 'SHOW_VALIDATION_ERRORS':
       return {
         ...state,
-        colorNameError: state.colorName.trim() ? '' : 'Color name is required.',
+        colorNameError: state.colorName.trim()
+          ? ''
+          : translate('Color name is required.'),
         variableNameError: validateCssVariableClientSide(state.variableName),
         colorValueError: state.isColorValueValid
           ? ''
-          : 'Must be a valid color.',
+          : translate('Must be a valid color.'),
       };
 
     default:
@@ -309,8 +316,9 @@ const ColorFormPopover = ({
               console.error('Failed to add color to folder:', folderErr);
               updateForm({
                 type: 'SET_FOLDER_ERROR',
-                error:
+                error: translate(
                   'The color was created but could not be added to the folder. You can move it manually.',
+                ),
               });
               // Keep the popover open so the user sees the error.
               return;
@@ -335,8 +343,11 @@ const ColorFormPopover = ({
   };
 
   const title =
-    operation === 'add' ? 'Add color' : (color?.name ?? 'Edit color');
-  const confirmText = operation === 'add' ? 'Add' : 'Save';
+    operation === 'add'
+      ? translate('Add color')
+      : (color?.name ?? translate('Edit color'));
+  const confirmText =
+    operation === 'add' ? translate('Add') : translate('Save');
 
   const isConfirmDisabled = useMemo(() => {
     // Block save if color value is invalid (for both add and edit operations).
@@ -426,7 +437,7 @@ const ColorFormPopover = ({
               <IconButton
                 variant="ghost"
                 size="1"
-                aria-label="Close"
+                aria-label={translate('Close')}
                 data-testid="color-form-close-button"
               >
                 <Cross2Icon />
@@ -447,13 +458,13 @@ const ColorFormPopover = ({
                 <>
                   <Flex direction="column" gap="1" px="3">
                     <label htmlFor="colorName" className={styles.fieldLabel}>
-                      Color name
+                      {translate('Color name')}
                     </label>
                     <TextField.Root
                       id="colorName"
                       value={colorName}
                       onChange={(e) => handleColorNameChange(e.target.value)}
-                      placeholder="Enter a name"
+                      placeholder={translate('Enter a name')}
                       size="1"
                       data-testid="canvas-color-name-input"
                     />
@@ -468,13 +479,13 @@ const ColorFormPopover = ({
 
               <Flex direction="column" gap="1" px="3">
                 <label htmlFor="variableName" className={styles.fieldLabel}>
-                  Variable name
+                  {translate('Variable name')}
                 </label>
                 <TextField.Root
                   id="variableName"
                   value={variableName}
                   onChange={(e) => handleVariableNameChange(e.target.value)}
-                  placeholder="e.g., color-primary"
+                  placeholder={translate('e.g., color-primary')}
                   size="1"
                   data-testid="canvas-color-variable-input"
                 >
@@ -490,7 +501,7 @@ const ColorFormPopover = ({
               {operation === 'add' && (
                 <>
                   <ErrorBoundary
-                    title="Color picker unavailable"
+                    title={translate('Color picker unavailable')}
                     variant="card"
                   >
                     <ColorPicker
@@ -534,7 +545,7 @@ const ColorFormPopover = ({
                       data-testid="color-current-preview"
                     >
                       <Text size="1" className={styles.previewLabel}>
-                        Current
+                        {translate('Current')}
                       </Text>
                       <div
                         className={styles.previewSwatch}
@@ -547,7 +558,7 @@ const ColorFormPopover = ({
                                 .padStart(2, '0')}`
                             : 'transparent',
                         }}
-                        aria-label="Current color"
+                        aria-label={translate('Current color')}
                         data-testid="canvas-color-current-swatch"
                       />
                       <Text
@@ -568,7 +579,7 @@ const ColorFormPopover = ({
                       data-testid="color-new-preview"
                     >
                       <Text size="1" className={styles.previewLabel}>
-                        Preview
+                        {translate('Preview')}
                       </Text>
                       <div
                         className={styles.previewSwatch}
@@ -579,7 +590,7 @@ const ColorFormPopover = ({
                             .toString(16)
                             .padStart(2, '0')}`,
                         }}
-                        aria-label="Preview color"
+                        aria-label={translate('Preview color')}
                         data-testid="canvas-color-preview-swatch"
                       />
                       <Text
@@ -593,7 +604,7 @@ const ColorFormPopover = ({
                   </Flex>
 
                   <ErrorBoundary
-                    title="Color picker unavailable"
+                    title={translate('Color picker unavailable')}
                     variant="card"
                   >
                     <ColorPicker
@@ -635,9 +646,12 @@ const ColorFormPopover = ({
                           />
                         </svg>
                         <Text size="1" className={styles.infoText}>
-                          Changing this color will affect {componentCount}{' '}
-                          component
-                          {componentCount !== 1 ? 's' : ''} across your design.
+                          {translatePlural(
+                            componentCount,
+                            'Changing this color will affect @count component across your design.',
+                            'Changing this color will affect @count components across your design.',
+                            { '@count': componentCount },
+                          )}
                         </Text>
                       </div>
                     </Box>
@@ -667,7 +681,7 @@ const ColorFormPopover = ({
                   size="1"
                   data-testid="canvas-color-cancel-button"
                 >
-                  Cancel
+                  {translate('Cancel')}
                 </Button>
               </Popover.Close>
               <Button

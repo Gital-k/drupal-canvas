@@ -15,6 +15,7 @@ import {
   useGetPageVariantsQuery,
 } from '@/services/pageVariants';
 import { hasPermission } from '@/utils/permissions';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 
@@ -72,7 +73,7 @@ const PageVariantLayer = ({ children }: { children: React.ReactNode }) => {
         title={
           canEditVariants
             ? variants?.[variantId]?.label || variantId
-            : 'Page template'
+            : translate('Page template')
         }
         variant="template"
         to={

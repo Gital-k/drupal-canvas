@@ -1,6 +1,8 @@
 import { Cross2Icon } from '@radix-ui/react-icons';
 import { Flex, Text, Tooltip } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import { TOOL_ICONS } from './AiToolSelector';
 
 import type { AiTool } from '@drupal-canvas/types';
@@ -20,10 +22,10 @@ const ActiveToolPill = ({ tool, onDismiss }: ActiveToolPillProps) => {
     <Flex align="center" gap="2" className={styles.pill}>
       {ToolIcon && <ToolIcon className={styles.toolIcon} />}
       <Text className={styles.toolLabel}>{tool.label}</Text>
-      <Tooltip content="Remove">
+      <Tooltip content={translate('Remove')}>
         <button
           type="button"
-          aria-label="Remove the selected tool"
+          aria-label={translate('Remove the selected tool')}
           className={styles.dismissButton}
           onClick={onDismiss}
         >

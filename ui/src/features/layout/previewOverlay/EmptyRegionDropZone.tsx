@@ -10,6 +10,7 @@ import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import { useTemplateCaption } from '@/hooks/useTemplateCaption';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { RegionNode } from '@/features/layout/layoutModelSlice';
@@ -80,7 +81,9 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
             <Text weight={'medium'} mt="2" trim="start">
               {isTemplateRoute ? templateCaption || 'Template' : 'Page content'}
             </Text>
-            <div className={styles.regionMessage}>Place items here</div>
+            <div className={styles.regionMessage}>
+              {translate('Place items here')}
+            </div>
           </>
         )}
       </div>

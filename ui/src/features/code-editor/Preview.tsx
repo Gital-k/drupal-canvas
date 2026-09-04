@@ -33,6 +33,7 @@ import {
   getDrupal,
   getDrupalSettings,
 } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import MissingDefaultExportMessage, {
   CodeBlock,
@@ -299,14 +300,14 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
 
   const renderCompileError = () => (
     <ErrorCard
-      title="Error: There was an error compiling your code."
+      title={translate('Error: There was an error compiling your code.')}
       error="Check your browser's developer console for more details."
     />
   );
 
   const renderExportMissingError = () => (
     <ErrorCard
-      title="Error: Component is missing a default export."
+      title={translate('Error: Component is missing a default export.')}
       asChild={true}
     >
       <MissingDefaultExportMessage />
@@ -314,19 +315,23 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   );
 
   const renderImportError = () => {
-    const title = `Error: Could not import JS component of id: ${jsImportNameWithError}`;
+    const title = translate('Error: Could not import JS component of id: @id', {
+      '@id': jsImportNameWithError,
+    });
     return (
       <ErrorCard title={title} asChild={true}>
         <Flex direction="column" gap="3">
           <TextBlock>
-            An auto-saved version of this component doesn't exist yet or your
-            import statement is using the wrong component id.
+            {translate(
+              "An auto-saved version of this component doesn't exist yet or your import statement is using the wrong component id.",
+            )}
           </TextBlock>
+          {/* eslint-disable-next-line translation/require-translated-user-facing-strings -- Code example, not user-facing text */}
           <CodeBlock>import Heading from '@/components/component_id'</CodeBlock>
           <TextBlock>
-            To find the correct id for the component you are trying to import,
-            open the code editor for that component, and it will be in your
-            browser's URL.
+            {translate(
+              "To find the correct id for the component you are trying to import, open the code editor for that component, and it will be in your browser's URL.",
+            )}
           </TextBlock>
         </Flex>
       </ErrorCard>
@@ -362,7 +367,7 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
         {activeErrors.length === 0 && (
           <iframe
             className={styles.iframe}
-            title="Canvas Code Editor Preview"
+            title={translate('Canvas Code Editor Preview')}
             ref={iframeRef}
             height="100%"
             width="100%"

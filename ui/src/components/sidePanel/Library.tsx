@@ -8,6 +8,7 @@ import LibraryToolbar from '@/components/sidePanel/LibraryToolbar';
 import { useCanvasHeadlessSettings } from '@/hooks/useCanvasHeadlessSettings';
 import useDebounce from '@/hooks/useDebounce';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import type { ComponentVisibility } from '@/components/list/ComponentList';
 
@@ -35,14 +36,14 @@ const Library = () => {
             value="components"
             data-testid="canvas-library-components-tab-select"
           >
-            Components
+            {translate('Components')}
           </Tabs.Trigger>
           {!externalComponentsOnly && (
             <Tabs.Trigger
               value="patterns"
               data-testid="canvas-library-patterns-tab-select"
             >
-              Patterns
+              {translate('Patterns')}
             </Tabs.Trigger>
           )}
         </Tabs.List>
@@ -52,7 +53,11 @@ const Library = () => {
             className={styles.tabContent}
             data-testid="canvas-library-components-tab-content"
           >
-            <ErrorBoundary title="An unexpected error has occurred while fetching components.">
+            <ErrorBoundary
+              title={translate(
+                'An unexpected error has occurred while fetching components.',
+              )}
+            >
               <LibraryToolbar
                 type={'component'}
                 searchTerm={searchTerm}
@@ -71,7 +76,11 @@ const Library = () => {
               className={styles.tabContent}
               data-testid="canvas-library-patterns-tab-content"
             >
-              <ErrorBoundary title="An unexpected error has occurred while fetching patterns.">
+              <ErrorBoundary
+                title={translate(
+                  'An unexpected error has occurred while fetching patterns.',
+                )}
+              >
                 <LibraryToolbar
                   type={'pattern'}
                   searchTerm={searchTerm}

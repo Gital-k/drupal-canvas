@@ -12,6 +12,8 @@ import {
   Text,
 } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import type React from 'react';
 
 import styles from '@/features/versionComparison/VersionComparisonPage.module.css';
@@ -94,7 +96,7 @@ const ConflictHeader = ({
           className={styles.breadcrumbLink}
           onClick={onNavigateToCanvas}
         >
-          Canvas
+          {translate('Canvas')}
         </button>
         <Text size="1" color="gray">
           /
@@ -104,7 +106,7 @@ const ConflictHeader = ({
           className={styles.breadcrumbLink}
           onClick={onNavigateToConflict}
         >
-          Conflict
+          {translate('Conflict')}
         </button>
         <Text size="1" color="gray">
           /
@@ -113,14 +115,14 @@ const ConflictHeader = ({
           {label}
         </Text>
         <Badge color="gray" variant="soft" radius="small">
-          Page
+          {translate('Page')}
         </Badge>
       </Flex>
       <IconButton
         variant="ghost"
         color="gray"
         highContrast
-        aria-label="Close"
+        aria-label={translate('Close')}
         onClick={onClose}
       >
         <Cross2Icon />
@@ -154,7 +156,10 @@ const ConflictFooter = ({
 }: ConflictFooterProps) => (
   <div className={styles.footer}>
     <Text size="2" color="gray">
-      Review {reviewIndex + 1} of {reviewTotal}
+      {translate('Review @current of @total', {
+        '@current': String(reviewIndex + 1),
+        '@total': String(reviewTotal),
+      })}
     </Text>
     <Flex align="center" gap="5">
       <Button
@@ -164,7 +169,7 @@ const ConflictFooter = ({
         onClick={onPrevious}
       >
         <ArrowLeftIcon />
-        Previous
+        {translate('Previous')}
       </Button>
       <Button
         variant="ghost"
@@ -172,14 +177,14 @@ const ConflictFooter = ({
         disabled={currentIndex >= unresolvedTotal - 1 || isResolving}
         onClick={onNext}
       >
-        Next
+        {translate('Next')}
         <ArrowRightIcon />
       </Button>
       <Button
         onClick={onResolveConflict}
         disabled={isResolving || !canResolveConflict}
       >
-        Resolve conflict
+        {translate('Resolve conflict')}
         <Spinner loading={isResolving} />
       </Button>
     </Flex>

@@ -17,6 +17,7 @@ import {
 } from '@radix-ui/themes';
 
 import { isConflictUxEnabled } from '@/features/conflict/conflictUtils';
+import { translate } from '@/utils/translate';
 
 import { getAvatarInitialColor, getChangeLabel, getTimeAgo } from '../utils';
 import ChangeIcon from './ChangeIcon';
@@ -122,7 +123,7 @@ const ChangeRow = ({
             />
             <Flex height="16px" align="center">
               {hasConflict ? (
-                <Tooltip content="This change has a conflict">
+                <Tooltip content={translate('This change has a conflict')}>
                   <ExclamationTriangleIcon
                     className={styles.conflictIcon}
                     data-testid="change-conflict-icon"
@@ -149,7 +150,9 @@ const ChangeRow = ({
             <Box pt="1">
               <Tooltip
                 content={
-                  willBeUnpublished ? 'Applies on next publish' : undefined
+                  willBeUnpublished
+                    ? translate('Applies on next publish')
+                    : undefined
                 }
               >
                 <Badge
@@ -166,10 +169,10 @@ const ChangeRow = ({
                   {willBeUnpublished ? (
                     <Flex align="center" gap="1">
                       <ClockIcon width="11" height="11" />
-                      Unpublish
+                      {translate('Unpublish')}
                     </Flex>
                   ) : (
-                    'Unpublished'
+                    translate('Unpublished')
                   )}
                 </Badge>
               </Tooltip>
@@ -182,7 +185,9 @@ const ChangeRow = ({
               </Text>
             </Tooltip>
           </Box>
-          <Tooltip content={`By ${change.owner.name}`}>
+          <Tooltip
+            content={translate('By {{name}}', { name: change.owner.name })}
+          >
             <Avatar
               highContrast
               size="1"
@@ -201,7 +206,10 @@ const ChangeRow = ({
           <Box pt="1">
             <DropdownMenu.Root>
               <DropdownMenu.Trigger>
-                <IconButton disabled={isBusy} aria-label="More options">
+                <IconButton
+                  disabled={isBusy}
+                  aria-label={translate('More options')}
+                >
                   <DotsVerticalIcon />
                 </IconButton>
               </DropdownMenu.Trigger>
@@ -210,16 +218,16 @@ const ChangeRow = ({
                   <DropdownMenu.Item
                     onSelect={() => onResolveConflict?.(change)}
                   >
-                    Resolve conflict
+                    {translate('Resolve conflict')}
                   </DropdownMenu.Item>
                 )}
                 {canViewChange && (
                   <DropdownMenu.Item onSelect={() => onViewClick?.(change)}>
-                    Review changes
+                    {translate('Review changes')}
                   </DropdownMenu.Item>
                 )}
                 <DropdownMenu.Item onSelect={() => onDiscardClick(change)}>
-                  Discard changes
+                  {translate('Discard changes')}
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Root>

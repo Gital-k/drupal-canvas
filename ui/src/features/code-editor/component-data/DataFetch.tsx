@@ -5,6 +5,7 @@ import { Box, Callout } from '@radix-ui/themes';
 
 import { useAppSelector } from '@/app/hooks';
 import { selectCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
+import { translate } from '@/utils/translate';
 
 import styles from './DataFetch.module.css';
 
@@ -43,8 +44,9 @@ const DataFetch = () => {
               <InfoCircledIcon />
             </Callout.Icon>
             <Callout.Text>
-              Results from <code>useSWR()</code> and data fetching with
-              <code>'@/lib/drupal-utils'</code> functions will be shown here.
+              {translate(
+                'Results from useSWR() and data fetching with @/lib/drupal-utils functions will be shown here.',
+              )}
             </Callout.Text>
           </Callout.Root>
         </Box>
@@ -82,7 +84,7 @@ const DataFetch = () => {
                     <Callout.Text>
                       {fetchedData[id].data?.message
                         ? fetchedData[id].data.message
-                        : 'error'}
+                        : translate('error')}
                     </Callout.Text>
                     <Box p="2" className={styles.errorWrapper}>
                       <JSONTree

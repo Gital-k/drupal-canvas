@@ -22,6 +22,7 @@ import NotificationToastManager from '@/features/notifications/NotificationToast
 import useNavigationListener from '@/hooks/useNavigationListener';
 import useRouteSync from '@/hooks/useRouteSync';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { CollisionDetection } from '@dnd-kit/core';
@@ -85,12 +86,14 @@ const App: React.FC = () => {
               <InfoCircledIcon />
             </Callout.Icon>
             <Callout.Text>
-              Drupal Canvas requires a browser window at least 1024 pixels wide
-              to function properly.
+              {translate(
+                'Drupal Canvas requires a browser window at least 1024 pixels wide to function properly.',
+              )}
             </Callout.Text>
             <Callout.Text>
-              Please resize your browser window or switch to a device with a
-              larger screen to continue using Drupal Canvas.
+              {translate(
+                'Please resize your browser window or switch to a device with a larger screen to continue using Drupal Canvas.',
+              )}
             </Callout.Text>
           </Callout.Root>
         </Box>
@@ -98,7 +101,9 @@ const App: React.FC = () => {
       <div className={styles.canvasAppContent}>
         <ErrorBoundary
           variant="alert"
-          title="Drupal Canvas has encountered an unexpected error."
+          title={translate(
+            'Drupal Canvas has encountered an unexpected error.',
+          )}
         >
           <DndContext
             sensors={sensors}

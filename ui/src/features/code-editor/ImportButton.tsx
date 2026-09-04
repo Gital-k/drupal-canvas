@@ -4,6 +4,7 @@ import { IconButton, Popover, Tooltip } from '@radix-ui/themes';
 import ErrorBoundary from '@/components/error/ErrorBoundary';
 import Panel from '@/components/Panel';
 import CodeComponentImports from '@/features/code-editor/CodeComponentImports';
+import { translate } from '@/utils/translate';
 
 import styles from '@/features/code-editor/Import.module.css';
 
@@ -13,7 +14,7 @@ const ImportButton = () => {
       <Tooltip content="Import components">
         <Popover.Trigger>
           <IconButton
-            aria-label="Import components"
+            aria-label={translate('Import components')}
             radius="full"
             data-testid="canvas-import-button"
             className={styles.importButton}

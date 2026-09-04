@@ -3,6 +3,7 @@ import { Flex, Text } from '@radix-ui/themes';
 
 import { PageVersionComparisonView } from '@/features/versionComparison/PageVersionComparisonView';
 import { useGetConflictPageLayoutQuery } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 
 import type { PageVersionSelection } from '@/features/versionComparison/PageVersionComparisonView';
 import type { LayoutApiResponse } from '@/services/componentAndLayout';
@@ -38,7 +39,10 @@ const formatPageVersionUpdated = (
   const formattedDate = versionUpdatedDateFormatter.format(date);
   const formattedTime = versionUpdatedTimeFormatter.format(date);
 
-  return `Updated ${formattedDate} at ${formattedTime}`;
+  return translate('Updated @date at @time', {
+    '@date': formattedDate,
+    '@time': formattedTime,
+  });
 };
 
 export interface PageVersionComparisonProps {
@@ -148,7 +152,9 @@ export const PageVersionComparison = ({
         data-testid="page-version-preview-error"
       >
         <Text color="red">
-          Unable to load both versions of this page for comparison.
+          {translate(
+            'Unable to load both versions of this page for comparison.',
+          )}
         </Text>
       </Flex>
     );

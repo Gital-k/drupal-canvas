@@ -10,6 +10,7 @@ import {
 } from '@/features/ui/codeComponentDialogSlice';
 import { selectPreviouslyEdited } from '@/features/ui/uiSlice';
 import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 
 import type { CodeComponentSerialized } from '@/types/CodeComponent';
 
@@ -72,31 +73,37 @@ const AddToComponentsDialog = () => {
     <Dialog
       open={isAddToComponentsDialogOpen}
       onOpenChange={handleOpenChange}
-      title="Add to components"
+      title={translate('Add to components')}
       description={
         <>
-          This component will be moved to the <b>Components</b> section and will
-          be available to use on the page.
+          {translate('This component will be moved to the')}{' '}
+          <b>{translate('Components')}</b>{' '}
+          {translate('section and will be available to use on the page.')}
           <br />
           <br />
-          You can remove it from <b>Components</b> at any time.
+          {translate('You can remove it from')} <b>{translate('Components')}</b>{' '}
+          {translate('at any time.')}
         </>
       }
       error={
         isError
           ? {
-              title: 'Failed to add to components',
-              message: `An error ${
-                'status' in error ? '(HTTP ' + error.status + ')' : ''
-              } occurred while adding to components. Please check the browser console for more details.`,
-              resetButtonText: 'Try again',
+              title: translate('Failed to add to components'),
+              message: translate(
+                'An error @error occurred while adding to components. Please check the browser console for more details.',
+                {
+                  '@error':
+                    'status' in error ? '(HTTP ' + error.status + ')' : '',
+                },
+              ),
+              resetButtonText: translate('Try again'),
               onReset: handleSave,
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Add',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Add'),
         onConfirm: handleSave,
         isConfirmDisabled: false,
         isConfirmLoading: isLoading,

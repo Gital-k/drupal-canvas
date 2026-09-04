@@ -18,6 +18,7 @@ import FindColorInstancesPopover from '@/features/brandKit/components/FindColorI
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import { useUpdateColorMutation } from '@/services/brandKit';
 import { getColorHex, getCssColorValue } from '@/utils/brandKitColor';
+import { translate } from '@/utils/translate';
 
 import type { Measurable } from '@radix-ui/rect';
 import type { BrandKitColor } from '@/types/CodeComponent';
@@ -167,13 +168,13 @@ const ColorRow = ({ color }: ColorRowProps) => {
         }}
         data-testid="canvas-color-row-edit"
       >
-        Edit color
+        {translate('Edit color')}
       </UnifiedMenu.Item>
       <UnifiedMenu.Item
         onClick={() => setIsRenaming(true)}
         data-testid="canvas-color-row-rename"
       >
-        Rename
+        {translate('Rename')}
       </UnifiedMenu.Item>
       <UnifiedMenu.Item
         onClick={() => {
@@ -182,7 +183,7 @@ const ColorRow = ({ color }: ColorRowProps) => {
         }}
         data-testid="canvas-color-row-find-instances"
       >
-        Find instances
+        {translate('Find instances')}
       </UnifiedMenu.Item>
       <UnifiedMenu.Separator />
       <UnifiedMenu.Item
@@ -193,7 +194,7 @@ const ColorRow = ({ color }: ColorRowProps) => {
         color="red"
         data-testid="canvas-color-row-delete"
       >
-        Delete
+        {translate('Delete')}
       </UnifiedMenu.Item>
     </>
   );
@@ -301,7 +302,7 @@ const ColorRow = ({ color }: ColorRowProps) => {
                   <DropdownMenu.Trigger>
                     <button
                       ref={dotsButtonRef as React.RefObject<HTMLButtonElement>}
-                      aria-label="Open contextual menu"
+                      aria-label={translate('Open contextual menu')}
                       className={styles.colorRowDots}
                     >
                       <DotsHorizontalIcon />
