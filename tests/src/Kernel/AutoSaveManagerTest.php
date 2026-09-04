@@ -243,6 +243,87 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Tests the auto-save data the client uses to detect concurrent saves.
+   *
+   * The starting point must track the *live* entity: it moves when somebody
+   * else saves that entity, and stays put when only the draft changes. Deriving
+   * it from the auto-saved draft would leave conflict detection blind, because
+   * a draft never changes underneath the client that wrote it.
+   *
+   * @see \Drupal\canvas\AutoSaveEntity::getLiveStartingPoint()
+   */
+  public function testClientAutoSaveData(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $sut = $this->container->get(AutoSaveManager::class);
+    self::assertInstanceOf(AutoSaveManager::class, $sut);
+
+    $page = Page::create([
+      'title' => 'Original title',
+      'components' => [],
+    ]);
+    self::assertSame(SAVED_NEW, $page->save());
+    $asset_library = AssetLibrary::load('global');
+    self::assertInstanceOf(AssetLibrary::class, $asset_library);
+
+    $page_key = AutoSaveManager::getAutoSaveKey($page);
+    $library_key = AutoSaveManager::getAutoSaveKey($asset_library);
+
+    // Every entity is described, keyed by its auto-save key. The hash is NULL
+    // while no auto-save entry exists.
+    $auto_saves = $sut->getClientAutoSaves([$page, $asset_library]);
+    self::assertSame([$page_key, $library_key], \array_keys($auto_saves));
+    self::assertNull($auto_saves[$page_key]['hash']);
+    self::assertNull($auto_saves[$library_key]['hash']);
+
+    // A revisionable entity that also tracks a changed time is identified by
+    // both, because not every save creates a new revision.
+    self::assertSame(
+      $page->getRevisionId() . '-' . $page->getChangedTime(),
+      $auto_saves[$page_key]['autoSaveStartingPoint'],
+    );
+    // A config entity has neither, so its values are hashed instead.
+    self::assertMatchesRegularExpression('/^[0-9a-f]{16}$/', $auto_saves[$library_key]['autoSaveStartingPoint']);
+
+    // Auto-saving a draft sets the hash, but must NOT move the starting point:
+    // the live entity has not changed.
+    $draft = clone $page;
+    $draft->set('title', 'Draft title');
+    $sut->saveEntity($draft);
+    $after_draft = $sut->getClientAutoSaves([$page, $asset_library]);
+    self::assertNotNull($after_draft[$page_key]['hash']);
+    self::assertSame(
+      $auto_saves[$page_key]['autoSaveStartingPoint'],
+      $after_draft[$page_key]['autoSaveStartingPoint'],
+      'Auto-saving a draft must not move the live starting point.',
+    );
+
+    // Somebody else saving the entity must move it, so that the client sending
+    // back the old value is told to refresh.
+    $page->set('title', 'Somebody else saved this');
+    $page->setNewRevision(TRUE);
+    self::assertSame(SAVED_UPDATED, $page->save());
+    $after_save = $sut->getClientAutoSaves([$page, $asset_library]);
+    self::assertNotSame(
+      $after_draft[$page_key]['autoSaveStartingPoint'],
+      $after_save[$page_key]['autoSaveStartingPoint'],
+    );
+    // Saving one entity leaves the others' starting points alone.
+    self::assertSame(
+      $after_draft[$library_key]['autoSaveStartingPoint'],
+      $after_save[$library_key]['autoSaveStartingPoint'],
+    );
+
+    // The hashed config entity starting point moves on save as well.
+    $asset_library->set('label', 'A brand new label');
+    self::assertSame(SAVED_UPDATED, $asset_library->save());
+    self::assertNotSame(
+      $after_save[$library_key]['autoSaveStartingPoint'],
+      $sut->getClientAutoSaves([$asset_library])[$library_key]['autoSaveStartingPoint'],
+    );
+  }
+
+  /**
    * Memoizes the reconstructed auto-save entity without serializing it.
    *
    * Repeated reads returning the same object instance proves no serialize /
