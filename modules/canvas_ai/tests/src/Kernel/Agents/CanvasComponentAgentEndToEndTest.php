@@ -58,6 +58,13 @@ final class CanvasComponentAgentEndToEndTest extends CanvasKernelTestBase {
     parent::setUp();
 
     $this->installConfig(['canvas_ai', 'canvas_dev_ai', 'ai', 'ai_agents', 'ai_test']);
+    // The component agent is not the shipped main agent; sites select it on
+    // the Agents & Tools form. The controller reads this setting, and these
+    // turns select no Tool, so they run whichever agent it names.
+    $this->config('canvas_dev_ai.settings')
+      ->set('main_agent', 'canvas_component_agent')
+      ->set('tools', ['canvas_dev_page_builder_agent'])
+      ->save();
     // The echoai provider reads the ai_mock_provider_result table before the
     // file fixtures this test drives it from.
     $this->installEntitySchema('ai_mock_provider_result');
@@ -264,7 +271,7 @@ final class CanvasComponentAgentEndToEndTest extends CanvasKernelTestBase {
   public function testSelectedToolAgentRunsEveryHop(): void {
     // Set another agent as the main agent.
     $this->config('canvas_dev_ai.settings')
-      ->set('main_agent', 'canvas_ai_orchestrator')
+      ->set('main_agent', 'canvas_dev_page_builder_agent')
       ->set('tools', ['canvas_component_agent'])
       ->save();
     JavaScriptComponent::create([
@@ -301,6 +308,30 @@ final class CanvasComponentAgentEndToEndTest extends CanvasKernelTestBase {
       "I am loading the Red Button component to make its text uppercase.\n\nI am updating the Red Button component to render its text in uppercase.",
       $hops[1]['progress'],
     );
+  }
+
+  /**
+   * Running out of loops falls back to a default message for this agent.
+   *
+   * This agent ships without a max_loops_message, unlike the dev page builder
+   * agent, so the controller supplies its own text.
+   *
+   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::getNotSolvableMessage()
+   */
+  public function testMaxLoopsWithoutAConfiguredMessageUsesTheDefault(): void {
+    $agent = $this->config('ai_agents.ai_agent.canvas_component_agent');
+    self::assertSame('', $agent->get('max_loops_message'));
+    // The budget is exhausted before the first provider call, so no fixture is
+    // needed for this turn.
+    $agent->set('max_loops', 0)->save();
+
+    $response = $this->hop([
+      'messages' => [['role' => 'user', 'text' => 'Make a red button']],
+    ]);
+
+    $this->assertFalse($response['status']);
+    $this->assertFalse($response['should_continue']);
+    $this->assertSame('I was unable to fully answer your question within the allowed number of processing steps. Please try rephrasing or narrowing your question.', $response['message']);
   }
 
 }
