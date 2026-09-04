@@ -37,7 +37,7 @@ final class ApiConfigAutoSaveControllers extends ApiControllerBase {
     return (new CacheableJsonResponse(
       data: [
         'data' => $auto_save_normalization,
-        'autoSaves' => $this->getAutoSaveHashes([$canvas_config_entity]),
+        'autoSaves' => $this->autoSaveManager->getClientAutoSaves([$canvas_config_entity]),
       ],
       status: Response::HTTP_OK,
     ))->addCacheableDependency($auto_save)
@@ -104,7 +104,7 @@ final class ApiConfigAutoSaveControllers extends ApiControllerBase {
     $this->autoSaveManager->saveEntity($auto_save_entity, $decoded['clientInstanceId']);
     \assert($auto_save_entity instanceof CanvasHttpApiEligibleConfigEntityInterface);
     BrandKit::syncAutoSaveFileUsage($source_entity, $auto_save_entity, (string) $canvas_config_entity->id());
-    return new JsonResponse(data: ['autoSaves' => $this->getAutoSaveHashes([$canvas_config_entity])], status: Response::HTTP_OK);
+    return new JsonResponse(data: ['autoSaves' => $this->autoSaveManager->getClientAutoSaves([$canvas_config_entity])], status: Response::HTTP_OK);
   }
 
 }

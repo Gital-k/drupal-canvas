@@ -219,7 +219,9 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $this->expectExceptionMessage($message);
     if (isset($content['autoSaves'])) {
       unset($content['autoSaves']);
-      $content += $this->getClientAutoSaves([Node::load(1)]);
+      $node = Node::load(1);
+      self::assertInstanceOf(Node::class, $node);
+      $content += $this->getClientAutoSaves([$node]);
     }
     $this->parentRequest(Request::create('/canvas/api/v0/layout/node/1', method: 'PATCH', server: [
       'CONTENT_TYPE' => 'application/json',
