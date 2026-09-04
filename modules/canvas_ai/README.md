@@ -16,5 +16,43 @@ The UI is powered by [Deepchat](https://deepchat.dev/), providing an intuitive a
 3. Configure providers at `/admin/config/ai/providers`.
 4. Configure core AI settings at `/admin/config/ai/settings`.
 
+## Supported Models
+
+Canvas AI requires AI models with strong function-calling capabilities and sufficient context windows for complex component generation tasks. Below is a categorization of models based on testing and community feedback.
+
+### Fully Supported
+
+These models have been tested and are known to work reliably with Canvas AI:
+
+- **Claude Opus 4.x** (Anthropic) - Tier 2+ access recommended
+- **ChatGPT 4.5+** (OpenAI) - Tier 2+ access recommended
+- **ChatGPT 5.1+** (OpenAI) - Tier 2+ access recommended
+
+### Likely Supported
+
+These models should work but may have limited testing:
+
+- **Gemini Pro 3** (Google)
+- **Mistral Large** (Mistral AI)
+- **Claude Sonnet 4.x** (Anthropic)
+
+### Unsupported / Not Recommended
+
+These models are known to have issues with Canvas AI due to limited capabilities, rate limiting, or insufficient function-calling support:
+
+- Free-tier ChatGPT (rate limits, limited function calling)
+- Grok 3 (insufficient function calling)
+- Claude Sonnet 3.7 (limited context for complex tasks)
+- Smaller models (Gemini Flash, Claude Haiku, etc.)
+
+### Why Some Models Are Not Supported
+
+1. **Function Calling**: Canvas AI relies heavily on structured function calling. Models without robust function-calling capabilities will fail to execute agents properly.
+2. **Context Window**: Complex component generation and editing requires large context windows to maintain state across operations.
+3. **Rate Limits**: Free tiers often have rate limits that interrupt multi-step AI workflows.
+4. **Response Quality**: Smaller models may generate syntactically valid but semantically incorrect code.
+
+If you are testing with an unlisted model and it works well, please contribute your findings to the issue queue.
+
 ## Contribution
 See the [CONTRIBUTING.md](CONTRIBUTING.md) for contribution.
