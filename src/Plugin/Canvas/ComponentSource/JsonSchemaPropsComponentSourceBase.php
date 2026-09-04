@@ -1622,34 +1622,35 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
    *   prop sources (such as `DynamicPropSource` and `HostEntityUrlPropSource`)
    *   are allowed to be the latter.
    *
+   * @throws \OutOfRangeException
+   *   When $prop_name is not a prop on this version of the Component, and so
+   *   has no `prop_field_definitions` entry to collapse against.
+   * @throws \LogicException
+   *   When the `StaticPropSource` does not have the same shape as the default
+   *   dictated by this component instance's referenced Component version.
+   *
    * @see ::uncollapse()
    */
   private function collapse(PropSourceBase $source, string $prop_name): mixed {
-    // @todo Simplify this to just `if ($source instanceof StaticPropSource && $source->hasSameShapeAs($this->getDefaultStaticPropSource($prop_name))) { return $source->getValue(); }` in https://www.drupal.org/project/canvas/issues/3532414
     if ($source instanceof StaticPropSource) {
-      try {
-        $default_source = $this->getDefaultStaticPropSource($prop_name, FALSE);
-        if (!$source->hasSameShapeAs($default_source)) {
-          throw new \LogicException(\sprintf(
-            "The prop %s of component %s has the following static prop source: '%s', but must match the default, which is '%s'. This prop source should be just: '%s'.",
-            $prop_name,
-            $this->getPluginId() . '.' . $this->getSourceSpecificComponentId(),
-            json_encode(array_diff_key($source->toArray(), array_flip(['value']))),
-            json_encode(array_diff_key($default_source->toArray(), array_flip(['value']))),
-            json_encode($source->getValue()),
-          ));
-        }
-        return $source->getValue();
+      // Deliberately not caught: when $prop_name has no entry in
+      // `prop_field_definitions`, ::getDefaultStaticPropSource() throws an
+      // \OutOfRangeException, and that MUST surface. Such a prop cannot be
+      // stored: no widget would ever have appeared for it, so there is no
+      // shape to validate the value against nor to collapse it to.
+      // @see ::getDefaultStaticPropSource()
+      $default_source = $this->getDefaultStaticPropSource($prop_name, FALSE);
+      if (!$source->hasSameShapeAs($default_source)) {
+        throw new \LogicException(\sprintf(
+          "The prop %s of component %s has the following static prop source: '%s', but must match the default, which is '%s'. This prop source should be just: '%s'.",
+          $prop_name,
+          $this->getPluginId() . '.' . $this->getSourceSpecificComponentId(),
+          json_encode(array_diff_key($source->toArray(), array_flip(['value']))),
+          json_encode(array_diff_key($default_source->toArray(), array_flip(['value']))),
+          json_encode($source->getValue()),
+        ));
       }
-      catch (\OutOfRangeException) {
-        // TRICKY: https://www.drupal.org/node/3500386 and its test coverage
-        // assume that even auto-saves of code components can have their props
-        // appear. This never really made sense, but especially no longer since
-        // we introduced component versions. It never made sense though, because
-        // no entry would exist in `prop_field_definitions` for the code
-        // component, meaning no widget would ever have appeared.
-        return $source->toArray();
-      }
+      return $source->getValue();
     }
     return $source->toArray();
   }
