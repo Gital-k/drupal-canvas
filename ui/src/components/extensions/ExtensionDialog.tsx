@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Box } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -33,6 +33,22 @@ const ExtensionDialog: React.FC<ExtensionDialogProps> = () => {
     },
     [dispatch],
   );
+
+  // Only grant 'allow-same-origin' to extensions served from the same origin
+  // as Canvas itself; a cross-origin extension gets a real opaque sandbox.
+  const sandbox = useMemo(() => {
+    const url = activeExtension?.url;
+    if (!url) return 'allow-scripts';
+    let isSameOrigin = false;
+    try {
+      isSameOrigin =
+        new URL(url, window.location.href).origin === window.location.origin;
+    } catch {
+      isSameOrigin = false;
+    }
+    return isSameOrigin ? 'allow-scripts allow-same-origin' : 'allow-scripts';
+  }, [activeExtension?.url]);
+
   if (!extension || activeExtension === null) {
     return null;
   }
@@ -50,8 +66,7 @@ const ExtensionDialog: React.FC<ExtensionDialogProps> = () => {
     >
       {url ? (
         <iframe
-          // @todo Only add 'allow-same-origin' if the extension is loaded from a local file.
-          sandbox="allow-scripts allow-same-origin"
+          sandbox={sandbox}
           id={`canvas-extension-iframe-${id}`}
           src={url}
           style={{
