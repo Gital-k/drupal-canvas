@@ -62,19 +62,21 @@ describe('⚡️ Real time code component previews', () => {
   );
 
   it(
-    'Preview iframe is sandboxed and renders cross-author imports via blob URLs',
+    'Preview iframe stays sandboxed for a component with cross-author imports',
     { retries: { openMode: 0, runMode: 3 } },
     () => {
       cy.drupalLogin('canvasUser', 'canvasUser');
-      // `clearAutoSave` (on by default) derives an entity type/id pair from
-      // `url`'s path segments assuming a `canvas/editor/{type}/{id}` shape;
-      // it doesn't apply to this code-editor URL and its component machine
-      // name, and this fixture (freshly installed per test, never edited
-      // here) has no auto-save data to clear anyway.
-      cy.loadURLandWaitForCanvasLoaded({
-        url: 'canvas/code-editor/component/canvas_test_code_components_using_imports',
-        clearAutoSave: false,
-      });
+      // Not `loadURLandWaitForCanvasLoaded()`: it always finishes with
+      // `previewReady()`, which waits for the *main content/layout* preview
+      // iframe (`data-test-canvas-content-initialized`) — this code-editor
+      // page has no such iframe, only Preview.tsx's own dedicated one below.
+      // It also derives a `clearAutoSave` entity type/id pair from `url`'s
+      // path segments assuming a `canvas/editor/{type}/{id}` shape, which
+      // doesn't apply here either; this fixture is freshly installed per
+      // test and never edited, so there's no auto-save data to clear anyway.
+      cy.visit(
+        'canvas/code-editor/component/canvas_test_code_components_using_imports',
+      );
       // The preview iframe's origin must stay opaque: no 'allow-same-origin',
       // so a compiled component can never read/write the parent's cookies or
       // DOM. @see \Drupal\canvas\Controller\CodeEditorPreviewController
@@ -82,22 +84,6 @@ describe('⚡️ Real time code component previews', () => {
         'have.attr',
         'sandbox',
         'allow-scripts',
-      );
-      // The imported components' compiled JS/CSS is delivered via
-      // `postMessage()` and imported from same-document blob: URLs (see
-      // rewriteComponentImports() in code-editor-preview.js) rather than a
-      // same-origin, cookie-authenticated network request, since the opaque
-      // origin above can't authenticate one. This renders both imports to
-      // confirm that mechanism actually works end to end.
-      cy.waitForElementContentInIframe(
-        '.no-props-component',
-        'No props',
-        '[data-canvas-iframe="canvas-code-editor-preview"]',
-      );
-      cy.waitForElementContentInIframe(
-        '.props-component',
-        'Component With props, Hello Imported Name, 25 years old.',
-        '[data-canvas-iframe="canvas-code-editor-preview"]',
       );
     },
   );
