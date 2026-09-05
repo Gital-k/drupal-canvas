@@ -12,6 +12,7 @@ import {
   setDialogClosed,
   setDialogOpen,
 } from '@/features/ui/dialogSlice';
+import { getIframeSandbox } from '@/utils/iframe-sandbox';
 
 import type React from 'react';
 
@@ -34,20 +35,10 @@ const ExtensionDialog: React.FC<ExtensionDialogProps> = () => {
     [dispatch],
   );
 
-  // Only grant 'allow-same-origin' to extensions served from the same origin
-  // as Canvas itself; a cross-origin extension gets a real opaque sandbox.
-  const sandbox = useMemo(() => {
-    const url = activeExtension?.url;
-    if (!url) return 'allow-scripts';
-    let isSameOrigin = false;
-    try {
-      isSameOrigin =
-        new URL(url, window.location.href).origin === window.location.origin;
-    } catch {
-      isSameOrigin = false;
-    }
-    return isSameOrigin ? 'allow-scripts allow-same-origin' : 'allow-scripts';
-  }, [activeExtension?.url]);
+  const sandbox = useMemo(
+    () => getIframeSandbox(activeExtension?.url, 'allow-scripts'),
+    [activeExtension?.url],
+  );
 
   if (!extension || activeExtension === null) {
     return null;

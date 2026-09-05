@@ -114,7 +114,7 @@ function setOtherComponentsCss(otherComponents) {
  * @return {string}
  *   The rewritten JS source text.
  */
-function rewriteComponentImports(js, otherComponentUrls) {
+export function rewriteComponentImports(js, otherComponentUrls) {
   return Object.entries(otherComponentUrls).reduce(
     (code, [name, url]) =>
       code
@@ -124,15 +124,66 @@ function rewriteComponentImports(js, otherComponentUrls) {
   );
 }
 
+/**
+ * Whether a `message` event actually came from the parent window.
+ *
+ * This holds regardless of this document's own opaque origin, since
+ * `window.parent` is one of the few properties accessible across an
+ * opaque/cross-origin boundary.
+ *
+ * @param {MessageEvent} event
+ *   The `message` event to check.
+ *
+ * @return {boolean}
+ *   Whether the event's source is `window.parent`.
+ */
+export function isFromParentWindow(event) {
+  return event.source === window.parent;
+}
+
+/**
+ * Extracts the preview payload from a `message` event, if it's complete.
+ *
+ * @param {MessageEvent} event
+ *   The `message` event to read.
+ *
+ * @return {?object}
+ *   The event's `data`, or `null` if a required property is missing.
+ */
+export function getCompletePreviewPayload(event) {
+  const data = event.data ?? {};
+  const {
+    compiledJs,
+    compiledJsForSlots,
+    propValues,
+    slotNames,
+    drupalSettings,
+  } = data;
+  if (
+    !compiledJs ||
+    !compiledJsForSlots ||
+    !propValues ||
+    !slotNames ||
+    !drupalSettings
+  ) {
+    return null;
+  }
+  return data;
+}
+
 // Guards against a stale response: a newer message may arrive and finish
 // importing while an older message's imports are still in flight.
 let latestRequestId = 0;
 
 window.addEventListener('message', async (event) => {
-  // The parent window is the only legitimate sender. This holds regardless of
-  // this document's own opaque origin, since `window.parent` is one of the
-  // few properties accessible across an opaque/cross origin boundary.
-  if (event.source !== window.parent) {
+  // The parent window is the only legitimate sender.
+  if (!isFromParentWindow(event)) {
+    return;
+  }
+
+  const payload = getCompletePreviewPayload(event);
+  if (!payload) {
+    console.error('Received incomplete code editor preview data.', event.data);
     return;
   }
 
@@ -148,18 +199,7 @@ window.addEventListener('message', async (event) => {
     propValues,
     slotNames,
     drupalSettings,
-  } = event.data ?? {};
-
-  if (
-    !compiledJs ||
-    !compiledJsForSlots ||
-    !propValues ||
-    !slotNames ||
-    !drupalSettings
-  ) {
-    console.error('Received incomplete code editor preview data.', event.data);
-    return;
-  }
+  } = payload;
 
   const requestId = ++latestRequestId;
 

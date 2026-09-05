@@ -29,10 +29,18 @@ test.describe('Page extensions', () => {
     await expect(page).toHaveURL(/\/canvas\/app\/canvas_test_page/);
 
     // Verify the extension iframe loaded.
-    const iframe = page
-      .locator('iframe[id="canvas-extension-page-canvas_test_page"]')
-      .contentFrame();
+    const iframeLocator = page.locator(
+      'iframe[id="canvas-extension-page-canvas_test_page"]',
+    );
+    const iframe = iframeLocator.contentFrame();
     await expect(iframe.getByText('Page extension is working.')).toBeVisible();
+    // This extension is served from the same origin as Canvas itself (a
+    // relative `url` in its .canvas_extension.yml), so it keeps
+    // 'allow-same-origin' in its sandbox.
+    await expect(iframeLocator).toHaveAttribute(
+      'sandbox',
+      'allow-scripts allow-same-origin allow-downloads',
+    );
 
     // Navigate back by clicking a sidebar panel button.
     await sideMenu.getByLabel('Pages').click();

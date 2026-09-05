@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from '@radix-ui/react-icons';
 import { IconButton } from '@radix-ui/themes';
 
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { getIframeSandbox } from '@/utils/iframe-sandbox';
 
 import type React from 'react';
 import type { PageExtension } from '@drupal-canvas/types';
@@ -29,22 +30,10 @@ const ExtensionPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extensionId]);
 
-  // Only grant 'allow-same-origin' to extensions served from the same origin
-  // as Canvas itself; a cross-origin extension gets a real opaque sandbox.
-  const sandbox = useMemo(() => {
-    if (!ext) return 'allow-scripts allow-downloads';
-    let isSameOrigin = false;
-    try {
-      isSameOrigin =
-        new URL(ext.extension_url, window.location.href).origin ===
-        window.location.origin;
-    } catch {
-      isSameOrigin = false;
-    }
-    return isSameOrigin
-      ? 'allow-scripts allow-same-origin allow-downloads'
-      : 'allow-scripts allow-downloads';
-  }, [ext]);
+  const sandbox = useMemo(
+    () => getIframeSandbox(ext?.extension_url, 'allow-scripts allow-downloads'),
+    [ext],
+  );
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 

@@ -60,4 +60,39 @@ describe('⚡️ Real time code component previews', () => {
       });
     },
   );
+
+  it(
+    'Preview iframe is sandboxed and renders cross-author imports via blob URLs',
+    { retries: { openMode: 0, runMode: 3 } },
+    () => {
+      cy.drupalLogin('canvasUser', 'canvasUser');
+      cy.loadURLandWaitForCanvasLoaded({
+        url: 'canvas/code-editor/component/canvas_test_code_components_using_imports',
+      });
+      // The preview iframe's origin must stay opaque: no 'allow-same-origin',
+      // so a compiled component can never read/write the parent's cookies or
+      // DOM. @see \Drupal\canvas\Controller\CodeEditorPreviewController
+      cy.get('[data-canvas-iframe="canvas-code-editor-preview"]').should(
+        'have.attr',
+        'sandbox',
+        'allow-scripts',
+      );
+      // The imported components' compiled JS/CSS is delivered via
+      // `postMessage()` and imported from same-document blob: URLs (see
+      // rewriteComponentImports() in code-editor-preview.js) rather than a
+      // same-origin, cookie-authenticated network request, since the opaque
+      // origin above can't authenticate one. This renders both imports to
+      // confirm that mechanism actually works end to end.
+      cy.waitForElementContentInIframe(
+        '.no-props-component',
+        'No props',
+        '[data-canvas-iframe="canvas-code-editor-preview"]',
+      );
+      cy.waitForElementContentInIframe(
+        '.props-component',
+        'Component With props, Hello Imported Name, 25 years old.',
+        '[data-canvas-iframe="canvas-code-editor-preview"]',
+      );
+    },
+  );
 });
