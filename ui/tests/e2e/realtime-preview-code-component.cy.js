@@ -66,8 +66,14 @@ describe('⚡️ Real time code component previews', () => {
     { retries: { openMode: 0, runMode: 3 } },
     () => {
       cy.drupalLogin('canvasUser', 'canvasUser');
+      // `clearAutoSave` (on by default) derives an entity type/id pair from
+      // `url`'s path segments assuming a `canvas/editor/{type}/{id}` shape;
+      // it doesn't apply to this code-editor URL and its component machine
+      // name, and this fixture (freshly installed per test, never edited
+      // here) has no auto-save data to clear anyway.
       cy.loadURLandWaitForCanvasLoaded({
         url: 'canvas/code-editor/component/canvas_test_code_components_using_imports',
+        clearAutoSave: false,
       });
       // The preview iframe's origin must stay opaque: no 'allow-same-origin',
       // so a compiled component can never read/write the parent's cookies or
