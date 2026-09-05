@@ -82,7 +82,10 @@ test.describe('AI Features', () => {
     const preview = canvas.getCodePreviewFrame();
     const redElements = preview.locator('.bg-red-600');
     const blueElements = preview.locator('.bg-blue-600');
-    await expect(redElements).toHaveCount(1);
+    // The preview iframe renders via postMessage() and a dynamic import of
+    // the compiled JS, which routinely exceeds the default 10s expect
+    // timeout under CI load.
+    await expect(redElements).toHaveCount(1, { timeout: 30_000 });
     await expect(blueElements).toHaveCount(0);
 
     await ai.submitQuery('Edit component');
@@ -90,7 +93,7 @@ test.describe('AI Features', () => {
     const redElementsUpdated = updatedPreview.locator('.bg-red-600');
     const blueElementsUpdated = updatedPreview.locator('.bg-blue-600');
     await expect(redElementsUpdated).toHaveCount(0);
-    await expect(blueElementsUpdated).toHaveCount(1);
+    await expect(blueElementsUpdated).toHaveCount(1, { timeout: 30_000 });
   });
 
   test('Image upload', async ({ page, drupal, canvas, ai }) => {

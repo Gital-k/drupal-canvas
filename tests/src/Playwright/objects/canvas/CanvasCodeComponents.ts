@@ -134,7 +134,15 @@ export function CanvasCodeComponentsMixin<
           response.request().method() === 'PATCH',
       );
 
-      await expect(this.getCodePreviewFrame()).toBeVisible();
+      // The preview iframe renders via postMessage(): the parent sends the
+      // compiled JS, then the iframe dynamically imports it and its
+      // dependencies (each fetched through a full Drupal request for CORS
+      // headers) before it can render. This chain routinely exceeds the
+      // default 10s expect timeout under CI load.
+      // @see \Drupal\canvas\Controller\CodeEditorPreviewController::asset()
+      await expect(this.getCodePreviewFrame()).toBeVisible({
+        timeout: 30_000,
+      });
 
       return propForm;
     }
