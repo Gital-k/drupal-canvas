@@ -958,6 +958,19 @@ canvas.boot.entity:
         type: entity:{entity_type}
     _format: 'json'
 
+canvas.code_editor_preview.asset:
+  # Serves packages/astro-hydration/dist/{filename} with
+  # Access-Control-Allow-Origin: *, for the same reason as the route below:
+  # the shell's import map points every entry (preact, react, clsx, etc.)
+  # here instead of at its plain static file URL.
+  # @see \Drupal\canvas\Controller\CodeEditorPreviewController::asset()
+  path: '/canvas/code-editor-preview/asset/{filename}'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\CodeEditorPreviewController::asset'
+  requirements:
+    _access: 'TRUE'
+    filename: '[A-Za-z0-9_.-]+\.m?js'
+
 canvas.code_editor_preview.script:
   # Serves ui/dist/assets/code-editor-preview.js with
   # Access-Control-Allow-Origin: *. The shell below's opaque origin makes the

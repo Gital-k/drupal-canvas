@@ -161,7 +161,7 @@ export function getCompletePreviewPayload(event) {
   } = data;
   if (
     !compiledJs ||
-    !compiledJsForSlots ||
+    compiledJsForSlots === undefined ||
     !propValues ||
     !slotNames ||
     !drupalSettings

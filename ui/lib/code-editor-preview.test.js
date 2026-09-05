@@ -79,4 +79,11 @@ describe('getCompletePreviewPayload', () => {
   it('returns null when data is absent entirely', () => {
     expect(getCompletePreviewPayload({})).toBeNull();
   });
+
+  it('returns the event data when compiledJsForSlots is an empty string', () => {
+    // A component with no slots compiles its slots preview module to an
+    // empty string; that is complete data, not missing data.
+    const data = { ...completeData, compiledJsForSlots: '' };
+    expect(getCompletePreviewPayload({ data })).toBe(data);
+  });
 });

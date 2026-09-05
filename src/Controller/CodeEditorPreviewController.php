@@ -115,12 +115,56 @@ HTML;
    * components. This mirrors what `Preview.tsx` currently builds
    * client-side by copying the parent document's import map.
    *
+   * Every `packages/astro-hydration/dist/` entry is rewritten to route
+   * through `asset()` instead of its plain static file URL: the shell's
+   * opaque origin needs `Access-Control-Allow-Origin` on every module it
+   * imports (not just its own entry script), and that directory is served
+   * directly by the web server, which adds no such header.
+   *
    * @return array{imports: array<string, string>, scopes: array<string, array<string, string>>}
    */
   private function buildImportMap(): array {
     $import_map = $this->globalImports->getImportMap();
     $import_map[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS]['@/components/'] = \base_path() . 'canvas/api/v0/auto-saves/js/js_component/';
+
+    $astro_hydration_path = \sprintf('%s%s/packages/astro-hydration/dist/', \base_path(), $this->extensionPathResolver->getPath('module', 'canvas'));
+    foreach ($import_map[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS] as $specifier => $url) {
+      if ($specifier === '@/components/' || !\str_starts_with($url, $astro_hydration_path)) {
+        continue;
+      }
+      [$filename, $query] = \array_pad(\explode('?', \substr($url, \strlen($astro_hydration_path)), 2), 2, NULL);
+      $import_map[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS][$specifier] = Url::fromRoute('canvas.code_editor_preview.asset', ['filename' => $filename])->toString()
+        . ($query !== NULL ? '?' . $query : '');
+    }
     return $import_map;
+  }
+
+  /**
+   * Serves `packages/astro-hydration/dist/{filename}` with a CORS header.
+   *
+   * The import map built by `buildImportMap()` points every
+   * `packages/astro-hydration/dist/` entry (`preact`, `react`, `clsx`, etc.)
+   * here instead of at its plain static file URL, for the same reason as
+   * `script()` above.
+   */
+  public function asset(string $filename): BinaryFileResponse {
+    if (\preg_match('/^[A-Za-z0-9_.-]+\.m?js$/', $filename) !== 1) {
+      throw new NotFoundHttpException();
+    }
+    $file_path = \sprintf(
+      '%s/%s/packages/astro-hydration/dist/%s',
+      DRUPAL_ROOT,
+      $this->extensionPathResolver->getPath('module', 'canvas'),
+      $filename,
+    );
+    if (!\is_file($file_path)) {
+      throw new NotFoundHttpException();
+    }
+    $response = new BinaryFileResponse($file_path);
+    $response->headers->set('Content-Type', 'text/javascript');
+    $response->headers->set('Access-Control-Allow-Origin', '*');
+    $response->headers->set('Cache-Control', 'no-cache');
+    return $response;
   }
 
 }
