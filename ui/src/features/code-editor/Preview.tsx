@@ -22,6 +22,7 @@ import {
   getDataDependenciesFromAst,
   getImportsFromAst,
 } from '@/features/code-editor/utils/ast-utils';
+import { safeSerializeDrupalSettings } from '@/features/code-editor/utils/previewPayload';
 import {
   getPropValuesForPreview,
   getSlotNamesForPreview,
@@ -105,18 +106,10 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { canvas, canvasExtension, ...rawDrupalSettings } =
       getDrupalSettings();
-    // `getDrupalSettings()` returns the live `window.drupalSettings` object
-    // by reference. Other code on the page (e.g. Drupal core's jQuery UI
-    // dialog behaviors) can attach non-serializable values to it, such as a
-    // live close-handler function, which would otherwise make the
-    // postMessage() below throw a DataCloneError. A JSON round-trip strips
-    // anything that can't be structured-cloned.
-    let drupalSettings: typeof rawDrupalSettings;
-    try {
-      drupalSettings = JSON.parse(JSON.stringify(rawDrupalSettings));
-    } catch {
-      drupalSettings = {} as typeof rawDrupalSettings;
-    }
+    // `getDrupalSettings()` returns the live `window.drupalSettings` object by
+    // reference, which may carry non-serializable values unsafe to
+    // `postMessage()` directly.
+    const drupalSettings = safeSerializeDrupalSettings(rawDrupalSettings);
     // Compiled JS and CSS for all code components except the current one, so
     // the preview can resolve `@/components/{name}` imports and render their
     // styles without an opaque-origin, cookie-authenticated network request.
