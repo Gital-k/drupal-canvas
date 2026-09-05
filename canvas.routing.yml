@@ -931,35 +931,6 @@ canvas.boot.app:
   options:
     _format: 'json'
 
-canvas.code_editor_preview.shell:
-  # The code editor preview iframe's document, served from its own route so
-  # it can run with an opaque origin (sandbox="allow-scripts", no
-  # allow-same-origin) instead of inheriting the parent app's origin.
-  # Reachable without authentication: this is Canvas's own fixed, non-secret,
-  # unauthenticated shell, not the dynamic per-component payload (sent by the
-  # parent via postMessage() instead).
-  # @see \Drupal\canvas\Controller\CodeEditorPreviewController::shell()
-  # @see ui/src/features/code-editor/Preview.tsx
-  # @see https://www.drupal.org/i/3527515
-  path: '/canvas/code-editor-preview'
-  defaults:
-    _controller: 'Drupal\canvas\Controller\CodeEditorPreviewController::shell'
-    _title: 'Code editor preview'
-  requirements:
-    _access: 'TRUE'
-
-canvas.code_editor_preview.script:
-  # Serves ui/dist/assets/code-editor-preview.js with
-  # Access-Control-Allow-Origin: *. The shell above's opaque origin makes the
-  # <script type="module"> that loads this a CORS-mode fetch sending
-  # `Origin: null`, which requires this header to succeed.
-  # @see \Drupal\canvas\Controller\CodeEditorPreviewController::script()
-  path: '/canvas/code-editor-preview/script.js'
-  defaults:
-    _controller: 'Drupal\canvas\Controller\CodeEditorPreviewController::script'
-  requirements:
-    _access: 'TRUE'
-
 canvas.boot.empty:
   path: '/canvas'
   defaults:
@@ -986,6 +957,35 @@ canvas.boot.entity:
       entity:
         type: entity:{entity_type}
     _format: 'json'
+
+canvas.code_editor_preview.script:
+  # Serves ui/dist/assets/code-editor-preview.js with
+  # Access-Control-Allow-Origin: *. The shell below's opaque origin makes the
+  # <script type="module"> that loads this a CORS-mode fetch sending
+  # `Origin: null`, which requires this header to succeed.
+  # @see \Drupal\canvas\Controller\CodeEditorPreviewController::script()
+  path: '/canvas/code-editor-preview/script.js'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\CodeEditorPreviewController::script'
+  requirements:
+    _access: 'TRUE'
+
+canvas.code_editor_preview.shell:
+  # The code editor preview iframe's document, served from its own route so
+  # it can run with an opaque origin (sandbox="allow-scripts", no
+  # allow-same-origin) instead of inheriting the parent app's origin.
+  # Reachable without authentication: this is Canvas's own fixed, non-secret,
+  # unauthenticated shell, not the dynamic per-component payload (sent by the
+  # parent via postMessage() instead).
+  # @see \Drupal\canvas\Controller\CodeEditorPreviewController::shell()
+  # @see ui/src/features/code-editor/Preview.tsx
+  # @see https://www.drupal.org/i/3527515
+  path: '/canvas/code-editor-preview'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\CodeEditorPreviewController::shell'
+    _title: 'Code editor preview'
+  requirements:
+    _access: 'TRUE'
 
 canvas.component.status:
   path: '/admin/appearance/component/status'
