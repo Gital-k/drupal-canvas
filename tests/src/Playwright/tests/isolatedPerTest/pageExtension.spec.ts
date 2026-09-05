@@ -39,7 +39,7 @@ test.describe('Page extensions', () => {
     // 'allow-same-origin' in its sandbox.
     await expect(iframeLocator).toHaveAttribute(
       'sandbox',
-      'allow-scripts allow-same-origin allow-downloads',
+      'allow-scripts allow-downloads allow-same-origin',
     );
 
     // Navigate back by clicking a sidebar panel button.
