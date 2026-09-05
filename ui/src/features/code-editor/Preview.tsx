@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { parse } from '@babel/parser';
 import { Flex, ScrollArea, Spinner } from '@radix-ui/themes';
 
@@ -27,12 +27,7 @@ import {
   getSlotNamesForPreview,
 } from '@/features/code-editor/utils/utils';
 import { useGetCodeComponentsQuery } from '@/services/componentAndLayout';
-import {
-  getBaseUrl,
-  getCanvasSettings,
-  getDrupal,
-  getDrupalSettings,
-} from '@/utils/drupal-globals';
+import { getDrupal, getDrupalSettings } from '@/utils/drupal-globals';
 
 import MissingDefaultExportMessage, {
   CodeBlock,
@@ -45,10 +40,11 @@ import type { BrandKit } from '@/types/CodeComponent';
 import styles from './Preview.module.css';
 
 const Drupal = getDrupal();
-const CANVAS_MODULE_PATH =
-  `${getBaseUrl()}${getCanvasSettings().canvasModulePath}` as const;
-const CANVAS_MODULE_UI_PATH = `${CANVAS_MODULE_PATH}/ui` as const;
-const PREVIEW_LIB_PATH = 'dist/assets/code-editor-preview.js' as const;
+// A route distinct from the parent app's own document, so the iframe below
+// can run with an opaque origin (sandbox="allow-scripts", no
+// allow-same-origin) instead of inheriting the parent's origin.
+// @see \Drupal\canvas\Controller\CodeEditorPreviewController::shell()
+const PREVIEW_SHELL_URL = Drupal.url('canvas/code-editor-preview');
 
 const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const dispatch = useAppDispatch();
@@ -85,93 +81,70 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const { data: codeComponents } = useGetCodeComponentsQuery();
   const [jsImportNameWithError, setJsImportNameWithError] = useState('');
 
-  const [iframeSrcDoc, setIframeSrcDoc] = useState('');
+  // Whether the shell document (loaded once, from PREVIEW_SHELL_URL) has
+  // fired `onload`, i.e. whether `code-editor-preview.js`'s `message`
+  // listener is registered and ready to receive the payload below.
+  const [isPreviewReady, setIsPreviewReady] = useState(false);
 
-  // Copy import maps from the main window, adding preview-specific entries.
-  const importMapTags = useMemo(() => {
-    const importMapEls = document.querySelectorAll('script[type="importmap"]');
-    const previewImportMapAdditions = {
-      '@/components/': Drupal.url('canvas/api/v0/auto-saves/js/js_component/'),
-    };
-    return Array.from(importMapEls)
-      .map((el) => {
-        try {
-          const importMap = JSON.parse(el.textContent || '{}');
-          if (importMap.imports) {
-            importMap.imports = {
-              ...importMap.imports,
-              ...previewImportMapAdditions,
-            };
-          }
-          return `<script type="importmap">${JSON.stringify(importMap)}</script>`;
-        } catch {
-          return el.outerHTML;
-        }
-      })
-      .join('\n');
-  }, []);
-
-  const getIframeSrc = useCallback(
-    ({
-      previewGlobalCss,
+  // Builds the dynamic per-render payload sent to the preview iframe via
+  // `postMessage()`. Everything here is data the compiled component needs to
+  // render; none of it is trusted to run with the parent's origin/cookies —
+  // that's the whole point of sending it to an opaque-origin iframe instead
+  // of embedding it in a same-origin document.
+  // @see ui/lib/code-editor-preview.js
+  const buildPreviewPayload = useCallback(() => {
+    const propValues = getPropValuesForPreview(props, brandKitColors);
+    const slotNames = getSlotNamesForPreview(slots);
+    const previewGlobalColorCss = buildColorStyles(brandKitColors ?? []);
+    const previewGlobalFontCss = buildFontFaceStyles(brandKitFonts ?? []);
+    const previewGlobalFontPreloads = getFontPreloadDefinitions(
+      brandKitFonts ?? [],
+    );
+    // Remove the `canvas` and `canvasExtension` properties from `drupalSettings`.
+    // They are only added for the Canvas UI, and are not available normally.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { canvas, canvasExtension, ...drupalSettings } = getDrupalSettings();
+    // Compiled JS and CSS for all code components except the current one, so
+    // the preview can resolve `@/components/{name}` imports and render their
+    // styles without an opaque-origin, cookie-authenticated network request.
+    // @todo Make this more efficient by introducing better backend support.
+    // @see https://drupal.org/i/3520867
+    const otherComponents = Object.fromEntries(
+      Object.entries(codeComponents ?? {})
+        .filter(([, component]) => component.machineName !== componentId)
+        .map(([name, component]) => [
+          name,
+          {
+            compiledJs: component.compiledJs ?? '',
+            compiledCss: component.compiledCss ?? '',
+          },
+        ]),
+    );
+    return {
+      compiledJs,
+      compiledJsForSlots: previewCompiledJsForSlots,
+      previewCss: compiledCss,
+      previewGlobalCss: compiledGlobalCss,
       previewGlobalColorCss,
       previewGlobalFontCss,
       previewGlobalFontPreloads,
-      previewCss,
-      previewJsData,
-    }: {
-      previewCss: string;
-      previewGlobalCss: string;
-      previewGlobalColorCss: string;
-      previewGlobalFontCss: string;
-      previewGlobalFontPreloads: string;
-      previewJsData: string;
-    }) => `
-    <html>
-      <head>
-        ${importMapTags}
-        ${previewGlobalFontPreloads}
-        <style>${previewGlobalFontCss}</style>
-        <style>${previewGlobalColorCss}</style>
-        <style>${previewGlobalCss}</style>
-        ${
-          // Add CSS for all code components except the current one.
-          // @todo Make this more efficient by introducing better backend support.
-          // @see https://drupal.org/i/3520867
-          codeComponents
-            ? Object.keys(codeComponents)
-                .filter(
-                  (componentName) =>
-                    codeComponents[componentName].machineName !== componentId,
-                )
-                .map(
-                  (componentName) =>
-                    `<link rel="stylesheet" href="${Drupal.url(`canvas/api/v0/auto-saves/css/js_component/${componentName}`)}" />`,
-                )
-                .join('\n')
-            : ''
-        }
-        <style>${previewCss}</style>
-        <script id="canvas-code-editor-preview-data" type="application/json">
-          ${previewJsData}
-        </script>
-        <script type="module" src="${CANVAS_MODULE_UI_PATH}/${PREVIEW_LIB_PATH}"></script>
-      </head>
-      <body>
-        <div id="canvas-code-editor-preview-root"></div>
-        <script>
-          document.addEventListener('click', function (e) {
-            const anchor = e.target.closest('a');
-            if (anchor) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          });
-        </script>
-      </body>
-    </html>`,
-    [codeComponents, componentId, importMapTags],
-  );
+      otherComponents,
+      propValues,
+      slotNames,
+      drupalSettings,
+    };
+  }, [
+    brandKitColors,
+    brandKitFonts,
+    codeComponents,
+    compiledCss,
+    compiledGlobalCss,
+    compiledJs,
+    componentId,
+    previewCompiledJsForSlots,
+    props,
+    slots,
+  ]);
 
   // Verifies that the component's JS code has a default export.
   const hasDefaultExport = (ast: File) => {
@@ -238,64 +211,16 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     }
   }, [sourceCodeJs, collectImportedJsComponents]);
 
+  // Sends the current payload to the preview iframe. Runs on every relevant
+  // state change, not just the first: the shell document (loaded once via
+  // PREVIEW_SHELL_URL) stays put, and updates reach it live via
+  // `postMessage()` instead of a fresh navigation per edit.
   useEffect(() => {
-    if (!compiledJs) {
+    if (!compiledJs || !isPreviewReady) {
       return;
     }
-    // The following data is going to be embedded in the iframe as a JSON
-    // object. It is used by a script that we load inside the iframe to render
-    // the component. The script is loaded via an `src` attribute instead of
-    // being added to the iframe inline because of Content Security Policy (CSP)
-    // restrictions.
-    // @see ui/lib/code-editor-preview.js
-    const propValues = getPropValuesForPreview(props, brandKitColors);
-    const slotNames = getSlotNamesForPreview(slots);
-    const previewGlobalColorCss = buildColorStyles(brandKitColors ?? []);
-    const previewGlobalFontCss = buildFontFaceStyles(brandKitFonts ?? []);
-    const previewGlobalFontPreloads = getFontPreloadDefinitions(
-      brandKitFonts ?? [],
-    )
-      .map(
-        ({ href, type }) =>
-          `<link rel="preload" as="font" type="${type}" href="${href}" crossorigin="anonymous" />`,
-      )
-      .join('\n');
-    // Remove the `canvas` and `canvasExtension` properties from `drupalSettings`.
-    // They are only added for the Canvas UI, and are not available normally.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { canvas, canvasExtension, ...drupalSettings } = getDrupalSettings();
-    const previewJsData = JSON.stringify({
-      compiledJsUrl: URL.createObjectURL(
-        new Blob([compiledJs], { type: 'text/javascript' }),
-      ),
-      compiledJsForSlotsUrl: URL.createObjectURL(
-        new Blob([previewCompiledJsForSlots], { type: 'text/javascript' }),
-      ),
-      propValues,
-      slotNames,
-      drupalSettings,
-    });
-    setIframeSrcDoc(
-      getIframeSrc({
-        previewCss: compiledCss,
-        previewGlobalCss: compiledGlobalCss,
-        previewGlobalColorCss,
-        previewGlobalFontCss,
-        previewGlobalFontPreloads,
-        previewJsData,
-      }),
-    );
-  }, [
-    compiledCss,
-    compiledGlobalCss,
-    compiledJs,
-    getIframeSrc,
-    brandKitFonts,
-    brandKitColors,
-    previewCompiledJsForSlots,
-    props,
-    slots,
-  ]);
+    iframeRef.current?.contentWindow?.postMessage(buildPreviewPayload(), '*');
+  }, [compiledJs, isPreviewReady, buildPreviewPayload]);
 
   const renderCompileError = () => (
     <ErrorCard
@@ -366,10 +291,10 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
             ref={iframeRef}
             height="100%"
             width="100%"
-            srcDoc={iframeSrcDoc}
+            src={PREVIEW_SHELL_URL}
+            onLoad={() => setIsPreviewReady(true)}
             data-canvas-iframe="canvas-code-editor-preview"
-            // @todo: Remove 'allow-same-origin' in https://www.drupal.org/i/3527515.
-            sandbox="allow-scripts allow-same-origin"
+            sandbox="allow-scripts"
           />
         )}
       </div>
