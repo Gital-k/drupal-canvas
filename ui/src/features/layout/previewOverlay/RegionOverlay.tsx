@@ -163,7 +163,9 @@ const RegionOverlay: React.FC<RegionOverlayProps> = ({ iframeRef, region }) => {
               />
             ))}
 
-            {!region.components.length && <EmptyRegionDropZone region={region} />}
+            {!region.components.length && (
+              <EmptyRegionDropZone region={region} />
+            )}
             {!!region.components.length && (
               <>
                 <RegionDropZone region={region} position="before" />
