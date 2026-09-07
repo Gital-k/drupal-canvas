@@ -146,6 +146,18 @@ describe('PageVersionComparisonView', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders one shared visual scaling toolbar above the version cards', () => {
+    renderComparison();
+
+    const [controls] = screen.getAllByTestId('canvas-version-preview-controls');
+
+    expect(
+      screen.getAllByTestId('canvas-version-preview-controls'),
+    ).toHaveLength(1);
+    expect(screen.getAllByTestId('page-version-scale-to-fit')).toHaveLength(1);
+    expect(controls.closest(`.${styles.cardBody}`)).toBeNull();
+  });
+
   it('applies the selected card style when a version is selected', async () => {
     const user = userEvent.setup();
     render(<ComparisonHarness />);
@@ -316,6 +328,43 @@ describe('PageVersionComparisonView', () => {
         publishedFrame.parentElement?.parentElement?.style.height ?? '',
       ),
     ).toBeCloseTo(844.8);
+  });
+
+  it('scales both visual previews to fit from the shared toolbar', async () => {
+    const user = userEvent.setup();
+    const { store } = renderComparison();
+    const scrollAreas = screen.getAllByTestId(
+      'canvas-version-preview-scroll-area',
+    ) as HTMLDivElement[];
+    const frames = screen.getAllByTitle(
+      'Page version preview',
+    ) as HTMLIFrameElement[];
+
+    store.dispatch(setViewportWidth(1024));
+    store.dispatch(setViewportMinHeight(768));
+
+    setScrollMetrics(scrollAreas[0], {
+      clientHeight: 864,
+      clientWidth: 1120,
+      scrollHeight: 1200,
+      scrollWidth: 1400,
+    });
+    setScrollMetrics(scrollAreas[1], {
+      clientHeight: 864,
+      clientWidth: 920,
+      scrollHeight: 1200,
+      scrollWidth: 1400,
+    });
+    frames.forEach((frame) => {
+      Object.defineProperties(frame.parentElement, {
+        offsetHeight: { configurable: true, value: 768 },
+        offsetWidth: { configurable: true, value: 1024 },
+      });
+    });
+
+    await user.click(screen.getByTestId('page-version-scale-to-fit'));
+
+    expect(store.getState().ui.editorViewPort.scale).toBe(0.75);
   });
 
   it('keeps the visual preview box scroll positions synchronized', () => {
