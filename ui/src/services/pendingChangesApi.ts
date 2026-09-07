@@ -8,6 +8,7 @@ import {
 } from '@/components/review/PublishReview.slice';
 import { baseQuery } from '@/services/baseQuery';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
+import { pageDataFormApi } from '@/services/pageDataForm';
 
 interface Owner {
   name: string;
@@ -187,6 +188,15 @@ export const pendingChangesApi = createApi({
           // any hook_entity_presave code
           dispatch(
             componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]),
+          );
+          // For the same reason, invalidate the page data form: code reacting
+          // to the entity being saved may store values the form displays but
+          // does not keep in entity fields, so the cached form would keep
+          // showing the state from before publishing.
+          dispatch(
+            pageDataFormApi.util.invalidateTags([
+              { type: 'PageDataForm', id: 'FORM' },
+            ]),
           );
           dispatch(setPreviousPendingChanges());
           dispatch(setErrors());
