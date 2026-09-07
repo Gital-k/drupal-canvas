@@ -13,6 +13,18 @@ interface PropLinkData extends Omit<PropLinkerProps, 'propName'> {
   prop_name: string;
 }
 
+// Whitespace between a custom element's tags reaches hyperscriptify as a text
+// node, so an element written as `<tag title="…"></tag>` still has children.
+const hasContent = (node: ReactNode): boolean => {
+  if (Array.isArray(node)) {
+    return node.some(hasContent);
+  }
+  if (typeof node === 'string') {
+    return node.trim() !== '';
+  }
+  return node !== null && node !== undefined && typeof node !== 'boolean';
+};
+
 const DrupalFormElementLabel = ({
   title = '',
   titleDisplay = '',
@@ -36,9 +48,11 @@ const DrupalFormElementLabel = ({
   );
   // Prefer the title passed as a child. An attribute can only carry a string,
   // so a label containing markup arrives there flattened and would render as
-  // text. Templates that pass the title only as an attribute keep working.
-  const label = children ?? title;
-  const show = !!label || !!title || !!required;
+  // text. Templates that pass the title only as an attribute keep working:
+  // the whitespace between an empty element's tags still arrives as a child,
+  // so only children with actual content may override the attribute.
+  const label = hasContent(children) ? children : title;
+  const show = hasContent(label) || !!required;
 
   // The basic form label
   const theLabel = (
