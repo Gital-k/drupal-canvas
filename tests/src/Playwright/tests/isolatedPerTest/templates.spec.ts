@@ -469,7 +469,15 @@ test.describe('Templates - General', () => {
     const templateMenu = page.getByRole('menu');
     await expect(templateMenu).toBeVisible();
     await expect(templateMenu.getByText('Page template')).toHaveCount(0);
-    await page.keyboard.press('Escape');
+    // Escape does not reliably dismiss the menu on the first press: Radix's
+    // focus trap and key listener attach slightly after the menu becomes
+    // visible, so a keypress in that window is silently missed. Retry until
+    // the menu actually closes, rather than clicking again while it is still
+    // open (and intercepting pointer events).
+    await expect(async () => {
+      await page.keyboard.press('Escape');
+      await expect(templateMenu).toBeHidden({ timeout: 1000 });
+    }).toPass();
 
     // Navigate to the teaser template
     await teaserTemplate.click();
