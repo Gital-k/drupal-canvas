@@ -173,6 +173,7 @@ canvasData.v0:
     - canvas/canvasData.v0.baseUrl
     - canvas/canvasData.v0.branding
     - canvas/canvasData.v0.breadcrumbs
+    - canvas/canvasData.v0.currentPath
     - canvas/canvasData.v0.jsonapiSettings
     - canvas/canvasData.v0.mainEntity
     - canvas/canvasData.v0.pageTitle
@@ -207,6 +208,14 @@ canvasData.v0.breadcrumbs:
     canvasData:
       v0:
         breadcrumbs: null
+
+canvasData.v0.currentPath:
+  dependencies:
+    - core/drupalSettings
+  drupalSettings:
+    canvasData:
+      v0:
+        currentPath: null
 
 canvasData.v0.mainEntity:
   dependencies:

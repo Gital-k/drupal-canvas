@@ -106,6 +106,9 @@ export interface DrupalSettings {
   canvasData: {
     v0: {
       pageTitle: string;
+      // The current page's path. `null` where there is no real current page,
+      // such as in the code editor's own preview.
+      currentPath: string | null;
       branding: {
         homeUrl: string;
         siteName: string;

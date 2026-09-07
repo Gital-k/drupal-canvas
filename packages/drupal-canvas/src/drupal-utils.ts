@@ -107,6 +107,10 @@ interface PageData {
   pageTitle: string;
   breadcrumbs: Array<BreadcrumbLink>;
   mainEntity: EntityMetadata | null;
+  // The current page's path, e.g. to highlight the matching link in a menu.
+  // `null` where there is no real current page, such as in the code editor's
+  // own preview.
+  currentPath: string | null;
 }
 
 interface ThemeAssets {
@@ -129,6 +133,8 @@ export const getPageData = (): PageData => {
     pageTitle: globalThis?.drupalSettings?.canvasData?.v0?.pageTitle || '',
     breadcrumbs: globalThis?.drupalSettings?.canvasData?.v0?.breadcrumbs || [],
     mainEntity: globalThis?.drupalSettings?.canvasData?.v0?.mainEntity || null,
+    currentPath:
+      globalThis?.drupalSettings?.canvasData?.v0?.currentPath || null,
   };
   // Explicit '*': called from a sandboxed, opaque-origin preview iframe,
   // which cannot know or assert the parent's real origin.

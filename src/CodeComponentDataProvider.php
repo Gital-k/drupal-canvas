@@ -123,6 +123,21 @@ readonly final class CodeComponentDataProvider {
   }
 
   /**
+   * Returns the current path for V0 of drupalSettings.canvasData.
+   *
+   * @return array[]
+   */
+  public function getCanvasDataCurrentPathV0(): array {
+    $request = $this->requestStack->getCurrentRequest();
+    \assert($request instanceof Request);
+    return [
+      self::V0 => [
+        'currentPath' => $request->getPathInfo(),
+      ],
+    ];
+  }
+
+  /**
    * Returns settings for using JSON:API for V0 of drupalSettings.canvasData.
    *
    * @return array

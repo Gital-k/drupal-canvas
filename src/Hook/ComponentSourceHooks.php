@@ -48,6 +48,7 @@ readonly final class ComponentSourceHooks {
     'canvas/canvasData.v0.baseUrl' => 'getCanvasDataBaseUrlV0',
     'canvas/canvasData.v0.branding' => 'getCanvasDataBrandingV0',
     'canvas/canvasData.v0.breadcrumbs' => 'getCanvasDataBreadcrumbsV0',
+    'canvas/canvasData.v0.currentPath' => 'getCanvasDataCurrentPathV0',
     'canvas/canvasData.v0.jsonapiSettings' => 'getCanvasDataJsonApiSettingsV0',
     'canvas/canvasData.v0.mainEntity' => 'getCanvasDataMainEntityV0',
     'canvas/canvasData.v0.pageTitle' => 'getCanvasDataPageTitleV0',
@@ -128,6 +129,10 @@ readonly final class ComponentSourceHooks {
     // TRICKY: the `route` cache context varies also by route parameters, that
     // is unnecessary here, because this only varies by route definition.
     $page['#cache']['contexts'][] = 'route.name';
+    // `canvasData.v0.currentPath` varies per exact path, unlike `route.name`
+    // (the same for e.g. every node of a given type).
+    // @see \Drupal\canvas\CodeComponentDataProvider::getCanvasDataCurrentPathV0()
+    $page['#cache']['contexts'][] = 'url.path';
     $asset_library = AssetLibrary::load(AssetLibrary::GLOBAL_ID);
     // The `global `asset library is guaranteed to exist, but protect even
     // against the most obscure edge cases. (Also: tests do simulate that!)
@@ -171,6 +176,12 @@ readonly final class ComponentSourceHooks {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'breadcrumbs']) === NULL) {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.breadcrumbs'));
+      }
+    }
+    if ($all || \in_array('canvas/canvasData.v0.currentPath', $all_attached_asset_libraries, TRUE)) {
+      // Allow overrides: only set if still NULL.
+      if (NestedArray::getValue($settings, [...$path, 'currentPath']) === NULL) {
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.currentPath'));
       }
     }
     if ($all || \in_array('canvas/canvasData.v0.pageTitle', $all_attached_asset_libraries, TRUE)) {
