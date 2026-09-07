@@ -4,6 +4,7 @@ import PropLinker from '@/components/form/components/drupal/PropLinker';
 import FormElementLabel from '@/components/form/components/FormElementLabel';
 import { a2p } from '@/local_packages/utils.js';
 
+import type { ReactNode } from 'react';
 import type { PropLinkerProps } from '@/components/form/components/drupal/PropLinker';
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -18,12 +19,14 @@ const DrupalFormElementLabel = ({
   required = '',
   attributes = {},
   directLinkerData = undefined,
+  children = undefined,
 }: {
   title: string;
   titleDisplay?: string;
   required?: string;
   attributes?: Attributes;
   directLinkerData?: PropLinkData;
+  children?: ReactNode;
 }) => {
   const classes = clsx(
     titleDisplay === 'after' ? 'option' : '',
@@ -31,7 +34,11 @@ const DrupalFormElementLabel = ({
     required ? 'js-form-required' : '',
     required ? 'form-required' : '',
   );
-  const show = !!title || !!required;
+  // Prefer the title passed as a child. An attribute can only carry a string,
+  // so a label containing markup arrives there flattened and would render as
+  // text. Templates that pass the title only as an attribute keep working.
+  const label = children ?? title;
+  const show = !!label || !!title || !!required;
 
   // The basic form label
   const theLabel = (
@@ -43,7 +50,7 @@ const DrupalFormElementLabel = ({
       )}
       className={classes}
     >
-      {title}
+      {label}
     </FormElementLabel>
   );
   const getTheLabel = () => {
