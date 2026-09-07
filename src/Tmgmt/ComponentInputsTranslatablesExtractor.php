@@ -126,7 +126,20 @@ final class ComponentInputsTranslatablesExtractor {
     }
     $concrete_element = $this->typedConfigManager->create($this->typedConfigManager->buildDataDefinition($concrete_schema, $config_data, $name, $parent), $config_data, $name, $parent);
     \assert($concrete_element instanceof TypedConfigInterface);
-    return $this->extractTranslatablesOptionallyIncludingEmpty($concrete_element, $config_data, $base_key);
+    try {
+      return $this->extractTranslatablesOptionallyIncludingEmpty($concrete_element, $config_data, $base_key);
+    }
+    catch (\TypeError $e) {
+      $component_uuid = $component_instance['uuid'] ?? '[unknown]';
+      throw new \TypeError(\sprintf(
+        'Canvas translatable extraction failed for component "%s" (version: "%s", uuid: "%s") at base key "%s": %s',
+        $component_id,
+        $component_version,
+        (string) $component_uuid,
+        $base_key,
+        $e->getMessage(),
+      ));
+    }
   }
 
   /**
@@ -244,7 +257,16 @@ final class ComponentInputsTranslatablesExtractor {
       $element_key = isset($base_key) ? "$base_key.$key" : $key;
       $definition = $element->getDataDefinition();
       if ($element instanceof Mapping || $element instanceof Sequence) {
-        $sub_data = $this->extractTranslatables($element, $config_data[$key] ?? [], $element_key);
+        $child_config_data = $config_data[$key] ?? [];
+        if (!\is_array($child_config_data)) {
+          throw new \TypeError(\sprintf(
+            'Expected nested config data at "%s" to be an array, got %s (value: %s).',
+            $element_key,
+            \get_debug_type($child_config_data),
+            self::summarizeValue($child_config_data),
+          ));
+        }
+        $sub_data = $this->extractTranslatables($element, $child_config_data, $element_key);
         if ($sub_data) {
           $data[$key] = $sub_data;
           $data[$key]['#label'] = $definition->getLabel();
@@ -313,6 +335,24 @@ final class ComponentInputsTranslatablesExtractor {
     // language yet translated to a non-empty value in the target language.
     // @see ::extractTranslatables()
     return $data->getParent()?->getDataDefinition()->getDataType() === 'canvas.component_tree_node';
+  }
+
+  /**
+   * Returns a compact debug-safe string representation of a value.
+   */
+  private static function summarizeValue(mixed $value): string {
+    if (\is_scalar($value) || $value === NULL) {
+      return \var_export($value, TRUE);
+    }
+
+    $json = \json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($json === FALSE) {
+      return '[' . \get_debug_type($value) . ']';
+    }
+
+    return \strlen($json) > 200
+      ? \substr($json, 0, 200) . '…'
+      : $json;
   }
 
 }
