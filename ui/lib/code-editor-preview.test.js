@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildPreviewFetchRequestMessage,
   getCompletePreviewPayload,
   isFromParentWindow,
+  reconstructPreviewFetchResponse,
   rewriteComponentImports,
 } from './code-editor-preview.js';
 
@@ -85,5 +87,42 @@ describe('getCompletePreviewPayload', () => {
     // empty string; that is complete data, not missing data.
     const data = { ...completeData, compiledJsForSlots: '' };
     expect(getCompletePreviewPayload({ data })).toBe(data);
+  });
+});
+
+describe('buildPreviewFetchRequestMessage', () => {
+  it('builds a typed, correlatable request message', () => {
+    expect(
+      buildPreviewFetchRequestMessage(1, '/jsonapi/menu_items/main', 'GET'),
+    ).toEqual({
+      type: '_canvas_preview_fetch_request',
+      id: 1,
+      url: '/jsonapi/menu_items/main',
+      method: 'GET',
+    });
+  });
+});
+
+describe('reconstructPreviewFetchResponse', () => {
+  it('reconstructs a successful response', async () => {
+    const response = reconstructPreviewFetchResponse({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"data":[]}',
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('application/json');
+    expect(await response.text()).toBe('{"data":[]}');
+  });
+
+  it('reconstructs an error response', async () => {
+    const response = reconstructPreviewFetchResponse({ status: 403 });
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe('');
+  });
+
+  it('defaults to a 502 when the relayed payload has no status', () => {
+    expect(reconstructPreviewFetchResponse({}).status).toBe(502);
   });
 });

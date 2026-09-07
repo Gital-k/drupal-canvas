@@ -171,6 +171,93 @@ export function getCompletePreviewPayload(event) {
   return data;
 }
 
+/**
+ * Builds the outgoing message for a proxied `fetch()` request.
+ *
+ * @param {number} id
+ *   A unique id to correlate the eventual response.
+ * @param {string} url
+ *   The requested URL.
+ * @param {string} method
+ *   The requested HTTP method.
+ *
+ * @return {object}
+ *   The message to `postMessage()` to the parent.
+ */
+export function buildPreviewFetchRequestMessage(id, url, method) {
+  return { type: '_canvas_preview_fetch_request', id, url, method };
+}
+
+/**
+ * Reconstructs a `Response` from a proxied fetch's relayed payload.
+ *
+ * @param {{status?: number, headers?: Record<string, string>, body?: string}} payload
+ *   The relayed response data.
+ *
+ * @return {Response}
+ *   A `Response` equivalent to what the real, parent-side fetch received.
+ */
+export function reconstructPreviewFetchResponse(payload) {
+  return new Response(payload.body ?? '', {
+    status: payload.status ?? 502,
+    headers: payload.headers ?? {},
+  });
+}
+
+// This document's opaque origin means `fetch()` can never carry the parent
+// site's session cookie, so a compiled component's own `fetch()` calls (e.g.
+// JSON:API lookups) would otherwise always fail with a CORS error. Proxy them
+// through the parent instead: the parent performs the real, authenticated
+// fetch (subject to its own allowlist) and relays the result back.
+// @see ui/src/features/code-editor/Preview.tsx
+const PREVIEW_FETCH_TIMEOUT_MS = 15_000;
+const pendingPreviewFetches = new Map();
+let latestPreviewFetchRequestId = 0;
+
+window.fetch = (input, init) => {
+  const url =
+    typeof input === 'string' || input instanceof URL
+      ? String(input)
+      : input.url;
+  const method = (
+    init?.method ??
+    (typeof input === 'object' && 'method' in input ? input.method : null) ??
+    'GET'
+  ).toUpperCase();
+  const id = ++latestPreviewFetchRequestId;
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      pendingPreviewFetches.delete(id);
+      reject(
+        new TypeError(
+          `Preview fetch proxy timed out waiting for a response to ${url}`,
+        ),
+      );
+    }, PREVIEW_FETCH_TIMEOUT_MS);
+    pendingPreviewFetches.set(id, { resolve, timeoutId });
+    window.parent.postMessage(
+      buildPreviewFetchRequestMessage(id, url, method),
+      '*',
+    );
+  });
+};
+
+window.addEventListener('message', (event) => {
+  if (
+    !isFromParentWindow(event) ||
+    event.data?.type !== '_canvas_preview_fetch_response'
+  ) {
+    return;
+  }
+  const pending = pendingPreviewFetches.get(event.data.id);
+  if (!pending) {
+    return;
+  }
+  clearTimeout(pending.timeoutId);
+  pendingPreviewFetches.delete(event.data.id);
+  pending.resolve(reconstructPreviewFetchResponse(event.data));
+});
+
 // Guards against a stale response: a newer message may arrive and finish
 // importing while an older message's imports are still in flight.
 let latestRequestId = 0;
@@ -178,6 +265,11 @@ let latestRequestId = 0;
 window.addEventListener('message', async (event) => {
   // The parent window is the only legitimate sender.
   if (!isFromParentWindow(event)) {
+    return;
+  }
+
+  // Handled by the fetch-proxy listener above.
+  if (event.data?.type === '_canvas_preview_fetch_response') {
     return;
   }
 

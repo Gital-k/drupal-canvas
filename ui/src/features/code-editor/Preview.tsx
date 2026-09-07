@@ -22,7 +22,10 @@ import {
   getDataDependenciesFromAst,
   getImportsFromAst,
 } from '@/features/code-editor/utils/ast-utils';
-import { safeSerializeDrupalSettings } from '@/features/code-editor/utils/previewPayload';
+import {
+  isAllowedPreviewFetchUrl,
+  safeSerializeDrupalSettings,
+} from '@/features/code-editor/utils/previewPayload';
 import {
   getPropValuesForPreview,
   getSlotNamesForPreview,
@@ -227,6 +230,49 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     }
     iframeRef.current?.contentWindow?.postMessage(buildPreviewPayload(), '*');
   }, [compiledJs, isPreviewReady, buildPreviewPayload]);
+
+  // Proxies the preview iframe's own `fetch()` calls (e.g. a component's
+  // JSON:API lookups). Its opaque origin can never carry this site's session,
+  // so those requests would otherwise always fail with a CORS error; the
+  // parent performs the real, authenticated fetch instead, restricted to an
+  // allowlist so this can't become a proxy for arbitrary admin-authenticated
+  // requests on a compiled component's behalf.
+  // @see ui/lib/code-editor-preview.js
+  useEffect(() => {
+    const handleFetchProxyRequest = async (event: MessageEvent) => {
+      if (
+        event.source !== iframeRef.current?.contentWindow ||
+        event.data?.type !== '_canvas_preview_fetch_request'
+      ) {
+        return;
+      }
+      const { id, url, method } = event.data;
+      const respond = (payload: object) =>
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: '_canvas_preview_fetch_response', id, ...payload },
+          '*',
+        );
+      if (method !== 'GET' || !isAllowedPreviewFetchUrl(url)) {
+        respond({ status: 403 });
+        return;
+      }
+      try {
+        const response = await fetch(url, { credentials: 'same-origin' });
+        respond({
+          status: response.status,
+          headers: {
+            'Content-Type':
+              response.headers.get('Content-Type') ?? 'application/json',
+          },
+          body: await response.text(),
+        });
+      } catch {
+        respond({ status: 502 });
+      }
+    };
+    window.addEventListener('message', handleFetchProxyRequest);
+    return () => window.removeEventListener('message', handleFetchProxyRequest);
+  }, []);
 
   const renderCompileError = () => (
     <ErrorCard

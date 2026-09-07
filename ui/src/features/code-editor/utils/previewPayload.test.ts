@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { safeSerializeDrupalSettings } from './previewPayload';
+import {
+  isAllowedPreviewFetchUrl,
+  safeSerializeDrupalSettings,
+} from './previewPayload';
 
 describe('safeSerializeDrupalSettings', () => {
   it('returns a plain-data object unchanged', () => {
@@ -19,5 +22,27 @@ describe('safeSerializeDrupalSettings', () => {
     const circular: Record<string, unknown> = {};
     circular.self = circular;
     expect(safeSerializeDrupalSettings(circular)).toEqual({});
+  });
+});
+
+describe('isAllowedPreviewFetchUrl', () => {
+  it.each([
+    '/jsonapi/menu_items/main',
+    '/jsonapi/node/page',
+    'https://example.com/jsonapi/media/image',
+    '/system/menu/main/linkset',
+    '/system/menu/footer/linkset',
+  ])('allows %s', (url) => {
+    expect(isAllowedPreviewFetchUrl(url)).toBe(true);
+  });
+
+  it.each([
+    '/user/login',
+    '/admin/config/system/site-information',
+    '/system/menu/main/linkset/extra',
+    '/system/menu//linkset',
+    'not a url',
+  ])('rejects %s', (url) => {
+    expect(isAllowedPreviewFetchUrl(url)).toBe(false);
   });
 });
