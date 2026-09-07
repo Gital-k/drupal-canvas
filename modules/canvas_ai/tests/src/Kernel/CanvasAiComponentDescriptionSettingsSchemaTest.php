@@ -17,7 +17,7 @@ use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 /**
- * Tests config schema validation for supported component source keys.
+ * Tests the shipped default and config schema of component description settings.
  */
 #[Group('canvas_ai')]
 final class CanvasAiComponentDescriptionSettingsSchemaTest extends CanvasKernelTestBase {
@@ -27,7 +27,40 @@ final class CanvasAiComponentDescriptionSettingsSchemaTest extends CanvasKernelT
    */
   protected static $modules = [
     'canvas_ai',
+    'ai',
+    'ai_agents',
   ];
+
+  /**
+   * Tests that the shipped default config seeds every supported source.
+   */
+  public function testInstallConfigSeedsSupportedComponentSources(): void {
+    $this->installConfig(['canvas_ai']);
+
+    $config = $this->config('canvas_ai.component_description.settings');
+    self::assertFalse($config->isNew());
+    // Each source starts disabled with empty data, so the AI keeps using the
+    // live component list until an administrator saves the settings form.
+    self::assertSame([
+      BlockComponent::SOURCE_PLUGIN_ID => [
+        'enabled' => FALSE,
+        'data' => "{}\n",
+      ],
+      JsComponent::SOURCE_PLUGIN_ID => [
+        'enabled' => FALSE,
+        'data' => "{}\n",
+      ],
+      SingleDirectoryComponent::SOURCE_PLUGIN_ID => [
+        'enabled' => FALSE,
+        'data' => "{}\n",
+      ],
+    ], $config->get('component_context'));
+
+    $violations = $this->container->get(TypedConfigManagerInterface::class)
+      ->createFromNameAndData($config->getName(), $config->getRawData())
+      ->validate();
+    self::assertCount(0, $violations, implode("\n", self::violationsToArray($violations)));
+  }
 
   /**
    * Tests that supported component source keys pass config schema validation.

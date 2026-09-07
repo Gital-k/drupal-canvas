@@ -16,5 +16,15 @@ The UI is powered by [Deepchat](https://deepchat.dev/), providing an intuitive a
 3. Configure providers at `/admin/config/ai/providers`.
 4. Configure core AI settings at `/admin/config/ai/settings`.
 
+## Component descriptions
+The descriptions the AI sees for each component, prop and slot can be overridden at
+`/admin/config/ai/canvas-ai-component-description-settings`.
+
+The module installs `canvas_ai.component_description.settings` with the three supported
+component sources (`block`, `js` and `sdc`) present, disabled and empty. Reading the settings
+fills them in with the components the site actually has, and keeps them in sync as components
+are added or removed. While a source is disabled the AI reads the live component list instead,
+so the stored descriptions only take effect once that source is enabled on the form.
+
 ## Contribution
 See the [CONTRIBUTING.md](CONTRIBUTING.md) for contribution.

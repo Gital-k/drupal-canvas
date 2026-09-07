@@ -18,7 +18,9 @@ use Drupal\Component\Serialization\Json;
 use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\VariationCacheFactory;
+use Drupal\Core\Config\FileStorage;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
@@ -614,6 +616,43 @@ XML;
     $this->assertArrayHasKey('use_site_logo', $props);
     $this->assertArrayHasKey('use_site_slogan', $props);
     $this->assertTrue($props['label_display']['required']);
+  }
+
+  /**
+   * Tests that the shipped default config picks up the site's components.
+   *
+   * The module ships every supported source disabled with empty data, so the
+   * AI keeps reading the live component list, while the first read fills the
+   * config with the components this particular site has.
+   */
+  public function testShippedDefaultConfigAdoptsAvailableComponents(): void {
+    $admin = $this->createUser([], '', TRUE);
+    \assert($admin instanceof User);
+    $this->container->get(AccountProxyInterface::class)->setAccount($admin);
+    $this->container->get(BlockManagerInterface::class)->getDefinitions();
+    $this->container->get(ComponentSourceManager::class)
+      ->generateComponents(BlockComponent::SOURCE_PLUGIN_ID, ['system_branding_block']);
+
+    // Install just the shipped default, so this asserts on the real file.
+    $module_path = $this->container->get(ModuleExtensionList::class)->getPath('canvas_ai');
+    $shipped = (new FileStorage($module_path . '/config/install'))
+      ->read('canvas_ai.component_description.settings');
+    self::assertIsArray($shipped);
+    $this->config('canvas_ai.component_description.settings')->setData($shipped)->save();
+
+    // No source is enabled, so nothing is served from config yet.
+    self::assertSame([], $this->canvasAiPageBuilderHelper->getComponentContextFromConfig());
+
+    // Reading it did populate the config with this site's block components.
+    $stored = Yaml::parse((string) $this->config('canvas_ai.component_description.settings')
+      ->get('component_context.' . BlockComponent::SOURCE_PLUGIN_ID . '.data'));
+    self::assertArrayHasKey(BlockComponent::SOURCE_PLUGIN_ID . '.system_branding_block', $stored);
+
+    // The AI context is unaffected: it still comes from the live listing.
+    self::assertStringContainsString(
+      BlockComponent::SOURCE_PLUGIN_ID . '.system_branding_block',
+      $this->canvasAiPageBuilderHelper->getComponentContextForAi(),
+    );
   }
 
   /**
