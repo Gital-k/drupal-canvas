@@ -105,6 +105,8 @@ final class PersonalizationTest extends KernelTestBase {
       'languages:language_interface',
       'route.name',
       'theme',
+      // @see \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments()
+      'url.path',
       'url.query_args:_wrapper_format',
       'url.query_args:utm_campaign',
       'url.site',
