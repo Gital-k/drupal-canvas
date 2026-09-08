@@ -46,11 +46,12 @@ final class JsonApiSettingsController implements ContainerInjectionInterface {
     // leaves its client's default prefix in place.
     $settings = $data[CodeComponentDataProvider::V0]['jsonapiSettings'];
     $cacheability = new CacheableMetadata();
-    $cacheability->addCacheContexts(['url.site']);
     // The prefix is stored in jsonapi_extras config (written by its settings
     // form) and surfaced via the jsonapi.base_path container parameter, which
     // emits no cache tag on its own. Depending on the jsonapi_extras config
     // invalidates this response when the prefix is changed through the UI.
+    // No url.site context: the prefix is a relative path fragment with no
+    // URL-dependent data, so the response never varies by site URL.
     $cacheability->addCacheTags(['config:jsonapi_extras.settings']);
     $response = new CacheableJsonResponse($settings);
     $response->addCacheableDependency($cacheability);
