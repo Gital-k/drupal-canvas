@@ -758,17 +758,27 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $autoSave = \Drupal::service(AutoSaveManager::class);
     $permissions = [
       PageRegion::ADMIN_PERMISSION,
-      // @todo 'bypass node access' is a very powerful permission and could have
-      //   side effects. Determine a way to give the user just the access they
-      //   need in https://drupal.org/i/3535354.
-      'bypass node access',
+      // Node access checks require `access content` for every operation. The
+      // auto-save list needs `view` access to the label of the unpublished node
+      // created below, which `view own unpublished content` grants because that
+      // node is owned by the current user. Publishing the auto-saved nodes
+      // needs `update` access, which `edit any article content` grants.
+      'access content',
+      'view own unpublished content',
+      'edit any article content',
       Page::EDIT_PERMISSION,
       ContentTemplate::ADMIN_PERMISSION,
     ];
     if ($authorized) {
       $permissions[] = AutoSaveManager::PUBLISH_PERMISSION;
     }
-    $this->setUpCurrentUser(permissions: $permissions);
+    $account = $this->setUpCurrentUser(permissions: $permissions);
+    // Every additional permission below is granted to this account's role
+    // instead of by creating another user, because `view own unpublished
+    // content` only grants access to the current user's own unpublished nodes.
+    $role_ids = $account->getRoles(TRUE);
+    $role = Role::load(\reset($role_ids));
+    \assert($role instanceof Role);
     if ($expected_403_message) {
       $this->expectException(AccessDeniedHttpException::class);
       $this->expectExceptionMessage($expected_403_message);
@@ -973,11 +983,14 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       $this->assertSame(['user.permissions'], $exception->getCacheContexts());
     }
     // Grant that permission.
-    $this->setUpCurrentUser(permissions: [
-      ...$permissions,
+    $this->grantPermissions($role, [
       AssetLibrary::ADMIN_PERMISSION,
       JavaScriptComponent::ADMIN_PERMISSION,
     ]);
+    // Entity access results are cached per account. Because this test keeps a
+    // single account, the access control handlers must forget the denials
+    // asserted above now that the account's role has more permissions.
+    $entity_type_manager->clearCachedDefinitions();
 
     // Verify that the user must have `administer site configuration` permission
     // to change the homepage.
@@ -995,12 +1008,9 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       $this->assertSame(['user.permissions'], $exception->getCacheContexts());
     }
     // Grant that permission.
-    $user = $this->setUpCurrentUser(permissions: [
-      ...$permissions,
-      AssetLibrary::ADMIN_PERMISSION,
-      JavaScriptComponent::ADMIN_PERMISSION,
-      'administer site configuration',
-    ]);
+    $this->grantPermissions($role, ['administer site configuration']);
+    // See above: forget the cached access results for the new permission.
+    $entity_type_manager->clearCachedDefinitions();
 
     $response = $this->makePublishAllRequest();
     $json = json_decode((string) $response->getContent(), TRUE);
@@ -1261,7 +1271,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     \assert($page instanceof Page);
     $this->assertTrue($page->isPublished());
     $this->assertSame('The updated title.', $page->label());
-    $this->assertSame($page->getRevisionUserId(), $user->id());
+    $this->assertSame($page->getRevisionUserId(), $account->id());
 
     // The `path` field is computed (aliases are persisted as `path_alias`
     // entities), but the auto-saved alias must still be published.
