@@ -466,6 +466,71 @@ describe('getDraftData', () => {
   });
 });
 
+describe('getClient', () => {
+  it('resolves the JSON:API prefix from the settings endpoint', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(Response.json({ apiPrefix: 'api' }));
+    const { server } = makeServer(fetchImpl as unknown as typeof fetch);
+
+    const publicClient = await server.getPublicClient();
+    expect(publicClient.apiPrefix).toBe('api');
+
+    const { server: draftServer, seedSession } = makeServer(
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ apiPrefix: 'api' }),
+        ) as unknown as typeof fetch,
+    );
+    seedSession(liveDraftData());
+    const draftClient = await draftServer.getClient();
+    expect(draftClient.apiPrefix).toBe('api');
+  });
+
+  it('fetches the prefix once per server instance', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(Response.json({ apiPrefix: 'api' }));
+    const { server, seedSession } = makeServer(
+      fetchImpl as unknown as typeof fetch,
+    );
+    seedSession(liveDraftData());
+
+    await server.getPublicClient();
+    await server.getClient();
+    await server.getDraftClient(liveDraftData());
+
+    const siteDataCalls = fetchImpl.mock.calls.filter(([url]) =>
+      String(url).includes('/canvas/api/v0/headless/jsonapi-settings'),
+    );
+    expect(siteDataCalls).toHaveLength(1);
+  });
+
+  it('falls back to the configured prefix when the fetch fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('refused'));
+    const { server } = makeServer(fetchImpl as unknown as typeof fetch, {
+      ...CONFIG,
+      apiPrefix: 'api',
+    });
+
+    const client = await server.getPublicClient();
+    expect(client.apiPrefix).toBe('api');
+    warn.mockRestore();
+  });
+
+  it('keeps the /jsonapi default when nothing provides a prefix', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('refused'));
+    const { server } = makeServer(fetchImpl as unknown as typeof fetch);
+
+    const client = await server.getPublicClient();
+    expect(client.apiPrefix).toBe('jsonapi');
+    warn.mockRestore();
+  });
+});
+
 describe('fetchPage', () => {
   const page = {
     content: { element: 'canvas-page' },

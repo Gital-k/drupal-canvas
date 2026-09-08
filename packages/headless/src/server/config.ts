@@ -6,6 +6,15 @@ export interface DraftConfig {
    * instead, so multi-origin dev topologies need no second URL here.
    */
   baseUrl: string;
+  /**
+   * The site's JSON:API prefix, without slashes (e.g. `api` for a site
+   * serving JSON:API at `/api` instead of `/jsonapi`). Fallback only: the
+   * JSON:API settings endpoint reports the site's configured prefix at
+   * runtime and wins over this value; this applies when that endpoint is
+   * unreachable. Omit to use the JSON:API client's `/jsonapi` default as the
+   * fallback.
+   */
+  apiPrefix?: string;
 }
 
 /**
@@ -24,7 +33,14 @@ export function resolveDraftConfig(
     throw new Error('CANVAS_SITE_URL must be set. See .env.example.');
   }
 
+  const apiPrefix = (
+    overrides.apiPrefix ??
+    process.env.CANVAS_JSONAPI_PREFIX ??
+    ''
+  ).replace(/^\/+|\/+$/g, '');
+
   return {
     baseUrl: baseUrl.replace(/\/+$/, ''),
+    ...(apiPrefix && { apiPrefix }),
   };
 }
