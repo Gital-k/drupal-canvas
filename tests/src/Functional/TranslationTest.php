@@ -905,6 +905,70 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
+   * Tests that the editor serves the source translation, not the site default.
+   *
+   * A Canvas page keeps the language it was created in. Changing the site
+   * default language afterwards must not change which translation the editor
+   * loads and writes.
+   *
+   * @see \Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber::getSourceLangcode()
+   */
+  public function testLayoutApiServesSourceTranslation(): void {
+    $page = $this->createCanvasTranslationTestPage();
+    $layout_path = '/canvas/api/v0/layout/canvas_page/' . $page->id();
+
+    // Requests a path without following redirects.
+    $get = fn (string $path, array $query = []): ResponseInterface =>
+      $this->makeApiRequest('GET', Url::fromUri("base:$path", $query ? ['query' => $query] : []), []);
+    // Returns the first content-region component name from a 200 response.
+    $content_name = function (ResponseInterface $response): ?string {
+      self::assertSame(200, $response->getStatusCode());
+      $layout = json_decode((string) $response->getBody(), TRUE)['layout'];
+      $content_region = current(array_filter($layout, fn($r) => $r['id'] === 'content'));
+      return $content_region['components'][0]['name'];
+    };
+
+    // Baseline: the page's source language is the site default language, so
+    // the un-prefixed layout request needs no redirect.
+    self::assertSame('English heading', $content_name($get($layout_path)));
+
+    // Give every language a URL prefix, so that an un-prefixed request
+    // negotiates to the site default language rather than to English, then
+    // change the site default language. The page keeps its English source.
+    $this->config('language.negotiation')->set('url.prefixes', ['en' => 'en', 'fr' => 'fr'])->save();
+    $this->config('system.site')->set('default_langcode', 'fr')->save();
+    self::assertSame('en', $page->getUntranslated()->language()->getId());
+
+    // The un-prefixed layout request is the editor: it names no language, so
+    // it is redirected to the source translation instead of being served the
+    // site default language's translation.
+    $editor = $get($layout_path);
+    self::assertSame(302, $editor->getStatusCode());
+    self::assertStringEndsWith("/en$layout_path", $editor->getHeaderLine('Location'));
+    self::assertSame('English heading', $content_name($get("/en$layout_path")));
+
+    // A request that does name a language is still served that language: the
+    // URL prefix here, and the preview hint below — which needs no redirect,
+    // because the un-prefixed URL already negotiates to the site default.
+    self::assertSame('French heading', $content_name($get("/fr$layout_path")));
+    self::assertSame('French heading', $content_name($get($layout_path, ['canvas_preview_langcode' => 'fr'])));
+    $hinted_en = $get($layout_path, ['canvas_preview_langcode' => 'en']);
+    self::assertSame(302, $hinted_en->getStatusCode());
+    self::assertStringEndsWith("/en$layout_path", $hinted_en->getHeaderLine('Location'));
+
+    // A page whose source language is the site default language is not
+    // redirected.
+    $fr_page = Page::create([
+      'title' => 'French source page',
+      'path' => '/french-source-page',
+      'status' => TRUE,
+    ]);
+    $fr_page->save();
+    self::assertSame('fr', $fr_page->language()->getId());
+    self::assertSame(200, $get('/canvas/api/v0/layout/canvas_page/' . $fr_page->id())->getStatusCode());
+  }
+
+  /**
    * Data provider for ::testCanvasPreviewLanguageNegotiation().
    */
   public static function previewLanguageNegotiationProvider(): array {

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\EventSubscriber;
 
+use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\EventSubscriber\MainContentViewSubscriber;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageInterface;
@@ -15,6 +17,10 @@ use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Routing\RoutingEvents;
 use Drupal\Core\Routing\TrustedRedirectResponse;
 use Drupal\Core\Url;
+use Drupal\language\ConfigurableLanguageManagerInterface;
+use Drupal\language\LanguageNegotiatorInterface;
+use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationSelected;
+use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUI;
 use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
@@ -86,10 +92,14 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
   }
 
   /**
-   * Redirects layout GET requests to the hinted preview translation.
+   * Redirects layout GET requests to the translation they are meant to serve.
    *
    * The `?canvas_preview_langcode` hint names the translation to preview. It
    * must not conflict with e.g. the `session.parameter` language negotiation.
+   * A request that names no language at all is the editor, which edits the
+   * entity's source translation rather than the site default language.
+   *
+   * @see ::getSourceLangcode()
    *
    * This is an event subscriber rather than a `#[LanguageNegotiation]` plugin
    * because the goal is not to negotiate a language — it is to defer to the
@@ -101,7 +111,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
    * active negotiation chain build the URL that resolves to the requested
    * language, redirecting there.
    */
-  public function redirectCanvasApiToPreviewLanguage(RequestEvent $event): void {
+  public function redirectCanvasApiToEntityLanguage(RequestEvent $event): void {
     $request = $event->getRequest();
     // Only safe (GET/HEAD) requests carry the preview language hint; never
     // redirect a request that has a body.
@@ -114,9 +124,12 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
     if (!\in_array($route_name, ['canvas.api.layout.get', 'canvas.api.layout.get.content_template'], TRUE)) {
       return;
     }
-    $langcode = $request->query->get('canvas_preview_langcode');
+    $langcode = $request->query->get(ApiLayoutController::PREVIEW_LANGCODE_QUERY_KEY);
     if (!\is_string($langcode) || $langcode === '') {
-      return;
+      $langcode = $this->getSourceLangcode();
+      if ($langcode === NULL) {
+        return;
+      }
     }
 
     // A hint naming a language that does not exist is a request for a
@@ -140,10 +153,11 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
 
     // Otherwise let the active negotiation chain build the URL that resolves
     // to the requested language instead of assuming a particular negotiation
-    // method, and redirect there. Drop the `canvas_preview_langcode` hint; the
-    // redirect carries whatever the negotiator needs.
+    // method, and redirect there. The redirect carries whatever the negotiator
+    // needs. Drop the `canvas_preview_langcode` hint; the redirect carries
+    // whatever the negotiator needs.
     $query = $request->query->all();
-    unset($query['canvas_preview_langcode']);
+    unset($query[ApiLayoutController::PREVIEW_LANGCODE_QUERY_KEY]);
     $url = Url::fromRoute($route_name, $this->routeMatch->getRawParameters()->all());
     // Negotiators that read a query parameter declare it in their language
     // switch links — the same mechanism the language switcher block uses — so
@@ -151,7 +165,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
     $switch_links = $this->languageManager->getLanguageSwitchLinks(LanguageInterface::TYPE_CONTENT, $url);
     $switch_query = $switch_links instanceof \stdClass ? ($switch_links->links[$langcode]['query'] ?? NULL) : NULL;
     if (\is_array($switch_query)) {
-      unset($switch_query['canvas_preview_langcode']);
+      unset($switch_query[ApiLayoutController::PREVIEW_LANGCODE_QUERY_KEY]);
       $query = $switch_query + $query;
     }
     // Negotiators that read the language from the URL path or domain encode it
@@ -216,6 +230,70 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
   }
 
   /**
+   * The langcode of the source translation, when no language was asked for.
+   *
+   * A layout request that names no language — no `canvas_preview_langcode`
+   * hint, and no URL prefix, session parameter or domain naming one — is the
+   * editor. The
+   * editor edits the entity's source translation: the language it was created
+   * in, which stops being the site default language as soon as a site builder
+   * changes that setting. Serving the site default language there loads and
+   * writes the wrong translation, silently.
+   *
+   * @return string|null
+   *   The langcode the entity was created in, or NULL when the request did ask
+   *   for a language, or the route carries no translatable entity — config
+   *   entities have a single language, so there is nothing to redirect to.
+   */
+  private function getSourceLangcode(): ?string {
+    if ($this->requestNamedALanguage()) {
+      return NULL;
+    }
+    $entity = $this->routeMatch->getParameter('entity');
+    if (!$entity instanceof ContentEntityInterface) {
+      return NULL;
+    }
+    return $entity->getUntranslated()->language()->getId();
+  }
+
+  /**
+   * Whether the request itself selected the content language.
+   *
+   * A URL prefix, a session parameter or a domain names a language; falling
+   * through to the site default language names nothing. `language-interface`
+   * means the content language follows the interface language, so the method
+   * that resolved that one decides.
+   *
+   * @return bool
+   *   TRUE when a negotiation method read the language off the request.
+   */
+  private function requestNamedALanguage(): bool {
+    // Without the language module there is one language, nothing negotiates it,
+    // and the negotiation plugins dereferenced below are not autoloadable.
+    if (!$this->moduleHandler->moduleExists('language')) {
+      return FALSE;
+    }
+    if (!$this->languageManager instanceof ConfigurableLanguageManagerInterface) {
+      return FALSE;
+    }
+    foreach ([LanguageInterface::TYPE_CONTENT, LanguageInterface::TYPE_INTERFACE] as $type) {
+      // Negotiate first: the resolved method is only recorded as a side effect.
+      $this->languageManager->getCurrentLanguage($type);
+      $method = $this->languageManager->getNegotiatedLanguageMethod($type);
+      if ($method === LanguageNegotiationUI::METHOD_ID) {
+        // Defer to the interface language, negotiated on the next iteration.
+        continue;
+      }
+      return !\in_array($method, [
+        LanguageNegotiationSelected::METHOD_ID,
+        LanguageNegotiatorInterface::METHOD_ID,
+        NULL,
+      ], TRUE);
+    }
+    return FALSE;
+  }
+
+  /**
    * {@inheritdoc}
    */
   public static function getSubscribedEvents(): array {
@@ -223,7 +301,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
     // Runs after the router (priority 32) so the matched route and raw
     // parameters are available, but before the OpenAPI request validator
     // (priority 0) so a redirected request never reaches it.
-    $events[KernelEvents::REQUEST][] = ['redirectCanvasApiToPreviewLanguage', 30];
+    $events[KernelEvents::REQUEST][] = ['redirectCanvasApiToEntityLanguage', 30];
     $events[KernelEvents::REQUEST][] = ['transformWrapperFormatRouteOption'];
     $events[RoutingEvents::ALTER][] = ['addCsrfToken'];
     $events[RoutingEvents::ALTER][] = ['preventRouteNormalization'];

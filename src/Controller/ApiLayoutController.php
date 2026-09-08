@@ -57,6 +57,13 @@ final class ApiLayoutController {
   use ClientServerConversionTrait;
   use EntityFormTrait;
   public const string AUTO_SAVED_QUERY_KEY = 'autoSaved';
+
+  /**
+   * Names the translation to preview; absent means "edit the source".
+   *
+   * @see \Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber::redirectCanvasApiToEntityLanguage()
+   */
+  public const string PREVIEW_LANGCODE_QUERY_KEY = 'canvas_preview_langcode';
   private array $regions;
   private array $regionsClientSideIds;
 

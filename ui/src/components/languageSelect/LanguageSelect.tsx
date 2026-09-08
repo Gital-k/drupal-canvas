@@ -152,11 +152,20 @@ const LanguageSelect = () => {
     getEntityTitle(entityType, pageData) ||
     pageData?.['title[0][value]'];
 
+  // The entity's original language: the one the editor edits, and the one
+  // every other language is a translation of. The layout API lists it first in
+  // `translations.available`. It is NOT necessarily the site default language —
+  // an entity keeps the language it was created in when the site default
+  // language changes. Only fall back to the site default language while the
+  // layout is still loading, when there is nothing better to name.
+  const originalLanguageId =
+    translations?.available?.[0] ||
+    languages.find((lang) => lang.isDefault)?.id ||
+    languages[0]?.id ||
+    '';
   // Derive the active language directly from the URL.
   const activeLanguageId = searchParams.get('language') ?? '';
-  const defaultLanguage = languages.find((lang) => lang.isDefault);
-  const currentLanguage =
-    activeLanguageId || defaultLanguage?.id || languages[0]?.id || '';
+  const currentLanguage = activeLanguageId || originalLanguageId;
 
   const handleLanguageChange = (languageId: string) => {
     setDropdownOpen(false);
@@ -166,7 +175,7 @@ const LanguageSelect = () => {
       return;
     }
 
-    if (selectedLang.isDefault) {
+    if (languageId === originalLanguageId) {
       if (isTemplateRoute) {
         navigate(
           `/template/${entityType}/${bundle}/${viewMode}/${entityId || previewEntityId}`,
