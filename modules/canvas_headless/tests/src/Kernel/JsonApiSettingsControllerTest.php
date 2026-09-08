@@ -45,11 +45,16 @@ final class JsonApiSettingsControllerTest extends CanvasKernelTestBase {
     $controller = JsonApiSettingsController::create($this->container);
     $response = $controller->get();
     self::assertSame(200, $response->getStatusCode());
-    // The endpoint exposes only non-sensitive settings (the prefix is already
-    // public in drupalSettings), so it is safe and correct to cache per-site.
+    // The response depends only on the prefix, which is invalidated via the
+    // jsonapi_extras config tag. It carries no URL-dependent data, so it must
+    // not vary by the url.site cache context.
     self::assertSame(
-      ['url.site'],
+      [],
       $response->getCacheableMetadata()->getCacheContexts(),
+    );
+    self::assertSame(
+      ['config:jsonapi_extras.settings'],
+      $response->getCacheableMetadata()->getCacheTags(),
     );
   }
 
