@@ -14,6 +14,7 @@ import {
   syncFontDefaultsFromAxisSettings,
   writeStoredAxisSelections,
 } from '@/features/brandKit/variableFontState';
+import { translate } from '@/utils/translate';
 
 import type {
   AssetLibraryFont,
@@ -207,7 +208,7 @@ const BrandKitFontsSection = () => {
     <Flex direction="column" gap="2">
       <Flex align="center" justify="between" gap="2">
         <Heading as="h5" size="2">
-          Fonts
+          {translate('Fonts')}
         </Heading>
         <Button
           size="1"
@@ -217,7 +218,7 @@ const BrandKitFontsSection = () => {
           data-testid="canvas-brand-kit-upload-font-button"
         >
           <DownloadIcon />
-          Upload font
+          {translate('Upload font')}
         </Button>
         <input
           ref={fileInputRef}
@@ -238,8 +239,10 @@ const BrandKitFontsSection = () => {
       {groupedFonts.length === 0 && !errorMessage && (
         <EmptyStateCallout
           my="3"
-          title="No fonts uploaded yet."
-          description="Upload one or more font files to generate reusable CSS snippets for the global asset library."
+          title={translate('No fonts uploaded yet.')}
+          description={translate(
+            'Upload one or more font files to generate reusable CSS snippets for the global asset library.',
+          )}
         />
       )}
 

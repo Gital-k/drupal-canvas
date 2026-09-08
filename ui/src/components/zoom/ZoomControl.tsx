@@ -8,6 +8,7 @@ import {
   selectEditorViewPortScale,
   setEditorFrameViewPort,
 } from '@/features/ui/uiSlice';
+import { translate } from '@/utils/translate';
 
 import styles from '@/components/zoom/ZoomControl.module.css';
 
@@ -38,7 +39,7 @@ const ZoomControl = (props: { buttonClass: string }) => {
       <Select.Trigger
         variant="surface"
         color="gray"
-        aria-label="Select zoom level"
+        aria-label={translate('Select zoom level')}
         className={buttonClass}
       >
         <Flex

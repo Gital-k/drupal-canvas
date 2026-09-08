@@ -15,6 +15,7 @@ import {
 } from '@/features/ui/codeComponentDialogSlice';
 import { setActivePanel } from '@/features/ui/primaryPanelSlice';
 import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 
 // Helper function to get the machine name from a component.
 // Handles both JSComponent (with 'id') and CodeComponentSerialized (with 'machineName').
@@ -101,32 +102,38 @@ const RemoveFromComponentsDialog = () => {
     <Dialog
       open={isRemoveFromComponentsDialogOpen}
       onOpenChange={handleOpenChange}
-      title="Remove from components"
+      title={translate('Remove from components')}
       description={
         <>
-          This component will be moved to the <b>Code</b> section and will no
-          longer be available to use on the page.
+          {translate('This component will be moved to the')}{' '}
+          <b>{translate('Code')}</b> {translate('section')}
+          {translate('and will no longer be available to use on the page.')}
           <br />
           <br />
-          You can re-add it to <b>Components</b> from the <b>Code</b> section at
-          any time.
+          {translate('You can re-add it to')} <b>{translate('Components')}</b>{' '}
+          {translate('from the')} <b>{translate('Code')}</b>{' '}
+          {translate('section at any time.')}
         </>
       }
       error={
         isError
           ? {
-              title: 'Failed to remove from components',
-              message: `An error ${
-                'status' in error ? '(HTTP ' + error.status + ')' : ''
-              } occurred while removing from components. Please check the browser console for more details.`,
-              resetButtonText: 'Try again',
+              title: translate('Failed to remove from components'),
+              message: translate(
+                'An error @error occurred while removing from components. Please check the browser console for more details.',
+                {
+                  '@error':
+                    'status' in error ? '(HTTP ' + error.status + ')' : '',
+                },
+              ),
+              resetButtonText: translate('Try again'),
               onReset: handleSave,
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Remove',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Remove'),
         onConfirm: handleSave,
         isConfirmDisabled: false,
         isConfirmLoading: isLoading,

@@ -11,6 +11,7 @@ import { Alpha, Hue, Saturation } from '@uiw/react-color';
 
 import ColorInputs from '@/components/ColorInputs';
 import { getColorHex } from '@/utils/brandKitColor';
+import { translate } from '@/utils/translate';
 
 import type { HsvaColor } from '@uiw/color-convert';
 import type { BrandKitColorValue } from '@/types/CodeComponent';
@@ -232,8 +233,8 @@ const ColorPicker = ({
           <Tooltip
             content={
               hasEyeDropper
-                ? 'Pick a color from the screen'
-                : 'Not available in this browser'
+                ? translate('Pick a color from the screen')
+                : translate('Not available in this browser')
             }
           >
             <IconButton
@@ -243,7 +244,7 @@ const ColorPicker = ({
               onClick={handleEyeDropper}
               disabled={!hasEyeDropper}
               className={styles.eyeDropperButton}
-              aria-label="Pick color from screen"
+              aria-label={translate('Pick color from screen')}
             >
               {/* Eyedropper/pipette SVG icon.  */}
               <svg
@@ -263,7 +264,7 @@ const ColorPicker = ({
           <div
             className={styles.colorSwatch}
             style={{ backgroundColor: currentColorStyle }}
-            aria-label="Current color"
+            aria-label={translate('Current color')}
           />
         </div>
 

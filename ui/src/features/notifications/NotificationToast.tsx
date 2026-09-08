@@ -8,6 +8,8 @@ import {
   UpdateIcon,
 } from '@radix-ui/react-icons';
 
+import { translate } from '@/utils/translate';
+
 import type { Notification } from '@/services/notificationsApi';
 
 import styles from './NotificationToast.module.css';
@@ -68,7 +70,7 @@ const NotificationToast = ({
       <button
         className={styles.dismissButton}
         onClick={() => onDismiss(notification.id)}
-        aria-label="Dismiss notification"
+        aria-label={translate('Dismiss notification')}
         type="button"
       >
         <Cross2Icon />

@@ -11,6 +11,7 @@ import {
   setEditorFrameViewPort,
 } from '@/features/ui/uiSlice';
 import { getHalfwayScrollPosition } from '@/utils/function-utils';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { RefObject } from 'react';
@@ -89,7 +90,7 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
       <ViewportSelector
         buttonClassName={clsx(styles.toolbarButton, styles.viewportSelect)}
       />
-      <Tooltip side="bottom" content={'Scale to fit'}>
+      <Tooltip side="bottom" content={translate('Scale to fit')}>
         <Button
           size="1"
           onClick={handleScaleToFit}

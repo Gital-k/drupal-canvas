@@ -25,6 +25,7 @@ import {
 import { useCanvasHeadlessSettings } from '@/hooks/useCanvasHeadlessSettings';
 import { getCanvasSettings } from '@/utils/drupal-globals';
 import { hasPermission } from '@/utils/permissions';
+import { translate } from '@/utils/translate';
 
 import type { PageExtension } from '@drupal-canvas/types';
 
@@ -114,7 +115,7 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       type: 'button',
       id: 'library',
       icon: <PlusIcon />,
-      label: 'Library',
+      label: translate('Library'),
       enabled: true,
       hidden: false,
     },
@@ -122,7 +123,7 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       type: 'button',
       id: 'layers',
       icon: <LayersIcon />,
-      label: 'Layers',
+      label: translate('Layers'),
       enabled: hasActiveEditorFrame,
       hidden: false,
     },
@@ -132,7 +133,7 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       type: 'button',
       id: 'code',
       icon: <CodeIcon />,
-      label: 'Code',
+      label: translate('Code'),
       enabled: true,
       hidden: externalComponentsOnly || !hasPermission('codeComponents'),
     },
@@ -140,7 +141,7 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       type: 'button',
       id: 'pages',
       icon: <FileTextIcon />,
-      label: 'Pages',
+      label: translate('Pages'),
       enabled: true,
       hidden: false,
     },
@@ -148,7 +149,7 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       type: 'button',
       id: 'templates',
       icon: <TemplateIcon />,
-      label: 'Templates',
+      label: translate('Templates'),
       enabled: true,
       // The panel holds content templates and page templates; show it when
       // the user may manage either.
@@ -160,7 +161,7 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       id: 'headless',
       href: '/headless/',
       icon: <GlobeIcon />,
-      label: 'Headless frontends',
+      label: translate('Headless frontends'),
       // Injected when the user may administer the Canvas Headless frontend
       // list. Unlike the preview settings, this flag is present before the
       // first frontend is configured.
@@ -174,7 +175,7 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       type: 'button',
       id: 'extensions',
       icon: <ExtensionIcon />,
-      label: 'Extensions',
+      label: translate('Extensions'),
       enabled: true,
       hidden: !hasExtensions,
     },
@@ -202,7 +203,7 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       type: 'button',
       id: 'brandKit',
       icon: <BrandKitIcon />,
-      label: 'Brand kit',
+      label: translate('Brand kit'),
       enabled: true,
       hidden: !hasPermission('brandKit') || !getCanvasSettings()?.devMode,
     },

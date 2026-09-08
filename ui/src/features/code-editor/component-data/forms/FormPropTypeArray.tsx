@@ -28,6 +28,7 @@ import {
 } from '@/features/code-editor/utils/arrayPropUtils';
 import { getNumericInputError } from '@/features/code-editor/utils/numericInputUtils';
 import { VALUE_MODE_UNLIMITED } from '@/types/CodeComponent';
+import { translate } from '@/utils/translate';
 
 import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
 
@@ -88,7 +89,9 @@ function NumericArrayItem({
         value={displayValue}
         size="1"
         placeholder={
-          itemType === 'integer' ? 'Enter an integer' : 'Enter a number'
+          itemType === 'integer'
+            ? translate('Enter an integer')
+            : translate('Enter a number')
         }
         onChange={(e) => {
           const raw = e.target.value;
@@ -225,7 +228,7 @@ export default function FormPropTypeArray({
           onChange={(e) => {
             handleValueChange(index, e.target.value);
           }}
-          placeholder="Enter a text value"
+          placeholder={translate('Enter a text value')}
         />
       </Box>
     );
@@ -236,7 +239,7 @@ export default function FormPropTypeArray({
       <Divider />
       <FormElement>
         <Text size="1" weight="medium" as="div">
-          Example value
+          {translate('Example value')}
         </Text>
         <PropValuesSortableList
           items={displayArray.map((_, index) => index)}

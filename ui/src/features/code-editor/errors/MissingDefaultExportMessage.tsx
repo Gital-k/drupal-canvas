@@ -1,29 +1,43 @@
 import { Code, Flex, Text } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import styles from './error.module.css';
 
 const MissingDefaultExportMessage = () => {
   return (
     <Flex direction="column" gap="3">
-      <TextBlock>If your component uses function declaration syntax:</TextBlock>
+      <TextBlock>
+        {translate('If your component uses function declaration syntax:')}
+      </TextBlock>
       <CodeBlock>
+        {/* eslint-disable-next-line translation/require-translated-user-facing-strings -- Code example */}
         {`function MyComponent() {\n  return (\n    <div>\n      Hello world\n    </div>\n  );\n}`}
       </CodeBlock>
 
-      <TextBlock>Add "export default" in front, like so:</TextBlock>
+      <TextBlock>
+        {translate('Add "export default" in front, like so:')}
+      </TextBlock>
       <CodeBlock>
+        {/* eslint-disable-next-line translation/require-translated-user-facing-strings -- Code example */}
         {`export default function MyComponent() {\n  return (\n    <div>\n      Hello world\n    </div>\n  );\n}`}
       </CodeBlock>
 
-      <TextBlock>Or if it uses the arrow function syntax:</TextBlock>
+      <TextBlock>
+        {translate('Or if it uses the arrow function syntax:')}
+      </TextBlock>
       <CodeBlock>
+        {/* eslint-disable-next-line translation/require-translated-user-facing-strings -- Code example */}
         {`const MyComponent = () => {\n  return (\n    <div>\n      Hello world\n    </div>\n  );\n};`}
       </CodeBlock>
 
       <TextBlock>
-        Add "export default" and the name of your component at the end:
+        {translate(
+          'Add "export default" and the name of your component at the end:',
+        )}
       </TextBlock>
       <CodeBlock>
+        {/* eslint-disable-next-line translation/require-translated-user-facing-strings -- Code example */}
         {`const MyComponent = () => {\n  return (\n    <div>\n      Hello world\n    </div>\n  );\n};\nexport default MyComponent;`}
       </CodeBlock>
     </Flex>

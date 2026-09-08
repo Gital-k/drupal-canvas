@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Flex, Text, TextField } from '@radix-ui/themes';
 
 import Dialog, { DialogFieldLabel } from '@/components/Dialog';
+import { translate } from '@/utils/translate';
 
 interface AddFrontendDialogProps {
   open: boolean;
@@ -34,17 +35,21 @@ const validateFrontendUrl = (value: string, existingUrls: string[]): string => {
   try {
     new URL(value);
   } catch {
-    return 'Enter a valid URL, including the protocol (for example, https://example.com).';
+    return translate(
+      'Enter a valid URL, including the protocol (for example, https://example.com).',
+    );
   }
   if (!FRONTEND_URL_PATTERN.test(value) || hasDotPathSegment(value)) {
-    return 'Enter an http:// or https:// URL without credentials, a query, a fragment, dot path segments, or a trailing slash.';
+    return translate(
+      'Enter an http:// or https:// URL without credentials, a query, a fragment, dot path segments, or a trailing slash.',
+    );
   }
   const canonical = canonicalFrontendUrl(value);
   if (
     canonical !== null &&
     existingUrls.some((url) => canonicalFrontendUrl(url) === canonical)
   ) {
-    return 'This frontend is already in the list.';
+    return translate('This frontend is already in the list.');
   }
   return '';
 };
@@ -61,7 +66,7 @@ const getSaveErrorMessage = (error: unknown): string => {
       return data.error;
     }
   }
-  return 'The frontend could not be saved. Please try again.';
+  return translate('The frontend could not be saved. Please try again.');
 };
 
 const AddFrontendDialog = ({
@@ -114,19 +119,21 @@ const AddFrontendDialog = ({
     <Dialog
       open={open}
       onOpenChange={handleOpenChange}
-      title="Add frontend"
+      title={translate('Add frontend')}
       width="440px"
-      description="Enter the URL where your frontend app runs. This can be a local development server or a deployed environment."
+      description={translate(
+        'Enter the URL where your frontend app runs. This can be a local development server or a deployed environment.',
+      )}
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Add frontend',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Add frontend'),
         onConfirm: () => void handleAdd(),
         isConfirmDisabled: isSubmitDisabled,
         isConfirmLoading: isSubmitting,
       }}
       error={
         submitError
-          ? { title: 'Failed to add frontend', message: submitError }
+          ? { title: translate('Failed to add frontend'), message: submitError }
           : undefined
       }
     >
@@ -138,7 +145,7 @@ const AddFrontendDialog = ({
       >
         <Flex direction="column" gap="2">
           <DialogFieldLabel htmlFor="frontendUrl">
-            Frontend URL
+            {translate('Frontend URL')}
           </DialogFieldLabel>
           <TextField.Root
             autoComplete="off"
@@ -146,7 +153,7 @@ const AddFrontendDialog = ({
             type="url"
             value={url}
             onChange={(e) => handleOnChange(e.target.value)}
-            placeholder="https://example.com"
+            placeholder={translate('https://example.com')}
             size="1"
           />
           {validationError && (

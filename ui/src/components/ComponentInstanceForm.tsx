@@ -42,6 +42,7 @@ import {
 import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import { isPropSourceComponent } from '@/types/Component';
 import parseHyperscriptifyTemplate from '@/utils/parse-hyperscriptify-template';
+import { translate } from '@/utils/translate';
 
 import type {
   ComponentModel,
@@ -449,8 +450,10 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     return (
       <EmptyStateCallout
         data-testid="canvas-marker-help"
-        title="Page content"
-        description="This marks where each page's own content renders. Every page that uses this template shows its content here. You can move it to a different spot in the layout, but it cannot be deleted. A page template always needs exactly one."
+        title={translate('Page content')}
+        description={translate(
+          "This marks where each page's own content renders. Every page that uses this template shows its content here. You can move it to a different spot in the layout, but it cannot be deleted. A page template always needs exactly one.",
+        )}
         variant="surface"
         mt="3"
       />
@@ -463,7 +466,7 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
       <>
         <ComponentInstanceFormRenderer queryString={formQueryString} />
         {componentSource === 'Module component' && emptyProp ? (
-          <Text size="4">This component has no props.</Text>
+          <Text size="4">{translate('This component has no props.')}</Text>
         ) : (
           ''
         )}

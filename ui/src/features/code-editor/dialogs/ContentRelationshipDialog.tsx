@@ -27,6 +27,7 @@ import {
   useListEntityTypesQuery,
   useListFieldsQuery,
 } from '@/services/contentEntityReferenceApi';
+import { translate } from '@/utils/translate';
 
 import type { ReactNode } from 'react';
 import type {
@@ -132,7 +133,10 @@ function ExpandButton({
       size="1"
       variant="ghost"
       color="blue"
-      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${label}`}
+      aria-label={translate('@action @label', {
+        '@action': isExpanded ? translate('Collapse') : translate('Expand'),
+        '@label': label,
+      })}
       onClick={onClick}
     >
       {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
@@ -142,9 +146,9 @@ function ExpandButton({
 
 function SelectedCountText({
   count,
-  singular = 'referenced entity property',
-  plural = 'referenced entity properties',
-  suffix = 'selected',
+  singular = translate('referenced entity property'),
+  plural = translate('referenced entity properties'),
+  suffix = translate('selected'),
 }: {
   count: number;
   singular?: string;
@@ -295,7 +299,7 @@ function FieldsTree({
       <Flex py="2" align="center" gap="2">
         <Spinner size="1" />
         <Text size="1" color="gray">
-          Loading fields…
+          {translate('Loading fields…')}
         </Text>
       </Flex>
     );
@@ -305,7 +309,7 @@ function FieldsTree({
     return (
       <Box py="1">
         <Callout.Root color="red" size="1">
-          <Callout.Text>Failed to load fields.</Callout.Text>
+          <Callout.Text>{translate('Failed to load fields.')}</Callout.Text>
         </Callout.Root>
       </Box>
     );
@@ -315,7 +319,7 @@ function FieldsTree({
     return (
       <Box py="1">
         <Text size="1" color="gray">
-          No fields available.
+          {translate('No fields available.')}
         </Text>
       </Box>
     );
@@ -678,7 +682,7 @@ function ContentRelationshipTitle() {
         <CubeIcon />
       </Flex>
       <Text size="2" weight="bold">
-        Content Relationship
+        {translate('Content Relationship')}
       </Text>
     </Flex>
   );
@@ -801,8 +805,8 @@ export default function ContentRelationshipDialog({
       title={<ContentRelationshipTitle />}
       headerClose
       footer={{
-        cancelText: 'Cancel',
-        confirmText: showFields ? 'Save' : 'Continue',
+        cancelText: translate('Cancel'),
+        confirmText: showFields ? translate('Save') : translate('Continue'),
         onCancel: () => onOpenChange(false),
         onConfirm: handleConfirm,
         isConfirmDisabled,
@@ -818,20 +822,23 @@ export default function ContentRelationshipDialog({
         <Flex direction="column" gap="3">
           <Flex direction="column" gap="1">
             <Text size="2" weight="bold">
-              Allowed type
+              {translate('Allowed type')}
             </Text>
             <Text size="1" color="gray">
-              Select a single type that editors can link to.
+              {translate('Select a single type that editors can link to.')}
             </Text>
             <Text size="1" color="gray">
-              For the selected type, choose which fields to include in the API
-              response.
+              {translate(
+                'For the selected type, choose which fields to include in the API response.',
+              )}
             </Text>
           </Flex>
 
           {typesError && (
             <Callout.Root color="red" size="1">
-              <Callout.Text>Failed to load entity types.</Callout.Text>
+              <Callout.Text>
+                {translate('Failed to load entity types.')}
+              </Callout.Text>
             </Callout.Root>
           )}
 
@@ -839,7 +846,7 @@ export default function ContentRelationshipDialog({
             <Flex gap="3" wrap="wrap">
               <Flex direction="column" gap="1" flexBasis="200px" flexGrow="1">
                 <Text size="1" weight="bold">
-                  Entity type
+                  {translate('Entity type')}
                 </Text>
                 <Select.Root
                   value={entityType ?? ''}
@@ -847,7 +854,9 @@ export default function ContentRelationshipDialog({
                   size="1"
                   disabled={typesLoading || !entityTypes}
                 >
-                  <Select.Trigger placeholder="Select entity type" />
+                  <Select.Trigger
+                    placeholder={translate('Select entity type')}
+                  />
                   <Select.Content>
                     {entityTypes &&
                       Object.entries(entityTypes).map(([typeId, { label }]) => (
@@ -860,7 +869,7 @@ export default function ContentRelationshipDialog({
               </Flex>
               <Flex direction="column" gap="1" flexBasis="200px" flexGrow="1">
                 <Text size="1" weight="bold">
-                  Bundle
+                  {translate('Bundle')}
                 </Text>
                 <Select.Root
                   value={bundle ?? ''}
@@ -868,7 +877,7 @@ export default function ContentRelationshipDialog({
                   size="1"
                   disabled={!entityType || bundleOptions.length === 0}
                 >
-                  <Select.Trigger placeholder="Select bundle" />
+                  <Select.Trigger placeholder={translate('Select bundle')} />
                   <Select.Content>
                     {bundleOptions.map((option) => (
                       <Select.Item key={option.id} value={option.id}>
@@ -891,7 +900,7 @@ export default function ContentRelationshipDialog({
                 <ChevronCell>
                   <ExpandButton
                     isExpanded={bundleExpanded}
-                    label="fields"
+                    label={translate('fields')}
                     onClick={() => setBundleExpanded((v) => !v)}
                   />
                 </ChevronCell>
@@ -900,9 +909,9 @@ export default function ContentRelationshipDialog({
                 </Text>
                 <SelectedCountText
                   count={pickedCount}
-                  singular="property"
-                  plural="properties"
-                  suffix="returned in the API"
+                  singular={translate('property')}
+                  plural={translate('properties')}
+                  suffix={translate('returned in the API')}
                 />
                 <Box flexGrow="1" />
                 {entityType && (
@@ -916,7 +925,7 @@ export default function ContentRelationshipDialog({
                     size="1"
                     variant="ghost"
                     color="gray"
-                    aria-label="Reset type and bundle"
+                    aria-label={translate('Reset type and bundle')}
                     onClick={handleReset}
                   >
                     <Cross2Icon />

@@ -14,6 +14,7 @@ import { addDataFetch } from '@/features/code-editor/codeEditorSlice';
 import DataFetch from '@/features/code-editor/component-data/DataFetch';
 import Props from '@/features/code-editor/component-data/Props';
 import Slots from '@/features/code-editor/component-data/Slots';
+import { translate } from '@/utils/translate';
 
 import styles from './ComponentData.module.css';
 
@@ -60,32 +61,46 @@ export default function ComponentData({
   return (
     <Spinner loading={isLoading}>
       <Heading as="h5" size="2" weight="medium">
-        Component data
+        {translate('Component data')}
       </Heading>
       <Tabs.Root defaultValue="props" className={styles.tabRoot} asChild>
         <Flex height="calc(100% - 34px)" direction="column" pt="4">
           <Box>
             <Tabs.List size="1">
-              <Tabs.Trigger value="props">Props</Tabs.Trigger>
-              <Tabs.Trigger value="slots">Slots</Tabs.Trigger>
-              <Tabs.Trigger value="data-fetch">Data Fetch</Tabs.Trigger>
+              <Tabs.Trigger value="props">{translate('Props')}</Tabs.Trigger>
+              <Tabs.Trigger value="slots">{translate('Slots')}</Tabs.Trigger>
+              <Tabs.Trigger value="data-fetch">
+                {translate('Data Fetch')}
+              </Tabs.Trigger>
             </Tabs.List>
           </Box>
           <Flex direction="column" flexGrow="1" height="calc(100% - 32px)">
             <ScrollArea>
               <Box px="4">
                 <Tabs.Content value="props">
-                  <ErrorBoundary title="An unexpected error has occurred while displaying props.">
+                  <ErrorBoundary
+                    title={translate(
+                      'An unexpected error has occurred while displaying props.',
+                    )}
+                  >
                     <Props />
                   </ErrorBoundary>
                 </Tabs.Content>
                 <Tabs.Content value="slots">
-                  <ErrorBoundary title="An unexpected error has occurred while displaying slots.">
+                  <ErrorBoundary
+                    title={translate(
+                      'An unexpected error has occurred while displaying slots.',
+                    )}
+                  >
                     <Slots />
                   </ErrorBoundary>
                 </Tabs.Content>
                 <Tabs.Content value="data-fetch">
-                  <ErrorBoundary title="An unexpected error has occurred while fetching.">
+                  <ErrorBoundary
+                    title={translate(
+                      'An unexpected error has occurred while fetching.',
+                    )}
+                  >
                     <DataFetch />
                   </ErrorBoundary>
                 </Tabs.Content>

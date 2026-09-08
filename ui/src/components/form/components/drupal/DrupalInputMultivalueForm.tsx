@@ -15,6 +15,7 @@ import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
 import { useUpdateComponentMutation } from '@/services/preview';
+import { translate } from '@/utils/translate';
 
 import {
   buildModelWithItemRemoved,
@@ -83,7 +84,8 @@ const DrupalInputMultivalueForm = ({
   // Controlled popover state so we can close it programmatically on remove.
   const [popoverOpen, setPopoverOpen] = useState(false);
   const fieldLabel = attributes['data-field-label'] || '';
-  const displayText = displayValue === '' ? 'Empty' : String(displayValue);
+  const displayText =
+    displayValue === '' ? translate('Empty') : String(displayValue);
 
   const setPopoverOpenAndRefocus = (open: boolean) => {
     setPopoverOpen(open);
@@ -271,7 +273,7 @@ const DrupalInputMultivalueForm = ({
           <Text size="1" weight="medium" className={styles.popoverLabel}>
             {fieldLabel}
           </Text>
-          <Popover.Close aria-label="Close">
+          <Popover.Close aria-label={translate('Close')}>
             <Cross2Icon />
           </Popover.Close>
         </Flex>
@@ -302,7 +304,7 @@ const DrupalInputMultivalueForm = ({
             disabled={!isRemoveButtonEnabled(refs.current.triggerRow)}
           >
             <TrashIcon />
-            Remove
+            {translate('Remove')}
           </Button>
         </Flex>
       </Popover.Content>

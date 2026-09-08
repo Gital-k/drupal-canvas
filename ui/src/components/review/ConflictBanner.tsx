@@ -1,6 +1,8 @@
 import { ExclamationTriangleIcon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Text } from '@radix-ui/themes';
 
+import { translate, translatePlural } from '@/utils/translate';
+
 import styles from './ConflictBanner.module.css';
 
 interface ConflictBannerProps {
@@ -22,11 +24,15 @@ const ConflictBanner = ({
         <Flex align="center" gap="2">
           <ExclamationTriangleIcon className={styles.warningIcon} />
           <Text size="2" weight="bold" className={styles.conflictText}>
-            {conflictCount} conflict{conflictCount !== 1 ? 's' : ''} to resolve
+            {translatePlural(
+              conflictCount,
+              '1 conflict to resolve',
+              '@count conflicts to resolve',
+            )}
           </Text>
         </Flex>
         <Text size="1" className={styles.conflictSubtext}>
-          Review and resolve before publishing.
+          {translate('Review and resolve before publishing.')}
         </Text>
         <Button
           variant="soft"
@@ -35,7 +41,11 @@ const ConflictBanner = ({
           disabled={disabled}
           data-testid="resolve-conflicts-button"
         >
-          Resolve {conflictCount} conflict{conflictCount !== 1 ? 's' : ''}
+          {translatePlural(
+            conflictCount,
+            'Resolve 1 conflict',
+            'Resolve @count conflicts',
+          )}
         </Button>
       </Flex>
     </Box>

@@ -4,6 +4,7 @@ import {
   closeAllDialogs,
   selectDialogStates,
 } from '@/features/ui/codeComponentDialogSlice';
+import { translate } from '@/utils/translate';
 
 const ComponentInLayoutDialog = () => {
   const dispatch = useAppDispatch();
@@ -21,14 +22,16 @@ const ComponentInLayoutDialog = () => {
       onOpenChange={handleOpenChange}
       title={
         <>
-          Unable to perform action:
+          {translate('Unable to perform action:')}
           <br />
-          Component in use
+          {translate('Component in use')}
         </>
       }
-      description="Please remove all instances of the component on the page before removing or deleting."
+      description={translate(
+        'Please remove all instances of the component on the page before removing or deleting.',
+      )}
       footer={{
-        cancelText: 'Cancel',
+        cancelText: translate('Cancel'),
       }}
     />
   );

@@ -19,6 +19,7 @@ import {
   useGetViewModesQuery,
 } from '@/services/componentAndLayout';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import type { ModeData } from '@/services/componentAndLayout';
 
@@ -45,13 +46,17 @@ const Templates = () => {
         <PermissionCheck hasPermission="contentTemplates">
           <AccordionDetails
             value="content-types"
-            title="Content types"
+            title={translate('Content types')}
             onTriggerClick={() => onClickHandler('content-types')}
           >
             <Flex direction="column" mb="4">
               <AddTemplateButton />
             </Flex>
-            <ErrorBoundary title="An unexpected error has occurred while fetching templates.">
+            <ErrorBoundary
+              title={translate(
+                'An unexpected error has occurred while fetching templates.',
+              )}
+            >
               <TemplateList />
             </ErrorBoundary>
           </AccordionDetails>
@@ -59,10 +64,14 @@ const Templates = () => {
         <PermissionCheck hasPermission="pageVariants">
           <AccordionDetails
             value="page-templates"
-            title="Page templates"
+            title={translate('Page templates')}
             onTriggerClick={() => onClickHandler('page-templates')}
           >
-            <ErrorBoundary title="An unexpected error has occurred while fetching page templates.">
+            <ErrorBoundary
+              title={translate(
+                'An unexpected error has occurred while fetching page templates.',
+              )}
+            >
               <PageVariants />
             </ErrorBoundary>
           </AccordionDetails>
@@ -84,7 +93,7 @@ const AddTemplateButton = () => {
         onClick={() => setIsOpen(true)}
       >
         <PlusIcon />
-        New content template
+        {translate('New content template')}
       </Button>
       {isOpen && <AddTemplateDialog isOpen={isOpen} setIsOpen={setIsOpen} />}
     </>
@@ -180,25 +189,25 @@ const AddTemplateDialog = ({
   return (
     <Dialog
       open={isOpen}
-      title="Add new template"
+      title={translate('Add new template')}
       headerClose={false}
       error={
         isError || isGetViewModeError
           ? {
               title: isError
-                ? 'Failed to add template'
-                : 'Failed to load view modes',
+                ? translate('Failed to add template')
+                : translate('Failed to load view modes'),
               message: parse(
                 extractErrorMessageFromApiResponse(error || getViewModeError),
               ),
-              resetButtonText: 'Try again',
+              resetButtonText: translate('Try again'),
               onReset: isError ? handleCreateTemplate : undefined,
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Add new template',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Add new template'),
         isConfirmDisabled: !(selectedContentType && selectedViewMode),
         onConfirm: handleCreateTemplate,
       }}
@@ -213,15 +222,16 @@ const AddTemplateDialog = ({
       >
         <Box>
           <Text as="p" size="1" color="gray">
-            Creates a new template for a content type using existing view modes
-            as the template name.
+            {translate(
+              'Creates a new template for a content type using existing view modes as the template name.',
+            )}
           </Text>
         </Box>
         {!contentType && (
           <Flex direction="column" gap="2">
             <Box>
               <DialogFieldLabel htmlFor="content-type">
-                Content type
+                {translate('Content type')}
               </DialogFieldLabel>
             </Box>
             <Select.Root
@@ -233,7 +243,7 @@ const AddTemplateDialog = ({
             >
               <Select.Trigger
                 id="content-type"
-                placeholder="Select content type…"
+                placeholder={translate('Select content type…')}
                 style={{ width: '100%' }}
               />
               <Select.Content>
@@ -250,7 +260,7 @@ const AddTemplateDialog = ({
         <Flex direction="column" gap="2">
           <Box>
             <DialogFieldLabel htmlFor="template-name">
-              Template
+              {translate('Template')}
             </DialogFieldLabel>
           </Box>
           <Select.Root
@@ -265,8 +275,8 @@ const AddTemplateDialog = ({
               id="template-name"
               placeholder={
                 availableTemplates === 0
-                  ? 'No more available templates'
-                  : 'Available templates…'
+                  ? translate('No more available templates')
+                  : translate('Available templates…')
               }
               style={{ width: '100%' }}
               disabled={!selectedContentType}
@@ -287,7 +297,7 @@ const AddTemplateDialog = ({
                       >
                         {typedModeData.label}{' '}
                         {typedModeData.hasTemplate &&
-                          '(template already exists)'}
+                          translate('(template already exists)')}
                       </Select.Item>
                     );
                   })}

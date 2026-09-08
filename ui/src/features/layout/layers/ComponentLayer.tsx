@@ -24,6 +24,7 @@ import {
 import useComponentSelection from '@/hooks/useComponentSelection';
 import useGetComponentName from '@/hooks/useGetComponentName';
 import { isMarkerComponentType } from '@/services/pageVariants';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { CollapsibleTriggerProps } from '@radix-ui/react-collapsible';
@@ -123,7 +124,7 @@ const ComponentLayer: React.FC<ComponentLayerProps> = ({
       {...attributes}
       ref={setNodeRef}
       role="treeitem"
-      aria-roledescription="Draggable component"
+      aria-roledescription={translate('Draggable component')}
       data-canvas-uuid={componentId}
       data-canvas-type={component.nodeType}
       data-canvas-selected={isSelected}

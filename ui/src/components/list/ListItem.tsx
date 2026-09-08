@@ -21,6 +21,7 @@ import { findNodePathByUuid } from '@/features/layout/layoutUtils';
 import { selectActivePanel } from '@/features/ui/primaryPanelSlice';
 import { useCanvasHeadlessSettings } from '@/hooks/useCanvasHeadlessSettings';
 import useComponentSelection from '@/hooks/useComponentSelection';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { LayoutItemType } from '@/features/ui/primaryPanelSlice';
@@ -140,7 +141,7 @@ const ListItem: React.FC<{
       onClick={handleInsertClick}
       disabled={layout.length === 0}
     >
-      Insert
+      {translate('Insert')}
     </UnifiedMenu.Item>
   );
 

@@ -8,6 +8,7 @@ import {
   setViewportMinHeight,
   setViewportWidth,
 } from '@/features/ui/uiSlice';
+import { translate } from '@/utils/translate';
 import { getViewportSizes } from '@/utils/viewports';
 
 import type React from 'react';
@@ -76,7 +77,7 @@ const ViewportSelector: React.FC<ViewportSelectorProps> = ({
           <BreakpointIcon width={currentWidth} />
           {currentWidth
             ? getViewportByWidth(currentWidth).name
-            : 'Select viewport'}
+            : translate('Select viewport')}
           <DropdownMenu.TriggerIcon />
         </Button>
       </DropdownMenu.Trigger>
@@ -88,7 +89,10 @@ const ViewportSelector: React.FC<ViewportSelectorProps> = ({
             color={viewportSize.width === currentWidth ? 'blue' : undefined}
           >
             <BreakpointIcon width={viewportSize.width} />
-            {viewportSize.name} ({viewportSize.width}px)
+            {translate('@name (@widthpx)', {
+              '@name': viewportSize.name,
+              '@width': viewportSize.width,
+            })}
           </DropdownMenu.Item>
         ))}
       </DropdownMenu.Content>

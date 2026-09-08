@@ -28,6 +28,7 @@ import {
   VALUE_MODE_LIMITED,
   VALUE_MODE_UNLIMITED,
 } from '@/types/CodeComponent';
+import { translate } from '@/utils/translate';
 
 import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
 
@@ -212,7 +213,7 @@ export default function FormPropTypeLink({
   return (
     <Flex direction="column" gap="4" flexGrow="1">
       <FormElement>
-        <Label htmlFor={`prop-link-type-${id}`}>Link type</Label>
+        <Label htmlFor={`prop-link-type-${id}`}>{translate('Link type')}</Label>
         <Select.Root
           value={linkType}
           onValueChange={(value: 'relative' | 'full') => {
@@ -246,14 +247,18 @@ export default function FormPropTypeLink({
         >
           <Select.Trigger id={`prop-link-type-${id}`} />
           <Select.Content>
-            <Select.Item value="relative">Relative path</Select.Item>
-            <Select.Item value="full">Full URL</Select.Item>
+            <Select.Item value="relative">
+              {translate('Relative path')}
+            </Select.Item>
+            <Select.Item value="full">{translate('Full URL')}</Select.Item>
           </Select.Content>
         </Select.Root>
       </FormElement>
       <Divider />
       <FormElement>
-        <Label htmlFor={`prop-example-${id}`}>Example value</Label>
+        <Label htmlFor={`prop-example-${id}`}>
+          {translate('Example value')}
+        </Label>
         {/* Single value mode */}
         {!allowMultiple && (
           <Flex align="center" gap="1" width="100%">

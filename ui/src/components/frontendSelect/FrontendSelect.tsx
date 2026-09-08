@@ -14,6 +14,7 @@ import {
   getCanvasSettings,
   setCanvasHeadlessFrontend,
 } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import type { HeadlessSettings } from '@drupal-canvas/types';
 
@@ -161,7 +162,7 @@ const FrontendSelect = ({ settings }: FrontendSelectProps) => {
           className={`${styles.syncIndicator} ${
             syncIndicatorState === 'fading' ? styles.syncIndicatorFading : ''
           }`}
-          aria-label="Synchronizing components"
+          aria-label={translate('Synchronizing components')}
           data-testid="frontend-sync-indicator"
         >
           <Spinner size="1" />

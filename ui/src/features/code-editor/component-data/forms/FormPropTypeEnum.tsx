@@ -32,6 +32,7 @@ import {
   VALUE_MODE_LIMITED,
   VALUE_MODE_UNLIMITED,
 } from '@/types/CodeComponent';
+import { translate } from '@/utils/translate';
 
 import type {
   CodeComponentProp,
@@ -174,7 +175,7 @@ export default function FormPropTypeEnum({
     <Flex direction="column" gap="4" flexGrow="1">
       <FormElement>
         <Text size="1" weight="medium" as="div">
-          Options
+          {translate('Options')}
         </Text>
         <EnumValuesForm
           propId={id}
@@ -237,10 +238,10 @@ export default function FormPropTypeEnum({
           <Divider />
           <FormElement>
             <Label htmlFor={`prop-enum-default-${id}`}>
-              Default value
+              {translate('Default value')}
               {allowMultiple &&
                 valueMode === VALUE_MODE_LIMITED &&
-                ` (max ${limitedCount})`}
+                ` (${translate('max')} ${limitedCount})`}
             </Label>
             {allowMultiple ? (
               <Popover.Root>
@@ -253,8 +254,10 @@ export default function FormPropTypeEnum({
                   >
                     <Text size="1" truncate>
                       {validSelectedValues.length > 0
-                        ? `${validSelectedValues.length} selected`
-                        : '- None -'}
+                        ? translate('@count selected', {
+                            '@count': validSelectedValues.length,
+                          })
+                        : translate('- None -')}
                     </Text>
                     <ChevronDownIcon />
                   </Button>
@@ -318,8 +321,10 @@ export default function FormPropTypeEnum({
                       <>
                         <Box className="fpe-divider" />
                         <Text size="1" color="gray">
-                          Selected: {validSelectedValues.length} /{' '}
-                          {limitedCount}
+                          {translate('Selected: @current / @limit', {
+                            '@current': validSelectedValues.length,
+                            '@limit': limitedCount,
+                          })}
                         </Text>
                       </>
                     )}
@@ -341,7 +346,9 @@ export default function FormPropTypeEnum({
                 <Select.Trigger id={`prop-enum-default-${id}`} />
                 <Select.Content>
                   {!required && (
-                    <Select.Item value={NONE_VALUE}>- None -</Select.Item>
+                    <Select.Item value={NONE_VALUE}>
+                      {translate('- None -')}
+                    </Select.Item>
                   )}
                   {validEnumValues.map((item, index) => (
                     <Select.Item
@@ -432,7 +439,7 @@ function EnumValuesForm({
             <Box flexGrow="1" flexShrink="1">
               <FormElement>
                 <Label htmlFor={`canvas-prop-enum-value-${propId}-${index}`}>
-                  Value
+                  {translate('Value')}
                 </Label>
                 <TextField.Root
                   autoComplete="off"
@@ -447,9 +454,9 @@ function EnumValuesForm({
                   onChange={(e) => handleValueChange(index, e.target.value)}
                   placeholder={
                     {
-                      string: 'Enter a text value',
-                      integer: 'Enter an integer',
-                      number: 'Enter a number',
+                      string: translate('Enter a text value'),
+                      integer: translate('Enter an integer'),
+                      number: translate('Enter a number'),
                     }[type]
                   }
                   disabled={isDisabled}
@@ -461,7 +468,7 @@ function EnumValuesForm({
             <Box flexGrow="1" flexShrink="1">
               <FormElement>
                 <Label htmlFor={`canvas-prop-enum-label-${propId}-${index}`}>
-                  Label
+                  {translate('Label')}
                 </Label>
                 <TextField.Root
                   autoComplete="off"
@@ -471,13 +478,13 @@ function EnumValuesForm({
                   value={item.label}
                   size="1"
                   onChange={(e) => handleLabelChange(index, e.target.value)}
-                  placeholder="Enter a label"
+                  placeholder={translate('Enter a label')}
                   disabled={isDisabled}
                 />
               </FormElement>
             </Box>
             <Button
-              aria-label="Remove value"
+              aria-label={translate('Remove value')}
               data-testid={`canvas-prop-enum-value-delete-${propId}-${index}`}
               size="1"
               color="red"
@@ -490,7 +497,7 @@ function EnumValuesForm({
           </Flex>
           {invalidValueIndices[index] && (
             <Text color="red" size="1">
-              Value must be unique.
+              {translate('Value must be unique.')}
             </Text>
           )}
         </React.Fragment>
@@ -498,7 +505,7 @@ function EnumValuesForm({
       <Button size="1" variant="soft" onClick={handleAdd} disabled={isDisabled}>
         <Flex gap="1" align="center">
           <PlusIcon />
-          <Text size="1">Add value</Text>
+          <Text size="1">{translate('Add value')}</Text>
         </Flex>
       </Button>
     </Flex>

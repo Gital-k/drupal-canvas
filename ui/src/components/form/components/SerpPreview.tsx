@@ -6,6 +6,7 @@ import FormElementLabel from '@/components/form/components/FormElementLabel';
 import { FORM_TYPES } from '@/features/form/constants';
 import { selectFormValues } from '@/features/form/formStateSlice';
 import { getBaseUrl, getDrupalSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import styles from './SerpPreview.module.css';
 
@@ -73,10 +74,12 @@ const SerpPreview = () => {
   return (
     <div className={styles.wrapper}>
       <FormElementLabel className={styles.label}>
-        Search Result Preview
+        {translate('Search Result Preview')}
       </FormElementLabel>
       <InputDescription
-        description="This preview uses the typical character limits for Google search result pages on desktop. Search engines may decide to show different content."
+        description={translate(
+          'This preview uses the typical character limits for Google search result pages on desktop. Search engines may decide to show different content.',
+        )}
         descriptionDisplay="before"
       >
         <div className={styles.preview}>

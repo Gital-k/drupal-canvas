@@ -6,6 +6,7 @@ import useInputUIData from '@/hooks/useInputUIData';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { usePatchProp } from '@/services/preview';
 import { isPropSourceComponent } from '@/types/Component';
+import { translate } from '@/utils/translate';
 
 import type {
   CodeComponentPropDocumentExample,
@@ -178,7 +179,7 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
       documentValue.filename ||
       documentValue.title ||
       documentValue.src.split('/').pop() ||
-      'Default';
+      translate('Default');
     const fileExtension =
       documentValue.src.split('.').pop()?.toUpperCase() ?? '';
     return (
@@ -192,8 +193,8 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
               type="button"
               onClick={handleRemoveDefault}
               className={styles.removeDefaultButton}
-              aria-label="Remove default"
-              title="Remove default"
+              aria-label={translate('Remove default')}
+              title={translate('Remove default')}
             />
           )}
           <span className={styles.defaultImageLabel}>{documentLabel}</span>
@@ -204,7 +205,8 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
 
   const imageUrl = defaultImageValue.src;
   const imageAlt =
-    (defaultImageValue as CodeComponentPropImageExample).alt || 'Default';
+    (defaultImageValue as CodeComponentPropImageExample).alt ||
+    translate('Default');
 
   return (
     <div ref={componentRefCallback} className={styles.defaultImagePreview}>
@@ -219,8 +221,8 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
             type="button"
             onClick={handleRemoveDefault}
             className={styles.removeDefaultButton}
-            aria-label="Remove default"
-            title="Remove default"
+            aria-label={translate('Remove default')}
+            title={translate('Remove default')}
           />
         )}
         <span className={styles.defaultImageLabel}>{imageAlt}</span>

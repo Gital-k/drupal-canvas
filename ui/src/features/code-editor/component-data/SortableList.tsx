@@ -21,6 +21,8 @@ import {
 } from '@radix-ui/react-icons';
 import { Button, Flex } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import type { DragEndEvent } from '@dnd-kit/core';
 
 import styles from './SortableList.module.css';
@@ -100,7 +102,7 @@ export default function SortableList<T>({
             disabled={isDisabled}
           >
             <PlusIcon />
-            Add
+            {translate('Add')}
           </Button>
         </Flex>
       </SortableContext>

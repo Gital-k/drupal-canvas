@@ -1,4 +1,5 @@
 import Dialog from '@/components/Dialog';
+import { translate } from '@/utils/translate';
 
 import type { HeadlessFrontend } from './types';
 
@@ -18,16 +19,17 @@ const RemoveFrontendDialog = ({
   <Dialog
     open={frontend !== null}
     onOpenChange={onOpenChange}
-    title="Remove frontend"
+    title={translate('Remove frontend')}
     description={
       <>
-        You are about to remove <b>{frontend?.url}</b> from your headless
-        frontends. You can add it again at any time.
+        {translate('You are about to remove')} <b>{frontend?.url}</b>{' '}
+        {translate('from your headless frontends.')}{' '}
+        {translate('You can add it again at any time.')}
       </>
     }
     footer={{
-      cancelText: 'Cancel',
-      confirmText: 'Remove',
+      cancelText: translate('Cancel'),
+      confirmText: translate('Remove'),
       onConfirm,
       isConfirmDisabled: isRemoving,
       isConfirmLoading: isRemoving,

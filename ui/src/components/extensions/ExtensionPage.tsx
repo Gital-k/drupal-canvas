@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from '@radix-ui/react-icons';
 import { IconButton } from '@radix-ui/themes';
 
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { PageExtension } from '@drupal-canvas/types';
@@ -71,7 +72,9 @@ const ExtensionPage: React.FC = () => {
 
   if (!ext) {
     return (
-      <div className={styles.notFound}>Extension not found: {extensionId}</div>
+      <div className={styles.notFound}>
+        {translate('Extension not found')}: {extensionId}
+      </div>
     );
   }
 
@@ -81,7 +84,7 @@ const ExtensionPage: React.FC = () => {
         <IconButton
           variant="ghost"
           color="gray"
-          aria-label="Go back"
+          aria-label={translate('Go back')}
           onClick={handleBack}
         >
           <ArrowLeftIcon />

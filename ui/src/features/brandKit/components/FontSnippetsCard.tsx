@@ -5,6 +5,7 @@ import {
   buildTailwindHtmlSnippet,
   buildTailwindThemeSnippet,
 } from '@/features/brandKit/fontCss';
+import { translate } from '@/utils/translate';
 
 import type { AssetLibraryFont } from '@/types/CodeComponent';
 
@@ -30,7 +31,7 @@ const FontSnippetsCard = ({
     <>
       <Flex direction="column" gap="2">
         <Text size="1" color="gray">
-          Tailwind theme (CSS)
+          {translate('Tailwind theme (CSS)')}
         </Text>
         <Box className={styles.snippetWrapper}>
           <Box className={styles.snippetBox}>
@@ -49,14 +50,16 @@ const FontSnippetsCard = ({
               disabled={isBusy}
             >
               <CopyIcon />
-              {copiedSnippetId === `${font.id}:css` ? 'Copied' : 'Copy CSS'}
+              {copiedSnippetId === `${font.id}:css`
+                ? translate('Copied')
+                : translate('Copy CSS')}
             </Button>
           </Box>
         </Box>
       </Flex>
       <Flex direction="column" gap="2">
         <Text size="1" color="gray">
-          HTML example
+          {translate('HTML example')}
         </Text>
         <Box className={styles.snippetWrapper}>
           <Box className={styles.snippetBox}>
@@ -75,7 +78,9 @@ const FontSnippetsCard = ({
               disabled={isBusy}
             >
               <CopyIcon />
-              {copiedSnippetId === `${font.id}:html` ? 'Copied' : 'Copy HTML'}
+              {copiedSnippetId === `${font.id}:html`
+                ? translate('Copied')
+                : translate('Copy HTML')}
             </Button>
           </Box>
         </Box>

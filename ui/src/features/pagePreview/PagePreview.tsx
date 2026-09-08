@@ -24,6 +24,7 @@ import {
   useGetSnapshotPreviewQuery,
   useQueuedPostPreviewMutation,
 } from '@/services/preview';
+import { translate } from '@/utils/translate';
 import { getViewportSizes } from '@/utils/viewports';
 
 import type React from 'react';
@@ -67,7 +68,7 @@ const HeadlessPagePreview: React.FC<{
       </p>
       <iframe
         ref={iframeRef}
-        title="Page preview"
+        title={translate('Page preview')}
         style={{ width }}
         className={styles.PagePreviewIframe}
       ></iframe>
@@ -248,7 +249,7 @@ const PagePreview = () => {
       <div className={styles.PagePreviewContainer}>
         <div className={styles.controls}></div>
         <iframe
-          title="Page preview"
+          title={translate('Page preview')}
           style={{ width: widthVal }}
           srcDoc={frameSrcDoc}
           className={styles.PagePreviewIframe}
@@ -262,20 +263,22 @@ const PagePreview = () => {
         <AlertDialog.Content maxWidth="450px">
           {linkIntercepted && (
             <>
-              <AlertDialog.Title>Link clicked</AlertDialog.Title>
+              <AlertDialog.Title>{translate('Link clicked')}</AlertDialog.Title>
               <AlertDialog.Description size="2" mb="4">
-                You attempted to open a link in the preview but it was
-                intercepted before you were navigated away from this page.
+                {translate(
+                  'You attempted to open a link in the preview but it was intercepted before you were navigated away from this page.',
+                )}
               </AlertDialog.Description>
 
               <AlertDialog.Description size="2">
-                The link goes to <strong>{linkIntercepted}</strong>
+                {translate('The link goes to')}{' '}
+                <strong>{linkIntercepted}</strong>
               </AlertDialog.Description>
 
               <Flex gap="3" mt="4" justify="end">
                 <AlertDialog.Cancel>
                   <Button variant="soft" color="gray">
-                    Close
+                    {translate('Close')}
                   </Button>
                 </AlertDialog.Cancel>
                 <AlertDialog.Action>
@@ -284,7 +287,7 @@ const PagePreview = () => {
                     color="blue"
                     onClick={handleLinkOpenClick}
                   >
-                    Open in new window
+                    {translate('Open in new window')}
                   </Button>
                 </AlertDialog.Action>
               </Flex>
@@ -292,16 +295,19 @@ const PagePreview = () => {
           )}
           {submissionIntercepted && (
             <>
-              <AlertDialog.Title>Form submitted</AlertDialog.Title>
+              <AlertDialog.Title>
+                {translate('Form submitted')}
+              </AlertDialog.Title>
               <AlertDialog.Description size="2" mb="4">
-                You attempted to submit a form in the preview but it was
-                intercepted before you were navigated away from this page.
+                {translate(
+                  'You attempted to submit a form in the preview but it was intercepted before you were navigated away from this page.',
+                )}
               </AlertDialog.Description>
 
               <Flex gap="3" mt="4" justify="end">
                 <AlertDialog.Cancel>
                   <Button variant="soft" color="gray">
-                    Close
+                    {translate('Close')}
                   </Button>
                 </AlertDialog.Cancel>
               </Flex>

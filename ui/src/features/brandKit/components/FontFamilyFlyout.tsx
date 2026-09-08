@@ -16,6 +16,7 @@ import FontVariantList from '@/features/brandKit/components/FontVariantList';
 import StaticFontVariantEditor from '@/features/brandKit/components/StaticFontVariantEditor';
 import VariableFontAxesEditor from '@/features/brandKit/components/VariableFontAxesEditor';
 import { buildFontVariantLabel } from '@/features/brandKit/fontCss';
+import { translate, translatePlural } from '@/utils/translate';
 
 import type {
   AssetLibraryFont,
@@ -81,10 +82,12 @@ const FontFamilyFlyout = ({
           {fontGroup.family}
         </Heading>
         <Text size="1" color="gray">
-          {fontGroup.fonts.length}{' '}
-          {fontGroup.fonts.length === 1
-            ? 'variant uploaded'
-            : 'variants uploaded'}
+          {translatePlural(
+            fontGroup.fonts.length,
+            '@count variant uploaded',
+            '@count variants uploaded',
+            { '@count': fontGroup.fonts.length },
+          )}
         </Text>
       </Box>
       <Flex align="center" gap="2" className={styles.flyoutHeaderActions}>
@@ -95,9 +98,9 @@ const FontFamilyFlyout = ({
           disabled={isBusy}
         >
           <DownloadIcon />
-          Add variant
+          {translate('Add variant')}
         </Button>
-        <Popover.Close aria-label="Close font details">
+        <Popover.Close aria-label={translate('Close font details')}>
           <IconButton
             variant="ghost"
             color="gray"
@@ -114,7 +117,7 @@ const FontFamilyFlyout = ({
       <Flex direction="column" gap="4" className={styles.flyoutBody}>
         <Flex direction="column" gap="2">
           <Text size="1" color="gray">
-            Family name
+            {translate('Family name')}
           </Text>
           <TextField.Root
             value={familyDraft}
@@ -136,8 +139,8 @@ const FontFamilyFlyout = ({
               <Flex direction="column" gap="3">
                 <Text size="1" color="gray">
                   {selectedFont.variantType === 'variable'
-                    ? 'CSS settings'
-                    : 'Variant settings'}
+                    ? translate('CSS settings')
+                    : translate('Variant settings')}
                 </Text>
                 <Flex
                   align="start"
@@ -157,7 +160,11 @@ const FontFamilyFlyout = ({
                     size="1"
                     onClick={() => void onRemoveFont(selectedFont.id)}
                     disabled={isBusy}
-                    aria-label={`Remove ${selectedFont.family} ${selectedFont.weight} ${selectedFont.style}`}
+                    aria-label={translate('Remove @family @weight @style', {
+                      '@family': selectedFont.family,
+                      '@weight': selectedFont.weight,
+                      '@style': selectedFont.style,
+                    })}
                   >
                     <TrashIcon />
                   </IconButton>

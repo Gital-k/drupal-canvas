@@ -11,6 +11,7 @@ import {
 } from '@/services/componentAndLayout';
 import { useGetFrontendsQuery } from '@/services/headlessFrontends';
 import { isMarkerComponentType } from '@/services/pageVariants';
+import { translate } from '@/utils/translate';
 
 import LibraryItemList from './LibraryItemList';
 
@@ -119,7 +120,7 @@ const ComponentList = ({ searchTerm, visibility }: ComponentListProps) => {
       isLoading={isLoading || foldersLoading || frontendsLoading}
       searchTerm={searchTerm}
       layoutType={LayoutItemType.COMPONENT}
-      topLevelLabel="Components"
+      topLevelLabel={translate('Components')}
       itemType="component"
       renderItem={renderItem}
     />

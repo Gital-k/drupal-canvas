@@ -19,6 +19,7 @@ import {
   selectSelectedCodeComponent,
 } from '@/features/ui/codeComponentDialogSlice';
 import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 
 const RenameCodeComponentDialog = () => {
   const selectedComponent = useAppSelector(selectSelectedCodeComponent);
@@ -91,22 +92,26 @@ const RenameCodeComponentDialog = () => {
     <Dialog
       open={isRenameDialogOpen}
       onOpenChange={handleOpenChange}
-      title="Rename component"
+      title={translate('Rename component')}
       error={
         isError
           ? {
-              title: 'Failed to rename component',
-              message: `An error ${
-                'status' in error ? '(HTTP ' + error.status + ')' : ''
-              } occurred while renaming the component. Please check the browser console for more details.`,
-              resetButtonText: 'Try again',
+              title: translate('Failed to rename component'),
+              message: translate(
+                'An error @error occurred while renaming the component. Please check the browser console for more details.',
+                {
+                  '@error':
+                    'status' in error ? '(HTTP ' + error.status + ')' : '',
+                },
+              ),
+              resetButtonText: translate('Try again'),
               onReset: handleSave,
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Rename',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Rename'),
         onConfirm: handleSave,
         isConfirmDisabled: isEmptyOrUnchanged,
         isConfirmLoading: isLoading,
@@ -123,14 +128,14 @@ const RenameCodeComponentDialog = () => {
       >
         <Flex direction="column" gap="2">
           <DialogFieldLabel htmlFor={'componentName'}>
-            Component name
+            {translate('Component name')}
           </DialogFieldLabel>
           <TextField.Root
             autoComplete="off"
             id={'componentName'}
             value={componentName}
             onChange={(e) => setComponentName(e.target.value)}
-            placeholder="Enter a new name"
+            placeholder={translate('Enter a new name')}
             size="1"
           />
         </Flex>

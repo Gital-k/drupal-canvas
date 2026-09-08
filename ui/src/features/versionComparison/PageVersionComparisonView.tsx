@@ -26,6 +26,7 @@ import {
   setEditorFrameViewPort,
 } from '@/features/ui/uiSlice';
 import { buildFullPagePreviewDocument } from '@/features/versionComparison/pageVersionPreview';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 
@@ -258,7 +259,7 @@ export const PageVersionComparisonView = ({
       <Flex justify="between" align="center" className={styles.toolbar}>
         <Tabs.List size="1" className={styles.tabList}>
           <Tabs.Trigger className={styles.tabTrigger} value="visual">
-            Visual
+            {translate('Visual')}
           </Tabs.Trigger>
         </Tabs.List>
         {tab === 'visual' && <ViewportSelector />}
@@ -415,7 +416,7 @@ const PreviewCard = ({
               className={styles.cardEditButton}
             >
               <Pencil1Icon />
-              Edit
+              {translate('Edit')}
             </Button>
           )}
           {showPreviewAction && (
@@ -424,7 +425,7 @@ const PreviewCard = ({
                 variant="ghost"
                 color="gray"
                 size="1"
-                aria-label="Open preview in new tab"
+                aria-label={translate('Open preview in new tab')}
                 onClick={handlePreviewButtonClick}
                 style={{ cursor: 'pointer' }}
               >
@@ -434,7 +435,7 @@ const PreviewCard = ({
           )}
           {changed && (
             <Badge color="yellow" radius="small">
-              Changed
+              {translate('Changed')}
             </Badge>
           )}
         </Flex>
@@ -746,7 +747,7 @@ const VisualFrame = ({
             >
               <iframe
                 ref={previewFrameRef}
-                title="Page version preview"
+                title={translate('Page version preview')}
                 className={styles.previewFrame}
                 scrolling="no"
                 srcDoc={html}
@@ -830,7 +831,7 @@ const PageVersionPreviewControls = ({
           variant="surface"
           highContrast
           className={styles.previewControlButton}
-          aria-label="Scale to fit"
+          aria-label={translate('Scale to fit')}
           data-testid="page-version-scale-to-fit"
         >
           <ScaleToFitIcon />

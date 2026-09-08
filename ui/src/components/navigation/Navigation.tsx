@@ -29,6 +29,7 @@ import EmptyStateCallout from '@/components/EmptyStateCallout';
 import InfiniteScrollObserver from '@/components/InfiniteScrollObserver';
 import { selectHomepagePath } from '@/features/configuration/configurationSlice';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
+import { translate } from '@/utils/translate';
 
 import type { FormEvent } from 'react';
 import type { ContentStub } from '@/types/Content';
@@ -83,7 +84,7 @@ const renderDuplicateButton = (
       onClick={(event) => event.stopPropagation()}
       onSelect={onDuplicate ? () => onDuplicate(item) : undefined}
     >
-      Duplicate page
+      {translate('Duplicate page')}
     </DropdownMenu.Item>
   ) : null;
 
@@ -99,7 +100,7 @@ const renderSetAsHomepageButton = (
         onClick={(event) => event.stopPropagation()}
         onSelect={onSetHomepage ? () => onSetHomepage(item) : undefined}
       >
-        Set as homepage
+        {translate('Set as homepage')}
       </DropdownMenu.Item>
     </>
   ) : null;
@@ -117,7 +118,7 @@ const renderUnpublishButton = (
         onClick={(event) => event.stopPropagation()}
         onSelect={onUnpublish ? () => onUnpublish(item) : undefined}
       >
-        Unpublish page
+        {translate('Unpublish page')}
       </DropdownMenu.Item>
     </>
   ) : null;
@@ -138,7 +139,7 @@ const renderPublishButton = (
         onClick={(event) => event.stopPropagation()}
         onSelect={onPublish ? () => onPublish(item) : undefined}
       >
-        Publish page
+        {translate('Publish page')}
       </DropdownMenu.Item>
     </>
   ) : null;
@@ -162,19 +163,22 @@ const renderDeleteButton = (
             onSelect={(event) => event.preventDefault()}
             color="red"
           >
-            Delete page
+            {translate('Delete page')}
           </DropdownMenu.Item>
         </AlertDialog.Trigger>
         <AlertDialog.Content>
-          <AlertDialog.Title>Delete {item.title} page</AlertDialog.Title>
+          <AlertDialog.Title>
+            {translate('Delete @title page', { '@title': item.title })}
+          </AlertDialog.Title>
           <AlertDialog.Description size="2">
-            This action will permanently delete the page and all of its
-            contents. This action cannot be undone.
+            {translate(
+              'This action will permanently delete the page and all of its contents. This action cannot be undone.',
+            )}
           </AlertDialog.Description>
           <Flex gap="3" mt="4" justify="end">
             <AlertDialog.Cancel>
               <Button variant="soft" color="gray">
-                Cancel
+                {translate('Cancel')}
               </Button>
             </AlertDialog.Cancel>
             <AlertDialog.Action>
@@ -183,7 +187,7 @@ const renderDeleteButton = (
                 onSelect={() => (onDelete ? onDelete(item) : undefined)}
               >
                 <Button variant="solid" color="red">
-                  Delete page
+                  {translate('Delete page')}
                 </Button>
               </DropdownMenu.Item>
             </AlertDialog.Action>
@@ -257,17 +261,17 @@ const NavigationItem = ({
       {!isMenuOpen && (isUnpublished || willBeUnpublished) && (
         <Flex align="center" mr="2">
           {willBeUnpublished ? (
-            <Tooltip content="Applies on next publish">
+            <Tooltip content={translate('Applies on next publish')}>
               <Badge size="1" variant="solid" color="gray">
                 <Flex align="center" gap="1">
                   <ClockIcon width="11" height="11" />
-                  Unpublish
+                  {translate('Unpublish')}
                 </Flex>
               </Badge>
             </Tooltip>
           ) : (
             <Badge size="1" variant="solid" color="gray">
-              Unpublished
+              {translate('Unpublished')}
             </Badge>
           )}
         </Flex>
@@ -279,7 +283,9 @@ const NavigationItem = ({
               variant="ghost"
               color="gray"
               className={styles.optionsButton}
-              aria-label={`Page options for ${item.title}`}
+              aria-label={translate('Page options for @title', {
+                '@title': item.title,
+              })}
             >
               <DotsVerticalIcon />
             </IconButton>
@@ -321,7 +327,7 @@ const ContentGroup = ({
     return (
       <EmptyStateCallout
         data-testid="canvas-navigation-results"
-        title="No pages found"
+        title={translate('No pages found')}
         variant="surface"
       />
     );
@@ -330,7 +336,7 @@ const ContentGroup = ({
   return (
     <div>
       <Heading as="h5" size="1" color="gray">
-        {title}
+        {translate(title)}
       </Heading>
       <Flex
         data-testid="canvas-navigation-results"
@@ -414,9 +420,9 @@ const Navigation = ({
           <TextField.Root
             autoComplete="off"
             id="canvas-navigation-search"
-            placeholder="Search…"
+            placeholder={translate('Search…')}
             radius="medium"
-            aria-label="Search content"
+            aria-label={translate('Search content')}
             size="1"
           >
             <TextField.Slot>
@@ -433,7 +439,7 @@ const Navigation = ({
                 size="1"
               >
                 <PlusIcon />
-                New
+                {translate('New')}
                 <ChevronDownIcon />
               </Button>
             </DropdownMenu.Trigger>
@@ -443,18 +449,18 @@ const Navigation = ({
                 data-testid="canvas-navigation-new-page-button"
               >
                 <FileTextIcon />
-                New page
+                {translate('New page')}
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         )}
       </Flex>
       <ScrollArea scrollbars="vertical" style={{ height: 175 }}>
-        {loading && <p>Loading...</p>}
+        {loading && <p>{translate('Loading...')}</p>}
         {!loading && (
           <>
             <ContentGroup
-              title="Pages"
+              title={translate('Pages')}
               items={items}
               onSelect={onSelect}
               onDuplicate={onDuplicate}

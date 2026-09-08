@@ -4,6 +4,7 @@ import { DropdownMenu } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
 import { openAddDialog } from '@/features/ui/codeComponentDialogSlice';
+import { translate } from '@/utils/translate';
 
 const AddCodeComponentButton = () => {
   const dispatch = useAppDispatch();
@@ -18,7 +19,7 @@ const AddCodeComponentButton = () => {
       data-testid="canvas-library-new-code-component-button"
     >
       <CodeIcon />
-      Code component
+      {translate('Code component')}
     </DropdownMenu.Item>
   );
 };

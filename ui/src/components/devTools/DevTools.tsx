@@ -5,6 +5,7 @@ import { Box, Button } from '@radix-ui/themes';
 
 import { useAppSelector } from '@/app/hooks';
 import Dialog from '@/components/Dialog';
+import { translate } from '@/utils/translate';
 
 const theme = {
   scheme: 'github-light-custom',
@@ -49,7 +50,7 @@ const DevTools = () => {
       <Dialog
         open={isOpen}
         onOpenChange={setIsOpen}
-        title="Redux state"
+        title={translate('Redux state')}
         modal={false}
         headerClose={true}
         footer={{ hidden: true }}
