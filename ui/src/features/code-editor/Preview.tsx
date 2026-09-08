@@ -85,10 +85,18 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const { data: codeComponents } = useGetCodeComponentsQuery();
   const [jsImportNameWithError, setJsImportNameWithError] = useState('');
 
-  // Whether the shell document (loaded once, from PREVIEW_SHELL_URL) has
-  // fired `onload`, i.e. whether `code-editor-preview.js`'s `message`
-  // listener is registered and ready to receive the payload below.
-  const [isPreviewReady, setIsPreviewReady] = useState(false);
+  // The `contentWindow` that most recently announced itself ready to
+  // receive the payload below (@see the `_canvas_preview_ready` listener).
+  // A ref, not state: a sandboxed, opaque-origin iframe's navigation to
+  // PREVIEW_SHELL_URL can make the browser swap it through more than one
+  // internal frame before settling, each running its own copy of
+  // `code-editor-preview.js`. The iframe element's `onload` DOM event fires
+  // once per swap and can't tell which firing was the last one, so relying
+  // on it to gate sending the payload risks targeting a `contentWindow`
+  // that's already been replaced by the next swap — silently dropping the
+  // message. Letting each shell instance announce its own readiness instead
+  // means whichever instance survives is also the last to announce itself.
+  const readyContentWindowRef = useRef<Window | null>(null);
 
   // Builds the dynamic per-render payload sent to the preview iframe via
   // `postMessage()`. Everything here is data the compiled component needs to
@@ -225,11 +233,34 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   // PREVIEW_SHELL_URL) stays put, and updates reach it live via
   // `postMessage()` instead of a fresh navigation per edit.
   useEffect(() => {
-    if (!compiledJs || !isPreviewReady) {
+    if (!compiledJs || !readyContentWindowRef.current) {
       return;
     }
-    iframeRef.current?.contentWindow?.postMessage(buildPreviewPayload(), '*');
-  }, [compiledJs, isPreviewReady, buildPreviewPayload]);
+    readyContentWindowRef.current.postMessage(buildPreviewPayload(), '*');
+  }, [compiledJs, buildPreviewPayload]);
+
+  // Listens for the preview shell announcing itself ready (@see
+  // `readyContentWindowRef` above for why this, rather than the iframe's
+  // `onload` event, is what gates sending the payload). Sends immediately
+  // if a payload is already available, covering the case where the shell
+  // becomes ready after `compiledJs` already arrived — the effect above
+  // only covers the reverse order.
+  useEffect(() => {
+    const handleReadyMessage = (event: MessageEvent) => {
+      if (
+        event.source !== iframeRef.current?.contentWindow ||
+        event.data?.type !== '_canvas_preview_ready'
+      ) {
+        return;
+      }
+      readyContentWindowRef.current = event.source as Window;
+      if (compiledJs) {
+        readyContentWindowRef.current.postMessage(buildPreviewPayload(), '*');
+      }
+    };
+    window.addEventListener('message', handleReadyMessage);
+    return () => window.removeEventListener('message', handleReadyMessage);
+  }, [compiledJs, buildPreviewPayload]);
 
   // Proxies the preview iframe's own `fetch()` calls (e.g. a component's
   // JSON:API lookups). Its opaque origin can never carry this site's session,
@@ -344,7 +375,6 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
             height="100%"
             width="100%"
             src={PREVIEW_SHELL_URL}
-            onLoad={() => setIsPreviewReady(true)}
             data-canvas-iframe="canvas-code-editor-preview"
             sandbox="allow-scripts"
           />

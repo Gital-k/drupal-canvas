@@ -204,6 +204,26 @@ export function reconstructPreviewFetchResponse(payload) {
   });
 }
 
+/**
+ * Builds the message announcing this document's listener is registered.
+ *
+ * A sandboxed, opaque-origin iframe's navigation to the shell URL can make
+ * the browser swap it through more than one internal frame before settling,
+ * each running its own copy of this script. Rather than have the parent
+ * infer readiness from the iframe element's `onload` DOM event, which fires
+ * once per swap and can't tell which firing was the last one, each instance
+ * announces its own readiness; whichever instance survives is also the last
+ * to announce itself, so the parent always ends up targeting a live window.
+ *
+ * @return {object}
+ *   The message to `postMessage()` to the parent.
+ *
+ * @see ui/src/features/code-editor/Preview.tsx
+ */
+export function buildPreviewReadyMessage() {
+  return { type: '_canvas_preview_ready' };
+}
+
 // This document's opaque origin means `fetch()` can never carry the parent
 // site's session cookie, so a compiled component's own `fetch()` calls (e.g.
 // JSON:API lookups) would otherwise always fail with a CORS error. Proxy them
@@ -361,3 +381,7 @@ window.addEventListener('message', async (event) => {
     );
   }
 });
+
+// Both `message` listeners above are now registered: announce readiness.
+// @see buildPreviewReadyMessage()
+window.parent.postMessage(buildPreviewReadyMessage(), '*');

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildPreviewFetchRequestMessage,
+  buildPreviewReadyMessage,
   getCompletePreviewPayload,
   isFromParentWindow,
   reconstructPreviewFetchResponse,
@@ -99,6 +100,14 @@ describe('buildPreviewFetchRequestMessage', () => {
       id: 1,
       url: '/jsonapi/menu_items/main',
       method: 'GET',
+    });
+  });
+});
+
+describe('buildPreviewReadyMessage', () => {
+  it('builds a typed ready message', () => {
+    expect(buildPreviewReadyMessage()).toEqual({
+      type: '_canvas_preview_ready',
     });
   });
 });
