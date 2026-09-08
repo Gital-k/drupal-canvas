@@ -158,3 +158,41 @@ export const getSiteData = (): SiteData => {
   });
   return siteData;
 };
+
+/**
+ * Returns whether the current document is the Canvas editor preview (layout
+ * iframe). Use this in code components to adjust behavior or styling when
+ * rendered inside the editor.
+ *
+ * @returns true when running in an iframe with a parent window on a Canvas
+ *   route (but not /canvas/preview/), false on the live site, in the editor
+ *   shell, or when running in an iframe with a parent window on the
+ *   /canvas/preview/ route.
+ */
+export const isCanvasPreview = (): boolean => {
+  // If we're not in an iframe, we're not in the Canvas editor preview.
+  if (window.self === window.top) {
+    return false;
+  }
+
+  // Check if the parent is on a Canvas route.
+  try {
+    const parentPathname = window.parent.location.pathname;
+    // If parent is on /canvas/preview/, this is the preview mode in the editor
+    // shell, so return false.
+    if (parentPathname.match(/^\/canvas\/preview\//)) {
+      return false;
+    }
+    // Parent is on /canvas/ (but not /canvas/preview/), so we're in the editor.
+    if (parentPathname.match(/^\/canvas/)) {
+      return true;
+    }
+  } catch {
+    // Cross-origin or other error accessing parent - cannot determine preview
+    // status, return false for safety.
+    return false;
+  }
+
+  // Parent is not on a Canvas route, so we're not in the Canvas editor.
+  return false;
+};

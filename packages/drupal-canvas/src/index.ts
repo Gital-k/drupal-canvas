@@ -1,6 +1,7 @@
 import {
   getPageData,
   getSiteData,
+  isCanvasPreview,
   sortMenu as sortLinksetMenu,
 } from './drupal-utils.js';
 import FormattedText from './FormattedText.js';
@@ -22,6 +23,7 @@ export {
   // drupal-utils
   getPageData,
   getSiteData,
+  isCanvasPreview,
   sortLinksetMenu,
 
   // jsonapi-utils

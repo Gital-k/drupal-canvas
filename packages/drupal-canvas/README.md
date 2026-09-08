@@ -66,6 +66,21 @@ const { baseUrl, branding } = getSiteData();
 const { homeUrl, siteName, siteSlogan } = branding;
 ```
 
+### `isCanvasPreview`
+
+Detect if the component is rendered in the Canvas editor preview (layout
+iframe). Returns `true` in the editor preview and `false` on the live site and
+in the editor shell. Use this to adjust behavior or styling when editing in
+Canvas.
+
+```js
+import { isCanvasPreview } from 'drupal-canvas';
+
+if (isCanvasPreview()) {
+  // Show placeholder, disable interactions, etc.
+}
+```
+
 ### `sortLinksetMenu`
 
 Sort a menu linkset returned by
