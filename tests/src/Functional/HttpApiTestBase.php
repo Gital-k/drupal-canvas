@@ -113,11 +113,12 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
       // always verified, except when we are explicitly testing using the same
       // client.
       // @see \Drupal\Tests\canvas\Kernel\AutoSave\AutoSaveConflictTestTrait::testOutdatedAutoSave()
-      // @see \Drupal\canvas\Controller\AutoSaveTrait::validateAutoSaves()
+      // @see \Drupal\canvas\Controller\AutoSaveValidateTrait::validateAutoSaves()
       'clientInstanceId' => 'test-client-' . (++$clientIdNumber),
     ];
     $patch_response = $this->assertExpectedResponse('PATCH', $auto_save_url, $request_options, 200, NULL, NULL, NULL, NULL);
     $entity = $this->container->get(EntityTypeManagerInterface::class)->getStorage($entity_type_id)->load($entity_id);
+    self::assertInstanceOf(EntityInterface::class, $entity);
     self::assertSame($this->getClientAutoSaves([$entity]), $patch_response);
 
     $this->assertCurrentAutoSave(200, $expected_auto_save_entity, $entity_type_id, $entity_id);
@@ -136,7 +137,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
     // Because the 'autoSaveStartingPoint`, which is returned from the
     // $auto_save_url GET request, is created using the saved entity in addition
     // to the auto-save entry we need to expect the cache tags of the entity.
-    // @see \Drupal\canvas\Controller\AutoSaveValidateTrait::getClientAutoSaveData()
+    // @see \Drupal\canvas\AutoSaveEntity::getLiveStartingPoint()
     $entity = $this->container->get(EntityTypeManagerInterface::class)->getStorage($entity_type_id)->load($entity_id);
     $cacheTags = [AutoSaveManager::CACHE_TAG, 'http_response'];
     if ($entity instanceof EntityInterface) {

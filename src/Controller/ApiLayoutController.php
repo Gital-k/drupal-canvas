@@ -147,7 +147,7 @@ final class ApiLayoutController {
       // an object and not empty array.
       'model' => empty($model) ? new \stdClass() : $model,
       'isNew' => $is_new,
-      'autoSaves' => $this->getAutoSaveHashes(array_merge(
+      'autoSaves' => $this->autoSaveManager->getClientAutoSaves(array_merge(
         [$entity],
         self::getEditableRegions($entity),
       )),
@@ -424,7 +424,7 @@ final class ApiLayoutController {
       // Config entities have no entity form; keep the response shape uniform.
       $data['entity_form_fields'] = new \stdClass();
     }
-    $data['autoSaves'] = $this->getAutoSaveHashes(array_merge(
+    $data['autoSaves'] = $this->autoSaveManager->getClientAutoSaves(array_merge(
       [$entity],
       self::getEditableRegions($entity),
     ));
@@ -525,7 +525,7 @@ final class ApiLayoutController {
     return new PreviewEnvelope(
       $this->buildPreviewRenderable($entity, $preview_entity),
       additionalData: [
-        'autoSaves' => $this->getAutoSaveHashes(array_merge(
+        'autoSaves' => $this->autoSaveManager->getClientAutoSaves(array_merge(
           [$entity],
           self::getEditableRegions($entity),
         )),

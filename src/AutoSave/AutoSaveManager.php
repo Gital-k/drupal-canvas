@@ -371,8 +371,16 @@ class AutoSaveManager implements EventSubscriberInterface {
   }
 
   /**
+   * Builds the auto-save data the client needs for conflict detection.
+   *
    * @param \Drupal\Core\Entity\EntityInterface $entity
-   * @return array{autoSaveStartingPoint: int|string|null, hash: string|null}
+   *   The entity to describe. May carry unsaved in-memory changes; the starting
+   *   point is computed from a freshly loaded copy regardless.
+   *
+   * @return array{autoSaveStartingPoint: string, hash: string|null}
+   *   The hash is NULL when there is no auto-save entry for this entity.
+   *
+   * @see \Drupal\canvas\AutoSaveEntity::getLiveStartingPoint()
    */
   public function getClientAutoSaveData(EntityInterface $entity): array {
     $autoSaveEntity = $this->getAutoSaveEntity($entity);
@@ -384,18 +392,33 @@ class AutoSaveManager implements EventSubscriberInterface {
       ->loadUnchanged($entity->id());
     \assert($savedEntity instanceof EntityInterface);
 
-    // If available we must use the revision ID and the changed time because
-    // not all entity types will increment the revision ID on every change.
-    $autoSaveStartRevision = $savedEntity instanceof RevisionableInterface
-      ? $savedEntity->getRevisionId()
-      : \hash('xxh64', \json_encode($savedEntity->toArray(), JSON_THROW_ON_ERROR));
-    if ($savedEntity instanceof EntityChangedInterface) {
-      $autoSaveStartRevision .= '-' . $savedEntity->getChangedTime();
-    }
     return [
-      'autoSaveStartingPoint' => $autoSaveStartRevision,
+      'autoSaveStartingPoint' => AutoSaveEntity::getLiveStartingPoint($savedEntity),
       'hash' => $autoSaveEntity->hash,
     ];
+  }
+
+  /**
+   * Builds ::getClientAutoSaveData() for many entities, keyed by auto-save key.
+   *
+   * This is the `autoSaves` structure in the HTTP API: the client sends it back
+   * unmodified with every mutating request.
+   *
+   * @param array<\Drupal\Core\Entity\EntityInterface> $entities
+   *   The entities that the current request may update.
+   *
+   * @return array<string, array{autoSaveStartingPoint: string, hash: string|null}>
+   *   Keyed by ::getAutoSaveKey().
+   *
+   * @see \Drupal\canvas\Controller\AutoSaveValidateTrait::validateAutoSaves()
+   */
+  public function getClientAutoSaves(array $entities): array {
+    $autoSaves = [];
+    foreach ($entities as $entity) {
+      \assert($entity instanceof EntityInterface);
+      $autoSaves[self::getAutoSaveKey($entity)] = $this->getClientAutoSaveData($entity);
+    }
+    return $autoSaves;
   }
 
   private function getUnchangedHash(EntityInterface $entity): ?string {

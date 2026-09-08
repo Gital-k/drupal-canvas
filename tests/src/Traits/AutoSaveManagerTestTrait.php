@@ -7,7 +7,6 @@ namespace Drupal\Tests\canvas\Traits;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiAutoSaveController;
 use Drupal\canvas\Entity\PageRegion;
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Session\AccountInterface;
@@ -34,20 +33,23 @@ trait AutoSaveManagerTestTrait {
   }
 
   /**
-   * @todo Move this logic elsewhere in https://www.drupal.org/project/canvas/issues/3535458
+   * Builds the `autoSaves` request/response body the client exchanges.
+   *
+   * @param array<\Drupal\Core\Entity\EntityInterface> $entities
+   *   The entities the request may update.
+   * @param bool $addRegions
+   *   Whether to also cover the active theme's PageRegion config entities, as
+   *   the controllers building a page preview do.
+   *
+   * @see \Drupal\canvas\AutoSave\AutoSaveManager::getClientAutoSaves()
    */
   protected function getClientAutoSaves(array $entities, bool $addRegions = TRUE): array {
-    $autoSaves = [];
     $autoSaveManager = \Drupal::service(AutoSaveManager::class);
     \assert($autoSaveManager instanceof AutoSaveManager);
     if ($addRegions) {
       $entities += PageRegion::loadForActiveTheme();
     }
-    foreach ($entities as $entity) {
-      \assert($entity instanceof EntityInterface);
-      $autoSaves[AutoSaveManager::getAutoSaveKey($entity)] = $autoSaveManager->getClientAutoSaveData($entity);
-    }
-    return ['autoSaves' => $autoSaves];
+    return ['autoSaves' => $autoSaveManager->getClientAutoSaves($entities)];
   }
 
   /**
