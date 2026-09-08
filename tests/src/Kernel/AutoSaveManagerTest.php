@@ -10,6 +10,7 @@ use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Controller\ConflictResolutionOutcomeEnum;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
+use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
@@ -20,7 +21,9 @@ use Drupal\Component\Datetime\Time;
 use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
@@ -240,6 +243,85 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
       'slots' => [],
     ];
     $this->assertAutoSaveCreated($canvas_page, $matching_client_data, $new_component_client_data);
+  }
+
+  /**
+   * Filing a page into a folder is not part of the page's draft.
+   *
+   * Folder membership is organizational metadata managed live from the Pages
+   * panel, so it must neither create nor disturb an auto-save: a draft taken
+   * before a page was filed must not move it back out when published, filing
+   * must not flag the open draft as updated externally, and the draft always
+   * reflects where the page currently is.
+   *
+   * @see \Drupal\canvas\AutoSave\AutoSaveManager::isFolderMembershipField()
+   */
+  public function testFolderMembershipIsNotPartOfTheDraft(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $folder = Folder::create([
+      'name' => 'Campaigns',
+      'configEntityTypeId' => Page::ENTITY_TYPE_ID,
+    ]);
+    $folder->save();
+    $page = Page::create([
+      'title' => 'Spring sale',
+      'components' => [],
+    ]);
+    self::assertSame(SAVED_NEW, $page->save());
+    $page_id = $page->id();
+    self::assertNotNull($page_id);
+    $storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Page::ENTITY_TYPE_ID);
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    \assert($autoSave instanceof AutoSaveManager);
+
+    // An editor starts a draft while the page is in no folder.
+    $draft = clone $page;
+    $draft->set('title', 'Spring sale, extended');
+    $autoSave->saveEntity($draft);
+    self::assertFalse($autoSave->getAutoSaveEntity($page)->isEmpty());
+    $store = $this->container->get(KeyValueFactoryInterface::class)->get(AutoSaveManager::AUTO_SAVE_STORE);
+    $entry = $store->get(AutoSaveManager::getAutoSaveKey($page));
+    self::assertIsArray($entry);
+    self::assertArrayHasKey('title', $entry['data']);
+    self::assertArrayNotHasKey('folder', $entry['data']);
+
+    // Meanwhile the page is filed from the Pages panel: a live save.
+    $filed = $storage->loadUnchanged($page_id);
+    \assert($filed instanceof Page);
+    $filed->set('folder', $folder->id());
+    self::assertEntityIsValid($filed);
+    $filed->save();
+
+    // Filing did not touch the draft, nor make it look updated externally.
+    self::assertNull($autoSave->getUnresolvedConflictForEntity($filed));
+    $reconstructed = $autoSave->getAutoSaveEntity($filed, bypass_cache: TRUE)->entity;
+    \assert($reconstructed instanceof Page);
+    self::assertSame('Spring sale, extended', $reconstructed->label());
+    self::assertSame($folder->id(), $reconstructed->get('folder')->target_id);
+
+    // Publishing the draft keeps the page where it was filed.
+    $reconstructed->save();
+    $published = $storage->loadUnchanged($page_id);
+    \assert($published instanceof Page);
+    self::assertSame('Spring sale, extended', $published->label());
+    self::assertSame($folder->id(), $published->get('folder')->target_id);
+
+    // And the other way round: taking the page out of its folder live is
+    // reflected by the draft too, without a conflict. (Publishing through the
+    // API also clears the entry; do the same here.)
+    $autoSave->delete($published);
+    $draft = clone $published;
+    $draft->set('title', 'Spring sale, extended again');
+    $autoSave->saveEntity($draft);
+    $removed = $storage->loadUnchanged($page_id);
+    \assert($removed instanceof Page);
+    $removed->set('folder', NULL)->save();
+    self::assertNull($autoSave->getUnresolvedConflictForEntity($removed));
+    $reconstructed = $autoSave->getAutoSaveEntity($removed, bypass_cache: TRUE)->entity;
+    \assert($reconstructed instanceof Page);
+    self::assertTrue($reconstructed->get('folder')->isEmpty());
   }
 
   /**

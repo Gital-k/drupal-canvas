@@ -321,6 +321,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
         'isNew' => FALSE,
         'hasUnsavedStatusChange' => FALSE,
         'path' => base_path() . 'page-1',
+        'folder' => NULL,
         'autoSaveLabel' => NULL,
         'autoSavePath' => NULL,
         'links' => [
@@ -340,6 +341,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
         'isNew' => TRUE,
         'hasUnsavedStatusChange' => FALSE,
         'path' => base_path() . 'page/2',
+        'folder' => NULL,
         'autoSaveLabel' => NULL,
         'autoSavePath' => NULL,
         'links' => [
@@ -357,6 +359,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
         'isNew' => FALSE,
         'hasUnsavedStatusChange' => FALSE,
         'path' => base_path() . 'page-3',
+        'folder' => NULL,
         'autoSaveLabel' => NULL,
         'autoSavePath' => NULL,
         'links' => [
@@ -394,6 +397,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
           'isNew' => FALSE,
           'hasUnsavedStatusChange' => FALSE,
           'path' => base_path() . 'page-1',
+          'folder' => NULL,
           'autoSaveLabel' => NULL,
           'autoSavePath' => NULL,
           'links' => [

@@ -5,6 +5,7 @@ import {
   useGetFoldersQuery,
   useUpdateFolderMutation,
 } from '@/services/componentAndLayout';
+import { useSetContentFolderMutation } from '@/services/content';
 
 import type { DragEndEvent } from '@dnd-kit/core';
 
@@ -12,6 +13,7 @@ export function useDropOnFolderHandler() {
   const dispatch = useAppDispatch();
   const { data: folders } = useGetFoldersQuery();
   const [updateFolder] = useUpdateFolderMutation();
+  const [setContentFolder] = useSetContentFolderMutation();
 
   const handleFolderDrop = async (e: DragEndEvent) => {
     const { active, over } = e;
@@ -27,6 +29,26 @@ export function useDropOnFolderHandler() {
 
     // Check if this is a folder being dragged (folder reordering).
     const activeData = active.data?.current;
+
+    // A content entity dropped onto a folder is filed through the content
+    // API: content folders have no `items`, the entity references its folder.
+    if (activeData?.origin === 'pages' && activeData?.type === 'page') {
+      const newFolderId = destination === 'folder' ? String(over?.id) : null;
+      if (newFolderId !== null && !folders.folders[newFolderId]) {
+        return;
+      }
+      if ((activeData.folderId ?? null) === newFolderId) {
+        // Dropped back where it already was.
+        return;
+      }
+      await setContentFolder({
+        entityType: String(activeData.entityType),
+        entityId: String(activeData.pageId),
+        folder: newFolderId,
+      }).unwrap();
+      return;
+    }
+
     if (activeData?.type === 'folder') {
       // Dragging folders to uncategorized is intentionally unsupported.
       if (destination !== 'folder') {

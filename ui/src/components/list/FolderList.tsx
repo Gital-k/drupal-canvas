@@ -38,11 +38,17 @@ const FolderList = ({
   children,
   extraMenuItems,
   deleteWarning,
+  itemCount,
 }: {
   folder: FolderInList;
   children: ReactNode;
   extraMenuItems?: ReactNode;
   deleteWarning?: string;
+  /**
+   * The number of things in the folder, for folders whose members are not
+   * listed in `items` (content entities reference their folder themselves).
+   */
+  itemCount?: number;
 }) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [folderName, setFolderName] = useState(folder.name);
@@ -98,11 +104,14 @@ const FolderList = ({
 
   // Determine the length of items in the folder, be it object or array.
   const getItemsLength = useCallback(() => {
+    if (itemCount !== undefined) {
+      return itemCount;
+    }
     if (Array.isArray(folder.items)) {
       return folder.items.length;
     }
     return Object.keys(folder.items).length;
-  }, [folder.items]);
+  }, [folder.items, itemCount]);
 
   const cancelRename = useCallback(() => {
     setIsRenaming(false);

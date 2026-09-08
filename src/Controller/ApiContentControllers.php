@@ -6,6 +6,7 @@ namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Resource\CanvasResourceLink;
@@ -115,7 +116,11 @@ final class ApiContentControllers extends ApiControllerBase {
       $body['page_variant'] = $body['pageVariant'] !== '' ? $body['pageVariant'] : NULL;
     }
 
-    foreach (['title', 'status', 'path', 'components', 'description', 'page_variant'] as $field_name) {
+    if (\array_key_exists('folder', $body)) {
+      $body['folder'] = $body['folder'] !== '' ? $body['folder'] : NULL;
+    }
+
+    foreach (['title', 'status', 'path', 'components', 'description', 'page_variant', 'folder'] as $field_name) {
       if (!\array_key_exists($field_name, $body)) {
         continue;
       }
@@ -174,6 +179,7 @@ final class ApiContentControllers extends ApiControllerBase {
       $requestPath = $body['path'] ?? NULL;
       $requestDescription = $body['description'] ?? NULL;
       $requestPageVariant = $body['pageVariant'] ?? NULL;
+      $requestFolder = $body['folder'] ?? NULL;
       $values = [
         'title' => $requestBodyTitle,
         'status' => $requestStatus,
@@ -181,6 +187,7 @@ final class ApiContentControllers extends ApiControllerBase {
         'path' => $requestPath,
         'description' => $requestDescription,
         'page_variant' => $requestPageVariant,
+        'folder' => $requestFolder !== '' ? $requestFolder : NULL,
       ];
       if (isset($body['uuid'])) {
         $values['uuid'] = $body['uuid'];
@@ -414,6 +421,18 @@ final class ApiContentControllers extends ApiControllerBase {
       ->addCacheableDependency($autoSaveData);
 
     \assert($content_entity instanceof ContentEntityInterface);
+
+    // The folder this entity is organized into in the Pages panel, when its
+    // entity type supports folders. NULL when it is in no folder.
+    $folder = NULL;
+    if ($content_entity->hasField('folder')) {
+      $folder_entity = $content_entity->get('folder')->entity;
+      if ($folder_entity instanceof Folder) {
+        $url_cacheability->addCacheableDependency($folder_entity);
+        $folder = $folder_entity->id();
+      }
+    }
+
     return [
       'id' => (int) $content_entity->id(),
       'uuid' => $content_entity->uuid(),
@@ -431,6 +450,7 @@ final class ApiContentControllers extends ApiControllerBase {
       // The internal path, which has not been processed and is the entity's
       // canonical link template.
       'internalPath' => '/' . $content_entity->toUrl()->getInternalPath(),
+      'folder' => $folder,
       'autoSaveLabel' => $autoSaveEntity?->label(),
       'autoSavePath' => $autoSavePath,
       // @see https://jsonapi.org/format/#document-links

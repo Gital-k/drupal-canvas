@@ -9,6 +9,7 @@ use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Marker;
@@ -108,6 +109,77 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Tests filing a page into a folder, and removing it from one.
+   */
+  public function testPatchSetsFolder(): void {
+    $folder = Folder::create([
+      'name' => 'Landing pages',
+      'configEntityTypeId' => Page::ENTITY_TYPE_ID,
+    ]);
+    $folder->save();
+    $page = Page::create([
+      'title' => 'Filed page',
+      'status' => TRUE,
+      'path' => ['alias' => '/filed-page'],
+      'components' => [],
+    ]);
+    $page->save();
+
+    // The request body carries the whole page, as every PATCH does; only the
+    // folder differs between the requests below.
+    $body = static fn (?string $folder_id): string => \json_encode([
+      'title' => 'Filed page',
+      'status' => TRUE,
+      'path' => '/filed-page',
+      'components' => [],
+      'folder' => $folder_id,
+    ], JSON_THROW_ON_ERROR);
+
+    // File the page into the folder.
+    $response = $this->request(Request::create(
+      \sprintf(self::URL, $page->id()),
+      'PATCH',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: $body($folder->id()),
+    ));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $data = $this->decodeResponse($response);
+    self::assertSame($folder->id(), $data['folder']);
+
+    // A folder organizing another entity type is not a valid target.
+    $component_folder = Folder::create([
+      'name' => 'Components',
+      'configEntityTypeId' => Component::ENTITY_TYPE_ID,
+    ]);
+    $component_folder->save();
+    $response = $this->request(Request::create(
+      \sprintf(self::URL, $page->id()),
+      'PATCH',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: $body($component_folder->id()),
+    ));
+    self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+    $violations = \array_column($this->decodeResponse($response)['errors'], 'detail');
+    self::assertContains(
+      'The folder <em class="placeholder">Components</em> does not organize <em class="placeholder">canvas_page</em> entities.',
+      $violations,
+      \json_encode($violations, JSON_THROW_ON_ERROR),
+    );
+
+    // Take the page back out of the folder. This is what the Pages panel
+    // sends: the folder alone, without resending the rest of the page.
+    $response = $this->request(Request::create(
+      \sprintf(self::URL, $page->id()),
+      'PATCH',
+      server: ['CONTENT_TYPE' => 'application/json'],
+      content: \json_encode(['folder' => NULL], JSON_THROW_ON_ERROR),
+    ));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $data = $this->decodeResponse($response);
+    self::assertNull($data['folder']);
+  }
+
+  /**
    * Tests clearing an explicit page variant selection.
    */
   public function testPatchClearsPageVariant(): void {
@@ -167,6 +239,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
         'hasUnsavedStatusChange' => FALSE,
         'path' => '/test-page',
         'internalPath' => '/page/1',
+        'folder' => NULL,
         'autoSaveLabel' => NULL,
         'autoSavePath' => NULL,
         'components' => [],
@@ -214,6 +287,7 @@ class ApiContentControllersPatchTest extends CanvasKernelTestBase {
         'hasUnsavedStatusChange' => FALSE,
         'path' => '/components-page',
         'internalPath' => '/page/1',
+        'folder' => NULL,
         'autoSaveLabel' => NULL,
         'autoSavePath' => NULL,
         'components' => [
