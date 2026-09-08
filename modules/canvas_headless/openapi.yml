@@ -97,6 +97,24 @@ paths:
           $ref: '#/components/responses/ProblemDetailsResponse'
       security: []
 
+  /canvas/api/v0/headless/jsonapi-settings:
+    get:
+      summary: Get the site's JSON:API settings
+      description: |
+        Returns the JSON:API prefix so the headless SDK can target sites
+        serving JSON:API from a non-default prefix, before any
+        authentication exists.
+      responses:
+        '200':
+          description: JSON:API settings, or null if JSON:API is not installed.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/JsonApiSettings'
+                  - type: 'null'
+      security: []
+
   /canvas-headless/assertion:
     post:
       summary: Mint a preview assertion
@@ -446,6 +464,16 @@ components:
           format: uuid
         langcode:
           type: string
+
+    JsonApiSettings:
+      type: object
+      additionalProperties: false
+      required: [apiPrefix]
+      properties:
+        apiPrefix:
+          type: string
+          description: JSON:API base path prefix, without leading slash.
+          examples: [jsonapi, api]
 
     FrontendEntry:
       type: object
