@@ -241,6 +241,7 @@ canvas.js_component.*:
                 - v0.baseUrl
                 - v0.branding
                 - v0.breadcrumbs
+                - v0.currentPath
                 - v0.jsonapiSettings
                 - v0.mainEntity
                 - v0.pageTitle
