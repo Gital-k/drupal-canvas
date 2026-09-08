@@ -279,11 +279,11 @@ export function createDraftServer(options: DraftServerOptions): DraftServer {
    * filled in from the JSON:API settings endpoint (fetched once per server
    * instance; the configured fallback applies when the fetch fails).
    */
-  const resolveApiPrefix = createApiPrefixResolver(getConfig(), fetchImpl);
-  const getClientConfig = async (): Promise<DraftConfig> => {
-    const apiPrefix = await resolveApiPrefix();
-    return { ...getConfig(), ...(apiPrefix && { apiPrefix }) };
-  };
+   const resolveApiPrefix = createApiPrefixResolver(getConfig(), fetchImpl);
+   const resolveClientConfig = async (): Promise<DraftConfig> => {
+     const apiPrefix = await resolveApiPrefix();
+     return { ...getConfig(), ...(apiPrefix && { apiPrefix }) };
+   };
 
   return {
     getConfig,
@@ -439,15 +439,15 @@ export function createDraftServer(options: DraftServerOptions): DraftServer {
       return new Response(null, { status: 303, headers: { Location: '/' } });
     },
 
-    getPublicClient: async () => getPublicClient(await getClientConfig()),
+    getPublicClient: async () => getPublicClient(await resolveClientConfig()),
     getDraftClient: async (draftData) =>
-      getDraftClient(await getClientConfig(), draftData),
+      getDraftClient(await resolveClientConfig(), draftData),
 
     async getClient(): Promise<JsonApiClient> {
       const draftData = await getDraftData();
       return draftData && !isDraftSessionExpired(draftData)
-        ? getDraftClient(await getClientConfig(), draftData)
-        : getPublicClient(await getClientConfig());
+        ? getDraftClient(await resolveClientConfig(), draftData)
+        : getPublicClient(await resolveClientConfig());
     },
 
     async fetchPage(path: string): Promise<PageResult | null> {
