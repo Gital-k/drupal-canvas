@@ -1,4 +1,5 @@
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import type { viewportSize } from '@/types/Preview';
 
@@ -14,25 +15,25 @@ import type { viewportSize } from '@/types/Preview';
 const VIEWPORTS = {
   mobile: {
     id: 'mobile',
-    name: 'Mobile',
+    nameKey: 'Mobile',
     defaultWidth: 468,
     aspectRatio: 800 / 468, // ~1.71 (portrait)
   },
   tablet: {
     id: 'tablet',
-    name: 'Tablet',
+    nameKey: 'Tablet',
     defaultWidth: 1024,
     aspectRatio: 768 / 1024, // 0.75 (4:3 landscape)
   },
   desktop: {
     id: 'desktop',
-    name: 'Desktop',
+    nameKey: 'Desktop',
     defaultWidth: 1920,
     aspectRatio: 1080 / 1920, // 0.5625 (16:9 landscape)
   },
   large_desktop: {
     id: 'large_desktop',
-    name: 'Large Desktop',
+    nameKey: 'Large Desktop',
     defaultWidth: 2560,
     aspectRatio: 1440 / 2560, // 0.5625 (16:9 landscape)
   },
@@ -58,7 +59,7 @@ function createViewportSize(
   const viewport = VIEWPORTS[id];
   const height = Math.round(width * viewport.aspectRatio);
   return {
-    name: viewport.name,
+    name: translate(viewport.nameKey),
     id: viewport.id,
     width,
     height,

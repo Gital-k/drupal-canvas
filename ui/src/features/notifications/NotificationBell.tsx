@@ -19,6 +19,7 @@ import {
   useMarkNotificationsReadMutation,
 } from '@/services/notificationsApi';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import ActivityCenter from './ActivityCenter';
 import {
@@ -102,7 +103,10 @@ const NotificationBell = () => {
   return (
     <Popover.Root open={isOpen} onOpenChange={handleOpenChange}>
       <Popover.Trigger>
-        <button className={styles.bellButton} aria-label="Notifications">
+        <button
+          className={styles.bellButton}
+          aria-label={translate('Notifications')}
+        >
           <BellIcon width="16" height="16" />
           {badgeCount > 0 && (
             <span className={styles.badge}>

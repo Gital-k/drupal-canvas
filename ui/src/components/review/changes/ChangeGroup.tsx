@@ -3,6 +3,7 @@ import { kebabCase } from 'lodash';
 import { Box, Checkbox, Flex, Text } from '@radix-ui/themes';
 
 import { isConflictUxEnabled } from '@/features/conflict/conflictUtils';
+import { translate } from '@/utils/translate';
 
 import { getGroupLabel } from '../utils';
 import ChangeRow from './ChangeRow';
@@ -96,7 +97,9 @@ const ChangeGroup = ({
             disabled={isBusy || selectableChanges.length === 0}
             checked={isGroupSelected}
             onCheckedChange={handleGroupSelection}
-            aria-label={`Select all changes in ${groupLabel}`}
+            aria-label={translate('Select all changes in {{groupLabel}}', {
+              groupLabel,
+            })}
           />
           {groupLabel}
         </Flex>

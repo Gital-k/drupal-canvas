@@ -16,6 +16,7 @@ import {
 import { selectSelectedComponentUuid } from '@/features/ui/uiSlice';
 import useGetComponentName from '@/hooks/useGetComponentName';
 import { useSavePatternMutation } from '@/services/patterns';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { SerializedError } from '@reduxjs/toolkit';
@@ -29,17 +30,17 @@ function getErrorMessage(error: FetchBaseQueryError | SerializedError): string {
   if ('status' in error) {
     // TODO: I think any calls to /api/ should respond in JSON, not an HTML document?
     if (error.status === 'PARSING_ERROR') {
-      return 'The server returned an unexpected response format.';
+      return translate('The server returned an unexpected response format.');
     }
     if (error.status === 404) {
-      return 'Resource not found.';
+      return translate('Resource not found.');
     }
     // Handle other HTTP status errors generically
     const errorData = error.data as ErrorData;
-    return `Error ${error.status}: ${errorData?.message || 'No additional information'}`;
+    return `Error ${error.status}: ${errorData?.message || translate('No additional information')}`;
   } else {
     // Handle SerializedError
-    return error.message || 'Unknown error occurred';
+    return error.message || translate('Unknown error occurred');
   }
 }
 
@@ -122,21 +123,23 @@ const SavePatternDialog: React.FC = () => {
     <Dialog
       open={saveAsPattern}
       onOpenChange={handleOpenChange}
-      title="Add new pattern"
-      description={`Saving this configuration of "${selectedComponentName}" as a pattern allows it to be used again later and customized there without affecting other copies.`}
+      title={translate('Add new pattern')}
+      description={translate(
+        `Saving this configuration of "${selectedComponentName}" as a pattern allows it to be used again later and customized there without affecting other copies.`,
+      )}
       error={
         isError
           ? {
-              title: 'Failed to save pattern',
+              title: translate('Failed to save pattern'),
               message: getErrorMessage(error),
-              resetButtonText: 'Try again',
+              resetButtonText: translate('Try again'),
               onReset: handleSaveClick,
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Add to library',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Add to library'),
         onConfirm: handleSaveClick,
         isConfirmDisabled: !patternName.trim(),
         isConfirmLoading: isSaving,
@@ -145,13 +148,13 @@ const SavePatternDialog: React.FC = () => {
       <Flex direction="column" gap="2">
         <label>
           <DialogFieldLabel htmlFor={'patternName'}>
-            Pattern name
+            {translate('Pattern name')}
           </DialogFieldLabel>
           <TextField.Root
             autoComplete="off"
             value={patternName}
             onChange={handleInputChange}
-            placeholder="Enter a name"
+            placeholder={translate('Enter a name')}
             id="patternName"
             name="patternName"
             size="1"

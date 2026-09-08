@@ -30,6 +30,7 @@ import { useTemplateRef } from '@/hooks/useTemplateRef';
 import { useDeletePageTranslationMutation } from '@/services/componentAndLayout';
 import { getCanvasPermissions, getLanguages } from '@/utils/drupal-globals';
 import { getEntityTitle } from '@/utils/entityTitle';
+import { translate } from '@/utils/translate';
 
 import styles from './LanguageSelect.module.css';
 
@@ -79,19 +80,21 @@ const DeleteTranslationDialog = ({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title="Delete translation"
-      description="You are about to delete this translation. This will permanently delete the translation from this page. This action cannot be undone."
+      title={translate('Delete translation')}
+      description={translate(
+        'You are about to delete this translation. This will permanently delete the translation from this page. This action cannot be undone.',
+      )}
       error={
         deleteError
           ? {
-              title: 'Failed to delete translation',
+              title: translate('Failed to delete translation'),
               message: deleteError,
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Delete Translation',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Delete Translation'),
         onConfirm: handleConfirmDelete,
         onCancel: onClose,
         isConfirmDisabled: confirmText !== 'DELETE',
@@ -100,7 +103,8 @@ const DeleteTranslationDialog = ({
     >
       <Flex direction="column" gap="2">
         <Text size="2">
-          To confirm this, type '<Text weight="bold">DELETE</Text>'
+          {translate('To confirm this, type')} '
+          <Text weight="bold">{translate('DELETE')}</Text>'
           <Text color="red">*</Text>
         </Text>
         <TextField.Root
@@ -237,7 +241,7 @@ const LanguageSelect = () => {
         <DropdownMenu.Trigger>
           <Button size="2" variant="soft" data-testid="language-select-trigger">
             <GlobeIcon />
-            <Text>{currentLangObj?.name || 'Select Language'}</Text>
+            <Text>{currentLangObj?.name || translate('Select Language')}</Text>
             <ChevronDownIcon width="16" height="16" />
           </Button>
         </DropdownMenu.Trigger>
@@ -289,7 +293,9 @@ const LanguageSelect = () => {
                         <button
                           data-testid="language-options-popover-trigger"
                           className={styles.dotsButton}
-                          aria-label={`More options for ${language.name}`}
+                          aria-label={translate('More options for @language', {
+                            '@language': language.name,
+                          })}
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePopoverOpenChange(language.id, true);
@@ -320,7 +326,7 @@ const LanguageSelect = () => {
                           className={styles.popoverTitle}
                           data-testid="language-options-popover-title"
                         >
-                          {pageTitle || 'Untitled'} ({language.name})
+                          {pageTitle || translate('Untitled')} ({language.name})
                         </Text>
                         <Separator size="4" my="1" />
                         {(translations?.links?.[language.id]?.['edit-form'] ||
@@ -332,8 +338,8 @@ const LanguageSelect = () => {
                             <ExternalLinkIcon width="14" height="14" />
                             <Text size="2">
                               {translations?.links?.[language.id]?.['edit-form']
-                                ? 'Edit translation'
-                                : 'Add translation'}
+                                ? translate('Edit translation')
+                                : translate('Add translation')}
                             </Text>
                           </button>
                         )}
@@ -349,7 +355,9 @@ const LanguageSelect = () => {
                             onClick={() => handleDeleteTranslation(language.id)}
                           >
                             <TrashIcon width="14" height="14" />
-                            <Text size="2">Delete translation</Text>
+                            <Text size="2">
+                              {translate('Delete translation')}
+                            </Text>
                           </button>
                         )}
                       </Flex>
@@ -367,7 +375,7 @@ const LanguageSelect = () => {
               >
                 <Flex align="center" gap="2">
                   <ExternalLinkIcon width="14" height="14" />
-                  <Text size="2">Configure languages</Text>
+                  <Text size="2">{translate('Configure languages')}</Text>
                 </Flex>
               </button>
             </DropdownMenu.Item>

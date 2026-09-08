@@ -9,6 +9,7 @@ import {
   useGetColorUsageDetailsQuery,
 } from '@/services/brandKit';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
+import { translate, translatePlural } from '@/utils/translate';
 
 import type { Measurable } from '@radix-ui/rect';
 import type { BrandKitColor } from '@/types/CodeComponent';
@@ -112,11 +113,15 @@ const DeleteColorPopover = ({
             <Flex gap="2" align="center">
               <TrashIcon className={styles.titleIcon} />
               <Text size="2" weight="bold">
-                Delete color
+                {translate('Delete color')}
               </Text>
             </Flex>
             <Popover.Close asChild>
-              <IconButton variant="ghost" size="1" aria-label="Close">
+              <IconButton
+                variant="ghost"
+                size="1"
+                aria-label={translate('Close')}
+              >
                 <Cross2Icon />
               </IconButton>
             </Popover.Close>
@@ -131,7 +136,10 @@ const DeleteColorPopover = ({
 
             {!isUsageLoading && isUsageError && (
               <Text size="2" role="alert">
-                Unable to get usage data for <b>{color.name}</b>. Try again.
+                {translate(
+                  'Unable to get usage data for <b>@name</b>. Try again.',
+                  { '@name': color.name },
+                )}
               </Text>
             )}
 
@@ -139,19 +147,22 @@ const DeleteColorPopover = ({
               <Text size="2">
                 {blockingCount > 0 ? (
                   <>
-                    <b>{color.name}</b> is in use on{' '}
-                    {blockingCount === 1
-                      ? '1 page or template'
-                      : `${blockingCount} pages or templates`}
-                    . Remove all uses before deleting.
+                    {translatePlural(
+                      blockingCount,
+                      '<b>@name</b> is in use on 1 page or template. Remove all uses before deleting.',
+                      '<b>@name</b> is in use on @count pages or templates. Remove all uses before deleting.',
+                      { '@name': color.name, '@count': blockingCount },
+                    )}
                   </>
                 ) : (
                   <>
                     {/* Blocked by an unpublished change or a published revision
                         that is no longer the latest, so there is nothing to
                         list here. */}
-                    <b>{color.name}</b> is still in use. Remove all uses before
-                    deleting.
+                    {translate(
+                      '<b>@name</b> is still in use. Remove all uses before deleting.',
+                      { '@name': color.name },
+                    )}
                   </>
                 )}
               </Text>
@@ -159,19 +170,20 @@ const DeleteColorPopover = ({
 
             {!isUsageLoading && !isBlocked && !isUsageError && (
               <Text size="2">
-                You are about to permanently delete the <b>{color.name}</b>{' '}
-                color.
+                {translate(
+                  'You are about to permanently delete the <b>@name</b> color.',
+                  { '@name': color.name },
+                )}
                 {hasPriorOnlyWarning && (
                   <>
                     <br />
                     <br />
-                    This will break{' '}
-                    <b>
-                      {priorUsages.length} past version
-                      {priorUsages.length > 1 ? 's' : ''}
-                    </b>
-                    . Reverting to past versions that rely on this color will
-                    appear broken.
+                    {translatePlural(
+                      priorUsages.length,
+                      'This will break <b>@count past version</b>. Reverting to past versions that rely on this color will appear broken.',
+                      'This will break <b>@count past versions</b>. Reverting to past versions that rely on this color will appear broken.',
+                      { '@count': priorUsages.length },
+                    )}
                   </>
                 )}
               </Text>
@@ -180,7 +192,10 @@ const DeleteColorPopover = ({
 
           {errorMessage && (
             <Box px="3" pb="3">
-              <ErrorCard title="Failed to delete color" error={errorMessage} />
+              <ErrorCard
+                title={translate('Failed to delete color')}
+                error={errorMessage}
+              />
             </Box>
           )}
 
@@ -195,7 +210,7 @@ const DeleteColorPopover = ({
           >
             <Popover.Close asChild>
               <Button variant="outline" size="1">
-                Cancel
+                {translate('Cancel')}
               </Button>
             </Popover.Close>
             <Button
@@ -206,7 +221,7 @@ const DeleteColorPopover = ({
               color="red"
               data-testid="canvas-delete-color-confirm-button"
             >
-              Delete
+              {translate('Delete')}
             </Button>
           </Flex>
         </Popover.Content>

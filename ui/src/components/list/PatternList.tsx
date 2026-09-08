@@ -5,6 +5,7 @@ import ListItem from '@/components/list/ListItem';
 import { LayoutItemType } from '@/features/ui/primaryPanelSlice';
 import { useGetFoldersQuery } from '@/services/componentAndLayout';
 import { useGetPatternsQuery } from '@/services/patterns';
+import { translate } from '@/utils/translate';
 
 import LibraryItemList from './LibraryItemList';
 
@@ -41,7 +42,7 @@ const PatternList = ({ searchTerm }: PatternListProps) => {
       isLoading={isLoading || foldersLoading}
       searchTerm={searchTerm}
       layoutType={LayoutItemType.PATTERN}
-      topLevelLabel="Patterns"
+      topLevelLabel={translate('Patterns')}
       itemType="pattern"
       renderItem={renderItem}
     />

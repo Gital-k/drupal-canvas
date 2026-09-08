@@ -24,6 +24,7 @@ import ErrorCard from '@/components/error/ErrorCard';
 import InfiniteScrollObserver from '@/components/InfiniteScrollObserver';
 import SidebarNode from '@/components/sidePanel/SidebarNode';
 import UnifiedMenu from '@/components/UnifiedMenu';
+import { translate } from '@/utils/translate';
 
 import type { FormEvent } from 'react';
 import type { ContentStub } from '@/types/Content';
@@ -89,14 +90,16 @@ const createPageMenuContent = (
 
   return (
     <>
-      <UnifiedMenu.Label>{item.autoSaveLabel || item.title}</UnifiedMenu.Label>
+      <UnifiedMenu.Label>
+        {translate(item.autoSaveLabel || item.title)}
+      </UnifiedMenu.Label>
       <UnifiedMenu.Separator />
       {hasDuplicate && (
         <UnifiedMenu.Item
           onClick={(event) => event.stopPropagation()}
           onSelect={onDuplicate ? () => onDuplicate(item) : undefined}
         >
-          Duplicate page
+          {translate('Duplicate page')}
         </UnifiedMenu.Item>
       )}
       {hasHomepage && (
@@ -106,7 +109,7 @@ const createPageMenuContent = (
             onClick={(event) => event.stopPropagation()}
             onSelect={onSetHomepage ? () => onSetHomepage(item) : undefined}
           >
-            Set as homepage
+            {translate('Set as homepage')}
           </UnifiedMenu.Item>
         </>
       )}
@@ -117,7 +120,7 @@ const createPageMenuContent = (
             onClick={(event) => event.stopPropagation()}
             onSelect={onUnpublish ? () => onUnpublish(item) : undefined}
           >
-            Unpublish page
+            {translate('Unpublish page')}
           </UnifiedMenu.Item>
         </>
       )}
@@ -130,7 +133,7 @@ const createPageMenuContent = (
             onClick={(event) => event.stopPropagation()}
             onSelect={onPublish ? () => onPublish(item) : undefined}
           >
-            Publish page
+            {translate('Publish page')}
           </UnifiedMenu.Item>
         </>
       )}
@@ -146,19 +149,22 @@ const createPageMenuContent = (
                 onSelect={(event) => event.preventDefault()}
                 color="red"
               >
-                Delete page
+                {translate('Delete page')}
               </UnifiedMenu.Item>
             </AlertDialog.Trigger>
             <AlertDialog.Content>
-              <AlertDialog.Title>Delete {item.title} page</AlertDialog.Title>
+              <AlertDialog.Title>
+                {translate('Delete @title page', { '@title': item.title })}
+              </AlertDialog.Title>
               <AlertDialog.Description size="2">
-                This action will permanently delete the page and all of its
-                contents. This action cannot be undone.
+                {translate(
+                  'This action will permanently delete the page and all of its contents. This action cannot be undone.',
+                )}
               </AlertDialog.Description>
               <Flex gap="3" mt="4" justify="end">
                 <AlertDialog.Cancel>
                   <Button variant="soft" color="gray">
-                    Cancel
+                    {translate('Cancel')}
                   </Button>
                 </AlertDialog.Cancel>
                 <AlertDialog.Action>
@@ -167,7 +173,7 @@ const createPageMenuContent = (
                     color="red"
                     onClick={() => onDelete?.(item)}
                   >
-                    Delete page
+                    {translate('Delete page')}
                   </Button>
                 </AlertDialog.Action>
               </Flex>
@@ -235,7 +241,7 @@ const PageListItem = ({
             trailingContent={
               !isMenuOpen && (isUnpublished || willBeUnpublished) ? (
                 willBeUnpublished ? (
-                  <Tooltip content="Applies on next publish">
+                  <Tooltip content={translate('Applies on next publish')}>
                     <Badge
                       size="1"
                       variant="solid"
@@ -243,7 +249,7 @@ const PageListItem = ({
                     >
                       <Flex align="center" gap="1">
                         <ClockIcon width="11" height="11" />
-                        Unpublish
+                        {translate('Unpublish')}
                       </Flex>
                     </Badge>
                   </Tooltip>
@@ -253,7 +259,7 @@ const PageListItem = ({
                     variant="solid"
                     color={isSelected ? 'blue' : 'gray'}
                   >
-                    Unpublished
+                    {translate('Unpublished')}
                   </Badge>
                 )
               ) : undefined
@@ -303,7 +309,7 @@ const ContentGroup = ({
     return (
       <EmptyStateCallout
         data-testid="canvas-page-list"
-        title="No pages found"
+        title={translate('No pages found')}
         variant="surface"
       />
     );
@@ -407,9 +413,9 @@ const PageList = ({
           <TextField.Root
             autoComplete="off"
             id="canvas-navigation-search"
-            placeholder="Search…"
+            placeholder={translate('Search…')}
             radius="medium"
-            aria-label="Search content"
+            aria-label={translate('Search content')}
             size="1"
           >
             <TextField.Slot>
@@ -426,7 +432,7 @@ const PageList = ({
                 size="1"
               >
                 <PlusIcon />
-                New
+                {translate('New')}
                 <ChevronDownIcon />
               </Button>
             </DropdownMenu.Trigger>
@@ -436,7 +442,7 @@ const PageList = ({
                 data-testid="canvas-page-list-new-page-button"
               >
                 <FileTextIcon />
-                New page
+                {translate('New page')}
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Root>
@@ -464,7 +470,9 @@ const PageList = ({
           )}
           {pageItemsError && (
             <ErrorCard
-              title="An unexpected error has occurred while loading pages."
+              title={translate(
+                'An unexpected error has occurred while loading pages.',
+              )}
               error={pageItemsError}
             />
           )}

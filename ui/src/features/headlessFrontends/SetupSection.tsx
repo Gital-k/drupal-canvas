@@ -3,6 +3,7 @@ import { ExternalLinkIcon } from '@radix-ui/react-icons';
 import { Box, Flex, Link, RadioCards, Tabs, Text } from '@radix-ui/themes';
 
 import { getSiteName, getSiteUrl } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import CommandSnippet from './CommandSnippet';
 import PackageManagerSwitcher from './PackageManagerSwitcher';
@@ -102,7 +103,7 @@ const SetupSection = ({
     <Flex direction="column" gap="4">
       <Flex direction="column" gap="2">
         <Text size="2" weight="bold">
-          Framework
+          {translate('Framework')}
         </Text>
         <RadioCards.Root
           size="1"
@@ -114,7 +115,7 @@ const SetupSection = ({
               setFramework(selected);
             }
           }}
-          aria-label="Framework"
+          aria-label={translate('Framework')}
           data-testid="canvas-headless-framework-select"
         >
           {FRAMEWORKS.map((item) => (
@@ -130,13 +131,13 @@ const SetupSection = ({
             value="new"
             data-testid="canvas-headless-setup-new-tab-select"
           >
-            Create a new codebase
+            {translate('Create a new codebase')}
           </Tabs.Trigger>
           <Tabs.Trigger
             value="existing"
             data-testid="canvas-headless-setup-existing-tab-select"
           >
-            Use an existing codebase
+            {translate('Use an existing codebase')}
           </Tabs.Trigger>
         </Tabs.List>
         <Box pt="3">
@@ -146,8 +147,9 @@ const SetupSection = ({
           >
             <Flex direction="column" gap="3" className={styles.sectionCard}>
               <Text size="1" color="gray">
-                Scaffold a new frontend project that comes preconfigured for
-                Drupal Canvas:
+                {translate(
+                  'Scaffold a new frontend project that comes preconfigured for Drupal Canvas:',
+                )}
               </Text>
               <PackageManagerSwitcher
                 value={packageManager}
@@ -165,13 +167,17 @@ const SetupSection = ({
           >
             <Flex direction="column" gap="4" className={styles.sectionCard}>
               <Text size="1" color="gray">
-                Add the Drupal Canvas adapter to your existing codebase:
+                {translate(
+                  'Add the Drupal Canvas adapter to your existing codebase:',
+                )}
               </Text>
               <Flex gap="3">
                 <StepNumber>1</StepNumber>
                 <Flex direction="column" gap="3" flexGrow="1">
                   <Text size="1">
-                    Install the adapter package for {framework.label}:
+                    {translate('Install the adapter package for @label:', {
+                      '@label': framework.label,
+                    })}
                   </Text>
                   <PackageManagerSwitcher
                     value={packageManager}
@@ -186,7 +192,9 @@ const SetupSection = ({
               <Flex gap="3">
                 <StepNumber>2</StepNumber>
                 <Flex direction="column" gap="1" flexGrow="1">
-                  <Text size="1">Wire the adapter into your app:</Text>
+                  <Text size="1">
+                    {translate('Wire the adapter into your app:')}
+                  </Text>
                   <Text size="1">
                     <Link
                       href={framework.docsUrl}
@@ -194,7 +202,9 @@ const SetupSection = ({
                       rel="noreferrer"
                       data-testid="canvas-headless-adapter-docs-link"
                     >
-                      Read and follow the {framework.label} setup guide{' '}
+                      {translate('Read and follow the @label setup guide', {
+                        '@label': framework.label,
+                      })}{' '}
                       <ExternalLinkIcon width="12" height="12" />
                     </Link>
                   </Text>

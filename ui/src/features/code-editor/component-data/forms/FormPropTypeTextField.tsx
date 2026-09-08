@@ -15,6 +15,7 @@ import {
 } from '@/features/code-editor/component-data/Props';
 import { useRequiredProp } from '@/features/code-editor/hooks/useRequiredProp';
 import { getNumericInputError } from '@/features/code-editor/utils/numericInputUtils';
+import { translate } from '@/utils/translate';
 
 import type { CodeComponentProp } from '@/types/CodeComponent';
 
@@ -100,7 +101,9 @@ export default function FormPropTypeTextField({
     <Flex direction="column" gap="4" flexGrow="1">
       <Divider />
       <FormElement>
-        <Label htmlFor={`prop-example-${id}`}>Example value</Label>
+        <Label htmlFor={`prop-example-${id}`}>
+          {translate('Example value')}
+        </Label>
         <TextField.Root
           autoComplete="off"
           id={`prop-example-${id}`}

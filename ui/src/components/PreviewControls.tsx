@@ -8,6 +8,7 @@ import PreviewWidthSelector from '@/features/pagePreview/PreviewWidthSelector';
 import { useEditorNavigation } from '@/hooks/useEditorNavigation';
 import { useTemplateRef } from '@/hooks/useTemplateRef';
 import { pageDataFormApi } from '@/services/pageDataForm';
+import { translate } from '@/utils/translate';
 
 type PreviewControlsProps = {
   isPreview: boolean;
@@ -61,12 +62,12 @@ const PreviewControls = ({ isPreview }: PreviewControlsProps) => {
             color="blue"
             onClick={handleChangeModeClick}
           >
-            <EyeNoneIcon /> Exit Preview
+            <EyeNoneIcon /> {translate('Exit Preview')}
           </Button>
         </>
       ) : (
         <Button variant="outline" color="blue" onClick={handleChangeModeClick}>
-          <EyeOpenIcon /> Preview
+          <EyeOpenIcon /> {translate('Preview')}
         </Button>
       )}
     </>

@@ -9,6 +9,7 @@ import {
   useDeleteFolderMutation,
   useUpdateFolderMutation,
 } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 
 import UnifiedMenu from '../UnifiedMenu';
 
@@ -215,7 +216,7 @@ const FolderList = ({
         data-testid="canvas-rename-folder-button"
         onClick={() => setIsRenaming(true)}
       >
-        Rename
+        {translate('Rename')}
       </UnifiedMenu.Item>
       <UnifiedMenu.Item
         data-testid="canvas-delete-folder-button"
@@ -224,11 +225,12 @@ const FolderList = ({
         color="red"
         title={
           hasItems
-            ? (deleteWarning ?? 'Cannot delete folder containing components')
+            ? (deleteWarning ??
+              translate('Cannot delete folder containing components'))
             : undefined
         }
       >
-        Delete folder
+        {translate('Delete folder')}
       </UnifiedMenu.Item>
     </>
   );
@@ -338,7 +340,7 @@ export const folderfyComponents = (
       if (!folderComponents[folderId]) {
         folderComponents[folderId] = {
           id: folderId,
-          name: folders.folders[folderId]?.name || 'Unknown folder',
+          name: folders.folders[folderId]?.name || translate('Unknown folder'),
           items: {},
           weight: folders.folders[folderId]?.weight || 0,
         };

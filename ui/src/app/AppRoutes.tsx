@@ -32,6 +32,7 @@ import { EditorFrameContext } from '@/features/ui/uiSlice';
 import VersionPreview from '@/features/versionComparison/VersionPreview';
 import Welcome from '@/features/welcome/Welcome';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 
@@ -56,8 +57,12 @@ const CodeEditorUi = (
     denied={
       <Flex align="center" justify="center" height="100vh" width="100%">
         <ErrorCard
-          title="You do not have permission to access the code editor."
-          error="Please contact your site administrator if you believe this is an error."
+          title={translate(
+            'You do not have permission to access the code editor.',
+          )}
+          error={translate(
+            'Please contact your site administrator if you believe this is an error.',
+          )}
         />
       </Flex>
     }
@@ -80,8 +85,12 @@ const HeadlessFrontendsUi = () =>
   ) : (
     <Flex align="center" justify="center" height="100vh" width="100%">
       <ErrorCard
-        title="You do not have permission to administer headless frontends."
-        error="Please contact your site administrator if you believe this is an error."
+        title={translate(
+          'You do not have permission to administer headless frontends.',
+        )}
+        error={translate(
+          'Please contact your site administrator if you believe this is an error.',
+        )}
       />
     </Flex>
   );
@@ -279,7 +288,7 @@ const AppRoutes: React.FC<AppRoutesInterface> = ({ basePath }) => {
               },
               {
                 path: '/segments/:segmentId',
-                element: <h1>Segment Details</h1>,
+                element: <h1>{translate('Segment Details')}</h1>,
               },
             ],
           },

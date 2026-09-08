@@ -1,6 +1,7 @@
 import { Box, Flex, Popover, Text } from '@radix-ui/themes';
 
 import FontFamilyFlyout from '@/features/brandKit/components/FontFamilyFlyout';
+import { translate, translatePlural } from '@/utils/translate';
 
 import type {
   AssetLibraryFont,
@@ -74,9 +75,18 @@ const FontFamiliesList = ({
             className={styles.familyRow}
             data-state={openFamily === fontGroup.family ? 'active' : 'inactive'}
             aria-expanded={openFamily === fontGroup.family}
-            aria-label={`Open ${fontGroup.family} font details, ${fontGroup.fonts.length} ${
-              fontGroup.fonts.length === 1 ? 'variant' : 'variants'
-            } uploaded`}
+            aria-label={translate(
+              'Open @family font details, @count @variantLabel uploaded',
+              {
+                '@family': fontGroup.family,
+                '@count': fontGroup.fonts.length,
+                '@variantLabel': translatePlural(
+                  fontGroup.fonts.length,
+                  'variant',
+                  'variants',
+                ),
+              },
+            )}
           >
             <Box className={styles.familyMeta}>
               <Text size="1" weight="medium" className={styles.familyName}>

@@ -11,6 +11,7 @@ import { useTemplateRef } from '@/hooks/useTemplateRef';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
 import { useGetAllPendingChangesQuery } from '@/services/pendingChangesApi';
 import { findInChanges } from '@/utils/function-utils';
+import { translate } from '@/utils/translate';
 
 export interface PageStatusBadgeProps {
   isNew: boolean;
@@ -29,7 +30,7 @@ export const PageStatusBadge: React.FC<PageStatusBadgeProps> = ({
   if (isNew && !isPublished) {
     return (
       <Badge size="1" variant="solid" color="blue">
-        Draft
+        {translate('Draft')}
       </Badge>
     );
   }
@@ -39,11 +40,11 @@ export const PageStatusBadge: React.FC<PageStatusBadgeProps> = ({
   if (!isPublished) {
     return hasUnsavedStatusChange ? (
       <Badge size="1" variant="solid" color="amber">
-        Changed
+        {translate('Changed')}
       </Badge>
     ) : (
       <Badge size="1" variant="solid" color="gray">
-        Unpublished
+        {translate('Unpublished')}
       </Badge>
     );
   }
@@ -51,14 +52,14 @@ export const PageStatusBadge: React.FC<PageStatusBadgeProps> = ({
   if (hasAutoSave) {
     return (
       <Badge size="1" variant="solid" color="amber">
-        Changed
+        {translate('Changed')}
       </Badge>
     );
   }
 
   return (
     <Badge size="1" variant="solid" color="green">
-      Published
+      {translate('Published')}
     </Badge>
   );
 };

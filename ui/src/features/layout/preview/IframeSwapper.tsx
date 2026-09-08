@@ -11,6 +11,7 @@ import clsx from 'clsx';
 import { useAppSelector } from '@/app/hooks';
 import { COMPONENT_PREVIEW_UPDATE_EVENT } from '@/components/form/react-hook-form/fields/componentPreviewEvents';
 import { selectDragging } from '@/features/ui/uiSlice';
+import { translate } from '@/utils/translate';
 
 import type { Dispatch, Ref, SetStateAction } from 'react';
 import type { ComponentPreviewUpdateEvent } from '@/components/form/react-hook-form/fields/componentPreviewEvents';
@@ -184,7 +185,11 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
           tabIndex={!interactive || whichActive === 1 ? -1 : 0}
           ref={(el) => (iFrameRefs.current[0] = el)}
           data-canvas-swap-active={whichActive === 0 ? 'true' : 'false'}
-          title={whichActive === 0 ? 'Preview' : 'Inactive preview'}
+          title={
+            whichActive === 0
+              ? translate('Preview')
+              : translate('Inactive preview')
+          }
           data-canvas-iframe="A"
           scrolling="no"
           {...commonIFrameProps}
@@ -193,7 +198,11 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
           tabIndex={!interactive || whichActive === 0 ? -1 : 0}
           ref={(el) => (iFrameRefs.current[1] = el)}
           data-canvas-swap-active={whichActive === 1 ? 'true' : 'false'}
-          title={whichActive === 1 ? 'Preview' : 'Inactive preview'}
+          title={
+            whichActive === 1
+              ? translate('Preview')
+              : translate('Inactive preview')
+          }
           data-canvas-iframe="B"
           scrolling="no"
           {...commonIFrameProps}

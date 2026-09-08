@@ -14,12 +14,14 @@ import {
   Text,
 } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import type { ReactNode } from 'react';
 import type { PageVersionSelection } from '@/features/versionComparison/PageVersionComparisonView';
 
 import styles from '@/features/versionComparison/VersionComparisonPage.module.css';
 
-const REVIEW_COMPLETE_LABEL = 'All changes reviewed';
+const REVIEW_COMPLETE_LABEL = translate('All changes reviewed');
 
 export interface ReviewChangesViewProps {
   label: string;
@@ -93,7 +95,7 @@ export const ReviewLoadingState = ({
 }) => (
   <div className={styles.page} data-testid="review-changes-page">
     <ReviewHeader
-      label="Loading"
+      label={translate('Loading')}
       onClose={onClose}
       onNavigateToCanvas={onNavigateToCanvas}
       onNavigateToReview={onNavigateToReview}
@@ -122,7 +124,7 @@ const ReviewHeader = ({
         className={styles.breadcrumbLink}
         onClick={onNavigateToCanvas}
       >
-        Canvas
+        {translate('Canvas')}
       </button>
       <Text size="1" color="gray">
         /
@@ -132,7 +134,7 @@ const ReviewHeader = ({
         className={styles.breadcrumbLink}
         onClick={onNavigateToReview}
       >
-        Review
+        {translate('Review')}
       </button>
       <Text size="1" color="gray">
         /
@@ -142,7 +144,7 @@ const ReviewHeader = ({
       </Text>
       {label !== REVIEW_COMPLETE_LABEL && (
         <Badge color="gray" variant="soft" radius="small">
-          Page
+          {translate('Page')}
         </Badge>
       )}
     </Flex>
@@ -150,7 +152,7 @@ const ReviewHeader = ({
       variant="ghost"
       color="gray"
       highContrast
-      aria-label="Close"
+      aria-label={translate('Close')}
       onClick={onClose}
     >
       <Cross2Icon />
@@ -185,8 +187,8 @@ const ReviewFooter = ({
 }) => {
   const actionText =
     selectedVersion === 'published'
-      ? 'Discard changes'
-      : 'Publish selected changes';
+      ? translate('Discard changes')
+      : translate('Publish selected changes');
   const isActionDisabled =
     isApplyingSelection ||
     !selectedVersion ||
@@ -196,7 +198,10 @@ const ReviewFooter = ({
     <div className={styles.footer}>
       <Flex direction="column" gap="1">
         <Text size="2" color="gray">
-          Review {reviewIndex + 1} of {reviewTotal}
+          {translate('Review @current of @total', {
+            '@current': String(reviewIndex + 1),
+            '@total': String(reviewTotal),
+          })}
         </Text>
         <Text as="label" size="2">
           <Flex align="center" gap="2">
@@ -205,7 +210,7 @@ const ReviewFooter = ({
               checked={isSelectedForPublishing}
               onCheckedChange={onSelectedForPublishingChange}
             />
-            Selected for publishing
+            {translate('Selected for publishing')}
           </Flex>
         </Text>
       </Flex>
@@ -217,7 +222,7 @@ const ReviewFooter = ({
           onClick={onPrevious}
         >
           <ArrowLeftIcon />
-          Previous
+          {translate('Previous')}
         </Button>
         <Button
           variant="ghost"
@@ -225,7 +230,7 @@ const ReviewFooter = ({
           disabled={isApplyingSelection}
           onClick={onNext}
         >
-          Next
+          {translate('Next')}
           <ArrowRightIcon />
         </Button>
         <Button
@@ -233,7 +238,7 @@ const ReviewFooter = ({
           disabled={isActionDisabled}
           color={selectedVersion === 'published' ? 'red' : undefined}
         >
-          {selectedVersion ? actionText : 'Action'}
+          {selectedVersion ? actionText : translate('Action')}
           <Spinner loading={isApplyingSelection} />
         </Button>
       </Flex>
@@ -279,7 +284,9 @@ export const ReviewCompleteState = ({
         {REVIEW_COMPLETE_LABEL}
       </Text>
       <Text size="2">
-        You've reviewed all selected changes. You're now ready to publish.
+        {translate(
+          "You've reviewed all selected changes. You're now ready to publish.",
+        )}
       </Text>
       <Flex align="center" gap="3">
         {onPrevious && (
@@ -290,18 +297,18 @@ export const ReviewCompleteState = ({
             disabled={!canPrevious || isPublishing}
           >
             <ArrowLeftIcon />
-            Previous
+            {translate('Previous')}
           </Button>
         )}
         <Button
           onClick={onPublish}
           disabled={isPublishing || selectedCount === 0}
         >
-          Publish selected changes
+          {translate('Publish selected changes')}
           <Spinner loading={isPublishing} />
         </Button>
         <Button variant="outline" onClick={onClose}>
-          Close
+          {translate('Close')}
         </Button>
       </Flex>
     </Flex>

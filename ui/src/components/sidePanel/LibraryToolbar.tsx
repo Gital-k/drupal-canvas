@@ -10,6 +10,7 @@ import { Button, DropdownMenu, Flex, Text, TextField } from '@radix-ui/themes';
 import PermissionCheck from '@/components/PermissionCheck';
 import FolderNameInput from '@/features/brandKit/components/FolderNameInput';
 import AddCodeComponentButton from '@/features/code-editor/AddCodeComponentButton';
+import { translate } from '@/utils/translate';
 
 import type { FormEvent } from 'react';
 import type { FolderType } from '@/types/Component';
@@ -58,9 +59,9 @@ const LibraryToolbar = ({
           <TextField.Root
             autoComplete="off"
             id="canvas-navigation-search"
-            placeholder="Search…"
+            placeholder={translate('Search…')}
             radius="medium"
-            aria-label="Search content"
+            aria-label={translate('Search content')}
             size="1"
             value={searchTerm}
             onChange={(e) => onSearch(e.target.value)}
@@ -80,7 +81,7 @@ const LibraryToolbar = ({
                   size="1"
                 >
                   <PlusIcon />
-                  New
+                  {translate('New')}
                   <ChevronDownIcon />
                 </Button>
               </DropdownMenu.Trigger>
@@ -103,7 +104,7 @@ const LibraryToolbar = ({
                     data-testid="canvas-library-new-folder-button"
                   >
                     <FolderIcon />
-                    Folder
+                    {translate('Folder')}
                   </DropdownMenu.Item>
                 </PermissionCheck>
               </DropdownMenu.Content>

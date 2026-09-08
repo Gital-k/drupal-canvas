@@ -37,6 +37,7 @@ import {
   useSetDefaultPageVariantMutation,
   useUpdatePageVariantMutation,
 } from '@/services/pageVariants';
+import { translate } from '@/utils/translate';
 
 import type { PageVariant } from '@/types/PageVariant';
 
@@ -67,26 +68,26 @@ const VariantMenuContent = ({
       onClick={(event) => event.stopPropagation()}
       onSelect={() => onEdit(variant)}
     >
-      Edit
+      {translate('Edit')}
     </UnifiedMenu.Item>
     <UnifiedMenu.Item
       onClick={(event) => event.stopPropagation()}
       onSelect={() => onRename(variant)}
     >
-      Rename
+      {translate('Rename')}
     </UnifiedMenu.Item>
     <UnifiedMenu.Item
       onClick={(event) => event.stopPropagation()}
       onSelect={() => onDuplicate(variant)}
     >
-      Duplicate
+      {translate('Duplicate')}
     </UnifiedMenu.Item>
     {!isDefault && variant.status && (
       <UnifiedMenu.Item
         onClick={(event) => event.stopPropagation()}
         onSelect={() => onSetDefault(variant)}
       >
-        Set as default
+        {translate('Set as default')}
       </UnifiedMenu.Item>
     )}
     {isDefault ? (
@@ -99,12 +100,13 @@ const VariantMenuContent = ({
       >
         <HoverCard.Root>
           <HoverCard.Trigger onClick={(event) => event.stopPropagation()}>
-            <Text as="span">Disable</Text>
+            <Text as="span">{translate('Disable')}</Text>
           </HoverCard.Trigger>
           <HoverCard.Content>
             <Text as="p">
-              Cannot disable the default template. Set another template as the
-              default first.
+              {translate(
+                'Cannot disable the default template. Set another template as the default first.',
+              )}
             </Text>
           </HoverCard.Content>
         </HoverCard.Root>
@@ -114,7 +116,7 @@ const VariantMenuContent = ({
         onClick={(event) => event.stopPropagation()}
         onSelect={() => onToggleStatus(variant)}
       >
-        {variant.status ? 'Disable' : 'Enable'}
+        {variant.status ? translate('Disable') : translate('Enable')}
       </UnifiedMenu.Item>
     )}
     <UnifiedMenu.Separator />
@@ -128,12 +130,13 @@ const VariantMenuContent = ({
       >
         <HoverCard.Root>
           <HoverCard.Trigger onClick={(event) => event.stopPropagation()}>
-            <Text as="span">Delete</Text>
+            <Text as="span">{translate('Delete')}</Text>
           </HoverCard.Trigger>
           <HoverCard.Content>
             <Text as="p">
-              Cannot delete the default template. Set another template as the
-              default first.
+              {translate(
+                'Cannot delete the default template. Set another template as the default first.',
+              )}
             </Text>
           </HoverCard.Content>
         </HoverCard.Root>
@@ -146,21 +149,24 @@ const VariantMenuContent = ({
             onClick={(event) => event.stopPropagation()}
             onSelect={(event) => event.preventDefault()}
           >
-            Delete
+            {translate('Delete')}
           </UnifiedMenu.Item>
         </AlertDialog.Trigger>
         <AlertDialog.Content>
           <AlertDialog.Title>
-            Delete {variant.label || variant.id}
+            {translate('Delete {{label}}', {
+              label: variant.label || variant.id,
+            })}
           </AlertDialog.Title>
           <AlertDialog.Description size="2">
-            This action will permanently delete the page template. This action
-            cannot be undone.
+            {translate(
+              'This action will permanently delete the page template. This action cannot be undone.',
+            )}
           </AlertDialog.Description>
           <Flex gap="3" mt="4" justify="end">
             <AlertDialog.Cancel>
               <Button variant="soft" color="gray">
-                Cancel
+                {translate('Cancel')}
               </Button>
             </AlertDialog.Cancel>
             <AlertDialog.Action>
@@ -169,7 +175,7 @@ const VariantMenuContent = ({
                 color="red"
                 onClick={() => onDelete(variant)}
               >
-                Delete template
+                {translate('Delete template')}
               </Button>
             </AlertDialog.Action>
           </Flex>
@@ -240,7 +246,7 @@ const VariantListItem = ({
                       : undefined
                   }
                 >
-                  {isDefault ? 'Default' : 'Disabled'}
+                  {isDefault ? translate('Default') : translate('Disabled')}
                 </Badge>
               ) : undefined
             }
@@ -305,13 +311,13 @@ const VariantFormDialog = ({
       error={
         error
           ? {
-              title: 'Something went wrong',
+              title: translate('Something went wrong'),
               message: parse(error),
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
+        cancelText: translate('Cancel'),
         confirmText,
         isConfirmDisabled: isConfirmDisabled || !label.trim(),
         isConfirmLoading: isSubmitting,
@@ -321,26 +327,28 @@ const VariantFormDialog = ({
     >
       <Flex direction="column" gap="2" mb="2">
         <Box>
-          <DialogFieldLabel htmlFor="page-variant-label">Name</DialogFieldLabel>
+          <DialogFieldLabel htmlFor="page-variant-label">
+            {translate('Name')}
+          </DialogFieldLabel>
         </Box>
         <TextField.Root
           id="page-variant-label"
           data-testid="canvas-page-variant-label-input"
           value={label}
-          placeholder="Template name"
+          placeholder={translate('Template name')}
           size="1"
           onChange={(event) => setLabel(event.target.value)}
         />
         <Box mt="2">
           <DialogFieldLabel htmlFor="page-variant-description">
-            Description
+            {translate('Description')}
           </DialogFieldLabel>
         </Box>
         <TextArea
           id="page-variant-description"
           data-testid="canvas-page-variant-description-input"
           value={description}
-          placeholder="Optional description"
+          placeholder={translate('Optional description')}
           size="1"
           onChange={(event) => setDescription(event.target.value)}
         />
@@ -458,7 +466,7 @@ const PageVariants = () => {
           }}
         >
           <PlusIcon />
-          New page template
+          {translate('New page template')}
         </Button>
       </Flex>
 
@@ -475,14 +483,16 @@ const PageVariants = () => {
         <Box>
           {variantsError && (
             <ErrorCard
-              title="An unexpected error has occurred while loading page templates."
+              title={translate(
+                'An unexpected error has occurred while loading page templates.',
+              )}
               error={String(extractErrorMessageFromApiResponse(variantsError))}
             />
           )}
           {!variantsError && variantList.length === 0 && (
             <EmptyStateCallout
               data-testid="canvas-page-variant-list"
-              title="No page templates found"
+              title={translate('No page templates found')}
               variant="surface"
             />
           )}
@@ -517,8 +527,8 @@ const PageVariants = () => {
       {isCreateOpen && (
         <VariantFormDialog
           open={isCreateOpen}
-          title="New page template"
-          confirmText="Create template"
+          title={translate('New page template')}
+          confirmText={translate('Create template')}
           initialValues={emptyFormValues}
           isSubmitting={isCreating}
           error={
@@ -534,8 +544,8 @@ const PageVariants = () => {
       {renameTarget && (
         <VariantFormDialog
           open={!!renameTarget}
-          title="Rename page template"
-          confirmText="Save changes"
+          title={translate('Rename page template')}
+          confirmText={translate('Save changes')}
           initialValues={{
             label: renameTarget.label ?? '',
             description: renameTarget.description ?? '',

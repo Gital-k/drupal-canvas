@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { Spinner } from '@radix-ui/themes';
 
 import { useGetConflictPageLayoutQuery } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 import { getViewportSizes } from '@/utils/viewports';
 
 import styles from './VersionPreview.module.css';
@@ -46,11 +47,15 @@ const VersionPreview = () => {
   );
 
   if (isError) {
+    const versionText = isPublished
+      ? translate('published')
+      : translate('auto-save');
     return (
       <div className={styles.container}>
         <p className={styles.error}>
-          Unable to load the {isPublished ? 'published' : 'auto-save'} version
-          preview.
+          {translate('Unable to load the @version version preview.', {
+            '@version': versionText,
+          })}
         </p>
       </div>
     );
@@ -67,7 +72,9 @@ const VersionPreview = () => {
   return (
     <div className={styles.container}>
       <iframe
-        title={`${isPublished ? 'Published' : 'New'} version preview`}
+        title={translate('@type version preview', {
+          '@type': isPublished ? translate('Published') : translate('New'),
+        })}
         style={{ width: widthVal }}
         srcDoc={data.html}
         className={styles.iframe}

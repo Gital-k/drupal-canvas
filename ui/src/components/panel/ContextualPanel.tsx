@@ -25,6 +25,7 @@ import {
 } from '@/features/ui/uiSlice';
 import useHidePanelClasses from '@/hooks/useHidePanelClasses';
 import { PAGE_VARIANT_ENTITY_TYPE } from '@/services/pageVariants';
+import { translate, translatePlural } from '@/utils/translate';
 
 import type React from 'react';
 
@@ -43,7 +44,9 @@ const ContextualPanel: React.FC = () => {
   // settings.
   const hasPageDataTab =
     !isTemplateContext && entityType !== PAGE_VARIANT_ENTITY_TYPE;
-  const mainTabText = isTemplateContext ? 'Template data' : 'Page data';
+  const mainTabText = isTemplateContext
+    ? translate('Template data')
+    : translate('Page data');
 
   const [activePanel, setActivePanel] = useState('pageData');
   const offRightClasses = useHidePanelClasses('right');
@@ -110,7 +113,7 @@ const ContextualPanel: React.FC = () => {
                   value="settings"
                   data-testid="canvas-contextual-panel--settings"
                 >
-                  Settings
+                  {translate('Settings')}
                 </Tabs.Trigger>
               )}
             </Tabs.List>
@@ -121,7 +124,12 @@ const ContextualPanel: React.FC = () => {
                     <Box my="2">
                       <Flex direction="column" gap="2">
                         <Text align="center" color="gray" my="3" size="1">
-                          {selection.items.length} items selected
+                          {translatePlural(
+                            selection.items.length,
+                            '@count item selected',
+                            '@count items selected',
+                            { '@count': selection.items.length },
+                          )}
                         </Text>
 
                         <Flex gap="1" justify="center" align="center">
@@ -130,27 +138,31 @@ const ContextualPanel: React.FC = () => {
                             disabled={!selection.consecutive}
                             onClick={() =>
                               alert(
-                                'Copy functionality will be implemented later',
+                                translate(
+                                  'Copy functionality will be implemented later',
+                                ),
                               )
                             }
                             className="canvas-button"
                           >
-                            Copy
+                            {translate('Copy')}
                           </Button>
                           <Text size="1" color="gray">
-                            or
+                            {translate('or')}
                           </Text>
                           <Button
                             size="1"
                             disabled={!selection.consecutive}
                             onClick={() =>
                               alert(
-                                'Save as Pattern functionality will be implemented later',
+                                translate(
+                                  'Save as Pattern functionality will be implemented later',
+                                ),
                               )
                             }
                             className="canvas-button"
                           >
-                            Save as Pattern
+                            {translate('Save as Pattern')}
                           </Button>
                         </Flex>
                         {!selection.consecutive && (
@@ -164,15 +176,20 @@ const ContextualPanel: React.FC = () => {
                               <InfoCircledIcon />
                             </Callout.Icon>
                             <Callout.Text>
-                              Actions are only available when selecting adjacent
-                              items in the layout
+                              {translate(
+                                'Actions are only available when selecting adjacent items in the layout',
+                              )}
                             </Callout.Text>
                           </Callout.Root>
                         )}
                       </Flex>
                     </Box>
                   )}
-                  <ErrorBoundary title="An unexpected error has occurred while rendering the component's form.">
+                  <ErrorBoundary
+                    title={translate(
+                      "An unexpected error has occurred while rendering the component's form.",
+                    )}
+                  >
                     <Outlet />
                   </ErrorBoundary>
                 </Tabs.Content>

@@ -8,6 +8,7 @@ import {
 } from '@radix-ui/react-icons';
 
 import { formatTimestamp } from '@/features/notifications/formatTimestamp';
+import { translate } from '@/utils/translate';
 
 import type { Notification } from '@/services/notificationsApi';
 
@@ -85,7 +86,7 @@ const NotificationCard = ({
           <button
             className={styles.readIndicator}
             onClick={() => onMarkRead(notification.id)}
-            aria-label="Mark as read"
+            aria-label={translate('Mark as read')}
           >
             <span className={styles.dot} />
           </button>

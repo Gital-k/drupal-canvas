@@ -10,6 +10,7 @@ import { useAppSelector } from '@/app/hooks';
 import UnifiedMenu from '@/components/UnifiedMenu';
 import { selectDragging } from '@/features/ui/uiSlice';
 import { usePermissionCheck } from '@/hooks/usePermissionCheck';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 
@@ -167,7 +168,7 @@ const SidebarFolder: React.FC<SidebarFolderProps> = ({
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
               <button
-                aria-label="Open contextual menu"
+                aria-label={translate('Open contextual menu')}
                 className={nodeStyles.contextualTrigger}
               >
                 <span className={nodeStyles.dots}>

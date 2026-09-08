@@ -18,6 +18,8 @@ import {
 } from '@radix-ui/react-icons';
 import { DropdownMenu, Flex, Text } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import { useIndentContext } from './ListIndentContext';
 
 import styles from './SidebarNode.module.css';
@@ -165,7 +167,7 @@ const SidebarNode = React.forwardRef<
           <DropdownMenu.Root onOpenChange={onMenuOpenChange}>
             <DropdownMenu.Trigger>
               <button
-                aria-label="Open contextual menu"
+                aria-label={translate('Open contextual menu')}
                 className={styles.contextualTrigger}
               >
                 <span className={styles.dots}>

@@ -1,6 +1,8 @@
 import { InfoCircledIcon } from '@radix-ui/react-icons';
 import { Button, Callout, Flex } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import type React from 'react';
 
 const ConflictWarning: React.FC<{ children?: React.ReactNode }> = () => {
@@ -15,12 +17,12 @@ const ConflictWarning: React.FC<{ children?: React.ReactNode }> = () => {
             <InfoCircledIcon />
           </Callout.Icon>
           <Callout.Text>
-            Your latest change was not saved because the content was modified
-            elsewhere since you loaded the page. Please refresh your browser to
-            receive the latest changes and continue.
+            {translate(
+              'Your latest change was not saved because the content was modified elsewhere since you loaded the page. Please refresh your browser to receive the latest changes and continue.',
+            )}
           </Callout.Text>
           <Button mt="2" onClick={handleRefreshClick}>
-            Refresh
+            {translate('Refresh')}
           </Button>
         </Callout.Root>
       </Flex>

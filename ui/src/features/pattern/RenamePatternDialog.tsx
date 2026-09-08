@@ -8,6 +8,7 @@ import {
   setDialogWithDataClosed,
 } from '@/features/ui/dialogSlice';
 import { useUpdatePatternMutation } from '@/services/patterns';
+import { translate } from '@/utils/translate';
 
 import type { Pattern } from '@/types/Pattern';
 
@@ -56,22 +57,24 @@ const RenamePatternDialog = () => {
     <Dialog
       open={open}
       onOpenChange={handleOpenChange}
-      title="Rename pattern"
+      title={translate('Rename pattern')}
       error={
         isError
           ? {
-              title: 'Failed to rename pattern',
-              message: `An error ${
-                'status' in error ? '(HTTP ' + error.status + ')' : ''
-              } occurred while renaming the pattern. Please check the browser console for more details.`,
-              resetButtonText: 'Try again',
+              title: translate('Failed to rename pattern'),
+              message: translate(
+                `An error ${
+                  'status' in error ? '(HTTP ' + error.status + ')' : ''
+                } occurred while renaming the pattern. Please check the browser console for more details.`,
+              ),
+              resetButtonText: translate('Try again'),
               onReset: handleRename,
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Rename',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Rename'),
         onConfirm: handleRename,
         isConfirmDisabled: isEmptyOrUnchanged,
         isConfirmLoading: isLoading,
@@ -85,14 +88,14 @@ const RenamePatternDialog = () => {
       >
         <Flex direction="column" gap="2">
           <DialogFieldLabel htmlFor="patternRenameInput">
-            Pattern name
+            {translate('Pattern name')}
           </DialogFieldLabel>
           <TextField.Root
             autoComplete="off"
             id="patternRenameInput"
             value={patternName}
             onChange={(e) => setPatternName(e.target.value)}
-            placeholder="Enter a new name"
+            placeholder={translate('Enter a new name')}
             size="1"
           />
         </Flex>

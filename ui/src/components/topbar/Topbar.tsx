@@ -22,6 +22,7 @@ import { useCanvasHeadlessSettings } from '@/hooks/useCanvasHeadlessSettings';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout';
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import PageInfo from '../pageInfo/PageInfo';
 import { isPreviewPath } from './topbarPreviewMode';
@@ -104,14 +105,14 @@ const Topbar = () => {
       >
         <Grid columns="1fr 1fr 1fr" gap="0" width="100%" height="100%">
           <Flex align="center" gap="2">
-            <Tooltip content="Exit Drupal Canvas">
+            <Tooltip content={translate('Exit Drupal Canvas')}>
               <a
                 href={backHref}
                 aria-labelledby="back-to-previous-label"
                 className={clsx(styles.topBarButton, styles.exitButton)}
               >
                 <span className="visually-hidden" id="back-to-previous-label">
-                  Exit Drupal Canvas
+                  {translate('Exit Drupal Canvas')}
                 </span>
                 <DropIcon
                   className={styles.drupalLogo}
@@ -135,7 +136,7 @@ const Topbar = () => {
                 >
                   <CardStackPlusIcon />
                   <span className={isEditor ? '' : 'visually-hidden'}>
-                    Builder
+                    {translate('Builder')}
                   </span>
                 </Button>
                 <Button
@@ -145,7 +146,7 @@ const Topbar = () => {
                 >
                   <PersonIcon />
                   <span className={isSegments ? '' : 'visually-hidden'}>
-                    Segments
+                    {translate('Segments')}
                   </span>
                 </Button>
               </>

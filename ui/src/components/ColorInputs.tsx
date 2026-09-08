@@ -10,6 +10,8 @@ import {
   rgbaToHsva,
 } from '@uiw/color-convert';
 
+import { translate } from '@/utils/translate';
+
 import type { HsvaColor } from '@uiw/color-convert';
 
 import styles from './ColorPicker.module.css';
@@ -311,10 +313,10 @@ const ColorInputs = ({
                 onFocus={rInput.onFocus}
                 onBlur={rInput.onBlur}
                 className={rInput.className}
-                aria-label="Red value"
+                aria-label={translate('Red value')}
               />
               <label htmlFor="color-r" className={styles.rgbaLabel}>
-                R
+                {translate('R')}
               </label>
             </div>
 
@@ -330,10 +332,10 @@ const ColorInputs = ({
                 onFocus={gInput.onFocus}
                 onBlur={gInput.onBlur}
                 className={gInput.className}
-                aria-label="Green value"
+                aria-label={translate('Green value')}
               />
               <label htmlFor="color-g" className={styles.rgbaLabel}>
-                G
+                {translate('G')}
               </label>
             </div>
 
@@ -349,10 +351,10 @@ const ColorInputs = ({
                 onFocus={bInput.onFocus}
                 onBlur={bInput.onBlur}
                 className={bInput.className}
-                aria-label="Blue value"
+                aria-label={translate('Blue value')}
               />
               <label htmlFor="color-b" className={styles.rgbaLabel}>
-                B
+                {translate('B')}
               </label>
             </div>
 
@@ -368,10 +370,10 @@ const ColorInputs = ({
                 onFocus={aInput.onFocus}
                 onBlur={aInput.onBlur}
                 className={aInput.className}
-                aria-label="Alpha value"
+                aria-label={translate('Alpha value')}
               />
               <label htmlFor="color-a-rgba" className={styles.rgbaLabel}>
-                A
+                {translate('A')}
               </label>
             </div>
           </>
@@ -392,10 +394,10 @@ const ColorInputs = ({
                 onFocus={hInput.onFocus}
                 onBlur={hInput.onBlur}
                 className={hInput.className}
-                aria-label="Hue value"
+                aria-label={translate('Hue value')}
               />
               <label htmlFor="color-h" className={styles.rgbaLabel}>
-                H
+                {translate('H')}
               </label>
             </div>
 
@@ -411,10 +413,10 @@ const ColorInputs = ({
                 onFocus={sInput.onFocus}
                 onBlur={sInput.onBlur}
                 className={sInput.className}
-                aria-label="Saturation value"
+                aria-label={translate('Saturation value')}
               />
               <label htmlFor="color-s" className={styles.rgbaLabel}>
-                S
+                {translate('S')}
               </label>
             </div>
 
@@ -430,10 +432,10 @@ const ColorInputs = ({
                 onFocus={lInput.onFocus}
                 onBlur={lInput.onBlur}
                 className={lInput.className}
-                aria-label="Lightness value"
+                aria-label={translate('Lightness value')}
               />
               <label htmlFor="color-l" className={styles.rgbaLabel}>
-                L
+                {translate('L')}
               </label>
             </div>
 
@@ -449,10 +451,10 @@ const ColorInputs = ({
                 onFocus={hslaAInput.onFocus}
                 onBlur={hslaAInput.onBlur}
                 className={hslaAInput.className}
-                aria-label="Alpha value"
+                aria-label={translate('Alpha value')}
               />
               <label htmlFor="color-a-hsla" className={styles.rgbaLabel}>
-                A
+                {translate('A')}
               </label>
             </div>
           </>
@@ -471,12 +473,12 @@ const ColorInputs = ({
                 onFocus={handleHexFocus}
                 onBlur={handleHexBlur}
                 className={getHexInputClassName()}
-                aria-label="Hex color value"
+                aria-label={translate('Hex color value')}
                 aria-invalid={isHexInvalid}
               />
             </div>
             <label htmlFor="color-hex" className={styles.rgbaLabel}>
-              HEX
+              {translate('HEX')}
             </label>
           </div>
         );
@@ -493,8 +495,8 @@ const ColorInputs = ({
         type="button"
         onClick={handleModeSwitch}
         className={styles.modeSwitch}
-        aria-label="Switch color format"
-        title="Switch color format"
+        aria-label={translate('Switch color format')}
+        title={translate('Switch color format')}
       >
         <span className={styles.modeSwitchIconContainer}>
           <TriangleUpIcon />

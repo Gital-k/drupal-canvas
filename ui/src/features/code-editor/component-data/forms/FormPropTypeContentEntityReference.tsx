@@ -13,6 +13,7 @@ import { Divider } from '@/features/code-editor/component-data/FormElement';
 import ContentRelationshipDialog from '@/features/code-editor/dialogs/ContentRelationshipDialog';
 import { useResolvedExpressionFields } from '@/features/code-editor/utils/contentEntityReferenceLabelResolver';
 import { useListEntityTypesQuery } from '@/services/contentEntityReferenceApi';
+import { translate } from '@/utils/translate';
 
 import type { ContentEntityReferencePropState } from '@/features/code-editor/dialogs/ContentRelationshipDialog';
 
@@ -86,7 +87,9 @@ export default function FormPropTypeContentEntityReference({
       <Divider />
       {error && (
         <Callout.Root color="red" size="1">
-          <Callout.Text>Failed to load entity types.</Callout.Text>
+          <Callout.Text>
+            {translate('Failed to load entity types.')}
+          </Callout.Text>
         </Callout.Root>
       )}
 
@@ -122,19 +125,21 @@ function NoTargetSelected({ onPick }: { onPick: () => void }) {
   return (
     <Flex direction="column" align="center" gap="2" py="4">
       <Text size="2" weight="bold">
-        No type selected
+        {translate('No type selected')}
       </Text>
       <Flex direction="column" align="center">
         <Text size="1" color="gray" align="center">
-          Select the type editors can link to.
+          {translate('Select the type editors can link to.')}
         </Text>
         <Text size="1" color="gray" align="center">
-          Then, choose which fields to return in the component props.
+          {translate(
+            'Then, choose which fields to return in the component props.',
+          )}
         </Text>
       </Flex>
       <Button size="1" variant="outline" onClick={onPick} mt="2">
         <PlusIcon />
-        Add type
+        {translate('Add type')}
       </Button>
     </Flex>
   );
@@ -158,13 +163,14 @@ function TargetSummary({
     >
       <Flex align="center" gap="2">
         <Text size="1">
-          Entity Type: <Text weight="medium">{entityTypeLabel}</Text>
+          {translate('Entity Type:')}{' '}
+          <Text weight="medium">{entityTypeLabel}</Text>
         </Text>
         <Text size="1" color="gray">
           |
         </Text>
         <Text size="1">
-          Bundle: <Text weight="medium">{bundleLabel}</Text>
+          {translate('Bundle:')} <Text weight="medium">{bundleLabel}</Text>
         </Text>
       </Flex>
     </Box>
@@ -200,7 +206,7 @@ function FieldList({
           }}
         >
           <Text size="1" weight="medium">
-            Entity fields ({fields.length})
+            {translate('Entity fields (@count)', { '@count': fields.length })}
           </Text>
         </button>
         <Flex align="center" gap="2">
@@ -212,13 +218,17 @@ function FieldList({
             style={{ color: 'var(--blue-9)', fontWeight: 500 }}
           >
             <Pencil1Icon />
-            Edit
+            {translate('Edit')}
           </Button>
           <IconButton
             size="1"
             variant="ghost"
             color="gray"
-            aria-label={expanded ? 'Collapse fields' : 'Expand fields'}
+            aria-label={
+              expanded
+                ? translate('Collapse fields')
+                : translate('Expand fields')
+            }
             aria-controls={summaryId}
             onClick={toggleExpanded}
           >

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { CheckIcon, CopyIcon } from '@radix-ui/react-icons';
 import { Flex, IconButton, Tooltip } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import styles from './HeadlessFrontends.module.css';
 
 interface CommandSnippetProps {
@@ -35,12 +37,16 @@ const CommandSnippet = ({
           {command}
         </pre>
       </div>
-      <Tooltip content={isCopied ? 'Copied' : 'Copy command'}>
+      <Tooltip
+        content={isCopied ? translate('Copied') : translate('Copy command')}
+      >
         <IconButton
           size="1"
           variant="ghost"
           color={isCopied ? 'green' : 'gray'}
-          aria-label={isCopied ? 'Copied' : 'Copy command'}
+          aria-label={
+            isCopied ? translate('Copied') : translate('Copy command')
+          }
           onClick={() => void handleCopy()}
         >
           {isCopied ? <CheckIcon /> : <CopyIcon />}

@@ -6,6 +6,7 @@ import { Button, DropdownMenu } from '@radix-ui/themes';
 
 import BreakpointIcon from '@/components/BreakpointIcon';
 import { useTemplateRef } from '@/hooks/useTemplateRef';
+import { translate } from '@/utils/translate';
 import { getViewportSizes } from '@/utils/viewports';
 
 import type React from 'react';
@@ -41,7 +42,7 @@ const PreviewWidthSelector: React.FC<PreviewWidthSelectorProps> = (props) => {
   const currentViewport = getCurrentViewport();
   const displayText = currentViewport
     ? `${currentViewport.name} (${currentViewport.width}px)`
-    : 'Full Width';
+    : translate('Full Width');
 
   return (
     <DropdownMenu.Root>
@@ -49,7 +50,7 @@ const PreviewWidthSelector: React.FC<PreviewWidthSelectorProps> = (props) => {
         <Button
           variant="surface"
           color="gray"
-          aria-label="Select preview width"
+          aria-label={translate('Select preview width')}
         >
           {currentViewport ? (
             <BreakpointIcon width={currentViewport.width} />
@@ -70,18 +71,22 @@ const PreviewWidthSelector: React.FC<PreviewWidthSelectorProps> = (props) => {
             color={currentWidth === 'full' ? 'blue' : undefined}
           >
             <WidthIcon />
-            Full Width
+            {translate('Full Width')}
           </DropdownMenu.RadioItem>
-          {viewportSizes.map((vs) => (
-            <DropdownMenu.RadioItem
-              key={vs.id}
-              value={vs.id}
-              color={currentWidth === vs.id ? 'blue' : undefined}
-            >
-              <BreakpointIcon width={vs.width} />
-              {vs.name} ({vs.width}px)
-            </DropdownMenu.RadioItem>
-          ))}
+          {viewportSizes.map((vs) => {
+            const pxUnit = 'px';
+            return (
+              <DropdownMenu.RadioItem
+                key={vs.id}
+                value={vs.id}
+                color={currentWidth === vs.id ? 'blue' : undefined}
+              >
+                <BreakpointIcon width={vs.width} />
+                {translate(vs.name)} ({vs.width}
+                {pxUnit})
+              </DropdownMenu.RadioItem>
+            );
+          })}
         </DropdownMenu.RadioGroup>
       </DropdownMenu.Content>
     </DropdownMenu.Root>

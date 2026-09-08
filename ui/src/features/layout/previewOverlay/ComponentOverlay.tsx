@@ -21,6 +21,7 @@ import {
 import useComponentSelection from '@/hooks/useComponentSelection';
 import useGetComponentName from '@/hooks/useGetComponentName';
 import { isMarkerComponentType } from '@/services/pageVariants';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { CanvasStackDirection } from '@drupal-canvas/preview-geometry';
@@ -167,7 +168,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
       style={style}
     >
       <button className="visually-hidden" onClick={handleComponentClick}>
-        Select component
+        {translate('Select component')}
       </button>
 
       <ComponentContextMenu component={component}>

@@ -8,6 +8,7 @@ import {
   FormElement,
   Label,
 } from '@/features/code-editor/component-data/FormElement';
+import { translate } from '@/utils/translate';
 
 import type {
   CodeComponentProp,
@@ -299,7 +300,9 @@ export default function FormPropTypeImage({
       <Flex gap="4" width="100%">
         <Box flexBasis="50%" flexShrink="0">
           <FormElement>
-            <Label htmlFor={`prop-example-${id}`}>Example aspect ratio</Label>
+            <Label htmlFor={`prop-example-${id}`}>
+              {translate('Example aspect ratio')}
+            </Label>
             <Select.Root
               value={aspectRatio}
               onValueChange={setAspectRatio}
@@ -308,7 +311,9 @@ export default function FormPropTypeImage({
               <Select.Trigger id={`prop-example-${id}`} />
               <Select.Content>
                 {!required && (
-                  <Select.Item value={NONE_VALUE}>- None -</Select.Item>
+                  <Select.Item value={NONE_VALUE}>
+                    {translate('- None -')}
+                  </Select.Item>
                 )}
                 {EXAMPLE_ASPECT_RATIO_VALUES.map((value) => (
                   <Select.Item key={value.value} value={value.value}>
@@ -323,7 +328,7 @@ export default function FormPropTypeImage({
           <Box flexGrow="1">
             <FormElement>
               <Label htmlFor={`prop-example-pixel-density-${id}`}>
-                Pixel density
+                {translate('Pixel density')}
               </Label>
               <Select.Root
                 value={pixelDensity}

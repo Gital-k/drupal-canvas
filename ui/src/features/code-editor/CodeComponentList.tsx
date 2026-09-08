@@ -8,6 +8,7 @@ import {
   useGetCodeComponentsQuery,
   useGetFoldersQuery,
 } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 
 import type { FolderData } from '@/components/list/FolderList';
 import type { CodeComponentSerialized } from '@/types/CodeComponent';
@@ -59,7 +60,7 @@ const CodeComponentList = ({ searchTerm }: { searchTerm: string }) => {
       isLoading={isLoading || foldersLoading}
       searchTerm={searchTerm}
       layoutType={LayoutItemType.CODE}
-      topLevelLabel="Code"
+      topLevelLabel={translate('Code')}
       itemType="js_component"
       renderItem={renderItem}
     />

@@ -10,6 +10,7 @@ import {
 
 import DraggableDialogWrapper from '@/components/DraggableDialogWrapper';
 import ErrorCard from '@/components/error/ErrorCard';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 
@@ -87,8 +88,8 @@ const Dialog = ({
   modal = true,
   width,
   footer = {
-    cancelText: 'Cancel',
-    confirmText: 'Confirm',
+    cancelText: translate('Cancel'),
+    confirmText: translate('Confirm'),
   },
 }: DialogProps) => {
   const handleOpenChange = (isOpen: boolean) => {
@@ -110,10 +111,10 @@ const Dialog = ({
             <IconButton
               variant="ghost"
               size="1"
-              aria-label="Close"
+              aria-label={translate('Close')}
               onClick={(e) => handleOpenChange(false)}
             >
-              <span className="visually-hidden">Close</span>
+              <span className="visually-hidden">{translate('Close')}</span>
               <Cross2Icon color="black" />
             </IconButton>
           </ThemedDialog.Close>

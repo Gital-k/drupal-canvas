@@ -1,5 +1,7 @@
 import { Flex, Select, Text, TextField } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import type { AssetLibraryFont } from '@/types/CodeComponent';
 
 import styles from '../BrandKitPanel.module.css';
@@ -22,7 +24,7 @@ const StaticFontVariantEditor = ({
   <Flex gap="3">
     <Flex direction="column" gap="2" flexGrow="1">
       <Text size="1" color="gray">
-        Weight
+        {translate('Weight')}
       </Text>
       <TextField.Root
         value={font.weight}
@@ -33,7 +35,7 @@ const StaticFontVariantEditor = ({
     </Flex>
     <Flex direction="column" gap="2" flexGrow="1">
       <Text size="1" color="gray">
-        Style
+        {translate('Style')}
       </Text>
       <Select.Root
         value={font.style}
@@ -43,8 +45,8 @@ const StaticFontVariantEditor = ({
       >
         <Select.Trigger />
         <Select.Content position="popper" className={styles.styleSelectContent}>
-          <Select.Item value="normal">Normal</Select.Item>
-          <Select.Item value="italic">Italic</Select.Item>
+          <Select.Item value="normal">{translate('Normal')}</Select.Item>
+          <Select.Item value="italic">{translate('Italic')}</Select.Item>
         </Select.Content>
       </Select.Root>
     </Flex>

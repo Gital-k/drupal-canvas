@@ -15,6 +15,7 @@ import {
   unsetHoveredComponent,
 } from '@/features/ui/uiSlice';
 import useGetComponentName from '@/hooks/useGetComponentName';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { CollapsibleTriggerProps } from '@radix-ui/react-collapsible';
@@ -102,7 +103,9 @@ const SlotLayer: React.FC<SlotLayerProps> = ({
                     >
                       <button
                         aria-label={
-                          isCollapsed ? `Expand slot` : `Collapse slot`
+                          isCollapsed
+                            ? translate('Expand slot')
+                            : translate('Collapse slot')
                         }
                       >
                         {isCollapsed ? (

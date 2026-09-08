@@ -4,6 +4,7 @@ import { ChevronDownIcon, Cross2Icon } from '@radix-ui/react-icons';
 
 import { withRHF } from '@/components/form/react-hook-form/withRHF';
 import { a2p } from '@/local_packages/utils';
+import { translate } from '@/utils/translate';
 
 import type {
   ActionMeta,
@@ -189,7 +190,9 @@ const DrupalSelectMultivalueForm = ({
   };
 
   const fieldLabel = String(attributes['data-field-label'] || '');
-  const placeholderText = `Select ${fieldLabel}`;
+  const placeholderText = fieldLabel
+    ? translate('Select @fieldLabel', { '@fieldLabel': fieldLabel })
+    : translate('Select...');
 
   return (
     <div className={styles.container}>
@@ -212,7 +215,7 @@ const DrupalSelectMultivalueForm = ({
         aria-label={placeholderText}
         classNamePrefix="canvas-select"
         closeMenuOnSelect={false}
-        noOptionsMessage={() => 'No selection'}
+        noOptionsMessage={() => translate('No selection')}
         components={{
           DropdownIndicator,
           MultiValueRemove,

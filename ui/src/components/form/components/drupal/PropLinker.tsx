@@ -9,6 +9,7 @@ import {
   isEvaluatedComponentModel,
 } from '@/features/layout/layoutModelSlice';
 import useInputUIData from '@/hooks/useInputUIData';
+import { translate } from '@/utils/translate';
 
 import type {
   BasePropSource,
@@ -206,7 +207,9 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
           className={clsx(styles.linker, {
             [styles.linkerOpen]: linkerOpen,
           })}
-          aria-label={`Link ${propName} to an other field`}
+          aria-label={translate('Link @propName to another field', {
+            '@propName': propName,
+          })}
           data-canvas-link-suggestions={JSON.stringify(flatSuggestions)}
         >
           {linked && <Link1Icon className={styles.default} />}

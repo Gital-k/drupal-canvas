@@ -2,6 +2,7 @@ import { ChevronRightIcon } from '@radix-ui/react-icons';
 import { Box, Flex, Text } from '@radix-ui/themes';
 
 import { buildFontVariantLabel } from '@/features/brandKit/fontCss';
+import { translate } from '@/utils/translate';
 
 import type { AssetLibraryFont } from '@/types/CodeComponent';
 
@@ -20,7 +21,7 @@ const FontVariantList = ({
 }: FontVariantListProps) => (
   <Flex direction="column" gap="2">
     <Text size="1" color="gray">
-      Variants
+      {translate('Variants')}
     </Text>
     <Box className={styles.variantList}>
       {fonts.map((font) => (

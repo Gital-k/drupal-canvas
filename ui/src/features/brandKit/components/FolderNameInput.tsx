@@ -6,6 +6,7 @@ import { Flex, Text, TextField } from '@radix-ui/themes';
 import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import { validateFolderNameClientSide } from '@/features/validation/validation';
 import { useCreateFolderMutation } from '@/services/componentAndLayout';
+import { translate } from '@/utils/translate';
 
 import type { ReactNode } from 'react';
 import type { FolderType } from '@/types/Component';
@@ -107,7 +108,7 @@ const FolderNameInput = ({
             autoFocus
             data-testid="canvas-manage-library-new-folder-name"
             id="folder-name"
-            placeholder="New folder"
+            placeholder={translate('New folder')}
             variant="soft"
             onChange={(e) => handleOnChange(e.target.value)}
             onBlur={handleBlur}

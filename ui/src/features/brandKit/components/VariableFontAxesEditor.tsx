@@ -4,6 +4,7 @@ import {
   getAxisSettingValue,
   getAxisStep,
 } from '@/features/brandKit/variableFontState';
+import { translate } from '@/utils/translate';
 
 import type {
   AssetLibraryFont,
@@ -31,7 +32,7 @@ const VariableFontAxesEditor = ({
 }: VariableFontAxesEditorProps) => (
   <Flex direction="column" gap="3">
     <Text size="1" color="gray">
-      CSS axes
+      {translate('CSS axes')}
     </Text>
     {font.axes?.map((axis) => (
       <Flex
@@ -65,13 +66,13 @@ const VariableFontAxesEditor = ({
         />
         <Flex justify="between" gap="2">
           <Text size="1" color="gray">
-            Min {axis.min}
+            {translate('Min @value', { '@value': axis.min })}
           </Text>
           <Text size="1" color="gray">
-            Default {axis.default}
+            {translate('Default @value', { '@value': axis.default })}
           </Text>
           <Text size="1" color="gray">
-            Max {axis.max}
+            {translate('Max @value', { '@value': axis.max })}
           </Text>
         </Flex>
       </Flex>

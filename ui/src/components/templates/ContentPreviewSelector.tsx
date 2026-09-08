@@ -1,6 +1,8 @@
 import { ChevronDownIcon, EyeOpenIcon } from '@radix-ui/react-icons';
 import { Button, DropdownMenu, Flex, Tooltip } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import type React from 'react';
 
 interface ContentItem {
@@ -42,8 +44,8 @@ const ContentPreviewSelector: React.FC<ContentPreviewSelectorProps> = ({
       <EyeOpenIcon />
       <span>
         {itemsCount === 0
-          ? 'No content available'
-          : (selectedItem?.label ?? 'Select content to preview')}
+          ? translate('No content available')
+          : (selectedItem?.label ?? translate('Select content to preview'))}
       </span>
       {itemsCount > 0 && <ChevronDownIcon />}
     </Flex>
@@ -52,14 +54,14 @@ const ContentPreviewSelector: React.FC<ContentPreviewSelectorProps> = ({
   return (
     <Flex>
       {itemsCount === 0 ? (
-        <Tooltip content="Preview content" side="bottom">
+        <Tooltip content={translate('Preview content')} side="bottom">
           <Button variant="soft" size="1" disabled color="blue">
             {triggerContent}
           </Button>
         </Tooltip>
       ) : (
         <DropdownMenu.Root>
-          <Tooltip content="Preview content" side="bottom">
+          <Tooltip content={translate('Preview content')} side="bottom">
             <DropdownMenu.Trigger>
               <Button
                 variant="soft"

@@ -1,11 +1,13 @@
 import { discoverCanvasBoundaries } from '@drupal-canvas/preview-geometry';
 
+import { translate } from '@/utils/translate';
+
 import type { PropsValues } from '@drupal-canvas/types';
 import type { PreviewDomMaps } from '@/features/layout/preview/PreviewDomContext';
 import type { PendingChanges } from '@/services/pendingChangesApi';
 
 export function handleNonWorkingBtn(): void {
-  alert('Not yet supported.');
+  alert(translate('Not yet supported.'));
 }
 
 export const preventHover = (event: any) => {

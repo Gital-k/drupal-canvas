@@ -13,6 +13,7 @@ import {
   REQUIRED_EXAMPLE_ERROR_MESSAGE,
 } from '@/features/code-editor/component-data/Props';
 import { useRequiredProp } from '@/features/code-editor/hooks/useRequiredProp';
+import { translate } from '@/utils/translate';
 
 import type { CodeComponentProp } from '@/types/CodeComponent';
 
@@ -46,10 +47,12 @@ export default function FormPropTypeFormattedText({
     <Flex direction="column" gap="4" flexGrow="1">
       <Divider />
       <FormElement>
-        <Label htmlFor={`prop-example-${id}`}>Example value</Label>
+        <Label htmlFor={`prop-example-${id}`}>
+          {translate('Example value')}
+        </Label>
         <TextArea
           id={`prop-example-${id}`}
-          placeholder="Enter a text value"
+          placeholder={translate('Enter a text value')}
           value={example as string}
           size="1"
           onChange={(e) => {

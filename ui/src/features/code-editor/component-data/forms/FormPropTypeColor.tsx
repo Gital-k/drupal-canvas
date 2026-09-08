@@ -11,12 +11,13 @@ import {
 } from '@/features/code-editor/component-data/FormElement';
 import { useGetFoldersQuery } from '@/services/componentAndLayout';
 import { ALL_FOLDERS_ID } from '@/utils/colorConstants';
+import { translate } from '@/utils/translate';
 
 const FALLBACK_DEFAULT_COLOR = '#ff0000ff';
 
 const COLOR_PICKER_MODES = [
-  { value: 'kit-only', label: 'Brand Kit' },
-  { value: 'kit-and-free', label: 'Freeform' },
+  { value: 'kit-only', label: translate('Brand Kit') },
+  { value: 'kit-and-free', label: translate('Freeform') },
 ] as const;
 
 interface FormPropTypeColorProps {
@@ -58,15 +59,15 @@ export default function FormPropTypeColor({
 
   // Label to display in the folder dropdown trigger
   const folderDropdownLabel = useMemo(() => {
-    if (isAllFoldersSelected) return 'All';
+    if (isAllFoldersSelected) return translate('All');
     const selected = colorFolders.filter((id) => id !== ALL_FOLDERS_ID);
     if (selected.length === 1) {
       const folder = availableColorFolders.find(
         (f: any) => f.id === selected[0],
       );
-      return folder ? folder.name : '1 folder';
+      return folder ? folder.name : translate('1 folder');
     }
-    return `${selected.length} folders`;
+    return translate('@count folders', { '@count': selected.length });
   }, [isAllFoldersSelected, colorFolders, availableColorFolders]);
 
   // Auto-set default color for kit-only/kit-and-free modes when:
@@ -140,7 +141,9 @@ export default function FormPropTypeColor({
       {/* Color Source and Color Folder side by side */}
       <Grid columns={showFolderSelector ? '2' : '1'} gap="2">
         <FormElement>
-          <Label htmlFor={`prop-color-mode-${id}`}>Color Source</Label>
+          <Label htmlFor={`prop-color-mode-${id}`}>
+            {translate('Color Source')}
+          </Label>
           <Select.Root
             size="1"
             value={colorPickerMode}
@@ -163,7 +166,7 @@ export default function FormPropTypeColor({
 
         {showFolderSelector && (
           <FormElement>
-            <Label>Color Folder</Label>
+            <Label>{translate('Color Folder')}</Label>
             <DropdownMenu.Root>
               <DropdownMenu.Trigger>
                 <button
@@ -196,7 +199,7 @@ export default function FormPropTypeColor({
                     handleFolderToggle(ALL_FOLDERS_ID, checked === true)
                   }
                 >
-                  All
+                  {translate('All')}
                 </DropdownMenu.CheckboxItem>
                 <DropdownMenu.Separator />
                 {availableColorFolders.map((folder: any) => (
@@ -225,8 +228,8 @@ export default function FormPropTypeColor({
           <FormElement>
             <Label htmlFor={id}>
               {colorPickerMode === 'kit-only'
-                ? 'Default Brand Kit color'
-                : 'Default color'}
+                ? translate('Default Brand Kit color')
+                : translate('Default color')}
             </Label>
             <CanvasColorPickerField
               mode={colorPickerMode}

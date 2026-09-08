@@ -7,6 +7,7 @@ import {
   getCanvasSettings,
   getDrupalSettings,
 } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import type React from 'react';
 import type { Extension, LegacyExtension } from '@/types/Extensions';
@@ -71,7 +72,7 @@ const ExtensionsList: React.FC<ExtensionsPopoverProps> = () => {
   if (isLoading) {
     return (
       <Flex justify="center">
-        <p>Loading extensions...</p>
+        <p>{translate('Loading extensions...')}</p>
       </Flex>
     );
   }
@@ -88,7 +89,7 @@ const ExtensionsList: React.FC<ExtensionsPopoverProps> = () => {
 
     return (
       <Flex justify="center">
-        <p>Error loading extensions</p>
+        <p>{translate('Error loading extensions')}</p>
       </Flex>
     );
   }
@@ -114,7 +115,7 @@ const ExtensionsListDisplay: React.FC<ExtensionsListDisplayProps> = ({
       )}
       {extensions?.length === 0 && (
         <Flex justify="center">
-          <p>No extensions found</p>
+          <p>{translate('No extensions found')}</p>
         </Flex>
       )}
     </>

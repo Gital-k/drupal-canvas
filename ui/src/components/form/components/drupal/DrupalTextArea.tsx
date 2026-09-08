@@ -11,6 +11,7 @@ import {
 } from '@/features/form/formStateSlice';
 import { a2p } from '@/local_packages/utils.js';
 import { getDrupalSettings } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import DrupalFormattedTextArea from './DrupalFormattedTextArea';
 
@@ -130,7 +131,9 @@ const FormatSelect = ({
 
   return (
     <Flex gap="1" align="center" my="2">
-      <label htmlFor={(attributes.id as string) || ''}>Text format</label>
+      <label htmlFor={(attributes.id as string) || ''}>
+        {translate('Text format')}
+      </label>
       {/* Using a native select instead of Radix requires less plumbing. */}
       <select
         {...a2p(attributes, {}, { skipAttributes: ['value'] })}

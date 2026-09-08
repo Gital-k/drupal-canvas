@@ -2,6 +2,8 @@ import clsx from 'clsx';
 import { CheckIcon, CodeIcon, ReaderIcon } from '@radix-ui/react-icons';
 import { Flex, Popover, Text } from '@radix-ui/themes';
 
+import { translate } from '@/utils/translate';
+
 import type { AiTool } from '@drupal-canvas/types';
 
 import styles from './AiToolSelector.module.css';
@@ -42,7 +44,7 @@ const AiToolSelector = ({
       width="240px"
       data-testid="canvas-ai-tool-selector"
     >
-      <Text className={styles.heading}>Available tools</Text>
+      <Text className={styles.heading}>{translate('Available tools')}</Text>
       {tools.map((tool) => {
         const isSelected = tool.id === selectedTool;
         const ToolIcon = TOOL_ICONS[tool.id];

@@ -1,6 +1,7 @@
 import { Cross2Icon } from '@radix-ui/react-icons';
 
 import { sortNotifications } from '@/features/notifications/sortNotifications';
+import { translate } from '@/utils/translate';
 
 import NotificationCard from './NotificationCard';
 
@@ -31,9 +32,9 @@ const ActivityCenter = ({
   return (
     <div className={styles.panel}>
       <div className={styles.headerTop}>
-        <h2 className={styles.heading}>Activity Center</h2>
+        <h2 className={styles.heading}>{translate('Activity Center')}</h2>
         <button
-          aria-label="Close"
+          aria-label={translate('Close')}
           className={styles.closeButton}
           onClick={onClose}
           type="button"
@@ -48,15 +49,17 @@ const ActivityCenter = ({
             onClick={onMarkAllRead}
             type="button"
           >
-            Mark all as read
+            {translate('Mark all as read')}
           </button>
         </div>
       )}
       {sorted.length === 0 ? (
         <div className={styles.empty}>
-          <p className={styles.emptyTitle}>No notifications yet</p>
+          <p className={styles.emptyTitle}>
+            {translate('No notifications yet')}
+          </p>
           <p className={styles.emptySubtitle}>
-            New notifications will appear here
+            {translate('New notifications will appear here')}
           </p>
         </div>
       ) : (

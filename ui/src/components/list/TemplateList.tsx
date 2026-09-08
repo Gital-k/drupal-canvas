@@ -17,6 +17,7 @@ import {
 } from '@/services/componentAndLayout';
 import { useGetPageVariantsQuery } from '@/services/pageVariants';
 import { hasPermission } from '@/utils/permissions';
+import { translate } from '@/utils/translate';
 
 import type {
   TemplateInBundle,
@@ -77,7 +78,7 @@ const BundleListItem = ({ bundle }: BundleListItemProps) => {
         key="edit-fields"
         onClick={() => window.open(bundle.editFieldsUrl, '_blank')}
       >
-        Edit fields
+        {translate('Edit fields')}
         <Flex ml="auto" align="end">
           <NewTabIcon />
         </Flex>
@@ -95,7 +96,7 @@ const BundleListItem = ({ bundle }: BundleListItemProps) => {
         color="red"
         onClick={() => window.open(bundle.deleteUrl, '_blank')}
       >
-        Delete content type
+        {translate('Delete content type')}
         <Flex align="end">
           <NewTabIcon />
         </Flex>
@@ -168,23 +169,30 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
     <Dialog
       onOpenChange={(open) => {}}
       open={deleteDialogOpen}
-      title="Delete template"
-      description={`Are you sure you want to delete "${viewMode.label}"? This action cannot be undone.`}
+      title={translate('Delete template')}
+      description={translate(
+        'Are you sure you want to delete "{{label}}"? This action cannot be undone.',
+        { label: viewMode.label },
+      )}
       error={
         isError
           ? {
-              title: 'Failed to delete template',
-              message: `An error ${
-                'status' in error ? '(HTTP ' + error.status + ')' : ''
-              } occurred while deleting the template. Please check the browser console for more details.`,
-              resetButtonText: 'Try again',
+              title: translate('Failed to delete template'),
+              message: translate(
+                'An error {{statusInfo}} occurred while deleting the template. Please check the browser console for more details.',
+                {
+                  statusInfo:
+                    'status' in error ? '(HTTP ' + error.status + ')' : '',
+                },
+              ),
+              resetButtonText: translate('Try again'),
               onReset: handleDelete,
             }
           : undefined
       }
       footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Delete',
+        cancelText: translate('Cancel'),
+        confirmText: translate('Delete'),
         onConfirm: handleDelete,
         isConfirmDisabled: false,
         isConfirmLoading: isLoading,
@@ -207,7 +215,9 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
       {canSelectVariant && (
         <>
           <UnifiedMenu.Sub>
-            <UnifiedMenu.SubTrigger>Page template</UnifiedMenu.SubTrigger>
+            <UnifiedMenu.SubTrigger>
+              {translate('Page template')}
+            </UnifiedMenu.SubTrigger>
             <UnifiedMenu.SubContent>
               <UnifiedMenu.RadioGroup
                 value={viewMode.pageVariant ?? ''}
@@ -219,7 +229,7 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
                 }
               >
                 <UnifiedMenu.RadioItem value="">
-                  Site default
+                  {translate('Site default')}
                 </UnifiedMenu.RadioItem>
                 {Object.values(pageVariants ?? {})
                   // Disabled templates keep rendering where already selected,
@@ -245,7 +255,7 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
           setDeleteDialogOpen(true);
         }}
       >
-        Delete template
+        {translate('Delete template')}
       </UnifiedMenu.Item>
     </>
   );
@@ -256,7 +266,9 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
         <ContextMenu.Trigger>
           <SidebarNode
             key={viewMode.id}
-            title={`${viewMode.viewModeLabel} template`}
+            title={translate('{{viewModeLabel}} template', {
+              viewModeLabel: viewMode.viewModeLabel,
+            })}
             variant="template"
             dropdownMenuContent={
               <UnifiedMenu.Content menuType="dropdown">

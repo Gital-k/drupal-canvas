@@ -4,6 +4,7 @@ import { ResetIcon } from '@radix-ui/react-icons';
 import { Button } from '@radix-ui/themes';
 
 import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { translate } from '@/utils/translate';
 
 import styles from '@/components/topbar/Topbar.module.css';
 
@@ -63,7 +64,7 @@ const UndoRedo = () => {
         className={styles.topBarButton}
         onClick={() => dispatchUndo()}
         disabled={!isUndoable}
-        aria-label="Undo"
+        aria-label={translate('Undo')}
       >
         <ResetIcon height="16" width="auto" />
       </Button>
@@ -74,7 +75,7 @@ const UndoRedo = () => {
         className={styles.topBarButton}
         onClick={() => dispatchRedo()}
         disabled={!isRedoable}
-        aria-label="Redo"
+        aria-label={translate('Redo')}
       >
         <ResetIcon
           height="16"

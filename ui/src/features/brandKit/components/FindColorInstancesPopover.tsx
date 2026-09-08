@@ -26,6 +26,7 @@ import {
 } from '@/features/brandKit/colorUsage';
 import { useGetColorUsageDetailsQuery } from '@/services/brandKit';
 import { getCssColorValue } from '@/utils/brandKitColor';
+import { translate, translatePlural } from '@/utils/translate';
 
 import type { Measurable } from '@radix-ui/rect';
 import type {
@@ -264,13 +265,13 @@ const FindColorInstancesPopover = ({
               weight="bold"
               data-testid="find-color-instances-title"
             >
-              Color usage
+              {translate('Color usage')}
             </Text>
             <Popover.Close asChild>
               <IconButton
                 variant="ghost"
                 size="1"
-                aria-label="Close"
+                aria-label={translate('Close')}
                 data-testid="find-color-instances-close-button"
               >
                 <Cross2Icon />
@@ -298,7 +299,7 @@ const FindColorInstancesPopover = ({
 
               {/* Search by page */}
               <TextField.Root
-                placeholder="Search usages"
+                placeholder={translate('Search usages')}
                 size="1"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -311,7 +312,9 @@ const FindColorInstancesPopover = ({
               {/* Error state */}
               {hasError && (
                 <Text size="1" color="red">
-                  Unable to load usage information for this color.
+                  {translate(
+                    'Unable to load usage information for this color.',
+                  )}
                 </Text>
               )}
 
@@ -325,7 +328,7 @@ const FindColorInstancesPopover = ({
               {/* No usages message */}
               {!isLoading && hasNoUsages && (
                 <Text size="1" color="gray">
-                  This color is not currently in use.
+                  {translate('This color is not currently in use.')}
                 </Text>
               )}
 
@@ -334,10 +337,20 @@ const FindColorInstancesPopover = ({
                 <Box>
                   <Flex justify="between" align="center" mb="1">
                     <Text size="1" color="gray" mb="1">
-                      {totalPages} page{totalPages !== 1 ? 's' : ''} found
+                      {translatePlural(
+                        totalPages,
+                        '@count page found',
+                        '@count pages found',
+                        { '@count': totalPages },
+                      )}
                     </Text>
                     <Text align="right" size="1" color="gray" mb="1">
-                      {totalInstances} instance{totalInstances !== 1 ? 's' : ''}
+                      {translatePlural(
+                        totalInstances,
+                        '@count instance',
+                        '@count instances',
+                        { '@count': totalInstances },
+                      )}
                     </Text>
                   </Flex>
                   <Separator size="4" mb="2" />
@@ -362,7 +375,7 @@ const FindColorInstancesPopover = ({
                             rel="noopener noreferrer"
                             color="gray"
                             className={styles.componentLink}
-                            title="Open in editor"
+                            title={translate('Open in editor')}
                           >
                             <ArrowRightIcon />
                           </Link>
@@ -377,7 +390,7 @@ const FindColorInstancesPopover = ({
               {!isLoading && configUsages.length > 0 && (
                 <Box>
                   <Text size="1" color="gray" mb="1">
-                    Configuration
+                    {translate('Configuration')}
                   </Text>
                   <Separator size="4" mb="2" />
                   <Flex direction="column" gap="2">
@@ -407,7 +420,7 @@ const FindColorInstancesPopover = ({
                 size="1"
                 data-testid="find-color-instances-footer-close-button"
               >
-                Close
+                {translate('Close')}
               </Button>
             </Popover.Close>
           </Flex>

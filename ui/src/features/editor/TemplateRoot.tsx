@@ -12,6 +12,7 @@ import {
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useGetContentTemplatesQuery } from '@/services/componentAndLayout';
 import { getBaseUrl } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import styles from './TemplateRoot.module.css';
 
@@ -71,7 +72,10 @@ const TemplateRoot = () => {
   // Get entity type and bundle names for the button
   const getEntityInfo = () => {
     if (!templatesData || !entityType || !bundle) {
-      return { entityLabel: 'content', bundleLabel: 'item' };
+      return {
+        entityLabel: translate('content'),
+        bundleLabel: translate('item'),
+      };
     }
 
     const entityTemplates = templatesData[entityType];
@@ -98,11 +102,14 @@ const TemplateRoot = () => {
       <>
         <ExclamationTriangleIcon width="16" height="16" />
         <Text size="1" weight="bold">
-          Template for {bundleLabel} not found.
+          {translate('Template for @bundleLabel not found.', {
+            '@bundleLabel': bundleLabel,
+          })}
         </Text>
         <Text size="1">
-          To add a template, use the <strong>Add new template</strong> button in
-          Templates menu.
+          {translate('To add a template, use the')}{' '}
+          <strong>{translate('Add new template')}</strong>{' '}
+          {translate('button in Templates menu.')}
         </Text>
       </>
     );
@@ -113,14 +120,15 @@ const TemplateRoot = () => {
       <>
         <ExclamationTriangleIcon width="16" height="16" />
         <Text size="1" weight="bold">
-          No preview content is available
+          {translate('No preview content is available')}
         </Text>
         <Text size="1">
-          To build a template, you must have at least one{' '}
+          {translate('To build a template, you must have at least one')}{' '}
           <strong>{bundleLabel}</strong>.
         </Text>
         <Button onClick={handleCreateContent} size="1" variant="solid" mt="2">
-          <PlusIcon /> Add new {bundleLabel}
+          <PlusIcon />{' '}
+          {translate('Add new @bundleLabel', { '@bundleLabel': bundleLabel })}
         </Button>
       </>
     );

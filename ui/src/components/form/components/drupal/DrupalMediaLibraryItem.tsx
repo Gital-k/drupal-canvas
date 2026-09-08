@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { DragHandleDots2Icon } from '@radix-ui/react-icons';
 
 import { a2p } from '@/local_packages/utils';
+import { translate } from '@/utils/translate';
 
 import type { ReactNode } from 'react';
 
@@ -63,7 +64,7 @@ const DrupalMediaLibraryItem = ({
           ref={setNodeRef}
           className={styles.dragHandle}
           data-canvas-drag-handle
-          aria-label="Drag to reorder"
+          aria-label={translate('Drag to reorder')}
           {...sortableAttributes}
           {...listeners}
           tabIndex={0}

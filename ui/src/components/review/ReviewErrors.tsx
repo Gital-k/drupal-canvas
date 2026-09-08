@@ -17,6 +17,7 @@ import {
 
 import ChangeIcon from '@/components/review/changes/ChangeIcon';
 import { getGroupLabel } from '@/components/review/utils';
+import { translatePlural } from '@/utils/translate';
 
 import type { ErrorResponse } from '@/services/pendingChangesApi';
 
@@ -184,8 +185,11 @@ const ReviewErrors: React.FC<ReviewErrorsProps> = ({ errorState }) => {
               <Flex gap="2" mb="1" align="center">
                 <ExclamationTriangleIcon color="red" />
                 <Heading as="h3" size="1" mb="0">
-                  {errorState.errors.length} Error
-                  {errorState.errors.length > 1 ? 's' : ''}
+                  {translatePlural(
+                    errorState.errors.length,
+                    '1 Error',
+                    '@count Errors',
+                  )}
                 </Heading>
                 <ChevronDownIcon
                   className={clsx(style.chevron, !isOpen && style.closed)}

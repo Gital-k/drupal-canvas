@@ -19,6 +19,7 @@ import { setActivePanel } from '@/features/ui/primaryPanelSlice';
 import { useGetFoldersQuery } from '@/services/componentAndLayout';
 import { ALL_FOLDERS_ID } from '@/utils/colorConstants';
 import { getCanvasPermissions } from '@/utils/drupal-globals';
+import { translate } from '@/utils/translate';
 
 import type { BrandKitColor, BrandKitColorValue } from '@/types/CodeComponent';
 import type { FolderInList, FoldersInList } from '@/types/Component';
@@ -329,7 +330,7 @@ const CanvasColorPickerField = ({
         return { label: '', swatchColor: 'transparent' };
       }
       return {
-        label: 'Unknown Brand Color',
+        label: translate('Unknown Brand Color'),
         swatchColor: 'transparent',
       };
     }
@@ -361,7 +362,7 @@ const CanvasColorPickerField = ({
     }
 
     return {
-      label: 'Choose color',
+      label: translate('Choose color'),
       swatchColor: 'transparent',
     };
   }, [parsedValue, colorsById, colorsLoading]);
@@ -549,12 +550,14 @@ const CanvasColorPickerField = ({
           >
             {/* Main header */}
             <div className={styles.popoverHeader}>
-              <span className={styles.popoverHeaderTitle}>Color picker</span>
+              <span className={styles.popoverHeaderTitle}>
+                {translate('Color picker')}
+              </span>
               <Popover.Close asChild>
                 <button
                   type="button"
                   className={styles.popoverCloseButton}
-                  aria-label="Close"
+                  aria-label={translate('Close')}
                 >
                   <Cross2Icon />
                 </button>
@@ -576,7 +579,9 @@ const CanvasColorPickerField = ({
               <div className={styles.colorList}>
                 {/* Brand kit sub-header */}
                 <div className={styles.brandKitSubheader}>
-                  <span className={styles.brandKitLabel}>Brand kit</span>
+                  <span className={styles.brandKitLabel}>
+                    {translate('Brand kit')}
+                  </span>
                   {permissions?.brandKit && (
                     <button
                       type="button"
@@ -585,16 +590,18 @@ const CanvasColorPickerField = ({
                         dispatch(setActivePanel('brandKit'));
                       }}
                     >
-                      Edit
+                      {translate('Edit')}
                     </button>
                   )}
                 </div>
 
                 {colorsLoading || foldersLoading ? (
-                  <div className={styles.emptyState}>Loading...</div>
+                  <div className={styles.emptyState}>
+                    {translate('Loading...')}
+                  </div>
                 ) : colors?.length === 0 ? (
                   <div className={styles.emptyState}>
-                    No colors in Brand Kit
+                    {translate('No colors in Brand Kit')}
                   </div>
                 ) : (
                   <>
@@ -607,8 +614,8 @@ const CanvasColorPickerField = ({
                       <input
                         type="text"
                         autoComplete="off"
-                        placeholder="Search"
-                        aria-label="Search colors"
+                        placeholder={translate('Search')}
+                        aria-label={translate('Search colors')}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className={styles.searchInput}

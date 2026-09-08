@@ -8,6 +8,7 @@ import {
   FormElement,
   Label,
 } from '@/features/code-editor/component-data/FormElement';
+import { translate } from '@/utils/translate';
 
 import type {
   CodeComponentProp,
@@ -28,7 +29,7 @@ export const EXAMPLE_DOCUMENT_VALUES: Array<{
 }> = [
   {
     value: 'pdf',
-    label: 'Sample document (PDF)',
+    label: translate('Sample document (PDF)'),
     example: {
       src: CONFIG_EXAMPLE_URLS.pdf,
       filename: 'sample.pdf',
@@ -192,7 +193,9 @@ export default function FormPropTypeDocument({
     <Flex direction="column" gap="4" flexGrow="1">
       <Divider />
       <FormElement>
-        <Label htmlFor={`prop-example-${id}`}>Example document</Label>
+        <Label htmlFor={`prop-example-${id}`}>
+          {translate('Example document')}
+        </Label>
         <Select.Root
           value={selectedDocument}
           onValueChange={setSelectedDocument}
@@ -201,7 +204,9 @@ export default function FormPropTypeDocument({
           <Select.Trigger id={`prop-example-${id}`} />
           <Select.Content>
             {!required && (
-              <Select.Item value={NONE_VALUE}>- None -</Select.Item>
+              <Select.Item value={NONE_VALUE}>
+                {translate('- None -')}
+              </Select.Item>
             )}
             {EXAMPLE_DOCUMENT_VALUES.map((doc) => (
               <Select.Item key={doc.value} value={doc.value}>

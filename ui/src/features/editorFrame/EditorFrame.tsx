@@ -37,6 +37,7 @@ import useSyncParamsToState from '@/hooks/useSyncParamsToState';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { isMarkerComponentType } from '@/services/pageVariants';
 import { getHalfwayScrollPosition } from '@/utils/function-utils';
+import { translate } from '@/utils/translate';
 
 import { deleteNode, selectLayout } from '../layout/layoutModelSlice';
 import {
@@ -636,7 +637,9 @@ const EditorFrame: React.FC = () => {
               ref={scalingContainerRef}
             >
               <ErrorBoundary
-                title="An unexpected error has occurred while rendering preview."
+                title={translate(
+                  'An unexpected error has occurred while rendering preview.',
+                )}
                 variant="alert"
                 onReset={isUndoable ? dispatchUndo : undefined}
                 resetButtonText={isUndoable ? 'Undo last action' : undefined}
