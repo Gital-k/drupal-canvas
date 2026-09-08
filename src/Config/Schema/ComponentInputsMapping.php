@@ -78,7 +78,7 @@ final class ComponentInputsMapping extends Mapping {
   public static function forItem(ComponentTreeItem $item): self {
     // TRICKY: this cannot use constructor injection because Typed Config
     // objects are instantiated by the Typed Config manager.
-    $typed_config_manager = \Drupal::service('config.typed');
+    $typed_config_manager = \Drupal::service(TypedConfigManagerInterface::class);
     \assert($typed_config_manager instanceof TypedConfigManagerInterface);
 
     $values = $item->getValue();

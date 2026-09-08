@@ -11,6 +11,8 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Translation\ComponentTreeTranslator;
 use Drupal\canvas\Translation\TranslatableText;
 use Drupal\canvas\Translation\TranslatedText;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 
@@ -46,7 +48,7 @@ final class ComponentTreeTranslatorTest extends ContentComponentTreeSymmetricalT
    * Asserts no translation system is installed; the facade is decoupled from it.
    */
   private function assertNoTmgmt(): void {
-    $module_handler = $this->container->get('module_handler');
+    $module_handler = $this->container->get(ModuleHandlerInterface::class);
     self::assertFalse($module_handler->moduleExists('tmgmt'), 'tmgmt must not be installed.');
     self::assertFalse($module_handler->moduleExists('tmgmt_content'), 'tmgmt_content must not be installed.');
   }
@@ -55,7 +57,7 @@ final class ComponentTreeTranslatorTest extends ContentComponentTreeSymmetricalT
    * Gets the `components` field of a Page built from the given component tree.
    */
   private function componentTreeField(array $tree): ComponentTreeItemList {
-    $storage = $this->container->get('entity_type.manager')->getStorage(Page::ENTITY_TYPE_ID);
+    $storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Page::ENTITY_TYPE_ID);
     $entity = $this->createEntityWithDefaultTranslation(Page::ENTITY_TYPE_ID, Page::ENTITY_TYPE_ID, 'components', $storage, $tree);
     $field = $entity->get('components');
     \assert($field instanceof ComponentTreeItemList);
