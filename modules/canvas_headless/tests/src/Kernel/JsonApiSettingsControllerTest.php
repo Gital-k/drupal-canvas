@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas_headless\Kernel;
 
 use Drupal\canvas_headless\Controller\JsonApiSettingsController;
+use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
@@ -62,7 +63,7 @@ final class JsonApiSettingsControllerTest extends CanvasKernelTestBase {
    * The route must be reachable without authentication.
    */
   public function testRouteIsPublic(): void {
-    $route_provider = \Drupal::service('router.route_provider');
+    $route_provider = \Drupal::service(RouteProviderInterface::class);
     $route = $route_provider->getRouteByName('canvas_headless.jsonapi_settings');
     self::assertSame('/canvas/api/v0/headless/jsonapi-settings', $route->getPath());
     // Anonymous access must be allowed; the OAuth/UI gates of the site-data

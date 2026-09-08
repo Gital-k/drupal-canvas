@@ -279,11 +279,11 @@ export function createDraftServer(options: DraftServerOptions): DraftServer {
    * filled in from the JSON:API settings endpoint (fetched once per server
    * instance; the configured fallback applies when the fetch fails).
    */
-   const resolveApiPrefix = createApiPrefixResolver(getConfig(), fetchImpl);
-   const resolveClientConfig = async (): Promise<DraftConfig> => {
-     const apiPrefix = await resolveApiPrefix();
-     return { ...getConfig(), ...(apiPrefix && { apiPrefix }) };
-   };
+  const resolveApiPrefix = createApiPrefixResolver(getConfig(), fetchImpl);
+  const resolveClientConfig = async (): Promise<DraftConfig> => {
+    const apiPrefix = await resolveApiPrefix();
+    return { ...getConfig(), ...(apiPrefix && { apiPrefix }) };
+  };
 
   return {
     getConfig,
