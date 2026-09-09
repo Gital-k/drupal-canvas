@@ -273,7 +273,7 @@ const ComponentInstanceFormRenderer: React.FC<
           <>
             {selectedComponentName && (
               <Box mb="-2" mt="3">
-                <Text weight="bold" data-testId="selected-component-name">
+                <Text weight="bold" data-testid="selected-component-name">
                   {selectedComponentName}
                 </Text>
               </Box>
