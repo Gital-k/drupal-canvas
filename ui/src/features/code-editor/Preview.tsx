@@ -50,6 +50,25 @@ const Drupal = getDrupal();
 // @see \Drupal\canvas\Controller\CodeEditorPreviewController::shell()
 const PREVIEW_SHELL_URL = Drupal.url('canvas/code-editor-preview');
 
+// The shell can't load this via its own `<script src>` fetch: a sandboxed,
+// opaque-origin document has no classifiable network address space, and
+// Chrome blocks any subresource fetch from such a document to a private
+// network target (e.g. the same site's own `localhost` or internal IP)
+// outright, before the request is even sent. Fetching it here instead, from
+// the parent's real (non-opaque) origin, and relaying the source into the
+// iframe over `postMessage()` (@see the `_canvas_preview_bootstrap_ready`
+// listener below) avoids that fetch entirely. Cached at module scope: the
+// content never changes within a session, and every code component's
+// preview iframe needs it.
+// @see ui/lib/code-editor-preview.js
+let previewScriptSourcePromise: Promise<string> | null = null;
+function getPreviewScriptSource(): Promise<string> {
+  previewScriptSourcePromise ??= fetch(
+    Drupal.url('canvas/code-editor-preview/script.js'),
+  ).then((response) => response.text());
+  return previewScriptSourcePromise;
+}
+
 const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const dispatch = useAppDispatch();
   const componentId = useAppSelector(
@@ -239,6 +258,31 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     readyContentWindowRef.current.postMessage(buildPreviewPayload(), '*');
   }, [compiledJs, buildPreviewPayload]);
 
+  // Listens for the shell's inline bootstrap announcing that its own message
+  // listener is registered, and replies with the actual preview script's
+  // source so the bootstrap can `Blob()`/dynamically `import()` it — @see
+  // `getPreviewScriptSource()` above for why this can't just be a
+  // `<script src>` fetch from inside the opaque-origin shell itself.
+  useEffect(() => {
+    const handleBootstrapReady = (event: MessageEvent) => {
+      if (
+        event.source !== iframeRef.current?.contentWindow ||
+        event.data?.type !== '_canvas_preview_bootstrap_ready'
+      ) {
+        return;
+      }
+      const target = event.source as Window;
+      void getPreviewScriptSource().then((source) => {
+        target.postMessage(
+          { type: '_canvas_preview_script_source', source },
+          '*',
+        );
+      });
+    };
+    window.addEventListener('message', handleBootstrapReady);
+    return () => window.removeEventListener('message', handleBootstrapReady);
+  }, []);
+
   // Listens for the preview shell announcing itself ready (@see
   // `readyContentWindowRef` above for why this, rather than the iframe's
   // `onload` event, is what gates sending the payload). Sends immediately
@@ -375,17 +419,7 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
           width="100%"
           src={PREVIEW_SHELL_URL}
           data-canvas-iframe="canvas-code-editor-preview"
-          // TEMP DEBUG: added "allow-same-origin" to isolate whether the
-          // script.js load failure is specific to the opaque origin.
-          // MUST be reverted to "allow-scripts" once diagnosed — this defeats
-          // the whole point of #3527515's own security fix.
-          sandbox="allow-scripts allow-same-origin"
-          onLoad={() =>
-            console.log('[TEMP DEBUG parent] iframe onLoad', performance.now())
-          }
-          onError={() =>
-            console.log('[TEMP DEBUG parent] iframe onError', performance.now())
-          }
+          sandbox="allow-scripts"
         />
       )}
       {/* A sibling overlay, not a wrapper: Radix's <Spinner loading> swaps its

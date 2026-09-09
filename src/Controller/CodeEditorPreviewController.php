@@ -30,61 +30,32 @@ final class CodeEditorPreviewController {
 <!doctype html>
 <html>
 <head>
-<script>
-console.log('[TEMP DEBUG shell] inline head script running', performance.now());
-window.addEventListener('pagehide', function (e) {
-  console.log('[TEMP DEBUG shell] pagehide', performance.now(), 'persisted=' + e.persisted);
-});
-window.addEventListener('beforeunload', function () {
-  console.log('[TEMP DEBUG shell] beforeunload', performance.now());
-});
-document.addEventListener('visibilitychange', function () {
-  console.log('[TEMP DEBUG shell] visibilitychange', document.visibilityState, performance.now());
-});
-window.addEventListener('error', function (e) {
-  console.log('[TEMP DEBUG shell] window error event', performance.now(), e.message, e.filename);
-}, true);
-</script>
 {{ import_map }}
-<script type="module" src="{{ script_url }}" data-canvas-debug-module-script></script>
-<script>
-(function () {
-  var scriptUrl = '{{ script_url }}';
-  var moduleScript = document.currentScript.previousElementSibling;
-  console.log('[TEMP DEBUG shell] module script element found:', !!moduleScript, moduleScript && moduleScript.src, performance.now());
-  if (moduleScript) {
-    moduleScript.addEventListener('load', function () {
-      console.log('[TEMP DEBUG shell] module script LOAD event', performance.now());
-    });
-    moduleScript.addEventListener('error', function (e) {
-      console.log('[TEMP DEBUG shell] module script ERROR event', performance.now(), e);
-    });
+<script type="module">
+// This document's own opaque origin has no classifiable network address
+// space, so Chrome blocks any subresource fetch it makes to a private
+// network target (this site's own host) outright, before the request is
+// even sent — `code-editor-preview.js` can't load itself via `<script
+// src>`. The parent fetches it instead, from its real origin, and relays
+// the source here over `postMessage()`; this bootstrap turns that source
+// into a same-realm `Blob` and dynamically imports it, which isn't a
+// network fetch at all.
+// @see ui/src/features/code-editor/Preview.tsx
+window.addEventListener('message', function (event) {
+  if (event.source !== window.parent || event.data?.type !== '_canvas_preview_script_source') {
+    return;
   }
-  // A plain <script src> error event carries no detail at all. A manual
-  // fetch() of the exact same URL surfaces a real TypeError message/name
-  // (e.g. a CORS rejection vs. a genuine network failure read very
-  // differently), so run one in parallel purely for diagnostics.
-  fetch(scriptUrl, { mode: 'cors' }).then(
-    function (r) {
-      console.log('[TEMP DEBUG shell] manual fetch of script_url SUCCEEDED', performance.now(), r.status, r.type, r.ok);
-    },
-    function (e) {
-      console.log('[TEMP DEBUG shell] manual fetch of script_url FAILED', performance.now(), e.name, e.message);
-    },
-  );
-  setTimeout(function () {
-    var entries = performance.getEntriesByType('resource').filter(function (e) {
-      return e.name === scriptUrl;
-    });
-    console.log('[TEMP DEBUG shell] resource timing entries for script_url', performance.now(), JSON.stringify(entries));
-  }, 2000);
-})();
+  const url = URL.createObjectURL(new Blob([event.data.source], { type: 'text/javascript' }));
+  import(url).finally(function () {
+    URL.revokeObjectURL(url);
+  });
+});
+window.parent.postMessage({ type: '_canvas_preview_bootstrap_ready' }, '*');
 </script>
 </head>
 <body>
 <div id="canvas-code-editor-preview-root"></div>
 <script>
-console.log('[TEMP DEBUG shell] body script running (DOM parsed to body)', performance.now());
 document.addEventListener('click', function (e) {
   const anchor = e.target.closest('a');
   if (anchor) {
@@ -119,7 +90,6 @@ HTML;
       '#template' => self::HTML,
       '#context' => [
         'import_map' => $this->renderer->renderInIsolation($import_map_tag),
-        'script_url' => Url::fromRoute('canvas.code_editor_preview.script')->toString(),
       ],
     ];
     $response = new Response((string) $this->renderer->renderInIsolation($build));
@@ -132,12 +102,12 @@ HTML;
   }
 
   /**
-   * Serves `ui/dist/assets/code-editor-preview.js` with a CORS header.
+   * Serves `ui/dist/assets/code-editor-preview.js`.
    *
-   * The shell above loads this via `<script type="module" src="...">`.
-   * Module scripts are always CORS-mode fetches, and the shell's opaque
-   * origin sends `Origin: null`, so the response needs
-   * `Access-Control-Allow-Origin: *` or the fetch is blocked.
+   * Fetched by the parent window itself, not by the sandboxed shell — the
+   * shell's opaque origin can't fetch this itself.
+   *
+   * @see ui/src/features/code-editor/Preview.tsx
    */
   public function script(): BinaryFileResponse {
     $file_path = \sprintf(
@@ -193,8 +163,15 @@ HTML;
    *
    * The import map built by `buildImportMap()` points every
    * `packages/astro-hydration/dist/` entry (`preact`, `react`, `clsx`, etc.)
-   * here instead of at its plain static file URL, for the same reason as
-   * `script()` above.
+   * here instead of at its plain static file URL, so a CORS header can be
+   * added (that directory is served directly by the web server, which adds
+   * none).
+   *
+   * @todo This is still fetched by the sandboxed shell itself (unlike
+   * `script()`, which the parent now fetches instead — @see its doc
+   * comment for why). If it turns out to hit the same opaque-origin
+   * network block, it needs the same treatment: relay each of these
+   * through the parent instead.
    */
   public function asset(string $filename): BinaryFileResponse {
     if (\preg_match('/^[A-Za-z0-9_.-]+\.m?js$/', $filename) !== 1) {
