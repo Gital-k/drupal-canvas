@@ -637,14 +637,14 @@ final class Doctor {
    * @return Finding
    */
   private static function buildEscapedConfigFinding(string $config_name, array $pending_methods): array {
-    $violations = \array_map(
+    $violations = \array_values(\array_map(
       static fn (string $method): array => [
         'message' => \sprintf('pending: %s', $method),
         'property_path' => '',
         'code' => $method,
       ],
       $pending_methods,
-    );
+    ));
     return ['label' => $config_name, 'violations' => $violations];
   }
 

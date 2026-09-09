@@ -194,7 +194,9 @@ final class CanvasDoctorTest extends CanvasKernelTestBase {
     self::assertSame($after_no_cache['total'], $after_no_cache['cached']);
 
     // Saving one component bumps only its own cache tag: every other config entity stays reused.
-    $component_storage->load($component_id)->save();
+    $component = $component_storage->load($component_id);
+    \assert($component instanceof Component);
+    $component->save();
     $after_save = $validator->runSystemCheck(HealthCheck::UpdatesEscapedConfig);
     self::assertSame($after_save['total'] - 1, $after_save['cached']);
   }
