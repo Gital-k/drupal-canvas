@@ -68,7 +68,7 @@ final class CanvasCommandsTest extends CanvasKernelTestBase {
     }
 
     // Find the Druplicon SDC component (provided by the test module).
-    $druplicon_rows = \array_filter($rows, static fn(array $row): bool => $row['id'] === 'sdc.canvas_test_sdc.druplicon');
+    $druplicon_rows = \array_filter($rows, static fn(array|\ArrayAccess $row): bool => $row['id'] === 'sdc.canvas_test_sdc.druplicon');
     self::assertCount(1, $druplicon_rows, 'Druplicon component should appear exactly once.');
     $druplicon = \reset($druplicon_rows);
     self::assertSame('Druplicon', $druplicon['label']);
