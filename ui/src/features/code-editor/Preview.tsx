@@ -375,7 +375,11 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
           width="100%"
           src={PREVIEW_SHELL_URL}
           data-canvas-iframe="canvas-code-editor-preview"
-          sandbox="allow-scripts"
+          // TEMP DEBUG: added "allow-same-origin" to isolate whether the
+          // script.js load failure is specific to the opaque origin.
+          // MUST be reverted to "allow-scripts" once diagnosed — this defeats
+          // the whole point of #3527515's own security fix.
+          sandbox="allow-scripts allow-same-origin"
           onLoad={() =>
             console.log('[TEMP DEBUG parent] iframe onLoad', performance.now())
           }
