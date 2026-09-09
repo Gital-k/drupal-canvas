@@ -8,6 +8,7 @@ use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Url;
+use Drupal\dynamic_page_cache\EventSubscriber\DynamicPageCacheSubscriber;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use GuzzleHttp\RequestOptions;
 use Psr\Http\Message\ResponseInterface;
@@ -95,13 +96,44 @@ trait AutoSaveConflictTestTrait {
   }
 
   /**
-   * Reads the auto-save state.
+   * Whether ::getAutoSaveUrl() responses carry cacheability metadata.
+   *
+   * Only responses that do can ever be served by the Dynamic Page Cache.
    */
-  protected function requestAutoSaveGet(): array {
+  protected function isAutoSaveUrlDynamicPageCacheable(): bool {
+    return TRUE;
+  }
+
+  /**
+   * Reads the auto-save state, asserting the expected Dynamic Page Cache state.
+   *
+   * @param bool $expectCacheHit
+   *   Whether this request is expected to be served by the Dynamic Page Cache.
+   */
+  protected function requestAutoSaveGet(bool $expectCacheHit = FALSE): array {
     $response = $this->makeApiRequest('GET', $this->getAutoSaveUrl(), $this->getRequestOptions());
     $body = (string) $response->getBody();
     self::assertSame(Response::HTTP_OK, $response->getStatusCode(), $body);
+    self::assertSame(
+      $this->isAutoSaveUrlDynamicPageCacheable() ? ($expectCacheHit ? 'HIT' : 'MISS') : 'UNCACHEABLE (no cacheability)',
+      $response->getHeader(DynamicPageCacheSubscriber::HEADER)[0] ?? NULL,
+      'Dynamic Page Cache response header'
+    );
     return self::decodeResponse($response);
+  }
+
+  /**
+   * Asserts that repeating the GET is served by the Dynamic Page Cache.
+   *
+   * For endpoints that are not cacheable, this only asserts that they keep
+   * reporting themselves as uncacheable.
+   */
+  protected function assertRepeatedAutoSaveGetIsCached(array $expectedJson): void {
+    if (!$this->isAutoSaveUrlDynamicPageCacheable()) {
+      $this->requestAutoSaveGet();
+      return;
+    }
+    $this->assertSame($expectedJson, $this->requestAutoSaveGet(TRUE));
   }
 
   /**
@@ -144,6 +176,10 @@ trait AutoSaveConflictTestTrait {
     // last request of the client could have been made a long time ago.
     $this->assertNull($getJson['autoSaves'][$autoSaveKey]['hash']);
     $this->assertNotEmpty($getJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint']);
+
+    // Repeating the request must be served by the Dynamic Page Cache, and must
+    // convey the same auto-save state.
+    $this->assertRepeatedAutoSaveGetIsCached($getJson);
 
     $originalGetJson = $getJson;
     $this->modifyJsonToSendAsAutoSave($getJson, 'Updated text');
@@ -201,7 +237,8 @@ trait AutoSaveConflictTestTrait {
     $this->publishAllAutoSaves();
 
     // After publishing the auto-save hash should be empty and the
-    // `autoSaveStartingPoint` should be different.
+    // `autoSaveStartingPoint` should be different. Publishing saves the entity,
+    // so the previously cached response must have been invalidated.
     $postPublishGetJson = $this->requestAutoSaveGet();
     $this->assertNull($postPublishGetJson['autoSaves'][$autoSaveKey]['hash']);
     $this->assertNotEmpty($postPublishGetJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint']);
@@ -250,14 +287,19 @@ trait AutoSaveConflictTestTrait {
 
     // Ensure that the `autoSaveStartingPoint` is updated *immediately* after
     // every entity save, not just after auto-saves.
-    // @todo Assert an `X-Drupal-Dynamic-Cache: HIT` here, now possible thanks to this being a functional test, in https://drupal.org/i/3535315
     $preEntitySaveJson = $this->requestAutoSaveGet();
     $this->assertNotNull($preEntitySaveJson['autoSaves'][$autoSaveKey]['hash']);
     $this->assertNotEmpty($preEntitySaveJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint']);
+    // Nothing changed in between, so this is served by the Dynamic Page Cache.
+    $this->assertRepeatedAutoSaveGetIsCached($preEntitySaveJson);
 
     $this->entity->save();
 
-    // @todo Assert an `X-Drupal-Dynamic-Cache: MISS` here, now possible thanks to this being a functional test, in https://drupal.org/i/3535315
+    // Saving the entity must invalidate the cached response: the
+    // `autoSaveStartingPoint` is derived from the *saved* entity, so a stale
+    // cache hit here would let the client keep auto-saving against a revision
+    // that no longer exists.
+    // @see \Drupal\canvas\Controller\AutoSaveValidateTrait::getClientAutoSaveData()
     $postEntitySaveJson = $this->requestAutoSaveGet();
     $this->entity instanceof CanvasHttpApiEligibleConfigEntityInterface ?
         // For CanvasHttpApiEligibleConfigEntityInterface entities the auto-save
@@ -269,6 +311,15 @@ trait AutoSaveConflictTestTrait {
 
     // The `autoSaveStartingPoint` should have changed.
     self::assertNotEquals($preEntitySaveJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint'], $postEntitySaveJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint']);
+
+    // Finally, prove that the freshly computed `autoSaveStartingPoint` is
+    // actually enforced: an auto-save targeting the pre-save starting point is
+    // now outdated. Were the response above served from a stale cache, the
+    // client would have been handed a starting point that still passed
+    // validation.
+    $preEntitySaveJson['clientInstanceId'] = $originalClientId;
+    $this->modifyJsonToSendAsAutoSave($preEntitySaveJson, 'Updated text-finalV5');
+    $this->assertAutoSaveConflict($preEntitySaveJson);
   }
 
 }

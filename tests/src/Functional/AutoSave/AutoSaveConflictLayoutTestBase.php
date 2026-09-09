@@ -35,6 +35,18 @@ abstract class AutoSaveConflictLayoutTestBase extends HttpApiTestBase {
   protected ?ContentEntityInterface $previewEntity = NULL;
 
   /**
+   * {@inheritdoc}
+   *
+   * The layout HTTP API returns responses without cacheability metadata, so the
+   * Dynamic Page Cache can never serve them. Unlike the config auto-save
+   * endpoint, this endpoint therefore recomputes the `autoSaveStartingPoint`
+   * from the saved entity on every request.
+   */
+  protected function isAutoSaveUrlDynamicPageCacheable(): bool {
+    return FALSE;
+  }
+
+  /**
    * Omit information received in the GET response that cannot be POSTed.
    */
   protected function filterLayoutForPost(array $json): array {
