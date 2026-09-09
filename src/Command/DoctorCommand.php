@@ -114,7 +114,7 @@ final class DoctorCommand extends Command {
         continue;
       }
       $start_ns = \hrtime(TRUE);
-      $result = $this->validator->runSystemCheck($check);
+      $result = $this->validator->runSystemCheck($check, $cache);
       $system_results[$check->value] = [
         'result' => $result,
         'duration_ms' => (\hrtime(TRUE) - $start_ns) / 1_000_000,
@@ -287,7 +287,7 @@ final class DoctorCommand extends Command {
       $checks[$check_value] = $entry(
         HealthCheck::from($check_value),
         $result['status'],
-        $result['total'], $result['healthy'], 0, \round($system_result['duration_ms'] / 1000, 3),
+        $result['total'], $result['healthy'], $result['cached'], \round($system_result['duration_ms'] / 1000, 3),
         $result['details'],
       );
     }
@@ -344,8 +344,9 @@ final class DoctorCommand extends Command {
     $data_rows = [];
 
     // Builds one row of the summary table for a single check. `cached` is
-    // always 0 for system checks, which have no cacheable items. `kind`
-    // picks the status icon: 'health' shows ✅/❌, 'risk' shows ✅/⚠️.
+    // always 0 for a system check with no per-item cache (only
+    // update_path_escaped_config has one). `kind` picks the status icon:
+    // 'health' shows ✅/❌, 'risk' shows ✅/⚠️.
     $format_row = static function (string $check, int $total, int $healthy, int $cached, int $count, float $duration_ms, string $kind = 'health'): array {
       if ($count === 0) {
         $status = '<info>✅ healthy</info>';
@@ -385,7 +386,7 @@ final class DoctorCommand extends Command {
     foreach ($system_results as $check_value => $system_result) {
       $result = $system_result['result'];
       $kind = $result['status'] === 'risk' ? 'risk' : 'health';
-      $system_rows[] = $format_row($check_value, $result['total'], $result['healthy'], 0, \count($result['problems']), $system_result['duration_ms'], $kind);
+      $system_rows[] = $format_row($check_value, $result['total'], $result['healthy'], $result['cached'], \count($result['problems']), $system_result['duration_ms'], $kind);
       if ($result['problems'] === []) {
         continue;
       }
@@ -448,10 +449,13 @@ final class DoctorCommand extends Command {
 
     // Explain a Cached column full of zeros, so it doesn't look like a bug:
     // it means at least one dev-checkout extension made cached results
-    // untrustworthy, not that caching is broken.
-    if ($reuse_disabled_extensions !== [] && $check_stats !== []) {
+    // untrustworthy, not that caching is broken. Covers both data checks and
+    // update_path_escaped_config, the only system check with a per-item
+    // cache.
+    $escaped_config_ran = isset($system_results[HealthCheck::UpdatesEscapedConfig->value]);
+    if ($reuse_disabled_extensions !== [] && ($check_stats !== [] || $escaped_config_ran)) {
       self::infoNote($io, \sprintf(
-        "Result reuse is disabled, so every data item is revalidated on each run (Cached = 0). "
+        "Result reuse is disabled, so every data item (and update_path_escaped_config's config entities, if run) is revalidated on each run (Cached = 0). "
         . "%d installed extension(s) are development checkouts with no release version (%s); "
         . "their code can change without changing the environment fingerprint, so cached results cannot be trusted. "
         . "Reuse activates automatically once every installed extension is at a tagged release.",

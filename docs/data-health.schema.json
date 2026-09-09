@@ -55,7 +55,7 @@
         "status": { "type": "string", "enum": ["healthy", "problem", "risk"], "description": "\"problem\" makes the overall run unhealthy; \"risk\" is advisory only." },
         "total": { "type": "integer", "minimum": 0, "description": "Items considered by this check." },
         "healthy": { "type": "integer", "minimum": 0, "description": "Items with no problem. Risks do not reduce this." },
-        "cached": { "type": "integer", "minimum": 0, "description": "Items reused from a prior run instead of revalidated. Always 0 for system checks." },
+        "cached": { "type": "integer", "minimum": 0, "description": "Items reused from a prior run instead of revalidated. Always 0 for a system check with no per-item cache; `update_path_escaped_config` is the only system check that caches (independently of `config`, though keyed by the same per-entity freshness signature)." },
         "duration_s": { "type": "number", "minimum": 0, "description": "Wall-clock time for this check, in seconds." },
         "details": { "type": "object", "description": "Per-check payload, unconstrained here; frozen only for checks with their own precise entries." }
       }
@@ -137,7 +137,7 @@
       ]
     },
     "updatesEscapedConfigEntry": {
-      "description": "update_path_escaped_config: config entities with a detectable pending migration.",
+      "description": "update_path_escaped_config: config entities with a detectable pending migration. The only system check with a per-item cache: `cached` reuses a prior result for an entity unchanged since then.",
       "allOf": [
         { "$ref": "#/$defs/checkEntry" },
         {
