@@ -356,31 +356,40 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     .map(([key]) => key);
 
   return (
-    <Spinner loading={isLoading}>
-      <div className={styles.iframeContainer} ref={parentRef}>
-        {activeErrors.length > 0 && (
-          <ScrollArea>
-            <div className={styles.errorContainer}>
-              {activeErrors.map(
-                (key) => errorComponents[key as keyof typeof errorComponents],
-              )}
-            </div>
-          </ScrollArea>
-        )}
-        {activeErrors.length === 0 && (
-          <iframe
-            className={styles.iframe}
-            title="Canvas Code Editor Preview"
-            ref={iframeRef}
-            height="100%"
-            width="100%"
-            src={PREVIEW_SHELL_URL}
-            data-canvas-iframe="canvas-code-editor-preview"
-            sandbox="allow-scripts"
-          />
-        )}
-      </div>
-    </Spinner>
+    <div className={styles.iframeContainer} ref={parentRef}>
+      {activeErrors.length > 0 && (
+        <ScrollArea>
+          <div className={styles.errorContainer}>
+            {activeErrors.map(
+              (key) => errorComponents[key as keyof typeof errorComponents],
+            )}
+          </div>
+        </ScrollArea>
+      )}
+      {activeErrors.length === 0 && (
+        <iframe
+          className={styles.iframe}
+          title="Canvas Code Editor Preview"
+          ref={iframeRef}
+          height="100%"
+          width="100%"
+          src={PREVIEW_SHELL_URL}
+          data-canvas-iframe="canvas-code-editor-preview"
+          sandbox="allow-scripts"
+        />
+      )}
+      {/* A sibling overlay, not a wrapper: Radix's <Spinner loading> swaps its
+          children into a differently-shaped element tree while loading,
+          which would otherwise force React to unmount and remount the
+          iframe above on every `isLoading` change, silently dropping an
+          in-flight preview render. Kept last in the child list so its own
+          appearance/disappearance never shifts the iframe's position. */}
+      {isLoading && (
+        <div className={styles.loadingOverlay}>
+          <Spinner loading />
+        </div>
+      )}
+    </div>
   );
 };
 
