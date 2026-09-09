@@ -594,18 +594,36 @@
 
   const ajaxCanProceed = () => !drupalSettings?.canvas?.canvasLayoutRequestInProgress || drupalSettings.canvas.canvasLayoutRequestInProgress.length === 0;
   const originalEventResponse = Drupal.Ajax.prototype.eventResponse;
-  Drupal.Ajax.prototype.eventResponse = function(...args) {
+  Drupal.Ajax.prototype.eventResponse = function (element, event) {
+    const runEventResponse = () => originalEventResponse.call(this, element, event);
     if (ajaxCanProceed()) {
-      originalEventResponse.apply(this, args)
+      // Drupal core's eventResponse() calls event.preventDefault() and
+      // event.stopPropagation() as its very first lines. For a
+      // 'change'-triggered #ajax element (e.g. a dependent select whose
+      // value also needs to reach Canvas's own React-managed form state),
+      // calling these synchronously - within the same dispatch as the
+      // original native event - stops that event from ever bubbling up to
+      // React's root-level delegated listener, so React's controlled state
+      // for the field never updates even though the field's own DOM value
+      // is correct. Both calls are no-ops once an event's synchronous
+      // dispatch has already completed, so deferring by a tick lets the
+      // native event finish its normal bubble phase (letting React see it
+      // too) before Drupal's ajax handling runs, without changing Drupal's
+      // own ajax submission behavior. This is intentionally scoped to
+      // 'change' only: other event types (e.g. 'click' on an Add
+      // more/Remove button) rely on synchronous preventDefault() to stop a
+      // real navigation/form submission, so those still run synchronously.
+      if (event.type === 'change') {
+        setTimeout(runEventResponse, 0);
+        return;
+      }
+      runEventResponse();
       return;
     }
     // Listen for the canvasLayoutRequestComplete event.
-    const canvasLayoutRequestCompleteListener = () => {
-      originalEventResponse.apply(this, args)
-    };
     document.addEventListener(
       'canvasLayoutRequestComplete',
-      canvasLayoutRequestCompleteListener,
+      runEventResponse,
       { once: true }
     );
   }
@@ -721,21 +739,17 @@
     // response.method takes precedence over ajax.method.
     const method = command.method || ajax.method;
 
-    // For addMoreAjax replaceWith on a multivalue element, place the new
-    // content into the real DOM immediately (so Drupal AJAX behaviors have
-    // correct form ancestry for serialization), but keep it visually hidden
-    // until React has had time to hydrate, avoiding pre-hydration flicker.
-    if (
-      method === 'replaceWith' &&
-      ['addMoreAjax', 'deleteAjax'].includes(callback?.[1]) &&
-      !!element.closest('[data-canvas-multiple-values]')
-    ) {
-      // Mirror the original: resolve wrapper and settings.
+    // Mirror the original insert command, but place the new content into the
+    // real DOM immediately (so Drupal AJAX behaviors have correct form
+    // ancestry for serialization), keeping it visually hidden until React has
+    // had time to hydrate the `<drupal-canvas-*>` custom elements it
+    // contains, avoiding both pre-hydration flicker and a broken React
+    // reconciliation.
+    const insertWithHydration = () => {
       const $wrapper = command.selector ? $(command.selector) : $(ajax.wrapper);
       const settings = command.settings || ajax.settings || drupalSettings;
       const effect = ajax.getEffect(command);
 
-      // Mirror the original: parse response.data and apply the ajaxWrapperNewContent theme.
       const parseHTML = (htmlString) => {
         const fragment = document.createDocumentFragment();
         const template = fragment.appendChild(document.createElement('template'));
@@ -745,11 +759,39 @@
       let $newContent = $(parseHTML(command.data));
       $newContent = Drupal.theme('ajaxWrapperNewContent', $newContent, ajax, command);
 
-      // Mirror the original: detach behaviors from the element being replaced.
-      // Note: detachBehaviors is deferred to reveal() inside replaceWithAfterHydration
-      // so the old element stays live in the DOM during hydration.
+      // Note: detachBehaviors is deferred to reveal() inside
+      // replaceWithAfterHydration so the old element stays live in the DOM
+      // during hydration.
       replaceWithAfterHydration($wrapper, $newContent, settings, effect);
+    };
 
+    // For addMoreAjax replaceWith on a multivalue element, use hydration-aware
+    // insertion.
+    if (
+      method === 'replaceWith' &&
+      ['addMoreAjax', 'deleteAjax'].includes(callback?.[1]) &&
+      !!element.closest('[data-canvas-multiple-values]')
+    ) {
+      insertWithHydration();
+      return;
+    }
+
+    // Any other `replaceWith` insert whose response markup contains
+    // unhydrated Canvas custom elements (e.g. a plain `#ajax` callback
+    // elsewhere in a component's settings form, such as a dependent select
+    // populated based on another field's value) also needs hydration-aware
+    // insertion. Without this, the response falls through to Drupal core's
+    // default jQuery-based insert, which drops the raw, unhydrated custom
+    // elements directly into a React/hyperscriptify-managed subtree. React's
+    // reconciliation then encounters DOM it does not recognize and silently
+    // fails to render the surrounding component (e.g. the whole settings
+    // form appears empty).
+    if (
+      method === 'replaceWith' &&
+      typeof command.data === 'string' &&
+      /<drupal-canvas-/.test(command.data)
+    ) {
+      insertWithHydration();
       return;
     }
 
