@@ -11,6 +11,7 @@ use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -632,8 +633,10 @@ HTML,
       // @see \Drupal\canvas_test_block_form\Plugin\Block\CanvasTestBlockForm::blockSubmit
       'multiplier' => 3,
     ], $input);
-    // @todo This is wrong (it does not conform to `type: block.settings.canvas_test_block_form`) and will be fixed in https://www.drupal.org/project/canvas/issues/3541125
-    self::assertFalse(\is_int($input['canvas_page']));
+    // `canvas_page` now conforms to `type: block.settings.canvas_test_block_form`,
+    // which declares it `type: integer`, even though the form submitted the
+    // entity ID as a string.
+    self::assertIsInt($input['canvas_page']);
 
     // Confirm that validation errors from submitting the block plugin are
     // stored in the auto-save manager for a subsequent validation step.
@@ -687,6 +690,123 @@ HTML,
       "components.0.inputs.canvas_page:This value should be of the correct primitive type.",
       'components.0.inputs.canvas_page:There are no pages matching "There is no such place".',
     ], $violationMap);
+  }
+
+  /**
+   * Block settings must be stored with the types their config schema declares.
+   *
+   * HTML form values are strings and the Form API does not cast them. A Block
+   * config entity nonetheless ends up with integers and booleans in its
+   * `settings`, because \Drupal\Core\Config\Config::save() casts using config
+   * schema. Canvas stores block settings in a component instance's `inputs`
+   * instead, so it must perform that same cast itself.
+   *
+   * @legacy-covers ::clientModelToInput
+   * @see \Drupal\Core\Config\StorableConfigBase::castValue()
+   */
+  public function testClientModelToInputCastsToConfigSchemaTypes(): void {
+    $this->generateComponentConfig();
+    $component = Component::load('block.system_menu_block.admin');
+    \assert($component instanceof ComponentInterface);
+    $source = $component->getComponentSource();
+    \assert($source instanceof BlockComponent);
+    $uuid = 'b0e0f3f2-2b30-4c1e-9a52-6f6c3b0a3f5e';
+
+    // Precisely what the client sends after the Content Creator filled in the
+    // block configuration form: every value is a string, because HTML form
+    // values are strings.
+    // @phpstan-ignore-next-line
+    $input = $source->clientModelToInput($uuid, $component, [
+      'resolved' => [
+        'label' => 'Administration menu',
+        'label_display' => '0',
+        'level' => '2',
+        'depth' => '3',
+        'expand_all_items' => '1',
+        'add_active_trail_class' => '1',
+      ],
+    ], NULL);
+    self::assertSame([
+      'label' => 'Administration menu',
+      // This confusingly isn't a boolean, because that is what its config
+      // schema dictates.
+      // @see `type: block_settings`
+      // @todo Remove after https://drupal.org/i/2544708 is fixed.
+      'label_display' => '0',
+      // 💡 `type: integer`, `type: integer` and `type: boolean` respectively.
+      // @see `type: block.settings.system_menu_block:*`
+      'level' => 2,
+      'depth' => 3,
+      'expand_all_items' => TRUE,
+    ], $input);
+
+    // A `nullable: true` integer must stay NULL rather than become 0, and an
+    // unchecked checkbox must become FALSE rather than stay the string '0'.
+    // @see \Drupal\system\Plugin\Block\SystemMenuBlock::blockSubmit()
+    // @phpstan-ignore-next-line
+    $input = $source->clientModelToInput($uuid, $component, [
+      'resolved' => [
+        'label' => 'Administration menu',
+        'label_display' => '0',
+        'level' => '1',
+        'depth' => '0',
+        'expand_all_items' => '0',
+        'add_active_trail_class' => '1',
+      ],
+    ], NULL);
+    self::assertSame([
+      'label' => 'Administration menu',
+      'label_display' => '0',
+      'level' => 1,
+      'depth' => NULL,
+      'expand_all_items' => FALSE,
+    ], $input);
+
+    // Content entities are the store that never got this cast for free: their
+    // `inputs` are a JSON string in a field column, so they never pass through
+    // Config::save(). This is what the issue reports.
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $page = Page::create(['title' => 'Cast to config schema types']);
+    $page->set('components', [
+      [
+        'uuid' => $uuid,
+        'component_id' => $component->id(),
+        'component_version' => $component->getActiveVersion(),
+        'inputs' => $input,
+      ],
+    ]);
+    self::assertEntityIsValid($page);
+    $page->save();
+    $reloaded = Page::load((int) $page->id());
+    \assert($reloaded instanceof Page);
+    $stored_item = $reloaded->get('components')->first();
+    \assert($stored_item instanceof ComponentTreeItem);
+    self::assertSameInputs($input, $stored_item->getInputs());
+
+    // And config-defined trees, which the issue reports the strings surviving
+    // into. Since #3582478 made `inputs` a `type: mapping`, Config::save()
+    // casts these too — this locks in that the two agree.
+    // @see \Drupal\canvas\Config\Schema\ComponentInputsMapping
+    $pattern = Pattern::create([
+      'id' => 'cast_to_config_schema_types',
+      'label' => 'Cast to config schema types',
+      'status' => TRUE,
+    ]);
+    $pattern->setComponentTree([
+      [
+        'uuid' => $uuid,
+        'component_id' => $component->id(),
+        'component_version' => $component->getActiveVersion(),
+        'inputs' => $input,
+      ],
+    ]);
+    self::assertEntityIsValid($pattern);
+    $pattern->save();
+    self::assertSameInputs(
+      $input,
+      $this->config('canvas.pattern.cast_to_config_schema_types')
+        ->get('component_tree')[$uuid]['inputs'],
+    );
   }
 
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
