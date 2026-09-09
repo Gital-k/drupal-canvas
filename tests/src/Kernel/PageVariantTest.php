@@ -1030,6 +1030,10 @@ final class PageVariantTest extends CanvasKernelTestBase {
     PageVariant::create(['id' => 'site_default', 'label' => 'Site default', 'component_tree' => [self::markerInstance()]])->save();
     $this->config('canvas.settings')->set(PageVariant::DEFAULT_SETTING, 'site_default')->save();
 
+    $theme_installer = $this->container->get(ThemeInstallerInterface::class);
+    self::assertInstanceOf(ThemeInstallerInterface::class, $theme_installer);
+    $theme_installer->install(['claro']);
+
     $subscriber = $this->container->get(PageVariantSelectorSubscriber::class);
     self::assertInstanceOf(PageVariantSelectorSubscriber::class, $subscriber);
 
@@ -1037,8 +1041,6 @@ final class PageVariantTest extends CanvasKernelTestBase {
     self::assertInstanceOf(ThemeManagerInterface::class, $theme_manager);
     $theme_initialization = $this->container->get(ThemeInitializationInterface::class);
     self::assertInstanceOf(ThemeInitializationInterface::class, $theme_initialization);
-    $theme_installer = $this->container->get(ThemeInstallerInterface::class);
-    self::assertInstanceOf(ThemeInstallerInterface::class, $theme_installer);
 
     // A non-admin route using the front-end theme receives the site default.
     $front_end = new Route('/a-front-end-page');
@@ -1064,7 +1066,6 @@ final class PageVariantTest extends CanvasKernelTestBase {
     // A theme negotiator may select the configured admin theme for a route
     // without the admin option, as gin_login does for /user/login. Exception
     // subrequests from admin routes have the same shape.
-    $theme_installer->install(['claro']);
     $this->config('system.theme')->set('admin', 'claro')->save();
     $theme_manager->setActiveTheme($theme_initialization->getActiveThemeByName('claro'));
     $event = new PageDisplayVariantSelectionEvent('simple_page', new RouteMatch('canvas.test', $front_end, [], []));
