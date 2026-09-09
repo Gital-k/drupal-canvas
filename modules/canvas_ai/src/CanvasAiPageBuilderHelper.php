@@ -1458,6 +1458,37 @@ class CanvasAiPageBuilderHelper {
   }
 
   /**
+   * Validates a component slot target.
+   *
+   * @param string $target
+   *   The target in the form "parent_uuid/slot_name".
+   *
+   * @return string|null
+   *   An error message, or NULL when the target exists.
+   */
+  public function validateSlotTargetExists(string $target): ?string {
+    [$parent_uuid, $slot_name] = explode('/', $target, 2);
+    $current_layout = $this->canvasAiTempstore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '';
+    $current_layout = Json::decode($current_layout);
+    $current_layout = \is_array($current_layout) ? $current_layout : [];
+    $layout_tree = $this->convertCurrentLayoutToTree($current_layout);
+    $path = $this->getPathFromUuid($layout_tree, $parent_uuid);
+    if (empty($path)) {
+      return \sprintf('Component with UUID "%s" not found in layout', $parent_uuid);
+    }
+
+    $node = $layout_tree;
+    foreach ($path as $key) {
+      $node = $node[$key];
+    }
+    if (!isset($node[$slot_name])) {
+      return \sprintf('Slot "%s" not found in path "%s"', $slot_name, implode('/', $path));
+    }
+
+    return NULL;
+  }
+
+  /**
    * Gets the region indices from the current layout.
    *
    * @param string $current_layout

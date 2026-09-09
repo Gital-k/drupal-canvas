@@ -384,7 +384,26 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
               element: "h1"
         YAML, placement: 'below', reference_uuid: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'),
     ]);
-    $this->assertSame('Failed to place components: Component with UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" not found in layout', self::normalizeErrorString($result));
+    $this->assertSame('Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Component with UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" not found in layout', self::normalizeErrorString($result));
+  }
+
+  /**
+   * Tests that reference errors are accumulated with later operation errors.
+   */
+  public function testPlaceComponentsAccumulatesUnknownReferenceErrors(): void {
+    $this->container->get(AccountProxyInterface::class)->setAccount($this->privilegedUser);
+    $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, $this->getCurrentLayout('multi_region_non_empty'));
+
+    $tool = $this->functionCallManager->createInstance('canvas_ai:place_components');
+    $this->assertInstanceOf(PlaceComponents::class, $tool);
+    $tool->setContextValue('operations', [
+      self::buildOperation('- sdc.canvas_test_sdc.heading: { props: { text: "First", element: "h1" } }', placement: 'below', reference_uuid: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'),
+      self::buildOperation('- sdc.canvas_test_sdc.heading: { props: { text: "Second", element: "h1" } }', placement: 'below'),
+    ]);
+    $tool->execute();
+
+    $this->assertSame('Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Component with UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" not found in layout ## Operation 1 - The reference_uuid must be provided for above/below placement.', self::normalizeErrorString($tool->getReadableOutput()));
+    $this->assertSame([], $tool->getStructuredOutput());
   }
 
   /**

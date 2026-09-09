@@ -11,6 +11,7 @@ use Drupal\canvas_ai\AiResponseValidator;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Drupal\canvas_ai\CanvasAiPermissions;
 use Drupal\canvas_ai\CanvasAiTempStore;
+use Drupal\Component\Serialization\Json;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -125,6 +126,10 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
       $operations = [];
       $all_errors = [];
       $current_layout = $this->tempStore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '';
+      $layout_data = Json::decode($current_layout);
+      $components_by_uuid = $this->pageBuilderHelper->getComponentsByUuid(
+        \is_array($layout_data) ? $layout_data : [],
+      );
       foreach ($this->getContextValue('operations') as $index => $operation) {
         $errors = [];
         try {
@@ -135,7 +140,7 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
           // the same payload; tell it how to fix the YAML instead.
           $errors[] = \sprintf("The components value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
         }
-        $errors = \array_merge($errors, $this->validatePlacementParams($operation, $current_layout));
+        $errors = \array_merge($errors, $this->validatePlacementParams($operation, $current_layout, $components_by_uuid));
         if (\is_array($operation['components'])) {
           try {
             $this->responseValidator->validateComponentStructure($operation['components']);
@@ -189,11 +194,13 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
    *   The operation to validate, with its components block already parsed.
    * @param string $current_layout
    *   The current layout JSON string, used to resolve the target region.
+   * @param array $components_by_uuid
+   *   The current page's components, keyed by UUID.
    *
    * @return list<string>
    *   The validation errors found, or an empty list if the operation is valid.
    */
-  private function validatePlacementParams(array $operation, string $current_layout): array {
+  private function validatePlacementParams(array $operation, string $current_layout, array $components_by_uuid): array {
     $errors = [];
 
     $target = $operation['target'] ?? NULL;
@@ -210,16 +217,27 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
     // A target naming a region must match a region present in the layout. A
     // target containing a slash names a `parent_uuid/slot_name` pair instead,
     // whose parent is resolved during nodePath calculation.
-    if ($has_target && strpos($target, '/') === FALSE) {
-      $region_error = $this->pageBuilderHelper->validateRegionExists($target, $current_layout);
-      if ($region_error !== NULL) {
-        $errors[] = $region_error;
+    if ($has_target) {
+      if (strpos($target, '/') === FALSE) {
+        $target_error = $this->pageBuilderHelper->validateRegionExists($target, $current_layout);
+      }
+      else {
+        $target_error = $this->pageBuilderHelper->validateSlotTargetExists($target);
+      }
+      if ($target_error !== NULL) {
+        $errors[] = $target_error;
       }
     }
 
     // If placement is 'above' or 'below', reference_uuid must be provided.
-    if (\in_array($placement, ['above', 'below'], TRUE) && empty($operation['reference_uuid'])) {
-      $errors[] = 'The reference_uuid must be provided for above/below placement.';
+    if (\in_array($placement, ['above', 'below'], TRUE)) {
+      $reference_uuid = $operation['reference_uuid'] ?? NULL;
+      if (empty($reference_uuid)) {
+        $errors[] = 'The reference_uuid must be provided for above/below placement.';
+      }
+      elseif (!\is_string($reference_uuid) || !isset($components_by_uuid[$reference_uuid])) {
+        $errors[] = \sprintf('Component with UUID "%s" not found in layout', $reference_uuid);
+      }
     }
 
     // If placement is 'inside', reference_uuid is not needed and the target
