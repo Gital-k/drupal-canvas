@@ -20,8 +20,8 @@ import {
   selectEditorFrameContext,
   selectEditorFrameMode,
   selectIsMultiSelect,
-  selectSelectedComponentUuid,
   selectRightPanelOpen,
+  selectSelectedComponentUuid,
   setRightPanelOpen,
 } from '@/features/ui/uiSlice';
 import { PAGE_VARIANT_ENTITY_TYPE } from '@/services/pageVariants';
@@ -165,10 +165,14 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
 
   useEffect(() => {
     if (rightColumnRef.current) {
-      rightColumnRef.current.style.display = isRightPanelOpen ? 'block' : 'none';
+      rightColumnRef.current.style.display = isRightPanelOpen
+        ? 'block'
+        : 'none';
     }
     if (rightColumnMenuRef.current) {
-      rightColumnMenuRef.current.style.display = !isRightPanelOpen ? 'block' : 'none';
+      rightColumnMenuRef.current.style.display = !isRightPanelOpen
+        ? 'block'
+        : 'none';
     }
   }, [isRightPanelOpen]);
 

@@ -404,9 +404,11 @@ export const uiSlice = createAppSlice({
         state.currentRoute = action.payload;
       },
     ),
-    setRightPanelOpen: create.reducer((state, action: PayloadAction<boolean>) => {
-      state.rightPanelOpen = action.payload;
-    }),
+    setRightPanelOpen: create.reducer(
+      (state, action: PayloadAction<boolean>) => {
+        state.rightPanelOpen = action.payload;
+      },
+    ),
   }),
   // You can define your selectors here. These selectors receive the slice
   // state as their first argument.
@@ -564,7 +566,7 @@ export const {
   selectCollapsedLayers,
   selectPreviouslyEdited,
   selectCurrentRoute,
-  selectRightPanelOpen
+  selectRightPanelOpen,
 } = uiSlice.selectors;
 
 // Memoized selectors using createSelector for better performance
