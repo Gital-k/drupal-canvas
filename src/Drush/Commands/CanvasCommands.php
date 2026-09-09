@@ -51,7 +51,7 @@ final class CanvasCommands extends DrushCommands {
     foreach ($entities as $entity) {
       $source = $entity->getComponentSource();
       $usage = $this->componentAudit->getConfigEntityUsageCount($entity)
-        + count($this->componentAudit->getContentRevisionsUsingComponent($entity));
+        + count($this->componentAudit->getContentRevisionIdsUsingAuditTarget($entity));
       $rows[] = [
         'id' => $entity->id(),
         'label' => $entity->label(),
