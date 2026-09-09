@@ -45,10 +45,14 @@ describe('Contextual panel', () => {
     });
     cy.waitForElementContentNotInIframe('h1', 'hello, world!');
     // Assert that close icon exists and clicking it closes the contextual panel, and that clicking the right panel menu button opens it again.
-    cy.findByTestId('canvas-contextual-panel--close-icon').click();
+    cy.findByTestId('canvas-contextual-panel--close-icon').focus();
+    cy.findByTestId('canvas-contextual-panel--close-icon').should('have.focus');
+    cy.findByTestId('canvas-contextual-panel--close-icon').realPress('Enter');
     cy.findByTestId('canvas-contextual-panel').should('not.be.visible');
-    cy.findByTestId('canvas-right-panel-menu-button').click();
-    cy.findByTestId('canvas-contextual-panel').and('be.visible');
+    cy.findByTestId('canvas-right-panel-menu-button').focus();
+    cy.findByTestId('canvas-right-panel-menu-button').should('have.focus');
+    cy.findByTestId('canvas-right-panel-menu-button').realPress('Enter');
+    cy.findByTestId('canvas-contextual-panel').should('be.visible');
   });
 
   it('should open the context menu on right-click in primary content menu', () => {

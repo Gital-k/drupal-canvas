@@ -84,6 +84,7 @@ export interface uiSliceState {
   redoStack: Array<UndoRedoStackItem>;
   currentRoute: RouteSnapshot;
   PreviouslyEdited: PreviouslyEdited;
+  rightPanelOpen: boolean;
 }
 
 type UpdateViewportPayload = {
@@ -135,6 +136,7 @@ export const initialState: uiSliceState = {
   },
   collapsedLayers: [],
   PreviouslyEdited: { name: '', path: '' },
+  rightPanelOpen: true,
 };
 
 export interface ScaleValue {
@@ -402,6 +404,9 @@ export const uiSlice = createAppSlice({
         state.currentRoute = action.payload;
       },
     ),
+    setRightPanelOpen: create.reducer((state, action: PayloadAction<boolean>) => {
+      state.rightPanelOpen = action.payload;
+    }),
   }),
   // You can define your selectors here. These selectors receive the slice
   // state as their first argument.
@@ -488,6 +493,9 @@ export const uiSlice = createAppSlice({
     selectCurrentRoute: (ui): RouteSnapshot => {
       return ui.currentRoute;
     },
+    selectRightPanelOpen: (ui): boolean => {
+      return ui.rightPanelOpen;
+    },
   },
 });
 
@@ -529,6 +537,7 @@ export const {
   toggleCollapsedLayer,
   removeCollapsedLayers,
   setCurrentRoute,
+  setRightPanelOpen,
 } = uiSlice.actions;
 
 export const {
@@ -555,6 +564,7 @@ export const {
   selectCollapsedLayers,
   selectPreviouslyEdited,
   selectCurrentRoute,
+  selectRightPanelOpen
 } = uiSlice.selectors;
 
 // Memoized selectors using createSelector for better performance

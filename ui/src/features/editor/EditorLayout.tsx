@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useParams } from 'react-router-dom';
 import { HamburgerMenuIcon } from '@radix-ui/react-icons';
-import { IconButton } from '@radix-ui/themes/components/index';
+import { IconButton } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ContextualPanel from '@/components/panel/ContextualPanel';
@@ -21,6 +21,8 @@ import {
   selectEditorFrameMode,
   selectIsMultiSelect,
   selectSelectedComponentUuid,
+  selectRightPanelOpen,
+  setRightPanelOpen,
 } from '@/features/ui/uiSlice';
 import { PAGE_VARIANT_ENTITY_TYPE } from '@/services/pageVariants';
 
@@ -37,6 +39,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
   const editorFrameMode = useAppSelector(selectEditorFrameMode);
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const isMultiSelect = useAppSelector(selectIsMultiSelect);
+  const isRightPanelOpen = useAppSelector(selectRightPanelOpen);
 
   const { entityType } = useParams();
   const dispatch = useAppDispatch();
@@ -160,23 +163,19 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
     }
   }, []);
 
-  const setRightPanelVisibility = (visible: boolean) => {
+  useEffect(() => {
     if (rightColumnRef.current) {
-      rightColumnRef.current.style.display = visible ? 'block' : 'none';
+      rightColumnRef.current.style.display = isRightPanelOpen ? 'block' : 'none';
     }
     if (rightColumnMenuRef.current) {
-      rightColumnMenuRef.current.style.display = !visible ? 'block' : 'none';
+      rightColumnMenuRef.current.style.display = !isRightPanelOpen ? 'block' : 'none';
     }
-  };
+  }, [isRightPanelOpen]);
 
   const effectiveRightWidth = isPanelHidden ? 0 : rightWidthPx;
   const showHandle = !isPanelHidden;
 
   const resizeCursor = getResizeCursor(rightWidthPx);
-
-  const toggleRightPanel = () => {
-    setRightPanelVisibility(true);
-  };
 
   return (
     <div ref={layoutRef} className={styles.layout}>
@@ -200,8 +199,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
         <IconButton
           aria-label="Open right panel"
           data-testid="canvas-right-panel-menu-button"
-          className="menu-btn"
-          onClick={toggleRightPanel}
+          onClick={() => dispatch(setRightPanelOpen(true))}
         >
           <HamburgerMenuIcon />
         </IconButton>
@@ -213,7 +211,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
         })}
         style={{ width: effectiveRightWidth }}
       >
-        <ContextualPanel setPanelVisibility={setRightPanelVisibility} />
+        <ContextualPanel />
       </div>
     </div>
   );

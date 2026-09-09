@@ -7,6 +7,7 @@ import {
   Button,
   Callout,
   Flex,
+  IconButton,
   ScrollArea,
   Tabs,
   Text,
@@ -22,21 +23,14 @@ import {
   selectIsMultiSelect,
   selectSelectedComponentUuid,
   selectSelection,
+  setRightPanelOpen,
 } from '@/features/ui/uiSlice';
 import useHidePanelClasses from '@/hooks/useHidePanelClasses';
 import { PAGE_VARIANT_ENTITY_TYPE } from '@/services/pageVariants';
 
-import type React from 'react';
-
 import styles from './ContextualPanel.module.css';
 
-interface ContextualPanelProps {
-  setPanelVisibility: (open: boolean) => void;
-}
-
-const ContextualPanel: React.FC<ContextualPanelProps> = ({
-  setPanelVisibility,
-}) => {
+const ContextualPanel = () => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const isMultiSelect = useAppSelector(selectIsMultiSelect);
   const selection = useAppSelector(selectSelection);
@@ -96,10 +90,14 @@ const ContextualPanel: React.FC<ContextualPanelProps> = ({
         data-testid={`canvas-contextual-panel-${selectedComponent}`}
       >
         <Flex align="end" justify="end" pr="4">
-          <Cross1Icon
+          <IconButton
+            aria-label="Close right panel"
             data-testid="canvas-contextual-panel--close-icon"
-            onClick={() => setPanelVisibility(false)}
-          />
+            onClick={() => dispatch(setRightPanelOpen(false))}
+            variant="ghost"
+          >
+            <Cross1Icon />
+          </IconButton>
         </Flex>
         <ErrorBoundary>
           <Tabs.Root
