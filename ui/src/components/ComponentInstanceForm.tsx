@@ -273,7 +273,9 @@ const ComponentInstanceFormRenderer: React.FC<
           <>
             {selectedComponentName && (
               <Box mb="-2" mt="3">
-                <Text weight="bold">{selectedComponentName}</Text>
+                <Text weight="bold" data-testId="selected-component-name">
+                  {selectedComponentName}
+                </Text>
               </Box>
             )}
             <TransformsContext.Provider value={persistentTransforms.current}>
