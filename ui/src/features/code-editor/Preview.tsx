@@ -50,23 +50,50 @@ const Drupal = getDrupal();
 // @see \Drupal\canvas\Controller\CodeEditorPreviewController::shell()
 const PREVIEW_SHELL_URL = Drupal.url('canvas/code-editor-preview');
 
-// The shell can't load this via its own `<script src>` fetch: a sandboxed,
-// opaque-origin document has no classifiable network address space, and
-// Chrome blocks any subresource fetch from such a document to a private
-// network target (e.g. the same site's own `localhost` or internal IP)
-// outright, before the request is even sent. Fetching it here instead, from
-// the parent's real (non-opaque) origin, and relaying the source into the
-// iframe over `postMessage()` (@see the `_canvas_preview_bootstrap_ready`
-// listener below) avoids that fetch entirely. Cached at module scope: the
-// content never changes within a session, and every code component's
-// preview iframe needs it.
+// Neither this nor the import map below (@see `getPreviewImportMap()`) can
+// load via the shell's own network fetch: a sandboxed, opaque-origin
+// document has no classifiable network address space, and Chrome blocks any
+// subresource fetch from such a document to a private network target (e.g.
+// the same site's own `localhost` or internal IP) outright, before the
+// request is even sent. Fetching it here instead, from the parent's real
+// (non-opaque) origin, and relaying it into the iframe over `postMessage()`
+// as a `Blob` (@see the `_canvas_preview_bootstrap_ready` listener below —
+// `Blob`s survive `postMessage()`'s structured clone, including across an
+// opaque-origin boundary) avoids that fetch entirely. Cached at module
+// scope: the content never changes within a session, and every code
+// component's preview iframe needs it.
 // @see ui/lib/code-editor-preview.js
-let previewScriptSourcePromise: Promise<string> | null = null;
-function getPreviewScriptSource(): Promise<string> {
+let previewScriptSourcePromise: Promise<Blob> | null = null;
+function getPreviewScriptSource(): Promise<Blob> {
   previewScriptSourcePromise ??= fetch(
     Drupal.url('canvas/code-editor-preview/script.js'),
-  ).then((response) => response.text());
+  ).then((response) => response.blob());
   return previewScriptSourcePromise;
+}
+
+// Same reasoning as `getPreviewScriptSource()` above, for the bare-specifier
+// dependencies (`preact`, `react`, etc.) the preview script needs to resolve
+// its own imports: the shell can't fetch any of these over the network
+// either. Fetches the import map itself
+// (@see \Drupal\canvas\Controller\CodeEditorPreviewController::importMap()),
+// then every entry's own content, so the shell can build an import map made
+// entirely of local blob URLs instead.
+let previewImportMapPromise: Promise<Record<string, Blob>> | null = null;
+function getPreviewImportMap(): Promise<Record<string, Blob>> {
+  previewImportMapPromise ??= fetch(
+    Drupal.url('canvas/code-editor-preview/import-map'),
+  )
+    .then((response) => response.json() as Promise<Record<string, string>>)
+    .then(async (imports) => {
+      const entries = await Promise.all(
+        Object.entries(imports).map(
+          async ([specifier, url]) =>
+            [specifier, await (await fetch(url)).blob()] as const,
+        ),
+      );
+      return Object.fromEntries(entries);
+    });
+  return previewImportMapPromise;
 }
 
 const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
@@ -259,10 +286,11 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   }, [compiledJs, buildPreviewPayload]);
 
   // Listens for the shell's inline bootstrap announcing that its own message
-  // listener is registered, and replies with the actual preview script's
-  // source so the bootstrap can `Blob()`/dynamically `import()` it — @see
-  // `getPreviewScriptSource()` above for why this can't just be a
-  // `<script src>` fetch from inside the opaque-origin shell itself.
+  // listener is registered, and replies with the actual preview script and
+  // its import map so the bootstrap can build local blob URLs for both and
+  // dynamically `import()` it — @see `getPreviewScriptSource()` and
+  // `getPreviewImportMap()` above for why neither can just be a network
+  // fetch from inside the opaque-origin shell itself.
   useEffect(() => {
     const handleBootstrapReady = (event: MessageEvent) => {
       if (
@@ -272,12 +300,14 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
         return;
       }
       const target = event.source as Window;
-      void getPreviewScriptSource().then((source) => {
-        target.postMessage(
-          { type: '_canvas_preview_script_source', source },
-          '*',
-        );
-      });
+      void Promise.all([getPreviewScriptSource(), getPreviewImportMap()]).then(
+        ([source, importMap]) => {
+          target.postMessage(
+            { type: '_canvas_preview_script_source', source, importMap },
+            '*',
+          );
+        },
+      );
     };
     window.addEventListener('message', handleBootstrapReady);
     return () => window.removeEventListener('message', handleBootstrapReady);

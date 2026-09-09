@@ -6,13 +6,11 @@ namespace Drupal\Tests\canvas\Unit\Controller;
 
 use Drupal\canvas\Controller\CodeEditorPreviewController;
 use Drupal\canvas\GlobalImports;
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\Core\Extension\ExtensionPathResolver;
-use Drupal\Core\Render\RendererInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * Tests Drupal\canvas\Controller\CodeEditorPreviewController.
@@ -22,57 +20,35 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 final class CodeEditorPreviewControllerTest extends TestCase {
 
   /**
-   * Tests asset rejects a filename that does not match its own filter.
+   * Tests importMap() returns only the global imports, as plain JSON.
    *
-   * The route's own path requirement regex already restricts what reaches
-   * this method; this is the redundant, defense-in-depth check inside the
-   * controller itself.
+   * The parent window fetches this to relay each entry into the sandboxed
+   * shell as a blob URL; `scopes` (always empty in practice, and not
+   * something a flat specifier => URL blob-URL map could represent anyway)
+   * is deliberately not included.
    *
-   * @legacy-covers ::asset
+   * @legacy-covers ::importMap
    */
-  #[DataProvider('providerInvalidFilenames')]
-  public function testAssetRejectsInvalidFilename(string $filename): void {
-    $extension_path_resolver = $this->createMock(ExtensionPathResolver::class);
-    // The filename is rejected before any path is resolved.
-    $extension_path_resolver->expects($this->never())->method('getPath');
-
-    $controller = new CodeEditorPreviewController(
-      $this->createMock(GlobalImports::class),
-      $this->createMock(RendererInterface::class),
-      $extension_path_resolver,
-    );
-
-    $this->expectException(NotFoundHttpException::class);
-    $controller->asset($filename);
-  }
-
-  public static function providerInvalidFilenames(): array {
-    return [
-      'path traversal' => ['../../../etc/passwd.js'],
-      'directory separator' => ['foo/bar.js'],
-      'wrong extension' => ['preact.module.php'],
-      'no extension' => ['preact'],
-      'empty string' => [''],
+  public function testImportMapReturnsOnlyGlobalImports(): void {
+    $imports = [
+      'preact' => '/modules/contrib/canvas/packages/astro-hydration/dist/preact.module.js?v1',
+      'react' => '/modules/contrib/canvas/packages/astro-hydration/dist/compat.module.js?v1',
     ];
-  }
-
-  /**
-   * Tests asset rejects a validly-named file that does not exist on disk.
-   *
-   * @legacy-covers ::asset
-   */
-  public function testAssetRejectsMissingFile(): void {
-    $extension_path_resolver = $this->createMock(ExtensionPathResolver::class);
-    $extension_path_resolver->method('getPath')->willReturn('does/not/exist');
+    $global_imports = $this->createMock(GlobalImports::class);
+    $global_imports->method('getImportMap')->willReturn([
+      ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS => $imports,
+      ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS => [
+        '/some/scope/' => ['some-specifier' => '/some/url.js'],
+      ],
+    ]);
 
     $controller = new CodeEditorPreviewController(
-      $this->createMock(GlobalImports::class),
-      $this->createMock(RendererInterface::class),
-      $extension_path_resolver,
+      $global_imports,
+      $this->createMock(ExtensionPathResolver::class),
     );
 
-    $this->expectException(NotFoundHttpException::class);
-    $controller->asset('preact.module.js');
+    $response = $controller->importMap();
+    self::assertSame($imports, \json_decode((string) $response->getContent(), TRUE));
   }
 
 }

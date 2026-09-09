@@ -7,10 +7,8 @@ namespace Drupal\canvas\Controller;
 use Drupal\canvas\GlobalImports;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\Core\Extension\ExtensionPathResolver;
-use Drupal\Core\Render\HtmlResponse;
-use Drupal\Core\Render\RendererInterface;
-use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -30,22 +28,34 @@ final class CodeEditorPreviewController {
 <!doctype html>
 <html>
 <head>
-{{ import_map }}
 <script type="module">
 // This document's own opaque origin has no classifiable network address
 // space, so Chrome blocks any subresource fetch it makes to a private
 // network target (this site's own host) outright, before the request is
-// even sent — `code-editor-preview.js` can't load itself via `<script
-// src>`. The parent fetches it instead, from its real origin, and relays
-// the source here over `postMessage()`; this bootstrap turns that source
-// into a same-realm `Blob` and dynamically imports it, which isn't a
-// network fetch at all.
+// even sent — neither `code-editor-preview.js` itself nor the bare-specifier
+// imports (`preact`, etc.) it needs can be loaded over the network from in
+// here. The parent fetches all of it instead, from its real origin, and
+// relays it over `postMessage()` as `Blob`s (which survive `postMessage()`'s
+// structured clone across an opaque-origin boundary): the script's own
+// source, and one `Blob` per import map entry. Turning each into a local
+// blob: URL and dynamically importing one are both purely local operations,
+// not network fetches, regardless of how the `Blob` got here.
 // @see ui/src/features/code-editor/Preview.tsx
 window.addEventListener('message', function (event) {
   if (event.source !== window.parent || event.data?.type !== '_canvas_preview_script_source') {
     return;
   }
-  const url = URL.createObjectURL(new Blob([event.data.source], { type: 'text/javascript' }));
+  if (event.data.importMap) {
+    var imports = {};
+    for (var specifier in event.data.importMap) {
+      imports[specifier] = URL.createObjectURL(event.data.importMap[specifier]);
+    }
+    var importMapScript = document.createElement('script');
+    importMapScript.type = 'importmap';
+    importMapScript.textContent = JSON.stringify({ imports: imports });
+    document.head.appendChild(importMapScript);
+  }
+  var url = URL.createObjectURL(event.data.source);
   import(url).finally(function () {
     URL.revokeObjectURL(url);
   });
@@ -70,7 +80,6 @@ HTML;
 
   public function __construct(
     private readonly GlobalImports $globalImports,
-    private readonly RendererInterface $renderer,
     private readonly ExtensionPathResolver $extensionPathResolver,
   ) {}
 
@@ -79,25 +88,14 @@ HTML;
    *
    * Loaded via the iframe's `src` attribute (not `srcdoc`), so it gets an
    * opaque origin under `sandbox="allow-scripts"` (no `allow-same-origin`).
+   *
+   * Entirely static: everything the previous version needed a Twig context
+   * for (the import map, the script URL) is now fetched and relayed by the
+   * parent instead — @see `importMap()` and `script()` below.
    */
   public function shell(): Response {
-    $import_map_tag = ImportMapResponseAttachmentsProcessor::buildHtmlTagForAttachedImportMaps(
-      (new HtmlResponse())->setAttachments(['import_maps' => $this->buildImportMap()]),
-    );
-    \assert($import_map_tag !== NULL);
-    $build = [
-      '#type' => 'inline_template',
-      '#template' => self::HTML,
-      '#context' => [
-        'import_map' => $this->renderer->renderInIsolation($import_map_tag),
-      ],
-    ];
-    $response = new Response((string) $this->renderer->renderInIsolation($build));
+    $response = new Response(self::HTML);
     $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
-    // Harmless: this document contains no secrets, only fixed asset URLs.
-    // Needed for the `@/components/` entries added by the import map, which
-    // an opaque-origin `import()` from inside this document will fetch.
-    $response->headers->set('Access-Control-Allow-Origin', '*');
     return $response;
   }
 
@@ -120,77 +118,31 @@ HTML;
     }
     $response = new BinaryFileResponse($file_path);
     $response->headers->set('Content-Type', 'text/javascript');
-    $response->headers->set('Access-Control-Allow-Origin', '*');
     $response->headers->set('Cache-Control', 'no-cache');
     return $response;
   }
 
   /**
-   * Builds the import map for the preview shell.
+   * Serves the import map as specifier => URL JSON.
+   *
+   * These are the bare-specifier imports (`preact`, `react`, etc.) the
+   * preview script needs to resolve its own imports. Fetched by the parent
+   * window, same as `script()` above — the shell can't fetch these itself.
+   * The parent fetches each URL's content and relays it to the shell as a
+   * `Blob`, so these are the real static file paths; unlike the previous
+   * `asset()` route this replaces, no CORS header is needed, since the
+   * parent is same-origin.
    *
    * Same as the base import map used by the main Canvas app
-   * (@see \Drupal\canvas\GlobalImports::getImportMap()), plus the
-   * `@/components/` entry the preview needs to import other auto-saved code
-   * components. This mirrors what `Preview.tsx` currently builds
-   * client-side by copying the parent document's import map.
-   *
-   * Every `packages/astro-hydration/dist/` entry is rewritten to route
-   * through `asset()` instead of its plain static file URL: the shell's
-   * opaque origin needs `Access-Control-Allow-Origin` on every module it
-   * imports (not just its own entry script), and that directory is served
-   * directly by the web server, which adds no such header.
-   *
-   * @return array{imports: array<string, string>, scopes: array<string, array<string, string>>}
+   * (@see \Drupal\canvas\GlobalImports::getImportMap()). Deliberately
+   * missing a `@/components/` entry other auto-saved code components need
+   * to resolve: that would be a prefix mapping, not a single fetchable
+   * file, and `code-editor-preview.js` already rewrites those specifiers to
+   * blob URLs directly instead (@see its `rewriteComponentImports()`).
    */
-  private function buildImportMap(): array {
+  public function importMap(): JsonResponse {
     $import_map = $this->globalImports->getImportMap();
-    $import_map[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS]['@/components/'] = \base_path() . 'canvas/api/v0/auto-saves/js/js_component/';
-
-    $astro_hydration_path = \sprintf('%s%s/packages/astro-hydration/dist/', \base_path(), $this->extensionPathResolver->getPath('module', 'canvas'));
-    foreach ($import_map[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS] as $specifier => $url) {
-      if ($specifier === '@/components/' || !\str_starts_with($url, $astro_hydration_path)) {
-        continue;
-      }
-      [$filename, $query] = \array_pad(\explode('?', \substr($url, \strlen($astro_hydration_path)), 2), 2, NULL);
-      $import_map[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS][$specifier] = Url::fromRoute('canvas.code_editor_preview.asset', ['filename' => $filename])->toString()
-        . ($query !== NULL ? '?' . $query : '');
-    }
-    return $import_map;
-  }
-
-  /**
-   * Serves `packages/astro-hydration/dist/{filename}` with a CORS header.
-   *
-   * The import map built by `buildImportMap()` points every
-   * `packages/astro-hydration/dist/` entry (`preact`, `react`, `clsx`, etc.)
-   * here instead of at its plain static file URL, so a CORS header can be
-   * added (that directory is served directly by the web server, which adds
-   * none).
-   *
-   * @todo This is still fetched by the sandboxed shell itself (unlike
-   * `script()`, which the parent now fetches instead — @see its doc
-   * comment for why). If it turns out to hit the same opaque-origin
-   * network block, it needs the same treatment: relay each of these
-   * through the parent instead.
-   */
-  public function asset(string $filename): BinaryFileResponse {
-    if (\preg_match('/^[A-Za-z0-9_.-]+\.m?js$/', $filename) !== 1) {
-      throw new NotFoundHttpException();
-    }
-    $file_path = \sprintf(
-      '%s/%s/packages/astro-hydration/dist/%s',
-      DRUPAL_ROOT,
-      $this->extensionPathResolver->getPath('module', 'canvas'),
-      $filename,
-    );
-    if (!\is_file($file_path)) {
-      throw new NotFoundHttpException();
-    }
-    $response = new BinaryFileResponse($file_path);
-    $response->headers->set('Content-Type', 'text/javascript');
-    $response->headers->set('Access-Control-Allow-Origin', '*');
-    $response->headers->set('Cache-Control', 'no-cache');
-    return $response;
+    return new JsonResponse($import_map[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS]);
   }
 
 }
