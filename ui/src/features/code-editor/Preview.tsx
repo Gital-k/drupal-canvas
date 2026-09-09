@@ -376,6 +376,12 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
           src={PREVIEW_SHELL_URL}
           data-canvas-iframe="canvas-code-editor-preview"
           sandbox="allow-scripts"
+          onLoad={() =>
+            console.log('[TEMP DEBUG parent] iframe onLoad', performance.now())
+          }
+          onError={() =>
+            console.log('[TEMP DEBUG parent] iframe onError', performance.now())
+          }
         />
       )}
       {/* A sibling overlay, not a wrapper: Radix's <Spinner loading> swaps its

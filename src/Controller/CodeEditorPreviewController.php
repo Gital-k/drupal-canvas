@@ -30,12 +30,42 @@ final class CodeEditorPreviewController {
 <!doctype html>
 <html>
 <head>
+<script>
+console.log('[TEMP DEBUG shell] inline head script running', performance.now());
+window.addEventListener('pagehide', function (e) {
+  console.log('[TEMP DEBUG shell] pagehide', performance.now(), 'persisted=' + e.persisted);
+});
+window.addEventListener('beforeunload', function () {
+  console.log('[TEMP DEBUG shell] beforeunload', performance.now());
+});
+document.addEventListener('visibilitychange', function () {
+  console.log('[TEMP DEBUG shell] visibilitychange', document.visibilityState, performance.now());
+});
+window.addEventListener('error', function (e) {
+  console.log('[TEMP DEBUG shell] window error event', performance.now(), e.message, e.filename);
+}, true);
+</script>
 {{ import_map }}
-<script type="module" src="{{ script_url }}"></script>
+<script type="module" src="{{ script_url }}" data-canvas-debug-module-script></script>
+<script>
+(function () {
+  var moduleScript = document.currentScript.previousElementSibling;
+  console.log('[TEMP DEBUG shell] module script element found:', !!moduleScript, moduleScript && moduleScript.src, performance.now());
+  if (moduleScript) {
+    moduleScript.addEventListener('load', function () {
+      console.log('[TEMP DEBUG shell] module script LOAD event', performance.now());
+    });
+    moduleScript.addEventListener('error', function (e) {
+      console.log('[TEMP DEBUG shell] module script ERROR event', performance.now(), e);
+    });
+  }
+})();
+</script>
 </head>
 <body>
 <div id="canvas-code-editor-preview-root"></div>
 <script>
+console.log('[TEMP DEBUG shell] body script running (DOM parsed to body)', performance.now());
 document.addEventListener('click', function (e) {
   const anchor = e.target.closest('a');
   if (anchor) {
