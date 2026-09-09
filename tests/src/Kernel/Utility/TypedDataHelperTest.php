@@ -9,10 +9,12 @@ use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
 use Drupal\canvas\Utility\TypedDataHelper;
+use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\Plugin\DataType\EntityReference;
 use Drupal\Core\Field\Plugin\Field\FieldType\StringItem;
 use Drupal\Core\TypedData\DataDefinition;
+use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
@@ -164,6 +166,87 @@ final class TypedDataHelperTest extends CanvasKernelTestBase {
       default => throw new \LogicException("Unhandled nullable property: $nullable_property"),
     };
     self::assertNull($value, "'$nullable_property' must be NULL after round-trip normalization.");
+  }
+
+  /**
+   * Values are cast to the primitive types their config schema declares.
+   *
+   * @see \Drupal\Core\Config\StorableConfigBase::castValue()
+   */
+  public function testCastToConfigSchemaTypes(): void {
+    $value = [
+      'an_integer' => '42',
+      // The Form API submits '' for an empty numeric field; that means "no
+      // value", not zero.
+      'a_nullable_integer' => '',
+      'a_boolean' => '0',
+      'a_string' => 5,
+      'a_nested_mapping' => ['a_float' => '1.5'],
+      // Config schema does not describe this key, so there is no type to cast
+      // to and the value must survive verbatim.
+      'not_in_the_schema' => '7',
+    ];
+    self::assertSame([
+      'an_integer' => 42,
+      'a_nullable_integer' => NULL,
+      'a_boolean' => FALSE,
+      'a_string' => '5',
+      'a_nested_mapping' => ['a_float' => 1.5],
+      'not_in_the_schema' => '7',
+    ], TypedDataHelper::castToConfigSchemaTypes(self::conjureTypedConfig($value)));
+  }
+
+  /**
+   * A value the config schema cannot represent is left exactly as it was.
+   *
+   * Casting it would silently replace it — `(int) 'not a number'` is `0` — and
+   * Canvas keeps such a value on purpose, so that validation can report it and
+   * the component instance form can show the Content Creator what they typed.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::clientModelToInput()
+   */
+  public function testCastToConfigSchemaTypesLeavesMismatchedValues(): void {
+    $value = [
+      'an_integer' => 'not a number',
+      // Not an integer either: casting would silently round it down to 3.
+      'a_nullable_integer' => '3.5',
+      'a_nested_mapping' => ['a_float' => 'not a number'],
+    ];
+    self::assertSame($value, TypedDataHelper::castToConfigSchemaTypes(self::conjureTypedConfig($value)));
+  }
+
+  /**
+   * Builds an ephemeral `type: mapping` config schema element around $value.
+   *
+   * Uses config schema rather than a real config object, so that the casting
+   * of each primitive type can be asserted without depending on any particular
+   * module's configuration.
+   *
+   * @param array $value
+   *   The config values to wrap.
+   *
+   * @return \Drupal\Core\TypedData\TypedDataInterface
+   *   Typed config for $value.
+   */
+  private static function conjureTypedConfig(array $value): TypedDataInterface {
+    $typed_config_manager = \Drupal::service(TypedConfigManagerInterface::class);
+    \assert($typed_config_manager instanceof TypedConfigManagerInterface);
+    return $typed_config_manager->create(
+      $typed_config_manager->buildDataDefinition([
+        'type' => 'mapping',
+        'mapping' => [
+          'an_integer' => ['type' => 'integer'],
+          'a_nullable_integer' => ['type' => 'integer', 'nullable' => TRUE],
+          'a_boolean' => ['type' => 'boolean'],
+          'a_string' => ['type' => 'string'],
+          'a_nested_mapping' => [
+            'type' => 'mapping',
+            'mapping' => ['a_float' => ['type' => 'float']],
+          ],
+        ],
+      ], $value),
+      $value,
+    );
   }
 
   public function testConjureFieldItemObject(): void {

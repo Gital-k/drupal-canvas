@@ -11,6 +11,7 @@ use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Form\ClientFormSubmissionHelper;
 use Drupal\canvas\MissingComponentInputsException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Component\Render\PlainTextOutput;
@@ -483,7 +484,20 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // plugin ID.
     $input += $defaults;
     unset($input['provider'], $input['id']);
-    return $input;
+
+    // HTML form values are strings, the Form API does not cast them, and block
+    // plugins' ::blockSubmit() implementations typically copy them into the
+    // plugin configuration verbatim. A Block config entity nonetheless ends up
+    // storing the types its config schema declares, because Config::save()
+    // casts them. Canvas stores block settings in a component instance's
+    // `inputs` rather than in a Block config entity's `settings`, so it must
+    // apply that same cast itself.
+    // @see \Drupal\Core\Config\StorableConfigBase::castValue()
+    $casted_input = TypedDataHelper::castToConfigSchemaTypes(
+      $this->typedConfigManager->createFromNameAndData('block.settings.' . $block_plugin->getPluginId(), $input)
+    );
+    \assert(\is_array($casted_input));
+    return $casted_input;
   }
 
   /**

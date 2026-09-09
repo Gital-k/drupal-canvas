@@ -8,6 +8,8 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Config\Schema\Ignore;
+use Drupal\Core\Config\Schema\Undefined;
 use Drupal\Core\Entity\Plugin\DataType\EntityReference;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
@@ -16,6 +18,8 @@ use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\PrimitiveInterface;
 use Drupal\Core\TypedData\TraversableTypedDataInterface;
+use Drupal\Core\TypedData\Type\FloatInterface;
+use Drupal\Core\TypedData\Type\IntegerInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Drupal\path\Plugin\Field\FieldType\PathItem;
@@ -199,6 +203,98 @@ final readonly class TypedDataHelper {
     // Anything that is neither a primitive nor traversable (e.g. an `ignore`
     // element) has no canonical config-schema type; use its value verbatim.
     return $element->getValue();
+  }
+
+  /**
+   * Casts config values to the types their config schema declares.
+   *
+   * Configuration stored in a config object gets this for free:
+   * \Drupal\Core\Config\Config::save() casts every value using config schema,
+   * which is why a Block config entity ends up with `level: 1` even though the
+   * Form API submitted the string `'1'`. Configuration that is not stored in a
+   * config object — such as the block settings that Canvas stores in a
+   * component instance's `inputs` — must be cast explicitly.
+   *
+   * Mirrors core, with one deliberate difference: a value whose primitive type
+   * does not match the config schema is returned unchanged instead of cast.
+   * Casting it would silently replace it (`(int) 'no such page'` is `0`), and
+   * Canvas keeps such a value on purpose, so that validation can report it and
+   * the component instance form can show the Content Creator what they typed.
+   *
+   * Unlike ::castRawPhpTypes(), which normalizes content typed data into a
+   * hashable representation, this casts config typed data into the exact
+   * representation config schema prescribes for storage.
+   *
+   * @param \Drupal\Core\TypedData\TypedDataInterface $element
+   *   Typed config, typically from
+   *   \Drupal\Core\Config\TypedConfigManagerInterface::createFromNameAndData().
+   *
+   * @return mixed
+   *   Scalar or NULL for primitives; an array (keys preserved) for traversable
+   *   elements.
+   *
+   * @see \Drupal\Core\Config\StorableConfigBase::castValue()
+   * @see ::castRawPhpTypes()
+   */
+  public static function castToConfigSchemaTypes(TypedDataInterface $element): mixed {
+    // Config schema declines to describe these, so there is no type to cast to.
+    if ($element instanceof Undefined || $element instanceof Ignore) {
+      return $element->getValue();
+    }
+
+    if ($element instanceof TraversableTypedDataInterface) {
+      // An absent mapping or sequence must stay absent rather than become an
+      // empty array.
+      if ($element->getValue() === NULL) {
+        return NULL;
+      }
+      return \array_map(
+        static fn (TypedDataInterface $child): mixed => self::castToConfigSchemaTypes($child),
+        \iterator_to_array($element),
+      );
+    }
+
+    if (!$element instanceof PrimitiveInterface) {
+      return $element->getValue();
+    }
+
+    $value = $element->getValue();
+    // The config system is primarily fed by the Form API, where an empty string
+    // for a numeric field means "no value" rather than the number zero.
+    // @see \Drupal\Core\Config\StorableConfigBase::castValue()
+    if ($value === NULL || ($value === '' && ($element instanceof IntegerInterface || $element instanceof FloatInterface))) {
+      return NULL;
+    }
+
+    return self::isOfCorrectPrimitiveType($element) ? $element->getCastedValue() : $value;
+  }
+
+  /**
+   * Whether a primitive's value is representable as its config schema type.
+   *
+   * Asks the very constraint that reports this mismatch during validation, so
+   * that what is cast here and what validates there cannot drift apart.
+   *
+   * @param \Drupal\Core\TypedData\TypedDataInterface $element
+   *   The primitive typed config element to check.
+   *
+   * @return bool
+   *   TRUE if the value can be cast without being replaced by a different one.
+   *
+   * @see \Drupal\Core\Validation\Plugin\Validation\Constraint\PrimitiveTypeConstraintValidator
+   */
+  private static function isOfCorrectPrimitiveType(TypedDataInterface $element): bool {
+    \assert($element instanceof PrimitiveInterface);
+    // TRICKY: this hands the generic typed data manager's validator even config
+    // typed data, which carries its own manager (TypedConfigManager). That is
+    // correct: the validator re-resolves the element's own manager.
+    // @see \Drupal\Core\TypedData\Validation\RecursiveContextualValidator::validateNode()
+    $typed_data_manager = self::getTypedDataManger();
+    $primitive_type_constraint = $typed_data_manager->getValidationConstraintManager()
+      ->create('PrimitiveType', []);
+    return $typed_data_manager->getValidator()
+      ->validate($element, $primitive_type_constraint)
+      ->count() === 0;
   }
 
   private static function getTypedDataManger(): TypedDataManagerInterface {

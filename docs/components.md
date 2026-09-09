@@ -138,6 +138,13 @@ plugin. These explicit inputs can hence be seen as knobs and levers to adjust wh
 `Block` DOES provide an input UX (`BlockPluginInterface::buildConfigurationForm()`), so its `Component Source Plugin`
 simply reuses that.
 
+Because that UX is a form, the submitted values are strings, and neither the Form API nor a block plugin's
+`::blockSubmit()` casts them. A `Block` config entity nonetheless stores the types its config schema declares, because
+`Config::save()` casts them on the way to storage. A `Block` `component` instance's inputs are not stored in a config
+object, so `BlockComponent::clientModelToInput()` applies that same cast itself — an input declared `type: integer`
+is stored as `1`, never as `'1'`. A value the config schema cannot represent is stored unchanged, so that validation
+can report it and the component instance form can show the Content Creator what they typed.
+
 #### 3.2.2 Criteria for `Block` `component`s
 
 For a `Block` to be compatible/eligible for use in Canvas it:
