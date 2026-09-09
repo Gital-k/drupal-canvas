@@ -49,6 +49,7 @@ window.addEventListener('error', function (e) {
 <script type="module" src="{{ script_url }}" data-canvas-debug-module-script></script>
 <script>
 (function () {
+  var scriptUrl = '{{ script_url }}';
   var moduleScript = document.currentScript.previousElementSibling;
   console.log('[TEMP DEBUG shell] module script element found:', !!moduleScript, moduleScript && moduleScript.src, performance.now());
   if (moduleScript) {
@@ -59,6 +60,24 @@ window.addEventListener('error', function (e) {
       console.log('[TEMP DEBUG shell] module script ERROR event', performance.now(), e);
     });
   }
+  // A plain <script src> error event carries no detail at all. A manual
+  // fetch() of the exact same URL surfaces a real TypeError message/name
+  // (e.g. a CORS rejection vs. a genuine network failure read very
+  // differently), so run one in parallel purely for diagnostics.
+  fetch(scriptUrl, { mode: 'cors' }).then(
+    function (r) {
+      console.log('[TEMP DEBUG shell] manual fetch of script_url SUCCEEDED', performance.now(), r.status, r.type, r.ok);
+    },
+    function (e) {
+      console.log('[TEMP DEBUG shell] manual fetch of script_url FAILED', performance.now(), e.name, e.message);
+    },
+  );
+  setTimeout(function () {
+    var entries = performance.getEntriesByType('resource').filter(function (e) {
+      return e.name === scriptUrl;
+    });
+    console.log('[TEMP DEBUG shell] resource timing entries for script_url', performance.now(), JSON.stringify(entries));
+  }, 2000);
 })();
 </script>
 </head>
