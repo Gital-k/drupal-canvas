@@ -28,11 +28,14 @@ use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Display\VariantManager;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Render\PageDisplayVariantSelectionEvent;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Routing\RouteMatch;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Theme\ThemeInitializationInterface;
+use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
@@ -1014,40 +1017,57 @@ final class PageVariantTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that admin routes are excluded by admin context, not theme name.
+   * Tests that admin routes and the active admin theme are excluded.
    *
-   * The selector must key off the route's admin flag, not a comparison of the
-   * configured admin theme to the active theme. Sites can point the admin
-   * theme at the front-end theme (a name comparison would then bail on every
-   * front-end request) or leave it empty (a name comparison would never match,
-   * wrapping admin routes in page chrome).
+   * Admin theme negotiators can select the admin theme for a non-admin route.
+   * Exception subrequests can also replace an admin route with a synthetic
+   * route that lacks the `_admin_route` option.
    *
    * @see \Drupal\canvas\EventSubscriber\PageVariantSelectorSubscriber
    * @see \Drupal\Core\Routing\AdminContext::isAdminRoute()
    */
-  public function testAdminRoutesExcludedByAdminContext(): void {
+  public function testAdminRoutesAndAdminThemeExcluded(): void {
     PageVariant::create(['id' => 'site_default', 'label' => 'Site default', 'component_tree' => [self::markerInstance()]])->save();
     $this->config('canvas.settings')->set(PageVariant::DEFAULT_SETTING, 'site_default')->save();
 
     $subscriber = $this->container->get(PageVariantSelectorSubscriber::class);
     self::assertInstanceOf(PageVariantSelectorSubscriber::class, $subscriber);
 
-    // Point the admin theme at the default (front-end) theme. The removed name
-    // comparison would have bailed here; the site default variant must still be
-    // selected on a non-admin route.
-    $default_theme = $this->config('system.theme')->get('default');
-    $this->config('system.theme')->set('admin', $default_theme)->save();
+    $theme_manager = $this->container->get(ThemeManagerInterface::class);
+    self::assertInstanceOf(ThemeManagerInterface::class, $theme_manager);
+    $theme_initialization = $this->container->get(ThemeInitializationInterface::class);
+    self::assertInstanceOf(ThemeInitializationInterface::class, $theme_initialization);
+    $theme_installer = $this->container->get(ThemeInstallerInterface::class);
+    self::assertInstanceOf(ThemeInstallerInterface::class, $theme_installer);
+
+    // A non-admin route using the front-end theme receives the site default.
     $front_end = new Route('/a-front-end-page');
     $event = new PageDisplayVariantSelectionEvent('simple_page', new RouteMatch('canvas.test', $front_end, [], []));
     $subscriber->onSelectPageDisplayVariant($event);
     self::assertSame(CanvasPageVariant::PLUGIN_ID, $event->getPluginId());
 
-    // Clear the admin theme ("use default theme"). The removed name comparison
-    // would never match, so an admin route would be wrapped in page chrome; the
-    // admin-context check must exclude it instead.
+    // When both settings name the same theme, the active theme cannot identify
+    // whether an admin theme negotiator selected it. Front-end routes must keep
+    // receiving the site default variant.
+    $this->config('system.theme')->set('admin', 'stark')->save();
+    $event = new PageDisplayVariantSelectionEvent('simple_page', new RouteMatch('canvas.test', $front_end, [], []));
+    $subscriber->onSelectPageDisplayVariant($event);
+    self::assertSame(CanvasPageVariant::PLUGIN_ID, $event->getPluginId());
+
+    // An admin route remains excluded when no separate admin theme is set.
     $this->config('system.theme')->set('admin', '')->save();
     $admin_route = new Route('/admin/a-page', [], [], ['_admin_route' => TRUE]);
     $event = new PageDisplayVariantSelectionEvent('simple_page', new RouteMatch('canvas.test', $admin_route, [], []));
+    $subscriber->onSelectPageDisplayVariant($event);
+    self::assertSame('simple_page', $event->getPluginId());
+
+    // A theme negotiator may select the configured admin theme for a route
+    // without the admin option, as gin_login does for /user/login. Exception
+    // subrequests from admin routes have the same shape.
+    $theme_installer->install(['claro']);
+    $this->config('system.theme')->set('admin', 'claro')->save();
+    $theme_manager->setActiveTheme($theme_initialization->getActiveThemeByName('claro'));
+    $event = new PageDisplayVariantSelectionEvent('simple_page', new RouteMatch('canvas.test', $front_end, [], []));
     $subscriber->onSelectPageDisplayVariant($event);
     self::assertSame('simple_page', $event->getPluginId());
   }

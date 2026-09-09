@@ -16,6 +16,7 @@ use Drupal\Core\Render\PageDisplayVariantSelectionEvent;
 use Drupal\Core\Render\RenderEvents;
 use Drupal\Core\Routing\AdminContext;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Theme\ThemeManagerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -32,6 +33,7 @@ final class PageVariantSelectorSubscriber implements EventSubscriberInterface {
     private readonly AdminContext $adminContext,
     private readonly ConfigFactoryInterface $configFactory,
     private readonly AutoSaveManager $autoSaveManager,
+    private readonly ThemeManagerInterface $themeManager,
   ) {}
 
   /**
@@ -44,6 +46,18 @@ final class PageVariantSelectorSubscriber implements EventSubscriberInterface {
     // Page variants render front-end pages only, never administration routes
     // (the Canvas editor, admin pages, and so on).
     if ($this->adminContext->isAdminRoute($event->getRouteMatch()->getRouteObject())) {
+      return;
+    }
+
+    // Other theme negotiators can select the admin theme for non-admin routes.
+    // During exception subrequests, the current route is the error route while
+    // Drupal negotiates the active theme from the main request.
+    $theme_config = $this->configFactory->get('system.theme');
+    $admin_theme = (string) $theme_config->get('admin');
+    $default_theme = (string) $theme_config->get('default');
+    if ($admin_theme !== ''
+      && $admin_theme !== $default_theme
+      && $this->themeManager->getActiveTheme()->getName() === $admin_theme) {
       return;
     }
 
