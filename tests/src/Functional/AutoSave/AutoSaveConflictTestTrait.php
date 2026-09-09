@@ -2,24 +2,37 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\canvas\Kernel\AutoSave;
+namespace Drupal\Tests\canvas\Functional\AutoSave;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
-use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Extension\ModuleInstallerInterface;
-use Drupal\Core\Extension\ThemeInstallerInterface;
+use Drupal\Core\Url;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
-use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
-use Symfony\Component\HttpFoundation\Request;
+use GuzzleHttp\RequestOptions;
+use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Tests that outdated auto-save updates are rejected, for one entity type.
+ *
+ * These are functional tests rather than kernel tests because conflict
+ * detection depends on the `autoSaveStartingPoint`, which is derived from the
+ * saved entity, and hence on the response being cached correctly. Kernel tests
+ * cannot exercise that: they are seen as originating from the command line, so
+ * caching is denied.
+ *
+ * @see \Drupal\canvas\Controller\AutoSaveValidateTrait::validateAutoSaves()
+ * @see \Drupal\Core\PageCache\RequestPolicy\CommandLineOrUnsafeMethod
+ */
 trait AutoSaveConflictTestTrait {
 
-  use AutoSaveRequestTestTrait;
-
   protected EntityInterface $entity;
+
+  /**
+   * The CSRF token for the logged-in user, for unsafe HTTP methods.
+   */
+  protected string $csrfToken;
 
   abstract protected static function getPermissions(): array;
 
@@ -29,22 +42,32 @@ trait AutoSaveConflictTestTrait {
 
   abstract protected function assertCurrentAutoSaveText(string $text): void;
 
-  abstract protected function getUpdateAutoSaveRequest(array $json): Request;
+  /**
+   * The URL that both reads and updates this entity's auto-save state.
+   */
+  abstract protected function getAutoSaveUrl(): Url;
+
+  /**
+   * Performs the "update the auto-save state" request for this entity type.
+   *
+   * Implementations differ in HTTP method and in which parts of the GET
+   * response may be sent back, so the request itself is delegated rather than
+   * a Symfony Request object being built here.
+   */
+  abstract protected function requestUpdateAutoSave(array $json): ResponseInterface;
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get(ModuleInstallerInterface::class)->install(['system', 'block', 'user', 'dynamic_page_cache']);
-    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
-    $this->container->get(ConfigFactoryInterface::class)->getEditable('system.theme')->set('default', 'stark')->save();
 
     // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
 
     $this->setUpEntity();
-    $this->setUpCurrentUser(permissions: self::getPermissions());
+    $this->drupalLogin($this->createUser(static::getPermissions()));
+    $this->csrfToken = $this->drupalGet('session/token');
   }
 
   protected function getAutoSaveManager(): AutoSaveManager {
@@ -54,15 +77,65 @@ trait AutoSaveConflictTestTrait {
   }
 
   /**
+   * The request options shared by every request made by this test.
+   */
+  protected function getRequestOptions(): array {
+    return [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+        'X-CSRF-Token' => $this->csrfToken,
+      ],
+    ];
+  }
+
+  protected static function decodeResponse(ResponseInterface $response): array {
+    $body = (string) $response->getBody();
+    self::assertJson($body);
+    return \json_decode($body, TRUE, flags: JSON_THROW_ON_ERROR);
+  }
+
+  /**
+   * Reads the auto-save state.
+   */
+  protected function requestAutoSaveGet(): array {
+    $response = $this->makeApiRequest('GET', $this->getAutoSaveUrl(), $this->getRequestOptions());
+    $body = (string) $response->getBody();
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode(), $body);
+    return self::decodeResponse($response);
+  }
+
+  /**
+   * Asserts that updating the auto-save state with the given data conflicts.
+   */
+  protected function assertAutoSaveConflict(array $json): void {
+    $response = $this->requestUpdateAutoSave($json);
+    $body = (string) $response->getBody();
+    self::assertSame(Response::HTTP_CONFLICT, $response->getStatusCode(), $body);
+    self::assertStringContainsString('You do not have the latest changes, please refresh your browser.', $body);
+  }
+
+  /**
+   * Publishes every pending auto-save, the way the client does.
+   */
+  protected function publishAllAutoSaves(): void {
+    $listResponse = $this->makeApiRequest('GET', Url::fromRoute('canvas.api.auto-save.get'), $this->getRequestOptions());
+    self::assertSame(Response::HTTP_OK, $listResponse->getStatusCode(), (string) $listResponse->getBody());
+    $list = self::decodeResponse($listResponse);
+    self::assertArrayHasKey('data', $list);
+
+    $options = $this->getRequestOptions();
+    $options[RequestOptions::JSON] = $list['data'];
+    $publishResponse = $this->makeApiRequest('POST', Url::fromRoute('canvas.api.auto-save.post'), $options);
+    self::assertSame(Response::HTTP_OK, $publishResponse->getStatusCode(), (string) $publishResponse->getBody());
+  }
+
+  /**
    * 💡 Debug tip: put a breakpoint in the 409-throwing ::validateAutoSaves().
    */
   public function testOutdatedAutoSave(): void {
     $autoSaveKey = AutoSaveManager::getAutoSaveKey($this->entity);
-    $url = $this->getAutoSaveUrl();
 
-    $response = $this->request(Request::create($url));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $getJson = self::decodeResponse($response);
+    $getJson = $this->requestAutoSaveGet();
     // Even without an auto-save entry, the `autoSaves` value will not be empty.
     // We always need the `autoSaveStartingPoint` set to determine if the client data
     // is outdated because the `hash` being empty only indicates
@@ -81,9 +154,9 @@ trait AutoSaveConflictTestTrait {
     // - ✅ *any* client ID
     // - ✅ initial `autoSaveStartingPoint`
     // - ✅ null `hash`
-    $response = $this->request($this->getUpdateAutoSaveRequest($getJson));
+    $response = $this->requestUpdateAutoSave($getJson);
     $this->assertCurrentAutoSaveText('Updated text');
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getBody());
     $postJson = self::decodeResponse($response);
     // The auto-save hash should be set after the first auto-save update but the
     // `autoSaveStartingPoint` should be the same as the one from the GET request.
@@ -97,7 +170,7 @@ trait AutoSaveConflictTestTrait {
     // does not match!)
     // (Rationale: subsequent auto-saves must update the existing one,
     // identified by the hash, unless we know it is from the same client.)
-    $this->assertRequestAutoSaveConflict($this->getUpdateAutoSaveRequest($originalGetJson));
+    $this->assertAutoSaveConflict($originalGetJson);
     $this->assertCurrentAutoSaveText('Updated text');
 
     // Success: auto-save using:
@@ -109,8 +182,8 @@ trait AutoSaveConflictTestTrait {
     $originalGetJsonWithMatchingClientId = $originalGetJson;
     $originalGetJsonWithMatchingClientId['clientInstanceId'] = $originalClientId;
     $this->modifyJsonToSendAsAutoSave($originalGetJsonWithMatchingClientId, 'Updated text-finalV2');
-    $response = $this->request($this->getUpdateAutoSaveRequest($originalGetJsonWithMatchingClientId));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $response = $this->requestUpdateAutoSave($originalGetJsonWithMatchingClientId);
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getBody());
     $this->assertCurrentAutoSaveText('Updated text-finalV2');
 
     // Success: auto-save using:
@@ -121,17 +194,15 @@ trait AutoSaveConflictTestTrait {
     // previous auto-save request might still be ongoing.)
     $originalGetJsonWithMatchingClientId['autoSaves'][$autoSaveKey]['hash'] = $this->randomString(8);
     $this->modifyJsonToSendAsAutoSave($originalGetJsonWithMatchingClientId, 'Updated text-finalV2a');
-    $response = $this->request($this->getUpdateAutoSaveRequest($originalGetJsonWithMatchingClientId));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $response = $this->requestUpdateAutoSave($originalGetJsonWithMatchingClientId);
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getBody());
     $this->assertCurrentAutoSaveText('Updated text-finalV2a');
 
-    $this->makePublishAllRequest();
+    $this->publishAllAutoSaves();
 
     // After publishing the auto-save hash should be empty and the
     // `autoSaveStartingPoint` should be different.
-    $response = $this->request(Request::create($url));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $postPublishGetJson = self::decodeResponse($response);
+    $postPublishGetJson = $this->requestAutoSaveGet();
     $this->assertNull($postPublishGetJson['autoSaves'][$autoSaveKey]['hash']);
     $this->assertNotEmpty($postPublishGetJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint']);
     $this->assertNotEquals($postPublishGetJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint'], $originalGetJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint']);
@@ -141,7 +212,7 @@ trait AutoSaveConflictTestTrait {
     // - ❌ initial `autoSaveStartingPoint` (non-matching!)
     // - ✅ null `hash`
     // (Rationale: auto-saves targeting a past entity revision make no sense.)
-    $this->assertRequestAutoSaveConflict($this->getUpdateAutoSaveRequest($originalGetJson));
+    $this->assertAutoSaveConflict($originalGetJson);
 
     // Conflict: auto-save using:
     // - ✅ matching client ID
@@ -154,7 +225,7 @@ trait AutoSaveConflictTestTrait {
     $originalGetJsonWithMatchingClientId = $originalGetJson;
     $originalGetJsonWithMatchingClientId['clientInstanceId'] = $originalClientId;
     $this->modifyJsonToSendAsAutoSave($originalGetJsonWithMatchingClientId, 'Updated text-finalV3');
-    $this->assertRequestAutoSaveConflict($this->getUpdateAutoSaveRequest($originalGetJsonWithMatchingClientId));
+    $this->assertAutoSaveConflict($originalGetJsonWithMatchingClientId);
 
     // Success: auto-save using:
     // - ✅ matching client ID
@@ -162,8 +233,8 @@ trait AutoSaveConflictTestTrait {
     // - ✅ null `hash`
     $postPublishGetJson['clientInstanceId'] = $originalClientId;
     $this->modifyJsonToSendAsAutoSave($postPublishGetJson, 'Updated text-finalV4');
-    $response = $this->request($this->getUpdateAutoSaveRequest($postPublishGetJson));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $response = $this->requestUpdateAutoSave($postPublishGetJson);
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getBody());
     $this->assertCurrentAutoSaveText('Updated text-finalV4');
 
     // Conflict: auto-save using:
@@ -174,32 +245,20 @@ trait AutoSaveConflictTestTrait {
     self::assertFalse($autoSaveEntity->isEmpty());
     self::assertSame($originalClientId, $autoSaveEntity->clientId);
     $originalGetJsonWithMatchingClientId['autoSaves'][$autoSaveKey]['hash'] = $autoSaveEntity->hash;
-    $this->assertRequestAutoSaveConflict($this->getUpdateAutoSaveRequest($originalGetJsonWithMatchingClientId));
+    $this->assertAutoSaveConflict($originalGetJsonWithMatchingClientId);
     $this->assertCurrentAutoSaveText('Updated text-finalV4');
 
     // Ensure that the `autoSaveStartingPoint` is updated *immediately* after
     // every entity save, not just after auto-saves.
-    // @todo We should be able to assert here that there's an
-    //   `X-Drupal-Dynamic-Cache: HIT` here, but we can't due to this being a
-    //   kernel test, which makes CommandLineOrUnsafeMethod deny caching.
-    //   Convert tests that use this trait to functional tests to be able to
-    //   test this in https://drupal.org/i/3535315.
-    $response = $this->request(Request::create($url));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $preEntitySaveJson = self::decodeResponse($response);
+    // @todo Assert an `X-Drupal-Dynamic-Cache: HIT` here, now possible thanks to this being a functional test, in https://drupal.org/i/3535315
+    $preEntitySaveJson = $this->requestAutoSaveGet();
     $this->assertNotNull($preEntitySaveJson['autoSaves'][$autoSaveKey]['hash']);
     $this->assertNotEmpty($preEntitySaveJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint']);
 
     $this->entity->save();
 
-    // @todo We should be able to assert here that there's an
-    //   `X-Drupal-Dynamic-Cache: MISS` here, but we can't due to this being a
-    //   kernel test, which makes CommandLineOrUnsafeMethod deny caching.
-    //   Convert tests that use this trait to functional tests to be able to
-    //   test this in https://drupal.org/i/3535315.
-    $response = $this->request(Request::create($url));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $postEntitySaveJson = self::decodeResponse($response);
+    // @todo Assert an `X-Drupal-Dynamic-Cache: MISS` here, now possible thanks to this being a functional test, in https://drupal.org/i/3535315
+    $postEntitySaveJson = $this->requestAutoSaveGet();
     $this->entity instanceof CanvasHttpApiEligibleConfigEntityInterface ?
         // For CanvasHttpApiEligibleConfigEntityInterface entities the auto-save
         // will be deleted after the entity save.
@@ -211,7 +270,5 @@ trait AutoSaveConflictTestTrait {
     // The `autoSaveStartingPoint` should have changed.
     self::assertNotEquals($preEntitySaveJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint'], $postEntitySaveJson['autoSaves'][$autoSaveKey]['autoSaveStartingPoint']);
   }
-
-  abstract protected function getAutoSaveUrl(): string;
 
 }
