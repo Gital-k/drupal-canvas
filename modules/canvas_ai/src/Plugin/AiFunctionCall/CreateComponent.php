@@ -10,6 +10,7 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
+use Drupal\canvas_ai\AiResponseValidator;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
@@ -17,7 +18,6 @@ use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\Yaml\Yaml;
 
 /**
  * Plugin implementation of the create component function.
@@ -77,6 +77,13 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
   protected LoggerInterface $logger;
 
   /**
+   * The AI response validator.
+   *
+   * @var \Drupal\canvas_ai\AiResponseValidator
+   */
+  protected AiResponseValidator $responseValidator;
+
+  /**
    * Load from dependency injection container.
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface | static {
@@ -88,6 +95,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
     );
     $instance->entityTypeManager = $container->get(EntityTypeManagerInterface::class);
     $instance->logger = $container->get(LoggerChannelFactoryInterface::class)->get('canvas_ai');
+    $instance->responseValidator = $container->get('canvas_ai.response_validator');
     return $instance;
   }
 
@@ -104,18 +112,18 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
       $slots = $this->getContextValue('slots_metadata') ?? '';
       $machine_name = strtolower(preg_replace('/\s+/', '_', $component_name));
 
-      // Check if the component exists.
-      /** @var \Drupal\canvas\Entity\JavaScriptComponent $component */
-      $component = $this->entityTypeManager->getStorage('js_component')->load($machine_name);
+      // Every check adds to $errors instead of stopping at the first one, so
+      // the model can fix everything in a single retry.
+      $errors = [];
 
-      // If the component does not exist, return an error.
+      // Check if the component exists.
+      $component = $this->entityTypeManager->getStorage('js_component')->load($machine_name);
       if ($component) {
-        throw new \Exception("The component with same name already exists.");
+        $errors['Component'][] = 'The component with same name already exists.';
       }
 
       if (str_contains($css, '@apply')) {
-        $this->setOutput(Yaml::dump(['error' => '@apply directives are not supported.'], 10, 2));
-        return;
+        $errors['Component'][] = '@apply directives are not supported.';
       }
       $props_array = Json::decode($props);
       $transformed_props = [];
@@ -146,7 +154,9 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
         }
       }
 
-      $transformed_slots = $this->transformSlotsMetadata($slots);
+      $slot_errors = [];
+      $transformed_slots = $this->transformSlotsMetadata($slots, $slot_errors);
+      $errors = \array_merge($errors, $slot_errors);
 
       $output = [
         'name' => $component_name,
@@ -164,23 +174,30 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
         'slots' => $transformed_slots,
         'dataDependencies' => [],
       ];
-      $violations = JavaScriptComponent::createFromClientSide($output)->getTypedData()->validate();
-      if ($violations->count() > 0) {
+      // The structure is only meaningful when every slot was accepted.
+      if ($slot_errors === []) {
+        $violations = JavaScriptComponent::createFromClientSide($output)->getTypedData()->validate();
+        if ($violations->count() > 0) {
+          // Translate constraint property paths to match YAML input structure
+          $translatedViolations = $this->translateConstraintPropertyPathsAndRoot(
+            ['' => 'component_structure.'],
+            $violations,
+            ''
+          );
+          $errors['Component'][] = (new ConstraintViolationException($translatedViolations, 'Component validation errors'))->getMessage();
+        }
+      }
 
-        // Translate constraint property paths to match YAML input structure
-        $translatedViolations = $this->translateConstraintPropertyPathsAndRoot(
-          ['' => 'component_structure.'],
-          $violations,
-          ''
-        );
-        throw new ConstraintViolationException($translatedViolations, 'Component validation errors');
+      if ($errors !== []) {
+        $message = $this->responseValidator->formatErrors($errors);
+        $this->logger->warning($message);
+        $this->setOutput($message);
+        return;
       }
     }
     catch (\Exception $e) {
       $this->logger->error($e->getMessage());
-      // \Drupal\canvas_ai\Controller\CanvasBuilder::render() also YAML parsable output.
-      // @see \Drupal\canvas_ai\Controller\CanvasBuilder::render()
-      $this->setOutput(Yaml::dump(['error' => \sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
+      $this->setOutput(\sprintf('Failed to process Javascript component data: %s', $e->getMessage()));
       return;
     }
     $this->setStructuredOutput(['component_structure' => $output]);
