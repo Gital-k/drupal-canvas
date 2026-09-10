@@ -121,16 +121,18 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
         \is_array($layout_data) ? $layout_data : [],
       );
       foreach ($this->getContextValue('operations') as $index => $operation) {
-        $errors = [];
+        $errors = $this->validatePlacementParams($operation, $current_layout, $components_by_uuid);
         try {
           $operation['components'] = Yaml::parse($operation['components'] ?? '');
+          // A block that did not parse is reported below; its shape is only
+          // checked once it has.
+          $errors = \array_merge($errors, self::validateComponents($operation['components']));
         }
         catch (ParseException $e) {
           // A raw parse error gives the model nothing to act on, so it retries
           // the same payload; tell it how to fix the YAML instead.
           $errors[] = \sprintf("The components value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
         }
-        $errors = \array_merge($errors, $this->validatePlacementParams($operation, $current_layout, $components_by_uuid));
         if (\is_array($operation['components'])) {
           try {
             $this->responseValidator->validateComponentStructure($operation['components']);
@@ -178,10 +180,10 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
   }
 
   /**
-   * Validates the placement parameters of a single operation.
+   * Validates the target, placement and reference of a single operation.
    *
    * @param array $operation
-   *   The operation to validate, with its components block already parsed.
+   *   The operation to validate.
    * @param string $current_layout
    *   The current layout JSON string, used to resolve the target region.
    * @param array $components_by_uuid
@@ -241,15 +243,27 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
       }
     }
 
-    // Operation must contain components, as a parseable YAML list.
-    if (!\is_array($operation['components'] ?? NULL)) {
-      $errors[] = 'The components value must be a YAML list.';
-    }
-    elseif ($operation['components'] === []) {
-      $errors[] = 'The operation must contain components.';
-    }
-
     return $errors;
+  }
+
+  /**
+   * Validates the parsed components block of a single operation.
+   *
+   * @param mixed $components
+   *   The operation's parsed components value.
+   *
+   * @return list<string>
+   *   The validation errors found, or an empty list if the block is a
+   *   non-empty list.
+   */
+  private static function validateComponents(mixed $components): array {
+    if (!\is_array($components)) {
+      return ['The components value must be a YAML list.'];
+    }
+    if ($components === []) {
+      return ['The operation must contain components.'];
+    }
+    return [];
   }
 
 }

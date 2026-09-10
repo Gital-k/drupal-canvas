@@ -481,7 +481,7 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
                   text: 2233-33-33
             YAML, placement: 'sideways'),
         ],
-        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - The components value is not valid YAML: The date "2233-33-33" could not be parsed as it is an invalid date at line 5 (near "text: 2233-33-33"). Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too. - The placement key is missing or invalid in the operation. - The components value must be a YAML list.',
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - The placement key is missing or invalid in the operation. - The components value is not valid YAML: The date "2233-33-33" could not be parsed as it is an invalid date at line 5 (near "text: 2233-33-33"). Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.',
       ],
       'a_different_error_kind_in_each_operation' => [
         'layout_type' => 'multi_region_empty',
@@ -503,7 +503,7 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
                   element: 'h2'
             YAML, target: 'footer', placement: 'below'),
         ],
-        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - The components value is not valid YAML: The date "2233-33-33" could not be parsed as it is an invalid date at line 5 (near "text: 2233-33-33"). Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too. - The components value must be a YAML list. ## Operation 1 - Component validation errors: components.0.[sdc.canvas_test_sdc.my-hero].props.cta1href: The property cta1href is required. ## Operation 2 - The reference_uuid must be provided for above/below placement.',
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - The components value is not valid YAML: The date "2233-33-33" could not be parsed as it is an invalid date at line 5 (near "text: 2233-33-33"). Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too. ## Operation 1 - Component validation errors: components.0.[sdc.canvas_test_sdc.my-hero].props.cta1href: The property cta1href is required. ## Operation 2 - The reference_uuid must be provided for above/below placement.',
       ],
       'nonexistent_component_ids' => [
         'layout_type' => 'multi_region_empty',
