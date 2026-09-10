@@ -129,14 +129,11 @@ const getWeightDeclaration = (font: AssetLibraryFont): string => {
 };
 
 /**
- * The `font-style` a single `@font-face` can honestly declare for this file.
+ * Returns the `font-style` to declare in this file's `@font-face`.
  *
- * A range is only spellable for `oblique <angle>`: `normal italic` is not a
- * valid descriptor, so a font whose `ital` axis spans both is declared as the
- * upright face it defaults to. Its italic is reached through
- * `font-variation-settings`, not by asking the browser for `font-style:
- * italic` — which, against an upright face, would have the browser fake a slant
- * on top of the one the axis already applies.
+ * - `@font-face` cannot declare a `normal` to `italic` range.
+ * - For fonts supporting both, we declare the default style here.
+ * - The alternate style is reached via `font-variation-settings` to avoid synthetic browser slanting.
  */
 export const getFontFaceStyleDeclaration = (font: AssetLibraryFont): string => {
   const italicAxis = font.axes?.find((axis) => axis.tag === 'ital');
