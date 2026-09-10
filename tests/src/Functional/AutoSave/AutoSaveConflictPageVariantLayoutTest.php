@@ -98,14 +98,12 @@ final class AutoSaveConflictPageVariantLayoutTest extends AutoSaveConflictLayout
   public function testMissingAutoSaveEntryConflicts(): void {
     // A user without the page variant admin permission cannot reach the
     // variant's layout routes at all.
-    $this->drupalLogin($this->createUser(array_diff(self::getPermissions(), [PageVariant::ADMIN_PERMISSION])));
-    $this->csrfToken = $this->drupalGet('session/token');
+    $this->loginWithPermissions(array_diff(self::getPermissions(), [PageVariant::ADMIN_PERMISSION]));
     $response = $this->makeApiRequest('GET', $this->getAutoSaveUrl(), $this->getRequestOptions());
     // The layout routes require update access to the page variant.
     self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), (string) $response->getBody());
 
-    $this->drupalLogin($this->createUser(self::getPermissions()));
-    $this->csrfToken = $this->drupalGet('session/token');
+    $this->loginWithPermissions(self::getPermissions());
     $getJson = $this->requestAutoSaveGet();
 
     // Posting back the GET response with the variant's own `autoSaves` entry

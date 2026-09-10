@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Functional\AutoSave;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
 use Drupal\dynamic_page_cache\EventSubscriber\DynamicPageCacheSubscriber;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
@@ -67,7 +68,18 @@ trait AutoSaveConflictTestTrait {
     (new CanvasTestSetup())->setup();
 
     $this->setUpEntity();
-    $this->drupalLogin($this->createUser(static::getPermissions()));
+    $this->loginWithPermissions(static::getPermissions());
+  }
+
+  /**
+   * Logs in a freshly created user, and refreshes its CSRF token.
+   */
+  protected function loginWithPermissions(array $permissions): void {
+    $account = $this->createUser($permissions);
+    // On the minimum supported core version ::createUser() returns FALSE on
+    // failure; from 11.4 onwards it always returns a user object.
+    self::assertInstanceOf(AccountInterface::class, $account);
+    $this->drupalLogin($account);
     $this->csrfToken = $this->drupalGet('session/token');
   }
 
