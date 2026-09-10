@@ -230,7 +230,7 @@ final class DefaultContentExportImportTest extends BrowserTestBase {
     ]);
     $violations = $original_page->validate();
     self::assertCount(1, $violations);
-    self::assertEquals($violations->get(0)->getMessage(), 'When using the default static prop source for a component input, you must use the collapsed input syntax.');
+    self::assertEquals($violations->get(0)->getMessage(), 'The <em class="placeholder">text</em> component input uses the uncollapsed representation of the <em class="placeholder">static:field_item:string</em> prop source. It must use the collapsed representation: <em class="placeholder">&quot;I lead with this&quot;</em>.');
     self::assertEquals($violations->get(0)->getPropertyPath(), "components.0.inputs.$head_sdc_uuid");
     $original_page->save();
     self::assertPageReferencesTargetEntity($original_page, $original_media, $image_sdc_uuid, 'image');

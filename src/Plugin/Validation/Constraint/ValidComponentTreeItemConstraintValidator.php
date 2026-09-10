@@ -14,6 +14,18 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\ConstraintViolationList;
 
+/**
+ * Validates a single component instance in a component tree.
+ *
+ * Besides delegating to the component source plugin, this checks that every
+ * explicit input is stored in its *collapsed* representation: the compact
+ * storage representation that Canvas requires, as opposed to the *uncollapsed*
+ * (runtime) representation.
+ *
+ * @see docs/data-model.md, section 3.2.2
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::collapse()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::uncollapse()
+ */
 final class ValidComponentTreeItemConstraintValidator extends ConstraintValidator {
 
   use ConfigComponentTreeTrait;
@@ -107,10 +119,10 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
       }
     }
 
-    // Also add a violation error if the inputs contain static prop sources that
-    // either:
-    // - deviate from those for the Component entity at the referenced version
-    // - or are unoptimized ("uncollapsed")
+    // Also add a violation error if the inputs contain either:
+    // - static prop sources that deviate from those for the Component entity at
+    //   the referenced version
+    // - prop sources of any type that are unoptimized ("uncollapsed")
     // Unless there's >=1 garbage input violation: optimization would fail in
     // that case, so there's no point in attempting it. The garbage value must
     // be removed first.
@@ -131,12 +143,28 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
         ->atPath(\sprintf('inputs.%s', $value->getUuid()))
         ->addViolation();
     }
-    // Don't allow uncollapsed inputs for StaticPropSources.
-    $before_optimize = \hash('xxh64', \json_encode($stored_explicit_input, \JSON_THROW_ON_ERROR));
-    $after_optimize = \hash('xxh64', \json_encode($value->getInputs(), \JSON_THROW_ON_ERROR));
-    if ($after_optimize !== $before_optimize) {
-      // @todo Document this at https://www.drupal.org/i/3564135
-      $this->context->buildViolation('When using the default static prop source for a component input, you must use the collapsed input syntax.')
+    // Don't allow uncollapsed inputs: every prop source must be stored in its
+    // collapsed representation. ::optimizeInputs() collapsed the inputs above,
+    // so any input whose stored representation differs from the optimized one
+    // was stored uncollapsed.
+    // @see docs/data-model.md, section 3.2.2
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::collapse()
+    $collapsed_explicit_input = $value->getInputs() ?? [];
+    foreach ($stored_explicit_input as $prop_name => $stored_prop_input) {
+      $collapsed_prop_input = $collapsed_explicit_input[$prop_name] ?? NULL;
+      if ($stored_prop_input === $collapsed_prop_input) {
+        continue;
+      }
+      // Only prop sources stored as an array carrying a `sourceType` key are
+      // uncollapsed, and hence only those can be collapsed any further.
+      \assert(\is_array($stored_prop_input) && \array_key_exists('sourceType', $stored_prop_input));
+      $this->context->buildViolation(
+        'The %prop_name component input uses the uncollapsed representation of the %source_type prop source. It must use the collapsed representation: %collapsed_representation.',
+        [
+          '%prop_name' => $prop_name,
+          '%source_type' => $stored_prop_input['sourceType'],
+          '%collapsed_representation' => \json_encode($collapsed_prop_input, \JSON_THROW_ON_ERROR),
+        ])
         ->atPath(\sprintf('inputs.%s', $value->getUuid()))
         ->addViolation();
     }
