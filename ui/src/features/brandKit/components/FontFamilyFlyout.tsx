@@ -72,10 +72,8 @@ const FontFamilyFlyout = ({
   onWeightCommit,
   selectedFont,
 }: FontFamilyFlyoutProps) => {
-  // A family is only offered "Add variant" when it is not variable, but the
-  // list of files is shown whenever there is more than one — including the
-  // several files a variable family can still hold, such as an upright and an
-  // italic. Otherwise every file but the first would be unreachable.
+  // Show variant files whenever a family has multiple files (including variable families),
+  // so users can choose between entries like upright vs italic.
   const isVariableFamily = isVariableFontFamily(fontGroup.fonts);
   const hasVariantList = fontGroup.fonts.length > 1;
   const isVariableSelection = selectedFont
