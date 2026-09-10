@@ -895,8 +895,8 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
       'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => [
         'allowed_values' => [
-          1.5 => 'One point five',
-          2.5 => 'Two point five',
+          '1.5' => 'One point five',
+          '2.5' => 'Two point five',
         ],
       ],
     ])->save();

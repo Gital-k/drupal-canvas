@@ -2,12 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Drupal\canvas\ShapeMatcher;
+namespace Drupal\canvas\Utility;
 
 use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\options\Plugin\Field\FieldType\ListFloatItem;
-use Drupal\options\Plugin\Field\FieldType\ListIntegerItem;
-use Drupal\options\Plugin\Field\FieldType\ListStringItem;
 
 /**
  * Shared policy for delta-less multi-valued entity-field mappings.
@@ -21,14 +18,19 @@ use Drupal\options\Plugin\Field\FieldType\ListStringItem;
 final class EntityFieldMappingSupport {
 
   /**
+   * @var list<string>
+   */
+  private const SUPPORTED_MULTI_VALUED_FIELD_TYPES = [
+    'list_string',
+    'list_integer',
+    'list_float',
+  ];
+
+  /**
    * Whether a field supports delta-less multi-valued entity-field mapping.
    */
   public static function supportsDeltaLessMultiValuedMapping(FieldDefinitionInterface $field_definition): bool {
-    return \in_array($field_definition->getFieldStorageDefinition()->getFieldItemClass(), [
-      ListStringItem::class,
-      ListIntegerItem::class,
-      ListFloatItem::class,
-    ], TRUE);
+    return \in_array($field_definition->getType(), self::SUPPORTED_MULTI_VALUED_FIELD_TYPES, TRUE);
   }
 
 }
