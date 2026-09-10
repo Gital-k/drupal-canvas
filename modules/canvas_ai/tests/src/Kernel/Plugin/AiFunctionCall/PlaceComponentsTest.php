@@ -777,6 +777,34 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
           ],
         ],
       ],
+      'test_placement_inside_empty_slot' => [
+        'layout_type' => 'multi_region_with_slots',
+        'operations' => [
+          self::buildOperation(<<<YAML
+            - sdc.canvas_test_sdc.heading:
+                props:
+                  text: "In the empty column"
+                  element: "h2"
+            YAML, target: '2f957795-e30a-46a0-acfe-868adc0685bf/column_one'),
+        ],
+        'expected_output' => [
+          'operations' => [
+            [
+              'operation' => 'ADD',
+              'components' => [
+                [
+                  'id' => 'sdc.canvas_test_sdc.heading',
+                  'nodePath' => [1, 0, 0, 0],
+                  'fieldValues' => [
+                    'text' => 'In the empty column',
+                    'element' => 'h2',
+                  ],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
     ];
   }
 
@@ -877,6 +905,42 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
         ],
         'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Region "sidebar" does not exist. Available regions are: header, content, footer.',
       ],
+      'test_unknown_slot_parent' => [
+        'layout_type' => 'multi_region_with_slots',
+        'operations' => [
+          self::buildOperation(<<<YAML
+            - sdc.canvas_test_sdc.heading:
+                props:
+                  text: "Some text"
+                  element: "h1"
+            YAML, target: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/column_one'),
+        ],
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Component with UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" not found in layout',
+      ],
+      'test_unknown_slot_name' => [
+        'layout_type' => 'multi_region_with_slots',
+        'operations' => [
+          self::buildOperation(<<<YAML
+            - sdc.canvas_test_sdc.heading:
+                props:
+                  text: "Some text"
+                  element: "h1"
+            YAML, target: '2f957795-e30a-46a0-acfe-868adc0685bf/column_three'),
+        ],
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Slot "column_three" not found in path "content/2f957795-e30a-46a0-acfe-868adc0685bf"',
+      ],
+      'test_inside_slot_with_children' => [
+        'layout_type' => 'multi_region_with_slots',
+        'operations' => [
+          self::buildOperation(<<<YAML
+            - sdc.canvas_test_sdc.heading:
+                props:
+                  text: "Some text"
+                  element: "h1"
+            YAML, target: '2f957795-e30a-46a0-acfe-868adc0685bf/column_two'),
+        ],
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - The target 2f957795-e30a-46a0-acfe-868adc0685bf/column_two has "inside" placement specified, but it contains child components. Select any child component in the target and use "above" or "below" placement instead.',
+      ],
     ];
   }
 
@@ -920,6 +984,44 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
                 'name' => 'sdc.canvas_test_sdc.heading',
                 'uuid' => '72384115-a8ee-44bc-9a13-de1c7a4d9b96',
                 'nodePath' => [1, 0],
+              ],
+            ],
+          ],
+          'footer' => [
+            'nodePathPrefix' => [2],
+            'components' => [],
+          ],
+        ],
+      ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+      // A two_column component whose column_one slot is empty and whose
+      // column_two slot holds a druplicon.
+      'multi_region_with_slots' => json_encode([
+        'regions' => [
+          'header' => [
+            'nodePathPrefix' => [0],
+            'components' => [],
+          ],
+          'content' => [
+            'nodePathPrefix' => [1],
+            'components' => [
+              [
+                'name' => 'sdc.canvas_test_sdc.two_column',
+                'uuid' => '2f957795-e30a-46a0-acfe-868adc0685bf',
+                'nodePath' => [1, 0],
+                'slots' => [
+                  '2f957795-e30a-46a0-acfe-868adc0685bf/column_one' => [
+                    'components' => [],
+                  ],
+                  '2f957795-e30a-46a0-acfe-868adc0685bf/column_two' => [
+                    'components' => [
+                      [
+                        'name' => 'sdc.canvas_test_sdc.druplicon',
+                        'uuid' => '4e45ef4c-501c-4612-b02b-1911e88a4592',
+                        'nodePath' => [1, 0, 1, 0],
+                      ],
+                    ],
+                  ],
+                ],
               ],
             ],
           ],
