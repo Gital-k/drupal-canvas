@@ -85,7 +85,14 @@ abstract class TranslationPropagationTestBase extends CanvasKernelTestBase {
     'optional_text' => 'HO',
   ];
 
+  /**
+   * The code component whose mutations the test propagates.
+   */
   protected JavaScriptComponent $jsComponent;
+
+  /**
+   * The version `$jsComponent` was at before the test mutated it.
+   */
   protected string $originalVersion;
 
   /**

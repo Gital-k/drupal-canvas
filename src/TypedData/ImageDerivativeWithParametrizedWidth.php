@@ -28,6 +28,9 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
     getValue as private traitGetValue;
   }
 
+  /**
+   * The computed derivative URL, unset until it has been computed.
+   */
   private ?GeneratedUrl $computedValue;
 
   /**

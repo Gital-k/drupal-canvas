@@ -42,6 +42,9 @@ final class ExternalComponentSync {
    */
   private const int SUPPORTED_PAYLOAD_VERSION = 1;
 
+  /**
+   * Discovers the code components that already exist locally.
+   */
   private readonly JsComponentDiscovery $jsComponentDiscovery;
 
   public function __construct(

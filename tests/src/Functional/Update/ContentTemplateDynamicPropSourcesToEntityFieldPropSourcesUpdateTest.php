@@ -21,6 +21,9 @@ use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 #[IgnoreDeprecations]
 final class ContentTemplateDynamicPropSourcesToEntityFieldPropSourcesUpdateTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   public const string EXPECT_DEPRECATION_3566701 = 'The "dynamic" prop source was renamed to "entity field" and is deprecated in canvas:1.2.0 and will be removed from canvas:2.0.0. Re-save (and re-export) all Canvas content templates. See https://www.drupal.org/node/3566701';

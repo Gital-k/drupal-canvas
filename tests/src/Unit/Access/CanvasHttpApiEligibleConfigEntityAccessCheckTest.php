@@ -22,6 +22,9 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('canvas')]
 class CanvasHttpApiEligibleConfigEntityAccessCheckTest extends UnitTestCase {
 
+  /**
+   * The route match the access check is given.
+   */
   protected RouteMatchInterface $routeMatch;
 
   protected function setUp(): void {

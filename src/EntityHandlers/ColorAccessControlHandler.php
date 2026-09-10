@@ -35,6 +35,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 final class ColorAccessControlHandler extends CanvasConfigEntityAccessControlHandler {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $viewLabelOperation = TRUE;
 
   public function __construct(

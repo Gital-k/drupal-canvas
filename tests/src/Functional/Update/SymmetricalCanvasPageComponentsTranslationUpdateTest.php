@@ -22,6 +22,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas_translation')]
 final class SymmetricalCanvasPageComponentsTranslationUpdateTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   private const SYMMETRICAL = [

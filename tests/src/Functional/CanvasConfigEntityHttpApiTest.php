@@ -80,8 +80,14 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
    */
   protected $defaultTheme = 'stark';
 
+  /**
+   * A user with every permission the HTTP API requires.
+   */
   protected readonly UserInterface $httpApiUser;
 
+  /**
+   * The folders Canvas installs, as the HTTP API returns them.
+   */
   protected array $defaultFolders = [
     '0bac3d4b-3ee1-47e7-9124-0d0b6882055d' => [
       'name' => 'Atom/Media',
@@ -256,6 +262,9 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     ],
   ];
 
+  /**
+   * A user missing some of the permissions the HTTP API requires.
+   */
   protected readonly UserInterface $limitedPermissionsUser;
 
   protected function setUp(): void {

@@ -21,7 +21,19 @@ use Drupal\image\Entity\ImageStyle;
  */
 final class ParametrizedImageStyle extends ImageStyle {
 
+  /**
+   * Values for the parameters in the image style's URI template.
+   *
+   * Currently only `width` is parametrized.
+   */
   private array $parameters = [];
+
+  /**
+   * Whether a URI template is being built instead of a concrete derivative.
+   *
+   * While TRUE, parameter placeholders are left in the generated URI
+   * rather than substituted.
+   */
   private bool $buildingTemplate = FALSE;
 
   public static function load($id): ?self {

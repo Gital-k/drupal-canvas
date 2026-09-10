@@ -16,6 +16,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 final class JavascriptComponentStorage extends CanvasAssetStorage {
 
+  /**
+   * The component source plugin manager.
+   */
   private ComponentSourceManager $componentSourceManager;
 
   /**

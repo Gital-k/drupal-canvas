@@ -15,6 +15,9 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('canvas')]
 final class CanvasParametrizedWidthImageStyleAvifUpdateTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   protected const string EFFECT_ID = '249b8926-f421-4d60-8453-fb5d9265c731';

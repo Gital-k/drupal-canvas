@@ -22,6 +22,9 @@ final class CanvasAiDefaultInformationToolsTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'ai',
     'ai_agents',

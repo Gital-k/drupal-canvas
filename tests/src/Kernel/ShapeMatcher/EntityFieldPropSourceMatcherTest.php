@@ -661,7 +661,14 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
     ],
   ];
 
+  /**
+   * Entity type ID of the host entity the current test case matches against.
+   */
   protected ?string $testedHostEntityTypeId = NULL;
+
+  /**
+   * Bundle of the host entity the current test case matches against.
+   */
   protected ?string $testedHostEntityBundle = NULL;
 
   /**

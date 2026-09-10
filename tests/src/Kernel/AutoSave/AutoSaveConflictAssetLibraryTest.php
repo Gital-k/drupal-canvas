@@ -18,6 +18,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[RunTestsInSeparateProcesses]
 final class AutoSaveConflictAssetLibraryTest extends AutoSaveConflictConfigTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected string $updateKey = 'label';
 
   protected function setUpEntity(): void {

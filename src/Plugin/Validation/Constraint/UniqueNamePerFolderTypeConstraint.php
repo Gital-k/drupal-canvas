@@ -19,9 +19,19 @@ use Symfony\Component\Validator\Constraint;
 )]
 final class UniqueNamePerFolderTypeConstraint extends Constraint {
 
+  /**
+   * Entity type ID of the folder type that names must be unique within.
+   */
   public string $configEntityTypeId;
+
+  /**
+   * ID of the folder being validated, excluded from the uniqueness search.
+   */
   public string $id;
 
+  /**
+   * Violation message for a name another folder of the same type already uses.
+   */
   public string $notUnique = 'Name %value is not unique in Folder type "%configEntityTypeId"';
 
   /**

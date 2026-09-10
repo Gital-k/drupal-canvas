@@ -31,6 +31,9 @@ trait ComputedDataTypeWithCacheabilityTrait {
    */
   private CacheableMetadata $cacheability;
 
+  /**
+   * Whether the value has been computed, to compute it at most once.
+   */
   private bool $isComputed = FALSE;
 
   /**

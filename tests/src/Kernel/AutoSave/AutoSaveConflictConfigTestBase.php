@@ -24,6 +24,9 @@ abstract class AutoSaveConflictConfigTestBase extends KernelTestBase {
   use UserCreationTrait;
   use VfsPublicStreamUrlTrait;
 
+  /**
+   * The entity property that the conflict is provoked by updating.
+   */
   protected string $updateKey;
 
   protected static function getPermissions(): array {

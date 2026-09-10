@@ -34,6 +34,9 @@ final class SdcContentEntityReferencePropTest extends CanvasKernelTestBase {
 
   private const string COMPONENT_SOURCE_ID = 'canvas_test_sdc_content_entity_ref:contributor-card';
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     ...self::CANVAS_KERNEL_TEST_MINIMAL_MODULES,
     'canvas_test_sdc_content_entity_ref',

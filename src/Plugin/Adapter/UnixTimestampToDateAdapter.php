@@ -20,6 +20,9 @@ final class UnixTimestampToDateAdapter extends AdapterBase {
 
   public const string PLUGIN_ID = 'unix_to_date';
 
+  /**
+   * The `unix` input: the timestamp to format as a date.
+   */
   protected int $unix;
 
   public function adapt(): EvaluationResult {

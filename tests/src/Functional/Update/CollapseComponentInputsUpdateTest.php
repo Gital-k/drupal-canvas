@@ -27,6 +27,9 @@ final class CollapseComponentInputsUpdateTest extends CanvasUpdatePathTestBase {
 
   use ComponentTreeItemListInstantiatorTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

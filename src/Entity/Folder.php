@@ -52,9 +52,24 @@ final class Folder extends ConfigEntityBase implements CanvasHttpApiEligibleConf
   public const string ENTITY_TYPE_ID = 'folder';
   public const string ADMIN_PERMISSION = 'administer folders';
 
+  /**
+   * The human-readable name, unique per folder type.
+   */
   protected string $name;
+
+  /**
+   * Entity type ID of the config entities this folder can contain.
+   */
   protected string $configEntityTypeId;
+
+  /**
+   * The sort order relative to other folders of the same type.
+   */
   protected int $weight = 0;
+
+  /**
+   * Config entity IDs of the items this folder contains.
+   */
   protected array $items = [];
 
   public function id(): ?string {

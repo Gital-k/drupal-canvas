@@ -9,6 +9,9 @@ use Symfony\Component\HttpFoundation\Request;
 
 class AutocompleteController {
 
+  /**
+   * The fixed result set that ::result() filters by the `q` query parameter.
+   */
   private array $items = [
     ['value' => 'apple', 'label' => 'Apple'],
     ['value' => 'banana', 'label' => 'Banana'],

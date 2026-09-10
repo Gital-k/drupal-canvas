@@ -80,6 +80,9 @@ class SegmentValidationTest extends BetterConfigEntityValidationTestBase {
     $this->installConfig('user');
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected static array $propertiesWithOptionalValues = [
     'description',
   ];

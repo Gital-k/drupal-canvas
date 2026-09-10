@@ -19,6 +19,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[RunTestsInSeparateProcesses]
 final class AutoSaveConflictJavaScriptComponentTest extends AutoSaveConflictConfigTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected string $updateKey = 'name';
 
   protected function setUpEntity(): void {

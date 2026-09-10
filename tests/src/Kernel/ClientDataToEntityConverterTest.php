@@ -71,6 +71,9 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
   use RequestTrait;
   use VfsPublicStreamUrlTrait;
 
+  /**
+   * A second user, to assert that conversion keeps the entity's own author.
+   */
   private User $otherUser;
 
   public function setUp(): void {

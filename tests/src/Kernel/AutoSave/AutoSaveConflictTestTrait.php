@@ -19,6 +19,9 @@ trait AutoSaveConflictTestTrait {
 
   use AutoSaveRequestTestTrait;
 
+  /**
+   * The entity whose auto-saved draft the conflict is provoked on.
+   */
   protected EntityInterface $entity;
 
   abstract protected static function getPermissions(): array;

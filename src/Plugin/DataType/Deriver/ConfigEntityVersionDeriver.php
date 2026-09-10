@@ -19,6 +19,10 @@ final class ConfigEntityVersionDeriver implements ContainerDeriverInterface {
    * @var array<string, array<string, mixed>>
    */
   protected array $derivatives = [];
+
+  /**
+   * The entity type manager.
+   */
   protected EntityTypeManagerInterface $entityTypeManager;
 
   public function __construct(

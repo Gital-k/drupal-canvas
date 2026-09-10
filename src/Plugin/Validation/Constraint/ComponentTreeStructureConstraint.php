@@ -18,6 +18,13 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 class ComponentTreeStructureConstraint extends SymfonyConstraint {
 
   public const string PLUGIN_ID = 'ComponentTreeStructure';
+
+  /**
+   * Property path that violations are reported relative to.
+   *
+   * Defaults to the empty string, in which case the validator falls back to the
+   * property path of the value being validated.
+   */
   public string $basePropertyPath = '';
 
 }

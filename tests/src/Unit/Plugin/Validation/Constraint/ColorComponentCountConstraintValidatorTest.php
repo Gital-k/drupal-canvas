@@ -19,8 +19,14 @@ use Symfony\Component\Validator\Violation\ConstraintViolationBuilderInterface;
 #[CoversClass(ColorComponentCountConstraintValidator::class)]
 final class ColorComponentCountConstraintValidatorTest extends UnitTestCase {
 
+  /**
+   * The validator under test.
+   */
   private ColorComponentCountConstraintValidator $validator;
 
+  /**
+   * The mocked execution context, to assert which violations are added.
+   */
   private ExecutionContextInterface&MockObject $context;
 
   /**

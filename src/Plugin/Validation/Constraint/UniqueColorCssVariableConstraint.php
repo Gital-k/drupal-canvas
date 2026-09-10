@@ -19,8 +19,14 @@ use Symfony\Component\Validator\Constraint;
 )]
 final class UniqueColorCssVariableConstraint extends Constraint {
 
+  /**
+   * ID of the Color entity being validated, excluded from the search.
+   */
   public string $id;
 
+  /**
+   * Violation message for a CSS variable another Color entity already uses.
+   */
   public string $notUnique = 'CSS variable %value is already in use by another color.';
 
   /**

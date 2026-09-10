@@ -74,6 +74,9 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
    */
   protected EntityTypeManagerInterface $entityTypeManager;
 
+  /**
+   * The `canvas_ai` logger channel.
+   */
   protected LoggerInterface $logger;
 
   /**

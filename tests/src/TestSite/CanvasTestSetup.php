@@ -89,8 +89,14 @@ class CanvasTestSetup implements TestSetupInterface {
   use CreateTestJsComponentTrait;
   use CanvasFieldCreationTrait;
 
+  /**
+   * The Drupal root directory, as CreateTestJsComponentTrait requires.
+   */
   protected string $root;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static array $configSchemaCheckerExclusions = [
     // The "all-props" test-only SDC is used to assess also prop shapes that are
     // not yet storable, and hence do not meet the requirements.

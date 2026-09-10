@@ -57,7 +57,15 @@ final class ApiLayoutController {
   use ClientServerConversionTrait;
   use EntityFormTrait;
   public const string AUTO_SAVED_QUERY_KEY = 'autoSaved';
+
+  /**
+   * Region labels, keyed by server-side region ID.
+   */
   private array $regions;
+
+  /**
+   * Client-side region IDs, keyed by server-side region ID.
+   */
   private array $regionsClientSideIds;
 
   public function __construct(

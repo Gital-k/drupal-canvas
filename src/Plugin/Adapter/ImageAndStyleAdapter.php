@@ -55,6 +55,10 @@ final class ImageAndStyleAdapter extends AdapterBase implements ContainerFactory
    * @var array{src:string, alt: string, width:integer, height:integer}
    */
   protected array $image;
+
+  /**
+   * The `imageStyle` input: the ID of the image style to apply.
+   */
   protected string $imageStyle;
 
   public function adapt(): EvaluationResult {

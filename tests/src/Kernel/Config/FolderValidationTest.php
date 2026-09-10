@@ -24,6 +24,9 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
   use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'canvas',
     'sdc',

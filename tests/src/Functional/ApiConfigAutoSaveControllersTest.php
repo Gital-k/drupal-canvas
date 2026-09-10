@@ -47,8 +47,14 @@ final class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
    */
   protected $defaultTheme = 'stark';
 
+  /**
+   * A user with every permission the HTTP API requires.
+   */
   protected readonly UserInterface $httpApiUser;
 
+  /**
+   * A user missing some of the permissions the HTTP API requires.
+   */
   protected readonly UserInterface $limitedPermissionsUser;
 
   protected function setUp(): void {

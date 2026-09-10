@@ -121,6 +121,9 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
     // heading ...0002, the values the fixtures' tool results carry.
     $this->container->set(self::PLACEMENT_UUID_SERVICE, new class () implements UuidInterface {
 
+      /**
+       * How many UUIDs have been generated so far, used as the sequence number.
+       */
       private int $count = 0;
 
       public function generate(): string {

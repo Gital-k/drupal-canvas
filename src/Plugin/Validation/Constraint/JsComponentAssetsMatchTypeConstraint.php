@@ -20,6 +20,9 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 )]
 final class JsComponentAssetsMatchTypeConstraint extends SymfonyConstraint {
 
+  /**
+   * Violation message for a React code component missing JavaScript or CSS.
+   */
   public string $assetsRequiredMessage = 'React code components must contain JavaScript and CSS.';
 
 }

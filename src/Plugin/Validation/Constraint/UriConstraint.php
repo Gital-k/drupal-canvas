@@ -28,9 +28,19 @@ final class UriConstraint extends SymfonyConstraint {
 
   public const string PLUGIN_ID = 'Uri';
 
+  /**
+   * Violation message for a value that is not a valid URI.
+   */
   public string $messageInvalidUri = "This value should be a valid URI.";
+
+  /**
+   * Violation message for a value that is not a valid URI reference.
+   */
   public string $messageInvalidUriReference = "This value should be a valid URI reference.";
 
+  /**
+   * Whether relative URI references are accepted in addition to absolute URIs.
+   */
   public bool $allowReferences;
 
   /**

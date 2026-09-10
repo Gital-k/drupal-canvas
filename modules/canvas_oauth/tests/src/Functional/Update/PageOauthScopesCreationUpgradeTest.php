@@ -18,6 +18,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas_oauth')]
 final class PageOauthScopesCreationUpgradeTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   private const array SCOPE_IDS = [

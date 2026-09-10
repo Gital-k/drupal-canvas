@@ -93,7 +93,14 @@ final class Color extends ConfigEntityBase implements CanvasHttpApiEligibleConfi
    */
   public const string REFERENCE_PREFIX = 'canvas-color:';
 
+  /**
+   * The human-readable name, unique across all Color entities.
+   */
   protected string $name;
+
+  /**
+   * The CSS custom property name, unique across all Color entities.
+   */
   protected string $cssVariable;
 
   /**
@@ -107,7 +114,15 @@ final class Color extends ConfigEntityBase implements CanvasHttpApiEligibleConfi
    * }
    */
   protected array $value;
+
+  /**
+   * The format to show this color in, or NULL to let the client decide.
+   */
   protected ?string $displayFormat = NULL;
+
+  /**
+   * The sort order relative to other Color entities.
+   */
   protected int $weight = 0;
 
   public function id(): ?string {

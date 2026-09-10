@@ -19,8 +19,14 @@ use Symfony\Component\Validator\Constraint;
 )]
 final class UniqueColorNameConstraint extends Constraint {
 
+  /**
+   * ID of the Color entity being validated, excluded from the search.
+   */
   public string $id;
 
+  /**
+   * Violation message for a name another Color entity already uses.
+   */
   public string $notUnique = 'Color name %value is already in use by another color.';
 
   /**

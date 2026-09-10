@@ -37,8 +37,14 @@ final class StagedConfigUpdateTest extends CanvasKernelTestBase {
    */
   protected $strictConfigSchema = FALSE;
 
+  /**
+   * {@inheritdoc}
+   */
   protected bool $usesSuperUserAccessPolicy = FALSE;
 
+  /**
+   * Whether `system.site` is registered as fully validatable on module install.
+   */
   private bool $markSystemSiteFullyValidated = FALSE;
 
   /**

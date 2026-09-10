@@ -16,6 +16,9 @@ use Symfony\Component\Validator\Constraint;
  */
 class CanvasTestInvalidFieldConstraint extends Constraint {
 
+  /**
+   * Violation message this test-only constraint always adds.
+   */
   public string $message = 'The value "invalid constraint" is not allowed in this field.';
 
 }

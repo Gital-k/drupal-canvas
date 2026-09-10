@@ -55,10 +55,29 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
   private const string COMPONENT_INSTANCE_UUID = '1191fb41-5fb7-4ed3-955d-03df4fde199d';
   private const string CHILD_COMPONENT_INSTANCE_ID = 'e8550590-f11b-431e-8932-340d2c00c103';
 
+  /**
+   * The UUID generator, to create component instance UUIDs.
+   */
   protected UuidInterface $uuid;
+
+  /**
+   * The component version in use before the test creates a new one.
+   */
   protected string $originalVersion;
+
+  /**
+   * The versioned `type` of the child component instance in the tree.
+   */
   protected string $childType;
+
+  /**
+   * The client-side representation the tree is expected to have.
+   */
   protected array $expectedClientModel = [];
+
+  /**
+   * The client-side representation the tree had before the new version.
+   */
   protected array $originalClientModel = [];
 
   /**

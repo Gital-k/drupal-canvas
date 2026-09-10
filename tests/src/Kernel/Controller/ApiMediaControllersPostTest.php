@@ -52,8 +52,14 @@ class ApiMediaControllersPostTest extends CanvasKernelTestBase {
 
   private const string URL = '/canvas/api/v0/media/%s/upload';
 
+  /**
+   * Path of the image file the test uploads.
+   */
   private string $testImagePath;
 
+  /**
+   * Path of the non-image file the test uploads.
+   */
   private string $testDocumentPath;
 
   /**

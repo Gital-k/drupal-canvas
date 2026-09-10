@@ -104,7 +104,15 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
    * @var array<string, \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource>
    */
   private array $defaultRelativeUrlPropSources = [];
+
+  /**
+   * The SDC plugin backing this component source, loaded on first use.
+   */
   protected ?ComponentPlugin $componentPlugin = NULL;
+
+  /**
+   * The component plugin's metadata, copied from it on first use.
+   */
   protected ?ComponentMetadata $metadata;
 
   public function __construct(

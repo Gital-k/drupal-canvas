@@ -22,6 +22,9 @@ final class UriSchemeConstraint extends SymfonyConstraint {
 
   public const string PLUGIN_ID = 'UriScheme';
 
+  /**
+   * Violation message for a URI whose scheme is not in `$allowedSchemes`.
+   */
   public string $messageInvalidUriScheme = "'@scheme' is not allowed, must be one of the allowed schemes: @allowed-schemes.";
 
   /**

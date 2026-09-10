@@ -25,6 +25,9 @@ final class ImageUriAdapter extends AdapterBase implements ContainerFactoryPlugi
 
   public const string PLUGIN_ID = 'image_extract_url';
 
+  /**
+   * The `imageUri` input: the URI whose basename identifies the file entity.
+   */
   protected string $imageUri;
 
   public function adapt(): EvaluationResult {

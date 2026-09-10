@@ -13,6 +13,11 @@ use Drupal\Core\Extension\ModuleExtensionList;
  */
 class Version {
 
+  /**
+   * The Canvas version read from `package.json`, read on first use.
+   *
+   * @see ::getVersion()
+   */
   private ?string $version = NULL;
 
   public function __construct(

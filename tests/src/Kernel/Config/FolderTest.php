@@ -15,6 +15,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[RunTestsInSeparateProcesses]
 class FolderTest extends CanvasKernelTestBase {
 
+  /**
+   * The Folder entity under test.
+   */
   protected Folder $entity;
 
   protected function setUp(): void {

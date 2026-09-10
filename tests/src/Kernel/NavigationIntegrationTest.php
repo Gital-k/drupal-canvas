@@ -15,6 +15,9 @@ final class NavigationIntegrationTest extends CanvasKernelTestBase {
 
   use PageTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     ...self::PAGE_TEST_MODULES,
     'layout_discovery',

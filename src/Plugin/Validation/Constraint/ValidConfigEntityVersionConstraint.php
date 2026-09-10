@@ -21,6 +21,9 @@ final class ValidConfigEntityVersionConstraint extends SymfonyConstraint {
 
   public const string PLUGIN_ID = 'ValidConfigEntityVersion';
 
+  /**
+   * Violation message for a version the config entity does not have.
+   */
   public string $message = "'@version' is not a version that exists on @entity_type config entity '@entity_id'. Available versions: '@available_versions'.";
 
   /**

@@ -90,13 +90,47 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     self::EXAMPLE_DOCUMENT,
   ];
 
+  /**
+   * The extension path resolver.
+   */
   protected ExtensionPathResolver $extensionPathResolver;
+
+  /**
+   * The auto-save manager.
+   */
   protected AutoSaveManager $autoSaveManager;
+
+  /**
+   * The file URL generator.
+   */
   protected FileUrlGeneratorInterface $fileUrlGenerator;
+
+  /**
+   * The config entity this source renders, loaded on first use.
+   *
+   * @see ::getJavaScriptComponent()
+   * @see ::setJavaScriptComponent()
+   */
   protected ?JavaScriptComponent $jsComponent = NULL;
+
+  /**
+   * The registry of import names that code components may import from.
+   */
   protected GlobalImports $globalImports;
+
+  /**
+   * The entity type manager.
+   */
   protected EntityTypeManagerInterface $entityTypeManager;
+
+  /**
+   * The provider of the data a code component receives when rendered.
+   */
   protected CodeComponentDataProvider $codeComponentDataProvider;
+
+  /**
+   * The config factory.
+   */
   protected ConfigFactoryInterface $configFactory;
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {

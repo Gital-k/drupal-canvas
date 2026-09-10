@@ -18,6 +18,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas_oauth')]
 final class MediaImageOauthScopesCreationUpgradeTest extends CanvasUpdatePathTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   private const string SCOPE_ID = 'canvas_media_image_create';

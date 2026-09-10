@@ -23,6 +23,9 @@ final class AutoSaveRehashItemsUpdateTest extends CanvasUpdatePathTestBase {
 
   use ConstraintViolationsTestTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

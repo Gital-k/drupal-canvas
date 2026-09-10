@@ -22,6 +22,9 @@ use Drupal\Core\Entity\EntityInterface;
  */
 trait StagedConfigEntityStorageTrait {
 
+  /**
+   * The auto-save manager.
+   */
   private AutoSaveManager $autoSaveManager;
 
   abstract protected function createStub(string $id): EntityInterface;

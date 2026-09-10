@@ -28,6 +28,9 @@ final class ListStringItemLabel extends StringData implements CacheableDependenc
 
   public const string PLUGIN_ID = 'computed_list_string_label';
 
+  /**
+   * The computed label, unset until it has been computed.
+   */
   private string $computedValue;
 
   /**

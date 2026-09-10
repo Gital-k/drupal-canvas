@@ -45,6 +45,9 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
   use CanvasFieldTrait;
   use ConstraintViolationsTestTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     // Required modules.
     'system',

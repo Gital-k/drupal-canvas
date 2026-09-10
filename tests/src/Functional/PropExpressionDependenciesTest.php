@@ -67,6 +67,9 @@ class PropExpressionDependenciesTest extends FunctionalTestBase {
     'canvas',
   ];
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

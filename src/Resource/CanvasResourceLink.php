@@ -26,10 +26,19 @@ final class CanvasResourceLink implements CacheableDependencyInterface {
 
   use CacheableDependencyTrait;
 
+  /**
+   * The URL this link points to.
+   */
   protected Url $uri;
 
+  /**
+   * The generated URL string for `$uri`.
+   */
   protected string $href;
 
+  /**
+   * The RFC 8288 link relation type.
+   */
   protected string $rel;
 
   /**

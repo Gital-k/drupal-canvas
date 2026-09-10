@@ -34,12 +34,24 @@ final class SetAIGeneratedTemplateDataTest extends CanvasKernelTestBase {
   use FunctionalCallTestTrait;
   use UserCreationTrait;
 
+  /**
+   * The AI function call plugin manager.
+   */
   protected FunctionCallPluginManager $functionCallManager;
 
+  /**
+   * A user permitted to edit content templates.
+   */
   protected AccountInterface $privilegedUser;
 
+  /**
+   * A user not permitted to edit content templates.
+   */
   protected AccountInterface $unprivilegedUser;
 
+  /**
+   * The stubbed temp store the function call writes the template data to.
+   */
   protected MockObject $mockTempStore;
 
   /**

@@ -28,6 +28,9 @@ final class AddPageControllerTest extends CanvasKernelTestBase {
   use RequestTrait;
   use UserCreationTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     ...self::PAGE_TEST_MODULES,
   ];

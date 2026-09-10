@@ -30,6 +30,9 @@ final class RequestTraitTest extends CanvasKernelTestBase {
    */
   protected static $modules = [];
 
+  /**
+   * The request stack.
+   */
   private RequestStack $requestStack;
 
   /**

@@ -25,6 +25,9 @@ final class ResolvedComponentInputs extends TypedData implements CacheableDepend
 
   use ComputedDataTypeWithCacheabilityTrait;
 
+  /**
+   * The resolved inputs, or NULL until they have been computed.
+   */
   private ?array $computedValue = NULL;
 
   /**

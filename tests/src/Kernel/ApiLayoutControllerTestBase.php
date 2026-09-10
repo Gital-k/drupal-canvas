@@ -40,6 +40,9 @@ abstract class ApiLayoutControllerTestBase extends KernelTestBase {
   use UserCreationTrait;
   use VfsPublicStreamUrlTrait;
 
+  /**
+   * The entity the content template previews, or NULL to preview none.
+   */
   protected ?ContentEntityInterface $previewEntity;
 
   protected static function getAdminPermission(EntityInterface $entity): string {

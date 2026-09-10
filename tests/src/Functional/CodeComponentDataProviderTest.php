@@ -30,11 +30,17 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'canvas',
     'canvas_test_code_components',
   ];
 
+  /**
+   * {@inheritdoc}
+   */
   protected $defaultTheme = 'stark';
 
   /**

@@ -31,6 +31,9 @@ use Drupal\Core\Field\FieldItemListInterface;
  */
 final class DefaultRelativeUrlPropSource extends PropSourceBase {
 
+  /**
+   * The component source that rewrites this prop source's relative URLs.
+   */
   private readonly UrlRewriteInterface $componentSource;
 
   public function __construct(

@@ -37,8 +37,19 @@ final class SingleDirectoryComponent extends JsonSchemaPropsComponentSourceBase 
 
   public const SOURCE_PLUGIN_ID = 'sdc';
 
+  /**
+   * The SDC plugin manager.
+   */
   protected ComponentPluginManager $componentPluginManager;
+
+  /**
+   * The module handler.
+   */
   protected ModuleHandlerInterface $moduleHandler;
+
+  /**
+   * The theme handler.
+   */
   protected ThemeHandlerInterface $themeHandler;
 
   /**

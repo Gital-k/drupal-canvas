@@ -22,7 +22,14 @@ final class MaybeUrl extends AccessResult implements AccessResultReasonInterface
 
   use AttachmentsTrait;
 
+  /**
+   * Why the URL is inaccessible, or NULL if it is accessible.
+   */
   private ?string $reason = NULL;
+
+  /**
+   * The generated URL, or NULL if it is inaccessible.
+   */
   private ?string $url;
 
   public function __construct(

@@ -22,6 +22,9 @@ final class ComponentIncompatibilityReasonRepository {
    */
   public const string MANUALLY_DISABLED_REASON = 'Manually disabled';
 
+  /**
+   * The key-value store holding the reasons, keyed by component plugin ID.
+   */
   private readonly KeyValueStoreInterface $keyValue;
 
   public function __construct(

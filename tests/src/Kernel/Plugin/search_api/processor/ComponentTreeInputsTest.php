@@ -52,6 +52,9 @@ final class ComponentTreeInputsTest extends CanvasKernelTestBase {
 
   private const string INDEX_FIELD_ID = 'canvas_component_tree_inputs_fulltext';
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'content_translation',
     'field',

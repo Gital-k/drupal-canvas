@@ -30,13 +30,22 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 class ColorAuditTest extends CanvasKernelTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'language',
     'node',
   ];
 
+  /**
+   * The Color entity whose usages the audit is expected to find.
+   */
   private Color $color;
 
+  /**
+   * The reference string that component inputs store `$color` as.
+   */
   private string $colorPattern;
 
   protected function setUp(): void {
