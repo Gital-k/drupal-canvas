@@ -1,4 +1,10 @@
 import {
+  canvasFormatDate,
+  canvasFormatDateRange,
+  canvasFormatDateTime,
+  canvasFormatTime,
+} from './date-utils.js';
+import {
   getPageData,
   getSiteData,
   sortMenu as sortLinksetMenu,
@@ -30,4 +36,10 @@ export {
 
   // jsonapi-client
   JsonApiClient,
+
+  // date-utils
+  canvasFormatDate,
+  canvasFormatDateTime,
+  canvasFormatTime,
+  canvasFormatDateRange,
 };
