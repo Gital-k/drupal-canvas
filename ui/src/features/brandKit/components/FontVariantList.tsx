@@ -20,10 +20,9 @@ type FontVariantListProps = {
 /**
  * The family's variants, previewed each in its own typeface.
  *
- * Selecting a variant scopes the example code beside it, so the cards are a
- * single-select group: a visually hidden radio inside each card's label gives
- * that its native semantics — arrow key navigation and an announced checked
- * state — without a roving tabindex of our own.
+ * Choosing a card selects the variant and updates the adjacent example/code.
+ * Cards are implemented as a native radio group (hidden radio in each label),
+ * facilitating keyboard navigation and checked-state announcements.
  */
 const FontVariantList = ({
   family,
@@ -75,11 +74,7 @@ const FontVariantList = ({
                 The quick brown fox jumps over the lazy dog.
               </Text>
             </label>
-            {/*
-             * Only the selected card is deletable, as in the design. The button
-             * is a sibling of the label rather than a child: inside it, a click
-             * would also toggle the radio.
-             */}
+            {/* Only the selected card is deletable, as in the design. */}
             {isSelected && (
               <Box className={styles.variantDeleteButton}>
                 <IconButton
