@@ -28,8 +28,6 @@ const SEL = {
     '[class*="_flyoutContent"] input[aria-label="Font family name"]',
 };
 
-
-
 /**
  * Uploads a font file through the fonts section's hidden file input.
  *
@@ -111,7 +109,9 @@ test.describe('brand kit fonts', () => {
     // settings on the left, the example code on the right.
     // @see useFontUpload's onFontUploaded / useBrandKitFontSelection.selectFont
     await expect(page.locator(SEL.flyout)).toBeVisible();
-    await expect(page.locator(SEL.flyout)).toHaveScreenshot('font-flyout-layout.png');
+    await expect(page.locator(SEL.flyout)).toHaveScreenshot(
+      'font-flyout-layout.png',
+    );
 
     // A family with one file has nothing to choose between, so Preview is the
     // specimen card rather than a list of variant cards.
@@ -156,7 +156,9 @@ test.describe('brand kit fonts', () => {
     await canvas.openBrandKitPanel();
     await page.locator(SEL.tab).click();
     await expect(familyRow).toContainText('Renamed Sans');
-    await expect(familyRowWrapper).toHaveScreenshot('reloaded-family-row-layout.png');
+    await expect(familyRowWrapper).toHaveScreenshot(
+      'reloaded-family-row-layout.png',
+    );
   });
 
   test('adds and deletes variants, and deletes a family', async ({
