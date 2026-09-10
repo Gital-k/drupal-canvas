@@ -93,7 +93,7 @@ HTML;
    * for (the import map, the script URL) is now fetched and relayed by the
    * parent instead — @see `importMap()` and `script()` below.
    */
-  public function shell(): Response {
+  public static function shell(): Response {
     $response = new Response(self::HTML);
     $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
     return $response;
