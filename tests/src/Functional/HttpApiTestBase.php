@@ -112,7 +112,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
       // Use a unique client instance ID to ensure that auto-save hashes are
       // always verified, except when we are explicitly testing using the same
       // client.
-      // @see \Drupal\Tests\canvas\Kernel\AutoSave\AutoSaveConflictTestTrait::testOutdatedAutoSave()
+      // @see \Drupal\Tests\canvas\Functional\AutoSave\AutoSaveConflictTestTrait::testOutdatedAutoSave()
       // @see \Drupal\canvas\Controller\AutoSaveTrait::validateAutoSaves()
       'clientInstanceId' => 'test-client-' . (++$clientIdNumber),
     ];

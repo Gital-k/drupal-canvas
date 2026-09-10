@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\canvas\Kernel\AutoSave;
+namespace Drupal\Tests\canvas\Functional\AutoSave;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Component;
@@ -10,12 +10,9 @@ use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Marker;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\Core\Url;
-use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Tests auto-save conflict handling for page variants.
@@ -25,9 +22,7 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
-final class AutoSaveConflictPageVariantLayoutTest extends ApiLayoutControllerTestBase {
-
-  use AutoSaveConflictTestTrait;
+final class AutoSaveConflictPageVariantLayoutTest extends AutoSaveConflictLayoutTestBase {
 
   protected function setUpEntity(): void {
     $marker = Component::load(Marker::PAGE_CONTENT_COMPONENT_ID);
@@ -103,19 +98,13 @@ final class AutoSaveConflictPageVariantLayoutTest extends ApiLayoutControllerTes
   public function testMissingAutoSaveEntryConflicts(): void {
     // A user without the page variant admin permission cannot reach the
     // variant's layout routes at all.
-    $this->setUpCurrentUser(permissions: array_diff(self::getPermissions(), [PageVariant::ADMIN_PERMISSION]));
-    try {
-      $this->request(Request::create($this->getAutoSaveUrl()));
-      $this->fail('Expected access to be denied without the page variant admin permission.');
-    }
-    catch (AccessDeniedHttpException) {
-      // The layout routes require update access to the page variant.
-    }
+    $this->loginWithPermissions(array_diff(self::getPermissions(), [PageVariant::ADMIN_PERMISSION]));
+    $response = $this->makeApiRequest('GET', $this->getAutoSaveUrl(), $this->getRequestOptions());
+    // The layout routes require update access to the page variant.
+    self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), (string) $response->getBody());
 
-    $this->setUpCurrentUser(permissions: self::getPermissions());
-    $response = $this->request(Request::create($this->getAutoSaveUrl()));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $getJson = self::decodeResponse($response);
+    $this->loginWithPermissions(self::getPermissions());
+    $getJson = $this->requestAutoSaveGet();
 
     // Posting back the GET response with the variant's own `autoSaves` entry
     // removed must conflict.
@@ -123,18 +112,14 @@ final class AutoSaveConflictPageVariantLayoutTest extends ApiLayoutControllerTes
     self::assertArrayHasKey($autoSaveKey, $getJson['autoSaves']);
     $getJsonMissingVariant = $getJson;
     unset($getJsonMissingVariant['autoSaves'][$autoSaveKey]);
-    $this->assertRequestAutoSaveConflict($this->getUpdateAutoSaveRequest($getJsonMissingVariant));
+    $this->assertAutoSaveConflict($getJsonMissingVariant);
   }
 
-  protected function getAutoSaveUrl(): string {
+  protected function getAutoSaveUrl(): Url {
     return Url::fromRoute('canvas.api.layout.get', [
       'entity' => $this->entity->id(),
       'entity_type' => PageVariant::ENTITY_TYPE_ID,
-    ])->toString();
-  }
-
-  protected function getUpdateAutoSaveRequest(array $json): Request {
-    return Request::create($this->getAutoSaveUrl(), method: 'POST', content: $this->filterLayoutForPost(json_encode($json, JSON_THROW_ON_ERROR)));
+    ]);
   }
 
 }

@@ -2,22 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\canvas\Kernel\AutoSave;
+namespace Drupal\Tests\canvas\Functional\AutoSave;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Url;
-use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
-use Symfony\Component\HttpFoundation\Request;
 
 #[Group('canvas')]
 #[Group('canvas_auto_save')]
 #[RunTestsInSeparateProcesses]
-final class AutoSaveConflictPageLayoutTest extends ApiLayoutControllerTestBase {
-
-  use AutoSaveConflictTestTrait;
+final class AutoSaveConflictPageLayoutTest extends AutoSaveConflictLayoutTestBase {
 
   protected function setUpEntity(): void {
     $this->entity = Page::create([
@@ -42,15 +38,11 @@ final class AutoSaveConflictPageLayoutTest extends ApiLayoutControllerTestBase {
     self::assertSame($text, $page->label());
   }
 
-  protected function getAutoSaveUrl(): string {
+  protected function getAutoSaveUrl(): Url {
     return Url::fromRoute('canvas.api.layout.get', [
       'entity' => $this->entity->id(),
       'entity_type' => Page::ENTITY_TYPE_ID,
-    ])->toString();
-  }
-
-  protected function getUpdateAutoSaveRequest(array $json): Request {
-    return Request::create($this->getAutoSaveUrl(), method: 'POST', content: $this->filterLayoutForPost(json_encode($json, JSON_THROW_ON_ERROR)));
+    ]);
   }
 
 }

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\canvas\Kernel\AutoSave;
+namespace Drupal\Tests\canvas\Functional\AutoSave;
 
 use Drupal\canvas\Entity\AssetLibrary;
 use PHPUnit\Framework\Attributes\Group;

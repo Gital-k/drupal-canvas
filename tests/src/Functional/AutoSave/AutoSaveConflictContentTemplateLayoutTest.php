@@ -2,17 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\canvas\Kernel\AutoSave;
+namespace Drupal\Tests\canvas\Functional\AutoSave;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Url;
 use Drupal\node\Entity\Node;
-use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Tests auto-save conflict handling for content templates.
@@ -22,9 +20,7 @@ use Symfony\Component\HttpFoundation\Request;
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
-class AutoSaveConflictContentTemplateLayoutTest extends ApiLayoutControllerTestBase {
-
-  use AutoSaveConflictTestTrait;
+class AutoSaveConflictContentTemplateLayoutTest extends AutoSaveConflictLayoutTestBase {
 
   protected static function getPermissions(): array {
     return [
@@ -74,16 +70,12 @@ class AutoSaveConflictContentTemplateLayoutTest extends ApiLayoutControllerTestB
     self::assertSame($text, $inputs['heading']);
   }
 
-  protected function getUpdateAutoSaveRequest(array $json): Request {
-    return Request::create($this->getAutoSaveUrl(), method: 'POST', content: $this->filterLayoutForPost(json_encode($json, JSON_THROW_ON_ERROR)));
-  }
-
-  protected function getAutoSaveUrl(): string {
+  protected function getAutoSaveUrl(): Url {
     self::assertInstanceOf(ContentEntityInterface::class, $this->previewEntity);
     return Url::fromRoute('canvas.api.layout.get.content_template', [
       'entity' => $this->entity->id(),
       'preview_entity' => $this->previewEntity->id(),
-    ])->toString();
+    ]);
   }
 
 }
