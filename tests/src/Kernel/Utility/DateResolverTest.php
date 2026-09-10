@@ -130,6 +130,8 @@ final class DateResolverTest extends CanvasKernelTestBase {
       'to' => '2026-03-20',
     ]);
     self::assertIsArray($result);
+    self::assertArrayHasKey('from', $result);
+    self::assertArrayHasKey('to', $result);
     self::assertNotSame('2026-01-15', $result['from']);
     self::assertNotEmpty($result['from']);
     self::assertNotSame('2026-03-20', $result['to']);
@@ -145,6 +147,8 @@ final class DateResolverTest extends CanvasKernelTestBase {
       'from' => '2026-01-15',
       'to' => NULL,
     ]);
+    self::assertArrayHasKey('from', $result);
+    self::assertArrayHasKey('to', $result);
     self::assertNotSame('2026-01-15', $result['from']);
     self::assertNull($result['to']);
   }

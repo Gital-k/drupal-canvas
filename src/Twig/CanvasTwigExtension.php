@@ -315,14 +315,14 @@ final class CanvasTwigExtension extends AbstractExtension {
   }
 
   /**
-   * Formats an ISO date string using the active Drupal locale's short date format.
+   * Formats an ISO date string using the active Drupal locale's short date.
    *
    * This is an opt-in Twig filter for component creators. Date props reach
    * templates as raw ISO strings by default; apply this filter only when you
    * want locale-formatted output.
    *
-   * **Cache context**: This filter is locale-sensitive. On multilingual sites,
-   * any render array whose template uses this filter must include the
+   * **Cache context**: This filter is locale-sensitive. On multilingual
+   * sites, any render array whose template uses this filter must include the
    * 'languages:language_interface' cache context to ensure correct cache
    * invalidation when the language changes.
    *
@@ -338,14 +338,14 @@ final class CanvasTwigExtension extends AbstractExtension {
   }
 
   /**
-   * Formats an ISO datetime string using the active Drupal locale's short date+time format.
+   * Formats an ISO datetime string using the active Drupal locale's format.
    *
    * This is an opt-in Twig filter for component creators. Date props reach
    * templates as raw ISO strings by default; apply this filter only when you
    * want locale-formatted output.
    *
-   * **Cache context**: This filter is locale-sensitive. On multilingual sites,
-   * any render array whose template uses this filter must include the
+   * **Cache context**: This filter is locale-sensitive. On multilingual
+   * sites, any render array whose template uses this filter must include the
    * 'languages:language_interface' cache context to ensure correct cache
    * invalidation when the language changes.
    *
@@ -353,29 +353,32 @@ final class CanvasTwigExtension extends AbstractExtension {
    *   ISO datetime string, e.g. '2026-01-15T14:30:00Z'.
    *
    * @return string
-   *   Locale-formatted date+time string. Returns $iso unchanged if it cannot be parsed.
+   *   Locale-formatted date+time string. Returns $iso unchanged if
+   *   it cannot be parsed.
    */
   public function canvasFormatDateTime(string $iso): string {
     return $this->dateResolver->resolveDateTime($iso);
   }
 
   /**
-   * Formats an ISO time or datetime string using the active Drupal locale's short time format.
+   * Formats an ISO time/datetime string using the Drupal locale's time format.
    *
    * This is an opt-in Twig filter for component creators. Date props reach
    * templates as raw ISO strings by default; apply this filter only when you
    * want locale-formatted output.
    *
-   * **Cache context**: This filter is locale-sensitive. On multilingual sites,
-   * any render array whose template uses this filter must include the
+   * **Cache context**: This filter is locale-sensitive. On multilingual
+   * sites, any render array whose template uses this filter must include the
    * 'languages:language_interface' cache context to ensure correct cache
    * invalidation when the language changes.
    *
    * @param string $iso
-   *   ISO time or datetime string, e.g. '14:30:00' or '2026-01-15T14:30:00Z'.
+   *   ISO time or datetime string, e.g. '14:30:00' or
+   *   '2026-01-15T14:30:00Z'.
    *
    * @return string
-   *   Locale-formatted time string. Returns $iso unchanged if it cannot be parsed.
+   *   Locale-formatted time string. Returns $iso unchanged if it cannot
+   *   be parsed.
    */
   public function canvasFormatTime(string $iso): string {
     return $this->dateResolver->resolveTime($iso);
@@ -397,7 +400,8 @@ final class CanvasTwigExtension extends AbstractExtension {
    * invalidation when the language changes.
    *
    * @param mixed $value
-   *   A Canvas date-range array, e.g. ['from' => '2026-01-15', 'to' => '2026-03-20'].
+   *   A Canvas date-range array with optional 'from' and 'to' string keys,
+   *   e.g. ['from' => '2026-01-15', 'to' => '2026-03-20'].
    *   Non-array values are returned unchanged.
    *
    * @return mixed

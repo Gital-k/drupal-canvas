@@ -61,7 +61,9 @@ const parseIso = (iso: string): Date | null => {
 export function canvasFormatDate(iso: string): string {
   const date = parseIso(iso);
   if (!date) return iso;
-  return createFormatter(getDrupalLocale(), { dateStyle: 'short' }).format(date);
+  return createFormatter(getDrupalLocale(), { dateStyle: 'short' }).format(
+    date,
+  );
 }
 
 /**
@@ -100,7 +102,9 @@ export function canvasFormatTime(iso: string): string {
   const normalized = /^\d{2}:\d{2}/.test(iso) ? `1970-01-01T${iso}` : iso;
   const date = parseIso(normalized);
   if (!date) return iso;
-  return createFormatter(getDrupalLocale(), { timeStyle: 'short' }).format(date);
+  return createFormatter(getDrupalLocale(), { timeStyle: 'short' }).format(
+    date,
+  );
 }
 
 /**

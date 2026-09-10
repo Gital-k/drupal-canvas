@@ -43,11 +43,11 @@ final class DateResolver {
   ) {}
 
   /**
-   * Formats an ISO date string (YYYY-MM-DD) in the active locale's short date format.
+   * Formats an ISO date string using the active locale's short date format.
    *
-   * The output is locale-sensitive. On multilingual sites, render arrays using
-   * this filter must include the 'languages:language_interface' cache context
-   * to ensure correct cache invalidation when the language changes.
+   * The output is locale-sensitive. On multilingual sites, render arrays
+   * using this filter must include the 'languages:language_interface' cache
+   * context to ensure correct cache invalidation when the language changes.
    *
    * @param string $iso
    *   ISO date string, e.g. '2026-01-15'.
@@ -57,41 +57,54 @@ final class DateResolver {
    *   Returns $iso unchanged if it cannot be parsed.
    */
   public function resolveDate(string $iso): string {
-    return $this->resolveLocalizedDateTime($iso, self::INTL_DATE_SHORT, self::INTL_DATE_NONE);
+    return $this->resolveLocalizedDateTime(
+      $iso,
+      self::INTL_DATE_SHORT,
+      self::INTL_DATE_NONE,
+    );
   }
 
   /**
-   * Formats an ISO datetime string in the active locale's short date+time format.
+   * Formats an ISO datetime string using the active locale's short format.
    *
-   * The output is locale-sensitive. On multilingual sites, render arrays using
-   * this filter must include the 'languages:language_interface' cache context
-   * to ensure correct cache invalidation when the language changes.
+   * The output is locale-sensitive. On multilingual sites, render arrays
+   * using this filter must include the 'languages:language_interface' cache
+   * context to ensure correct cache invalidation when the language changes.
    *
    * @param string $iso
    *   ISO datetime string, e.g. '2026-01-15T14:30:00Z'.
    *
    * @return string
-   *   Formatted date+time string. Returns $iso unchanged if it cannot be parsed.
+   *   Formatted date+time string. Returns $iso unchanged if unparseable.
    */
   public function resolveDateTime(string $iso): string {
-    return $this->resolveLocalizedDateTime($iso, self::INTL_DATE_SHORT, self::INTL_DATE_SHORT);
+    return $this->resolveLocalizedDateTime(
+      $iso,
+      self::INTL_DATE_SHORT,
+      self::INTL_DATE_SHORT,
+    );
   }
 
   /**
-   * Formats an ISO time or datetime string in the active locale's short time format.
+   * Formats an ISO time/datetime string using the active locale's time format.
    *
-   * The output is locale-sensitive. On multilingual sites, render arrays using
-   * this filter must include the 'languages:language_interface' cache context
-   * to ensure correct cache invalidation when the language changes.
+   * The output is locale-sensitive. On multilingual sites, render arrays
+   * using this filter must include the 'languages:language_interface' cache
+   * context to ensure correct cache invalidation when the language changes.
    *
    * @param string $iso
-   *   ISO time or datetime string, e.g. '14:30:00' or '2026-01-15T14:30:00Z'.
+   *   ISO time or datetime string, e.g. '14:30:00' or
+   *   '2026-01-15T14:30:00Z'.
    *
    * @return string
    *   Formatted time string. Returns $iso unchanged if it cannot be parsed.
    */
   public function resolveTime(string $iso): string {
-    return $this->resolveLocalizedDateTime($iso, self::INTL_DATE_NONE, self::INTL_DATE_SHORT);
+    return $this->resolveLocalizedDateTime(
+      $iso,
+      self::INTL_DATE_NONE,
+      self::INTL_DATE_SHORT,
+    );
   }
 
   /**
@@ -131,7 +144,11 @@ final class DateResolver {
    * @return string
    *   Formatted string, or $iso unchanged if parsing or formatting fails.
    */
-  private function resolveLocalizedDateTime(string $iso, int $date_type, int $time_type): string {
+  private function resolveLocalizedDateTime(
+    string $iso,
+    int $date_type,
+    int $time_type,
+  ): string {
     if ($iso === '') {
       return $iso;
     }
@@ -146,7 +163,11 @@ final class DateResolver {
 
     foreach (self::buildLocaleCandidates($langcode) as $locale) {
       try {
-        $formatter = \IntlDateFormatter::create($locale, $date_type, $time_type);
+        $formatter = \IntlDateFormatter::create(
+          $locale,
+          $date_type,
+          $time_type,
+        );
       }
       catch (\ValueError) {
         continue;
