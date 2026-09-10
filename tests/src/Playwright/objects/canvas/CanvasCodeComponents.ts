@@ -47,8 +47,17 @@ export function CanvasCodeComponentsMixin<
         'for documentation on how to build a code component',
       );
       await codeEditor.selectText();
-      await this.page.keyboard.press('Delete');
-      await codeEditor.fill(code);
+      // Not `codeEditor.fill(code)`: CodeMirror's `contenteditable` DOM is
+      // reconciled by its own MutationObserver-based change detection, not
+      // read as a plain form value. `fill()` replaces that DOM in one raw,
+      // un-observed mutation, which CodeMirror's reconciliation can silently
+      // drop or truncate for large content instead of committing it to the
+      // editor's actual document state (and from there, to `sourceCodeJs`).
+      // `keyboard.insertText()` dispatches a real `beforeinput`/`input`
+      // event with `inputType: "insertText"` — the same pathway a real
+      // paste uses, which CodeMirror is built to handle reliably. Replaces
+      // the current selection, so no separate delete step is needed.
+      await this.page.keyboard.insertText(code);
     }
 
     async addCodeComponentProp(
