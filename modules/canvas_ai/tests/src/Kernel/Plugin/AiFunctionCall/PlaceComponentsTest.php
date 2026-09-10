@@ -893,6 +893,28 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
         ],
         'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - The components value must be a YAML list.',
       ],
+      // The model sent the list as JSON instead of as a YAML string.
+      'test_components_not_a_string' => [
+        'layout_type' => 'multi_region_empty',
+        'operations' => [
+          [
+            'target' => 'content',
+            'placement' => 'inside',
+            'components' => [
+              ['sdc.canvas_test_sdc.heading' => ['props' => ['text' => 'Some text', 'element' => 'h1']]],
+            ],
+          ],
+        ],
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - The components value must be a string containing a YAML list.',
+      ],
+      // Bare component IDs parse as strings, not mappings.
+      'test_component_list_items_not_mappings' => [
+        'layout_type' => 'multi_region_empty',
+        'operations' => [
+          self::buildOperation("- sdc.canvas_test_sdc.heading\n- sdc.canvas_test_sdc.druplicon: {}\n- sdc.canvas_test_sdc.druplicon"),
+        ],
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Entry 0 of the components list must be a mapping keyed by the component ID, with its props and slots under it. - Entry 2 of the components list must be a mapping keyed by the component ID, with its props and slots under it.',
+      ],
       'test_unknown_target_region' => [
         'layout_type' => 'multi_region_empty',
         'operations' => [

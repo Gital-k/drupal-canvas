@@ -125,15 +125,24 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
         $uuid = $edit['component_uuid'] ?? NULL;
         $errors = self::validateComponentUuid($uuid, $components_by_uuid);
         $props = NULL;
-        try {
-          $props = Yaml::parse($edit['props'] ?? '');
-          // A block that did not parse is reported below; its shape is only
-          // checked once it has.
-          $errors = \array_merge($errors, self::validateProps($props));
+        $props_yaml = $edit['props'] ?? '';
+        // The schema types props as a string, but ComplexToolItems does not
+        // check a record's fields, so a model that sends the mapping as JSON
+        // gets there too; Yaml::parse() would throw a TypeError on it.
+        if (!\is_string($props_yaml)) {
+          $errors[] = 'The props value must be a string containing a YAML mapping of prop names to values.';
         }
-        catch (ParseException $e) {
-          // Replaces the raw YAML parse error with instructions to quote string values.
-          $errors[] = \sprintf("The props value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
+        else {
+          try {
+            $props = Yaml::parse($props_yaml);
+            // A block that did not parse is reported below; its shape is only
+            // checked once it has.
+            $errors = \array_merge($errors, self::validateProps($props));
+          }
+          catch (ParseException $e) {
+            // Replaces the raw YAML parse error with instructions to quote string values.
+            $errors[] = \sprintf("The props value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
+          }
         }
 
         if (\is_array($props) && \is_string($uuid) && isset($components_by_uuid[$uuid])) {

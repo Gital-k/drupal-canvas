@@ -122,23 +122,34 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
       );
       foreach ($this->getContextValue('operations') as $index => $operation) {
         $errors = $this->validatePlacementParams($operation, $current_layout, $components_by_uuid);
-        try {
-          $operation['components'] = Yaml::parse($operation['components'] ?? '');
-          // A block that did not parse is reported below; its shape is only
-          // checked once it has.
-          $errors = \array_merge($errors, self::validateComponents($operation['components']));
+        $components_yaml = $operation['components'] ?? '';
+        // The schema types components as a string, but ComplexToolItems does
+        // not check a record's fields, so a model that sends the list as JSON
+        // gets there too; Yaml::parse() would throw a TypeError on it.
+        if (!\is_string($components_yaml)) {
+          $errors[] = 'The components value must be a string containing a YAML list.';
         }
-        catch (ParseException $e) {
-          // A raw parse error gives the model nothing to act on, so it retries
-          // the same payload; tell it how to fix the YAML instead.
-          $errors[] = \sprintf("The components value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
-        }
-        if (\is_array($operation['components'])) {
+        else {
           try {
-            $this->responseValidator->validateComponentStructure($operation['components']);
+            $operation['components'] = Yaml::parse($components_yaml);
+            // A block that did not parse is reported below; its shape is only
+            // checked once it has, and the components in it only once it is a
+            // list of mappings.
+            $component_errors = self::validateComponents($operation['components']);
+            if ($component_errors === []) {
+              try {
+                $this->responseValidator->validateComponentStructure($operation['components']);
+              }
+              catch (\Exception $e) {
+                $component_errors[] = $e->getMessage();
+              }
+            }
+            $errors = \array_merge($errors, $component_errors);
           }
-          catch (\Exception $e) {
-            $errors[] = $e->getMessage();
+          catch (ParseException $e) {
+            // A raw parse error gives the model nothing to act on, so it
+            // retries the same payload; tell it how to fix the YAML instead.
+            $errors[] = \sprintf("The components value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
           }
         }
         if ($errors !== []) {
@@ -254,7 +265,7 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
    *
    * @return list<string>
    *   The validation errors found, or an empty list if the block is a
-   *   non-empty list.
+   *   non-empty list of mappings.
    */
   private static function validateComponents(mixed $components): array {
     if (!\is_array($components)) {
@@ -263,7 +274,15 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
     if ($components === []) {
       return ['The operation must contain components.'];
     }
-    return [];
+    // A bare component ID parses as a string; the structure validation
+    // iterates each entry, so it must be a mapping.
+    $errors = [];
+    foreach ($components as $position => $component) {
+      if (!\is_array($component)) {
+        $errors[] = \sprintf('Entry %d of the components list must be a mapping keyed by the component ID, with its props and slots under it.', $position);
+      }
+    }
+    return $errors;
   }
 
 }
