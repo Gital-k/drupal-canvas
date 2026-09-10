@@ -302,6 +302,11 @@ final class EditComponentsTest extends CanvasKernelTestBase {
         'edits' => [['component_uuid' => '72384115-a8ee-44bc-9a13-de1c7a4d9b96', 'props' => '{}']],
         'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Edit 0 - The edit must contain at least one prop change.',
       ],
+      // The model sent the mapping as JSON instead of as a YAML string.
+      'props_not_a_string' => [
+        'edits' => [['component_uuid' => '72384115-a8ee-44bc-9a13-de1c7a4d9b96', 'props' => ['text' => 'x']]],
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Edit 0 - The props value must be a string containing a YAML mapping of prop names to values.',
+      ],
       'scalar_props' => [
         'edits' => [['component_uuid' => '72384115-a8ee-44bc-9a13-de1c7a4d9b96', 'props' => 'just a string']],
         'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Edit 0 - The props value must be a YAML mapping of prop names to values, one "prop_name: value" pair per line.',
