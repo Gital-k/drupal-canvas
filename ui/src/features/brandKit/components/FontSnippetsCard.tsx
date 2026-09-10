@@ -103,9 +103,9 @@ const FontSnippetsCard = ({
         </Callout.Text>
       </Callout.Root>
 
-      <Text size="2" weight="medium" as="h3" style={{ marginTop: '1rem' }}>
-        Code Examples
-      </Text>
+       <Text size="2" weight="medium" as="div" style={{ marginTop: '1rem' }}>
+         Code Examples
+       </Text>
       <Flex direction="column" gap="2" className={styles.consoleSection}>
         <Text size="2" weight="medium">
           Tailwind CSS
