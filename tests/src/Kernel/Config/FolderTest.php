@@ -45,19 +45,21 @@ class FolderTest extends CanvasKernelTestBase {
     // 4. It is not the only Folder entity anymore.
     $folder_labels = \array_map(fn (Folder $folder) => $folder->label(), \array_values($folders));
     \sort($folder_labels);
+    // No 'Forms' or 'core' Folder: every Component in those categories is a
+    // core-provided Block Component, which is generated disabled, and Folders
+    // are only created for enabled Components.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::computeInitialComponentStatus()
     $this->assertEquals([
       'Atom/Media',
       'Atom/Tabs',
       'Atom/Text',
       'Container',
       'Container/Special',
-      'Forms',
       'Menus',
       'Other',
       'Status',
       'System',
       'Test folder, please ignore',
-      'core',
     ], $folder_labels);
 
     // 5. Delete all folders and regenerate Components. As no new Components
@@ -93,13 +95,43 @@ class FolderTest extends CanvasKernelTestBase {
       'Atom/Text',
       'Container',
       'Container/Special',
-      'Forms',
       'Menus',
       'Other',
       'Status',
       'System',
-      'core',
     ], $folder_labels);
+  }
+
+  /**
+   * Tests that a Folder is created when a disabled Component is enabled.
+   */
+  public function testFolderCreatedWhenComponentIsEnabled(): void {
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
+
+    // Core-provided Block Components are generated disabled, so no Folder was
+    // created for their category.
+    $disabled = \array_filter(Component::loadMultiple(), fn (Component $component): bool => !$component->status());
+    $this->assertNotEmpty($disabled);
+    $component = \reset($disabled);
+    $category = (string) $component->getComponentSource()->determineDefaultFolder();
+    $this->assertNull(Folder::loadByNameAndConfigEntityTypeId($category, Component::ENTITY_TYPE_ID));
+
+    // Enabling it files it into a Folder named after its category.
+    $component->setStatus(TRUE)->save();
+    $folder = Folder::loadByItemAndConfigEntityTypeId($component->id(), Component::ENTITY_TYPE_ID);
+    \assert($folder instanceof Folder);
+    $this->assertSame($category, $folder->label());
+
+    // Disabling and re-enabling does not move it back out of a Folder the site
+    // owner chose: it is already in one, so it is left alone.
+    $folder->removeItem($component->id())->save();
+    $this->entity->addItems([$component->id()])->save();
+    $component->setStatus(FALSE)->save();
+    $component->setStatus(TRUE)->save();
+    $this->assertSame(
+      $this->entity->id(),
+      Folder::loadByItemAndConfigEntityTypeId($component->id(), Component::ENTITY_TYPE_ID)?->id(),
+    );
   }
 
   public function testComponentDeletionModifiesFolder(): void {
