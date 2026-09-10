@@ -63,7 +63,6 @@ use Drupal\file\Plugin\Field\FieldType\FileItem;
 use Drupal\file\Plugin\Field\FieldType\FileUriItem;
 use Drupal\options\Plugin\Field\FieldType\ListFloatItem;
 use Drupal\options\Plugin\Field\FieldType\ListIntegerItem;
-use Drupal\options\Plugin\Field\FieldType\ListStringItem;
 use Drupal\telephone\Plugin\Field\FieldType\TelephoneItem;
 use Drupal\text\TextProcessed;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -112,7 +111,7 @@ use Symfony\Component\Validator\Constraint;
 final class EntityFieldPropSourceMatcher {
 
   /**
-   * @var array<lowercase-string, array{class: class-string, exceptions: array<array>}>
+   * @var array<lowercase-string, array{class?: class-string, field_type?: string, exceptions: array<array>}>
    */
   public const IGNORE_FIELD_TYPES = [
     // The `decimal` field type is impossible to match, because it is impossible
@@ -147,7 +146,7 @@ final class EntityFieldPropSourceMatcher {
       ],
     ],
     'list_string' => [
-      'class' => ListStringItem::class,
+      'field_type' => 'list_string',
       // Allow matching against a prop that accepts ANY string.
       'exceptions' => [
         ['type' => 'string'],
@@ -680,13 +679,20 @@ final class EntityFieldPropSourceMatcher {
     $field_definitions = $this->recurseDataDefinitionInterface($entity_data_definition);
     foreach ($field_definitions as $field_definition) {
       \assert($field_definition instanceof FieldDefinitionInterface);
-      foreach (self::IGNORE_FIELD_TYPES as ['class' => $field_type_class, 'exceptions' => $allowed_schemas]) {
+      foreach (self::IGNORE_FIELD_TYPES as [
+        'class' => $field_type_class,
+        'field_type' => $field_type_id,
+        'exceptions' => $allowed_schemas,
+      ]) {
         // DO NOT ignore the field type if it's one of a carefully selected set
         // of exceptions.
         if (\in_array($schema, $allowed_schemas, TRUE)) {
           continue;
         }
-        if (is_a($field_definition->getItemDefinition()->getClass(), $field_type_class, TRUE)) {
+        if (
+          ($field_type_class !== NULL && is_a($field_definition->getItemDefinition()->getClass(), $field_type_class, TRUE))
+          || ($field_type_id !== NULL && $field_definition->getType() === $field_type_id)
+        ) {
           continue 2;
         }
       }
