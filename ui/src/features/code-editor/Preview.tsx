@@ -71,27 +71,95 @@ function getPreviewScriptSource(): Promise<Blob> {
   return previewScriptSourcePromise;
 }
 
+// Matches a bundler-emitted `from"./foo.js"` / `from '../foo.js'` inside an
+// `import`/`export ... from` statement — used by `discoverFiles()` below to
+// find a file's own relative imports.
+const RELATIVE_IMPORT_PATTERN = /\bfrom(\s*)(["'])(\.\.?\/[^"']*)\2/g;
+
+// Recursively fetches a JS file's own relative-imported siblings
+// (Vite/Rollup-built chunks sometimes import a shared sibling this way,
+// e.g. `@drupal-api-client/json-api-client` importing
+// `./_commonjsHelpers.js`), filling `files` with each one's raw source
+// keyed by its real (absolute) URL.
+//
+// This only *discovers* files and their text — it deliberately doesn't
+// build blob URLs itself, unlike `getPreviewScriptSource()` above. A `Blob`
+// created here would need embedding into another file's rewritten source
+// as a URL string, but a `blob:` URL is scoped to the realm that called
+// `URL.createObjectURL()`: one created in the parent's real origin can't be
+// dereferenced from the opaque-origin iframe's own realm, even embedded
+// verbatim as a string in a file the iframe otherwise trusts. So instead
+// the shell bootstrap does that part itself, from this same raw-source
+// data, entirely inside its own realm — @see the `_canvas_preview_bootstrap_ready`
+// listener below and `CodeEditorPreviewController`'s shell HTML.
+async function discoverFiles(
+  url: string,
+  files: Map<string, string>,
+  inProgress: Map<string, Promise<void>>,
+): Promise<void> {
+  // `GlobalImports::getImportMap()` returns root-relative URLs
+  // (`/modules/...`). `fetch()` resolves those against the page origin
+  // implicitly, but the `URL` constructor needs an explicit absolute base
+  // to resolve a relative specifier against — so every URL used as a base
+  // below has to be made absolute first, or a nested relative import (e.g.
+  // `drupal-canvas.js`'s own `./jsonapi-client.js`) throws trying to
+  // resolve against it.
+  const absoluteUrl = new URL(url, window.location.href).href;
+  let pending = inProgress.get(absoluteUrl);
+  if (!pending) {
+    pending = (async () => {
+      const text = await (await fetch(absoluteUrl)).text();
+      files.set(absoluteUrl, text);
+      const relativeSpecifiers = new Set(
+        [...text.matchAll(RELATIVE_IMPORT_PATTERN)].map((match) => match[3]),
+      );
+      await Promise.all(
+        [...relativeSpecifiers].map((specifier) =>
+          discoverFiles(
+            new URL(specifier, absoluteUrl).href,
+            files,
+            inProgress,
+          ),
+        ),
+      );
+    })();
+    inProgress.set(absoluteUrl, pending);
+  }
+  return pending;
+}
+
 // Same reasoning as `getPreviewScriptSource()` above, for the bare-specifier
 // dependencies (`preact`, `react`, etc.) the preview script needs to resolve
 // its own imports: the shell can't fetch any of these over the network
 // either. Fetches the import map itself
 // (@see \Drupal\canvas\Controller\CodeEditorPreviewController::importMap()),
-// then every entry's own content, so the shell can build an import map made
-// entirely of local blob URLs instead.
-let previewImportMapPromise: Promise<Record<string, Blob>> | null = null;
-function getPreviewImportMap(): Promise<Record<string, Blob>> {
+// then every entry's own source and (transitively) every file it relatively
+// imports — @see `discoverFiles()` for why this stops short of building
+// blob URLs itself.
+let previewImportMapPromise: Promise<{
+  imports: Record<string, string>;
+  files: Record<string, string>;
+}> | null = null;
+function getPreviewImportMap() {
   previewImportMapPromise ??= fetch(
     Drupal.url('canvas/code-editor-preview/import-map'),
   )
     .then((response) => response.json() as Promise<Record<string, string>>)
     .then(async (imports) => {
-      const entries = await Promise.all(
-        Object.entries(imports).map(
-          async ([specifier, url]) =>
-            [specifier, await (await fetch(url)).blob()] as const,
+      const files = new Map<string, string>();
+      const inProgress = new Map<string, Promise<void>>();
+      await Promise.all(
+        Object.values(imports).map((url) =>
+          discoverFiles(url, files, inProgress),
         ),
       );
-      return Object.fromEntries(entries);
+      const resolvedImports = Object.fromEntries(
+        Object.entries(imports).map(([specifier, url]) => [
+          specifier,
+          new URL(url, window.location.href).href,
+        ]),
+      );
+      return { imports: resolvedImports, files: Object.fromEntries(files) };
     });
   return previewImportMapPromise;
 }
@@ -303,7 +371,12 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
       void Promise.all([getPreviewScriptSource(), getPreviewImportMap()]).then(
         ([source, importMap]) => {
           target.postMessage(
-            { type: '_canvas_preview_script_source', source, importMap },
+            {
+              type: '_canvas_preview_script_source',
+              source,
+              imports: importMap.imports,
+              files: importMap.files,
+            },
             '*',
           );
         },

@@ -35,20 +35,39 @@ final class CodeEditorPreviewController {
 // even sent — neither `code-editor-preview.js` itself nor the bare-specifier
 // imports (`preact`, etc.) it needs can be loaded over the network from in
 // here. The parent fetches all of it instead, from its real origin, and
-// relays it over `postMessage()` as `Blob`s (which survive `postMessage()`'s
-// structured clone across an opaque-origin boundary): the script's own
-// source, and one `Blob` per import map entry. Turning each into a local
-// blob: URL and dynamically importing one are both purely local operations,
-// not network fetches, regardless of how the `Blob` got here.
+// relays it over `postMessage()`: the script's own source as a `Blob`
+// (`Blob`s survive `postMessage()`'s structured clone across an
+// opaque-origin boundary), and, for the import map, the raw source of every
+// file involved (keyed by its real URL) rather than `Blob`s — a `blob:` URL
+// is scoped to the realm that created it via `URL.createObjectURL()`, so
+// one built by the parent's real origin couldn't be dereferenced from here
+// even embedded as a string in another file's rewritten source. Building
+// the import map's `blob:` URLs — and rewriting each file's own relative
+// imports (e.g. `@drupal-api-client/json-api-client` importing
+// `./_commonjsHelpers.js`) to point at them — has to happen here instead,
+// in this realm, from that raw source.
 // @see ui/src/features/code-editor/Preview.tsx
 window.addEventListener('message', function (event) {
   if (event.source !== window.parent || event.data?.type !== '_canvas_preview_script_source') {
     return;
   }
-  if (event.data.importMap) {
+  if (event.data.imports && event.data.files) {
+    var files = event.data.files;
+    var blobUrlCache = {};
+    var getBlobUrl = function (realUrl) {
+      if (blobUrlCache[realUrl]) {
+        return blobUrlCache[realUrl];
+      }
+      var rewritten = files[realUrl].replace(/\\bfrom(\\s*)(["'])(\\.\\.?\\/[^"']*)\\2/g, function (fullMatch, spacing, quote, specifier) {
+        return 'from' + spacing + quote + getBlobUrl(new URL(specifier, realUrl).href) + quote;
+      });
+      var blobUrl = URL.createObjectURL(new Blob([rewritten], { type: 'text/javascript' }));
+      blobUrlCache[realUrl] = blobUrl;
+      return blobUrl;
+    };
     var imports = {};
-    for (var specifier in event.data.importMap) {
-      imports[specifier] = URL.createObjectURL(event.data.importMap[specifier]);
+    for (var specifier in event.data.imports) {
+      imports[specifier] = getBlobUrl(event.data.imports[specifier]);
     }
     var importMapScript = document.createElement('script');
     importMapScript.type = 'importmap';
