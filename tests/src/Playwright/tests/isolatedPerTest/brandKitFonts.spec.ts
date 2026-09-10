@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 
 import { isolatedPerTest as test } from '../../fixtures/test.js';
 
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 // @cspell:ignore fontmaster
 
@@ -12,9 +12,6 @@ const SEL = {
   uploadButton: '[data-testid="canvas-brand-kit-upload-font-button"]',
   fileInput:
     '[data-testid="canvas-brand-kit-fonts-tab-content"] input[type="file"]',
-  // The rows and the flyout are styled through CSS modules, so they are
-  // addressed by the hashed class name prefix. This is what
-  // brandKitColors.spec.ts does for folder counts.
   familyList: '[class*="_familyList"]',
   familyRowWrapper: '[class*="_familyRowWrapper"]',
   familyRow: 'button[class*="_familyRow"]',
@@ -31,25 +28,14 @@ const SEL = {
     '[class*="_flyoutContent"] input[aria-label="Font family name"]',
 };
 
-/**
- * Returns an element's on-screen box, failing the test if it has none.
- */
-const boxOf = async (locator: Locator) => {
-  const box = await locator.boundingBox();
-  expect(box, `expected ${locator} to be laid out on screen`).not.toBeNull();
-  return box!;
-};
 
-const centerY = (box: { y: number; height: number }) => box.y + box.height / 2;
 
 /**
  * Uploads a font file through the fonts section's hidden file input.
  *
- * The uploaded bytes are not a real font. Metadata parsing fails gracefully and
- * the family name falls back to the filename, which keeps this spec free of a
- * binary fixture.
  */
 const uploadFont = async (page: Page, filename: string) => {
+  // Use fake font bytes to avoid the need for real font files.
   await page.locator(SEL.fileInput).setInputFiles({
     name: filename,
     mimeType: 'font/woff2',
@@ -118,30 +104,14 @@ test.describe('brand kit fonts', () => {
     // `all: unset` reset stopped being its first declaration, the row lost its
     // layout and the badge dropped onto a second line under the name.
     // @see https://www.drupal.org/i/3591954
-    const rowBox = await boxOf(familyRowWrapper);
-    const listBox = await boxOf(page.locator(SEL.familyList));
-    const nameBox = await boxOf(familyRow.locator(SEL.familyName));
-    const badgeBox = await boxOf(familyRowWrapper.locator(SEL.familyBadge));
-
-    expect(rowBox.width).toBeGreaterThanOrEqual(listBox.width - 1);
-    expect(rowBox.height).toBeGreaterThan(20);
-    // The badge is beside the name, not stacked under it.
-    expect(badgeBox.x).toBeGreaterThanOrEqual(nameBox.x + nameBox.width - 1);
-    // Both sit inside the row's own height.
-    expect(badgeBox.y + badgeBox.height).toBeLessThanOrEqual(
-      rowBox.y + rowBox.height + 1,
-    );
+    await expect(familyRowWrapper).toHaveScreenshot('family-row-layout.png');
 
     // Uploading selects the new font, which opens its family flyout. The
     // flyout carries the design's two consoles side by side: the font's own
     // settings on the left, the example code on the right.
     // @see useFontUpload's onFontUploaded / useBrandKitFontSelection.selectFont
     await expect(page.locator(SEL.flyout)).toBeVisible();
-    const centerBox = await boxOf(page.locator(SEL.centerConsole));
-    const rightBox = await boxOf(page.locator(SEL.rightConsole));
-    expect(rightBox.x).toBeGreaterThanOrEqual(
-      centerBox.x + centerBox.width - 1,
-    );
+    await expect(page.locator(SEL.flyout)).toHaveScreenshot('font-flyout-layout.png');
 
     // A family with one file has nothing to choose between, so Preview is the
     // specimen card rather than a list of variant cards.
@@ -175,11 +145,7 @@ test.describe('brand kit fonts', () => {
     await expect(familyRow).toContainText('Renamed Sans');
     await autoSaved;
 
-    // Whether the flyout is still open at this point is not deterministic:
-    // `handleFamilyCommit` re-opens it on the renamed family only after its
-    // save resolves, and the effect that closes a flyout whose family no
-    // longer exists may run either side of that. So do not assert on it here —
-    // just switch tabs, which dismisses it either way.
+    // Leave the fonts tab then return to it to ensure the flyout is closed.
     await page.locator(SEL.colorsTab).click();
     await expect(page.locator(SEL.uploadButton)).toBeHidden();
     await page.locator(SEL.tab).click();
@@ -190,14 +156,7 @@ test.describe('brand kit fonts', () => {
     await canvas.openBrandKitPanel();
     await page.locator(SEL.tab).click();
     await expect(familyRow).toContainText('Renamed Sans');
-    const reloadedRowBox = await boxOf(familyRowWrapper);
-    const reloadedBadgeBox = await boxOf(
-      familyRowWrapper.locator(SEL.familyBadge),
-    );
-    expect(reloadedRowBox.width).toBeGreaterThanOrEqual(listBox.width - 1);
-    expect(reloadedBadgeBox.y + reloadedBadgeBox.height).toBeLessThanOrEqual(
-      reloadedRowBox.y + reloadedRowBox.height + 1,
-    );
+    await expect(familyRowWrapper).toHaveScreenshot('reloaded-family-row-layout.png');
   });
 
   test('adds and deletes variants, and deletes a family', async ({
@@ -213,8 +172,8 @@ test.describe('brand kit fonts', () => {
     await uploadFont(page, 'mona-sans.woff2');
     await expect(page.locator(SEL.flyout)).toBeVisible();
 
-    // "Add variant" uploads into the family that is open, so the family keeps
-    // one row, and Preview becomes the list of variant cards.
+    // "Add variant" updates the open family, replacing the Preview with a list
+    // of variant cards.
     await page
       .locator('[data-testid="canvas-brand-kit-font-add-variant-button"]')
       .click();
@@ -222,17 +181,10 @@ test.describe('brand kit fonts', () => {
     await expect(page.locator(SEL.variantRow)).toHaveCount(2);
     await expect(page.locator(SEL.familyRow)).toHaveCount(1);
 
-    // A card reads as a card: its monospace label above the specimen typeset in
-    // that variant. The card carries the same `all: unset` reset as the family
-    // row, so this is also the second half of the layout guard above.
+    // A card displays its label above the font specimen. This also verifies the
+    // card's layout against the all: unset reset.
     const variantRow = page.locator(SEL.variantRow).first();
-    const variantBox = await boxOf(variantRow);
-    const labelBox = await boxOf(variantRow.locator(SEL.variantLabel));
-    const specimenBox = await boxOf(variantRow.locator(SEL.variantSpecimen));
-
-    expect(variantBox.height).toBeGreaterThan(40);
-    expect(labelBox.width).toBeGreaterThan(0);
-    expect(centerY(specimenBox)).toBeGreaterThan(centerY(labelBox));
+    await expect(variantRow).toHaveScreenshot('variant-card-layout.png');
     await expect(variantRow).toContainText('400 Normal [WOFF2]');
 
     // Arrow keys move the selection, which re-scopes the code beside it.
@@ -248,9 +200,7 @@ test.describe('brand kit fonts', () => {
       .click();
     await expect(page.locator(SEL.variantRow)).toHaveCount(0);
 
-    // "Delete font" in the row's overflow menu removes the whole family, which
-    // empties the section again. Dismiss the flyout first — it is anchored
-    // beside the row and covers the row's own controls.
+    // Close the flyout to access the row's menu and delete the entire font family.
     await page.keyboard.press('Escape');
     await expect(
       page.locator('[data-radix-popper-content-wrapper]'),
