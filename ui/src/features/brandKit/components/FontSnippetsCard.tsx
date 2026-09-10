@@ -103,7 +103,7 @@ const FontSnippetsCard = ({
         </Callout.Text>
       </Callout.Root>
 
-      <Text size="2" weight="medium" as="div" style={{ marginTop: '1rem' }}>
+      <Text size="2" weight="medium" as="div" mt="4">
         Code Examples
       </Text>
       <Flex direction="column" gap="2" className={styles.consoleSection}>

@@ -49,13 +49,21 @@ export const stripFontListClientFields = (
   fonts: AssetLibraryFont[],
 ): PersistedAssetLibraryFont[] => fonts.map(stripFontClientFields);
 
+/**
+ * The display name a font is grouped under: its trimmed family, or a shared
+ * fallback for unnamed uploads. Kept in one place so grouping and the code that
+ * matches against those groups (e.g. deleting a family) never drift apart.
+ */
+export const normalizeFontFamilyName = (font: AssetLibraryFont): string =>
+  font.family.trim() || 'New font';
+
 export const groupFontsByFamily = (
   fonts: AssetLibraryFont[],
 ): Array<{ family: string; fonts: AssetLibraryFont[] }> => {
   const groupedFonts = new Map<string, AssetLibraryFont[]>();
 
   fonts.forEach((font) => {
-    const family = font.family.trim() || 'New font';
+    const family = normalizeFontFamilyName(font);
     const familyFonts = groupedFonts.get(family) ?? [];
     familyFonts.push(font);
     groupedFonts.set(family, familyFonts);

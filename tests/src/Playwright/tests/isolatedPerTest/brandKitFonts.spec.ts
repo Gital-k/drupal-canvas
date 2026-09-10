@@ -204,9 +204,10 @@ test.describe('brand kit fonts', () => {
 
     // Close the flyout to access the row's menu and delete the entire font family.
     await page.keyboard.press('Escape');
-    await expect(
-      page.locator('[data-radix-popper-content-wrapper]'),
-    ).toHaveCount(0);
+    // Assert against our own flyout element rather than a Radix internal
+    // (e.g. [data-radix-popper-content-wrapper]) so the test does not break if
+    // Radix changes its popper DOM structure.
+    await expect(page.locator(SEL.flyout)).toHaveCount(0);
     await page
       .locator('[data-testid="canvas-brand-kit-font-family-menu-Mona Sans"]')
       .click();

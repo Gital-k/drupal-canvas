@@ -4,7 +4,7 @@ import { Button, Callout, Flex, Spinner, TextField } from '@radix-ui/themes';
 
 import EmptyStateCallout from '@/components/EmptyStateCallout';
 import FontFamiliesList from '@/features/brandKit/components/FontFamiliesList';
-import { groupFontsByFamily } from '@/features/brandKit/fontCss';
+import { groupFontsByFamily, normalizeFontFamilyName} from '@/features/brandKit/fontCss';
 import { useBrandKitFonts } from '@/features/brandKit/hooks/useBrandKitFonts';
 import { useBrandKitFontSelection } from '@/features/brandKit/hooks/useBrandKitFontSelection';
 import { useFontUpload } from '@/features/brandKit/hooks/useFontUpload';
@@ -194,7 +194,7 @@ const BrandKitFontsSection = () => {
 
   const handleRemoveFamily = async (family: string) => {
     const nextFonts = fonts.filter(
-      (font) => (font.family.trim() || 'New font') !== family,
+      (font) => normalizeFontFamilyName(font) !== family,
     );
     if (openFamily === family) {
       setOpenFamily(null);
@@ -206,9 +206,7 @@ const BrandKitFontsSection = () => {
     const nextFonts = fonts.filter((font) => font.id !== fontId);
     if (
       openFamily &&
-      !nextFonts.some(
-        (font) => (font.family.trim() || 'New font') === openFamily,
-      )
+      !nextFonts.some((font) => normalizeFontFamilyName(font) === openFamily)
     ) {
       setOpenFamily(null);
     }
