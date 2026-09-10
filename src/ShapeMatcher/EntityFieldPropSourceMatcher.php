@@ -111,7 +111,7 @@ use Symfony\Component\Validator\Constraint;
 final class EntityFieldPropSourceMatcher {
 
   /**
-   * @var array<lowercase-string, array{class?: class-string, field_type?: string, exceptions: array<array>}>
+   * @var array<lowercase-string, array{class: class-string, exceptions: array<array>}>
    */
   public const IGNORE_FIELD_TYPES = [
     // The `decimal` field type is impossible to match, because it is impossible
@@ -145,13 +145,6 @@ final class EntityFieldPropSourceMatcher {
         ['type' => 'number'],
       ],
     ],
-    'list_string' => [
-      'field_type' => 'list_string',
-      // Allow matching against a prop that accepts ANY string.
-      'exceptions' => [
-        ['type' => 'string'],
-      ],
-    ],
     // The `map` field type has no widget, is broken, and is hidden in the UI.
     // @see https://www.drupal.org/node/2563843
     // @see \Drupal\Core\Field\Plugin\Field\FieldType\MapItem
@@ -164,6 +157,31 @@ final class EntityFieldPropSourceMatcher {
     // not a common need in components.
     // @todo Consider adding a computed `tel_uri` property in https://www.drupal.org/i/3549940 to expose this as a `tel:…` URI, which then would be matchable against `type: string, format: uri, x-allowed-schemes: [tel]`
     'telephone' => ['class' => TelephoneItem::class, 'exceptions' => []],
+  ];
+
+  /**
+   * Field types ignored by field type ID rather than field item class.
+   *
+   * Used for field types whose field item class lives in a module that
+   * ShapeMatcher infrastructure may not depend on directly (per the
+   * `phpat.shapeMatcher` architecture rule), so matching is done against the
+   * field type ID string instead of the field item class.
+   *
+   * @var array<lowercase-string, array{exceptions: array<array>}>
+   *
+   * @see \Drupal\Core\Field\FieldDefinitionInterface::getType()
+   */
+  public const IGNORE_FIELD_TYPES_BY_ID = [
+    // The `list_string` field type allows each field instance to define its
+    // own set of possible values. The probability of this exactly matching
+    // the explicit inputs (i.e. the prop shape's `enum`) for a component is
+    // astronomical.
+    'list_string' => [
+      // Allow matching against a prop that accepts ANY string.
+      'exceptions' => [
+        ['type' => 'string'],
+      ],
+    ],
   ];
 
   public function __construct(
@@ -679,20 +697,23 @@ final class EntityFieldPropSourceMatcher {
     $field_definitions = $this->recurseDataDefinitionInterface($entity_data_definition);
     foreach ($field_definitions as $field_definition) {
       \assert($field_definition instanceof FieldDefinitionInterface);
-      foreach (self::IGNORE_FIELD_TYPES as [
-        'class' => $field_type_class,
-        'field_type' => $field_type_id,
-        'exceptions' => $allowed_schemas,
-      ]) {
+      foreach (self::IGNORE_FIELD_TYPES as ['class' => $field_type_class, 'exceptions' => $allowed_schemas]) {
         // DO NOT ignore the field type if it's one of a carefully selected set
         // of exceptions.
         if (\in_array($schema, $allowed_schemas, TRUE)) {
           continue;
         }
-        if (
-          ($field_type_class !== NULL && is_a($field_definition->getItemDefinition()->getClass(), $field_type_class, TRUE))
-          || ($field_type_id !== NULL && $field_definition->getType() === $field_type_id)
-        ) {
+        if (is_a($field_definition->getItemDefinition()->getClass(), $field_type_class, TRUE)) {
+          continue 2;
+        }
+      }
+      foreach (self::IGNORE_FIELD_TYPES_BY_ID as $field_type_id => ['exceptions' => $allowed_schemas]) {
+        // DO NOT ignore the field type if it's one of a carefully selected set
+        // of exceptions.
+        if (\in_array($schema, $allowed_schemas, TRUE)) {
+          continue;
+        }
+        if ($field_definition->getType() === $field_type_id) {
           continue 2;
         }
       }
