@@ -133,17 +133,19 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
       $component_updates = [];
       $all_errors = [];
       foreach ($this->getContextValue('component_edits') as $index => $edit) {
-        $errors = [];
         $uuid = $edit['component_uuid'] ?? NULL;
+        $errors = self::validateComponentUuid($uuid, $components_by_uuid);
         $props = NULL;
         try {
           $props = Yaml::parse($edit['props'] ?? '');
+          // A block that did not parse is reported below; its shape is only
+          // checked once it has.
+          $errors = \array_merge($errors, self::validateProps($props));
         }
         catch (ParseException $e) {
           // Replaces the raw YAML parse error with instructions to quote string values.
           $errors[] = \sprintf("The props value is not valid YAML: %s Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.", $e->getMessage());
         }
-        $errors = \array_merge($errors, $this->validateEditParams($uuid, $props, $components_by_uuid));
 
         if (\is_array($props) && \is_string($uuid) && isset($components_by_uuid[$uuid])) {
           $component = $components_by_uuid[$uuid];
@@ -182,37 +184,43 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
   }
 
   /**
-   * Validates the component_uuid and props of a single edit.
+   * Validates the component_uuid of a single edit.
    *
    * @param mixed $uuid
    *   The edit's component_uuid value.
-   * @param mixed $props
-   *   The edit's parsed props value.
    * @param array $components_by_uuid
    *   The current page's components, keyed by UUID.
    *
    * @return list<string>
-   *   The validation errors found, or an empty list if the edit is valid.
+   *   The validation errors found, or an empty list if the UUID is valid.
    */
-  private function validateEditParams(mixed $uuid, mixed $props, array $components_by_uuid): array {
-    $errors = [];
-
-    $has_uuid = \is_string($uuid) && $uuid !== '';
-    if (!$has_uuid) {
-      $errors[] = 'The component_uuid key is missing in the edit.';
+  private static function validateComponentUuid(mixed $uuid, array $components_by_uuid): array {
+    if (!\is_string($uuid) || $uuid === '') {
+      return ['The component_uuid key is missing in the edit.'];
     }
-    elseif (!isset($components_by_uuid[$uuid])) {
-      $errors[] = \sprintf('Component %s was not found on the page.', $uuid);
+    if (!isset($components_by_uuid[$uuid])) {
+      return [\sprintf('Component %s was not found on the page.', $uuid)];
     }
+    return [];
+  }
 
+  /**
+   * Validates the parsed props of a single edit.
+   *
+   * @param mixed $props
+   *   The edit's parsed props value.
+   *
+   * @return list<string>
+   *   The validation errors found, or an empty list if the props are valid.
+   */
+  private static function validateProps(mixed $props): array {
     if (!\is_array($props)) {
-      $errors[] = 'The props value must be a YAML mapping of prop names to values, one "prop_name: value" pair per line.';
+      return ['The props value must be a YAML mapping of prop names to values, one "prop_name: value" pair per line.'];
     }
-    elseif ($props === []) {
-      $errors[] = 'The edit must contain at least one prop change.';
+    if ($props === []) {
+      return ['The edit must contain at least one prop change.'];
     }
-
-    return $errors;
+    return [];
   }
 
 }
