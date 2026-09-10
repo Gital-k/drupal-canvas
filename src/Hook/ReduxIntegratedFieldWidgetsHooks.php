@@ -367,7 +367,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     $form_id = $form['form_id']['#value'] ?? NULL;
 
     // If we aren't in the component instance or config translation form, remove
-    // text formats that are exclusive to Canvas.
+    // text formats and their guidelines that are exclusive to Canvas.
     // @see \Drupal\canvas\Hook\ShapeMatchingHooks::filterFormatAccess()
     $forms_with_static_prop_sources = [
       ComponentInstanceForm::FORM_ID,
@@ -378,8 +378,10 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     if (!\in_array($form_id, $forms_with_static_prop_sources, TRUE)) {
       // @see config/install/filter.format.canvas_html_block.yml
       unset($element['format']['format']['#options']['canvas_html_block']);
+      unset($element['format']['guidelines']['canvas_html_block']);
       // @see config/install/filter.format.canvas_html_inline.yml
       unset($element['format']['format']['#options']['canvas_html_inline']);
+      unset($element['format']['guidelines']['canvas_html_inline']);
     }
     return $element;
   }

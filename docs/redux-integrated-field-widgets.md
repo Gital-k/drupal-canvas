@@ -68,6 +68,12 @@ intermediary concepts (`field widget`, `field type`, `field prop`, etc.) into a 
 ### 3.2 How?
 The forms use Drupal's Form API but ultimately render `React component`s  instead of `Twig`. See the [`Twig to React in the Canvas_Stark theme` doc](twig-to-react-in-canvas-stark.md) for more details.
 
+The `canvas_html_block` and `canvas_html_inline` text formats are available in
+component instance and supported configuration translation forms. On other
+forms, `ReduxIntegratedFieldWidgetsHooks::processTextFormat()` removes both their
+selector options and guidelines. Guidelines for the remaining formats are
+preserved, including when the format selector is hidden.
+
 To redux-sync a `React`-rendered `HTML form control element`, it should be wrapped by `withRHF`:
 
 ```javascript

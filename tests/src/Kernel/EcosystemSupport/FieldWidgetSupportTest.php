@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\EcosystemSupport;
 
+use Drupal\canvas\Form\ComponentInstanceForm;
+use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Form\FormState;
+use Drupal\Core\Render\Element;
+use Drupal\Core\Render\RendererInterface;
+use Drupal\filter\Entity\FilterFormat;
+use Drupal\user\Entity\Role;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * Checks that all core field widgets have Canvas client-side transforms metadata.
+ * Checks core field widget integration and text format guidelines.
  *
  * @see docs/redux-integrated-field-widgets.md#3.4
  * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter
@@ -74,6 +82,68 @@ final class FieldWidgetSupportTest extends EcosystemSupportTestBase {
       count($supported) / count($field_widget_definitions),
       \sprintf('Not yet supported: %s', implode(', ', \array_keys($missing)))
     );
+  }
+
+  /**
+   * Tests that guidelines match the formats available outside Canvas forms.
+   */
+  #[DataProvider('providerTextFormatGuidelines')]
+  public function testTextFormatGuidelines(string $form_id, bool $canvas_formats_allowed): void {
+    $this->installEntitySchema('path_alias');
+    $this->installConfig(['filter', 'user']);
+    $format = FilterFormat::create([
+      'format' => 'public_html',
+      'name' => 'Public HTML',
+      'weight' => -10,
+      'filters' => [
+        'filter_html' => ['status' => TRUE, 'settings' => ['allowed_html' => '<p> <strong>']],
+      ],
+    ]);
+    $format->save();
+    $this->assertEntityIsValid($format);
+    $role = Role::load('anonymous');
+    \assert($role instanceof Role);
+    $role->grantPermission('use text format public_html')->save();
+    $this->assertTrue(\Drupal::currentUser()->isAnonymous());
+    $form = [
+      '#type' => 'form',
+      '#tree' => FALSE,
+      '#action' => '/',
+      '#parents' => [],
+      '#array_parents' => [],
+      'form_id' => ['#type' => 'hidden', '#value' => $form_id],
+      'body' => ['#type' => 'text_format', '#title' => 'Body', '#format' => 'public_html'],
+    ];
+    $form_state = new FormState();
+    $form = \Drupal::service(FormBuilderInterface::class)->doBuildForm($form_id, $form, $form_state);
+    $expected_formats = $canvas_formats_allowed
+      ? ['public_html', 'canvas_html_block', 'canvas_html_inline']
+      : ['public_html'];
+    $this->assertSame($expected_formats, \array_keys($form['body']['format']['format']['#options']));
+    $this->assertSame($expected_formats, Element::children($form['body']['format']['guidelines']));
+    if (!$canvas_formats_allowed) {
+      // Guidelines must be correct without relying on a visible format selector
+      // and its JavaScript, including when only one format can be selected.
+      $form['body']['format']['format']['#access'] = FALSE;
+      $html = (string) \Drupal::service(RendererInterface::class)->renderRoot($form);
+      $this->assertStringContainsString('data-drupal-format-id="public_html"', $html);
+      $this->assertStringNotContainsString('data-drupal-format-id="canvas_html_block"', $html);
+      $this->assertStringNotContainsString('data-drupal-format-id="canvas_html_inline"', $html);
+    }
+  }
+
+  /**
+   * @return array<string, array{string, bool}>
+   */
+  public static function providerTextFormatGuidelines(): array {
+    return [
+      'comment form' => ['comment_form', FALSE],
+      'node form' => ['node_article_form', FALSE],
+      'component instance' => [ComponentInstanceForm::FORM_ID, TRUE],
+      'add config translation' => ['config_translation_add_form', TRUE],
+      'edit config translation' => ['config_translation_edit_form', TRUE],
+      'translation job item' => ['tmgmt_job_item_edit_form', TRUE],
+    ];
   }
 
 }
