@@ -28,7 +28,7 @@ interface FolderData {
   componentIndexedFolders: Record<string, string>;
   folders: Record<
     string,
-    { name?: string; weight?: number; [key: string]: any }
+    { name?: string; weight?: number; items?: string[]; [key: string]: any }
   >;
 }
 
@@ -350,8 +350,18 @@ export const folderfyComponents = (
   });
   Object.entries(folders?.folders || []).forEach(([id, folder]) => {
     // Add any folder of a given type that wasn't already populated by the
-    // first loop.
-    if (folder.type === type && !folderComponents[id]) {
+    // first loop — but only if it is genuinely empty. A folder that has items
+    // in config yet received none in the first loop contains nothing the user
+    // can see (disabled Components, or Components provided by a non-default
+    // theme), so rendering it would show an empty folder the user cannot act
+    // on or get rid of. A folder with no items at all was created deliberately
+    // and must still be shown, because it is a drop target.
+    // @see https://git.drupalcode.org/project/canvas/-/work_items/3592055
+    if (
+      folder.type === type &&
+      !folderComponents[id] &&
+      !folder.items?.length
+    ) {
       folderComponents[id] = {
         id,
         name: folder.name || '',
