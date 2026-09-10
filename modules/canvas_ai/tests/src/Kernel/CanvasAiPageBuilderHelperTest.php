@@ -11,6 +11,7 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\canvas_ai\CanvasAiTempStore;
 use Drupal\canvas_personalization\Plugin\Canvas\ComponentSource\Personalization;
 use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Cache\CacheableMetadata;
@@ -680,6 +681,79 @@ XML;
 
     // An empty layout yields an empty map.
     $this->assertSame([], $this->canvasAiPageBuilderHelper->getComponentsByUuid([]));
+  }
+
+  /**
+   * Tests validateSlotTargetExists() against the layout in the temp store.
+   *
+   * The layout holds a two_column component whose column_one slot has a child
+   * and whose column_two slot is empty: a slot is a valid target whether or
+   * not it holds components.
+   *
+   * @param string $target
+   *   The "parent_uuid/slot_name" target to validate.
+   * @param string|null $expected
+   *   The expected error, or NULL when the target exists.
+   */
+  #[DataProvider('providerValidateSlotTargetExists')]
+  public function testValidateSlotTargetExists(string $target, ?string $expected): void {
+    $layout = [
+      'regions' => [
+        'content' => [
+          'nodePathPrefix' => [0],
+          'components' => [
+            [
+              'name' => 'sdc.canvas_test_sdc.two_column',
+              'uuid' => '2f957795-e30a-46a0-acfe-868adc0685bf',
+              'nodePath' => [0, 0],
+              'slots' => [
+                '2f957795-e30a-46a0-acfe-868adc0685bf/column_one' => [
+                  'components' => [
+                    [
+                      'name' => 'sdc.canvas_test_sdc.druplicon',
+                      'uuid' => '4e45ef4c-501c-4612-b02b-1911e88a4592',
+                      'nodePath' => [0, 0, 0, 0],
+                    ],
+                  ],
+                ],
+                '2f957795-e30a-46a0-acfe-868adc0685bf/column_two' => [
+                  'components' => [],
+                ],
+              ],
+            ],
+          ],
+        ],
+      ],
+    ];
+    $this->container->get(CanvasAiTempStore::class)
+      ->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, Json::encode($layout));
+
+    $this->assertSame($expected, $this->canvasAiPageBuilderHelper->validateSlotTargetExists($target));
+  }
+
+  /**
+   * Data provider for ::testValidateSlotTargetExists().
+   *
+   * @return array<string, array{string, string|null}>
+   *   The target and the expected error.
+   */
+  public static function providerValidateSlotTargetExists(): array {
+    return [
+      'slot with children' => ['2f957795-e30a-46a0-acfe-868adc0685bf/column_one', NULL],
+      'empty slot' => ['2f957795-e30a-46a0-acfe-868adc0685bf/column_two', NULL],
+      'unknown parent' => [
+        'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/column_one',
+        'Component with UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" not found in layout',
+      ],
+      'unknown slot' => [
+        '2f957795-e30a-46a0-acfe-868adc0685bf/column_three',
+        'Slot "column_three" not found in path "content/2f957795-e30a-46a0-acfe-868adc0685bf"',
+      ],
+      'child component as parent' => [
+        '4e45ef4c-501c-4612-b02b-1911e88a4592/column_one',
+        'Slot "column_one" not found in path "content/2f957795-e30a-46a0-acfe-868adc0685bf/column_one/4e45ef4c-501c-4612-b02b-1911e88a4592"',
+      ],
+    ];
   }
 
 }
