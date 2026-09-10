@@ -63,6 +63,7 @@ use Drupal\file\Plugin\Field\FieldType\FileItem;
 use Drupal\file\Plugin\Field\FieldType\FileUriItem;
 use Drupal\options\Plugin\Field\FieldType\ListFloatItem;
 use Drupal\options\Plugin\Field\FieldType\ListIntegerItem;
+use Drupal\options\Plugin\Field\FieldType\ListStringItem;
 use Drupal\telephone\Plugin\Field\FieldType\TelephoneItem;
 use Drupal\text\TextProcessed;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -143,6 +144,13 @@ final class EntityFieldPropSourceMatcher {
       'exceptions' => [
         ['type' => 'integer'],
         ['type' => 'number'],
+      ],
+    ],
+    'list_string' => [
+      'class' => ListStringItem::class,
+      // Allow matching against a prop that accepts ANY string.
+      'exceptions' => [
+        ['type' => 'string'],
       ],
     ],
     // The `map` field type has no widget, is broken, and is hidden in the UI.

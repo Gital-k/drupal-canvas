@@ -10,6 +10,7 @@ use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\ShapeMatcher\EntityFieldMappingSupport;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -153,7 +154,8 @@ final class MultiValuedFieldNotSupportedConstraintValidator extends ConstraintVa
       // A nonexistent field is handled by other constraints.
       return FALSE;
     }
-    return $field_definition->getFieldStorageDefinition()->getCardinality() !== 1;
+    return $field_definition->getFieldStorageDefinition()->getCardinality() !== 1
+      && !EntityFieldMappingSupport::supportsDeltaLessMultiValuedMapping($field_definition);
   }
 
 }

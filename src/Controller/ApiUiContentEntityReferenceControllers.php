@@ -14,6 +14,7 @@ use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\ShapeMatcher\EntityFieldMappingSupport;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\comment\CommentInterface;
@@ -208,7 +209,10 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       // render time, and rejected by storage.
       // @see \Drupal\canvas\Plugin\Validation\Constraint\MultiValuedFieldNotSupportedConstraint
       // @todo https://git.drupalcode.org/project/canvas/-/work_items/3589536
-      if ($field_definition->getFieldStorageDefinition()->getCardinality() !== 1) {
+      if (
+        $field_definition->getFieldStorageDefinition()->getCardinality() !== 1
+        && !EntityFieldMappingSupport::supportsDeltaLessMultiValuedMapping($field_definition)
+      ) {
         continue;
       }
       // Skip fields the current user cannot view (e.g., the user entity's
