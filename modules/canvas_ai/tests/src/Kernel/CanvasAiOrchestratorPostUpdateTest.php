@@ -60,6 +60,31 @@ final class CanvasAiOrchestratorPostUpdateTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Tests that post_update 0012 refreshes the orchestrator system prompt.
+   */
+  public function testPostUpdate0012RefreshesOrchestratorPrompt(): void {
+    $this->includePostUpdateFile();
+
+    $original = $this->config(self::ORCHESTRATOR);
+    $uuid = $original->get('uuid');
+    $core = $original->get('_core');
+    self::assertNotEmpty($uuid);
+    self::assertNotEmpty($core);
+
+    $this->config(self::ORCHESTRATOR)->set('system_prompt', 'stale prompt')->save(TRUE);
+
+    canvas_ai_post_update_0012_reimport_orchestrator_content_only_chrome();
+    $this->container->get(ConfigFactoryInterface::class)->reset(self::ORCHESTRATOR);
+
+    $updated = $this->config(self::ORCHESTRATOR);
+    self::assertSame($uuid, $updated->get('uuid'));
+    self::assertSame($core, $updated->get('_core'));
+    self::assertNotSame('stale prompt', $updated->get('system_prompt'));
+    self::assertStringContainsString('Site Chrome Comes From the Page Variant', $updated->get('system_prompt'));
+    self::assertStringNotContainsString('including headers, footers, and multiple sections', $updated->get('system_prompt'));
+  }
+
+  /**
    * Tests that the repair hook restores the uuid and _core stripped by 0003.
    */
   public function testPostUpdate0006RestoresManagedKeys(): void {
