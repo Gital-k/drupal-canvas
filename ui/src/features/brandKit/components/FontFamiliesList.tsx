@@ -16,8 +16,6 @@ import type {
 
 import styles from '../BrandKitPanel.module.css';
 
-// Radix Themes caps popover content at 480px through an inline custom
-// property, so the width the two consoles need is passed as a prop.
 const FLYOUT_WIDTH = 'min(760px, calc(100vw - 32px))';
 
 type FontGroup = { family: string; fonts: AssetLibraryFont[] };
@@ -151,6 +149,8 @@ const FontFamiliesList = ({
               </UnifiedMenu.Content>
             </DropdownMenu.Root>
           </Box>
+          {/* Both width and maxWidth need to be set to override Radix
+          Themes' default 480px cap on popover content. */}
           <Popover.Content
             side="right"
             sideOffset={32}
