@@ -4,7 +4,10 @@ import { Button, Callout, Flex, Spinner, TextField } from '@radix-ui/themes';
 
 import EmptyStateCallout from '@/components/EmptyStateCallout';
 import FontFamiliesList from '@/features/brandKit/components/FontFamiliesList';
-import { groupFontsByFamily, normalizeFontFamilyName} from '@/features/brandKit/fontCss';
+import {
+  groupFontsByFamily,
+  normalizeFontFamilyName,
+} from '@/features/brandKit/fontCss';
 import { useBrandKitFonts } from '@/features/brandKit/hooks/useBrandKitFonts';
 import { useBrandKitFontSelection } from '@/features/brandKit/hooks/useBrandKitFontSelection';
 import { useFontUpload } from '@/features/brandKit/hooks/useFontUpload';
