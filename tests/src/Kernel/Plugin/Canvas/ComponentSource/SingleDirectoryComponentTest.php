@@ -258,6 +258,7 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
       'sdc.canvas_test_sdc.component-no-meta-enum',
       'sdc.canvas_test_sdc.crash',
       'sdc.canvas_test_sdc.date',
+      'sdc.canvas_test_sdc.date-formatted',
       'sdc.canvas_test_sdc.deprecated',
       'sdc.canvas_test_sdc.document',
       'sdc.canvas_test_sdc.druplicon',
@@ -926,6 +927,22 @@ HTML,
           'library' => [
             'core/components.canvas_test_sdc--date',
             'core/components.canvas_test_sdc--date',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.date-formatted' => [
+        'html' => '<dl>
+  <dt>date</dt>
+  <dd id="date-formatted-date"></dd>
+  <dt>date_time</dt>
+  <dd id="date-formatted-date-time"></dd>
+</dl>
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--date-formatted',
+            'core/components.canvas_test_sdc--date-formatted',
           ],
         ],
       ],
@@ -2466,6 +2483,34 @@ HTML
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.date-formatted' => [
+        'prop_field_definitions' => [
+          'date' => [
+            'required' => FALSE,
+            'field_type' => 'datetime',
+            'field_storage_settings' => [
+              'datetime_type' => DateTimeItem::DATETIME_TYPE_DATE,
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'datetime_default',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎datetime␟value',
+            'derived_schema_metadata' => [],
+          ],
+          'date_time' => [
+            'required' => FALSE,
+            'field_type' => 'datetime',
+            'field_storage_settings' => [
+              'datetime_type' => DateTimeItem::DATETIME_TYPE_DATETIME,
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'datetime_default',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎datetime␟value',
+            'derived_schema_metadata' => [],
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.deprecated' => [
         'prop_field_definitions' => [
           'text' => [
@@ -3823,6 +3868,12 @@ HTML
           'canvas_test_sdc',
         ],
       ],
+      'sdc.canvas_test_sdc.date-formatted' => [
+        'module' => [
+          'datetime',
+          'canvas_test_sdc',
+        ],
+      ],
       'sdc.canvas_test_sdc.deprecated' => [
         'module' => [
           'core',
@@ -5091,6 +5142,45 @@ HTML
                 0 => ['value' => 'Birthday'],
               ],
               'resolved' => 'Birthday',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.date-formatted' => [
+        'expected_output_selectors' => [
+          'dl > dd#date-formatted-date',
+          'dl > dd#date-formatted-date-time',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'date' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'format' => 'date',
+            ],
+            'sourceType' => 'static:field_item:datetime',
+            'expression' => 'ℹ︎datetime␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'datetime_type' => DateTimeItem::DATETIME_TYPE_DATE,
+              ],
+            ],
+          ],
+          'date_time' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'format' => 'date-time',
+            ],
+            'sourceType' => 'static:field_item:datetime',
+            'expression' => 'ℹ︎datetime␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'datetime_type' => DateTimeItem::DATETIME_TYPE_DATETIME,
+              ],
             ],
           ],
         ],
