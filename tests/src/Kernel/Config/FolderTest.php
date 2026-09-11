@@ -108,12 +108,6 @@ class FolderTest extends CanvasKernelTestBase {
   public function testFolderCreatedWhenComponentIsEnabled(): void {
     $this->container->get(ComponentSourceManager::class)->generateComponents();
 
-    // Core-provided Block Components are generated disabled, so no Folder was
-    // created for their category.
-    $disabled = \array_filter(Component::loadMultiple(), fn (Component $component): bool => !$component->status());
-    $this->assertNotEmpty($disabled);
-    $component = \reset($disabled);
-    $category = (string) $component->getComponentSource()->determineDefaultFolder();
     // Use a Block Component whose category has only disabled Components, so
     // no Folder exists yet. Categories such as System/Menus already have a
     // Folder from BLOCKS_TO_KEEP_ENABLED.

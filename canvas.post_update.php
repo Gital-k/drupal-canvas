@@ -810,17 +810,6 @@ function canvas_post_update_0031_remove_empty_auto_created_folders(): void {
     }
     $items = $folder->get('items');
     // A Folder with no items at all was created by a site owner and is still
-    // needed as a drop target; only Folders whose every item is disabled were
-    // auto-created for Components that never appear in the Library.
-    if (empty($items)) {
-      continue;
-    }
-    $components = $component_storage->loadMultiple($items);
-    $enabled = array_filter($components, fn (Component $component): bool => $component->status());
-    if (empty($enabled)) {
-      $folder->delete();
-    $items = $folder->get('items');
-    // A Folder with no items at all was created by a site owner and is still
     // needed as a drop target.
     if (empty($items)) {
       continue;
