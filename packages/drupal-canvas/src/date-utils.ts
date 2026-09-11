@@ -10,10 +10,6 @@
  * default format styles without losing the Drupal locale or the UTC timezone
  * guard that prevents stored dates from shifting by the viewer's UTC offset.
  *
- * **Cache context**: On multilingual sites, render arrays that use these
- * utilities must include the `languages:language_interface` cache context
- * to ensure correct cache invalidation when the language changes.
- *
  * @example Twig: `{{ my_date_prop|canvasFormatDate }}`
  * @example JSX: `canvasFormatDate(myDateProp)`
  * @example JSX with options: `canvasFormatDate(myDateProp, { dateStyle: 'long' })`

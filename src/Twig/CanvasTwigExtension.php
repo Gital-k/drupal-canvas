@@ -321,11 +321,6 @@ final class CanvasTwigExtension extends AbstractExtension {
    * templates as raw ISO strings by default; apply this filter only when you
    * want locale-formatted output.
    *
-   * **Cache context**: This filter is locale-sensitive. On multilingual
-   * sites, any render array whose template uses this filter must include the
-   * 'languages:language_interface' cache context to ensure correct cache
-   * invalidation when the language changes.
-   *
    * @param string $iso
    *   ISO date string, e.g. '2026-01-15'.
    *
@@ -344,11 +339,6 @@ final class CanvasTwigExtension extends AbstractExtension {
    * templates as raw ISO strings by default; apply this filter only when you
    * want locale-formatted output.
    *
-   * **Cache context**: This filter is locale-sensitive. On multilingual
-   * sites, any render array whose template uses this filter must include the
-   * 'languages:language_interface' cache context to ensure correct cache
-   * invalidation when the language changes.
-   *
    * @param string $iso
    *   ISO datetime string, e.g. '2026-01-15T14:30:00Z'.
    *
@@ -366,11 +356,6 @@ final class CanvasTwigExtension extends AbstractExtension {
    * This is an opt-in Twig filter for component creators. Date props reach
    * templates as raw ISO strings by default; apply this filter only when you
    * want locale-formatted output.
-   *
-   * **Cache context**: This filter is locale-sensitive. On multilingual
-   * sites, any render array whose template uses this filter must include the
-   * 'languages:language_interface' cache context to ensure correct cache
-   * invalidation when the language changes.
    *
    * @param string $iso
    *   ISO time or datetime string, e.g. '14:30:00' or
@@ -393,11 +378,6 @@ final class CanvasTwigExtension extends AbstractExtension {
    *
    * Non-array values are passed through unchanged, so templates can safely
    * apply this filter even when the prop might not always be a range.
-   *
-   * **Cache context**: This filter is locale-sensitive. On multilingual sites,
-   * any render array whose template uses this filter must include the
-   * 'languages:language_interface' cache context to ensure correct cache
-   * invalidation when the language changes.
    *
    * @param mixed $value
    *   A Canvas date-range array with optional 'from' and 'to' string keys,

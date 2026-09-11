@@ -212,11 +212,21 @@ See `\Drupal\canvas\ComponentSource\ComponentSourceInterface::determineDefaultFo
 
 ### 3.7 Date and time prop formatting
 
-Canvas stores `date`, `date-time`, and `time` props as raw ISO strings and passes them to templates unchanged. This lets you use them programmatically (comparisons, calculations, etc.).
+Canvas stores `date`, `date-time`, and `time` props as raw ISO strings and
+passes them to templates unchanged. This lets you use them programmatically
+(comparisons, calculations, etc.).
 
-When you want to display a date in the user's locale, use the Canvas date formatting utilities.
+When you want to display a date in the user's locale, use the Canvas date
+formatting utilities. Both Twig filters and JSX functions automatically:
+
+- Use the active Drupal interface language (`drupalSettings.langcode`).
+- Apply `timeZone: 'UTC'` so stored dates are never shifted by the viewer's
+  local UTC offset. (Canvas stores dates without timezone information; a date
+  entered as 11 PM UTC must display as 11 PM, not 3 AM the following day in
+  an Eastern Time browser.)
 
 **Twig:**
+
 ```twig
 {{ my_date_prop|canvasFormatDate }}
 {{ my_datetime_prop|canvasFormatDateTime }}
@@ -224,16 +234,35 @@ When you want to display a date in the user's locale, use the Canvas date format
 {{ my_date_range_prop|canvasFormatDateRange }}
 ```
 
-**JSX:**
-```tsx
-import { canvasFormatDate, canvasFormatDateTime, canvasFormatTime, canvasFormatDateRange } from 'drupal-canvas';
+**JSX — default short style:**
 
-canvasFormatDate(myDateProp)       // e.g. '1/15/26' (en) or '15/01/2026' (fr)
-canvasFormatDateTime(myDatetimeProp)
-canvasFormatTime(myTimeProp)
-canvasFormatDateRange(myDateRangeProp)  // { from: '1/15/26', to: '3/20/26' }
+```tsx
+import {
+  canvasFormatDate,
+  canvasFormatDateTime,
+  canvasFormatTime,
+  canvasFormatDateRange,
+} from 'drupal-canvas';
+
+canvasFormatDate(myDateProp)          // e.g. '1/15/26' (en) or '15/01/2026' (fr)
+canvasFormatDateTime(myDatetimeProp)  // e.g. '1/15/26, 2:30 PM' (en)
+canvasFormatTime(myTimeProp)          // e.g. '2:30 PM' (en)
+canvasFormatDateRange(myDateRangeProp) // { from: '1/15/26', to: '3/20/26' }
 ```
 
-Both Twig and JSX use the active Drupal interface language (`drupalSettings.langcode`) and produce the same short locale format.
+**JSX — custom format style:**
 
-**Cache context**: these filters are locale-sensitive. On multilingual sites, any render array whose template uses them must include the `languages:language_interface` cache context to ensure correct cache invalidation when the language changes. Canvas's render pipeline does **not** add this context automatically; the component author is responsible for it.
+All four functions accept an optional `options` object (`CanvasDateFormatOptions`)
+so you can override the default `'short'` style without losing the Drupal
+locale or UTC timezone guard:
+
+```tsx
+import type { CanvasDateFormatOptions } from 'drupal-canvas';
+
+canvasFormatDate(myDateProp, { dateStyle: 'long' })
+// e.g. 'January 15, 2026' (en)
+
+canvasFormatDateTime(myDatetimeProp, { dateStyle: 'medium', timeStyle: 'short' })
+canvasFormatTime(myTimeProp, { timeStyle: 'medium' })
+canvasFormatDateRange(myDateRangeProp, { dateStyle: 'medium' })
+```

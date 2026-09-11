@@ -354,10 +354,6 @@ final class DateResolver {
   /**
    * Formats an ISO date string using the active locale's short date format.
    *
-   * The output is locale-sensitive. On multilingual sites, render arrays
-   * using this filter must include the 'languages:language_interface' cache
-   * context to ensure correct cache invalidation when the language changes.
-   *
    * @param string $iso
    *   ISO date string, e.g. '2026-01-15'.
    *
@@ -376,10 +372,6 @@ final class DateResolver {
   /**
    * Formats an ISO datetime string using the active locale's short format.
    *
-   * The output is locale-sensitive. On multilingual sites, render arrays
-   * using this filter must include the 'languages:language_interface' cache
-   * context to ensure correct cache invalidation when the language changes.
-   *
    * @param string $iso
    *   ISO datetime string, e.g. '2026-01-15T14:30:00Z'.
    *
@@ -396,10 +388,6 @@ final class DateResolver {
 
   /**
    * Formats an ISO time/datetime string using the active locale's time format.
-   *
-   * The output is locale-sensitive. On multilingual sites, render arrays
-   * using this filter must include the 'languages:language_interface' cache
-   * context to ensure correct cache invalidation when the language changes.
    *
    * @param string $iso
    *   ISO time or datetime string, e.g. '14:30:00' or
@@ -418,10 +406,6 @@ final class DateResolver {
 
   /**
    * Formats a date-range array ({from, to}) with locale-formatted dates.
-   *
-   * The output is locale-sensitive. On multilingual sites, render arrays
-   * using this filter must include the 'languages:language_interface' cache
-   * context to ensure correct cache invalidation when the language changes.
    *
    * @param array{from?: string|null, to?: string|null} $value
    *   The date-range array with optional 'from' and 'to' keys.
