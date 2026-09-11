@@ -372,6 +372,49 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       ],
     ];
 
+    // A HostEntityUrlPropSource is not a StaticPropSource, but it too must be
+    // stored collapsed: `absolute` defaults to TRUE and hence is explicit in
+    // the collapsed representation.
+    // @see \Drupal\canvas\PropSource\HostEntityUrlPropSource::parse()
+    yield "VALID: collapsed HostEntityUrlPropSource" => [
+      'component_tree' => [
+        [
+          'uuid' => '15616c29-72c6-417a-a7d9-aff329467cc4',
+          'component_id' => 'sdc.canvas_test_sdc.my-cta',
+          'component_version' => '89881c04a0fde367',
+          'inputs' => [
+            'text' => 'Behold this node in all its glory',
+            'href' => [
+              'sourceType' => PropSource::HostEntityUrl->value,
+              'absolute' => TRUE,
+            ],
+          ],
+        ],
+      ],
+      'expected_messages' => [],
+    ];
+
+    yield "INVALID: uncollapsed HostEntityUrlPropSource" => [
+      'component_tree' => [
+        [
+          'uuid' => '15616c29-72c6-417a-a7d9-aff329467cc4',
+          'component_id' => 'sdc.canvas_test_sdc.my-cta',
+          'component_version' => '89881c04a0fde367',
+          'inputs' => [
+            'text' => 'Behold this node in all its glory',
+            'href' => [
+              'sourceType' => PropSource::HostEntityUrl->value,
+            ],
+          ],
+        ],
+      ],
+      // Proves the message names the prop source that is actually at fault: not
+      // every uncollapsed input is a StaticPropSource.
+      'expected_messages' => [
+        'component_tree.0.inputs.15616c29-72c6-417a-a7d9-aff329467cc4' => 'The <em class="placeholder">href</em> component input uses the uncollapsed representation of the <em class="placeholder">host-entity-url</em> prop source. It must use the collapsed representation: <em class="placeholder">{&quot;sourceType&quot;:&quot;host-entity-url&quot;,&quot;absolute&quot;:true}</em>.',
+      ],
+    ];
+
     yield "INVALID: not a uuid" => [
       'component_tree' => [
         [

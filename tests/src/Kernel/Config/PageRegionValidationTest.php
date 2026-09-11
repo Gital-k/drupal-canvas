@@ -389,7 +389,7 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
         ],
       ],
       'expected_messages' => [
-        'component_tree.0.inputs.e303dd88-9409-4dc7-8a8b-a31602884a94' => 'When using the default static prop source for a component input, you must use the collapsed input syntax.',
+        'component_tree.0.inputs.e303dd88-9409-4dc7-8a8b-a31602884a94' => 'The <em class="placeholder">heading</em> component input uses the uncollapsed representation of the <em class="placeholder">static:field_item:string</em> prop source. It must use the collapsed representation: <em class="placeholder">&quot;And we laugh like soft, mad children&quot;</em>.',
       ],
     ];
 

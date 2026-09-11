@@ -243,10 +243,11 @@ Example: A simple tree showing a root item (`41595148-e5c1-4873-b373-be3ae6e2134
 ],
 ```
 
-The above is the _runtime_ representation.
+The above is the _runtime_ representation, also called the _uncollapsed_ representation: every `prop source` is a JSON
+object with a `sourceType` key.
 
-The _stored_ representation is optimized for compactness, and each `ComponentSource` is the authority for how to
-optimize the stored data. For example:
+The _stored_ representation, also called the _collapsed_ representation, is optimized for compactness, and each
+`ComponentSource` is the authority for how to optimize the stored data. For example:
 - `ComponentSource`s whose explicit inputs are populated by `StaticPropSource`s can decide that all instances of some
   `component version` must use the exact same `StaticPropSource`. That enables them to store only the value inside the
   `StaticPropSource`, and load the metadata when needed. Result: see below.
@@ -287,6 +288,17 @@ optimize the stored data. For example:
   ],
 ],
 ```
+
+Canvas stores `component instance` inputs in the _collapsed_ representation only. Collapsing a `prop source` means:
+- for a `static prop source`: storing only its value, dropping the `sourceType` and `expression` keys, because that
+  metadata is already known from the `Component config entity` at the referenced `component version`
+- for every other `prop source` (such as `entity field prop source` and `host-entity-url`): storing the canonical array
+  representation of that `prop source`, which does still contain a `sourceType` key
+
+Storing an input in the _uncollapsed_ representation is a validation error, no matter which `prop source` it uses. See:
+- `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::collapse()`
+- `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::uncollapse()`
+- `\Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator`
 
 #### 3.2.3 Validation
 
