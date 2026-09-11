@@ -7,6 +7,8 @@ import {
   canvasFormatTime,
 } from './date-utils';
 
+import type { CanvasDateFormatOptions } from './date-utils';
+
 /** Helper to set drupalSettings.langcode for the duration of a test. */
 function setLocale(langcode: string): void {
   (globalThis as { drupalSettings?: { langcode?: string } }).drupalSettings = {
@@ -77,6 +79,22 @@ describe('canvasFormatDate', () => {
     expect(result).toMatch(/\d+[/\-.]\d+/);
     expect(result).not.toBe('2026-01-15');
   });
+
+  it('accepts a dateStyle option that overrides the default short style', () => {
+    // With dateStyle: 'long' the year is written in full and the month is
+    // spelled out — the result is longer than the short format.
+    const shortResult = canvasFormatDate('2026-01-15');
+    const longResult = canvasFormatDate('2026-01-15', { dateStyle: 'long' });
+    expect(longResult.length).toBeGreaterThan(shortResult.length);
+    expect(longResult).not.toBe('2026-01-15');
+  });
+
+  it('CanvasDateFormatOptions type is satisfied by a plain object', () => {
+    // Type-level check: the options parameter accepts CanvasDateFormatOptions.
+    const opts: CanvasDateFormatOptions = { dateStyle: 'medium' };
+    const result = canvasFormatDate('2026-01-15', opts);
+    expect(typeof result).toBe('string');
+  });
 });
 
 describe('canvasFormatDateTime', () => {
@@ -107,6 +125,16 @@ describe('canvasFormatDateTime', () => {
   it('returns the original string for an invalid ISO input', () => {
     expect(canvasFormatDateTime('not-a-date')).toBe('not-a-date');
   });
+
+  it('accepts dateStyle and timeStyle options that override the defaults', () => {
+    const shortResult = canvasFormatDateTime('2026-01-15T14:30:00Z');
+    const longResult = canvasFormatDateTime('2026-01-15T14:30:00Z', {
+      dateStyle: 'long',
+      timeStyle: 'medium',
+    });
+    expect(longResult.length).toBeGreaterThan(shortResult.length);
+    expect(longResult).not.toBe('2026-01-15T14:30:00Z');
+  });
 });
 
 describe('canvasFormatTime', () => {
@@ -133,6 +161,14 @@ describe('canvasFormatTime', () => {
 
   it('returns the original string for an invalid ISO input', () => {
     expect(canvasFormatTime('not-a-time')).toBe('not-a-time');
+  });
+
+  it('accepts a timeStyle option that overrides the default short style', () => {
+    const shortResult = canvasFormatTime('14:30:00');
+    const mediumResult = canvasFormatTime('14:30:00', { timeStyle: 'medium' });
+    // medium includes seconds; it must be at least as long as short.
+    expect(mediumResult.length).toBeGreaterThanOrEqual(shortResult.length);
+    expect(mediumResult).not.toBe('14:30:00');
   });
 });
 
@@ -177,5 +213,22 @@ describe('canvasFormatDateRange', () => {
     const result = canvasFormatDateRange({ from: '', to: '' });
     expect(result.from).toBe('');
     expect(result.to).toBe('');
+  });
+
+  it('accepts a dateStyle option and passes it to each field', () => {
+    const shortResult = canvasFormatDateRange({
+      from: '2026-01-15',
+      to: '2026-03-20',
+    });
+    const longResult = canvasFormatDateRange(
+      { from: '2026-01-15', to: '2026-03-20' },
+      { dateStyle: 'long' },
+    );
+    expect((longResult.from ?? '').length).toBeGreaterThan(
+      (shortResult.from ?? '').length,
+    );
+    expect((longResult.to ?? '').length).toBeGreaterThan(
+      (shortResult.to ?? '').length,
+    );
   });
 });

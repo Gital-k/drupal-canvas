@@ -16,6 +16,8 @@ import Image from './next-image-standalone.js';
 import { Region, RegionsProvider } from './Region.js';
 import { cn } from './utils.js';
 
+import type { CanvasDateFormatOptions } from './date-utils.js';
+
 export {
   FormattedText,
   Image,
@@ -43,3 +45,5 @@ export {
   canvasFormatTime,
   canvasFormatDateRange,
 };
+
+export type { CanvasDateFormatOptions };
