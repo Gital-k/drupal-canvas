@@ -1050,6 +1050,7 @@ class ApiUiContentEntityReferenceControllersTest extends CanvasKernelTestBase {
       'field_date_range',
       'field_file',
       'field_image',
+      'field_keywords',
       'field_link',
       'field_media',
       'field_text',

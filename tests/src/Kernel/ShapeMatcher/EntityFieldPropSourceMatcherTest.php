@@ -105,6 +105,14 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
     ],
     // The typical example; with a variety of field types.
     'entity:node:foo' => [
+      'type=array&items[type]=integer' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝many_from_an_integer_list␞␟value'],
+      'type=array&items[type]=integer&minItems=1' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝many_from_an_integer_list␞␟value'],
+      'type=array&items[type]=number' => [
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝many_from_a_float_list␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝many_from_an_integer_list␞␟value'],
+      ],
+      'type=array&items[type]=string' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝many_from_a_string_list␞␟label'],
+      'type=array&items[type]=string&minItems=1' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝many_from_a_string_list␞␟label'],
       'type=boolean!optional' => [
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝default_langcode␞␟value'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝status␞␟value'],
@@ -216,7 +224,6 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
       'type=string&$ref=json-schema-definitions://canvas.module/color' => [
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝name␞␟value'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝name␞␟value'],
-        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝one_from_an_string_list␞␟label'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝title␞␟value'],
       ],
       'type=string&$ref=json-schema-definitions://canvas.module/color!optional' => [
