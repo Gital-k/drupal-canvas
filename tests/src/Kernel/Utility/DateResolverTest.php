@@ -9,6 +9,7 @@ use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
@@ -24,20 +25,25 @@ final class DateResolverTest extends CanvasKernelTestBase {
   protected static $modules = [];
 
   /**
-   * Creates a DateResolver wired to a mock language manager returning $langcode.
+   * Creates a DateResolver wired to a mock language manager.
    *
    * @param string $langcode
    *   The langcode the mock should return.
+   * @param bool|null $intlAvailable
+   *   NULL = auto-detect; TRUE = force intl path; FALSE = force fallback path.
    *
    * @return \Drupal\canvas\Utility\DateResolver
    *   A freshly constructed resolver.
    */
-  private function makeResolver(string $langcode): DateResolver {
+  private function makeResolver(
+    string $langcode,
+    ?bool $intlAvailable = NULL,
+  ): DateResolver {
     $language = $this->createMock(LanguageInterface::class);
     $language->method('getId')->willReturn($langcode);
     $languageManager = $this->createMock(LanguageManagerInterface::class);
     $languageManager->method('getCurrentLanguage')->willReturn($language);
-    return new DateResolver($languageManager);
+    return new DateResolver($languageManager, $intlAvailable);
   }
 
   /**
@@ -60,97 +66,143 @@ final class DateResolverTest extends CanvasKernelTestBase {
     self::assertSame('not-a-date', $resolver->resolveTime('not-a-date'));
   }
 
+  // ---------------------------------------------------------------------------
+  // Fallback path (intl disabled) — exact output assertions.
+  // ---------------------------------------------------------------------------
+
   /**
-   * ResolveDate returns a non-empty string different from the ISO input for English.
+   * Fallback: English date uses n/j/y pattern.
    */
-  public function testResolveDateEnglish(): void {
-    $resolver = $this->makeResolver('en');
-    $result = $resolver->resolveDate('2026-01-15');
-    self::assertNotSame('2026-01-15', $result);
-    self::assertNotEmpty($result);
+  #[DataProvider('fallbackDateProvider')]
+  public function testResolveDateFallback(
+    string $langcode,
+    string $expected,
+  ): void {
+    $result = $this->makeResolver($langcode, FALSE)->resolveDate('2026-01-15');
+    self::assertSame($expected, $result);
   }
 
   /**
-   * ResolveDate returns a non-empty string different from the ISO input for French.
+   * Data provider for fallback date tests.
+   *
+   * @return array<string, array{0: string, 1: string}>
    */
-  public function testResolveDateFrench(): void {
-    $resolver = $this->makeResolver('fr');
-    $result = $resolver->resolveDate('2026-01-15');
-    self::assertNotSame('2026-01-15', $result);
-    self::assertNotEmpty($result);
+  public static function fallbackDateProvider(): array {
+    return [
+      'en (n/j/y)' => ['en', '1/15/26'],
+      'fr (d/m/Y)' => ['fr', '15/01/2026'],
+      'ja (Y/m/d)' => ['ja', '2026/01/15'],
+      'en-gb (d/m/Y)' => ['en-gb', '15/01/2026'],
+      'de (d.m.Y)' => ['de', '15.01.2026'],
+      'ru (d.m.Y)' => ['ru', '15.01.2026'],
+      'ko (Y.m.d)' => ['ko', '2026.01.15'],
+      'nl (d-m-Y)' => ['nl', '15-01-2026'],
+      'hu (Y-m-d)' => ['hu', '2026-01-15'],
+    ];
   }
 
   /**
-   * ResolveDate returns a non-empty string different from the ISO input for Japanese.
+   * Fallback: English datetime uses n/j/y, g:i A pattern.
    */
-  public function testResolveDateJapanese(): void {
-    $resolver = $this->makeResolver('ja');
-    $result = $resolver->resolveDate('2026-01-15');
-    self::assertNotSame('2026-01-15', $result);
-    self::assertNotEmpty($result);
+  public function testResolveDateTimeFallbackEn(): void {
+    $result = $this->makeResolver('en', FALSE)
+      ->resolveDateTime('2026-01-15T14:30:00');
+    self::assertSame('1/15/26, 2:30 PM', $result);
   }
 
   /**
-   * ResolveDate returns a non-empty string different from the ISO input for British English.
+   * Fallback: French datetime uses d/m/Y H:i pattern.
    */
-  public function testResolveDateEnglishGb(): void {
-    $resolver = $this->makeResolver('en-gb');
-    $result = $resolver->resolveDate('2026-01-15');
-    self::assertNotSame('2026-01-15', $result);
-    self::assertNotEmpty($result);
+  public function testResolveDateTimeFallbackFr(): void {
+    $result = $this->makeResolver('fr', FALSE)
+      ->resolveDateTime('2026-01-15T14:30:00');
+    self::assertSame('15/01/2026 14:30', $result);
   }
 
   /**
-   * ResolveDateTime returns a formatted string for English.
+   * Fallback: English time uses g:i A pattern.
    */
-  public function testResolveDateTime(): void {
-    $resolver = $this->makeResolver('en');
-    $result = $resolver->resolveDateTime('2026-01-15T14:30:00Z');
-    self::assertNotSame('2026-01-15T14:30:00Z', $result);
-    self::assertNotEmpty($result);
+  public function testResolveTimeFallbackEn(): void {
+    $result = $this->makeResolver('en', FALSE)
+      ->resolveTime('2026-01-15T14:30:00');
+    self::assertSame('2:30 PM', $result);
   }
 
   /**
-   * ResolveTime returns a formatted time string for English.
+   * Fallback: French time uses H:i pattern.
    */
-  public function testResolveTime(): void {
-    $resolver = $this->makeResolver('en');
-    $result = $resolver->resolveTime('2026-01-15T14:30:00Z');
-    self::assertNotSame('2026-01-15T14:30:00Z', $result);
-    self::assertNotEmpty($result);
+  public function testResolveTimeFallbackFr(): void {
+    $result = $this->makeResolver('fr', FALSE)
+      ->resolveTime('2026-01-15T14:30:00');
+    self::assertSame('14:30', $result);
   }
 
   /**
-   * ResolveDateRange formats both from and to fields.
+   * Fallback: date-range formats both fields.
    */
-  public function testResolveDateRange(): void {
-    $resolver = $this->makeResolver('en');
-    $result = $resolver->resolveDateRange([
+  public function testResolveDateRangeFallback(): void {
+    $result = $this->makeResolver('en', FALSE)->resolveDateRange([
       'from' => '2026-01-15',
       'to' => '2026-03-20',
     ]);
-    self::assertIsArray($result);
     self::assertArrayHasKey('from', $result);
     self::assertArrayHasKey('to', $result);
-    self::assertNotSame('2026-01-15', $result['from']);
-    self::assertNotEmpty($result['from']);
-    self::assertNotSame('2026-03-20', $result['to']);
-    self::assertNotEmpty($result['to']);
+    self::assertSame('1/15/26', $result['from']);
+    self::assertSame('3/20/26', $result['to']);
   }
 
   /**
-   * ResolveDateRange handles null and absent fields without error.
+   * Fallback: date-range handles null and absent fields without error.
    */
-  public function testResolveDateRangeWithNullFields(): void {
-    $resolver = $this->makeResolver('en');
-    $result = $resolver->resolveDateRange([
+  public function testResolveDateRangeFallbackNullField(): void {
+    $result = $this->makeResolver('en', FALSE)->resolveDateRange([
       'from' => '2026-01-15',
       'to' => NULL,
     ]);
     self::assertArrayHasKey('from', $result);
     self::assertArrayHasKey('to', $result);
-    self::assertNotSame('2026-01-15', $result['from']);
+    self::assertSame('1/15/26', $result['from']);
     self::assertNull($result['to']);
+  }
+
+  /**
+   * Fallback: unknown locale returns the ISO string unchanged.
+   */
+  public function testResolveDateFallbackUnknownLocale(): void {
+    $result = $this->makeResolver('xx', FALSE)->resolveDate('2026-01-15');
+    self::assertSame('2026-01-15', $result);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Intl path — assert formatting happened (exact output is ICU-version-
+  // dependent, so we only check the value differs from the ISO input).
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Intl path: resolveDate produces a locale-formatted value.
+   */
+  #[DataProvider('intlLocaleProvider')]
+  public function testResolveDateIntl(string $langcode): void {
+    if (!\extension_loaded('intl')) {
+      $this->markTestSkipped('intl extension not loaded.');
+    }
+    $result = $this->makeResolver($langcode)->resolveDate('2026-01-15');
+    self::assertNotSame('2026-01-15', $result);
+    self::assertNotEmpty($result);
+  }
+
+  /**
+   * Data provider for intl-path locale tests.
+   *
+   * @return array<string, array{0: string}>
+   */
+  public static function intlLocaleProvider(): array {
+    return [
+      'en' => ['en'],
+      'fr' => ['fr'],
+      'ja' => ['ja'],
+      'en-gb' => ['en-gb'],
+    ];
   }
 
 }
