@@ -19,16 +19,18 @@ use Drupal\Core\Language\LanguageManagerInterface;
 final class DateResolver {
 
   /**
-   * IntlDateFormatter constant: no date or time part.
+   * Mirrors \IntlDateFormatter::NONE (-1).
    *
-   * Mirrors \IntlDateFormatter::NONE (value -1).
+   * Defined locally so this class loads even when the intl extension is
+   * absent; the fallback path does not call \IntlDateFormatter at all.
    */
   private const INTL_DATE_NONE = -1;
 
   /**
-   * IntlDateFormatter constant: short format.
+   * Mirrors \IntlDateFormatter::SHORT (3).
    *
-   * Mirrors \IntlDateFormatter::SHORT (value 3).
+   * Defined locally so this class loads even when the intl extension is
+   * absent; the fallback path does not call \IntlDateFormatter at all.
    */
   private const INTL_DATE_SHORT = 3;
 
@@ -425,14 +427,20 @@ final class DateResolver {
   }
 
   /**
-   * Core formatting method shared by all public resolve* methods.
+   * Tries intl formatting first; falls back to the static pattern map.
+   *
+   * Both paths produce a locale-appropriate short format. The intl path
+   * delegates to ICU data (\IntlDateFormatter), which gives accurate results
+   * for every locale. The fallback path uses a built-in PHP date() pattern map
+   * covering 90%+ of web traffic locales, for environments (e.g. Drupal CI)
+   * where ext-intl is not installed.
    *
    * @param string $iso
    *   ISO date/time string.
    * @param int $date_type
-   *   IntlDateFormatter date type constant (NONE or SHORT).
+   *   \IntlDateFormatter date type constant (NONE or SHORT).
    * @param int $time_type
-   *   IntlDateFormatter time type constant (NONE or SHORT).
+   *   \IntlDateFormatter time type constant (NONE or SHORT).
    *
    * @return string
    *   Formatted string, or $iso unchanged if parsing or formatting fails.

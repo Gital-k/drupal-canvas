@@ -1,0 +1,12 @@
+{#
+  Renders date and date-time props through the canvasFormatDate and
+  canvasFormatDateTime Twig filters. Used by Playwright tests to verify that
+  the filters produce locale-formatted output rather than the raw ISO strings
+  that Canvas passes to templates by default.
+#}
+<dl>
+  <dt>date</dt>
+  <dd id="date-formatted-date">{{ date|default('')|canvasFormatDate }}</dd>
+  <dt>date_time</dt>
+  <dd id="date-formatted-date-time">{{ date_time|default('')|canvasFormatDateTime }}</dd>
+</dl>

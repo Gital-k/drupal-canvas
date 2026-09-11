@@ -317,10 +317,6 @@ final class CanvasTwigExtension extends AbstractExtension {
   /**
    * Formats an ISO date string using the active Drupal locale's short date.
    *
-   * This is an opt-in Twig filter for component creators. Date props reach
-   * templates as raw ISO strings by default; apply this filter only when you
-   * want locale-formatted output.
-   *
    * @param string $iso
    *   ISO date string, e.g. '2026-01-15'.
    *
@@ -334,10 +330,6 @@ final class CanvasTwigExtension extends AbstractExtension {
 
   /**
    * Formats an ISO datetime string using the active Drupal locale's format.
-   *
-   * This is an opt-in Twig filter for component creators. Date props reach
-   * templates as raw ISO strings by default; apply this filter only when you
-   * want locale-formatted output.
    *
    * @param string $iso
    *   ISO datetime string, e.g. '2026-01-15T14:30:00Z'.
@@ -353,10 +345,6 @@ final class CanvasTwigExtension extends AbstractExtension {
   /**
    * Formats an ISO time/datetime string using the Drupal locale's time format.
    *
-   * This is an opt-in Twig filter for component creators. Date props reach
-   * templates as raw ISO strings by default; apply this filter only when you
-   * want locale-formatted output.
-   *
    * @param string $iso
    *   ISO time or datetime string, e.g. '14:30:00' or
    *   '2026-01-15T14:30:00Z'.
@@ -371,10 +359,6 @@ final class CanvasTwigExtension extends AbstractExtension {
 
   /**
    * Formats the 'from' and 'to' fields of a Canvas date-range prop.
-   *
-   * This is an opt-in Twig filter for component creators. Date props reach
-   * templates as raw ISO strings by default; apply this filter only when you
-   * want locale-formatted output.
    *
    * Non-array values are passed through unchanged, so templates can safely
    * apply this filter even when the prop might not always be a range.
