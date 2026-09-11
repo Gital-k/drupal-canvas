@@ -120,7 +120,7 @@ final class DateResolverTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Fallback: English time uses g:i A pattern.
+   * Fallback: English time uses g:i A pattern, from a full datetime string.
    */
   public function testResolveTimeFallbackEn(): void {
     $result = $this->makeResolver('en', FALSE)
@@ -129,12 +129,45 @@ final class DateResolverTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Fallback: French time uses H:i pattern.
+   * Fallback: French time uses H:i pattern, from a full datetime string.
    */
   public function testResolveTimeFallbackFr(): void {
     $result = $this->makeResolver('fr', FALSE)
       ->resolveTime('2026-01-15T14:30:00');
     self::assertSame('14:30', $result);
+  }
+
+  /**
+   * Fallback: bare HH:MM:SS time string is formatted correctly.
+   *
+   * There are currently no Canvas prop types that produce a bare time value.
+   * This test documents the intended use case for when a format: time prop
+   * type is introduced: a bare HH:MM:SS string passed to resolveTime() should
+   * produce a locale-formatted time, not be returned unchanged.
+   */
+  public function testResolveTimeFallbackBareTimeString(): void {
+    $en_result = $this->makeResolver('en', FALSE)->resolveTime('14:30:00');
+    self::assertSame('2:30 PM', $en_result);
+
+    $fr_result = $this->makeResolver('fr', FALSE)->resolveTime('14:30:00');
+    self::assertSame('14:30', $fr_result);
+  }
+
+  /**
+   * Intl path: bare HH:MM:SS time string is formatted correctly.
+   *
+   * There are currently no Canvas prop types that produce a bare time value.
+   * This test documents the intended use case for when a format: time prop
+   * type is introduced.
+   */
+  public function testResolveTimeBareTimeStringIntl(): void {
+    if (!\extension_loaded('intl')) {
+      $this->markTestSkipped('intl extension not loaded.');
+    }
+    $result = $this->makeResolver('en')->resolveTime('14:30:00');
+    // Exact output is ICU-version-dependent; assert formatting happened.
+    self::assertNotSame('14:30:00', $result);
+    self::assertNotEmpty($result);
   }
 
   /**
