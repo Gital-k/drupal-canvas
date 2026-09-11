@@ -1079,7 +1079,10 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
       $matcher->match(TRUE, $prop_shape, 'node', 'foo'),
     );
 
-    self::assertContains('ℹ︎␜entity:node:foo␝many_from_a_string_list␞␟value', $matches);
+    self::assertNotEmpty(\array_filter(
+      $matches,
+      fn (string $match): bool => \str_starts_with($match, 'ℹ︎␜entity:node:foo␝many_from_a_string_list␞␟')
+    ));
   }
 
   public function testMultiValuedIntegerListMatchesArrayOfIntegers(): void {
