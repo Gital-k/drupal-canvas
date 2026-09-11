@@ -14,7 +14,13 @@ import {
   selectSelectedCodeComponent,
 } from '@/features/ui/codeComponentDialogSlice';
 import { setActivePanel } from '@/features/ui/primaryPanelSlice';
-import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
+import {
+  useGetComponentUsageDetailsQuery,
+  useGetComponentUsageListQuery,
+  useUpdateCodeComponentMutation,
+} from '@/services/componentAndLayout';
+
+import type { ComponentUsageDetailsResponse } from '@/services/componentAndLayout';
 
 // Helper function to get the machine name from a component.
 // Handles both JSComponent (with 'id') and CodeComponentSerialized (with 'machineName').
@@ -42,6 +48,49 @@ const RemoveFromComponentsDialog = () => {
   const { isRemoveFromComponentsDialogOpen } =
     useAppSelector(selectDialogStates);
   const { codeComponentId: codeComponentBeingEditedId } = useParams();
+
+  const componentListName = `js.${getComponentMachineName(selectedComponent)}`;
+  const [statefulUsageDetails, setStatefulUsageDetails] =
+    useState<ComponentUsageDetailsResponse | null>(null);
+
+  // Check whether this component has any recorded usage (i.e. has ever been
+  // placed on a page). If it has never been exposed, there is no usage data
+  // and we skip the details query to avoid a 404.
+  const {
+    data: componentUsageList,
+    isSuccess: componentUsageListSuccess,
+    isError: isComponentUsageListError,
+    error: componentUsageListError,
+    isFetching,
+  } = useGetComponentUsageListQuery(undefined, {
+    skip: !isRemoveFromComponentsDialogOpen,
+  });
+  const componentInComponentList = !!(componentUsageList?.data || {})[
+    componentListName
+  ];
+  const noUsageToCheck =
+    !isFetching && componentUsageListSuccess && !componentInComponentList;
+
+  const {
+    data: usageDetails,
+    isSuccess: usageLoadingSuccess,
+    isError: isUsageError,
+    error: usageError,
+    isFetching: isUsageFetching,
+  } = useGetComponentUsageDetailsQuery(componentListName, {
+    skip:
+      !isRemoveFromComponentsDialogOpen ||
+      noUsageToCheck ||
+      !componentUsageList,
+    refetchOnMountOrArgChange: true,
+  });
+
+  useEffect(() => {
+    if (usageDetails && !isUsageFetching) {
+      setStatefulUsageDetails(usageDetails);
+    }
+  }, [usageDetails, isUsageFetching]);
+
   const handleSave = async () => {
     if (!selectedComponent) return;
 
@@ -73,6 +122,7 @@ const RemoveFromComponentsDialog = () => {
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       reset();
+      setStatefulUsageDetails(null);
       dispatch(closeAllDialogs());
     }
   };
@@ -97,42 +147,107 @@ const RemoveFromComponentsDialog = () => {
     }
   }, [isError, error]);
 
+  useEffect(() => {
+    if (isUsageError) {
+      console.error('Failed to get component usage data:', usageError);
+    }
+  }, [isUsageError, usageError]);
+
+  useEffect(() => {
+    if (isComponentUsageListError) {
+      console.error(
+        'Failed to get component usage list:',
+        componentUsageListError,
+      );
+    }
+  }, [isComponentUsageListError, componentUsageListError]);
+
+  // The component is currently placed on one or more pages.
+  const isInUse =
+    !isUsageFetching &&
+    statefulUsageDetails?.content &&
+    statefulUsageDetails.content.length > 0;
+
+  const componentUsageListErrorOutput = {
+    title: 'Failed to fetch component list',
+    message: `An error ${
+      componentUsageListError && 'status' in componentUsageListError
+        ? '(HTTP ' + componentUsageListError.status + ')'
+        : ''
+    } occurred while fetching the component usage list. Please check the browser console for more details.`,
+  };
+
+  const usageErrorOutput = {
+    title: 'Failed to fetch component usage details',
+    message: `An error ${
+      usageError && 'status' in usageError
+        ? '(HTTP ' + usageError.status + ')'
+        : ''
+    } occurred while fetching component usage. Please check the browser console for more details.`,
+  };
+
+  const formImpactingErrors = isUsageError || isComponentUsageListError;
+
+  // Only render the dialog once usage data has been resolved (or errored).
+  const dialogReady =
+    (noUsageToCheck ||
+      usageLoadingSuccess ||
+      isUsageError ||
+      isComponentUsageListError) &&
+    !isFetching &&
+    !isUsageFetching;
+
+  const description = isInUse ? (
+    <>
+      This component is currently used on{' '}
+      <b>{statefulUsageDetails!.content.length}</b> page
+      {statefulUsageDetails!.content.length > 1 ? 's' : ''}. Please remove all
+      instances of the component from those pages before removing it from
+      components.
+    </>
+  ) : (
+    <>
+      This component will be moved to the <b>Code</b> section and will no
+      longer be available to use on the page.
+      <br />
+      <br />
+      You can re-add it to <b>Components</b> from the <b>Code</b> section at
+      any time.
+    </>
+  );
+
   return (
-    <Dialog
-      open={isRemoveFromComponentsDialogOpen}
-      onOpenChange={handleOpenChange}
-      title="Remove from components"
-      description={
-        <>
-          This component will be moved to the <b>Code</b> section and will no
-          longer be available to use on the page.
-          <br />
-          <br />
-          You can re-add it to <b>Components</b> from the <b>Code</b> section at
-          any time.
-        </>
-      }
-      error={
-        isError
-          ? {
-              title: 'Failed to remove from components',
-              message: `An error ${
-                'status' in error ? '(HTTP ' + error.status + ')' : ''
-              } occurred while removing from components. Please check the browser console for more details.`,
-              resetButtonText: 'Try again',
-              onReset: handleSave,
-            }
-          : undefined
-      }
-      footer={{
-        cancelText: 'Cancel',
-        confirmText: 'Remove',
-        onConfirm: handleSave,
-        isConfirmDisabled: false,
-        isConfirmLoading: isLoading,
-        isDanger: true,
-      }}
-    />
+    dialogReady && (
+      <Dialog
+        open={isRemoveFromComponentsDialogOpen}
+        onOpenChange={handleOpenChange}
+        title="Remove from components"
+        description={!formImpactingErrors && description}
+        error={
+          (isError && {
+            title: 'Failed to remove from components',
+            message: `An error ${
+              'status' in error ? '(HTTP ' + error.status + ')' : ''
+            } occurred while removing from components. Please check the browser console for more details.`,
+            resetButtonText: 'Try again',
+            onReset: handleSave,
+          }) ||
+          (isUsageError && usageErrorOutput) ||
+          (isComponentUsageListError && componentUsageListErrorOutput) ||
+          undefined
+        }
+        footer={{
+          cancelText: 'Cancel',
+          confirmText:
+            (!formImpactingErrors && !isInUse && 'Remove') || undefined,
+          onConfirm:
+            (!formImpactingErrors && !isInUse && handleSave) || undefined,
+          isConfirmDisabled: false,
+          isConfirmLoading: isLoading,
+          isDanger: true,
+        }}
+      />
+    )
   );
 };
 
