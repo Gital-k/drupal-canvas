@@ -110,13 +110,19 @@ final class CanvasPropVisitor implements NodeVisitorInterface {
       // We have access to the HTML buffer for the parent template.
       $node->getSourceContext()) {
       $expr = $node->getNode('expr');
+      $source_name = $node->getSourceContext()->getName();
       // We are printing the outcome of another expression rather than a
-      // variable.
+      // variable. We still need to account for its eventual output in the
+      // buffer: leaving a hole here (instead of a placeholder) would let a
+      // broken fragment elsewhere in the template (e.g. a dynamic tag name)
+      // permanently poison the HTML5 validity check - and the custom-element
+      // attribute detection it feeds - for every print node that follows it.
       if (!$expr instanceof NameExpression || !$expr->hasAttribute('name')) {
+        $this->buffer[$source_name] .= $this->getPlaceholder($expr);
         return $node;
       }
 
-      $buffer = $this->buffer[$node->getSourceContext()->getName()];
+      $buffer = $this->buffer[$source_name];
 
       // Check if we're in an attribute value of a Canvas custom element.
       // This will determine if the element is to ultimately be rendered by JSX.
@@ -147,6 +153,7 @@ final class CanvasPropVisitor implements NodeVisitorInterface {
         // Prevent recursive replacement when Twig traverses into the replaced
         // node.
         $this->replacingFilter = TRUE;
+        $this->buffer[$source_name] .= $this->getPlaceholder($expr);
         return new PrintNode($filtered, $line_number);
       }
 
@@ -167,10 +174,51 @@ final class CanvasPropVisitor implements NodeVisitorInterface {
           $node,
           new CanvasWrapperNode($name, FALSE, $line_number),
         ];
+        $this->buffer[$source_name] .= $this->getPlaceholder($expr);
         return new Nodes($nodes);
       }
+      // Not (yet) valid HTML5 - e.g. because this print node is itself a
+      // dynamic tag name (`<{{ element }}>`), or sits inside an unterminated
+      // attribute value. We can't wrap it, but we still need to stand in for
+      // its eventual output so later print nodes in the same template don't
+      // inherit a hole in the buffer.
+      $this->buffer[$source_name] .= $this->getPlaceholder($expr);
     }
     return $node;
+  }
+
+  /**
+   * Builds a stable, HTML5-token-safe placeholder for a print expression.
+   *
+   * The buffer only ever contains the template's raw, unevaluated source, so
+   * we can't know what a print node will actually output. But we still need
+   * some stand-in text so the HTML5 validity check (and the custom-element
+   * attribute detection above) for later print nodes isn't thrown off by a
+   * hole where this node's output would be. For a bare variable (e.g.
+   * `{{ element }}` used as a dynamic tag name), the placeholder is derived
+   * from the variable name, so that the same variable printed twice - as in
+   * `<{{ element }}>...</{{ element }}>` - produces the same placeholder both
+   * times. That keeps the reconstructed buffer well-formed (matching
+   * open/close tag names), not merely error-free.
+   *
+   * @param \Twig\Node\Node $expr
+   *   The print node's expression.
+   *
+   * @return string
+   *   A placeholder consisting only of ASCII letters and digits, safe to
+   *   appear in a tag name, attribute name/value, or text position.
+   */
+  private function getPlaceholder(Node $expr): string {
+    if ($expr instanceof NameExpression && $expr->hasAttribute('name')) {
+      $safe_name = \preg_replace('/[^A-Za-z0-9]/', '', (string) $expr->getAttribute('name'));
+      if ($safe_name !== '') {
+        return 'cnvs' . $safe_name;
+      }
+    }
+    // Not a bare variable (e.g. a filter, attribute access, or
+    // concatenation): a unique placeholder is enough, since these aren't
+    // realistically reused as both a tag's open and close name.
+    return 'cnvsx' . \spl_object_id($expr);
   }
 
   /**
