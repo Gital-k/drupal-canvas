@@ -35,7 +35,7 @@ const SEL = {
 const LAYOUT_SCREENSHOT_OPTIONS = {
   // Allow up to 1% of the compared pixels to differ.
   maxDiffPixelRatio: 0.01,
-  // Per-pixel colour sensitivity, 0 (strict) - 1 (loose).
+  // Per-pixel color sensitivity, 0 (strict) - 1 (loose).
   threshold: 0.2,
 } as const;
 
