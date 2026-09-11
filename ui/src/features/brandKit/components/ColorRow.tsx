@@ -158,17 +158,16 @@ const ColorRow = ({ color }: ColorRowProps) => {
     handleRenameCancel();
   };
 
+  // Open the edit modal when the row is clicked.
+  const handleRowClick = () => {
+    if (isRenaming) {
+      return;
+    }
+    setIsEditPopoverOpen(true);
+  };
+
   const menuItems = (
     <>
-      <UnifiedMenu.Item
-        onClick={() => {
-          openingPopoverRef.current = true;
-          setIsEditPopoverOpen(true);
-        }}
-        data-testid="canvas-color-row-edit"
-      >
-        Edit color
-      </UnifiedMenu.Item>
       <UnifiedMenu.Item
         onClick={() => setIsRenaming(true)}
         data-testid="canvas-color-row-rename"
@@ -205,6 +204,7 @@ const ColorRow = ({ color }: ColorRowProps) => {
           <ContextMenu.Trigger>
             <Flex
               align="center"
+              onClick={handleRowClick}
               className={clsx(styles.colorRow, {
                 [styles.isDragging]: isDragging,
               })}
@@ -303,6 +303,7 @@ const ColorRow = ({ color }: ColorRowProps) => {
                       ref={dotsButtonRef as React.RefObject<HTMLButtonElement>}
                       aria-label="Open contextual menu"
                       className={styles.colorRowDots}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <DotsHorizontalIcon />
                     </button>
