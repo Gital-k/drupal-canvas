@@ -329,8 +329,10 @@ test.describe('brand kit colors', () => {
     // Set a unique variable name and continue editing.
     await page.locator(SEL.form.variable).fill('brand-yellow');
     await page.locator(SEL.form.save).click();
+    // A successful save closes the popover — wait for it to close before
+    // clicking the row again to reopen it.
+    await expect(page.locator(SEL.form.save)).toBeHidden();
     // - Edit "Brand Blue" so the color is now yellow (255, 255, 0)
-    // Color picker is already open from format verification above
 
     await page.locator(SEL.row('Brand Blue')).click();
     // The CSS variable error should be hidden.
