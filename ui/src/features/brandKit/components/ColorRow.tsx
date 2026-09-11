@@ -158,9 +158,24 @@ const ColorRow = ({ color }: ColorRowProps) => {
     handleRenameCancel();
   };
 
-  // Open the edit modal when the row is clicked.
+  // Captures whether the edit popover was open at the moment the pointer went
+  // down on the row. This runs before Radix's outside-interaction dismissal, so
+  // the click handler can tell whether the click is closing the popover (was
+  // open) or should open it (was closed) — avoiding a close-then-reopen flicker.
+  const wasEditOpenOnPointerDownRef = useRef(false);
+
+  const handleRowPointerDown = () => {
+    wasEditOpenOnPointerDownRef.current = isEditPopoverOpen;
+  };
+
+  // Toggle the edit modal when the row is clicked.
   const handleRowClick = () => {
     if (isRenaming) {
+      return;
+    }
+    // If the popover was already open when the interaction began, this same
+    // click has closed it via outside-interaction — leave it closed.
+    if (wasEditOpenOnPointerDownRef.current) {
       return;
     }
     setIsEditPopoverOpen(true);
@@ -204,6 +219,7 @@ const ColorRow = ({ color }: ColorRowProps) => {
           <ContextMenu.Trigger>
             <Flex
               align="center"
+              onPointerDown={handleRowPointerDown}
               onClick={handleRowClick}
               className={clsx(styles.colorRow, {
                 [styles.isDragging]: isDragging,
