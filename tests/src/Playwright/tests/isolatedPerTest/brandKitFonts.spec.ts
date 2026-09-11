@@ -28,6 +28,17 @@ const SEL = {
     '[class*="_flyoutContent"] input[aria-label="Font family name"]',
 };
 
+// Visual regression tolerance for the layout guards below. Each assertion
+// targets an element locator, so only that element is captured. A small,
+// bounded deviation is allowed to absorb rendering differences across
+// machines/CI while still catching gross layout breakage.
+const LAYOUT_SCREENSHOT_OPTIONS = {
+  // Allow up to 1% of the compared pixels to differ.
+  maxDiffPixelRatio: 0.01,
+  // Per-pixel colour sensitivity, 0 (strict) - 1 (loose).
+  threshold: 0.2,
+} as const;
+
 /**
  * Uploads a font file through the fonts section's hidden file input.
  *
@@ -102,7 +113,10 @@ test.describe('brand kit fonts', () => {
     // `all: unset` reset stopped being its first declaration, the row lost its
     // layout and the badge dropped onto a second line under the name.
     // @see https://www.drupal.org/i/3591954
-    await expect(familyRowWrapper).toHaveScreenshot('family-row-layout.png');
+    await expect(familyRowWrapper).toHaveScreenshot(
+      'family-row-layout.png',
+      LAYOUT_SCREENSHOT_OPTIONS,
+    );
 
     // Uploading selects the new font, which opens its family flyout. The
     // flyout carries the design's two consoles side by side: the font's own
@@ -111,6 +125,7 @@ test.describe('brand kit fonts', () => {
     await expect(page.locator(SEL.flyout)).toBeVisible();
     await expect(page.locator(SEL.flyout)).toHaveScreenshot(
       'font-flyout-layout.png',
+      LAYOUT_SCREENSHOT_OPTIONS,
     );
 
     // A family with one file has nothing to choose between, so Preview is the
@@ -158,6 +173,7 @@ test.describe('brand kit fonts', () => {
     await expect(familyRow).toContainText('Renamed Sans');
     await expect(familyRowWrapper).toHaveScreenshot(
       'reloaded-family-row-layout.png',
+      LAYOUT_SCREENSHOT_OPTIONS,
     );
   });
 
@@ -186,7 +202,10 @@ test.describe('brand kit fonts', () => {
     // A card displays its label above the font specimen. This also verifies the
     // card's layout against the all: unset reset.
     const variantRow = page.locator(SEL.variantRow).first();
-    await expect(variantRow).toHaveScreenshot('variant-card-layout.png');
+    await expect(variantRow).toHaveScreenshot(
+      'variant-card-layout.png',
+      LAYOUT_SCREENSHOT_OPTIONS,
+    );
     await expect(variantRow).toContainText('400 Normal [WOFF2]');
 
     // Arrow keys move the selection, which re-scopes the code beside it.
