@@ -28,15 +28,21 @@ const getDrupalLocale = (): string =>
  * Drupal langcodes like `zh-hans` or `pt-br` use lowercase language tag
  * components which may throw `RangeError` in strict BCP 47 environments.
  * The try/catch ensures graceful degradation.
+ *
+ * All formatters use `timeZone: 'UTC'` because Canvas date/datetime props are
+ * stored without timezone offset. Formatting in the local browser timezone
+ * would silently shift dates — e.g. a UTC midnight date would appear as the
+ * previous day in negative-UTC-offset timezones (Americas).
  */
 const createFormatter = (
   locale: string,
   options: Intl.DateTimeFormatOptions,
 ): Intl.DateTimeFormat => {
+  const utcOptions = { timeZone: 'UTC', ...options };
   try {
-    return new Intl.DateTimeFormat(locale, options);
+    return new Intl.DateTimeFormat(locale, utcOptions);
   } catch {
-    return new Intl.DateTimeFormat('en', options);
+    return new Intl.DateTimeFormat('en', utcOptions);
   }
 };
 

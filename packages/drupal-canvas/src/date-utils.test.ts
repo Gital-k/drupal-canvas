@@ -39,6 +39,16 @@ describe('canvasFormatDate', () => {
     expect(canvasFormatDate('not-a-date')).toBe('not-a-date');
   });
 
+  it('does not shift a date-only value to the previous day', () => {
+    // ECMAScript parses date-only strings (YYYY-MM-DD) as UTC midnight.
+    // Without timeZone: 'UTC', Intl.DateTimeFormat renders in local time,
+    // which shifts midnight UTC to the previous evening in negative-offset
+    // timezones (e.g. Americas), producing the wrong date.
+    const result = canvasFormatDate('2026-09-08');
+    expect(result).toMatch(/9\/8/);
+    expect(result).not.toMatch(/9\/7/);
+  });
+
   it('formats differently for fr locale', () => {
     setLocale('fr');
     const result = canvasFormatDate('2026-01-15');
@@ -77,6 +87,17 @@ describe('canvasFormatDateTime', () => {
     const result = canvasFormatDateTime('2026-01-15T14:30:00Z');
     expect(result).not.toBe('2026-01-15T14:30:00Z');
     expect(result).not.toBe('');
+  });
+
+  it('does not shift the time by the local UTC offset', () => {
+    // Canvas datetime props are stored in UTC without timezone awareness.
+    // Formatting must not apply a local-timezone offset — e.g. a value stored
+    // as 23:00 UTC must never appear as 03:00 the next day in an ET browser.
+    // timeZone: 'UTC' in the formatter guarantees this.
+    const result = canvasFormatDateTime('2026-09-08T23:00:00Z');
+    // The date portion must always be Sept 8, never Sept 9.
+    expect(result).toMatch(/9\/8/);
+    expect(result).not.toMatch(/9\/9/);
   });
 
   it('returns the original string for an empty input', () => {
