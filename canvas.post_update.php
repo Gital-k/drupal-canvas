@@ -819,6 +819,29 @@ function canvas_post_update_0031_remove_empty_auto_created_folders(): void {
     $enabled = array_filter($components, fn (Component $component): bool => $component->status());
     if (empty($enabled)) {
       $folder->delete();
+    $items = $folder->get('items');
+    // A Folder with no items at all was created by a site owner and is still
+    // needed as a drop target.
+    if (empty($items)) {
+      continue;
     }
+    $components = $component_storage->loadMultiple($items);
+    // Skip Folders with missing item config; dependency cleanup owns that.
+    if (count($components) !== count($items)) {
+      continue;
+    }
+    $enabled = array_filter($components, fn (Component $component): bool => $component->status());
+    if (!empty($enabled)) {
+      continue;
+    }
+    // All items disabled: only delete if this still looks like an untouched
+    // auto-created category Folder (name matches every item's default folder).
+    $folder_name = (string) $folder->label();
+    foreach ($components as $component) {
+      if ((string) $component->getComponentSource()->determineDefaultFolder() !== $folder_name) {
+        continue 2;
+      }
+    }
+    $folder->delete();
   }
 }

@@ -114,6 +114,15 @@ class FolderTest extends CanvasKernelTestBase {
     $this->assertNotEmpty($disabled);
     $component = \reset($disabled);
     $category = (string) $component->getComponentSource()->determineDefaultFolder();
+    // Use a Block Component whose category has only disabled Components, so
+    // no Folder exists yet. Categories such as System/Menus already have a
+    // Folder from BLOCKS_TO_KEEP_ENABLED.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::computeInitialComponentStatus()
+    $component = Component::load('block.local_actions_block');
+    $this->assertInstanceOf(Component::class, $component);
+    $this->assertFalse($component->status());
+    $category = (string) $component->getComponentSource()->determineDefaultFolder();
+    $this->assertSame('core', $category);
     $this->assertNull(Folder::loadByNameAndConfigEntityTypeId($category, Component::ENTITY_TYPE_ID));
 
     // Enabling it files it into a Folder named after its category.
