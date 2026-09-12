@@ -187,6 +187,9 @@ const ReviewFooter = ({
     selectedVersion === 'published'
       ? 'Discard changes'
       : 'Publish selected changes';
+  const publishSelectionLabel = isSelectedForPublishing
+    ? 'Selected for publishing'
+    : 'Not selected for publishing';
   const isActionDisabled =
     isApplyingSelection ||
     !selectedVersion ||
@@ -205,7 +208,7 @@ const ReviewFooter = ({
               checked={isSelectedForPublishing}
               onCheckedChange={onSelectedForPublishingChange}
             />
-            Selected for publishing
+            {publishSelectionLabel}
           </Flex>
         </Text>
       </Flex>
