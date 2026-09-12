@@ -45,8 +45,9 @@ final class CanvasTwigExtensionTest extends CanvasKernelTestBase {
     string $component_id,
     bool $props_handled_by_twig,
     string $slot_selector,
-    array $render_array_additions,
-    bool $is_preview,
+    array $render_array_additions = [],
+    bool $is_preview = FALSE,
+    array $extra_props = [],
   ): void {
     $heading = $this->randomMachineName();
     $uuid = $this->container->get(UuidInterface::class)->generate();
@@ -87,7 +88,7 @@ final class CanvasTwigExtensionTest extends CanvasKernelTestBase {
         'canvas_uuid' => $uuid,
         'canvas_slot_ids' => ['the_body'],
         'canvas_is_preview' => $is_preview,
-      ],
+      ] + $extra_props,
       '#slots' => [
         'the_body' => [
           '#markup' => $body,
@@ -139,6 +140,50 @@ final class CanvasTwigExtensionTest extends CanvasKernelTestBase {
 
     yield 'SDC, preview' => [...$sdc, TRUE];
     yield 'SDC, live' => [...$sdc, FALSE];
+
+    // Regression tests for #3569815: a dynamic tag name preceding a prop or
+    // slot print must not poison the HTML5 validity check (and the
+    // custom-element attribute detection it interacts with) for everything
+    // that follows it in the template.
+    $dynamic_tag = [
+      'component',
+      'canvas_test_sdc:dynamic-tag',
+      TRUE,
+      '.component--dynamic-tag--body',
+      [],
+    ];
+
+    // Use 'h1' as the dynamic tag name so the h1-based prop assertions above
+    // continue to apply unchanged.
+    yield 'SDC with dynamic tag, preview' => [...$dynamic_tag, TRUE, ['tag' => 'h1']];
+    yield 'SDC with dynamic tag, live' => [...$dynamic_tag, FALSE, ['tag' => 'h1']];
+
+    // `<{{ as }}{{ attributes }}>` - a fully dynamic tag name immediately
+    // followed by a second print with no intervening text, mirroring the
+    // common "as" prop convention for polymorphic elements.
+    $dynamic_tag_as = [
+      'component',
+      'canvas_test_sdc:dynamic-tag-as',
+      TRUE,
+      '.component--dynamic-tag-as--body',
+      [],
+    ];
+
+    yield 'SDC with "as" dynamic tag, preview' => [...$dynamic_tag_as, TRUE, ['as' => 'h1']];
+    yield 'SDC with "as" dynamic tag, live' => [...$dynamic_tag_as, FALSE, ['as' => 'h1']];
+
+    // `<h{{ level }}>` - only part of the tag name is dynamic (a literal "h"
+    // prefix immediately followed by the print).
+    $dynamic_tag_partial = [
+      'component',
+      'canvas_test_sdc:dynamic-tag-partial',
+      TRUE,
+      '.component--dynamic-tag-partial--body',
+      [],
+    ];
+
+    yield 'SDC with partially-dynamic tag, preview' => [...$dynamic_tag_partial, TRUE, ['level' => '1']];
+    yield 'SDC with partially-dynamic tag, live' => [...$dynamic_tag_partial, FALSE, ['level' => '1']];
 
     $js_component = [
       AstroIsland::PLUGIN_ID,
