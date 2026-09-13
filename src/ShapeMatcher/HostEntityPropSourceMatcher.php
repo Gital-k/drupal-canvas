@@ -6,6 +6,7 @@ namespace Drupal\canvas\ShapeMatcher;
 
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropSource\HostEntityPropSource;
+use Drupal\canvas\PropSource\PropSource;
 
 /**
  * Matcher for the host entity itself as a content-entity-reference prop source.
@@ -15,7 +16,7 @@ use Drupal\canvas\PropSource\HostEntityPropSource;
  *
  * @internal
  */
-final class HostEntityPropSourceMatcher {
+final class HostEntityPropSourceMatcher implements PropSourceMatcherInterface {
 
   /**
    * Matches a host entity prop source for a content-entity-reference prop.
@@ -30,7 +31,7 @@ final class HostEntityPropSourceMatcher {
    *   Whether the prop shape to match is required or not.
    * @param \Drupal\canvas\PropShape\PropShape $prop_shape
    *   The prop shape to match.
-   * @param string $host_entity_type
+   * @param string $host_entity_type_id
    *   The host entity type ID.
    * @param string $host_entity_bundle
    *   The host entity bundle.
@@ -40,7 +41,7 @@ final class HostEntityPropSourceMatcher {
    *   not satisfy the prop's constraints (or the prop is not a
    *   content-entity-reference).
    */
-  public static function match(bool $is_required, PropShape $prop_shape, string $host_entity_type, string $host_entity_bundle): array {
+  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id = '', string $host_entity_bundle = ''): array {
     $schema = $prop_shape->resolvedSchema;
 
     // Only content-entity-reference shapes are candidates: x-allowed-entity-
@@ -52,7 +53,7 @@ final class HostEntityPropSourceMatcher {
 
     $target_type_id = $schema['x-allowed-entity-type-id'];
     \assert(\is_string($target_type_id));
-    if ($target_type_id !== $host_entity_type) {
+    if ($target_type_id !== $host_entity_type_id) {
       return [];
     }
 
@@ -65,6 +66,13 @@ final class HostEntityPropSourceMatcher {
     }
 
     return [new HostEntityPropSource()];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPropSourceType(): string {
+    return PropSource::HostEntity->value;
   }
 
 }

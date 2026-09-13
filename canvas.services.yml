@@ -54,12 +54,23 @@ services:
   Drupal\canvas\ShapeMatcher\PropSourceSuggester: {}
   Drupal\canvas\ShapeMatcher\AdaptedPropSourceMatcher:
     public: false
+    tags:
+      - { name: canvas.prop_source_matcher }
   Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher:
     public: false
+    tags:
+      - { name: canvas.prop_source_matcher }
   Drupal\canvas\ShapeMatcher\HostEntityUrlPropSourceMatcher:
     public: false
+    tags:
+      - { name: canvas.prop_source_matcher }
   Drupal\canvas\ShapeMatcher\HostEntityPropSourceMatcher:
     public: false
+    tags:
+      - { name: canvas.prop_source_matcher }
+
+  # Prop source parsing.
+  Drupal\canvas\PropSource\PropSourceTypeRegistry: {}
 
   # Utilities.
   Drupal\canvas\CanvasNotificationHandler: {}

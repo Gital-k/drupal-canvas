@@ -142,7 +142,7 @@ class HostEntityPropSourceMatcherTest extends PropSourceMatcherTestBase {
 
   public function testNoXAllowedEntityTypeIdReturnsEmpty(): void {
     $shape = PropShape::normalize(['type' => 'string']);
-    self::assertSame([], HostEntityPropSourceMatcher::match(FALSE, $shape, 'node', 'article'));
+    self::assertSame([], (new HostEntityPropSourceMatcher())->match(FALSE, $shape, 'node', 'article'));
   }
 
   public function testTypeMismatchReturnsEmpty(): void {
@@ -150,7 +150,7 @@ class HostEntityPropSourceMatcherTest extends PropSourceMatcherTestBase {
       JsonSchemaObjectRef::ContentEntityReference->asPropShapeArray()
       + ['x-allowed-entity-type-id' => 'node', 'x-allowed-bundle' => 'article']
     );
-    self::assertSame([], HostEntityPropSourceMatcher::match(FALSE, $shape, 'user', 'user'));
+    self::assertSame([], (new HostEntityPropSourceMatcher())->match(FALSE, $shape, 'user', 'user'));
   }
 
   public function testTypeAndBundleMatchReturnsHostEntityPropSource(): void {
@@ -158,7 +158,7 @@ class HostEntityPropSourceMatcherTest extends PropSourceMatcherTestBase {
       JsonSchemaObjectRef::ContentEntityReference->asPropShapeArray()
       + ['x-allowed-entity-type-id' => 'node', 'x-allowed-bundle' => 'article']
     );
-    $result = HostEntityPropSourceMatcher::match(FALSE, $shape, 'node', 'article');
+    $result = (new HostEntityPropSourceMatcher())->match(FALSE, $shape, 'node', 'article');
     self::assertSame(
       [(new HostEntityPropSource())->toArray()],
       \array_map(fn (HostEntityPropSource $s): array => $s->toArray(), $result),
@@ -170,7 +170,7 @@ class HostEntityPropSourceMatcherTest extends PropSourceMatcherTestBase {
       JsonSchemaObjectRef::ContentEntityReference->asPropShapeArray()
       + ['x-allowed-entity-type-id' => 'node', 'x-allowed-bundle' => 'page']
     );
-    self::assertSame([], HostEntityPropSourceMatcher::match(FALSE, $shape, 'node', 'article'));
+    self::assertSame([], (new HostEntityPropSourceMatcher())->match(FALSE, $shape, 'node', 'article'));
   }
 
   public function testBundleAbsentForBundlelessTargetReturnsHostEntityPropSource(): void {
@@ -178,7 +178,7 @@ class HostEntityPropSourceMatcherTest extends PropSourceMatcherTestBase {
       JsonSchemaObjectRef::ContentEntityReference->asPropShapeArray()
       + ['x-allowed-entity-type-id' => 'user']
     );
-    $result = HostEntityPropSourceMatcher::match(FALSE, $shape, 'user', 'user');
+    $result = (new HostEntityPropSourceMatcher())->match(FALSE, $shape, 'user', 'user');
     self::assertSame(
       [(new HostEntityPropSource())->toArray()],
       \array_map(fn (HostEntityPropSource $s): array => $s->toArray(), $result),

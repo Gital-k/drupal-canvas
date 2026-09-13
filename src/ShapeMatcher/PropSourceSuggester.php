@@ -13,7 +13,6 @@ use Drupal\canvas\PropExpressions\StructuredData\Labeler;
 use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
-use Drupal\canvas\PropSource\HostEntityUrlPropSource;
 use Drupal\canvas\PropSource\LinkablePropSourceInterface;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
@@ -40,6 +39,10 @@ use Drupal\Core\Theme\Component\ComponentMetadata;
  * - HostEntityUrlPropSources — these suggest (relative or absolute) URLs
  * - AdaptedPropSource — these suggest adapters
  *
+ * Additional prop source types can be contributed by tagging a service
+ * `canvas.prop_source_matcher`.
+ *
+ * @see \Drupal\canvas\ShapeMatcher\PropSourceMatcherInterface
  * @see \Drupal\Core\Theme\Component\ComponentMetadata
  * @see \Drupal\canvas\PropShape\PropShape
  * @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher
@@ -51,10 +54,7 @@ use Drupal\Core\Theme\Component\ComponentMetadata;
 final readonly class PropSourceSuggester {
 
   public function __construct(
-    private EntityFieldPropSourceMatcher $entityFieldPropSourceMatcher,
-    private AdaptedPropSourceMatcher $adaptedPropSourceMatcher,
-    private HostEntityUrlPropSourceMatcher $hostEntityUrlPropSourceMatcher,
-    private HostEntityPropSourceMatcher $hostEntityPropSourceMatcher,
+    private \Traversable $propSourceMatchers,
     private EntityDisplayRepositoryInterface $entityDisplayRepository,
     private Labeler $labeler,
     private EntityTypeManagerInterface $entityTypeManager,
@@ -139,7 +139,11 @@ final readonly class PropSourceSuggester {
    *   Host entity type + bundle, necessary to suggest certain types of prop
    *   sources.
    *
-   * @return array<string, array{required: bool, entity-field: array<string, EntityFieldPropSource>, adapter: array<AdapterInterface>, host-entity-url: array<string, HostEntityUrlPropSource>, host-entity: array<string, \Drupal\canvas\PropSource\HostEntityPropSource>}>
+   * @return array<string, array{required: bool, entity-field: array<string, EntityFieldPropSource>, adapter: array<AdapterInterface>, ...<array<string, LinkablePropSourceInterface>>}>
+   *   Keyed by `entity-field` and `adapter` (always present), plus one key
+   *   per other tagged `canvas.prop_source_matcher` service's
+   *   ::getPropSourceType() (present when it produced matches) — for example
+   *   the built-in `host-entity-url` and `host-entity`.
    */
   public function suggest(string $component_plugin_id, ComponentMetadata $component_metadata, EntityDataDefinitionInterface $host_entity_type): array {
     $host_entity_type_id = $host_entity_type->getEntityTypeId();
@@ -183,11 +187,16 @@ final readonly class PropSourceSuggester {
       // @todo filtering
       $processed_matches[$cpe][PropSource::Adapter->value] = $m[PropSource::Adapter->value];
 
-      // Nothing to do for HostEntityUrlPropSource matches.
-      $processed_matches[$cpe][PropSource::HostEntityUrl->value] = $m[PropSource::HostEntityUrl->value];
-
-      // Nothing to do for HostEntityPropSource matches.
-      $processed_matches[$cpe][PropSource::HostEntity->value] = $m[PropSource::HostEntity->value];
+      // Every other prop source type — built-in (e.g. HostEntityUrlPropSource,
+      // HostEntityPropSource) or from a custom matcher tagged
+      // `canvas.prop_source_matcher` — needs no bucketing/filtering: pass its
+      // raw matches through unmodified.
+      foreach ($m as $type => $matches) {
+        if (\in_array($type, [PropSource::EntityField->value, PropSource::Adapter->value], TRUE)) {
+          continue;
+        }
+        $processed_matches[$cpe][$type] = $matches;
+      }
     }
 
     // 3. Generate appropriate labels for each. And specify whether required.
@@ -222,30 +231,36 @@ final readonly class PropSourceSuggester {
       // Sort alphabetically by label.
       ksort($suggestions[$cpe][PropSource::Adapter->value]);
 
-      // Host entity URLs: generate labels, retain match order.
-      $suggestions[$cpe][PropSource::HostEntityUrl->value] = array_combine(
-        \array_map(
-          fn (HostEntityUrlPropSource $s): string => (string) $s->label($host_entity_type),
-          $m[PropSource::HostEntityUrl->value],
-        ),
-        $m[PropSource::HostEntityUrl->value],
-      );
-
-      // Host entity: at most one match by definition.
-      // @see \Drupal\canvas\ShapeMatcher\HostEntityPropSourceMatcher::match()
-      $suggestions[$cpe][PropSource::HostEntity->value] = [];
-      $host_entity_match = $m[PropSource::HostEntity->value][0] ?? NULL;
-      if ($host_entity_match !== NULL) {
-        $label = (string) $host_entity_match->label($host_entity_type);
-        $suggestions[$cpe][PropSource::HostEntity->value][$label] = $host_entity_match;
+      // Every other prop source type — built-in (e.g. HostEntityUrlPropSource,
+      // HostEntityPropSource) or from a custom matcher tagged
+      // `canvas.prop_source_matcher` — is labeled generically: its matches
+      // MUST implement LinkablePropSourceInterface. Retains match order.
+      // @see \Drupal\canvas\ShapeMatcher\PropSourceMatcherInterface::match()
+      foreach ($m as $type => $matches) {
+        if (\in_array($type, [PropSource::EntityField->value, PropSource::Adapter->value], TRUE)) {
+          continue;
+        }
+        $suggestions[$cpe][$type] = array_combine(
+          \array_map(
+            // @phpstan-ignore argument.type
+            fn (LinkablePropSourceInterface $s): string => (string) $s->label($host_entity_type),
+            $matches,
+          ),
+          $matches,
+        );
       }
     }
 
+    // PHPStan cannot correlate the dynamic $type keys assigned above with
+    // the declared return shape's literal + unsealed catch-all keys, so it
+    // widens the value type of the whole per-$cpe array instead of matching
+    // the shape.
+    // @phpstan-ignore return.type
     return $suggestions;
   }
 
   /**
-   * @return array<string, array{entity-field: array<EntityFieldPropSource>, adapter: array<\Drupal\canvas\Plugin\Adapter\AdapterInterface>, host-entity-url: array<HostEntityUrlPropSource>, host-entity: array<\Drupal\canvas\PropSource\HostEntityPropSource>}>
+   * @return array<string, array{entity-field: array<EntityFieldPropSource>, adapter: array<\Drupal\canvas\Plugin\Adapter\AdapterInterface>, ...<array<\Drupal\canvas\PropSource\LinkablePropSourceInterface>>}>
    */
   private function getRawMatches(string $component_plugin_id, ComponentMetadata $component_metadata, string $host_entity_type, string $host_entity_bundle): array {
     $raw_matches = [];
@@ -257,7 +272,9 @@ final readonly class PropSourceSuggester {
       $is_required = \in_array($cpe->propName, $component_metadata->schema['required'] ?? [], TRUE);
       $schema = $prop_shape->resolvedSchema;
 
-      $raw_matches[(string) $cpe][PropSource::EntityField->value] = $this->entityFieldPropSourceMatcher->match($is_required, $prop_shape, $host_entity_type, $host_entity_bundle);
+      foreach ($this->propSourceMatchers as $prop_source_matcher) {
+        $raw_matches[(string) $cpe][$prop_source_matcher->getPropSourceType()] = $prop_source_matcher->match($is_required, $prop_shape, $host_entity_type, $host_entity_bundle);
+      }
       // @todo Remove these hard-coded bits with generic logic in https://www.drupal.org/project/canvas/issues/3563960
       if ($schema === ['type' => 'string', 'format' => 'date'] && $host_entity_type === 'node') {
         $created_as_date_string = (new EntityFieldPropSource(
@@ -269,11 +286,11 @@ final readonly class PropSourceSuggester {
         $raw_matches[(string) $cpe][PropSource::EntityField->value][] = $created_as_date_string;
         $raw_matches[(string) $cpe][PropSource::EntityField->value][] = $changed_as_date_string;
       }
-      $raw_matches[(string) $cpe][PropSource::Adapter->value] = $this->adaptedPropSourceMatcher->match($is_required, $prop_shape);
-      $raw_matches[(string) $cpe][PropSource::HostEntityUrl->value] = $this->hostEntityUrlPropSourceMatcher->match($is_required, $prop_shape);
-      $raw_matches[(string) $cpe][PropSource::HostEntity->value] = $this->hostEntityPropSourceMatcher->match($is_required, $prop_shape, $host_entity_type, $host_entity_bundle);
     }
 
+    // Same PHPStan limitation as ::suggest(): the dynamic
+    // $prop_source_matcher->getPropSourceType() key defeats shape matching.
+    // @phpstan-ignore return.type
     return $raw_matches;
   }
 
@@ -281,11 +298,18 @@ final readonly class PropSourceSuggester {
     // @todo Remove this after refactoring ::suggest() in https://www.drupal.org/i/3523446 to stop returning a nested array keyed by prop source type, and instead return an array of prop source objects.
     $combined_suggestions = [];
     foreach ($suggestions as $key => $value) {
-      $combined_suggestions[$key] = [
-        ...$value[PropSource::EntityField->value],
-        ...$value[PropSource::HostEntityUrl->value],
-        ...$value[PropSource::HostEntity->value],
-      ];
+      // Combine every prop source type except `required` (not a list of
+      // matches) and `adapter` (AdapterInterface plugins, which — unlike
+      // every other prop source type, built-in or from a custom matcher
+      // tagged `canvas.prop_source_matcher` — do not implement
+      // LinkablePropSourceInterface).
+      $combined_suggestions[$key] = [];
+      foreach ($value as $type => $prop_sources) {
+        if (\in_array($type, ['required', PropSource::Adapter->value], TRUE)) {
+          continue;
+        }
+        $combined_suggestions[$key] = [...$combined_suggestions[$key], ...$prop_sources];
+      }
     }
 
     return array_combine(

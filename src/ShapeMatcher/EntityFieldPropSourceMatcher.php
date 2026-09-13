@@ -23,6 +23,7 @@ use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterfac
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\Component\Assertion\Inspector;
@@ -108,7 +109,7 @@ use Symfony\Component\Validator\Constraint;
  *
  * @internal
  */
-final class EntityFieldPropSourceMatcher {
+final class EntityFieldPropSourceMatcher implements PropSourceMatcherInterface {
 
   /**
    * @var array<lowercase-string, array{class: class-string, exceptions: array<array>}>
@@ -947,7 +948,7 @@ final class EntityFieldPropSourceMatcher {
    * @return list<\Drupal\canvas\PropSource\EntityFieldPropSource>
    *   An array of EntityFieldPropSource instances, empty array if no matches.
    */
-  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id, string $host_entity_bundle): array {
+  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id = '', string $host_entity_bundle = ''): array {
     return \array_map(
       fn (EntityFieldBasedPropExpressionInterface $expr) => new EntityFieldPropSource($expr),
       $this->findFieldInstanceFormatMatches(
@@ -958,6 +959,13 @@ final class EntityFieldPropSourceMatcher {
         $host_entity_bundle
       ),
     );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPropSourceType(): string {
+    return PropSource::EntityField->value;
   }
 
   /**

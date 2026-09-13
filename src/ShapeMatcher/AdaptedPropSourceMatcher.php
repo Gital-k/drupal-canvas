@@ -6,6 +6,7 @@ namespace Drupal\canvas\ShapeMatcher;
 
 use Drupal\canvas\Plugin\AdapterManager;
 use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropSource\PropSource;
 
 /**
  * Matches adapted prop sources against a JSON schema.
@@ -20,7 +21,7 @@ use Drupal\canvas\PropShape\PropShape;
  *
  * @todo Update in https://www.drupal.org/project/canvas/issues/3464003
  */
-final readonly class AdaptedPropSourceMatcher {
+final readonly class AdaptedPropSourceMatcher implements PropSourceMatcherInterface {
 
   public function __construct(
     private AdapterManager $adapterManager,
@@ -33,14 +34,25 @@ final readonly class AdaptedPropSourceMatcher {
    *   Whether the prop shape to match is required or not.
    * @param \Drupal\canvas\PropShape\PropShape $prop_shape
    *   The prop shape to match.
+   * @param string $host_entity_type_id
+   *   Unused; adapters do not depend on the host entity type.
+   * @param string $host_entity_bundle
+   *   Unused; adapters do not depend on the host entity bundle.
    *
    * @return list<\Drupal\canvas\Plugin\Adapter\AdapterInterface>
    *   All adapters whose output schema matches the given schema.
    *
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    */
-  public function match(bool $is_required, PropShape $prop_shape): array {
+  public function match(bool $is_required, PropShape $prop_shape, string $host_entity_type_id = '', string $host_entity_bundle = ''): array {
     return $this->adapterManager->getDefinitionsByOutputSchema($prop_shape->schema);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPropSourceType(): string {
+    return PropSource::Adapter->value;
   }
 
 }
