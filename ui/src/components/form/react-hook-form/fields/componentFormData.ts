@@ -78,6 +78,16 @@ export const formStateToObject = (
       normalizedKey.indexOf(']', prefix.length) === normalizedKey.length - 1;
     if (isDirectArrayProp) {
       arrayPropNames.push(toPropName(normalizedKey, componentId));
+    }
+    if (Array.isArray(value)) {
+      // URLSearchParams#append coerces a non-string value via
+      // Array.prototype.toString(), which joins every element with a comma
+      // into a single entry. That silently corrupts multi-value selections
+      // (e.g. a `<select multiple>` nested inside a grouped/tree prop, such
+      // as `[layout][layout_classes][]`) into one comma-joined string wrapped
+      // in a single-element array instead of one array entry per selection.
+      // Append each element as its own entry so qs.parse() reconstructs a
+      // proper array, regardless of nesting depth.
       if ((value as any[]).length) {
         (value as any[]).forEach((item) => params.append(key, item));
       } else {
