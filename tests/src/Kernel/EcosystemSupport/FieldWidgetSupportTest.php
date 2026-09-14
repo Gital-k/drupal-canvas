@@ -20,6 +20,10 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  *
  * @see docs/redux-integrated-field-widgets.md#3.4
  * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter
+ * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::processTextFormat
+ *
+ * @see docs/redux-integrated-field-widgets.md#3.4
+ * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter
  */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]

@@ -382,6 +382,8 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       // @see config/install/filter.format.canvas_html_inline.yml
       unset($element['format']['format']['#options']['canvas_html_inline']);
       unset($element['format']['guidelines']['canvas_html_inline']);
+      // processFormat() set #access while Canvas formats were still counted.
+      $element['format']['format']['#access'] = count($element['format']['format']['#options']) > 1;
     }
     return $element;
   }
