@@ -204,6 +204,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         'sdc.canvas_test_sdc.required-integer',
         'sdc.canvas_test_sdc.required-formatted-body',
         'sdc.canvas_test_sdc.required-plain-string',
+        'sdc.canvas_test_sdc.required-icon-string',
         'sdc.canvas_test_sdc.my-section',
         'sdc.canvas_test_sdc.crash',
         'sdc.canvas_test_sdc.card-with-local-image',

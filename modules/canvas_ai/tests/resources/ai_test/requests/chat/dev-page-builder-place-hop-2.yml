@@ -142,6 +142,9 @@ request:
         sdc.canvas_test_sdc.required-integer:
           name: 'Canvas test SDC with a required single-cardinality integer prop'
           description: 'Canvas test SDC with a required single-cardinality integer prop'
+        sdc.canvas_test_sdc.required-icon-string:
+          name: 'Required icon string'
+          description: 'Required string with x-canvas-icon for empty-while-editing coverage.'
         sdc.canvas_test_sdc.required-plain-string:
           name: 'Required plain string'
           description: 'Single required plain string prop for kernel coverage of empty required strings.'

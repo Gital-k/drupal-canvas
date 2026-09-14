@@ -280,6 +280,7 @@ final class SingleDirectoryComponentTest extends JsonSchemaPropsComponentSourceB
       'sdc.canvas_test_sdc.props-no-slots',
       'sdc.canvas_test_sdc.props-slots',
       'sdc.canvas_test_sdc.required-formatted-body',
+      'sdc.canvas_test_sdc.required-icon-string',
       'sdc.canvas_test_sdc.required-integer',
       'sdc.canvas_test_sdc.required-plain-string',
       'sdc.canvas_test_sdc.select-fields',
@@ -828,6 +829,17 @@ HTML,
           'library' => [
             'core/components.canvas_test_sdc--required-integer',
             'core/components.canvas_test_sdc--required-integer',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.required-icon-string' => [
+        'html' => '<span>phosphor:search</span>
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--required-icon-string',
+            'core/components.canvas_test_sdc--required-icon-string',
           ],
         ],
       ],
@@ -3261,6 +3273,24 @@ HTML
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.required-icon-string' => [
+        'prop_field_definitions' => [
+          'icon' => [
+            'required' => TRUE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'phosphor:search',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => [],
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.required-plain-string' => [
         'prop_field_definitions' => [
           'title' => [
@@ -3941,6 +3971,12 @@ HTML
         ],
       ],
       'sdc.canvas_test_sdc.required-integer' => [
+        'module' => [
+          'core',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.required-icon-string' => [
         'module' => [
           'core',
           'canvas_test_sdc',
@@ -6723,6 +6759,33 @@ HTML
         ],
         'transforms' => [],
       ],
+      'sdc.canvas_test_sdc.required-icon-string' => [
+        'expected_output_selectors' => [
+          'span:contains("phosphor:search")',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'icon' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'x-canvas-icon' => TRUE,
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 'phosphor:search',
+                ],
+              ],
+              'resolved' => 'phosphor:search',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
       'sdc.canvas_test_sdc.required-plain-string' => [
         'expected_output_selectors' => [
           'span:contains("Hello")',
@@ -7924,8 +7987,10 @@ HTML
    *
    * ::clientModelToInput(): required free-form prose (plain `type: string` and
    * HTML / text_long) stay in the returned input when evaluated as ''. Required
-   * props whose schema is URI-shaped (`format`) or enumerated must not use that
-   * path; an empty value is omitted from the returned input.
+   * `type: string` props with extra schema keys (`x-canvas-icon`) use the same
+   * path via field type `string`. Required props whose schema is URI-shaped
+   * (`format`) or enumerated must not use that path; an empty value is omitted
+   * from the returned input.
    *
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::clientModelToInput()
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::validateComponentInput()
@@ -7982,6 +8047,24 @@ HTML
           ],
         ],
         'prop' => 'title',
+        'expected' => '',
+      ],
+      'required x-canvas-icon string' => [
+        'positive' => TRUE,
+        'component_id' => 'sdc.canvas_test_sdc.required-icon-string',
+        'client_model' => [
+          'source' => [
+            'icon' => [
+              'sourceType' => 'static:field_item:string',
+              'expression' => 'ℹ︎string␟value',
+              'value' => '',
+            ],
+          ],
+          'resolved' => [
+            'icon' => '',
+          ],
+        ],
+        'prop' => 'icon',
         'expected' => '',
       ],
       'required uri (format: uri), empty link omitted' => [
@@ -8111,6 +8194,18 @@ HTML
       $violations = $source->validateComponentInput($input, $uuid, NULL);
       $this->assertGreaterThan(0, $violations->count(), $label);
     }
+
+    // Same keep-empty guarantee when the UI omits the prop key from 'source'.
+    $component = Component::load('sdc.canvas_test_sdc.required-icon-string');
+    $this->assertInstanceOf(Component::class, $component);
+    $inputMissingProp = $component->getComponentSource()->clientModelToInput(
+      'a-uuid-for-testing',
+      $component,
+      ['source' => [], 'resolved' => []],
+      NULL,
+    );
+    $this->assertArrayHasKey('icon', $inputMissingProp);
+    $this->assertSame('', $inputMissingProp['icon']);
   }
 
   /**

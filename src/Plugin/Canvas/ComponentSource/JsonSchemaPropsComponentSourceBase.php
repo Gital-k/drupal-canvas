@@ -1500,11 +1500,18 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
         // string input, as they're thinking about what string they do want.
         // ⚠️ This won't work for components whose logic specifically checks for
         // an empty string and refuses to render then.
-        if ($is_required_prop && $evaluated === '' && PropShape::isPlainOrRichProse($this->getExplicitInputDefinitions()['shapes'][$prop])) {
+        // ::isPlainOrRichProse() matches `['type' => 'string']` (or the HTML
+        // variants) exactly. Extra keys such as `x-canvas-icon` miss that
+        // match; those props still use field type `string`, so keep '' then
+        // too. Otherwise ::buildComponentInstanceForm() asserts (HTTP 500).
+        $field_type = $this->configuration['prop_field_definitions'][$prop]['field_type'] ?? NULL;
+        if ($is_required_prop && $evaluated === '' && (
+          PropShape::isPlainOrRichProse($this->getExplicitInputDefinitions()['shapes'][$prop])
+          || $field_type === 'string'
+        )) {
           // Confirm that *if* this weren't special-cased, that this would
           // indeed enter the next branch, which would cause it to be skipped.
-          // @todo Consider adding a new `GracefulDegradationPropSource` to
-          // encapsulate this similarly to `DefaultRelativeUrlPropSource`.
+          // @todo Consider adding a new `GracefulDegradationPropSource` to encapsulate this similarly to `DefaultRelativeUrlPropSource`.
           \assert(!$source instanceof StaticPropSource || ($source->fieldItemList->count() > 0 && $source->fieldItemList->isEmpty()));
         }
         // 💡 Automatically inform developers of missing client-side transforms,
@@ -1545,14 +1552,16 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       if (
         !\array_key_exists($required_prop, $props)
         && \array_key_exists($required_prop, $this->configuration['prop_field_definitions'] ?? [])
-        && \in_array(
-          $this->configuration['prop_field_definitions'][$required_prop]['field_type'] ?? NULL,
-          ['integer', 'float'],
-          TRUE
-        )
       ) {
-        // Default to 0 so rendering receives a valid numeric value.
-        $props[$required_prop] = $this->collapse($this->uncollapse(0, $required_prop), $required_prop);
+        $field_type = $this->configuration['prop_field_definitions'][$required_prop]['field_type'] ?? NULL;
+        if (\in_array($field_type, ['integer', 'float'], TRUE)) {
+          // Default to 0 so rendering receives a valid numeric value.
+          $props[$required_prop] = $this->collapse($this->uncollapse(0, $required_prop), $required_prop);
+        }
+        // Same guarantee for a required `string` prop omitted from 'source'.
+        elseif ($field_type === 'string') {
+          $props[$required_prop] = $this->collapse($this->uncollapse('', $required_prop), $required_prop);
+        }
       }
     }
 

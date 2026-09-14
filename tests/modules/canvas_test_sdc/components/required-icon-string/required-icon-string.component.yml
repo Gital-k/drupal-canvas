@@ -1,0 +1,14 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Required icon string
+description: Required string with x-canvas-icon for empty-while-editing coverage.
+props:
+  type: object
+  required:
+    - icon
+  properties:
+    icon:
+      type: string
+      title: Icon
+      x-canvas-icon: true
+      examples:
+        - 'phosphor:search'
