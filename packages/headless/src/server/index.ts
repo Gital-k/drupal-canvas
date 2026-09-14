@@ -54,3 +54,5 @@ export {
   mergeFrameAncestors,
   resolveFrameAncestors,
 } from './csp';
+export { fetchEntity } from './entity-api';
+export type { EntityResult } from '../entity';

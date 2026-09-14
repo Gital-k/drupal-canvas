@@ -20,6 +20,7 @@ const validClaims = {
   path: '/node/1',
   resourceVersion: 'rel:working-copy',
   previewContext: {
+    language: 'fr',
     viewMode: 'teaser',
     pageVariant: 'alternate',
   },
@@ -166,6 +167,21 @@ describe('redeemAssertion', () => {
     // An activation exchange carries no verifier: none was passed in.
     expect(body.get('code_verifier')).toBeNull();
   });
+
+  it.each([42, null, ['fr']])(
+    'does not retain an invalid language claim (%s)',
+    async (language) => {
+      const result = await redeemAssertion(
+        buildAssertion({ ...validClaims, previewContext: { language } }),
+        CONFIG,
+        vi.fn().mockResolvedValue(tokenResponse()),
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.draftData.previewContext).toBeUndefined();
+      }
+    },
+  );
 
   it('presents the previous verifier when one is passed', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(tokenResponse());
@@ -615,6 +631,7 @@ describe('fetchPage', () => {
     seedSession(
       liveDraftData({
         previewContext: {
+          language: 'fr',
           viewMode: 'teaser',
           pageVariant: 'alternate',
         },
@@ -627,7 +644,7 @@ describe('fetchPage', () => {
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       new URL(
-        'https://drupal.example/canvas/content-api?requestUri=%2Fexample&viewMode=teaser&pageVariant=alternate',
+        'https://drupal.example/canvas/content-api?requestUri=%2Fexample&language=fr&viewMode=teaser&pageVariant=alternate',
       ),
       expect.objectContaining({
         headers: {
@@ -668,11 +685,18 @@ describe('fetchPage', () => {
     const { server, seedSession } = makeServer(
       fetchImpl as unknown as typeof fetch,
     );
-    seedSession(liveDraftData({ tokenExpiresAt: Date.now() - 1 }));
+    seedSession(
+      liveDraftData({
+        tokenExpiresAt: Date.now() - 1,
+        previewContext: { language: 'fr' },
+      }),
+    );
 
     await expect(server.fetchPage('/example')).resolves.toEqual(page);
     expect(fetchImpl).toHaveBeenCalledWith(
-      expect.any(URL),
+      new URL(
+        'https://drupal.example/canvas/content-api?requestUri=%2Fexample',
+      ),
       expect.objectContaining({
         headers: { Accept: 'application/json' },
       }),
@@ -712,5 +736,68 @@ describe('fetchPage', () => {
     seedSession(liveDraftData());
 
     await expect(server.fetchPage('/example')).resolves.toEqual(unmanagedPage);
+  });
+});
+
+describe('fetchEntity', () => {
+  const entity = {
+    content: { element: 'js-article-card' },
+    managedByCanvas: true,
+    entity: {
+      entityType: 'node',
+      bundle: 'article',
+      id: '2',
+      uuid: 'node-uuid',
+      langcode: 'en',
+    },
+  };
+
+  it('fetches one public entity in a specific view mode', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(Response.json(entity));
+    const { server } = makeServer(fetchImpl as unknown as typeof fetch);
+
+    await expect(
+      server.fetchEntity({ type: 'node', id: '2', viewMode: 'teaser' }),
+    ).resolves.toEqual(entity);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      new URL(
+        'https://drupal.example/canvas/content-api/entity?type=node&id=2&viewMode=teaser',
+      ),
+      expect.objectContaining({
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      }),
+    );
+  });
+
+  it('marks a managed draft entity render as editor-renderable', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(Response.json(entity));
+    const { server, seedSession } = makeServer(
+      fetchImpl as unknown as typeof fetch,
+    );
+    seedSession(liveDraftData());
+
+    await expect(
+      server.fetchEntity({ type: 'node', id: '2' }),
+    ).resolves.toEqual({
+      ...entity,
+      content: { element: 'js-article-card', canvasDraftMode: true },
+    });
+  });
+
+  it('returns unmanaged draft content unchanged', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ ...entity, content: null, managedByCanvas: false }),
+      );
+    const { server, seedSession } = makeServer(
+      fetchImpl as unknown as typeof fetch,
+    );
+    seedSession(liveDraftData());
+
+    await expect(
+      server.fetchEntity({ type: 'node', id: '2' }),
+    ).resolves.toEqual({ ...entity, content: null, managedByCanvas: false });
   });
 });

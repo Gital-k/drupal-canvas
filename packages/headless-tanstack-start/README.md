@@ -108,3 +108,6 @@ is unreachable, the `CANVAS_JSONAPI_PREFIX` environment variable applies, then
 the `/jsonapi` default. `getPublicClient()` and `getDraftClient()` are async for
 the same reason: `await` them like `getClient()`. For full manual control, use
 `JsonApiClient` from `@drupal-api-client/json-api-client` directly.
+
+`fetchEntity({ type, id, viewMode })` renders one content entity without
+page-level route or head data. Use it for embedded renders such as teaser cards.

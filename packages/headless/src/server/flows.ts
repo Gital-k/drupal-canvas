@@ -24,6 +24,7 @@ import {
 import { resolveDraftConfig } from './config';
 import { fetchPage } from './content-api';
 import { buildClearedDraftCookie, buildDraftCookie } from './cookies';
+import { fetchEntity } from './entity-api';
 import { getDraftClient, getPublicClient } from './json-api-client';
 import { codeChallenge, generateCodeVerifier } from './pkce';
 import { createApiPrefixResolver } from './site-data';
@@ -31,6 +32,7 @@ import { exchangeAssertion } from './token-exchange';
 
 import type { JsonApiClient } from '@drupal-api-client/json-api-client';
 import type { DraftData } from '../draft-data';
+import type { EntityResult } from '../entity';
 import type { PageResult } from '../page';
 import type { DraftServerAdapter } from './adapter';
 import type { DraftConfig } from './config';
@@ -99,11 +101,16 @@ export async function redeemAssertion(
       : null;
   const previewContext =
     rawPreviewContext &&
+    (rawPreviewContext.language === undefined ||
+      typeof rawPreviewContext.language === 'string') &&
     (rawPreviewContext.viewMode === undefined ||
       typeof rawPreviewContext.viewMode === 'string') &&
     (rawPreviewContext.pageVariant === undefined ||
       typeof rawPreviewContext.pageVariant === 'string')
       ? {
+          ...(typeof rawPreviewContext.language === 'string' && {
+            language: rawPreviewContext.language,
+          }),
           ...(typeof rawPreviewContext.viewMode === 'string' && {
             viewMode: rawPreviewContext.viewMode,
           }),
@@ -228,6 +235,12 @@ export interface DraftServer {
    * live draft session's bearer token when there is one.
    */
   fetchPage(path: string): Promise<PageResult | null>;
+  /** Fetches one entity by type and ID, optionally in a specific view mode. */
+  fetchEntity(options: {
+    type: string;
+    id: string;
+    viewMode?: string;
+  }): Promise<EntityResult | null>;
   /**
    * Fetches one component preview through the current draft session without
    * changing that session's entry path.
@@ -456,6 +469,16 @@ export function createDraftServer(options: DraftServerOptions): DraftServer {
         baseUrl: getConfig().baseUrl,
         draftData,
         fetchImpl,
+      });
+    },
+
+    async fetchEntity(options): Promise<EntityResult | null> {
+      const draftData = await getDraftData();
+      return fetchEntity({
+        baseUrl: getConfig().baseUrl,
+        draftData,
+        fetchImpl,
+        ...options,
       });
     },
 
