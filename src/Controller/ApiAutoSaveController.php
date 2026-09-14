@@ -613,12 +613,18 @@ final class ApiAutoSaveController extends ApiControllerBase {
    * @throws \Drupal\canvas\Exception\ConstraintViolationException
    */
   private function ensureEntityIsValid(EntityInterface $entity, bool $conflict_detection_dev_mode): void {
+    // Keep each list bound to the entity it came from, exactly as the
+    // pre-transaction validation above does: that binding is what puts
+    // `meta.entity_type`/`entity_id` on the error objects, which is how the
+    // client attributes an error to a page and links the author to it. A plain
+    // ConstraintViolationList would drop it.
+    // @see \Drupal\canvas\Controller\ApiControllerBase::createJsonResponseFromViolationSets()
     $violations = new ConstraintViolationList();
     if ($entity instanceof ConfigEntityInterface) {
-      $violations->addAll($entity->getTypedData()->validate());
+      $violations = new EntityConstraintViolationList($entity, $entity->getTypedData()->validate());
     }
     elseif ($entity instanceof ContentEntityInterface) {
-      $violations->addAll($this->getConflictAwareContentEntityViolations($entity, $conflict_detection_dev_mode));
+      $violations = $this->getConflictAwareContentEntityViolations($entity, $conflict_detection_dev_mode);
     }
     if (count($violations) > 0) {
       throw new ConstraintViolationException($violations);

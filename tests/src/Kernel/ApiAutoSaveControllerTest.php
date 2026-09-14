@@ -1301,6 +1301,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       $node2_auto_save_key => $auto_save_data[$node2_auto_save_key],
     ]);
     $decoded = self::decodeResponse($response);
+    // The collision only surfaces once the first node of the batch is saved,
+    // so this violation comes from the in-transaction revalidation. It carries
+    // the same `meta` as one raised before the transaction, which is what lets
+    // the client tell the author which item is at fault.
     $this->assertSame(
       [
         'errors' => [
@@ -1308,6 +1312,12 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
             'detail' => 'A content item with Title <em class="placeholder">I am not unique!</em> already exists.',
             'source' => [
               'pointer' => 'title',
+            ],
+            'meta' => [
+              'entity_type' => 'node',
+              'entity_id' => $node2->id(),
+              'label' => 'I am not unique!',
+              ApiAutoSaveController::AUTO_SAVE_KEY => $node2_auto_save_key,
             ],
           ],
         ],
