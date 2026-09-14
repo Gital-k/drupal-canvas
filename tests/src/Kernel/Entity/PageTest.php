@@ -177,4 +177,64 @@ final class PageTest extends CanvasKernelTestBase {
     $this->assertSame([], $dependencies['theme']);
   }
 
+  /**
+   * Tests that two pages cannot share one URL alias.
+   *
+   * Every page created through the Canvas UI starts with the same default
+   * title, and the client derives the URL alias from that title — so colliding
+   * aliases are the common case rather than an edge case.
+   *
+   * @see \Drupal\canvas\Controller\ApiContentControllers::defaultTitle()
+   */
+  public function testDuplicatePathAliasIsRejected(): void {
+    $first = Page::create([
+      'title' => 'Untitled page',
+      'path' => ['alias' => '/untitled-page'],
+    ]);
+    self::assertSaveWithoutViolations($first);
+    self::assertCount(1, $this->loadPathAliases('/untitled-page'));
+
+    // A second page claiming the first page's alias must not validate: one
+    // alias cannot resolve to two pages.
+    $second = Page::create([
+      'title' => 'Untitled page',
+      'path' => ['alias' => '/untitled-page'],
+    ]);
+    self::assertSame(
+      ['path.0.alias' => 'The alias <em class="placeholder">/untitled-page</em> is already in use in this language.'],
+      self::violationsToArray($second->validate()),
+    );
+
+    // Choosing a free alias resolves the violation.
+    $second->set('path', ['alias' => '/untitled-page-0']);
+    self::assertEntityIsValid($second);
+    $second->save();
+    self::assertCount(1, $this->loadPathAliases('/untitled-page'));
+    self::assertCount(1, $this->loadPathAliases('/untitled-page-0'));
+
+    // Re-saving a page without touching its alias must not report the page's
+    // own alias as a duplicate.
+    $second->set('title', 'Renamed page');
+    self::assertEntityIsValid($second);
+    $second->save();
+    self::assertCount(1, $this->loadPathAliases('/untitled-page-0'));
+  }
+
+  /**
+   * Loads the path_alias entities that use the given alias.
+   *
+   * The alias lives in its own entity created by PathItem::postSave(), so
+   * asserting on the page entity alone would not reveal a duplicate.
+   *
+   * @return array<int, \Drupal\path_alias\PathAliasInterface>
+   *   The matching path alias entities, keyed by entity ID.
+   *
+   * @see \Drupal\path\Plugin\Field\FieldType\PathItem::postSave()
+   */
+  private function loadPathAliases(string $alias): array {
+    return $this->container->get(EntityTypeManagerInterface::class)
+      ->getStorage('path_alias')
+      ->loadByProperties(['alias' => $alias]);
+  }
+
 }
