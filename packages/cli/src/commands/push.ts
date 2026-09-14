@@ -23,7 +23,11 @@ import {
   buildFontPushPlannedResults,
   pushFonts,
 } from '../lib/fonts/font-push.js';
-import { createApiService, ensureAuthConfig } from '../services/api.js';
+import {
+  createApiService,
+  ensureAuthConfig,
+  supportsPageVariants,
+} from '../services/api.js';
 import { buildCanvasProject } from '../utils/build-project';
 import {
   applySyncOptionAliasesAndWarnings,
@@ -766,6 +770,9 @@ export function pushCommand(program: Command): void {
         await ensureAuthConfig();
         await ensureConfig(['componentDir']);
         const config = getConfig();
+        const pageVariantsSupported = await supportsPageVariants(
+          config.siteUrl,
+        );
         const { componentDir, aliasBaseDir, outputDir } = config;
         const includesPages = config.includePages;
         const includesContentTemplates = config.includeContentTemplates;
@@ -951,7 +958,8 @@ export function pushCommand(program: Command): void {
         // Fetch remote page variants (and the site default) early for the
         // planned operations summary.
         const remotePageVariants =
-          includesPageTemplates || includesPages || includesContentTemplates
+          includesPageTemplates ||
+          (pageVariantsSupported && (includesPages || includesContentTemplates))
             ? await apiService.listPageVariants()
             : {};
         const currentDefaultPageVariant = includesPageTemplates
@@ -964,9 +972,11 @@ export function pushCommand(program: Command): void {
         // When page templates are synchronized, only locally authored IDs
         // remain after the replacement-style sync. Otherwise, dependents may
         // reference any existing remote variant.
-        const availablePageVariantIds = includesPageTemplates
-          ? localPageTemplateIds
-          : remotePageVariantIds;
+        const availablePageVariantIds = pageVariantsSupported
+          ? includesPageTemplates
+            ? localPageTemplateIds
+            : remotePageVariantIds
+          : undefined;
         // When page templates are synchronized, remote variants absent locally
         // are candidates for deletion. The push step changes the site default
         // before deleting its previous variant, or keeps that variant when no
@@ -1617,7 +1627,12 @@ export function pushCommand(program: Command): void {
               );
             },
             push: (validPages) =>
-              pushPages(validPages, remotePageByUuid, pushApiService),
+              pushPages(
+                validPages,
+                remotePageByUuid,
+                pushApiService,
+                pageVariantsSupported,
+              ),
             collectResults: (pushResults, failedPreps) =>
               collectPageResults(pushResults, failedPreps, discoveredPages),
             reportOptions: PUSH_REPORT_OPTIONS,
@@ -1679,6 +1694,7 @@ export function pushCommand(program: Command): void {
                 validTemplates,
                 remoteContentTemplateById,
                 pushApiService,
+                pageVariantsSupported,
               ),
             collectResults: (pushResults, failedPreps) =>
               collectContentTemplateResults(
