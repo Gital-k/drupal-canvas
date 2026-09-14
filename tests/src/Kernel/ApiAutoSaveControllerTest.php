@@ -1833,11 +1833,14 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
    * - Published pages: preserve status from autosaved entity
    * - Unpublished pages (previously published, now unpublished): preserve status
    *   from autosaved entity, allowing both unpublishing and republishing.
+   * - Never-published pages: the first publish reuses the initial revision and
+   *   attributes it to the publishing user, while later publishes each add a
+   *   revision.
    *
    * @legacy-covers ::post
    */
   public function testPublishingBehaviorForDraftPublishedAndUnpublishedPages(): void {
-    $this->setUpCurrentUser(permissions: [
+    $account = $this->setUpCurrentUser(permissions: [
       'bypass node access',
       Page::EDIT_PERMISSION,
       AutoSaveManager::PUBLISH_PERMISSION,
@@ -2008,6 +2011,87 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     \assert($draft_node instanceof NodeInterface);
     self::assertTrue($draft_node->isPublished());
     self::assertSame('Updated Draft Article', $draft_node->getTitle());
+
+    // Test Case 5: publishing a never-published page reuses its first
+    // revision. A page is stored the moment it is created, so its initial
+    // revision is an empty placeholder rather than a state worth keeping. The
+    // first publish must write into that revision instead of adding a second
+    // one, and must attribute it to the publishing user.
+    $page_storage = $entity_type_manager->getStorage('canvas_page');
+    $new_page = Page::create([
+      'title' => self::NEW_PAGE_TITLE,
+      'path' => ['alias' => '/first-publish-single-revision'],
+      'status' => FALSE,
+    ]);
+    self::assertSame([], self::violationsToArray($new_page->validate()));
+    self::assertSame(SAVED_NEW, $new_page->save());
+    $new_page_id = $new_page->id();
+    self::assertNotNull($new_page_id);
+    self::assertTrue(AutoSaveManager::entityIsConsideredNew($new_page));
+    self::assertSame(1, $this->countRevisions('canvas_page', $new_page_id));
+
+    // Rename it before publishing, which is what an author actually does: the
+    // default title is a placeholder nobody keeps.
+    $new_page->set('title', 'Renamed Before First Publish');
+    $autoSave->saveEntity($new_page);
+
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $new_page_key = AutoSaveManager::getAutoSaveKey($new_page);
+    self::assertArrayHasKey($new_page_key, $auto_save_data);
+
+    $response = $this->makePublishAllRequest([
+      $new_page_key => $auto_save_data[$new_page_key],
+    ]);
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    $new_page = $page_storage->loadUnchanged($new_page_id);
+    \assert($new_page instanceof Page);
+    self::assertTrue($new_page->isPublished());
+    self::assertSame('Renamed Before First Publish', $new_page->label());
+    // The page had never been published, so no second revision may exist.
+    self::assertSame(1, $this->countRevisions('canvas_page', $new_page_id));
+    self::assertSame($account->id(), $new_page->getRevisionUser()?->id());
+
+    // Every publish after the first one does create a revision, so that the
+    // previously published state remains recoverable. This guards the opposite
+    // error: suppressing revisions for more than the initial publish.
+    $new_page->set('title', 'Edited After First Publish');
+    $autoSave->saveEntity($new_page);
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $new_page_key = AutoSaveManager::getAutoSaveKey($new_page);
+    self::assertArrayHasKey($new_page_key, $auto_save_data);
+    $response = $this->makePublishAllRequest([
+      $new_page_key => $auto_save_data[$new_page_key],
+    ]);
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    $new_page = $page_storage->loadUnchanged($new_page_id);
+    \assert($new_page instanceof Page);
+    self::assertSame('Edited After First Publish', $new_page->label());
+    self::assertSame(2, $this->countRevisions('canvas_page', $new_page_id));
+    self::assertSame($account->id(), $new_page->getRevisionUser()?->id());
+  }
+
+  /**
+   * Counts the stored revisions of a content entity.
+   *
+   * @param string $entity_type_id
+   *   The entity type ID.
+   * @param string|int $entity_id
+   *   The entity ID.
+   *
+   * @return int
+   *   The number of revisions.
+   */
+  private function countRevisions(string $entity_type_id, string|int $entity_id): int {
+    $storage = $this->container->get(EntityTypeManagerInterface::class)->getStorage($entity_type_id);
+    $count = $storage->getQuery()
+      ->allRevisions()
+      ->accessCheck(FALSE)
+      ->condition($storage->getEntityType()->getKey('id'), $entity_id)
+      ->count()
+      ->execute();
+    return (int) $count;
   }
 
   /**
