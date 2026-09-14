@@ -14,6 +14,12 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * HTTP API controller for the auto-save state of Canvas content entities.
+ *
+ * Stores the layout, model and entity form fields the client sends without
+ * saving the entity, and reports any conflict with a concurrent change.
+ */
 final class ApiContentAutoSaveControllers {
 
   /**

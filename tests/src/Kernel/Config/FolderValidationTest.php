@@ -15,6 +15,12 @@ use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests the validation constraints on folder config entities.
+ *
+ * Covers folder names being unique per type, the immutability of the type a
+ * folder groups, and an item belonging to at most one folder.
+ */
 #[Group('canvas')]
 #[RunTestsInSeparateProcesses]
 class FolderValidationTest extends BetterConfigEntityValidationTestBase {

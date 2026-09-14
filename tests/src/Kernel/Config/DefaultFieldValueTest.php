@@ -19,6 +19,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests validation of a component tree stored as a field's default value.
+ *
+ * A default value is a sequence of field items, so validation has to reach the
+ * whole sequence rather than a single item.
+ */
 #[CoversClass(ValidComponentTreeItemConstraintValidator::class)]
 #[Group('canvas')]
 #[RunTestsInSeparateProcesses]

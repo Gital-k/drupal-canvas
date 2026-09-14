@@ -8,6 +8,14 @@ use Drupal\canvas\Entity\ParametrizedImageStyle;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\image\Entity\ImageStyle;
 
+/**
+ * Hook implementations keeping parametrized image styles in sync.
+ *
+ * Flushing the image style a parametrized style is derived from must also flush
+ * the parametrized style, whose derivatives core does not know about.
+ *
+ * @see \Drupal\canvas\Entity\ParametrizedImageStyle
+ */
 final class ImageStyleHooks {
 
   /**

@@ -8,6 +8,13 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 
+/**
+ * Validates the scheme of an absolute URI against a list of allowed schemes.
+ *
+ * Relative URIs have no scheme and are accepted. `temporary://` is always
+ * accepted: it occurs while a file is being uploaded and is never a
+ * permanently stored value.
+ */
 final class UriSchemeConstraintValidator extends ConstraintValidator {
 
   /**

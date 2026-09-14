@@ -30,6 +30,16 @@ use Drupal\canvas\Utility\ComponentMetadataHelper;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\field\Entity\FieldConfig;
 
+/**
+ * Updates stored Canvas config entities to the current data model.
+ *
+ * Methods come in pairs: `needs*()` reports whether an entity still uses an
+ * older shape, and the matching `update*()` rewrites it. Both run from
+ * post-update hooks and from config entity presave; post-update hooks mute the
+ * deprecation notices that presave would otherwise emit for every entity.
+ *
+ * @see canvas.post_update.php
+ */
 class CanvasConfigUpdater {
 
   use ComponentTreeItemListInstantiatorTrait;

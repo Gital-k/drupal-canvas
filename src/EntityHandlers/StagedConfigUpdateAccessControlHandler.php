@@ -12,6 +12,13 @@ use Drupal\Core\Entity\EntityHandlerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
 
+/**
+ * Controls access to staged config updates via the configuration they target.
+ *
+ * Anyone with access to the Canvas UI may `view` a staged update. Creating,
+ * updating and deleting one requires permission to update the targeted
+ * configuration, so staging cannot be used to bypass config access.
+ */
 final class StagedConfigUpdateAccessControlHandler extends EntityAccessControlHandler implements EntityHandlerInterface {
 
   use StagedConfigEntityAccessControlTrait;

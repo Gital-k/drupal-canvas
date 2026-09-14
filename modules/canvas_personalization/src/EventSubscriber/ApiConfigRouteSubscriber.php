@@ -8,6 +8,12 @@ use Drupal\canvas_personalization\Entity\Segment;
 use Drupal\Core\Routing\RouteSubscriberBase;
 use Symfony\Component\Routing\RouteCollection;
 
+/**
+ * Adds segments to the config entity types Canvas' config HTTP API accepts.
+ *
+ * The routes restrict `canvas_config_entity_type_id` to a fixed list, which is
+ * extended here rather than redeclared, so Canvas keeps owning the routes.
+ */
 final class ApiConfigRouteSubscriber extends RouteSubscriberBase {
 
   protected function alterRoutes(RouteCollection $collection): void {

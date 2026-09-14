@@ -6,6 +6,9 @@ namespace Drupal\Tests\canvas\Traits;
 
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 
+/**
+ * Generates the Component config entities for the components on the site.
+ */
 trait GenerateComponentConfigTrait {
 
   protected function generateComponentConfig(): void {

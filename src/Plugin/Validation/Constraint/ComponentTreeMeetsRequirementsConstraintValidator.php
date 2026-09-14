@@ -15,6 +15,15 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 
+/**
+ * Validates a component tree against the requirements of its host.
+ *
+ * Normalizes whatever it is handed — a field item, a field item list, or the
+ * array form used by config entities — into a component tree item list, so the
+ * requirement checks have one shape to work against.
+ *
+ * @see \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeMeetsRequirementsConstraint
+ */
 final class ComponentTreeMeetsRequirementsConstraintValidator extends ConstraintValidator implements ContainerInjectionInterface {
 
   use ComponentTreeItemListInstantiatorTrait;

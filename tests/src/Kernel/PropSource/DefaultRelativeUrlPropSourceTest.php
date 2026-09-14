@@ -18,6 +18,13 @@ use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests the prop source backing a component's relative example URLs.
+ *
+ * A component's example asset is referenced relative to the component's own
+ * directory, so the stored URL has to be rewritten before a browser can
+ * request it.
+ */
 #[CoversClass(DefaultRelativeUrlPropSource::class)]
 #[CoversMethod(SingleDirectoryComponent::class, 'rewriteExampleUrl')]
 #[Group('canvas')]

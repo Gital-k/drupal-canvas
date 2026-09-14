@@ -13,6 +13,12 @@ use Drupal\file\FileInterface;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\image\ImageStyleInterface;
 
+/**
+ * Applies an image style to an image object.
+ *
+ * Returns the derivative's URL and dimensions, so a component receives the
+ * styled image rather than the original.
+ */
 #[Adapter(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Apply image style'),

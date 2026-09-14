@@ -33,6 +33,12 @@ use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests that JSON:API exposes Canvas entities without leaking internals.
+ *
+ * Component trees are checked for pages, content templates and page regions,
+ * because each stores its tree differently.
+ */
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
 final class JsonapiSupportTest extends CanvasKernelTestBase {

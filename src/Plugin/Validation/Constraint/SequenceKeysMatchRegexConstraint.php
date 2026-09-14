@@ -8,6 +8,12 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\Attribute\Constraint;
 use Symfony\Component\Validator\Constraints\Regex;
 
+/**
+ * Validates the keys of a config sequence against a regular expression.
+ *
+ * Core's Regex constraint validates values; this applies the same pattern to
+ * the keys of a sequence instead.
+ */
 #[Constraint(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Sequence keys match regex', options: ['context' => 'Validation']),

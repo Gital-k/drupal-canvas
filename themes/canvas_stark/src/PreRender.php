@@ -7,6 +7,14 @@ namespace Drupal\canvas_stark;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Security\TrustedCallbackInterface;
 
+/**
+ * Pre-render callbacks marking up form elements for the Canvas UI.
+ *
+ * Adds the properties the semi-coupled theme engine's templates look for, so
+ * vertical tabs, accordions and tables reach the React UI already identified.
+ *
+ * @see \Drupal\canvas\Hook\SemiCoupledThemeEngineForceTwigHooks
+ */
 class PreRender implements TrustedCallbackInterface {
 
   public static function verticalTabs(array $element): array {

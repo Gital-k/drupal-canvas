@@ -13,6 +13,13 @@ use Drupal\language\Config\LanguageConfigOverride;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
+/**
+ * Stores staged language config overrides in auto-save until published.
+ *
+ * Publishing writes the staged values into the language config override, or
+ * deletes the override when the staged entity is empty. The entity ID combines
+ * the langcode and the configuration name.
+ */
 final class StagedLanguageConfigOverrideStorage extends ConfigEntityStorage {
 
   use StagedConfigEntityStorageTrait;

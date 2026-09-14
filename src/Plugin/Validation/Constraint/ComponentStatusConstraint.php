@@ -8,6 +8,9 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\Attribute\Constraint;
 use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 
+/**
+ * Validates that a component instance does not use a disabled component.
+ */
 #[Constraint(
   id: 'ComponentStatusConstraint',
   label: new TranslatableMarkup('Validates the component status', [], ['context' => 'Validation']),

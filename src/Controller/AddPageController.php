@@ -9,6 +9,12 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
+/**
+ * Creates an unpublished page and redirects to its Canvas editor.
+ *
+ * Canvas pages have no add form: the page is created immediately with a default
+ * title so that all editing happens in Canvas.
+ */
 final readonly class AddPageController {
 
   public function __construct(

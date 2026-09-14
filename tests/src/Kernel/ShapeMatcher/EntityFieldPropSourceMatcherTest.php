@@ -28,6 +28,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests which entity fields are offered for a given component input shape.
+ *
+ * Covers entity reference props and the narrowing of file fields by the file
+ * extensions a prop shape allows.
+ */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(EntityFieldPropSourceMatcher::class)]
 #[Group('canvas')]

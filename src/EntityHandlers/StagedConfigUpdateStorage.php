@@ -12,6 +12,12 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
+/**
+ * Stores staged config updates in auto-save until they are published.
+ *
+ * Publishing runs each staged config action against the target configuration.
+ * Because the entity only ever exists in auto-save, reads fall back to a stub.
+ */
 final class StagedConfigUpdateStorage extends ConfigEntityStorage {
 
   use StagedConfigEntityStorageTrait;

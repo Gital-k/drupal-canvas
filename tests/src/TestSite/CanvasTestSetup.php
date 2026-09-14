@@ -60,6 +60,12 @@ if (!\class_exists(TestSetupInterface::class)) {
   require_once $interface;
 }
 
+/**
+ * Installs a site with Canvas content for browser-driven tests.
+ *
+ * Component instance and referenced entity UUIDs are fixed constants, so tests
+ * and front-end fixtures can address the same instances by UUID.
+ */
 class CanvasTestSetup implements TestSetupInterface {
 
   use ConstraintViolationsTestTrait;

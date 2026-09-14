@@ -11,6 +11,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
+/**
+ * Helpers for driving the auto-save and publish endpoints from a test.
+ */
 trait AutoSaveRequestTestTrait {
 
   protected function getAutoSaveStatesFromServer(): array {

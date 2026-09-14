@@ -15,6 +15,12 @@ use Drupal\views\Entity\View;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 
+/**
+ * Tests that derivative blocks become available as Canvas components.
+ *
+ * Views and menus create block derivatives after Canvas' components have been
+ * generated, so the decorator has to pick them up without a cache rebuild.
+ */
 #[CoversClass(BlockManagerDecorator::class)]
 #[Group('canvas')]
 #[Group('canvas_component_sources')]

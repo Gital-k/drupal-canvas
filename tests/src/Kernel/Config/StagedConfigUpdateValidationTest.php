@@ -9,6 +9,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests the validation constraints on staged config update entities.
+ */
 #[Group('canvas')]
 #[Group('canvas_update_path')]
 #[RunTestsInSeparateProcesses]

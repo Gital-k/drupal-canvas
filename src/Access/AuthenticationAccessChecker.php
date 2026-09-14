@@ -15,6 +15,13 @@ use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
+/**
+ * Requires an authenticated user, and challenges anonymous requests.
+ *
+ * Anonymous requests are answered with a 401 carrying a `Basic` authentication
+ * challenge named after the site, instead of the 403 that returning a forbidden
+ * access result would produce. This lets non-browser clients authenticate.
+ */
 class AuthenticationAccessChecker implements AccessInterface {
 
   public function __construct(

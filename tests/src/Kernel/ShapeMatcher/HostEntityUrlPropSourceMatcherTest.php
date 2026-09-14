@@ -13,6 +13,12 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests when the host entity's URL is offered for a component input.
+ *
+ * The prop's allowed schemes and media type decide whether a URL can be
+ * offered at all.
+ */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(HostEntityUrlPropSourceMatcher::class)]
 #[Group('canvas')]

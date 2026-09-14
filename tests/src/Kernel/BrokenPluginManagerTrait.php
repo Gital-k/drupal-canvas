@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+/**
+ * Hides plugins marked as missing while the broken-components flag is set.
+ *
+ * Implements the marking and filtering; the using plugin manager only has to
+ * route its discovery through ::removeBrokenPlugins().
+ */
 trait BrokenPluginManagerTrait {
 
   protected array $missingPlugins = [];

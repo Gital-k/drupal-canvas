@@ -36,6 +36,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests indexing the inputs of a component tree with Search API.
+ *
+ * Only the values of an enabled content template are indexed, and translated
+ * items fall back to the static values the template defines.
+ */
 #[Group('canvas')]
 #[CoversClass(ComponentTreeInputs::class)]
 #[RunTestsInSeparateProcesses]

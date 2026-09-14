@@ -15,6 +15,9 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
+/**
+ * Tests the endpoint exposing site-wide data to the Canvas UI.
+ */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(SiteDataController::class)]
 #[Group('canvas')]

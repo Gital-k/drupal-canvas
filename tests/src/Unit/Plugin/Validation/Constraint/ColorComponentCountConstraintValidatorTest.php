@@ -15,6 +15,12 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 use Symfony\Component\Validator\Violation\ConstraintViolationBuilderInterface;
 
+/**
+ * Tests validation of the number of components a color value carries.
+ *
+ * The count depends on the color space, so a value whose color space is absent
+ * or not a string is left for other constraints to report.
+ */
 #[Group('canvas')]
 #[CoversClass(ColorComponentCountConstraintValidator::class)]
 final class ColorComponentCountConstraintValidatorTest extends UnitTestCase {

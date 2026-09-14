@@ -21,7 +21,6 @@ use Drupal\media_library\MediaLibraryState;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
- * @file
  * Hook implementations that make Redux-integrated field widgets work.
  *
  * @see https://www.drupal.org/project/issues/canvas?component=Redux-integrated+field+widgets

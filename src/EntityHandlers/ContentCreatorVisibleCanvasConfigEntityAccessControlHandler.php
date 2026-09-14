@@ -15,6 +15,13 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
+/**
+ * Lets content creators see enabled Canvas config entities they may use.
+ *
+ * Anyone with access to the Canvas UI may `view` an enabled entity of this
+ * type, and `view label` whatever its status, so that a disabled entity can
+ * still be published. Every other operation stays with the parent handler.
+ */
 class ContentCreatorVisibleCanvasConfigEntityAccessControlHandler extends CanvasConfigEntityAccessControlHandler {
 
   protected $viewLabelOperation = TRUE;

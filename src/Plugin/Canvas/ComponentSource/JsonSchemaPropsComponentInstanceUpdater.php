@@ -15,6 +15,15 @@ use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 
+/**
+ * Updates component instances to a newer version of their component.
+ *
+ * Decides whether the difference between the version stored on an instance and
+ * the component's active version is backward compatible, and rewrites the
+ * stored inputs when it is.
+ *
+ * @see ::canUpdate()
+ */
 final class JsonSchemaPropsComponentInstanceUpdater implements ComponentInstanceUpdaterInterface {
 
   /**

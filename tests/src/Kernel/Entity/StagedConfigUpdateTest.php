@@ -22,6 +22,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests staging a config update and applying it on publish.
+ *
+ * Covers the client-side representation, the cacheability and access of a
+ * staged update, and what happens when applying it would break config schema.
+ */
 #[Group('canvas')]
 #[CoversClass(StagedConfigUpdate::class)]
 #[CoversClass(StagedConfigUpdateStorage::class)]

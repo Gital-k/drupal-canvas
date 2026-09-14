@@ -15,6 +15,13 @@ use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Tests that an auto-save request based on stale data is rejected.
+ *
+ * The abstract methods let one set of assertions run against any entity type
+ * that supports auto-save: the implementing class provides the entity and says
+ * how to modify and read back the auto-saved value.
+ */
 trait AutoSaveConflictTestTrait {
 
   use AutoSaveRequestTestTrait;

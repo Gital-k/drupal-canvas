@@ -10,6 +10,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * Tests that the validation choices stay in step with the enum's cases.
+ */
 #[CoversClass(JsonSchemaObjectRef::class)]
 #[Group('canvas')]
 final class JsonSchemaObjectRefTest extends UnitTestCase {

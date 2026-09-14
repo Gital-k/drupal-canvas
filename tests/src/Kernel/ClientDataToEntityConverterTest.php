@@ -696,6 +696,9 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
 
 }
 
+/**
+ * Widget manager that swaps in the test widget for `string_textfield`.
+ */
 class TestWidgetManager extends WidgetPluginManager {
 
   protected function findDefinitions() {
@@ -708,6 +711,9 @@ class TestWidgetManager extends WidgetPluginManager {
 
 }
 
+/**
+ * Widget that rewrites one sentinel value, proving widgets massage input.
+ */
 class TestStringTextfieldWidget extends StringTextfieldWidget {
 
   public function massageFormValues(array $values, array $form, FormStateInterface $form_state) {

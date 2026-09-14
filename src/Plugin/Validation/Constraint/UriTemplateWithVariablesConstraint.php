@@ -8,6 +8,9 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\Attribute\Constraint;
 use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 
+/**
+ * Validates that a URI template declares the variables its consumer requires.
+ */
 #[Constraint(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Validates a URI template has certain variables', [], ['context' => 'Validation']),

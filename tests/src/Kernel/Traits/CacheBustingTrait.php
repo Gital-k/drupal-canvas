@@ -9,6 +9,12 @@ use Drupal\canvas\Version;
 use Drupal\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
 
+/**
+ * Pins the cache-busting query string appended to Canvas' asset URLs.
+ *
+ * Lets a test assert on complete asset URLs, which otherwise change whenever
+ * the module version does.
+ */
 trait CacheBustingTrait {
 
   protected function setCacheBustingQueryString(ContainerInterface $container, string $queryString): void {

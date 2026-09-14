@@ -32,6 +32,14 @@ use GuzzleHttp\Psr7\Query;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Validator\ConstraintViolation;
 
+/**
+ * Applies an edit made in the Canvas UI to a fieldable entity.
+ *
+ * Consumes the `layout`, `model` and `entity_form_fields` the client sends,
+ * converts layout and model into component tree field values, and sets the
+ * remaining entity fields. Constraint violations are collected against the
+ * entity so the UI can show each one next to the input that caused it.
+ */
 class ClientDataToEntityConverter {
 
   use ClientServerConversionTrait;

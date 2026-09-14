@@ -9,6 +9,12 @@ use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Render\Attribute\RenderElement;
 use Drupal\Core\Render\Element\RenderElementBase;
 
+/**
+ * Renders a component input that is linked to a prop source.
+ *
+ * @see ::getInfo()
+ * @see \Drupal\canvas\PropSource\LinkablePropSourceInterface
+ */
 #[RenderElement('linked_prop')]
 class LinkedProp extends RenderElementBase {
 

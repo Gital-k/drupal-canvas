@@ -11,6 +11,9 @@ use PHPat\Test\PHPat;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Architecture rules that every Canvas test class must satisfy.
+ */
 final class Tests {
 
   #[TestRule]

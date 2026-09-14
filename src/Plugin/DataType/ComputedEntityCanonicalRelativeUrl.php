@@ -17,6 +17,13 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\Attribute\DataType;
 use Drupal\Core\TypedData\Plugin\DataType\Uri;
 
+/**
+ * Computes the canonical URL of a referenced entity, as a relative URL.
+ *
+ * Yields NULL when nothing is referenced, when the referenced entity is unsaved
+ * and so has no URL, or when the current user may not view it. Access is
+ * checked because a path alias can disclose the entity's label.
+ */
 #[DataType(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup("URL of the referenced entity")

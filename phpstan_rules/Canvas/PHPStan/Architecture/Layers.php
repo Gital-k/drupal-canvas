@@ -95,6 +95,13 @@ use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
+/**
+ * Architecture rules keeping Canvas' layers from depending on each other.
+ *
+ * Each method returns one PHPat rule bounding what a namespace may depend on.
+ * The `because()` message on every rule states the reasoning, so a failure
+ * explains which boundary was crossed and why it exists.
+ */
 final class Layers {
 
   #[TestRule]

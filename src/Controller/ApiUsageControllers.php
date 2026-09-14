@@ -18,6 +18,13 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * HTTP API controllers reporting where components and colors are used.
+ *
+ * Backs the UI that warns before a component or color is changed or removed, by
+ * listing the content and config entities referencing it. Results are paged,
+ * because a single component can be used on an unbounded number of pages.
+ */
 final class ApiUsageControllers extends ApiControllerBase {
 
   /**

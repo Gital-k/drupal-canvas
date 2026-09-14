@@ -10,6 +10,13 @@ use Drupal\Core\Entity\EntityAccessControlHandler;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
 
+/**
+ * Controls access to Canvas pages.
+ *
+ * Grants `view` on a published page to anyone who may access content, and to
+ * anyone holding a page permission regardless of publishing status, so editors
+ * can preview their own unpublished work.
+ */
 final class PageAccessControlHandler extends EntityAccessControlHandler {
 
   /**

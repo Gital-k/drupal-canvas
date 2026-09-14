@@ -22,6 +22,12 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
+/**
+ * Tests the endpoint listing available Canvas extensions.
+ *
+ * The list is derived from installed modules, so it must react to a module
+ * being installed or uninstalled.
+ */
 #[Group('canvas')]
 #[CoversFunction('ApiExtensionControllers::list')]
 #[RunTestsInSeparateProcesses]

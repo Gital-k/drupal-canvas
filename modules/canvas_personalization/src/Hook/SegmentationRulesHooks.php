@@ -6,6 +6,13 @@ namespace Drupal\canvas_personalization\Hook;
 
 use Drupal\Core\Hook\Attribute\Hook;
 
+/**
+ * Hook implementations restricting which conditions segments may use.
+ *
+ * Only conditions provided by Canvas modules, plus a short allowlist, are
+ * offered as segmentation rules. They are sorted by provider, which the Drupal
+ * UI relies on.
+ */
 final class SegmentationRulesHooks {
 
   const string CONDITION_PLUGIN = 'condition.plugin';

@@ -10,6 +10,9 @@ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\file\FileInterface;
 
+/**
+ * Rewrites the URL of an image object to an absolute one.
+ */
 #[Adapter(
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Make relative image URL absolute'),

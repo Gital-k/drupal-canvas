@@ -30,6 +30,12 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
+/**
+ * Tests the health checks Canvas runs over a site's content and environment.
+ *
+ * Checks run incrementally and their results are reused, so the cursor cron
+ * advances with, and the bounded window it wraps around, are covered too.
+ */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(Doctor::class)]
 #[CoversClass(Environment::class)]

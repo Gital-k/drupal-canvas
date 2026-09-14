@@ -9,6 +9,9 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * Creates code components, and the Component config entities exposing them.
+ */
 trait CreateTestJsComponentTrait {
 
   use CiModulePathTrait;

@@ -4,6 +4,16 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropExpressions\StructuredData;
 
+/**
+ * Parses the string form of a structured data prop expression.
+ *
+ * Which concrete expression a string denotes is determined by its symbols: the
+ * first says whether a host entity is required, the last whether the expression
+ * targets an object rather than a scalar, and the symbol after the root
+ * expression whether a reference is followed.
+ *
+ * @see \Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface
+ */
 final class StructuredDataPropExpression {
 
   use CompoundExpressionTrait;

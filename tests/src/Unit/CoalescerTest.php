@@ -20,6 +20,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Prophecy\Argument;
 
+/**
+ * Tests collapsing prop expressions and expanding them back.
+ *
+ * Coalescing must lose nothing: expanding a coalesced set has to return the
+ * original leaves, and coalescing again has to change nothing.
+ */
 #[CoversClass(Coalescer::class)]
 #[Group('canvas')]
 #[Group('canvas_data_model')]

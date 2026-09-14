@@ -14,6 +14,12 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 
+/**
+ * Follows an entity reference, then evaluates an expression on the target.
+ *
+ * The referenced side may branch per bundle, in which case the referencing side
+ * must start from a single entity type and bundle, so the branch is decidable.
+ */
 final class ReferenceFieldPropExpression implements EntityFieldBasedPropExpressionInterface, ReferencePropExpressionInterface {
 
   use CompoundExpressionTrait;

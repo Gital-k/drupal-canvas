@@ -11,6 +11,9 @@ use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests folder creation and what happens to a folder when an item is deleted.
+ */
 #[Group('canvas')]
 #[RunTestsInSeparateProcesses]
 class FolderTest extends CanvasKernelTestBase {

@@ -16,6 +16,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests when the host entity itself is offered for a component input.
+ *
+ * A match requires the prop to name an allowed entity type, and the bundle to
+ * agree where the entity type has bundles.
+ */
 #[RunTestsInSeparateProcesses]
 #[CoversClass(HostEntityPropSourceMatcher::class)]
 #[Group('canvas')]

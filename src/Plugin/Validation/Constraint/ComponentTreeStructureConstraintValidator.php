@@ -31,6 +31,14 @@ use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
+/**
+ * Validates the structure of a component tree.
+ *
+ * For a field's default value, validation traverses to the parent sequence: a
+ * field type controls the individual items of `default_value`, not the sequence
+ * itself, so a single item cannot be checked against the whole tree in
+ * isolation.
+ */
 final class ComponentTreeStructureConstraintValidator extends ConstraintValidator implements ContainerInjectionInterface {
 
   public function __construct(
