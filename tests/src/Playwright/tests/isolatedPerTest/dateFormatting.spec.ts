@@ -58,7 +58,7 @@ test.describe('Date formatting Twig filters', () => {
     });
 
     // The datetime filter must produce the en-US short datetime for Jan 15
-    // 2026 at 14:30 UTC. U+202F before AM/PM is normalised to a regular space.
+    // 2026 at 14:30 UTC. U+202F before AM/PM is normalized to a regular space.
     await canvas.testInPreviewFrame('#date-formatted-date-time', async (el) => {
       const text =
         (await el.textContent())?.trim().replaceAll('\u202f', ' ') ?? '';
