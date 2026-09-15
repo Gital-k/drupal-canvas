@@ -245,6 +245,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Uuid->value]),
       new PropShape(['type' => 'string', 'minLength' => 2]),
       new PropShape(['type' => 'string', 'pattern' => '(.|\r?\n)*']),
+      new PropShape(['type' => 'string', 'x-canvas-icon' => TRUE]),
     ], $unique_prop_shapes);
 
     return $unique_prop_shapes;
@@ -304,6 +305,11 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       ),
       'type=string' => new StorablePropShape(
         shape: new PropShape(['type' => 'string']),
+        fieldTypeProp: new FieldTypePropExpression('string', 'value'),
+        fieldWidget: 'string_textfield',
+      ),
+      'type=string&x-canvas-icon=1' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'x-canvas-icon' => TRUE]),
         fieldTypeProp: new FieldTypePropExpression('string', 'value'),
         fieldWidget: 'string_textfield',
       ),

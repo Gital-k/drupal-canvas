@@ -821,17 +821,6 @@ HTML,
           ],
         ],
       ],
-      'sdc.canvas_test_sdc.required-integer' => [
-        'html' => '<span>42</span>
-',
-        'cacheability' => $default_cacheability,
-        'attachments' => [
-          'library' => [
-            'core/components.canvas_test_sdc--required-integer',
-            'core/components.canvas_test_sdc--required-integer',
-          ],
-        ],
-      ],
       'sdc.canvas_test_sdc.required-icon-string' => [
         'html' => '<span>phosphor:search</span>
 ',
@@ -840,6 +829,17 @@ HTML,
           'library' => [
             'core/components.canvas_test_sdc--required-icon-string',
             'core/components.canvas_test_sdc--required-icon-string',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.required-integer' => [
+        'html' => '<span>42</span>
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--required-integer',
+            'core/components.canvas_test_sdc--required-integer',
           ],
         ],
       ],
@@ -3255,24 +3255,6 @@ HTML
           ],
         ],
       ],
-      'sdc.canvas_test_sdc.required-integer' => [
-        'prop_field_definitions' => [
-          'count' => [
-            'required' => TRUE,
-            'field_type' => 'integer',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'number',
-            'default_value' => [
-              0 => [
-                'value' => 42,
-              ],
-            ],
-            'expression' => 'ℹ︎integer␟value',
-            'derived_schema_metadata' => [],
-          ],
-        ],
-      ],
       'sdc.canvas_test_sdc.required-icon-string' => [
         'prop_field_definitions' => [
           'icon' => [
@@ -3287,6 +3269,24 @@ HTML
               ],
             ],
             'expression' => 'ℹ︎string␟value',
+            'derived_schema_metadata' => [],
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.required-integer' => [
+        'prop_field_definitions' => [
+          'count' => [
+            'required' => TRUE,
+            'field_type' => 'integer',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'number',
+            'default_value' => [
+              0 => [
+                'value' => 42,
+              ],
+            ],
+            'expression' => 'ℹ︎integer␟value',
             'derived_schema_metadata' => [],
           ],
         ],
@@ -3970,13 +3970,13 @@ HTML
           'canvas_test_sdc',
         ],
       ],
-      'sdc.canvas_test_sdc.required-integer' => [
+      'sdc.canvas_test_sdc.required-icon-string' => [
         'module' => [
           'core',
           'canvas_test_sdc',
         ],
       ],
-      'sdc.canvas_test_sdc.required-icon-string' => [
+      'sdc.canvas_test_sdc.required-integer' => [
         'module' => [
           'core',
           'canvas_test_sdc',
@@ -6733,32 +6733,6 @@ HTML
         ],
         'transforms' => [],
       ],
-      'sdc.canvas_test_sdc.required-integer' => [
-        'expected_output_selectors' => [
-          'span:contains("42")',
-        ],
-        'source' => 'Module component',
-        'metadata' => ['slots' => []],
-        'propSources' => [
-          'count' => [
-            'required' => TRUE,
-            'jsonSchema' => [
-              'type' => 'integer',
-            ],
-            'sourceType' => 'static:field_item:integer',
-            'expression' => 'ℹ︎integer␟value',
-            'default_values' => [
-              'source' => [
-                0 => [
-                  'value' => 42,
-                ],
-              ],
-              'resolved' => 42,
-            ],
-          ],
-        ],
-        'transforms' => [],
-      ],
       'sdc.canvas_test_sdc.required-icon-string' => [
         'expected_output_selectors' => [
           'span:contains("phosphor:search")',
@@ -6781,6 +6755,32 @@ HTML
                 ],
               ],
               'resolved' => 'phosphor:search',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.required-integer' => [
+        'expected_output_selectors' => [
+          'span:contains("42")',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'count' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'integer',
+            ],
+            'sourceType' => 'static:field_item:integer',
+            'expression' => 'ℹ︎integer␟value',
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 42,
+                ],
+              ],
+              'resolved' => 42,
             ],
           ],
         ],
