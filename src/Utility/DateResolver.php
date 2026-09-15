@@ -454,7 +454,10 @@ final class DateResolver {
       return $iso;
     }
     try {
-      $date_time = new \DateTime($iso);
+      // Parse in UTC so that ISO strings with a Z suffix (e.g. date-time props
+      // stored by Canvas) and bare date strings both render at the same UTC
+      // instant they represent.
+      $date_time = new \DateTime($iso, new \DateTimeZone('UTC'));
     }
     catch (\Exception) {
       return $iso;
@@ -469,6 +472,7 @@ final class DateResolver {
             $locale,
             $date_type,
             $time_type,
+            'UTC',
           );
         }
         catch (\ValueError) {

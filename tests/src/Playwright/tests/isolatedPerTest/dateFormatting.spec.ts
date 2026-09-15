@@ -7,9 +7,9 @@ import { isolatedPerTest as test } from '../../fixtures/test.js';
  * produce locale-formatted output rather than the raw ISO strings that Canvas
  * passes to templates by default.
  *
- * Uses the canvas_test_date_formatting:date-formatted component, which renders its date
- * and date-time props through the filters so the Playwright layer can inspect
- * the result in the preview iframe.
+ * Uses the canvas_test_date_formatting:date-formatted component, which renders
+ * its date and date-time props through the filters so the test layer can
+ * inspect the result in the preview iframe.
  */
 
 test.use({
@@ -46,13 +46,10 @@ test.describe('Date formatting Twig filters', () => {
     await dateInput.press('Tab');
     await autoSavePromise;
 
-    // The preview must show a formatted date — not the raw ISO string.
+    // The preview must show the en-US short date for Jan 15 2026.
     await canvas.testInPreviewFrame('#date-formatted-date', async (el) => {
-      const text = await el.textContent();
-      expect(text?.trim()).not.toBe('2026-01-15');
-      expect(text?.trim()).not.toBe('');
-      // A formatted date contains a digit separator (/, -, or .).
-      expect(text?.trim()).toMatch(/\d+[/\-.]\d+/);
+      const text = (await el.textContent())?.trim() ?? '';
+      expect(text).toBe('1/15/26');
     });
   });
 
@@ -89,13 +86,12 @@ test.describe('Date formatting Twig filters', () => {
     await timeInput.press('Tab');
     await autoSavePromise;
 
-    // The preview must show a formatted datetime — not the raw ISO string.
+    // The preview must show the en-US short datetime for Jan 15 2026 at 14:30
+    // UTC.
     await canvas.testInPreviewFrame('#date-formatted-date-time', async (el) => {
-      const text = await el.textContent();
-      expect(text?.trim()).not.toBe('2026-01-15T14:30:00Z');
-      expect(text?.trim()).not.toBe('');
-      // A formatted date+time contains a digit separator.
-      expect(text?.trim()).toMatch(/\d+[/\-.]\d+/);
+      const text =
+        (await el.textContent())?.trim().replaceAll('\u202f', ' ') ?? '';
+      expect(text).toBe('1/15/26, 2:30 PM');
     });
   });
 });
