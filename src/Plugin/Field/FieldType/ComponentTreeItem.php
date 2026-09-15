@@ -248,12 +248,15 @@ class ComponentTreeItem extends FieldItemBase {
           // These are UUIDs
           'length' => 36,
           // NULL represents either:
-          // - the root of the tree
+          // - the root of the tree (then `slot` is NULL too)
           // - or the root of a bonsai tree (a tree in a content template's
           //   exposed slot)
           // In the latter case, `slot` must match an exposed slot of the
-          // associated `ContentTemplate`.
-          // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidParentAndSlotConstraintValidator
+          // associated `ContentTemplate` — by machine name, so that moving the
+          // exposed slot within the content template's component tree leaves
+          // the content filling it intact.
+          // @see \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator::validateExposedSlotName()
+          // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::isInExposedSlot()
           'not null' => FALSE,
         ],
         'slot' => [

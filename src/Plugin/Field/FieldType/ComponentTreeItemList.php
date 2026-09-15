@@ -169,8 +169,37 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
     return $built;
   }
 
+  /**
+   * Matches component instances at the root of this component tree.
+   *
+   * A root-level component instance has neither a parent component instance nor
+   * a slot. That distinguishes it from the root of a "bonsai tree", which also
+   * has no parent component instance, but does name the exposed slot it
+   * belongs to.
+   *
+   * @see ::isInExposedSlot()
+   */
   public static function inRootLevel(): callable {
-    return static fn (ComponentTreeItem $item) => $item->getParentUuid() === NULL;
+    return static fn (ComponentTreeItem $item) => $item->getParentUuid() === NULL && $item->getSlot() === NULL;
+  }
+
+  /**
+   * Matches the roots of the bonsai tree grown in a given exposed slot.
+   *
+   * A content entity populates the slots its content template exposes by
+   * storing component instances that name the exposed slot's machine name in
+   * `slot`, and nothing in `parent_uuid`: the component instance holding the
+   * exposed slot lives in the content template's component tree, not in this
+   * one, so its UUID cannot be referenced here. Referring to the exposed slot
+   * by machine name is also what allows a site builder to move an exposed slot
+   * elsewhere in the content template's component tree without invalidating the
+   * content that fills it.
+   *
+   * @see \Drupal\canvas\Entity\ContentTemplate::getExposedSlots()
+   * @see ::injectSubTreeItemList()
+   */
+  public static function isInExposedSlot(string $exposed_slot_name): callable {
+    return static fn (ComponentTreeItem $item) => $item->getParentUuid() === NULL && $item->getSlot() === $exposed_slot_name;
   }
 
   public static function isChildOfComponentTreeItemSlot(string $parent_uuid, string $slot_name): callable {
@@ -627,12 +656,34 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
   }
 
   /**
+   * Grafts a host entity's bonsai trees onto this content template's tree.
+   *
+   * The host entity stores each bonsai tree's root against the machine name of
+   * the exposed slot it fills. This resolves those machine names to the
+   * component instance UUID and slot name they currently point at, and rewrites
+   * each bonsai root's `parent_uuid` and `slot` accordingly as it is appended.
+   * Only this resolution step knows about exposed slots: the resulting tree is
+   * an ordinary component tree.
+   *
+   * Resolving on read is what makes an exposed slot movable. The site builder
+   * can delete the exposed slot and recreate it against a different component
+   * instance or slot in the content template, and every content entity filling
+   * it keeps working, because the content references only the machine name.
+   *
    * @param ExposedSlotDefinitions $exposed_slot_info
+   *   The exposed slots of the content template, keyed by machine name.
    * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList $subTreeItemList
+   *   The host entity's component tree, containing zero or more bonsai trees.
+   *
    * @return $this
+   *
+   * @throws \Drupal\canvas\Exception\SubtreeInjectionException
+   *
+   * @see ::isInExposedSlot()
+   * @see \Drupal\canvas\Entity\ContentTemplate::getExposedSlots()
    */
   public function injectSubTreeItemList(array $exposed_slot_info, ComponentTreeItemList $subTreeItemList): self {
-    foreach ($exposed_slot_info as $slot_detail) {
+    foreach ($exposed_slot_info as $exposed_slot_name => $slot_detail) {
       $parent_uuid = $slot_detail['component_uuid'] ?? NULL;
       $slot = $slot_detail['slot_name'] ?? NULL;
       if ($parent_uuid === NULL) {
@@ -646,12 +697,18 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       if ($existing !== 0) {
         throw new SubtreeInjectionException("Cannot inject subtree because the targeted slot is not empty.");
       }
-      foreach ($subTreeItemList->componentTreeItemsIterator(self::isChildOfComponentTreeItemSlot($parent_uuid, $slot)) as $item) {
+      // @todo Only the roots of the bonsai tree are injected, so component instances nested inside them are dropped. This predates referencing exposed slots by machine name; a dedicated follow-up should inject each bonsai root's descendants too.
+      foreach ($subTreeItemList->componentTreeItemsIterator(self::isInExposedSlot((string) $exposed_slot_name)) as $item) {
         \assert($item instanceof ComponentTreeItem);
         if ($this->getComponentTreeItemByUuid($item->getUuid()) !== NULL) {
           throw new SubtreeInjectionException("Cannot inject subtree because some of its components are already in the final tree.");
         }
-        $this->appendItem($item->getValue());
+        // Resolve the exposed slot's machine name to the component instance and
+        // slot it names in this content template's component tree.
+        $value = $item->getValue();
+        $value['parent_uuid'] = $parent_uuid;
+        $value['slot'] = $slot;
+        $this->appendItem($value);
       }
     }
     return $this;

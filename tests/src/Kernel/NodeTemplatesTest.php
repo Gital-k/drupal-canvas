@@ -388,8 +388,13 @@ HTML;
               'expression' => 'ℹ︎string␟value',
             ],
           ],
-          'slot' => 'the_body',
-          'parent_uuid' => '2842cc6f-9e2b-42a5-8400-e7d6363e08bf',
+          // The entity references the exposed slot by its machine name, and
+          // stores no parent UUID: the component instance holding the exposed
+          // slot lives in the content template's component tree, not in this
+          // one. That is what lets the exposed slot be moved.
+          // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::isInExposedSlot()
+          'slot' => 'custom_content',
+          'parent_uuid' => NULL,
         ],
         // If the entity is targeting a slot that doesn't exist in the template,
         // or is not exposed, it shouldn't be an error.
@@ -399,7 +404,7 @@ HTML;
           'uuid' => '9a1ec750-e016-44fb-9bd2-9a7acb497bd7',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'slot' => 'ignore_me',
-          'parent_uuid' => '2842cc6f-9e2b-42a5-8400-e7d6363e08bf',
+          'parent_uuid' => NULL,
           'inputs' => [
             'heading' => [
               'sourceType' => 'static:field_item:string',
@@ -448,7 +453,7 @@ HTML;
     self::assertCount(1, $violations);
     $violation = $violations->get(0);
     self::assertSame('field_component_tree.1.slot', $violation->getPropertyPath());
-    self::assertSame('Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">ignore_me</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.', (string) $violation->getMessage());
+    self::assertSame('Invalid component subtree. This component subtree claims to fill an exposed slot that the content template <em class="placeholder">node.article.full</em> does not expose: <em class="placeholder">ignore_me</em>. Exposed slots are: <em class="placeholder">custom_content</em>.', (string) $violation->getMessage());
 
     // If we delete the field item, all good!
     $node->get('field_component_tree')->removeItem(1);

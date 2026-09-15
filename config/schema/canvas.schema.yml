@@ -479,6 +479,10 @@ canvas.component_tree_node:
       type: string
       # Omitting the key is equivalent to specifying `null` — but this is more succinct.
       requiredKey: false
+      # TRICKY: in a *content* entity's component tree, a `slot` without a `parent_uuid` names an
+      # exposed slot of the entity's content template instead (the root of a "bonsai tree"). That
+      # never occurs in config: config entities have no content template of their own.
+      # @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::isInExposedSlot()
       label: 'Machine name of the slot in the parent component instance'
     uuid:
       # TRICKY: this MUST NOT use `type: uuid` because the containing `canvas.component_tree`'s
