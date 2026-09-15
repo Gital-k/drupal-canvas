@@ -18,6 +18,39 @@ use Symfony\Component\Yaml\Yaml;
 #[Group('canvas')]
 final class DxRouteConsistencyTest extends UnitTestCase {
 
+  /**
+   * Route paths whose config entity type openapi.yml leaves dynamic.
+   *
+   * Most Canvas API routes accepting several config entity types are documented
+   * in openapi.yml as one path per accepted type, even though
+   * canvas.routing.yml defines a single route for all of them. That is done
+   * because their operation specs differ per type. For example, the single
+   * `/canvas/api/v0/auto-saves/css/{canvas_config_entity_type_id}/{canvas_config_entity}`
+   * route is documented as three paths, each with its own summary and example:
+   * @code
+   * /canvas/api/v0/auto-saves/css/asset_library/{configEntityId}: …
+   * /canvas/api/v0/auto-saves/css/brand_kit/{configEntityId}: …
+   * /canvas/api/v0/auto-saves/css/js_component/{configEntityId}: …
+   * @endcode
+   *
+   * The paths listed here are the exception: their operation spec is the same
+   * for every config entity type they accept, because both the request and the
+   * response body are opaque auto-save states (`type: object`). One path per
+   * type would repeat that spec verbatim, so openapi.yml documents them with
+   * the config entity type left dynamic instead. Consequently
+   * ::resolveRouteDefinitionsToOperations() must not resolve them.
+   *
+   * The trade-off: openapi.yml cannot express that these routes accept a
+   * different set of config entity types per method — GET additionally accepts
+   * `staged_config_update`, PATCH does not.
+   *
+   * @see \Drupal\canvas\Controller\ApiConfigAutoSaveControllers
+   * @see ::resolveRouteDefinitionsToOperations()
+   */
+  private const array PATHS_WITH_UNRESOLVED_CONFIG_ENTITY_TYPE = [
+    '/canvas/api/v0/config/auto-save/{canvas_config_entity_type_id}/{canvas_config_entity}',
+  ];
+
   public function testRoutingYmlDx(): array {
     $routes = Yaml::parseFile(__DIR__ . '/../../../canvas.routing.yml');
     \assert(\is_array($routes));
@@ -69,6 +102,10 @@ final class DxRouteConsistencyTest extends UnitTestCase {
     // but with an OpenAPI operation spec as values.
     $openapi = Yaml::parseFile(__DIR__ . '/../../../openapi.yml');
     $normalized_openapi_paths = self::ignoreDynamicPathPartNames($openapi['paths']);
+    // Simplifying the dynamic path parts must not cause two documented paths to
+    // become one: that would silently drop one of them from this test's
+    // comparison, and hence hide a missing or superfluous route.
+    $this->assertSameSize($openapi['paths'], $normalized_openapi_paths, 'Every openapi.yml path is still distinct after simplifying its dynamic path parts.');
     $normalized_openapi_defined_operations = [];
     foreach ($normalized_openapi_paths as $path => $path_spec) {
       foreach (['DELETE', 'GET', 'PATCH', 'POST'] as $method) {
@@ -89,8 +126,10 @@ final class DxRouteConsistencyTest extends UnitTestCase {
       // @see https://swagger.io/docs/specification/v3_0/paths-and-operations/#operations
       $original_path = $route['path'];
       $operations_for_route = [];
-      foreach ($route['methods'] as $method) {
-        $operations_for_route[$original_path . ' ' . $method] = $route;
+      foreach (self::expandOptionalTrailingPathParts($route) as $path) {
+        foreach ($route['methods'] as $method) {
+          $operations_for_route[$path . ' ' . $method] = $route;
+        }
       }
 
       // Determine static path parts corresponding to route requirements. These
@@ -106,10 +145,7 @@ final class DxRouteConsistencyTest extends UnitTestCase {
       ));
 
       // No need to resolve: add the operations for the route.
-      // Unlike other paths documented in openapi.yml, the openapi.yml does not
-      // have a separate paths for each of the possible config entity types for
-      // `canvas_config_entity_type_id` under `requirements`.
-      if (empty($static_path_part_requirements) || $original_path === '/canvas/api/v0/config/auto-save/{canvas_config_entity_type_id}/{canvas_config_entity}') {
+      if (empty($static_path_part_requirements) || \in_array($original_path, self::PATHS_WITH_UNRESOLVED_CONFIG_ENTITY_TYPE, TRUE)) {
         $operations = [...$operations, ...$operations_for_route];
         continue;
       }
@@ -146,6 +182,36 @@ final class DxRouteConsistencyTest extends UnitTestCase {
   }
 
   /**
+   * Expands a route path to every path the route actually matches.
+   *
+   * A trailing route parameter that has a value under `defaults` is optional:
+   * Symfony then matches the path both with and without it. openapi.yml
+   * documents each of those as a path of its own, so the route side must be
+   * expanded to match. For example:
+   * @code
+   * canvas.api.form.content_entity:
+   *   path: '/canvas/api/v0/form/content-entity/{entity_type}/{entity}/{entity_form_mode}'
+   *   defaults:
+   *     entity_form_mode: default
+   * @endcode
+   * … matches both `…/{entity_type}/{entity}/{entity_form_mode}` and
+   * `…/{entity_type}/{entity}`, so both are returned.
+   *
+   * @see \Symfony\Component\Routing\RouteCompiler::compilePattern()
+   */
+  private static function expandOptionalTrailingPathParts(array $route): array {
+    $path = $route['path'];
+    $paths = [$path];
+    // Strip optional trailing path parts one by one: a path part can only be
+    // optional if every path part after it is optional too.
+    while (preg_match('#/\{([^}]+)\}$#', $path, $matches) === 1 && \array_key_exists($matches[1], $route['defaults'] ?? [])) {
+      $path = substr($path, 0, -\strlen($matches[0]));
+      $paths[] = $path;
+    }
+    return $paths;
+  }
+
+  /**
    * Simplifies `{…}` path parts to just `{}`.
    *
    * The route parameter syntax in *.routing.yml and openapi.yml is similar:
@@ -155,14 +221,26 @@ final class DxRouteConsistencyTest extends UnitTestCase {
    * - in the openapi.yml file are intended for human readers that do not need
    *   to know Drupal internals
    * So: strip their contents to allow for simple comparisons.
-   * For example, both `/canvas/api/some/path/{id1}/{id2}` and
-   * `/canvas/api/some/path/{id1}` become `/canvas/api/some/path/{}`.
+   *
+   * Each dynamic path part is simplified individually, to not lose how many of
+   * them a path has. For example:
+   * @code
+   * // Two dynamic path parts, so two remain after simplifying.
+   * '/canvas/api/some/path/{entity_type}/{entity} GET'
+   * // … becomes:
+   * '/canvas/api/some/path/{}/{} GET'
+   *
+   * // One dynamic path part, so one remains: distinct from the above.
+   * '/canvas/api/some/path/{entity} GET'
+   * // … becomes:
+   * '/canvas/api/some/path/{} GET'
+   * @endcode
    */
   private static function ignoreDynamicPathPartNames(array $array_with_paths_as_keys): array {
     return array_combine(
       // @phpstan-ignore-next-line
       \array_map(
-        fn (string $path) => preg_replace('/\{.*\}/', '{}', $path),
+        fn (string $path) => preg_replace('/\{[^}]*\}/', '{}', $path),
         \array_keys($array_with_paths_as_keys),
       ),
       array_values($array_with_paths_as_keys)
