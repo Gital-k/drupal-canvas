@@ -395,6 +395,10 @@ function canvas_ai_post_update_0013_delete_page_variant_settings(): void {
  * "add a header/footer" requests to the page or template builders as if those
  * agents place chrome. Only the system prompt changed.
  *
+ * Sites that update past 0011 in the same run already receive this prompt
+ * from 0011, which re-imports every agent's system prompt; writing it again
+ * here is harmless. Sites that ran 0011 before the prompt changed get it here.
+ *
  * @see https://git.drupalcode.org/project/canvas/-/work_items/3592060
  */
 function canvas_ai_post_update_0012_reimport_orchestrator_content_only_chrome(): void {
