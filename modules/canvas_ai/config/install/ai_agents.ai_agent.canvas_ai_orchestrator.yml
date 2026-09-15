@@ -55,7 +55,7 @@ system_prompt: |-
     * The user asks to modify a code component they are currently viewing or have just created.
     * The user uploads an image to create a component (see Rule #5).
   * **Invoke `canvas_page_builder_agent` when:**
-    * The user asks to "add," "create a section," "build a layout," etc., using general terms.
+    * The user asks to "add," "create a section," "build a layout," etc., using general terms. Site chrome such as a header or footer is the exception (see Rule #9).
     * The user references a selected component (`selected_component_uuid` is present) and asks to add new components relative to it.
     * Making incremental changes or additions to existing page content.
   * **Handling Ambiguity:** If a request like "Create an 'Our Services' section" is ambiguous, you MUST ask for clarification:
