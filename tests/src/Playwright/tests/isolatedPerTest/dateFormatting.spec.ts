@@ -7,12 +7,15 @@ import { isolatedPerTest as test } from '../../fixtures/test.js';
  * produce locale-formatted output rather than the raw ISO strings that Canvas
  * passes to templates by default.
  *
- * Uses the canvas_test_sdc:date-formatted component, which renders its date
+ * Uses the canvas_test_date_formatting:date-formatted component, which renders its date
  * and date-time props through the filters so the Playwright layer can inspect
  * the result in the preview iframe.
  */
 
-test.use({ modules: ['canvas_test_sdc'], enableTestExtensions: true });
+test.use({
+  modules: ['canvas_test_date_formatting'],
+  enableTestExtensions: true,
+});
 
 test.describe('Date formatting Twig filters', () => {
   test('canvasFormatDate renders a locale-formatted date, not the raw ISO string', async ({
@@ -29,12 +32,12 @@ test.describe('Date formatting Twig filters', () => {
     const componentLocator = page
       .getByTestId('canvas-primary-panel')
       .locator(
-        '[data-canvas-type="component"][data-canvas-component-id="sdc.canvas_test_sdc.date-formatted"]',
+        '[data-canvas-type="component"][data-canvas-component-id="sdc.canvas_test_date_formatting.date-formatted"]',
       );
     await componentLocator.scrollIntoViewIfNeeded();
 
     await canvas.addComponent({
-      id: 'sdc.canvas_test_sdc.date-formatted',
+      id: 'sdc.canvas_test_date_formatting.date-formatted',
     });
 
     // Set a known date value via the date input in the contextual panel.
@@ -74,12 +77,12 @@ test.describe('Date formatting Twig filters', () => {
     const componentLocator = page
       .getByTestId('canvas-primary-panel')
       .locator(
-        '[data-canvas-type="component"][data-canvas-component-id="sdc.canvas_test_sdc.date-formatted"]',
+        '[data-canvas-type="component"][data-canvas-component-id="sdc.canvas_test_date_formatting.date-formatted"]',
       );
     await componentLocator.scrollIntoViewIfNeeded();
 
     await canvas.addComponent({
-      id: 'sdc.canvas_test_sdc.date-formatted',
+      id: 'sdc.canvas_test_date_formatting.date-formatted',
     });
 
     // Set a known datetime value via the date and time inputs.

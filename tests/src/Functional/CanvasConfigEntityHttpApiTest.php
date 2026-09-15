@@ -154,7 +154,6 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'weight' => 0,
       'items' => [
         'sdc.canvas_test_sdc.date',
-        'sdc.canvas_test_sdc.date-formatted',
         'sdc.canvas_test_sdc.heading',
         'sdc.canvas_test_sdc.shoe_badge',
       ],

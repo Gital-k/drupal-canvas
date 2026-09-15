@@ -74,9 +74,6 @@ request:
         sdc.canvas_test_sdc.date:
           name: Date
           description: Date
-        sdc.canvas_test_sdc.date-formatted:
-          name: 'Date (Formatted)'
-          description: 'Date (Formatted)'
         sdc.canvas_test_sdc.deprecated:
           name: 'Deprecated SDC'
           description: 'A deprecated SDC component.'
