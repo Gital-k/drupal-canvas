@@ -166,7 +166,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
   useEffect(() => {
     if (rightColumnRef.current) {
       rightColumnRef.current.style.display = isRightPanelOpen
-        ? 'block'
+        ? 'flex'
         : 'none';
     }
     if (rightColumnMenuRef.current) {
