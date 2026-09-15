@@ -161,6 +161,7 @@ test.describe('brand kit fonts', () => {
     // Ensure all requests complete before reloading.
     // eslint-disable-next-line playwright/no-networkidle
     await page.waitForLoadState('networkidle');
+    await page.reload();
     await canvas.openBrandKitPanel();
     await page.locator(SEL.tab).click();
     await expect(familyRow).toContainText('Renamed Sans');
