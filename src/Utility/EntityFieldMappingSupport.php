@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Utility;
 
 use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\Plugin\Field\FieldType\ListItemBase;
 
 /**
  * Shared policy for delta-less multi-valued entity-field mappings.
@@ -18,19 +19,10 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 final class EntityFieldMappingSupport {
 
   /**
-   * @var list<string>
-   */
-  private const SUPPORTED_MULTI_VALUED_FIELD_TYPES = [
-    'list_string',
-    'list_integer',
-    'list_float',
-  ];
-
-  /**
    * Whether a field supports delta-less multi-valued entity-field mapping.
    */
   public static function supportsDeltaLessMultiValuedMapping(FieldDefinitionInterface $field_definition): bool {
-    return \in_array($field_definition->getType(), self::SUPPORTED_MULTI_VALUED_FIELD_TYPES, TRUE);
+    return \is_a($field_definition->getItemDefinition()->getClass(), ListItemBase::class, TRUE);
   }
 
 }
