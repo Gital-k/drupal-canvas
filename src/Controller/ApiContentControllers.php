@@ -7,6 +7,7 @@ namespace Drupal\canvas\Controller;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
@@ -577,6 +578,20 @@ final class ApiContentControllers extends ApiControllerBase {
         // Ensure `inputs` is not a JSON string, but a structured value,
         // so API consumers receive a proper object rather than a JSON string.
         $values['inputs'] = $item->getInputs();
+        // Resolve color props to rich objects for client-side rendering.
+        // @todo Color is stored and validated as a string, but made available to
+        // components as a rich object. This logic mirrors
+        // getResolvedPropsAndBubbleableMetadata() in
+        // JsonSchemaPropsComponentSourceBase.
+        // @see https://www.drupal.org/i/...
+        $component = $item->getComponent();
+        $source = $component?->getComponentSource();
+        if ($source instanceof JsonSchemaPropsComponentSourceBase) {
+          $explicit_input = $source->getResolvedExplicitInput($item->getUuid(), $item);
+          $prop_schemas = $source->getMetadata()->schema['properties'] ?? [];
+          [$values['inputs_resolved'], $color_cacheability] = $source->getResolvedPropsAndBubbleableMetadata($explicit_input, $prop_schemas);
+          $url_cacheability->addCacheableDependency($color_cacheability);
+        }
         $components[] = $values;
       }
       $field_access = $content_entity->get($field_name)->access('view', return_as_object: TRUE);
