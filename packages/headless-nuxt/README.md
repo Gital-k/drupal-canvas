@@ -67,7 +67,7 @@ live: `getClient(event)` returns the draft-aware JSON:API client and
 `page.content` directly and pass the complete `page.head` object reactively to
 `useHead()`. Handle `PageRedirect` before page rendering with `navigateTo()`.
 
-The client's JSON:API prefix is resolved from the site's JSON:API settings
+The client's JSON:API prefix is resolved from the site's public site-data
 endpoint (fetched once per server instance), so sites serving JSON:API from a
 non-default prefix (e.g. `/api`) work without configuration. When that endpoint
 is unreachable, the `CANVAS_JSONAPI_PREFIX` environment variable applies, then

@@ -222,12 +222,12 @@ export interface DraftServer {
    * anonymous fetching — the draft indicator makes that state visible
    * instead of letting anonymous-visible content masquerade as a draft.
    *
-   * The client's JSON:API prefix comes from the site's JSON:API settings
-   * endpoint (fetched once per server instance from the Canvas HTTP API), so
-   * sites serving JSON:API from a non-default prefix (e.g. `/api`) work
-   * without configuration. When the endpoint is unreachable the
-   * CANVAS_JSONAPI_PREFIX environment variable (or a config override)
-   * applies, then the client's `/jsonapi` default.
+   * The client's JSON:API prefix comes from the site's public site-data
+   * endpoint (fetched once per server instance), so sites serving JSON:API
+   * from a non-default prefix (e.g. `/api`) work without configuration. When
+   * the endpoint is unreachable the CANVAS_JSONAPI_PREFIX environment
+   * variable (or a config override) applies, then the client's `/jsonapi`
+   * default.
    */
   getClient(): Promise<JsonApiClient>;
   /**
@@ -287,11 +287,6 @@ export function createDraftServer(options: DraftServerOptions): DraftServer {
     );
   };
 
-  /**
-   * The config for client construction, with the site's JSON:API prefix
-   * filled in from the JSON:API settings endpoint (fetched once per server
-   * instance; the configured fallback applies when the fetch fails).
-   */
   const resolveApiPrefix = createApiPrefixResolver(getConfig(), fetchImpl);
   const resolveClientConfig = async (): Promise<DraftConfig> => {
     const apiPrefix = await resolveApiPrefix();

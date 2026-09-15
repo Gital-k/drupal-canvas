@@ -86,7 +86,7 @@ the `Astro` global (pages, components) or the APIContext (endpoints,
 middleware), because Astro exposes cookies per request rather than through
 request-scoped globals.
 
-The client's JSON:API prefix is resolved from the site's JSON:API settings
+The client's JSON:API prefix is resolved from the site's public site-data
 endpoint (fetched once per server instance), so sites serving JSON:API from a
 non-default prefix (e.g. `/api`) work without configuration. When that endpoint
 is unreachable, the `CANVAS_JSONAPI_PREFIX` environment variable applies, then

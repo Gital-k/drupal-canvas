@@ -101,7 +101,7 @@ loaders directly. Render `page.content` directly and return
 `toTanStackHead(page.head)` from the route's `head` callback. Handle
 `PageRedirect` in the loader with TanStack Router's `redirect()`.
 
-The client's JSON:API prefix is resolved from the site's JSON:API settings
+The client's JSON:API prefix is resolved from the site's public site-data
 endpoint (fetched once per server instance), so sites serving JSON:API from a
 non-default prefix (e.g. `/api`) work without configuration. When that endpoint
 is unreachable, the `CANVAS_JSONAPI_PREFIX` environment variable applies, then

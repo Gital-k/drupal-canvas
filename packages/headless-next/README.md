@@ -91,7 +91,7 @@ path resolved through Drupal routing. Both are draft-session-aware. Render
 before page rendering with `permanentRedirect()` for permanent redirects and
 `redirect()` for other redirects.
 
-The client's JSON:API prefix is resolved from the site's JSON:API settings
+The client's JSON:API prefix is resolved from the site's public site-data
 endpoint (fetched once per server instance), so sites serving JSON:API from a
 non-default prefix (e.g. `/api`) work without configuration. When that endpoint
 is unreachable, the `CANVAS_JSONAPI_PREFIX` environment variable applies, then
