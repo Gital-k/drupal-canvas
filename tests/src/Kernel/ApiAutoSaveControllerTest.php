@@ -1301,6 +1301,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       $node2_auto_save_key => $auto_save_data[$node2_auto_save_key],
     ]);
     $decoded = self::decodeResponse($response);
+    // The collision only surfaces once the first node of the batch is saved,
+    // so this violation comes from the in-transaction revalidation. It carries
+    // the same `meta` as one raised before the transaction, which is what lets
+    // the client tell the author which item is at fault.
     $this->assertSame(
       [
         'errors' => [
@@ -1308,6 +1312,12 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
             'detail' => 'A content item with Title <em class="placeholder">I am not unique!</em> already exists.',
             'source' => [
               'pointer' => 'title',
+            ],
+            'meta' => [
+              'entity_type' => 'node',
+              'entity_id' => $node2->id(),
+              'label' => 'I am not unique!',
+              ApiAutoSaveController::AUTO_SAVE_KEY => $node2_auto_save_key,
             ],
           ],
         ],
@@ -2148,6 +2158,98 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertArrayHasKey(AutoSaveManager::AUTO_SAVE_CONFLICT_KEY, $response_content['errors'][0]['meta']);
     self::assertSame($expected_conflict_id, $response_content['errors'][0]['meta'][AutoSaveManager::AUTO_SAVE_CONFLICT_KEY]);
     self::assertSame($expected_auto_save_key, $response_content['errors'][0]['meta']['api_auto_save_key']);
+  }
+
+  /**
+   * Tests that pages sharing one URL alias cannot be published together.
+   *
+   * Pages created through the Canvas UI all start with the same default title,
+   * and the client derives the URL alias from the title — so a batch of new
+   * pages published in one request all claim `/untitled-page`. Nothing checked
+   * that: core only validates alias uniqueness in the path field widget, which
+   * the Canvas UI never submits.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\UniqueEntityPathAliasConstraint
+   */
+  public function testPublishRejectsDuplicatePathAliases(): void {
+    $this->setUpCurrentUser(permissions: [
+      Page::EDIT_PERMISSION,
+      Page::CREATE_PERMISSION,
+      AutoSaveManager::PUBLISH_PERMISSION,
+    ]);
+    $auto_save = $this->container->get(AutoSaveManager::class);
+    $entity_type_manager = $this->container->get(EntityTypeManagerInterface::class);
+
+    // Two drafts, as the "+ New -> New Page" action creates them: no alias of
+    // their own yet.
+    // @see \Drupal\canvas\Controller\AddPageController
+    $pages = [];
+    foreach ([0, 1] as $delta) {
+      $page = Page::create([
+        'title' => self::NEW_PAGE_TITLE,
+        'status' => FALSE,
+      ]);
+      self::assertSame([], self::violationsToArray($page->validate()));
+      $page->save();
+      // Both are then given the alias derived from their identical title.
+      $page->set('path', ['alias' => '/untitled-page']);
+      $page->setPublished();
+      $auto_save->saveEntity($page);
+      $pages[$delta] = $page;
+    }
+
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $keys = \array_map(
+      static fn (Page $page): string => AutoSaveManager::getAutoSaveKey($page),
+      $pages,
+    );
+    foreach ($keys as $key) {
+      self::assertArrayHasKey($key, $auto_save_data);
+    }
+
+    // Publishing both at once must fail: the second page would take an alias
+    // the first one just claimed.
+    $response = $this->makePublishAllRequest(\array_intersect_key($auto_save_data, \array_flip($keys)));
+    self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+    $json = \json_decode((string) $response->getContent(), TRUE);
+    self::assertIsArray($json);
+    self::assertSame(
+      [
+        [
+          'detail' => 'The alias <em class="placeholder">/untitled-page</em> is already in use in this language.',
+          'source' => ['pointer' => 'path.0.alias'],
+          'meta' => [
+            'entity_type' => Page::ENTITY_TYPE_ID,
+            'entity_id' => $pages[1]->id(),
+            'label' => self::NEW_PAGE_TITLE,
+            ApiAutoSaveController::AUTO_SAVE_KEY => $keys[1],
+          ],
+        ],
+      ],
+      $json['errors'],
+    );
+
+    // Nothing was published: the whole request is one transaction, so the
+    // alias the first page had already claimed was rolled back with it.
+    self::assertSame([], $entity_type_manager->getStorage('path_alias')
+      ->loadByProperties(['alias' => '/untitled-page']));
+    foreach ($pages as $page) {
+      $stored = $entity_type_manager->getStorage(Page::ENTITY_TYPE_ID)
+        ->loadUnchanged((int) $page->id());
+      \assert($stored instanceof Page);
+      self::assertFalse($stored->isPublished());
+    }
+
+    // Giving the second page its own alias lets both publish.
+    $pages[1]->set('path', ['alias' => '/untitled-page-0']);
+    $auto_save->saveEntity($pages[1]);
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $response = $this->makePublishAllRequest(\array_intersect_key($auto_save_data, \array_flip($keys)));
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    self::assertCount(1, $entity_type_manager->getStorage('path_alias')
+      ->loadByProperties(['alias' => '/untitled-page']));
+    self::assertCount(1, $entity_type_manager->getStorage('path_alias')
+      ->loadByProperties(['alias' => '/untitled-page-0']));
   }
 
 }

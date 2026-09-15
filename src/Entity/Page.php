@@ -6,6 +6,7 @@ namespace Drupal\canvas\Entity;
 
 use Drupal\canvas\Entity\Routing\CanvasHtmlRouteProvider;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\canvas\Plugin\Validation\Constraint\UniqueEntityPathAliasConstraint;
 use Drupal\Core\Entity\Attribute\ContentEntityType;
 use Drupal\Core\Entity\ContentEntityDeleteForm;
 use Drupal\Core\Entity\EditorialContentEntityBase;
@@ -162,6 +163,11 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
     $fields['path'] = BaseFieldDefinition::create('path')
       ->setLabel(t('URL alias'))
       ->setTranslatable(TRUE)
+      // Core checks alias uniqueness only in the path field widget, which the
+      // Canvas UI never submits. Pages are edited through the Canvas HTTP API,
+      // which validates the entity, so the check belongs on the entity.
+      // @see \Drupal\canvas\Plugin\Validation\Constraint\UniqueEntityPathAliasConstraint
+      ->addConstraint(UniqueEntityPathAliasConstraint::PLUGIN_ID)
       ->setDisplayOptions('form', [
         'type' => 'path',
       ])

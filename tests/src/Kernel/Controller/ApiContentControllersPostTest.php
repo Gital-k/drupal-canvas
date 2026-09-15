@@ -349,6 +349,52 @@ class ApiContentControllersPostTest extends CanvasKernelTestBase {
     );
   }
 
+  /**
+   * Tests that a page cannot be created on an alias another page already uses.
+   *
+   * @see \Drupal\canvas\Plugin\Validation\Constraint\UniqueEntityPathAliasConstraint
+   */
+  public function testPostWithDuplicatePath(): void {
+    $response = $this->request(
+      Request::create(
+        self::URL,
+        'POST',
+        server: ['CONTENT_TYPE' => 'application/json'],
+        content: \json_encode([
+          'title' => 'Page claiming a taken alias',
+          'status' => FALSE,
+          'path' => '/preexisting-page',
+          'components' => [],
+        ], JSON_THROW_ON_ERROR),
+      ),
+    );
+    $this->assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+    $this->assertSame([
+      'errors' => [
+        [
+          'detail' => 'The alias <em class="placeholder">/preexisting-page</em> is already in use in this language.',
+          'source' => ['pointer' => 'path.0.alias'],
+        ],
+      ],
+    ], $this->decodeResponse($response));
+
+    // A free alias is accepted.
+    $response = $this->request(
+      Request::create(
+        self::URL,
+        'POST',
+        server: ['CONTENT_TYPE' => 'application/json'],
+        content: \json_encode([
+          'title' => 'Page claiming a free alias',
+          'status' => FALSE,
+          'path' => '/preexisting-page-0',
+          'components' => [],
+        ], JSON_THROW_ON_ERROR),
+      ),
+    );
+    $this->assertSame(Response::HTTP_CREATED, $response->getStatusCode());
+  }
+
   public function testPostWithEmptyContentRequest(): void {
     $this->expectException(InvalidBody::class);
     $this->request(
