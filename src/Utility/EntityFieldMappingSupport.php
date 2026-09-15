@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Utility;
 
 use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Field\Plugin\Field\FieldType\ListItemBase;
+use Drupal\options\Plugin\Field\FieldType\ListItemBase;
 
 /**
  * Shared policy for delta-less multi-valued entity-field mappings.

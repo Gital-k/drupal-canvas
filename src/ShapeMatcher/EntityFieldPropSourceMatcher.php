@@ -177,7 +177,8 @@ final class EntityFieldPropSourceMatcher {
     // match would be meaningless. Only a prop that accepts any string (no enum
     // or other constraints) is a legitimate match.
     'list_string' => [
-      // Allow matching a prop that accepts any string, with no enum or other constraints.
+      // Allow matching a prop that accepts any string, with no enum or other
+      // constraints.
       'allowed' => [
         ['type' => 'string'],
       ],
