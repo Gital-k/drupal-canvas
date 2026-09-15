@@ -19,6 +19,11 @@ entity.canvas_page.collection:
   route_name: entity.canvas_page.collection
   base_route: system.admin_content
 
+entity.content_template.collection:
+  title: Templates
+  route_name: entity.content_template.collection
+  base_route: system.admin_content
+
 entity.canvas_page.canonical:
   title: 'View'
   route_name: entity.canvas_page.canonical

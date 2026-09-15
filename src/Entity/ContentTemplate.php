@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Entity;
 
 use Drupal\canvas\ClientSideRepresentation;
+use Drupal\canvas\EntityHandlers\ContentTemplateListBuilder;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
@@ -23,6 +24,7 @@ use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityViewModeInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\Entity\Routing\AdminHtmlRouteProvider;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -49,6 +51,13 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
   ],
   handlers: [
     'access' => VisibleWhenDisabledCanvasConfigEntityAccessControlHandler::class,
+    'list_builder' => ContentTemplateListBuilder::class,
+    'route_provider' => [
+      'html' => AdminHtmlRouteProvider::class,
+    ],
+  ],
+  links: [
+    'collection' => '/admin/content/templates',
   ],
   admin_permission: self::ADMIN_PERMISSION,
   constraints: [
