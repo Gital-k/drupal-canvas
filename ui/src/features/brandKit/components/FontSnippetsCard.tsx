@@ -27,6 +27,7 @@ type CodeBlockProps = {
   label: string;
   onCopySnippet: (text: string, snippetId: string) => Promise<void>;
   snippetId: string;
+  subheading?: string;
   testId: string;
 };
 
@@ -37,12 +38,19 @@ const CodeBlock = ({
   label,
   onCopySnippet,
   snippetId,
+  subheading,
   testId,
 }: CodeBlockProps) => (
-  <Box className={styles.codeBlock}>
-    <pre data-testid={testId} className={styles.codeBlockPre}>
-      {code}
-    </pre>
+  <Flex direction="column" gap="1">
+    {subheading && (
+      <Text as="span" size="1" weight="medium" color="gray">
+        {subheading}
+      </Text>
+    )}
+    <Box className={styles.codeBlock}>
+      <pre data-testid={testId} className={styles.codeBlockPre}>
+        {code}
+      </pre>
     {/* Positioned through a wrapper: Radix's own `position` on the button
         would otherwise win over the class. */}
     <Box className={styles.codeBlockCopyButton}>
@@ -60,7 +68,8 @@ const CodeBlock = ({
     <Text as="span" role="status" className="visually-hidden">
       {copiedSnippetId === snippetId ? `${label} copied` : ''}
     </Text>
-  </Box>
+    </Box>
+  </Flex>
 );
 
 /**
@@ -103,9 +112,6 @@ const FontSnippetsCard = ({
         </Callout.Text>
       </Callout.Root>
 
-      <Text size="2" weight="medium" as="div" mt="4">
-        Code Examples
-      </Text>
       <Flex direction="column" gap="2" className={styles.consoleSection}>
         <Text size="2" weight="medium">
           Tailwind CSS
@@ -114,6 +120,7 @@ const FontSnippetsCard = ({
           {...sharedProps}
           code={buildTailwindThemeSnippet(font)}
           label="Tailwind theme declaration"
+          subheading="Theme declaration"
           snippetId={`${font.id}:css`}
           testId={`canvas-brand-kit-font-theme-snippet-${font.id}`}
         />
@@ -121,6 +128,7 @@ const FontSnippetsCard = ({
           {...sharedProps}
           code={buildTailwindHtmlSnippet(font)}
           label="Tailwind usage example"
+          subheading="HTML usage example"
           snippetId={`${font.id}:html`}
           testId={`canvas-brand-kit-font-snippet-${font.id}`}
         />
