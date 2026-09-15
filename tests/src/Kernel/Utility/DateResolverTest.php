@@ -66,10 +66,6 @@ final class DateResolverTest extends CanvasKernelTestBase {
     self::assertSame('not-a-date', $resolver->resolveTime('not-a-date'));
   }
 
-  // ---------------------------------------------------------------------------
-  // Fallback path (intl disabled) — exact output assertions.
-  // ---------------------------------------------------------------------------
-
   /**
    * Fallback: English date uses n/j/y pattern.
    */
@@ -213,11 +209,6 @@ final class DateResolverTest extends CanvasKernelTestBase {
     $result = $this->makeResolver('xx', FALSE)->resolveDate('2026-01-15');
     self::assertSame('2026-01-15', $result);
   }
-
-  // ---------------------------------------------------------------------------
-  // Intl path — assert formatting happened (exact output is ICU-version-
-  // dependent, so we only check the value differs from the ISO input).
-  // ---------------------------------------------------------------------------
 
   /**
    * Intl path: resolveDate produces a locale-formatted value.
