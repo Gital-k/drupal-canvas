@@ -76,28 +76,36 @@ final class DateResolverTest extends CanvasKernelTestBase {
   #[DataProvider('fallbackDateProvider')]
   public function testResolveDateFallback(
     string $langcode,
+    string $iso,
     string $expected,
   ): void {
-    $result = $this->makeResolver($langcode, FALSE)->resolveDate('2026-01-15');
+    $result = $this->makeResolver($langcode, FALSE)->resolveDate($iso);
     self::assertSame($expected, $result);
   }
 
   /**
    * Data provider for fallback date tests.
    *
-   * @return array<string, array{0: string, 1: string}>
+   * Each locale is tested with both a bare YYYY-MM-DD string (the canonical
+   * stored format for format: date props) and a full RFC3339 datetime string.
+   *
+   * @return array<string, array{0: string, 1: string, 2: string}>
    */
   public static function fallbackDateProvider(): array {
     return [
-      'en (n/j/y)' => ['en', '1/15/26'],
-      'fr (d/m/Y)' => ['fr', '15/01/2026'],
-      'ja (Y/m/d)' => ['ja', '2026/01/15'],
-      'en-gb (d/m/Y)' => ['en-gb', '15/01/2026'],
-      'de (d.m.Y)' => ['de', '15.01.2026'],
-      'ru (d.m.Y)' => ['ru', '15.01.2026'],
-      'ko (Y.m.d)' => ['ko', '2026.01.15'],
-      'nl (d-m-Y)' => ['nl', '15-01-2026'],
-      'hu (Y-m-d)' => ['hu', '2026-01-15'],
+      'en (n/j/y) bare date' => ['en', '2026-01-15', '1/15/26'],
+      'en (n/j/y) full ISO' => ['en', '2026-01-15T14:30:00Z', '1/15/26'],
+      'fr (d/m/Y) bare date' => ['fr', '2026-01-15', '15/01/2026'],
+      'fr (d/m/Y) full ISO' => ['fr', '2026-01-15T14:30:00Z', '15/01/2026'],
+      'ja (Y/m/d) bare date' => ['ja', '2026-01-15', '2026/01/15'],
+      'ja (Y/m/d) full ISO' => ['ja', '2026-01-15T14:30:00Z', '2026/01/15'],
+      'en-gb (d/m/Y) bare date' => ['en-gb', '2026-01-15', '15/01/2026'],
+      'en-gb (d/m/Y) full ISO' => ['en-gb', '2026-01-15T14:30:00Z', '15/01/2026'],
+      'de (d.m.Y) bare date' => ['de', '2026-01-15', '15.01.2026'],
+      'ru (d.m.Y) bare date' => ['ru', '2026-01-15', '15.01.2026'],
+      'ko (Y.m.d) bare date' => ['ko', '2026-01-15', '2026.01.15'],
+      'nl (d-m-Y) bare date' => ['nl', '2026-01-15', '15-01-2026'],
+      'hu (Y-m-d) bare date' => ['hu', '2026-01-15', '2026-01-15'],
     ];
   }
 
