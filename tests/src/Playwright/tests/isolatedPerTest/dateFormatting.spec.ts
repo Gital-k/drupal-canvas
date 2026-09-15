@@ -37,14 +37,10 @@ test.describe('Date formatting Twig filters', () => {
     );
     await expect(dateInput).toBeVisible();
 
-    const autoSavePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes('/canvas/api/v0/layout/canvas_page/') &&
-        response.request().method() === 'PATCH',
-    );
     await dateInput.fill('2026-01-15');
     await dateInput.press('Tab');
-    await autoSavePromise;
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
 
     // The preview must show the en-US short date for Jan 15 2026.
     await canvas.testInPreviewFrame('#date-formatted-date', async (el) => {
@@ -76,15 +72,11 @@ test.describe('Date formatting Twig filters', () => {
     await expect(dateInput).toBeVisible();
     await expect(timeInput).toBeVisible();
 
-    const autoSavePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes('/canvas/api/v0/layout/canvas_page/') &&
-        response.request().method() === 'PATCH',
-    );
     await dateInput.fill('2026-01-15');
     await timeInput.fill('14:30:00');
     await timeInput.press('Tab');
-    await autoSavePromise;
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
 
     // The preview must show the en-US short datetime for Jan 15 2026 at 14:30
     // UTC.
