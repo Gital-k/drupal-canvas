@@ -483,10 +483,12 @@ describe('getDraftData', () => {
 });
 
 describe('getClient', () => {
-  it('resolves the JSON:API prefix from the settings endpoint', async () => {
+  it('resolves the JSON:API prefix from the site-data endpoint', async () => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValue(Response.json({ apiPrefix: 'api' }));
+      .mockResolvedValue(
+        Response.json({ jsonapiSettings: { apiPrefix: 'api' } }),
+      );
     const { server } = makeServer(fetchImpl as unknown as typeof fetch);
 
     const publicClient = await server.getPublicClient();
@@ -496,7 +498,7 @@ describe('getClient', () => {
       vi
         .fn()
         .mockResolvedValue(
-          Response.json({ apiPrefix: 'api' }),
+          Response.json({ jsonapiSettings: { apiPrefix: 'api' } }),
         ) as unknown as typeof fetch,
     );
     seedSession(liveDraftData());
@@ -507,7 +509,9 @@ describe('getClient', () => {
   it('fetches the prefix once per server instance', async () => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValue(Response.json({ apiPrefix: 'api' }));
+      .mockResolvedValue(
+        Response.json({ jsonapiSettings: { apiPrefix: 'api' } }),
+      );
     const { server, seedSession } = makeServer(
       fetchImpl as unknown as typeof fetch,
     );
@@ -518,7 +522,7 @@ describe('getClient', () => {
     await server.getDraftClient(liveDraftData());
 
     const siteDataCalls = fetchImpl.mock.calls.filter(([url]) =>
-      String(url).includes('/canvas/api/v0/headless/jsonapi-settings'),
+      String(url).includes('/canvas/api/v0/site-data'),
     );
     expect(siteDataCalls).toHaveLength(1);
   });

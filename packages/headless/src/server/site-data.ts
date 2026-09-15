@@ -1,8 +1,8 @@
 /**
  * @file
- * Resolves the site's JSON:API prefix from the Canvas Headless module's public
- * JSON:API settings endpoint (`/canvas/api/v0/headless/jsonapi-settings`),
- * which reports the site's configured `jsonapi.base_path`.
+ * Resolves the site's JSON:API prefix from the Canvas module's public
+ * site-data endpoint (`/canvas/api/v0/site-data`), which reports the site's
+ * configured `jsonapi.base_path` under `jsonapiSettings.apiPrefix`.
  */
 
 import type { DraftConfig } from './config';
@@ -15,10 +15,10 @@ import type { DraftConfig } from './config';
  * Concurrent first calls share the single in-flight fetch.
  *
  * Resolution order:
- * 1. The endpoint's `apiPrefix` when reachable.
+ * 1. The site-data endpoint's `jsonapiSettings.apiPrefix` when reachable.
  * 2. The configured fallback (CANVAS_JSONAPI_PREFIX or an explicit override)
  *    when the fetch fails — a site running a Canvas version without the
- *    endpoint still gets a working client via the fallback.
+ *    site-data endpoint still gets a working client via the fallback.
  * 3. undefined, leaving the JSON:API client's `/jsonapi` default in place.
  */
 export function createApiPrefixResolver(
@@ -29,7 +29,7 @@ export function createApiPrefixResolver(
 
   return () => {
     resolved ??= (async () => {
-      const url = `${config.baseUrl}/canvas/api/v0/headless/jsonapi-settings`;
+      const url = `${config.baseUrl}/canvas/api/v0/site-data`;
       try {
         const response = await fetchImpl(url, {
           headers: { Accept: 'application/json' },
@@ -37,21 +37,21 @@ export function createApiPrefixResolver(
         });
         if (!response.ok) {
           console.warn(
-            `[drupal-canvas] Canvas JSON:API settings endpoint returned HTTP ${response.status} — ` +
+            `[drupal-canvas] Canvas site-data endpoint returned HTTP ${response.status} — ` +
               'falling back to the configured JSON:API prefix.',
           );
           return config.apiPrefix;
         }
         const data = (await response.json()) as {
-          apiPrefix?: string;
+          jsonapiSettings?: { apiPrefix?: string } | null;
         } | null;
-        // A null payload means JSON:API is not installed on the site — no
-        // prefix (fetched or configured) will make requests succeed, so
-        // leave the client's default in place.
-        return data?.apiPrefix;
+        // A null jsonapiSettings payload means JSON:API is not installed on
+        // the site — no prefix (fetched or configured) will make requests
+        // succeed, so leave the client's default in place.
+        return data?.jsonapiSettings?.apiPrefix ?? undefined;
       } catch (error) {
         console.warn(
-          `[drupal-canvas] Failed to fetch Canvas JSON:API settings — ` +
+          `[drupal-canvas] Failed to fetch Canvas site-data — ` +
             `falling back to the configured JSON:API prefix. ${
               error instanceof Error ? error.message : String(error)
             }`,

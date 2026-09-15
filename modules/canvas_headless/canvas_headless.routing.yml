@@ -8,21 +8,6 @@ canvas_headless.content:
   requirements:
     _access: 'TRUE'
 
-# Public JSON:API settings. The headless SDK reads the site's JSON:API prefix
-# from here before any authentication exists (public content mode), so it can
-# target sites serving JSON:API from a non-default prefix (e.g. `/api`). The
-# prefix is not sensitive: it is already present in `drupalSettings` on every
-# rendered page. Only the JSON:API settings are exposed — the editor-only
-# site-data endpoint carries the rest of the canvasData.v0 payload.
-canvas_headless.jsonapi_settings:
-  path: '/canvas/api/v0/headless/jsonapi-settings'
-  defaults:
-    _controller: 'Drupal\canvas_headless\Controller\JsonApiSettingsController::get'
-    _format: 'json'
-  methods: [GET]
-  requirements:
-    _access: 'TRUE'
-
 canvas_headless.entity:
   path: '/canvas/content-api/entity'
   defaults:

@@ -9,10 +9,12 @@ const CONFIG: DraftConfig = {
 };
 
 describe('createApiPrefixResolver', () => {
-  it('returns the API prefix reported by the JSON:API settings endpoint', async () => {
+  it('returns the API prefix reported by the site-data endpoint', async () => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValue(Response.json({ apiPrefix: 'api' }));
+      .mockResolvedValue(
+        Response.json({ jsonapiSettings: { apiPrefix: 'api' } }),
+      );
     const resolve = createApiPrefixResolver(
       CONFIG,
       fetchImpl as unknown as typeof fetch,
@@ -20,7 +22,7 @@ describe('createApiPrefixResolver', () => {
 
     await expect(resolve()).resolves.toBe('api');
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://drupal.example/canvas/api/v0/headless/jsonapi-settings',
+      'https://drupal.example/canvas/api/v0/site-data',
       { headers: { Accept: 'application/json' }, cache: 'no-store' },
     );
   });
@@ -28,7 +30,9 @@ describe('createApiPrefixResolver', () => {
   it('prefers the fetched prefix over the configured fallback', async () => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValue(Response.json({ apiPrefix: 'api' }));
+      .mockResolvedValue(
+        Response.json({ jsonapiSettings: { apiPrefix: 'api' } }),
+      );
     const resolve = createApiPrefixResolver(
       { ...CONFIG, apiPrefix: 'jsonapi' },
       fetchImpl as unknown as typeof fetch,
@@ -38,7 +42,9 @@ describe('createApiPrefixResolver', () => {
   });
 
   it('returns undefined when JSON:API is not installed on the site', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(Response.json(null));
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(Response.json({ jsonapiSettings: null }));
     const resolve = createApiPrefixResolver(
       { ...CONFIG, apiPrefix: 'api' },
       fetchImpl as unknown as typeof fetch,
@@ -90,7 +96,9 @@ describe('createApiPrefixResolver', () => {
   it('fetches once and shares the result across calls', async () => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValue(Response.json({ apiPrefix: 'api' }));
+      .mockResolvedValue(
+        Response.json({ jsonapiSettings: { apiPrefix: 'api' } }),
+      );
     const resolve = createApiPrefixResolver(
       CONFIG,
       fetchImpl as unknown as typeof fetch,
