@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\canvas\EntityHandlers;
 
 use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Url;
@@ -40,16 +39,13 @@ final class ContentTemplateListBuilder extends ConfigEntityListBuilder {
   /**
    * {@inheritdoc}
    */
-  protected function getDefaultOperations(EntityInterface $entity, ?CacheableMetadata $cacheability = NULL): array {
+  public function getDefaultOperations(EntityInterface $entity): array {
     \assert($entity instanceof ContentTemplate);
-    $cacheability ??= new CacheableMetadata();
-    $operations = parent::getDefaultOperations($entity, $cacheability);
+    $operations = parent::getDefaultOperations($entity);
 
     // Content templates have no Drupal edit form: the Canvas UI edits them.
     // @see \Drupal\canvas\Controller\ViewModeDisplayController
-    $update_access = $entity->access('update', return_as_object: TRUE);
-    $cacheability->addCacheableDependency($update_access);
-    if ($update_access->isAllowed()) {
+    if ($entity->access('update')) {
       $url = Url::fromUri(\sprintf(
         'base:canvas/template/%s/%s/%s',
         $entity->getTargetEntityTypeId(),
