@@ -27,15 +27,6 @@ test.describe('Date formatting Twig filters', () => {
     await canvas.openCanvas(await canvas.createCanvas());
     await canvas.openLibraryPanel();
 
-    // Scroll the component into view before addComponent so the hover-revealed
-    // contextual menu button is accessible.
-    const componentLocator = page
-      .getByTestId('canvas-primary-panel')
-      .locator(
-        '[data-canvas-type="component"][data-canvas-component-id="sdc.canvas_test_date_formatting.date-formatted"]',
-      );
-    await componentLocator.scrollIntoViewIfNeeded();
-
     await canvas.addComponent({
       id: 'sdc.canvas_test_date_formatting.date-formatted',
     });
@@ -73,13 +64,6 @@ test.describe('Date formatting Twig filters', () => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.openCanvas(await canvas.createCanvas());
     await canvas.openLibraryPanel();
-
-    const componentLocator = page
-      .getByTestId('canvas-primary-panel')
-      .locator(
-        '[data-canvas-type="component"][data-canvas-component-id="sdc.canvas_test_date_formatting.date-formatted"]',
-      );
-    await componentLocator.scrollIntoViewIfNeeded();
 
     await canvas.addComponent({
       id: 'sdc.canvas_test_date_formatting.date-formatted',
