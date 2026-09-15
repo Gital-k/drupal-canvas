@@ -51,23 +51,23 @@ const CodeBlock = ({
       <pre data-testid={testId} className={styles.codeBlockPre}>
         {code}
       </pre>
-    {/* Positioned through a wrapper: Radix's own `position` on the button
+      {/* Positioned through a wrapper: Radix's own `position` on the button
         would otherwise win over the class. */}
-    <Box className={styles.codeBlockCopyButton}>
-      <IconButton
-        className={styles.codeBlockCopyIcon}
-        variant="ghost"
-        size="1"
-        disabled={isBusy}
-        aria-label={`Copy ${label}`}
-        onClick={() => void onCopySnippet(code, snippetId)}
-      >
-        <CopyIcon />
-      </IconButton>
-    </Box>
-    <Text as="span" role="status" className="visually-hidden">
-      {copiedSnippetId === snippetId ? `${label} copied` : ''}
-    </Text>
+      <Box className={styles.codeBlockCopyButton}>
+        <IconButton
+          className={styles.codeBlockCopyIcon}
+          variant="ghost"
+          size="1"
+          disabled={isBusy}
+          aria-label={`Copy ${label}`}
+          onClick={() => void onCopySnippet(code, snippetId)}
+        >
+          <CopyIcon />
+        </IconButton>
+      </Box>
+      <Text as="span" role="status" className="visually-hidden">
+        {copiedSnippetId === snippetId ? `${label} copied` : ''}
+      </Text>
     </Box>
   </Flex>
 );
