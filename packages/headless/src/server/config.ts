@@ -8,11 +8,8 @@ export interface DraftConfig {
   baseUrl: string;
   /**
    * The site's JSON:API prefix, without slashes (e.g. `api` for a site
-   * serving JSON:API at `/api` instead of `/jsonapi`). Fallback only: the
-   * JSON:API settings endpoint reports the site's configured prefix at
-   * runtime and wins over this value; this applies when that endpoint is
-   * unreachable. Omit to use the JSON:API client's `/jsonapi` default as the
-   * fallback.
+   * serving JSON:API at `/api`). Used only when the site-data endpoint is
+   * unreachable; omit to fall back to the JSON:API client's `/jsonapi` default.
    */
   apiPrefix?: string;
 }
