@@ -66,9 +66,9 @@ const CodeBlock = ({
 /**
  * The example code for the selected font, scoped to how it is currently set up.
  *
- * For a variable font that is the live axis settings; for a static family it is
- * the selected variant. The callout says which, because the snippets below it
- * change under the reader as they move a slider or pick another variant.
+ * Generates code snippets matching the current font configuration (live sliders
+ * for variable fonts, selected variant for static fonts). A callout clarifies
+ * the state as snippets update in real time.
  */
 const FontSnippetsCard = ({
   copiedSnippetId,

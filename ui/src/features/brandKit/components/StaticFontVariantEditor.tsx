@@ -13,9 +13,9 @@ type StaticFontVariantEditorProps = {
 };
 
 /**
- * Not in the design, which reads weight and style out of the font file. Kept
- * because that detection is best effort: a file whose metadata cannot be parsed
- * lands on 400 normal, and this is the only way to correct it.
+ * Manual controls for static font weight and style.
+ * Required so users can correct the font's metadata if automatic extraction
+ * fails and incorrectly defaults to 400/normal.
  */
 const StaticFontVariantEditor = ({
   font,

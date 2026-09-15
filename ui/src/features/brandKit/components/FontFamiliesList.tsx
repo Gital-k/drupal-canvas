@@ -87,10 +87,8 @@ const FontFamiliesList = ({
             data-testid={`canvas-brand-kit-font-family-row-${fontGroup.family}`}
           >
             {/*
-              The trigger spans the whole row, badge included: the flyout is
-              positioned from the trigger's right edge, and a trigger that
-              stopped short of the row would open the flyout over the panel.
-              The overflow menu cannot nest inside it, so it sits on top.
+              Layered over the full-width trigger to avoid invalid nested
+              <button> elements.
             */}
             <Popover.Trigger>
               <button

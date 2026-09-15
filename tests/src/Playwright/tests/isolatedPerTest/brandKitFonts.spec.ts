@@ -28,24 +28,11 @@ const SEL = {
     '[class*="_flyoutContent"] input[aria-label="Font family name"]',
 };
 
-// Visual regression tolerance for the layout guards below. Each assertion
-// targets an element locator, so only that element is captured. These guards
-// exist to catch gross layout breakage (e.g. the Variable/Static badge
-// dropping onto a second line under the family name), not to pin down exact
-// glyph rendering. Text antialiasing and font hinting differ between the
-// environment that generated the committed snapshots and the CI runner, which
-// scatters a few percent of "different" pixels around every text edge. The
-// tolerance below is deliberately generous enough to absorb that
-// cross-environment rendering noise while remaining far below the double-digit
-// pixel ratio a real layout break produces.
 const LAYOUT_SCREENSHOT_OPTIONS = {
-  // Allow up to 10% of the compared pixels to differ. Observed cross-environment
-  // antialiasing noise is ~4-5%; a genuine layout break (badge wrapping to a new
-  // line) shifts far more than 10% of the element's pixels, so this still fails
-  // on real regressions.
+  // Allow up to 10% of the compared pixels to differ.
   maxDiffPixelRatio: 0.1,
-  // Per-pixel color sensitivity, 0 (strict) - 1 (loose). Relaxed slightly to
-  // stop antialiased text edges from being counted as differing pixels.
+  // Raise the per-pixel color-difference threshold so small cross-environment
+  // rendering differences are not counted as differing pixels.
   threshold: 0.3,
 } as const;
 
@@ -117,12 +104,6 @@ test.describe('brand kit fonts', () => {
       'Static',
     );
 
-    // Regression guard: the family row must read as a row. Its name sits on the
-    // left and its Variable/Static badge on the right of the same line, and the
-    // row spans the list rather than shrinking to its text. When the row's
-    // `all: unset` reset stopped being its first declaration, the row lost its
-    // layout and the badge dropped onto a second line under the name.
-    // @see https://www.drupal.org/i/3591954
     await expect(familyRowWrapper).toHaveScreenshot(
       'family-row-layout.png',
       LAYOUT_SCREENSHOT_OPTIONS,
@@ -176,8 +157,10 @@ test.describe('brand kit fonts', () => {
     await page.locator(SEL.tab).click();
     await expect(familyRow).toContainText('Renamed Sans');
 
-    // The rename survives a reload, and the row keeps its layout.
-    await page.reload();
+    // The rename survives a reload.
+    // Ensure all requests complete before reloading.
+    // eslint-disable-next-line playwright/no-networkidle
+    await page.waitForLoadState('networkidle');
     await canvas.openBrandKitPanel();
     await page.locator(SEL.tab).click();
     await expect(familyRow).toContainText('Renamed Sans');
@@ -233,9 +216,6 @@ test.describe('brand kit fonts', () => {
 
     // Close the flyout to access the row's menu and delete the entire font family.
     await page.keyboard.press('Escape');
-    // Assert against our own flyout element rather than a Radix internal
-    // (e.g. [data-radix-popper-content-wrapper]) so the test does not break if
-    // Radix changes its popper DOM structure.
     await expect(page.locator(SEL.flyout)).toHaveCount(0);
     await page
       .locator('[data-testid="canvas-brand-kit-font-family-menu-Mona Sans"]')

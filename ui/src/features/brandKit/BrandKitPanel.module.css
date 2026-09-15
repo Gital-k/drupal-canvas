@@ -33,13 +33,6 @@
   background: var(--blue-9);
 }
 
-/*
- * `all: unset` strips the user agent button styling and MUST stay the first
- * declaration: it is a shorthand for every property, so anything above it would
- * be discarded. `.stylelintrc.json` lists `all` first in `order/properties-order`
- * so the fixer cannot sort it to the end again.
- * @see https://www.drupal.org/i/3591954
- */
 .familyRow {
   all: unset;
   display: flex;
@@ -208,11 +201,8 @@
   background: color-mix(in sRGB, var(--color-panel-solid) 94%, var(--gray-3) 6%);
 }
 
-/*
- * Below the width the two consoles need, they stack instead of scrolling
- * sideways. Keyed off the viewport because the flyout's own width is capped by
- * it; where the popover still has room beside its trigger, Radix keeps the two
- * columns.
+/* Stacks the consoles vertically on smaller screens to prevent
+ * horizontal scrolling.
  */
 @media (max-width: 820px) {
   .flyoutBody {
@@ -277,12 +267,7 @@
   position: relative;
 }
 
-/*
- * A `<label>` wrapping a visually hidden radio, so the variant cards are a real
- * single-select group: arrow keys move between them and the checked state is
- * announced. `all: unset` MUST stay first here for the same reason as
- * `.familyRow` above.
- */
+/* Wraps a hidden radio for accessible single-select behavior. */
 .variantRow {
   all: unset;
   display: flex;
@@ -365,10 +350,8 @@
 }
 
 /*
- * The design's slider: a 6px rounded track filled to the current value, with a
- * small round thumb centred on it. Any author style on the track turns off the
- * fill the browser paints from `accent-color`, so the fill is a gradient
- * stopped at `--axis-progress`, which the component sets from the value.
+ * Custom track styles disable the browser's native accent-color fill,
+ * so progress is recreated using a gradient tied to --axis-progress.
  */
 .axisSlider {
   width: 100%;
