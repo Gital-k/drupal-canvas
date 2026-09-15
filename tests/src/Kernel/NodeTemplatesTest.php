@@ -460,6 +460,51 @@ HTML;
     // If we delete the field item, all good!
     $node->get('field_component_tree')->removeItem(1);
     self::assertEntityIsValid($node);
+
+    // The point of referencing an exposed slot by machine name: the site
+    // builder can move the exposed slot elsewhere in the content template's
+    // component tree, and the content filling it keeps rendering. Move
+    // `custom_content` from the `the_body` slot of the existing component
+    // instance to the `the_footer` slot of a newly added one.
+    $template = ContentTemplate::load('node.article.full');
+    \assert($template instanceof ContentTemplate);
+    $component_tree = $template->get('component_tree');
+    \assert(\is_array($component_tree));
+    $component_tree[] = [
+      'uuid' => 'b0d4bb1d-9c24-4d2a-9e1e-6b6c4a84e0a1',
+      'component_id' => 'sdc.canvas_test_sdc.props-slots',
+      'component_version' => '0e79e884426a53ae',
+      'inputs' => [
+        'heading' => [
+          'sourceType' => PropSource::EntityField->value,
+          'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
+        ],
+      ],
+    ];
+    $template
+      ->set('component_tree', $component_tree)
+      ->set('exposed_slots', [
+        'custom_content' => [
+          'component_uuid' => 'b0d4bb1d-9c24-4d2a-9e1e-6b6c4a84e0a1',
+          'slot_name' => 'the_footer',
+          'label' => 'Custom content area',
+        ],
+      ])
+      ->save();
+
+    // The node itself was not touched, yet its component instance now renders
+    // inside the moved exposed slot. Before referencing exposed slots by
+    // machine name this was impossible: the node stored the UUID and slot name
+    // the exposed slot happened to resolve to, so moving it stranded the
+    // content.
+    self::assertEntityIsValid($node);
+    $build = $viewBuilder->view($node);
+    $crawler = $this->crawlerForRenderArray($build);
+    self::assertCount(1, $crawler->filter('h1:contains("Now we\'re cooking with gas!")'));
+    // It really moved: it now renders in the exposed slot's new home, the
+    // `the_footer` slot, and no longer in `the_body`.
+    self::assertCount(1, $crawler->filter('div.component--props-slots--footer h1:contains("Now we\'re cooking with gas!")'));
+    self::assertCount(0, $crawler->filter('div.component--props-slots--body h1:contains("Now we\'re cooking with gas!")'));
   }
 
   /**
