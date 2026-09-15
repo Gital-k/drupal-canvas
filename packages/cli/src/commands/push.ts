@@ -739,6 +739,10 @@ export function pushCommand(program: Command): void {
         .default(undefined),
     )
     .option(
+      '--no-include-brand-kit',
+      'Exclude brand kit (fonts and colors) from the push operation',
+    )
+    .option(
       '--prune-colors',
       'Delete colors from the site that are absent from canvas.brand-kit.json',
     )
@@ -1252,6 +1256,7 @@ export function pushCommand(program: Command): void {
               componentPushApiService,
               'Pushing',
               componentSpinner,
+              includesBrandKit ? remoteBrandKitColors : [],
             );
           } catch (error) {
             reportDiscoveryWarnings(componentDiscoveryWarnings);

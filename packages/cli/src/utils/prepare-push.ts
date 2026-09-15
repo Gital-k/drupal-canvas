@@ -11,7 +11,11 @@ import { createProgressCallback, processInPool } from './request-pool';
 import { fileExists } from './utils';
 
 import type { ApiService } from '../services/api.js';
-import type { AssetLibrary, Component } from '../types/Component.js';
+import type {
+  AssetLibrary,
+  BrandKitColorEntry,
+  Component,
+} from '../types/Component.js';
 import type { Result } from '../types/Result.js';
 
 type ComponentOperation = 'create' | 'update' | 'delete';
@@ -53,6 +57,105 @@ interface PushProgressSpinner {
 }
 
 /**
+ * Prefix used for brand kit color references in stored values.
+ */
+const CANVAS_COLOR_REF_PREFIX = 'canvas-color:';
+
+/**
+ * UUID pattern used to distinguish canvas-color:<uuid> from canvas-color:<cssVarKey>.
+ */
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Transforms a single color example value for API submission.
+ *
+ * - canvas-color:<cssVarKey> → canvas-color:<uuid> (looks up --<cssVarKey> in colorsByCssVariable)
+ * - canvas-color:<uuid> → left unchanged (already in UUID format, unlikely to appear here)
+ * - Free-pick CSS strings or any other value → left unchanged
+ */
+function serializeColorExampleForApi(
+  exampleValue: unknown,
+  colorsByCssVariable: Map<string, BrandKitColorEntry>,
+): unknown {
+  if (typeof exampleValue !== 'string') {
+    return exampleValue;
+  }
+
+  if (!exampleValue.startsWith(CANVAS_COLOR_REF_PREFIX)) {
+    return exampleValue;
+  }
+
+  const ref = exampleValue.slice(CANVAS_COLOR_REF_PREFIX.length);
+
+  // UUID references pass through unchanged.
+  if (UUID_PATTERN.test(ref)) {
+    return exampleValue;
+  }
+
+  // cssVarKey reference: look up by --<cssVarKey>.
+  const entry = colorsByCssVariable.get(`--${ref}`);
+  if (entry) {
+    return `${CANVAS_COLOR_REF_PREFIX}${entry.id}`;
+  }
+
+  // Color not found on server — leave unchanged; Drupal will reject it,
+  // which is the correct behavior (the color needs to be pushed first).
+  return exampleValue;
+}
+
+/**
+ * Serializes color examples in component props for API submission.
+ *
+ * Converts canvas-color:<cssVarKey> strings to canvas-color:<uuid> strings.
+ */
+function serializeColorExamplesInProps(
+  props: Record<string, unknown> | null | undefined,
+  colorsByCssVariable: Map<string, BrandKitColorEntry>,
+): Record<string, unknown> | null | undefined {
+  if (!props) {
+    return props;
+  }
+  const properties = props.properties as Record<string, unknown> | undefined;
+  if (!properties) {
+    return props;
+  }
+
+  const serializedProperties: Record<string, unknown> = {};
+
+  for (const [propName, propDefinition] of Object.entries(properties)) {
+    if (
+      typeof propDefinition === 'object' &&
+      propDefinition !== null &&
+      '$ref' in propDefinition &&
+      (propDefinition as { $ref?: string }).$ref ===
+        'json-schema-definitions://canvas.module/color'
+    ) {
+      const def = propDefinition as {
+        examples?: unknown[];
+        [key: string]: unknown;
+      };
+      if (Array.isArray(def.examples) && def.examples.length > 0) {
+        const serializedExample = serializeColorExampleForApi(
+          def.examples[0],
+          colorsByCssVariable,
+        );
+        serializedProperties[propName] = {
+          ...def,
+          examples: [serializedExample],
+        };
+      } else {
+        serializedProperties[propName] = def;
+      }
+    } else {
+      serializedProperties[propName] = propDefinition;
+    }
+  }
+
+  return { ...props, properties: serializedProperties };
+}
+
+/**
  * Determine the operation for each component (create, update, or delete)
  * and build upload tasks with payloads attached.
  */
@@ -60,6 +163,7 @@ async function buildComponentUploadTasks(
   preparedByName: Map<string, BuiltComponentForPush>,
   apiService: { listComponents: () => Promise<Record<string, unknown>> },
   onProgress: () => void,
+  colorsByCssVariable: Map<string, BrandKitColorEntry>,
 ): Promise<ComponentUploadTask[]> {
   const existingComponents = await apiService.listComponents();
   const remoteNames = new Set(Object.keys(existingComponents));
@@ -67,8 +171,23 @@ async function buildComponentUploadTasks(
   const tasks: ComponentUploadTask[] = [];
   for (const [machineName, prepared] of preparedByName.entries()) {
     onProgress();
+    // Serialize color examples for API submission.
+    const serializedProps = serializeColorExamplesInProps(
+      prepared.componentPayload.props as
+        | Record<string, unknown>
+        | null
+        | undefined,
+      colorsByCssVariable,
+    );
+    const serializedPayload: Component = {
+      ...prepared.componentPayload,
+      props:
+        serializedProps === null || serializedProps === undefined
+          ? prepared.componentPayload.props
+          : (serializedProps as Component['props']),
+    };
     if (remoteNames.has(machineName)) {
-      let componentPayload = prepared.componentPayload;
+      let componentPayload = serializedPayload;
       if (componentPayload.type === 'external') {
         const serverComponent = existingComponents[machineName] as Component;
         // Preserve dependencies used by retained React fallback assets. Entity
@@ -96,7 +215,7 @@ async function buildComponentUploadTasks(
       tasks.push({
         machineName,
         operation: 'create',
-        componentPayload: prepared.componentPayload,
+        componentPayload: serializedPayload,
         importedJsComponents: prepared.importedJsComponents,
       });
     }
@@ -328,6 +447,7 @@ export async function pushBuiltComponents(
   apiService: ApiService,
   actionLabel: string = 'Uploading',
   activeSpinner?: PushProgressSpinner,
+  brandKitColors: BrandKitColorEntry[] = [],
 ): Promise<Result[]> {
   const results: Result[] = [];
   const spinner = activeSpinner ?? p.spinner();
@@ -360,12 +480,18 @@ export async function pushBuiltComponents(
   } else {
     spinner.start('Checking component operations');
   }
+  // Build CSS variable → BrandKitColorEntry map for color example serialization.
+  const colorsByCssVariable = new Map<string, BrandKitColorEntry>(
+    brandKitColors.map((c) => [c.cssVariable, c]),
+  );
+
   let uploadTasks: ComponentUploadTask[];
   try {
     uploadTasks = await buildComponentUploadTasks(
       preparedByName,
       apiService,
       existenceProgress,
+      colorsByCssVariable,
     );
   } catch (error) {
     spinner.stop('Component operation check failed', 2);

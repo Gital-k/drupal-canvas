@@ -233,10 +233,116 @@ export function buildSkippedLocalOnlyPullResources(
   ];
 }
 
+/**
+ * Prefix used for brand kit color references in stored values.
+ */
+const CANVAS_COLOR_REF_PREFIX = 'canvas-color:';
+
+/**
+ * UUID pattern used to distinguish canvas-color:<uuid> from canvas-color:<cssVarKey>.
+ */
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Transforms a single color example value for storage in component.yml.
+ *
+ * - canvas-color:<uuid> → canvas-color:<cssVarKey> (strips -- prefix from cssVariable)
+ * - canvas-color:<cssVarKey> → left unchanged (already in authored format)
+ * - Free-pick CSS strings or any other value → left unchanged
+ */
+function resolveColorExampleToVarKey(
+  exampleValue: unknown,
+  colorsByUuid: Map<string, BrandKitColorEntry>,
+): unknown {
+  if (typeof exampleValue !== 'string') {
+    return exampleValue;
+  }
+
+  if (!exampleValue.startsWith(CANVAS_COLOR_REF_PREFIX)) {
+    return exampleValue;
+  }
+
+  const ref = exampleValue.slice(CANVAS_COLOR_REF_PREFIX.length);
+
+  // Only transform UUID references; cssVarKey references are already authored format.
+  if (!UUID_PATTERN.test(ref)) {
+    return exampleValue;
+  }
+
+  const entry = colorsByUuid.get(ref);
+  if (!entry) {
+    // UUID not found in brand kit — leave unchanged to avoid data loss.
+    return exampleValue;
+  }
+
+  // Strip the -- prefix from cssVariable to get the cssVarKey.
+  const cssVarKey = entry.cssVariable.startsWith('--')
+    ? entry.cssVariable.slice(2)
+    : entry.cssVariable;
+
+  return `${CANVAS_COLOR_REF_PREFIX}${cssVarKey}`;
+}
+
+/**
+ * Transforms color examples in component props from UUID refs to cssVarKey refs.
+ */
+function resolveColorExamplesInProps(
+  props: Record<string, unknown>,
+  colorsByUuid: Map<string, BrandKitColorEntry>,
+): Record<string, unknown> {
+  const properties = props.properties as Record<string, unknown> | undefined;
+  if (!properties) {
+    return props;
+  }
+
+  const resolvedProperties: Record<string, unknown> = {};
+
+  for (const [propName, propDefinition] of Object.entries(properties)) {
+    if (
+      typeof propDefinition === 'object' &&
+      propDefinition !== null &&
+      '$ref' in propDefinition &&
+      (propDefinition as { $ref?: string }).$ref ===
+        'json-schema-definitions://canvas.module/color'
+    ) {
+      const def = propDefinition as {
+        examples?: unknown[];
+        [key: string]: unknown;
+      };
+      if (Array.isArray(def.examples) && def.examples.length > 0) {
+        const resolved = resolveColorExampleToVarKey(
+          def.examples[0],
+          colorsByUuid,
+        );
+        resolvedProperties[propName] = {
+          ...def,
+          examples: [resolved],
+        };
+      } else {
+        resolvedProperties[propName] = def;
+      }
+    } else {
+      resolvedProperties[propName] = propDefinition;
+    }
+  }
+
+  return { ...props, properties: resolvedProperties };
+}
+
+/**
+ * Shared mutable reference for brand kit colors, populated during
+ * brand kit task prepare() and used during component task execute().
+ */
+interface BrandKitColorsRef {
+  colors: BrandKitColorEntry[];
+}
+
 export function createComponentsPullTask(
   apiService: ApiService,
   componentDir: string,
   skipOverwrite: boolean,
+  brandKitColorsRef: BrandKitColorsRef,
 ): PullTask {
   let components: Record<string, Component> = {};
   const localComponentMap = new Map<string, DiscoveredComponent>();
@@ -244,16 +350,24 @@ export function createComponentsPullTask(
   let preferJsxForNewComponents = false;
 
   function buildMetadata(component: Component): Metadata {
+    // Build UUID → BrandKitColorEntry map from the shared ref.
+    const colorsByUuid = new Map<string, BrandKitColorEntry>(
+      brandKitColorsRef.colors.map((c) => [c.id, c]),
+    );
+
     const metadata: Metadata = {
       name: component.name,
       machineName: component.machineName,
       status: component.status,
       required: component.required || [],
-      props: {
-        properties: stripProjectedContentEntityReferencePropKeys(
-          component.props || {},
-        ),
-      },
+      props: resolveColorExamplesInProps(
+        {
+          properties: stripProjectedContentEntityReferencePropKeys(
+            component.props || {},
+          ),
+        },
+        colorsByUuid,
+      ) as Metadata['props'],
       slots: Array.isArray(component.slots) ? {} : component.slots || {},
       dataDependencies: component.dataDependencies?.entityFields
         ? { entityFields: component.dataDependencies.entityFields }
@@ -1014,6 +1128,7 @@ export function createBrandKitPullTask(
   apiService: ApiService,
   projectRoot: string,
   skipOverwrite: boolean = false,
+  brandKitColorsRef: BrandKitColorsRef,
 ): PullTask {
   let totalFontVariants = 0;
   let newCount = 0;
@@ -1029,6 +1144,10 @@ export function createBrandKitPullTask(
         apiService.getBrandKit(),
         readBrandKitConfig(projectRoot),
       ]);
+
+      // Populate the shared ref so component pull can resolve color examples.
+      remoteColors = brandKit.colors ?? [];
+      brandKitColorsRef.colors = remoteColors;
 
       const summaryLines: string[] = [];
       const remoteFonts = brandKit.fonts ?? [];
@@ -1062,7 +1181,7 @@ export function createBrandKitPullTask(
         );
       }
 
-      remoteColors = brandKit.colors ?? [];
+      // remoteColors already populated from brandKit.colors above.
       const colorPlan = planColorPull(
         remoteColors,
         await readBrandKitColorsFile(projectRoot),
@@ -1226,6 +1345,10 @@ export function pullCommand(program: Command): void {
         .argParser(parseBooleanOption)
         .default(undefined),
     )
+    .option(
+      '--no-include-brand-kit',
+      'Exclude brand kit (fonts and colors) from the pull operation',
+    )
     .option('-d, --dir <directory>', 'Component directory')
     .option('-y, --yes', 'Skip all confirmation prompts')
     .option('--skip-overwrite', 'Skip pulling items that already exist locally')
@@ -1249,6 +1372,9 @@ export function pullCommand(program: Command): void {
         const includesPageTemplates = config.includePageTemplates;
         const includesBrandKit = config.includeBrandKit;
 
+        // Shared ref to pass brand kit colors from brand kit task to component task.
+        const brandKitColorsRef: BrandKitColorsRef = { colors: [] };
+
         // Build pull tasks.
         const projectRoot = process.cwd();
         const tasks: PullTask[] = [
@@ -1256,6 +1382,7 @@ export function pullCommand(program: Command): void {
             apiService,
             config.componentDir,
             options.skipOverwrite ?? false,
+            brandKitColorsRef,
           ),
           createAssetsPullTask(
             apiService,
@@ -1271,6 +1398,7 @@ export function pullCommand(program: Command): void {
               apiService,
               projectRoot,
               options.skipOverwrite ?? false,
+              brandKitColorsRef,
             ),
           );
         }

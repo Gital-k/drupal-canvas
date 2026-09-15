@@ -48,7 +48,7 @@ describe('Pull Command', () => {
 
     it('should return empty summary when no components', async () => {
       const api = mockApiService({});
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual([]);
@@ -56,7 +56,7 @@ describe('Pull Command', () => {
 
     it('should show only new counts in summary when none exist locally', async () => {
       const api = mockApiService({ a: mockComponent('button') });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual(['Components: 1 pull (1 new)']);
@@ -82,7 +82,7 @@ describe('Pull Command', () => {
         b: mockComponent('card'),
         c: mockComponent('hero'),
       });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual(['Components: 3 pull (2 new, 1 existing)']);
@@ -103,7 +103,7 @@ describe('Pull Command', () => {
       );
 
       const api = mockApiService({});
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       const { summaryLines, localOnlyCount } = await task.prepare();
       expect(summaryLines).toEqual(['Components: 1 delete (local-only)']);
@@ -125,7 +125,7 @@ describe('Pull Command', () => {
       );
 
       const api = mockApiService({ a: mockComponent('button') });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual([
@@ -136,7 +136,7 @@ describe('Pull Command', () => {
 
     it('should write new component files on execute', async () => {
       const api = mockApiService({ a: mockComponent('my-button') });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       const results = await task.execute();
@@ -181,7 +181,7 @@ describe('Pull Command', () => {
           sourceCodeJs: 'export default function MyButton() {}',
         },
       });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       await task.execute();
@@ -209,7 +209,7 @@ describe('Pull Command', () => {
       );
 
       const api = mockApiService({ a: mockComponent('my-button') });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       await task.execute();
@@ -235,7 +235,7 @@ describe('Pull Command', () => {
         sourceCodeJs,
       };
       const api = mockApiService({ a: component });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       const results = await task.execute();
@@ -260,7 +260,7 @@ describe('Pull Command', () => {
         },
       };
       const api = mockApiService({ a: component });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       await task.execute();
@@ -286,6 +286,7 @@ describe('Pull Command', () => {
         mockApiService({ a: component }),
         tmpDir,
         false,
+        { colors: [] },
       );
 
       await task.prepare();
@@ -319,6 +320,7 @@ describe('Pull Command', () => {
         mockApiService({ a: component }),
         tmpDir,
         false,
+        { colors: [] },
       );
 
       await task.prepare();
@@ -362,7 +364,7 @@ describe('Pull Command', () => {
       };
 
       const api = mockApiService({ a: component });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       const results = await task.execute();
@@ -414,7 +416,7 @@ describe('Pull Command', () => {
       };
 
       const api = mockApiService({ a: component });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       const results = await task.execute();
@@ -447,7 +449,7 @@ describe('Pull Command', () => {
         sourceCodeJs,
       };
       const api = mockApiService({ a: component });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       const results = await task.execute();
@@ -486,7 +488,7 @@ describe('Pull Command', () => {
       };
 
       const api = mockApiService({ a: component });
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       const results = await task.execute();
@@ -517,7 +519,7 @@ describe('Pull Command', () => {
       );
 
       const api = mockApiService({ a: mockComponent('my-button') });
-      const task = createComponentsPullTask(api, tmpDir, true);
+      const task = createComponentsPullTask(api, tmpDir, true, { colors: [] });
 
       await task.prepare();
       const results = await task.execute();
@@ -547,7 +549,7 @@ describe('Pull Command', () => {
       );
 
       const api = mockApiService({});
-      const task = createComponentsPullTask(api, tmpDir, false);
+      const task = createComponentsPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       const results = await task.execute({ deleteLocalOnly: true });
@@ -556,6 +558,147 @@ describe('Pull Command', () => {
       expect(results.results[0].success).toBe(true);
       expect(results.results[0].details?.[0].content).toBe('Deleted');
       await expect(fs.access(orphanDir)).rejects.toThrow();
+    });
+
+    describe('color example UUID→cssVarKey transform', () => {
+      const brandKitColorsRef = {
+        colors: [
+          {
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            name: 'Baguette Legs',
+            cssVariable: '--baguette-legs',
+            value: {
+              colorSpace: 'srgb' as const,
+              components: [0.41, 0.49, 0.97],
+              alpha: null,
+              hex: null,
+            },
+            weight: 0,
+          },
+        ],
+      };
+
+      function makeColorComponent(exampleValue: unknown): Component {
+        return {
+          ...mockComponent('color-test'),
+          props: {
+            backgroundColor: {
+              $ref: 'json-schema-definitions://canvas.module/color',
+              examples: [exampleValue],
+            },
+          },
+        } as unknown as Component;
+      }
+
+      it('transforms canvas-color:<uuid> to canvas-color:<cssVarKey> when UUID is found', async () => {
+        const component = makeColorComponent(
+          'canvas-color:a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        );
+        const api = mockApiService({ a: component });
+        const task = createComponentsPullTask(
+          api,
+          tmpDir,
+          false,
+          brandKitColorsRef,
+        );
+
+        await task.prepare();
+        await task.execute();
+
+        const ymlContent = await fs.readFile(
+          path.join(tmpDir, 'color-test', 'component.yml'),
+          'utf-8',
+        );
+        const parsed = yaml.load(ymlContent) as Record<string, unknown>;
+        const props = parsed.props as {
+          properties: {
+            backgroundColor: { examples: unknown[] };
+          };
+        };
+        expect(props.properties.backgroundColor.examples[0]).toBe(
+          'canvas-color:baguette-legs',
+        );
+      });
+
+      it('leaves canvas-color:<uuid> unchanged when UUID is not in brand kit', async () => {
+        const unknownUuid = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+        const component = makeColorComponent(`canvas-color:${unknownUuid}`);
+        const api = mockApiService({ a: component });
+        const task = createComponentsPullTask(api, tmpDir, false, {
+          colors: [],
+        });
+
+        await task.prepare();
+        await task.execute();
+
+        const ymlContent = await fs.readFile(
+          path.join(tmpDir, 'color-test', 'component.yml'),
+          'utf-8',
+        );
+        const parsed = yaml.load(ymlContent) as Record<string, unknown>;
+        const props = parsed.props as {
+          properties: {
+            backgroundColor: { examples: unknown[] };
+          };
+        };
+        expect(props.properties.backgroundColor.examples[0]).toBe(
+          `canvas-color:${unknownUuid}`,
+        );
+      });
+
+      it('leaves canvas-color:<cssVarKey> unchanged (already authored format)', async () => {
+        const component = makeColorComponent('canvas-color:baguette-legs');
+        const api = mockApiService({ a: component });
+        const task = createComponentsPullTask(
+          api,
+          tmpDir,
+          false,
+          brandKitColorsRef,
+        );
+
+        await task.prepare();
+        await task.execute();
+
+        const ymlContent = await fs.readFile(
+          path.join(tmpDir, 'color-test', 'component.yml'),
+          'utf-8',
+        );
+        const parsed = yaml.load(ymlContent) as Record<string, unknown>;
+        const props = parsed.props as {
+          properties: {
+            backgroundColor: { examples: unknown[] };
+          };
+        };
+        expect(props.properties.backgroundColor.examples[0]).toBe(
+          'canvas-color:baguette-legs',
+        );
+      });
+
+      it('leaves free-pick CSS color strings unchanged', async () => {
+        const component = makeColorComponent('#687df7e3');
+        const api = mockApiService({ a: component });
+        const task = createComponentsPullTask(
+          api,
+          tmpDir,
+          false,
+          brandKitColorsRef,
+        );
+
+        await task.prepare();
+        await task.execute();
+
+        const ymlContent = await fs.readFile(
+          path.join(tmpDir, 'color-test', 'component.yml'),
+          'utf-8',
+        );
+        const parsed = yaml.load(ymlContent) as Record<string, unknown>;
+        const props = parsed.props as {
+          properties: {
+            backgroundColor: { examples: unknown[] };
+          };
+        };
+        expect(props.properties.backgroundColor.examples[0]).toBe('#687df7e3');
+      });
     });
   });
 
@@ -1388,7 +1531,7 @@ describe('Pull Command', () => {
       const api = mockApiService([
         { family: 'Inter', weight: '400', style: 'normal' },
       ]);
-      const task = createBrandKitPullTask(api, tmpDir);
+      const task = createBrandKitPullTask(api, tmpDir, false, { colors: [] });
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual(['brand kit: 1 font variant pull (1 new)']);
@@ -1396,7 +1539,7 @@ describe('Pull Command', () => {
 
     it('should return empty summary when no fonts on brand kit', async () => {
       const api = mockApiService([]);
-      const task = createBrandKitPullTask(api, tmpDir);
+      const task = createBrandKitPullTask(api, tmpDir, false, { colors: [] });
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual([]);
@@ -1406,7 +1549,7 @@ describe('Pull Command', () => {
       const api = mockApiService([
         { family: 'My Font', weight: '400', style: 'normal' },
       ]);
-      const task = createBrandKitPullTask(api, tmpDir);
+      const task = createBrandKitPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       const results = await task.execute();
@@ -1470,7 +1613,7 @@ describe('Pull Command', () => {
           weight: 0,
         },
       ]);
-      const task = createBrandKitPullTask(api, tmpDir);
+      const task = createBrandKitPullTask(api, tmpDir, false, { colors: [] });
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual(['brand kit colors: 1 color pull (1 new)']);
@@ -1491,7 +1634,7 @@ describe('Pull Command', () => {
           weight: 0,
         },
       ]);
-      const task = createBrandKitPullTask(api, tmpDir);
+      const task = createBrandKitPullTask(api, tmpDir, false, { colors: [] });
 
       await task.prepare();
       const results = await task.execute();
@@ -1522,7 +1665,7 @@ describe('Pull Command', () => {
         'utf-8',
       );
       const api = mockApiServiceWithColors([]);
-      const task = createBrandKitPullTask(api, tmpDir);
+      const task = createBrandKitPullTask(api, tmpDir, false, { colors: [] });
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual(['brand kit colors: 0 pull (1 local-only)']);

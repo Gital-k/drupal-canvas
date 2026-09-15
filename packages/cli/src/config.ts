@@ -180,7 +180,7 @@ const {
   onWarning: (warning) => canvasConfigWarnings.push(warning),
 });
 
-export const DEFAULT_INCLUDE_BRAND_KIT = false;
+export const DEFAULT_INCLUDE_BRAND_KIT = true;
 
 const DEFAULT_SCOPES =
   'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:document:create canvas:media:view';
