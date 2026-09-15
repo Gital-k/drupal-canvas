@@ -5,11 +5,7 @@ import { isolatedPerTest as test } from '../../fixtures/test.js';
 /**
  * Tests that the canvasFormatDate and canvasFormatDateTime Twig filters
  * produce locale-formatted output rather than the raw ISO strings that Canvas
- * passes to templates by default.
- *
- * Uses the canvas_test_date_formatting:date-formatted component, which renders
- * its date and date-time props through the filters so the test layer can
- * inspect the result in the preview iframe.
+ * passes to templates.
  */
 
 test.use({
@@ -18,7 +14,7 @@ test.use({
 });
 
 test.describe('Date formatting Twig filters', () => {
-  test('canvasFormatDate renders a locale-formatted date, not the raw ISO string', async ({
+  test('date and date-time props are rendered through locale formatting filters', async ({
     drupal,
     canvas,
     page,
@@ -31,55 +27,38 @@ test.describe('Date formatting Twig filters', () => {
       id: 'sdc.canvas_test_date_formatting.date-formatted',
     });
 
-    // Set a known date value via the date input in the contextual panel.
+    // Set a known date value.
     const dateInput = page.locator(
       '[data-testid="canvas-contextual-panel"] .field--name-date input[type="date"]',
     );
     await expect(dateInput).toBeVisible();
-
     await dateInput.fill('2026-01-15');
     await dateInput.press('Tab');
-    // eslint-disable-next-line playwright/no-networkidle
-    await page.waitForLoadState('networkidle');
 
-    // The preview must show the en-US short date for Jan 15 2026.
-    await canvas.testInPreviewFrame('#date-formatted-date', async (el) => {
-      const text = (await el.textContent())?.trim() ?? '';
-      expect(text).toBe('1/15/26');
-    });
-  });
-
-  test('canvasFormatDateTime renders a locale-formatted datetime, not the raw ISO string', async ({
-    drupal,
-    canvas,
-    page,
-  }) => {
-    await drupal.login({ username: 'editor', password: 'editor' });
-    await canvas.openCanvas(await canvas.createCanvas());
-    await canvas.openLibraryPanel();
-
-    await canvas.addComponent({
-      id: 'sdc.canvas_test_date_formatting.date-formatted',
-    });
-
-    // Set a known datetime value via the date and time inputs.
-    const dateInput = page.locator(
+    // Set a known datetime value.
+    const dateTimeInput = page.locator(
       '[data-testid="canvas-contextual-panel"] .field--name-date-time input[type="date"]',
     );
     const timeInput = page.locator(
       '[data-testid="canvas-contextual-panel"] .field--name-date-time input[type="time"]',
     );
-    await expect(dateInput).toBeVisible();
+    await expect(dateTimeInput).toBeVisible();
     await expect(timeInput).toBeVisible();
-
-    await dateInput.fill('2026-01-15');
+    await dateTimeInput.fill('2026-01-15');
     await timeInput.fill('14:30:00');
     await timeInput.press('Tab');
+
     // eslint-disable-next-line playwright/no-networkidle
     await page.waitForLoadState('networkidle');
 
-    // The preview must show the en-US short datetime for Jan 15 2026 at 14:30
-    // UTC.
+    // The date filter must produce the en-US short date for Jan 15 2026.
+    await canvas.testInPreviewFrame('#date-formatted-date', async (el) => {
+      const text = (await el.textContent())?.trim() ?? '';
+      expect(text).toBe('1/15/26');
+    });
+
+    // The datetime filter must produce the en-US short datetime for Jan 15
+    // 2026 at 14:30 UTC. U+202F before AM/PM is normalised to a regular space.
     await canvas.testInPreviewFrame('#date-formatted-date-time', async (el) => {
       const text =
         (await el.textContent())?.trim().replaceAll('\u202f', ' ') ?? '';
