@@ -15,10 +15,13 @@
  */
 #}
 
+{# The title is passed as a child, not only as an attribute: a label may
+   contain markup, and an attribute can only carry a string, which the front
+   end then renders as text. The attribute stays for the sake of labels that
+   are plain text and for components reading the prop. #}
 <drupal-canvas-form-element-label
     required="{{ required }}"
     title-display="{{ title_display }}"
     attributes="{{ attributes }}"
     title="{{ render_var(title) }}"
->
-</drupal-canvas-form-element-label>
+>{{ title }}</drupal-canvas-form-element-label>
