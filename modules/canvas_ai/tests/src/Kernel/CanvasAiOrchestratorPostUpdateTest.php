@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas_ai\Kernel;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\FileStorage;
 use Drupal\Core\Config\StorageCacheInterface;
-use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
@@ -36,9 +37,13 @@ final class CanvasAiOrchestratorPostUpdateTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that the prompt update keeps the uuid and _core hash intact.
+   * Tests that a prompt reimport keeps the uuid and _core hash intact.
+   *
+   * @param string $function
+   *   The post-update function that re-imports the orchestrator system prompt.
    */
-  public function testPostUpdate0003PreservesManagedKeys(): void {
+  #[DataProvider('providerPromptReimport')]
+  public function testPromptReimportPreservesManagedKeys(string $function): void {
     $this->includePostUpdateFile();
 
     $original = $this->config(self::ORCHESTRATOR);
@@ -50,38 +55,29 @@ final class CanvasAiOrchestratorPostUpdateTest extends CanvasKernelTestBase {
     // Change the active prompt so the update has something to overwrite.
     $this->config(self::ORCHESTRATOR)->set('system_prompt', 'stale prompt')->save(TRUE);
 
-    canvas_ai_post_update_0003_reimport_orchestrator_agent();
+    \assert(\is_callable($function));
+    $function();
     $this->container->get(ConfigFactoryInterface::class)->reset(self::ORCHESTRATOR);
 
     $updated = $this->config(self::ORCHESTRATOR);
     self::assertSame($uuid, $updated->get('uuid'));
     self::assertSame($core, $updated->get('_core'));
-    self::assertNotSame('stale prompt', $updated->get('system_prompt'));
+    self::assertSame($this->readInstallConfig()['system_prompt'], $updated->get('system_prompt'));
+    self::assertStringContainsString('Site Chrome Comes From the Page Variant', $updated->get('system_prompt'));
+    self::assertStringNotContainsString('including headers, footers, and multiple sections', $updated->get('system_prompt'));
   }
 
   /**
-   * Tests that post_update 0012 refreshes the orchestrator system prompt.
+   * Provides the post-update functions that re-import the orchestrator prompt.
+   *
+   * @return array<string, array{string}>
+   *   The post-update function names keyed by update number.
    */
-  public function testPostUpdate0012RefreshesOrchestratorPrompt(): void {
-    $this->includePostUpdateFile();
-
-    $original = $this->config(self::ORCHESTRATOR);
-    $uuid = $original->get('uuid');
-    $core = $original->get('_core');
-    self::assertNotEmpty($uuid);
-    self::assertNotEmpty($core);
-
-    $this->config(self::ORCHESTRATOR)->set('system_prompt', 'stale prompt')->save(TRUE);
-
-    canvas_ai_post_update_0012_reimport_orchestrator_content_only_chrome();
-    $this->container->get(ConfigFactoryInterface::class)->reset(self::ORCHESTRATOR);
-
-    $updated = $this->config(self::ORCHESTRATOR);
-    self::assertSame($uuid, $updated->get('uuid'));
-    self::assertSame($core, $updated->get('_core'));
-    self::assertNotSame('stale prompt', $updated->get('system_prompt'));
-    self::assertStringContainsString('Site Chrome Comes From the Page Variant', $updated->get('system_prompt'));
-    self::assertStringNotContainsString('including headers, footers, and multiple sections', $updated->get('system_prompt'));
+  public static function providerPromptReimport(): array {
+    return [
+      '0003' => ['canvas_ai_post_update_0003_reimport_orchestrator_agent'],
+      '0012' => ['canvas_ai_post_update_0012_reimport_orchestrator_content_only_chrome'],
+    ];
   }
 
   /**
@@ -112,8 +108,19 @@ final class CanvasAiOrchestratorPostUpdateTest extends CanvasKernelTestBase {
    * Includes the Canvas AI post-update file.
    */
   private function includePostUpdateFile(): void {
-    $module_path = $this->container->get(ModuleExtensionList::class)->getPath('canvas_ai');
-    require_once DRUPAL_ROOT . '/' . $module_path . '/canvas_ai.post_update.php';
+    require_once DRUPAL_ROOT . '/' . $this->getModulePath('canvas_ai') . '/canvas_ai.post_update.php';
+  }
+
+  /**
+   * Reads the orchestrator agent record shipped in config/install.
+   *
+   * @return array<string, mixed>
+   *   The decoded install config.
+   */
+  private function readInstallConfig(): array {
+    $data = (new FileStorage(DRUPAL_ROOT . '/' . $this->getModulePath('canvas_ai') . '/config/install'))->read(self::ORCHESTRATOR);
+    self::assertIsArray($data);
+    return $data;
   }
 
 }
