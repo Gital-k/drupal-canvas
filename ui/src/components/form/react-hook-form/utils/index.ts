@@ -53,6 +53,19 @@ export const dispatchFieldError = (
 
 export const getCurrentValueFromProps = (props: Record<string, any>) => {
   if (props.options && props.options.some((opt: any) => opt.selected)) {
+    // A <select multiple> element can have more than one selected option.
+    // For such fields, return every selected option's value rather than
+    // just the first (mirrors the equivalent special-casing for the
+    // onChange path in parseNewValue()), otherwise a scalar value gets
+    // passed as the multi-select's controlled `value`, which React cannot
+    // match against any option (it iterates the string's characters
+    // instead of treating it as a single array element), leaving the
+    // field appearing empty on initial render.
+    if (props.attributes?.multiple) {
+      return props.options
+        .filter((opt: any) => opt.selected)
+        .map((opt: any) => opt.value);
+    }
     return props.options.find((opt: any) => opt.selected).value;
   }
   if (props.attributes?.type === 'checkbox') {
