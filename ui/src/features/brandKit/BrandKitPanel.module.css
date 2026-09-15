@@ -464,6 +464,8 @@
   line-height: 1.45;
 }
 
+/* Positioned through a wrapper: Radix's own `position` on the button
+   would otherwise win over this class. */
 .codeBlockCopyButton {
   position: absolute;
   top: var(--space-2);
