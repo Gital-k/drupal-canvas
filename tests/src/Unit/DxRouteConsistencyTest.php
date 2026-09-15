@@ -18,6 +18,39 @@ use Symfony\Component\Yaml\Yaml;
 #[Group('canvas')]
 final class DxRouteConsistencyTest extends UnitTestCase {
 
+  /**
+   * Route paths whose config entity type openapi.yml leaves dynamic.
+   *
+   * Most Canvas API routes accepting several config entity types are documented
+   * in openapi.yml as one path per accepted type, even though
+   * canvas.routing.yml defines a single route for all of them. That is done
+   * because their operation specs differ per type. For example, the single
+   * `/canvas/api/v0/auto-saves/css/{canvas_config_entity_type_id}/{canvas_config_entity}`
+   * route is documented as three paths, each with its own summary and example:
+   * @code
+   * /canvas/api/v0/auto-saves/css/asset_library/{configEntityId}: …
+   * /canvas/api/v0/auto-saves/css/brand_kit/{configEntityId}: …
+   * /canvas/api/v0/auto-saves/css/js_component/{configEntityId}: …
+   * @endcode
+   *
+   * The paths listed here are the exception: their operation spec is the same
+   * for every config entity type they accept, because both the request and the
+   * response body are opaque auto-save states (`type: object`). One path per
+   * type would repeat that spec verbatim, so openapi.yml documents them with
+   * the config entity type left dynamic instead. Consequently
+   * ::resolveRouteDefinitionsToOperations() must not resolve them.
+   *
+   * The trade-off: openapi.yml cannot express that these routes accept a
+   * different set of config entity types per method — GET additionally accepts
+   * `staged_config_update`, PATCH does not.
+   *
+   * @see \Drupal\canvas\Controller\ApiConfigAutoSaveControllers
+   * @see ::resolveRouteDefinitionsToOperations()
+   */
+  private const array PATHS_WITH_UNRESOLVED_CONFIG_ENTITY_TYPE = [
+    '/canvas/api/v0/config/auto-save/{canvas_config_entity_type_id}/{canvas_config_entity}',
+  ];
+
   public function testRoutingYmlDx(): array {
     $routes = Yaml::parseFile(__DIR__ . '/../../../canvas.routing.yml');
     \assert(\is_array($routes));
@@ -112,10 +145,7 @@ final class DxRouteConsistencyTest extends UnitTestCase {
       ));
 
       // No need to resolve: add the operations for the route.
-      // Unlike other paths documented in openapi.yml, the openapi.yml does not
-      // have a separate paths for each of the possible config entity types for
-      // `canvas_config_entity_type_id` under `requirements`.
-      if (empty($static_path_part_requirements) || $original_path === '/canvas/api/v0/config/auto-save/{canvas_config_entity_type_id}/{canvas_config_entity}') {
+      if (empty($static_path_part_requirements) || \in_array($original_path, self::PATHS_WITH_UNRESOLVED_CONFIG_ENTITY_TYPE, TRUE)) {
         $operations = [...$operations, ...$operations_for_route];
         continue;
       }
