@@ -34,12 +34,14 @@ export interface CanvasDateFormatOptions {
  * falling back to core drupalSettings and then 'en'.
  */
 const getDrupalLocale = (): string =>
-  (globalThis as {
-    drupalSettings?: {
-      canvasData?: { v0?: { locale?: string } };
-      langcode?: string;
-    };
-  }).drupalSettings?.canvasData?.v0?.locale ??
+  (
+    globalThis as {
+      drupalSettings?: {
+        canvasData?: { v0?: { locale?: string } };
+        langcode?: string;
+      };
+    }
+  ).drupalSettings?.canvasData?.v0?.locale ??
   (globalThis as { drupalSettings?: { langcode?: string } }).drupalSettings
     ?.langcode ??
   'en';
