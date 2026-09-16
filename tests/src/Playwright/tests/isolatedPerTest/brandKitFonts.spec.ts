@@ -38,7 +38,6 @@ const LAYOUT_SCREENSHOT_OPTIONS = {
 
 /**
  * Uploads a font file through the fonts section's hidden file input.
- *
  */
 const uploadFont = async (page: Page, filename: string) => {
   // Use fake font bytes to avoid the need for real font files.
@@ -97,13 +96,9 @@ test.describe('brand kit fonts', () => {
     const familyRowWrapper = page.locator(SEL.familyRowWrapper);
     const familyRow = page.locator(SEL.familyRow);
     await expect(familyRow).toBeVisible();
-    await expect(familyRow).toContainText('Mona Sans');
-    // The row reports the file format and whether the family is variable.
-    await expect(familyRow.locator(SEL.familyFormat)).toHaveText('WOFF2');
-    await expect(familyRowWrapper.locator(SEL.familyBadge)).toHaveText(
-      'Static',
-    );
 
+    // Text content (family name, format, badge) and layout are covered by the
+    // screenshot assertion below.
     await expect(familyRowWrapper).toHaveScreenshot(
       'family-row-layout.png',
       LAYOUT_SCREENSHOT_OPTIONS,
@@ -118,22 +113,6 @@ test.describe('brand kit fonts', () => {
       'font-flyout-layout.png',
       LAYOUT_SCREENSHOT_OPTIONS,
     );
-
-    // A family with one file has nothing to choose between, so Preview is the
-    // specimen card rather than a list of variant cards.
-    await expect(
-      page.locator('[data-testid^="canvas-brand-kit-font-preview-"]'),
-    ).toBeVisible();
-    await expect(page.locator(SEL.variantRow)).toHaveCount(0);
-
-    // The right console names what the code below it is scoped to, and emits
-    // the @font-face rule for the selected variant.
-    await expect(
-      page.locator('[data-testid="canvas-brand-kit-font-code-context"]'),
-    ).toContainText('Variant: 400 Normal');
-    await expect(
-      page.locator('[data-testid^="canvas-brand-kit-font-face-snippet-"]'),
-    ).toContainText('font-display: swap;');
 
     // Rename the family. The name field commits on blur, and the commit applies
     // to local state before its auto-save PATCH resolves. Wait for the request

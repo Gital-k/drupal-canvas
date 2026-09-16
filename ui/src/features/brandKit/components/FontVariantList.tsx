@@ -74,7 +74,7 @@ const FontVariantList = ({
                 The quick brown fox jumps over the lazy dog.
               </Text>
             </label>
-            {/* Only the selected card is deletable, as in the design. */}
+            {/* Only the selected card is deletable. */}
             {isSelected && (
               <Box className={styles.variantDeleteButton}>
                 <IconButton
