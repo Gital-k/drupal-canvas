@@ -159,7 +159,6 @@ const ColorRow = ({ color }: ColorRowProps) => {
     handleRenameCancel();
   };
 
-
   const menuItems = (
     <>
       <UnifiedMenu.Item
@@ -266,7 +265,9 @@ const ColorRow = ({ color }: ColorRowProps) => {
 
               case 'hex':
               default:
-                return (color.value.hex ?? getColorHex(color.value)).toUpperCase();
+                return (
+                  color.value.hex ?? getColorHex(color.value)
+                ).toUpperCase();
             }
           })()}
         </Text>
