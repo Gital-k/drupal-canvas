@@ -15,13 +15,18 @@ use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionI
 use Drupal\canvas\PropExpressions\StructuredData\FieldItemAnalyzer;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
+use Drupal\canvas\PropShape\EphemeralPropShapeRepository;
 use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\canvas\Utility\TypedDataHelper;
@@ -169,6 +174,12 @@ final class EntityFieldPropSourceMatcher {
     private readonly CacheBackendInterface $cache,
     #[Autowire(service: 'file.mime_type.guesser.extension')]
     private readonly ExtensionMimeTypeGuesser|LazyExtensionMimeTypeGuesser $extensionMimeTypeGuesser,
+    // TRICKY: the *ephemeral* repository, deliberately. The persistent one
+    // regenerates Components when its cache is written, which has no business
+    // happening while merely suggesting prop sources.
+    // @see \Drupal\canvas\PropShape\PersistentPropShapeRepository::updateCache()
+    #[Autowire(service: EphemeralPropShapeRepository::class)]
+    private readonly PropShapeRepositoryInterface $propShapeRepository,
   ) {}
 
   /**
@@ -435,7 +446,99 @@ final class EntityFieldPropSourceMatcher {
       ...$matches,
       ...self::matchContentEntityReferenceShape($entity_data_definition, $schema),
       ...$this->matchDocumentShapeToMediaTypes($entity_data_definition, $levels_to_recurse, $is_required_in_json_schema, $schema, $cardinality_in_json_schema),
+      ...$this->matchObjectShapeToFieldTypes($entity_data_definition, $is_required_in_json_schema, $schema, $cardinality_in_json_schema, [...$matches_references, ...$matches]),
     ];
+  }
+
+  /**
+   * Matches an object shape to field instances of its storable field type.
+   *
+   * Scalar-driven matching can only find a field instance whose properties
+   * carry validation constraints mirroring the object shape's key-value pairs.
+   * That works for shapes built out of well-constrained core field types, but
+   * not for a field type that a module declares to fit a shape via
+   * hook_canvas_storable_prop_shape_alter(): a `type: string` with no further
+   * keywords is read as prose, so such a field type stays invisible here even
+   * though Canvas already knows it fits.
+   *
+   * That left the two prop source types disagreeing: a prop could be populated
+   * by conjuring a field of that type (StaticPropSource), while an existing
+   * field instance of that very same field type on the host entity was never
+   * offered (EntityFieldPropSource) — so the shape worked in the component
+   * editor and was unmappable in a Content Template.
+   *
+   * So: reuse what the storable prop shape already established. If a field type
+   * is declared to fit this object shape, then a field instance of that field
+   * type on the host entity type + bundle fits it too.
+   *
+   * @param bool $is_required_in_json_schema
+   *   Whether the prop shape to match is required.
+   * @param JsonSchema $schema
+   * @param \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED|int<1, max> $cardinality_in_json_schema
+   * @param ObjectMatches $already_matched
+   *   Matches found by scalar-driven matching, to avoid duplicating them.
+   *
+   * @return ObjectMatches
+   *
+   * @see \Drupal\canvas\PropShape\StorablePropShape
+   * @see hook_canvas_storable_prop_shape_alter()
+   */
+  private function matchObjectShapeToFieldTypes(EntityDataDefinitionInterface $entity_data_definition, bool $is_required_in_json_schema, array $schema, int $cardinality_in_json_schema, array $already_matched): array {
+    $storable = $this->propShapeRepository->getStorablePropShape(PropShape::standardize($schema));
+    if (!$storable?->fieldTypeProp instanceof FieldTypeObjectPropsExpression) {
+      return [];
+    }
+    // Only plain field type properties can be rewritten to field instance
+    // properties; following a reference needs the entity-level context that
+    // only scalar-driven matching has.
+    // @todo Support ReferenceFieldTypePropExpression once a field type needs it.
+    foreach ($storable->fieldTypeProp->objectPropsToFieldTypeProps as $field_type_prop) {
+      if (!$field_type_prop instanceof FieldTypePropExpression) {
+        return [];
+      }
+    }
+
+    $already_matched_field_names = \array_map(
+      fn (StructuredDataPropExpressionInterface $expr): string => $expr->getFieldName(),
+      $already_matched,
+    );
+
+    $matches = [];
+    foreach ($this->recurseDataDefinitionInterface($entity_data_definition) as $field_definition) {
+      \assert($field_definition instanceof FieldDefinitionInterface);
+      if ($field_definition->getType() !== $storable->fieldTypeProp->getFieldType()) {
+        continue;
+      }
+      // Mirror scalar-driven matching: a required prop needs a required field,
+      // otherwise the required matches would not be a subset of the optional
+      // ones.
+      if ($is_required_in_json_schema && !$field_definition->isRequired()) {
+        continue;
+      }
+      // Scalar-driven matching already found this field; its mapping is at
+      // least as complete as the field type's, so leave it alone.
+      if (\in_array($field_definition->getName(), $already_matched_field_names, TRUE)) {
+        continue;
+      }
+      if ($cardinality_in_json_schema !== $field_definition->getFieldStorageDefinition()->getCardinality()) {
+        continue;
+      }
+      $matches[] = new FieldObjectPropsExpression(
+        $entity_data_definition,
+        $field_definition->getName(),
+        NULL,
+        \array_map(
+          fn (FieldTypePropExpression $field_type_prop): FieldPropExpression => new FieldPropExpression(
+            $entity_data_definition,
+            $field_definition->getName(),
+            NULL,
+            $field_type_prop->propName,
+          ),
+          $storable->fieldTypeProp->objectPropsToFieldTypeProps,
+        ),
+      );
+    }
+    return $matches;
   }
 
   /**
@@ -624,10 +727,26 @@ final class EntityFieldPropSourceMatcher {
   private function matchEntityPropsForObjectUsingScalars(EntityDataDefinitionInterface $entity_data_definition, int $levels_to_recurse, bool $is_required_in_json_schema, array $schema, int $cardinality_in_json_schema): array {
     $object_prop_matches = [];
     foreach (self::iterateObjectJsonSchema($schema) as $name => ['required' => $sub_required, 'schema' => $sub_schema]) {
+      // A key-value pair in a `type: object` prop shape can only be matched if
+      // it is a scalar: Canvas' object prop expressions map each object key to
+      // a scalar or reference expression, so neither a nested `type: object`
+      // nor a nested `type: array` can ever be expressed. Such key-value pairs
+      // simply get zero matches; the object prop shape as a whole remains
+      // matchable as long as all its *required* key-value pairs are scalars.
+      // A key-value pair without a `type` at all is not matchable either.
+      // PropShape::normalize() rejects those upstream, so this is defensive:
+      // ::iterateObjectJsonSchema() is public API and takes any JSON Schema.
+      // @see \Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface::getObjectExpressions()
+      // @see ::matchEntityPropsForObject()
+      // @todo Support nested object prop shapes in https://www.drupal.org/i/3467890
+      if (!isset($sub_schema['type']) || !JsonSchemaType::fromSdcPropJsonSchema($sub_schema)->isScalar()) {
+        $object_prop_matches[$name] = [];
+        continue;
+      }
       $object_prop_matches[$name] = $this->matchEntityPropsForScalar(
         $entity_data_definition,
         $levels_to_recurse,
-        JsonSchemaType::from($sub_schema['type']),
+        JsonSchemaType::fromSdcPropJsonSchema($sub_schema),
         // TRICKY: even if a key-value pair in a `type: object` is required, it
         // may very well be optional: if the `type: object` itself is optional.
         $is_required_in_json_schema && $sub_required,

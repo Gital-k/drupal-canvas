@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\canvas_test_storable_prop_shape_alter\Hook;
 
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\CandidateStorablePropShape;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\canvas_test_storable_prop_shape_alter\Plugin\Field\FieldType\StructuredPairItem;
 use Drupal\Core\State\StateInterface;
 
 class CanvasTestStorablePropShapeAlterHooks {
@@ -53,6 +56,32 @@ class CanvasTestStorablePropShapeAlterHooks {
       $storable_prop_shape->fieldStorageSettings = ['must_be_divisible_by' => 12];
       $storable_prop_shape->fieldWidget = 'number';
     }
+
+    // Show that a contrib module can declare a field type to fit an *object*
+    // prop shape, including one with a nested `type: object` member.
+    // Neither member carries validation constraints that scalar-driven shape
+    // matching could recognize: this mapping is the only thing that makes the
+    // field type fit. Contrib does exactly this — e.g. ui_icons for its
+    // `{pack_id, icon_id, settings}` icon shape.
+    // @see \Drupal\canvas_test_storable_prop_shape_alter\Plugin\Field\FieldType\StructuredPairItem
+    $schema = $storable_prop_shape->shape->resolvedSchema;
+    if (($schema['type'] ?? NULL) !== 'object') {
+      return;
+    }
+    $properties = $schema['properties'] ?? [];
+    if (($properties['first']['type'] ?? NULL) !== 'string' || ($properties['second']['type'] ?? NULL) !== 'string') {
+      return;
+    }
+    $object_props = [
+      'first' => new FieldTypePropExpression(StructuredPairItem::PLUGIN_ID, 'first'),
+      'second' => new FieldTypePropExpression(StructuredPairItem::PLUGIN_ID, 'second'),
+    ];
+    // Only map the nested object member for shapes that declare it.
+    if (($properties['extra']['type'] ?? NULL) === 'object') {
+      $object_props['extra'] = new FieldTypePropExpression(StructuredPairItem::PLUGIN_ID, 'extra');
+    }
+    $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression(StructuredPairItem::PLUGIN_ID, $object_props);
+    $storable_prop_shape->fieldWidget = 'string_textfield';
   }
 
   /**
