@@ -269,12 +269,7 @@ const ColorRow = ({ color }: ColorRowProps) => {
                     )}
                   </>
                 ) : (
-                  <Text
-                    size="1"
-                    truncate
-                    style={{ flex: 1 }}
-                    onDoubleClick={() => setIsRenaming(true)}
-                  >
+                  <Text size="1" truncate style={{ flex: 1 }}>
                     {colorName}
                   </Text>
                 )}
