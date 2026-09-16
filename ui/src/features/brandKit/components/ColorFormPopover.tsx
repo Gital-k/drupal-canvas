@@ -37,7 +37,17 @@ interface ColorFormPopoverProps {
   operation: 'add' | 'edit';
   color?: BrandKitColor;
   folderId?: string;
-  anchorRef: React.RefObject<Measurable>;
+  /**
+   * Virtual anchor the popover content is positioned against. When `children`
+   * provide a `Popover.Trigger`, the trigger toggles the popover while the
+   * content still opens against this anchor (e.g. the row's dots button).
+   */
+  anchorRef?: React.RefObject<Measurable>;
+  /**
+   * Optional trigger markup rendered inside the popover root. Use this to wire
+   * up a native `Popover.Trigger` instead of opening the popover programmatically.
+   */
+  children?: React.ReactNode;
   align?: 'start' | 'center' | 'end';
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -182,6 +192,7 @@ const ColorFormPopover = ({
   color,
   folderId,
   anchorRef,
+  children,
   align = 'start',
   open,
   onOpenChange,
@@ -380,7 +391,8 @@ const ColorFormPopover = ({
 
   return (
     <Popover.Root open={open} onOpenChange={onOpenChange}>
-      <Popover.Anchor virtualRef={anchorRef} />
+      {children}
+      {anchorRef ? <Popover.Anchor virtualRef={anchorRef} /> : null}
       <Popover.Portal
         container={
           document.querySelector<HTMLElement>('.radix-themes') ?? document.body

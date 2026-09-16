@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import parse from 'html-react-parser';
 import { useDraggable } from '@dnd-kit/core';
 import { DotsHorizontalIcon } from '@radix-ui/react-icons';
+import * as Popover from '@radix-ui/react-popover';
 import {
   ContextMenu,
   DropdownMenu,
@@ -158,28 +159,6 @@ const ColorRow = ({ color }: ColorRowProps) => {
     handleRenameCancel();
   };
 
-  // Captures whether the edit popover was open at the moment the pointer went
-  // down on the row. This runs before Radix's outside-interaction dismissal, so
-  // the click handler can tell whether the click is closing the popover (was
-  // open) or should open it (was closed) — avoiding a close-then-reopen flicker.
-  const wasEditOpenOnPointerDownRef = useRef(false);
-
-  const handleRowPointerDown = () => {
-    wasEditOpenOnPointerDownRef.current = isEditPopoverOpen;
-  };
-
-  // Toggle the edit modal when the row is clicked.
-  const handleRowClick = () => {
-    if (isRenaming) {
-      return;
-    }
-    // If the popover was already open when the interaction began, this same
-    // click has closed it via outside-interaction — leave it closed.
-    if (wasEditOpenOnPointerDownRef.current) {
-      return;
-    }
-    setIsEditPopoverOpen(true);
-  };
 
   const menuItems = (
     <>
@@ -212,142 +191,147 @@ const ColorRow = ({ color }: ColorRowProps) => {
     </>
   );
 
+  const row = (
+    <Flex
+      align="center"
+      className={clsx(styles.colorRow, {
+        [styles.isDragging]: isDragging,
+      })}
+      data-popover-open={
+        isEditPopoverOpen || isDeletePopoverOpen || isFindInstancesPopoverOpen
+          ? true
+          : undefined
+      }
+      data-is-renaming={isRenaming ? true : undefined}
+      data-has-inline-error={renameErrorMessage ? true : undefined}
+      data-testid={`canvas-color-row-${color.name}`}
+    >
+      {/* Color swatch */}
+      <div
+        className={styles.swatch}
+        style={{
+          width: '16px',
+          height: '16px',
+          borderRadius: 'var(--radius-1)',
+          backgroundColor: getCssColorValue(color.value),
+          border: '1px solid var(--gray-6)',
+          flexShrink: 0,
+        }}
+      />
+
+      {/* Name or rename input */}
+      <Flex flexGrow="1" px="2" overflow="hidden" direction="column">
+        {isRenaming ? (
+          <>
+            <TextField.Root
+              ref={inputRef}
+              value={colorName}
+              onChange={(e) => setColorName(e.target.value)}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              size="1"
+              style={{ width: '100%' }}
+              data-testid="canvas-color-row-rename-input"
+            />
+            {renameErrorMessage && (
+              <Text size="1" color="red" style={{ marginTop: '2px' }}>
+                {parse(renameErrorMessage)}
+              </Text>
+            )}
+          </>
+        ) : (
+          <Text size="1" truncate style={{ flex: 1 }}>
+            {colorName}
+          </Text>
+        )}
+      </Flex>
+
+      {!isRenaming && (
+        <Text size="1" className={styles.hexCode} style={{ color: '#646464' }}>
+          {(() => {
+            const format =
+              color.displayFormat ??
+              (color.value.colorSpace === 'hsl' ? 'hsl' : 'hex');
+
+            switch (format) {
+              case 'hsl':
+                return `hsl(${Math.round(color.value.components[0])}, ${Math.round(color.value.components[1])}%, ${Math.round(color.value.components[2])}%)`;
+
+              case 'rgb': {
+                const r = Math.round(color.value.components[0] * 255);
+                const g = Math.round(color.value.components[1] * 255);
+                const b = Math.round(color.value.components[2] * 255);
+                return `rgb(${r}, ${g}, ${b})`;
+              }
+
+              case 'hex':
+              default:
+                return (color.value.hex ?? getColorHex(color.value)).toUpperCase();
+            }
+          })()}
+        </Text>
+      )}
+
+      {!isRenaming && (
+        <DropdownMenu.Root onOpenChange={setIsMenuOpen}>
+          <DropdownMenu.Trigger>
+            <button
+              ref={dotsButtonRef as React.RefObject<HTMLButtonElement>}
+              aria-label="Open contextual menu"
+              className={styles.colorRowDots}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DotsHorizontalIcon />
+            </button>
+          </DropdownMenu.Trigger>
+          <UnifiedMenu.Content
+            menuType="dropdown"
+            onCloseAutoFocus={(e: Event) => {
+              if (openingPopoverRef.current) {
+                e.preventDefault();
+                openingPopoverRef.current = false;
+              }
+            }}
+          >
+            {menuItems}
+          </UnifiedMenu.Content>
+        </DropdownMenu.Root>
+      )}
+    </Flex>
+  );
+
   return (
     <>
       <div ref={setNodeRef} {...attributes} {...listeners}>
-        <ContextMenu.Root onOpenChange={setIsMenuOpen}>
-          <ContextMenu.Trigger>
-            <Flex
-              align="center"
-              onPointerDown={handleRowPointerDown}
-              onClick={handleRowClick}
-              className={clsx(styles.colorRow, {
-                [styles.isDragging]: isDragging,
-              })}
-              data-popover-open={
-                isEditPopoverOpen ||
-                isDeletePopoverOpen ||
-                isFindInstancesPopoverOpen
-                  ? true
-                  : undefined
-              }
-              data-is-renaming={isRenaming ? true : undefined}
-              data-has-inline-error={renameErrorMessage ? true : undefined}
-              data-testid={`canvas-color-row-${color.name}`}
-            >
-              {/* Color swatch */}
-              <div
-                className={styles.swatch}
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: 'var(--radius-1)',
-                  backgroundColor: getCssColorValue(color.value),
-                  border: '1px solid var(--gray-6)',
-                  flexShrink: 0,
-                }}
-              />
-
-              {/* Name or rename input */}
-              <Flex flexGrow="1" px="2" overflow="hidden" direction="column">
-                {isRenaming ? (
-                  <>
-                    <TextField.Root
-                      ref={inputRef}
-                      value={colorName}
-                      onChange={(e) => setColorName(e.target.value)}
-                      onBlur={handleBlur}
-                      onKeyDown={handleKeyDown}
-                      size="1"
-                      style={{ width: '100%' }}
-                      data-testid="canvas-color-row-rename-input"
-                    />
-                    {renameErrorMessage && (
-                      <Text size="1" color="red" style={{ marginTop: '2px' }}>
-                        {parse(renameErrorMessage)}
-                      </Text>
-                    )}
-                  </>
-                ) : (
-                  <Text size="1" truncate style={{ flex: 1 }}>
-                    {colorName}
-                  </Text>
-                )}
-              </Flex>
-
-              {!isRenaming && (
-                <Text
-                  size="1"
-                  className={styles.hexCode}
-                  style={{ color: '#646464' }}
-                >
-                  {(() => {
-                    const format =
-                      color.displayFormat ??
-                      (color.value.colorSpace === 'hsl' ? 'hsl' : 'hex');
-
-                    switch (format) {
-                      case 'hsl':
-                        return `hsl(${Math.round(color.value.components[0])}, ${Math.round(color.value.components[1])}%, ${Math.round(color.value.components[2])}%)`;
-
-                      case 'rgb': {
-                        const r = Math.round(color.value.components[0] * 255);
-                        const g = Math.round(color.value.components[1] * 255);
-                        const b = Math.round(color.value.components[2] * 255);
-                        return `rgb(${r}, ${g}, ${b})`;
-                      }
-
-                      case 'hex':
-                      default:
-                        return (
-                          color.value.hex ?? getColorHex(color.value)
-                        ).toUpperCase();
-                    }
-                  })()}
-                </Text>
+        <ColorFormPopover
+          operation="edit"
+          color={color}
+          anchorRef={dotsButtonRef}
+          open={isEditPopoverOpen}
+          onOpenChange={setIsEditPopoverOpen}
+        >
+          <ContextMenu.Root onOpenChange={setIsMenuOpen}>
+            <ContextMenu.Trigger>
+              {/*
+                While renaming, the row must not act as a popover trigger so
+                clicks inside the rename input don't open the edit popover.
+              */}
+              {isRenaming ? (
+                row
+              ) : (
+                <Popover.Trigger asChild>{row}</Popover.Trigger>
               )}
-
-              {!isRenaming && (
-                <DropdownMenu.Root onOpenChange={setIsMenuOpen}>
-                  <DropdownMenu.Trigger>
-                    <button
-                      ref={dotsButtonRef as React.RefObject<HTMLButtonElement>}
-                      aria-label="Open contextual menu"
-                      className={styles.colorRowDots}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <DotsHorizontalIcon />
-                    </button>
-                  </DropdownMenu.Trigger>
-                  <UnifiedMenu.Content
-                    menuType="dropdown"
-                    onCloseAutoFocus={(e: Event) => {
-                      if (openingPopoverRef.current) {
-                        e.preventDefault();
-                        openingPopoverRef.current = false;
-                      }
-                    }}
-                  >
-                    {menuItems}
-                  </UnifiedMenu.Content>
-                </DropdownMenu.Root>
-              )}
-            </Flex>
-          </ContextMenu.Trigger>
-          <UnifiedMenu.Content menuType="context" align="start" side="right">
-            {menuItems}
-          </UnifiedMenu.Content>
-        </ContextMenu.Root>
+            </ContextMenu.Trigger>
+            <UnifiedMenu.Content menuType="context" align="start" side="right">
+              {menuItems}
+            </UnifiedMenu.Content>
+          </ContextMenu.Root>
+        </ColorFormPopover>
       </div>
 
-      {/* Popovers — each owns its Popover.Root; all anchor to the dots button */}
-      <ColorFormPopover
-        operation="edit"
-        color={color}
-        anchorRef={dotsButtonRef}
-        open={isEditPopoverOpen}
-        onOpenChange={setIsEditPopoverOpen}
-      />
+      {/* Menu-triggered popovers — each owns its Popover.Root and anchors to the
+          dots button. These still manage dismissal manually because they are
+          opened from the dropdown menu. */}
       <DeleteColorPopover
         color={color}
         anchorRef={dotsButtonRef}
