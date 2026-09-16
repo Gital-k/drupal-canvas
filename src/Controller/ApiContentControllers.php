@@ -579,11 +579,6 @@ final class ApiContentControllers extends ApiControllerBase {
         // so API consumers receive a proper object rather than a JSON string.
         $values['inputs'] = $item->getInputs();
         // Resolve color props to rich objects for client-side rendering.
-        // @todo Color is stored and validated as a string, but made available to
-        // components as a rich object. This logic mirrors
-        // getResolvedPropsAndBubbleableMetadata() in
-        // JsonSchemaPropsComponentSourceBase.
-        // @see https://www.drupal.org/i/...
         $component = $item->getComponent();
         $source = $component?->getComponentSource();
         if ($source instanceof JsonSchemaPropsComponentSourceBase) {
