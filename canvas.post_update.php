@@ -795,3 +795,42 @@ function canvas_post_update_0030_page_variant_selection_options(): void {
   $storage_definitions = \Drupal::service(EntityFieldManagerInterface::class)->getFieldStorageDefinitions('canvas_page');
   $update_manager->updateFieldStorageDefinition($storage_definitions['page_variant']);
 }
+
+/**
+ * Removes auto-created Component folders that hold no enabled Component.
+ */
+function canvas_post_update_0031_remove_empty_auto_created_folders(): void {
+  $folder_storage = \Drupal::entityTypeManager()->getStorage(Folder::ENTITY_TYPE_ID);
+  $component_storage = \Drupal::entityTypeManager()->getStorage(Component::ENTITY_TYPE_ID);
+
+  foreach ($folder_storage->loadMultiple() as $folder) {
+    \assert($folder instanceof Folder);
+    if ($folder->get('configEntityTypeId') !== Component::ENTITY_TYPE_ID) {
+      continue;
+    }
+    $items = $folder->get('items');
+    // A Folder with no items at all was created by a site owner and is still
+    // needed as a drop target.
+    if (empty($items)) {
+      continue;
+    }
+    $components = $component_storage->loadMultiple($items);
+    // Skip Folders with missing item config; dependency cleanup owns that.
+    if (count($components) !== count($items)) {
+      continue;
+    }
+    $enabled = array_filter($components, fn (Component $component): bool => $component->status());
+    if (!empty($enabled)) {
+      continue;
+    }
+    // All items disabled: only delete if this still looks like an untouched
+    // auto-created category Folder (name matches every item's default folder).
+    $folder_name = (string) $folder->label();
+    foreach ($components as $component) {
+      if ((string) $component->getComponentSource()->determineDefaultFolder() !== $folder_name) {
+        continue 2;
+      }
+    }
+    $folder->delete();
+  }
+}

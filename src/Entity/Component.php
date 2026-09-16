@@ -657,20 +657,37 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
     parent::postSave($storage, $update);
 
-    // For new Components, auto-create Folders based on their category.
-    if (!$update) {
+    // Auto-create a Folder based on this Component's category, but only for
+    // Components that are actually enabled: a Folder whose every item is
+    // disabled shows up in the Library as an empty folder the site owner
+    // cannot act on or remove.
+    //
+    // The trigger is "this Component is enabled", not "this Component was just
+    // switched on": SDCs are created enabled and never undergo a FALSE => TRUE
+    // transition, so keying on the transition alone would never file them.
+    //
+    // Config imports bring their own Folder config, so never create any here.
+    // @see https://git.drupalcode.org/project/canvas/-/work_items/3592055
+    $newly_enabled = !$update
+      ? $this->status()
+      : ($this->getOriginal() instanceof self && !$this->getOriginal()->status() && $this->status());
+    if ($newly_enabled && !\Drupal::isConfigSyncing()) {
       $category = $this->getComponentSource()->determineDefaultFolder();
 
-      $folder = Folder::loadByNameAndConfigEntityTypeId((string) $category, self::ENTITY_TYPE_ID);
-      if (empty($folder)) {
-        $folder = Folder::create([
-          'name' => $category,
-          'weight' => 0,
-          'status' => TRUE,
-          'configEntityTypeId' => self::ENTITY_TYPE_ID,
-        ]);
+      // Respect a site owner who deliberately moved this Component out of its
+      // folder: only file a Component that is not in one already.
+      if (Folder::loadByItemAndConfigEntityTypeId($this->id, self::ENTITY_TYPE_ID) === NULL) {
+        $folder = Folder::loadByNameAndConfigEntityTypeId((string) $category, self::ENTITY_TYPE_ID);
+        if (empty($folder)) {
+          $folder = Folder::create([
+            'name' => $category,
+            'weight' => 0,
+            'status' => TRUE,
+            'configEntityTypeId' => self::ENTITY_TYPE_ID,
+          ]);
+        }
+        $folder->addItems([$this->id])->save();
       }
-      $folder->addItems([$this->id])->save();
     }
   }
 
