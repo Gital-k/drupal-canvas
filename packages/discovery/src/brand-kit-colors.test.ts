@@ -224,9 +224,7 @@ describe('serializeColorValue', () => {
     ).toBe('hsla(220.5, 60%, 50%, 0.25)');
   });
 
-  it('keeps a token object when components only round to the hex', () => {
-    // 0.1 rounds to hex 1a, but 0x1a / 255 is not 0.1 — a string form
-    // would change the components on the next push.
+  it('writes the stored hex string when components only round to that hex', () => {
     expect(
       serializeColorValue({
         colorSpace: 'srgb',
@@ -234,14 +232,10 @@ describe('serializeColorValue', () => {
         alpha: null,
         hex: '#1a334d',
       }),
-    ).toEqual({
-      colorSpace: 'srgb',
-      components: [0.1, 0.2, 0.3],
-      hex: '#1a334d',
-    });
+    ).toBe('#1a334d');
   });
 
-  it('keeps a token object when the stored hex disagrees with the components', () => {
+  it('writes the stored hex string when the stored hex disagrees with components', () => {
     expect(
       serializeColorValue({
         colorSpace: 'srgb',
@@ -249,11 +243,17 @@ describe('serializeColorValue', () => {
         alpha: null,
         hex: '#000000',
       }),
-    ).toEqual({
-      colorSpace: 'srgb',
-      components: [0.5, 0.5, 0.5],
-      hex: '#000000',
-    });
+    ).toBe('#000000');
+  });
+
+  it('computes a hex string when an opaque srgb token has no stored hex', () => {
+    expect(
+      serializeColorValue({
+        colorSpace: 'srgb',
+        components: [0.8, 0, 0],
+        alpha: null,
+      }),
+    ).toBe('#cc0000');
   });
 
   it('keeps the rgb() form for opaque colors displayed as RGB', () => {

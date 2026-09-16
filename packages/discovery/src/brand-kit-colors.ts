@@ -319,10 +319,10 @@ export function colorTokenValuesEqual(
 }
 
 /**
- * Serializes a token for canvas.brand-kit.json: a CSS string when one parses
- * back to the exact same token, otherwise the token object. The parse-back
- * check makes the lossless guarantee structural — a value no string can
- * represent exactly stays an object, so the next push never rewrites it.
+ * Serializes a token for canvas.brand-kit.json as a CSS color string.
+ *
+ * The file keeps human-authored formats (`hex`, `rgb`, `hsl`) readable while
+ * token components remain an internal API detail.
  */
 export function serializeColorValue(
   token: ColorTokenValue,
@@ -330,29 +330,9 @@ export function serializeColorValue(
 ): BrandKitColorFileValue {
   const candidate = serializeCandidateString(token, preferredFormat);
   if (candidate !== null) {
-    const parsed = parseCssColorString(candidate)?.token;
-    if (
-      parsed &&
-      exactTokensEqual(parsed, token) &&
-      (token.hex == null ||
-        parsed.hex == null ||
-        parsed.hex.toLowerCase() === token.hex.toLowerCase())
-    ) {
-      return candidate;
-    }
+    return candidate;
   }
-  const out: ColorTokenValue = {
-    colorSpace: token.colorSpace,
-    components: token.components,
-  };
-  const opaque = token.alpha == null || token.alpha === 1;
-  if (!opaque) {
-    out.alpha = token.alpha;
-  }
-  if (token.hex != null) {
-    out.hex = token.hex;
-  }
-  return out;
+  return computedHex(token.components);
 }
 
 function serializeCandidateString(
@@ -387,25 +367,6 @@ function serializeCandidateString(
       : `hsla(${h}, ${s}%, ${l}%, ${String(token.alpha)})`;
   }
   return null;
-}
-
-/**
- * Bit-for-bit equality for the serialize round-trip check — an epsilon here
- * would let the string form change the stored value on the next push.
- */
-function exactTokensEqual(a: ColorTokenValue, b: ColorTokenValue): boolean {
-  if (a.colorSpace !== b.colorSpace) {
-    return false;
-  }
-  if (a.components.length !== b.components.length) {
-    return false;
-  }
-  for (let i = 0; i < a.components.length; i++) {
-    if (a.components[i] !== b.components[i]) {
-      return false;
-    }
-  }
-  return (a.alpha ?? 1) === (b.alpha ?? 1);
 }
 
 function channelTo255(component: number): number {
