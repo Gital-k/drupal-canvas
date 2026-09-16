@@ -120,21 +120,24 @@ final class CanvasTwigExtension extends AbstractExtension {
         $template = str_replace(' ', '%20', $params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM]);
       }
     }
-    // Stream wrappers.
-    if ($template === NULL && $this->streamWrapperManager->isValidUri($src)) {
-      $clean_uri = strtok($src, '?#');
-      $uri = $clean_uri !== FALSE ? rawurldecode($clean_uri) : rawurldecode($src);
-      $template = ParametrizedImageStyle::load('canvas_parametrized_width')?->buildUrlTemplate($uri);
-      if (\is_string($template)) {
-        $template = $this->fileUrlGenerator->transformRelative($template);
-        $template = str_replace(' ', '%20', $template);
+    // Stream wrappers or relative public file paths.
+    if ($template === NULL) {
+      $resolved_path = $this->resolvePath($src);
+      if ($resolved_path !== NULL && $this->streamWrapperManager->isValidUri($resolved_path)) {
+        $clean_uri = strtok($resolved_path, '?#');
+        $uri = $clean_uri !== FALSE ? rawurldecode($clean_uri) : rawurldecode($resolved_path);
+        $template = ParametrizedImageStyle::load('canvas_parametrized_width')?->buildUrlTemplate($uri);
+        if (\is_string($template)) {
+          $template = $this->fileUrlGenerator->transformRelative($template);
+          $template = str_replace(' ', '%20', $template);
+        }
+        // Respect the specified width, if any, but ensure that it's never
+        // bigger than the actual image width.
+        $actual_intrinsic_image_width = $this->getWidth($src);
+        $intrinsicImageWidth = $intrinsicImageWidth === NULL
+          ? $actual_intrinsic_image_width
+          : min($intrinsicImageWidth, $actual_intrinsic_image_width);
       }
-      // Respect the specified width, if any, but ensure that it's never bigger
-      // than the actual image width.
-      $actual_intrinsic_image_width = $this->getWidth($src);
-      $intrinsicImageWidth = $intrinsicImageWidth === NULL
-        ? $actual_intrinsic_image_width
-        : min($intrinsicImageWidth, $actual_intrinsic_image_width);
     }
 
     if (empty($template)) {

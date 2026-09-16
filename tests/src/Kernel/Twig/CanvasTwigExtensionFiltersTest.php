@@ -153,6 +153,21 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
         'public/my%20test%20image.png.avif?itok=lRrFaDXm'
       ),
     ];
+
+    yield 'root-relative public file URL without query string' => [
+      '/sites/default/files/balloons.png',
+      NULL,
+      $expect_all_srcset_widths,
+    ];
+
+    yield 'root-relative public file URL with spaces in filename' => [
+      '/sites/default/files/my%20test%20image.png',
+      NULL,
+      self::generateExpectedSrcSet(
+        self::getWidthsIncludingNextLarger($actual_width),
+        'public/my%20test%20image.png.avif?itok=lRrFaDXm'
+      ),
+    ];
   }
 
   /**
