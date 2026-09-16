@@ -8,8 +8,8 @@ use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\CandidateStorablePropShape;
-use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\canvas_test_storable_prop_shape_alter\Plugin\Field\FieldType\StructuredPairItem;
+use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\State\StateInterface;
 
 class CanvasTestStorablePropShapeAlterHooks {

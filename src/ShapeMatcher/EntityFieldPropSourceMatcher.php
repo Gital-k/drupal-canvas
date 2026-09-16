@@ -446,7 +446,13 @@ final class EntityFieldPropSourceMatcher {
       ...$matches,
       ...self::matchContentEntityReferenceShape($entity_data_definition, $schema),
       ...$this->matchDocumentShapeToMediaTypes($entity_data_definition, $levels_to_recurse, $is_required_in_json_schema, $schema, $cardinality_in_json_schema),
-      ...$this->matchObjectShapeToFieldTypes($entity_data_definition, $is_required_in_json_schema, $schema, $cardinality_in_json_schema, [...$matches_references, ...$matches]),
+      ...$this->matchObjectShapeToFieldTypes(
+        $entity_data_definition,
+        $is_required_in_json_schema,
+        $schema,
+        $cardinality_in_json_schema,
+        [...$matches_references, ...$matches],
+      ),
     ];
   }
 
@@ -465,7 +471,7 @@ final class EntityFieldPropSourceMatcher {
    * by conjuring a field of that type (StaticPropSource), while an existing
    * field instance of that very same field type on the host entity was never
    * offered (EntityFieldPropSource) — so the shape worked in the component
-   * editor and was unmappable in a Content Template.
+   * editor and was not matchable in a Content Template.
    *
    * So: reuse what the storable prop shape already established. If a field type
    * is declared to fit this object shape, then a field instance of that field
@@ -523,19 +529,22 @@ final class EntityFieldPropSourceMatcher {
       if ($cardinality_in_json_schema !== $field_definition->getFieldStorageDefinition()->getCardinality()) {
         continue;
       }
+      $object_props = [];
+      foreach ($storable->fieldTypeProp->objectPropsToFieldTypeProps as $object_prop_name => $field_type_prop) {
+        // Guaranteed by the early return above.
+        \assert($field_type_prop instanceof FieldTypePropExpression);
+        $object_props[$object_prop_name] = new FieldPropExpression(
+          $entity_data_definition,
+          $field_definition->getName(),
+          NULL,
+          $field_type_prop->propName,
+        );
+      }
       $matches[] = new FieldObjectPropsExpression(
         $entity_data_definition,
         $field_definition->getName(),
         NULL,
-        \array_map(
-          fn (FieldTypePropExpression $field_type_prop): FieldPropExpression => new FieldPropExpression(
-            $entity_data_definition,
-            $field_definition->getName(),
-            NULL,
-            $field_type_prop->propName,
-          ),
-          $storable->fieldTypeProp->objectPropsToFieldTypeProps,
-        ),
+        $object_props,
       );
     }
     return $matches;

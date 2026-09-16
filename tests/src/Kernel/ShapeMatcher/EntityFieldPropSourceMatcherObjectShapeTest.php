@@ -101,9 +101,11 @@ class EntityFieldPropSourceMatcherObjectShapeTest extends CanvasKernelTestBase {
 
     $this->assertSame(
       [$expected],
-      array_map(fn (EntityFieldPropSource $m): string => (string) $m->expression, $matches),
+      \array_map(fn (EntityFieldPropSource $m): string => (string) $m->expression, $matches),
     );
-    $this->assertInstanceOf(FieldObjectPropsExpression::class, reset($matches)->expression);
+    foreach ($matches as $match) {
+      $this->assertInstanceOf(FieldObjectPropsExpression::class, $match->expression);
+    }
   }
 
   /**
@@ -130,7 +132,7 @@ class EntityFieldPropSourceMatcherObjectShapeTest extends CanvasKernelTestBase {
         [
           'first' => ['type' => 'string'],
           'second' => ['type' => 'string'],
-          'unmappable' => ['type' => 'array', 'items' => ['type' => 'string']],
+          'not_matchable' => ['type' => 'array', 'items' => ['type' => 'string']],
         ],
         'ℹ︎␜entity:node:foo␝field_pair␞␟{first↠first,second↠second}',
       ],
@@ -160,7 +162,7 @@ class EntityFieldPropSourceMatcherObjectShapeTest extends CanvasKernelTestBase {
 
     // No exception. The node title populates the shape's one scalar member;
     // `nested` is absent from the expression rather than fatal.
-    $expressions = array_map(
+    $expressions = \array_map(
       fn (EntityFieldPropSource $m): string => (string) $m->expression,
       $this->matcher->match(FALSE, $shape, 'node', 'foo'),
     );
