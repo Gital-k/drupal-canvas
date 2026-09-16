@@ -14,6 +14,7 @@ import {
 import {
   createCanvasViteBuildConfig,
   extractComponentPreviewMetadataFromComponentYaml,
+  resolvePageColorPropsForPreview,
   validateCanvasImportRoots,
 } from '@drupal-canvas/vite-compat';
 import tailwindcss from '@tailwindcss/vite';
@@ -27,6 +28,7 @@ import { toPreviewPageSpec } from '../lib/spec-discovery';
 import type {
   DiscoveredComponent,
   DiscoveryResult,
+  NormalizedBrandKitColor,
 } from '@drupal-canvas/discovery';
 import type { Spec } from '@json-render/core';
 import type { OutputAsset, OutputChunk, RollupOutput } from 'rollup';
@@ -111,7 +113,14 @@ interface PreparedPagePreview {
 interface BuildPreviewPayloadDependencies {
   discover?: typeof discoverCanvasProject;
   resolveConfig?: typeof resolveCanvasConfig;
-  extractMetadata?: typeof extractComponentPreviewMetadataFromComponentYaml;
+  extractMetadata?: (
+    metadataPath: string,
+    brandKitColors?: NormalizedBrandKitColor[],
+  ) => Promise<{
+    label: string | null;
+    exampleProps: Record<string, unknown>;
+    requiredPropNames: string[];
+  }>;
   bundleInteractivePreview?: typeof bundleInteractivePreview;
 }
 
@@ -620,7 +629,11 @@ async function prepareComponentPreview(options: {
     };
   }
 
-  const metadata = await options.extractMetadata(component.metadataPath);
+  const brandKitColors = readBrandKitColors(options.projectRoot);
+  const metadata = await options.extractMetadata(
+    component.metadataPath,
+    brandKitColors,
+  );
   const spec = canvasTreeToSpec([
     {
       uuid: 'canvas-workbench-preview-root',
@@ -793,7 +806,10 @@ async function preparePagePreview(options: {
         name: page.name,
         projectRelativePath: page.relativePath,
       },
-      spec: parsedPage.spec,
+      spec: resolvePageColorPropsForPreview(
+        parsedPage.spec,
+        readBrandKitColors(options.projectRoot),
+      ),
       pageTemplateSpec,
       bundleSources: toPreviewablePageRegistrySources(
         options.discoveryResult.components,

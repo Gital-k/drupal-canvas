@@ -13,6 +13,7 @@ import {
   ensureHostGlobalCssExists,
   extractComponentPreviewMetadataFromComponentYaml,
   getWorkbenchHostGlobalCssVirtualUrl,
+  resolvePageColorPropsForPreview,
 } from '@drupal-canvas/vite-compat';
 
 import { isComponentMetadataPath } from '../lib/component-metadata-path';
@@ -312,7 +313,10 @@ async function loadPreviewPageSpec(
   }
 
   return {
-    spec: parsedPage.spec,
+    spec: resolvePageColorPropsForPreview(
+      parsedPage.spec,
+      readBrandKitColors(discoveryResult.projectRoot),
+    ),
     pageVariant: parsedPage.pageVariant,
     status: 200,
     error: null,
@@ -535,6 +539,7 @@ export async function buildWorkbenchPreviewManifest(
       const componentPreviewMetadata =
         await extractComponentPreviewMetadataFromComponentYaml(
           component.metadataPath,
+          readBrandKitColors(discoveryResult.projectRoot),
         );
       const exampleProps = componentPreviewMetadata.exampleProps;
       const { mocks, warnings } = await loadComponentMocks(
@@ -922,16 +927,33 @@ export function createWorkbenchPlugin(paths: WorkbenchPaths): Plugin {
         }
 
         if (path.basename(filePath) === BRAND_KIT_CONFIG_FILENAME) {
-          // A brand kit edit only affects the generated stylesheet. Vite does
-          // not know the virtual module reads this file, so reload it by hand:
-          // reloadModule() invalidates it and pushes an HMR update, and the
-          // self-accepting CSS module hot-swaps its style in the open preview.
+          // A brand kit edit affects both the generated stylesheet and the
+          // resolved color prop values (cssColorValue, cssVariable, colorName).
+          // Reload the CSS module first, then refresh the manifest to re-resolve
+          // color props with the updated brand kit colors.
           const brandKitModule = server.moduleGraph.getModuleById(
             resolvedVirtualBrandKitCssId,
           );
           if (brandKitModule) {
             void server.reloadModule(brandKitModule);
           }
+          void refresh()
+            .then(() => {
+              server.ws.send({
+                type: 'custom',
+                event: 'canvas:workbench:update',
+                data: {
+                  reloadFrameOnly: false,
+                  filePath,
+                  event,
+                },
+              });
+            })
+            .catch((error) => {
+              server.config.logger.error(
+                `Failed to refresh discovery after brand kit change: ${String(error)}`,
+              );
+            });
           return;
         }
 
