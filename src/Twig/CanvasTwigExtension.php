@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Twig;
 
+// cspell:ignore WHATWG
 use Drupal\canvas\Entity\ParametrizedImageStyle;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
@@ -114,7 +115,9 @@ final class CanvasTwigExtension extends AbstractExtension {
       if (!empty($params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM])) {
         // We only expect 1 `alternateWidths` query parameter.
         \assert(\is_string($params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM]));
-        $template = urldecode($params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM]);
+        // Note: parse_str() already decodes query parameters. Keep spaces
+        // encoded as %20 for WHATWG HTML §4.8.4.3.7 compliance.
+        $template = str_replace(' ', '%20', $params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM]);
       }
     }
     // Stream wrappers.
@@ -124,6 +127,7 @@ final class CanvasTwigExtension extends AbstractExtension {
       $template = ParametrizedImageStyle::load('canvas_parametrized_width')?->buildUrlTemplate($uri);
       if (\is_string($template)) {
         $template = $this->fileUrlGenerator->transformRelative($template);
+        $template = str_replace(' ', '%20', $template);
       }
       // Respect the specified width, if any, but ensure that it's never bigger
       // than the actual image width.
