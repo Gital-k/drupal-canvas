@@ -16,10 +16,18 @@ canvas_personalization.segment.*:
       label: Description
       nullable: true
     rules:
-      # @todo: We should validate the keys are valid filtered plugins. Fix in https://www.drupal.org/i/3527409
       type: sequence
       label: Segment Rules
       orderby: key
+      constraints:
+        # Segment rules are keyed by condition plugin ID. Only the condition
+        # plugins that personalization allows may be used as a segment rule.
+        # @see \Drupal\canvas_personalization\Hook\SegmentationRulesHooks::conditionPersonalizationAlter()
+        # @see \Drupal\canvas_personalization\Entity\Segment::addSegmentRule()
+        SequenceKeysAreFilteredPluginIds:
+          manager: plugin.manager.condition
+          consumer: canvas_personalization
+          interface: Drupal\Core\Condition\ConditionInterface
       sequence:
         type: condition.plugin.[%key]
         label: Condition Settings

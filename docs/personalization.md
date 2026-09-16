@@ -111,6 +111,13 @@ id, label, description, rules (array), weight(int), status (bool)
 
 The personalization rules will re-use the existing Condition API from Drupal core.
 
+Not every condition plugin makes sense as a segment rule, so personalization narrows the available ones through
+`hook_plugin_filter_condition__canvas_personalization_alter()`. That narrowed set is what the Drupal UI offers, what
+`\Drupal\canvas_personalization\Entity\Segment::addSegmentRule()` accepts, and — thanks to the
+`SequenceKeysAreFilteredPluginIds` validation constraint on the `rules` sequence — what validation of the stored config
+accepts. Drupal core's `PluginExists` constraint is not sufficient here: it only checks that a condition plugin exists,
+not that personalization allows it.
+
 We need to take into consideration third-party integrations defining segment rules.
 We might need in the future ensuring the last step for negotiation is done client-side. This means, more than one
 grafting could be served for a given variation, and which one is actually active to the user could happen client-side.
