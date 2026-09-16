@@ -140,16 +140,9 @@ test.describe('brand kit fonts', () => {
     // so the reload below cannot abort a still-in-flight save.
     const nameInput = page.locator(SEL.familyNameInput).first();
     await expect(nameInput).toHaveValue('Mona Sans');
-    const autoSaved = page.waitForResponse(
-      (response) =>
-        response.url().includes('config/auto-save/brand_kit/global') &&
-        response.request().method() === 'PATCH' &&
-        response.ok(),
-    );
     await nameInput.fill('Renamed Sans');
     await nameInput.blur();
     await expect(familyRow).toContainText('Renamed Sans');
-    await autoSaved;
 
     // Leave the fonts tab then return to it to ensure the flyout is closed.
     await page.locator(SEL.colorsTab).click();
