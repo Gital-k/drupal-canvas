@@ -79,6 +79,18 @@ import type { WorkbenchHotPayload } from '@wb/lib/workbench-preview-iframe-remou
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 const DEFAULT_COMPONENT_VARIANT_ID = '__default__';
 
+/** Build cssUrls array from manifest and component CSS. */
+const mkCssUrls = (
+  m: PreviewManifest,
+  comps: DiscoveredComponent[],
+): string[] => [
+  ...(m.brandKitCssUrl ? [m.brandKitCssUrl] : []),
+  ...(m.globalCssUrl ? [m.globalCssUrl] : []),
+  ...comps
+    .filter((c) => c.cssEntryPath !== null)
+    .map((c) => toViteFsUrl(c.cssEntryPath!)),
+];
+
 interface ComponentPreviewVariant {
   id: string;
   label: string;
@@ -889,17 +901,7 @@ export function App() {
               },
             ];
         const cssUrls = selectedComponentMock
-          ? [
-              ...(previewManifest.brandKitCssUrl
-                ? [previewManifest.brandKitCssUrl]
-                : []),
-              ...(previewManifest.globalCssUrl
-                ? [previewManifest.globalCssUrl]
-                : []),
-              ...(discoveryResult?.components ?? [])
-                .filter((component) => component.cssEntryPath !== null)
-                .map((component) => toViteFsUrl(component.cssEntryPath!)),
-            ]
+          ? mkCssUrls(previewManifest, discoveryResult?.components ?? [])
           : [
               ...(previewManifest.brandKitCssUrl
                 ? [previewManifest.brandKitCssUrl]
@@ -1008,17 +1010,7 @@ export function App() {
                     jsEntryUrl: toViteFsUrl(component.jsEntryPath),
                   }),
                 ),
-              cssUrls: [
-                ...(previewManifest.brandKitCssUrl
-                  ? [previewManifest.brandKitCssUrl]
-                  : []),
-                ...(previewManifest.globalCssUrl
-                  ? [previewManifest.globalCssUrl]
-                  : []),
-                ...discoveryResult.components
-                  .filter((component) => component.cssEntryPath !== null)
-                  .map((component) => toViteFsUrl(component.cssEntryPath!)),
-              ],
+              cssUrls: mkCssUrls(previewManifest, discoveryResult.components),
             },
           };
           frameWindow.postMessage(pageMessage, window.location.origin);
@@ -1227,17 +1219,7 @@ export function App() {
                     jsEntryUrl: toViteFsUrl(component.jsEntryPath),
                   }),
                 ),
-              cssUrls: [
-                ...(previewManifest.brandKitCssUrl
-                  ? [previewManifest.brandKitCssUrl]
-                  : []),
-                ...(previewManifest.globalCssUrl
-                  ? [previewManifest.globalCssUrl]
-                  : []),
-                ...discoveryResult.components
-                  .filter((component) => component.cssEntryPath !== null)
-                  .map((component) => toViteFsUrl(component.cssEntryPath!)),
-              ],
+              cssUrls: mkCssUrls(previewManifest, discoveryResult.components),
             },
           };
           frameWindow.postMessage(templateMessage, window.location.origin);
@@ -1303,17 +1285,7 @@ export function App() {
                   name: component.name,
                   jsEntryUrl: toViteFsUrl(component.jsEntryPath),
                 })),
-              cssUrls: [
-                ...(previewManifest.brandKitCssUrl
-                  ? [previewManifest.brandKitCssUrl]
-                  : []),
-                ...(previewManifest.globalCssUrl
-                  ? [previewManifest.globalCssUrl]
-                  : []),
-                ...discoveryResult.components
-                  .filter((component) => component.cssEntryPath !== null)
-                  .map((component) => toViteFsUrl(component.cssEntryPath!)),
-              ],
+              cssUrls: mkCssUrls(previewManifest, discoveryResult.components),
             },
           };
           frameWindow.postMessage(pageTemplateMessage, window.location.origin);

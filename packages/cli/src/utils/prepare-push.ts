@@ -3,6 +3,10 @@ import path from 'path';
 import chalk from 'chalk';
 import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
+import {
+  CANVAS_COLOR_REF_PREFIX,
+  UUID_PATTERN,
+} from '@drupal-canvas/discovery';
 import { getImportsFromAst } from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
 
 import { getGlobalCss } from './build-tailwind.js';
@@ -55,17 +59,6 @@ interface PushProgressSpinner {
   stop: (message?: string) => void;
   message: (message?: string) => void;
 }
-
-/**
- * Prefix used for brand kit color references in stored values.
- */
-const CANVAS_COLOR_REF_PREFIX = 'canvas-color:';
-
-/**
- * UUID pattern used to distinguish canvas-color:<uuid> from canvas-color:<cssVarKey>.
- */
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Transforms a single color example value for API submission.

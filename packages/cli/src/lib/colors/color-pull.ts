@@ -5,6 +5,7 @@ import {
   BRAND_KIT_SCHEMA_URL,
   colorTokenValuesEqual,
   deriveColorName,
+  itemName,
   normalizeBrandKitColors,
   parseCssColorString,
   serializeColorValue,
@@ -38,10 +39,6 @@ export interface ColorPullPlan {
 export interface ColorPullOptions {
   /** Keep existing local entries untouched; only append new server colors. */
   skipOverwrite?: boolean;
-}
-
-function itemName(name: string, cssVariable: string): string {
-  return `${name} (${cssVariable})`;
 }
 
 /**

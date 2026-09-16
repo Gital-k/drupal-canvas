@@ -1,5 +1,6 @@
 import {
   colorTokenValuesEqual,
+  itemName,
   normalizeBrandKitColors,
 } from '@drupal-canvas/discovery';
 
@@ -35,10 +36,6 @@ export interface ColorPushResult {
   /** Names of colors on the server that are absent from the local file. */
   serverOnly: string[];
   outcomes: ColorPushOutcome[];
-}
-
-function itemName(name: string, cssVariable: string): string {
-  return `${name} (${cssVariable})`;
 }
 
 /**

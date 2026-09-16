@@ -29,6 +29,20 @@ export const COLOR_KEY_PATTERN = /^(--)?[a-zA-Z_-][a-zA-Z0-9_-]*$/;
 /** Six- or eight-digit hex color string accepted in the brand kit file. */
 export const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/;
 
+/** Prefix used for brand kit color references in stored values. */
+export const CANVAS_COLOR_REF_PREFIX = 'canvas-color:';
+
+/**
+ * UUID pattern used to distinguish canvas-color:<uuid> from canvas-color:<cssVarKey>.
+ * Case-insensitive (standard 8-4-4-4-12 format).
+ */
+export const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Formats a color name and CSS variable for display in CLI output. */
+export const itemName = (name: string, cssVariable: string): string =>
+  `${name} (${cssVariable})`;
+
 /**
  * Color value in W3C design token format, as stored on `canvas.color.*`
  * config entities and returned by the brand kit HTTP API.

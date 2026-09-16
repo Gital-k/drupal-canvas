@@ -4,7 +4,11 @@ import { Option } from 'commander';
 import yaml from 'js-yaml';
 import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
-import { discoverCanvasProject } from '@drupal-canvas/discovery';
+import {
+  CANVAS_COLOR_REF_PREFIX,
+  discoverCanvasProject,
+  UUID_PATTERN,
+} from '@drupal-canvas/discovery';
 import { resolveHostGlobalCssPath } from '@drupal-canvas/vite-compat';
 
 import { ensureConfig, getConfig } from '../config';
@@ -232,17 +236,6 @@ export function buildSkippedLocalOnlyPullResources(
     },
   ];
 }
-
-/**
- * Prefix used for brand kit color references in stored values.
- */
-const CANVAS_COLOR_REF_PREFIX = 'canvas-color:';
-
-/**
- * UUID pattern used to distinguish canvas-color:<uuid> from canvas-color:<cssVarKey>.
- */
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Transforms a single color example value for storage in component.yml.
