@@ -228,10 +228,12 @@ formatting utilities. Both Twig filters and JSX functions automatically:
 **Twig:**
 
 ```twig
-{{ my_date_prop|canvasFormatDate }}
-{{ my_datetime_prop|canvasFormatDateTime }}
-{{ my_time_prop|canvasFormatTime }}
-{{ my_date_range_prop|canvasFormatDateRange }}
+{% set formatted_range = my_date_range_prop|canvasFormatDateRange %}
+
+<p><strong>Date:</strong> {{ my_date_prop|canvasFormatDate }}</p>
+<p><strong>DateTime:</strong> {{ my_datetime_prop|canvasFormatDateTime }}</p>
+<p><strong>Time:</strong> {{ my_time_prop|canvasFormatTime }}</p>
+<p><strong>Date Range:</strong> {{ formatted_range.from }} - {{ formatted_range.to }}</p>
 ```
 
 **JSX — default short style:**
@@ -244,10 +246,26 @@ import {
   canvasFormatDateRange,
 } from 'drupal-canvas';
 
-canvasFormatDate(myDateProp)          // e.g. '1/15/26' (en) or '15/01/2026' (fr)
-canvasFormatDateTime(myDatetimeProp)  // e.g. '1/15/26, 2:30 PM' (en)
-canvasFormatTime(myTimeProp)          // e.g. '2:30 PM' (en)
-canvasFormatDateRange(myDateRangeProp) // { from: '1/15/26', to: '3/20/26' }
+export default function MyDateComponent({
+  myDateProp,
+  myDatetimeProp,
+  myTimeProp,
+  myDateRangeProp,
+}) {
+  const formattedDate = canvasFormatDate(myDateProp);
+  const formattedDateTime = canvasFormatDateTime(myDatetimeProp);
+  const formattedTime = canvasFormatTime(myTimeProp);
+  const formattedDateRange = canvasFormatDateRange(myDateRangeProp);
+
+  return (
+    <div>
+      <p><strong>Date:</strong> {formattedDate}</p>
+      <p><strong>DateTime:</strong> {formattedDateTime}</p>
+      <p><strong>Time:</strong> {formattedTime}</p>
+      <p><strong>Date Range:</strong> {formattedDateRange.from} - {formattedDateRange.to}</p>
+    </div>
+  );
+}
 ```
 
 **JSX — custom format style:**

@@ -51,10 +51,23 @@ test.describe('Date formatting Twig filters', () => {
     // eslint-disable-next-line playwright/no-networkidle
     await page.waitForLoadState('networkidle');
 
+    // Verify raw ISO date value is rendered correctly.
+    await canvas.testInPreviewFrame('#date-raw', async (el) => {
+      const text = (await el.textContent())?.trim() ?? '';
+      expect(text).toBe('2026-01-15');
+    });
+
     // The date filter must produce the en-US short date for Jan 15 2026.
     await canvas.testInPreviewFrame('#date-formatted-date', async (el) => {
       const text = (await el.textContent())?.trim() ?? '';
       expect(text).toBe('1/15/26');
+    });
+
+    // Verify raw ISO datetime value is rendered correctly.
+    // Accept both formats: with and without milliseconds.
+    await canvas.testInPreviewFrame('#date-time-raw', async (el) => {
+      const text = (await el.textContent())?.trim() ?? '';
+      expect(text).toMatch(/^2026-01-15T14:30:00(?:\.\d{3})?Z$/);
     });
 
     // The datetime filter must produce the en-US short datetime for Jan 15
