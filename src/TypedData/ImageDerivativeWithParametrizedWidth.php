@@ -45,8 +45,11 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
   }
 
   private static function getParametrizedImageStyle(): ParametrizedImageStyle {
-    // @phpstan-ignore-next-line
-    return ParametrizedImageStyle::load('canvas_parametrized_width');
+    $style = ParametrizedImageStyle::load('canvas_parametrized_width');
+    if ($style === NULL) {
+      throw new \RuntimeException('The `canvas_parametrized_width` image style was not found, but is needed for Canvas to work properly.');
+    }
+    return $style;
   }
 
   /**
@@ -69,11 +72,6 @@ final class ImageDerivativeWithParametrizedWidth extends UriTemplate implements 
     \assert($file instanceof File);
 
     \assert(\is_string($file->getFileUri()));
-    // Because this image style is an enforced dependency of the Canvas module,
-    // it is possible to assume it always exists. Because this computed property
-    // is also only present when Canvas is installed.
-    // @see config/install/image.style.canvas_parametrized_width.yml
-    // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride::propertyDefinitions()
     $parametrized_image_style = $this->getParametrizedImageStyle();
     $url_template = $parametrized_image_style->buildUrlTemplate($file->getFileUri());
     \assert(str_contains($url_template, '{width}'));
