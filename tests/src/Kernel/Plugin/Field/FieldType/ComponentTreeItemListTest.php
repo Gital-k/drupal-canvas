@@ -1721,12 +1721,16 @@ HTML,
         'slot_name' => 'the_body',
       ],
     ];
+    // A bonsai tree: its root names the exposed slot's machine name in `slot`
+    // and stores no `parent_uuid`, because the component instance holding the
+    // exposed slot lives in the content template's tree, not in this one.
+    // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::isInExposedSlot()
     $valid_subtree = [
       [
         'uuid' => 'caac2f59-6a47-41d5-8dc9-0fa99a7e6101',
         'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-        'parent_uuid' => '72eb7863-ea7f-4e31-8cfe-01f0d0471682',
-        'slot' => 'the_body',
+        'parent_uuid' => NULL,
+        'slot' => 'exposed',
         'inputs' => [
           'heading' => [
             'sourceType' => 'static:field_item:string',
@@ -1736,6 +1740,11 @@ HTML,
         ],
       ],
     ];
+    // On injection, the exposed slot's machine name is resolved to the
+    // component instance and slot it currently points at.
+    $injected_subtree = $valid_subtree;
+    $injected_subtree[0]['parent_uuid'] = '72eb7863-ea7f-4e31-8cfe-01f0d0471682';
+    $injected_subtree[0]['slot'] = 'the_body';
 
     // The subtree is properly injected into the exposed slot and its inputs are
     // merged into the main tree.
@@ -1743,7 +1752,26 @@ HTML,
       $initial_tree,
       $valid_exposed_slots,
       $valid_subtree,
-      \array_merge($initial_tree, $valid_subtree),
+      \array_merge($initial_tree, $injected_subtree),
+    ];
+
+    // The same stored subtree, injected into an exposed slot that the site
+    // builder has moved to a different slot of the same component instance. The
+    // subtree is untouched, yet it lands in the exposed slot's new home: this is
+    // the capability that referencing exposed slots by machine name unlocks.
+    $moved_injected_subtree = $valid_subtree;
+    $moved_injected_subtree[0]['parent_uuid'] = '72eb7863-ea7f-4e31-8cfe-01f0d0471682';
+    $moved_injected_subtree[0]['slot'] = 'the_colophon';
+    yield 'No error: the exposed slot moved, the subtree follows it' => [
+      $initial_tree,
+      [
+        'exposed' => [
+          'component_uuid' => '72eb7863-ea7f-4e31-8cfe-01f0d0471682',
+          'slot_name' => 'the_colophon',
+        ],
+      ],
+      $valid_subtree,
+      \array_merge($initial_tree, $moved_injected_subtree),
     ];
 
     // The subtree targets a slot that isn't exposed, so it's just ignored.

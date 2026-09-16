@@ -795,3 +795,195 @@ function canvas_post_update_0030_page_variant_selection_options(): void {
   $storage_definitions = \Drupal::service(EntityFieldManagerInterface::class)->getFieldStorageDefinitions('canvas_page');
   $update_manager->updateFieldStorageDefinition($storage_definitions['page_variant']);
 }
+
+/**
+ * Returns the slots exposed by an entity's content template, keyed by name.
+ *
+ * Only the `full` view mode can expose slots.
+ *
+ * @return array<string, array{'component_uuid': string, 'slot_name': string, 'label': string}>
+ *
+ * @see \Drupal\canvas\Entity\ContentTemplate::getExposedSlots()
+ */
+function _canvas_exposed_slots_for(string $entity_type_id, string $bundle): array {
+  $templates = &drupal_static(__FUNCTION__, []);
+  $template_id = \implode('.', [$entity_type_id, $bundle, 'full']);
+  if (!\array_key_exists($template_id, $templates)) {
+    $template = \Drupal::entityTypeManager()
+      ->getStorage(ContentTemplate::ENTITY_TYPE_ID)
+      ->load($template_id);
+    $templates[$template_id] = $template instanceof ContentTemplate ? $template->getExposedSlots() : [];
+  }
+  return $templates[$template_id];
+}
+
+/**
+ * Reference exposed content template slots by machine name, not UUID + slot.
+ */
+function canvas_post_update_0031_content_exposed_slot_machine_names(array &$sandbox): void {
+  $entity_type_manager = \Drupal::entityTypeManager();
+
+  // Build the work list once: every revision (or entity) id of every content
+  // entity holding a component_tree field. Every revision must be fixed — the
+  // data-health audit validates default, past and forward revisions separately.
+  if (!isset($sandbox['items'])) {
+    $entity_field_manager = \Drupal::service(EntityFieldManagerInterface::class);
+    \assert($entity_field_manager instanceof EntityFieldManagerInterface);
+    $sandbox['items'] = [];
+    $sandbox['fields'] = [];
+    foreach ($entity_field_manager->getFieldMapByFieldType(ComponentTreeItem::PLUGIN_ID) as $entity_type_id => $fields) {
+      $sandbox['fields'][$entity_type_id] = \array_keys($fields);
+      $query = $entity_type_manager->getStorage($entity_type_id)->getQuery()->accessCheck(FALSE);
+      if ($entity_type_manager->getDefinition($entity_type_id)->isRevisionable()) {
+        $query->allRevisions();
+      }
+      // allRevisions() keys the result by revision id, otherwise by entity id.
+      foreach (\array_keys($query->execute()) as $id) {
+        $sandbox['items'][] = [$entity_type_id, $id];
+      }
+    }
+    $sandbox['total'] = \count($sandbox['items']);
+    $sandbox['progress'] = 0;
+  }
+
+  $batch = \array_slice($sandbox['items'], $sandbox['progress'], (int) Settings::get('entity_update_batch_size', 50));
+  foreach ($batch as [$entity_type_id, $id]) {
+    $storage = $entity_type_manager->getStorage($entity_type_id);
+    $revisionable = $entity_type_manager->getDefinition($entity_type_id)->isRevisionable();
+    if ($revisionable) {
+      \assert($storage instanceof RevisionableStorageInterface);
+      $entity = $storage->loadRevision($id);
+    }
+    else {
+      $entity = $storage->load($id);
+    }
+    if (!$entity instanceof ContentEntityInterface) {
+      continue;
+    }
+    $exposed_slots = _canvas_exposed_slots_for($entity_type_id, $entity->bundle());
+    if ($exposed_slots === []) {
+      // Without exposed slots there is nothing a bonsai root could resolve to.
+      continue;
+    }
+    $changed = FALSE;
+    // Component trees can differ per translation (asymmetric fields), so visit
+    // each.
+    foreach (\array_keys($entity->getTranslationLanguages()) as $langcode) {
+      $translation = $entity->getTranslation((string) $langcode);
+      foreach ($sandbox['fields'][$entity_type_id] as $field_name) {
+        \assert(\is_string($field_name));
+        if (!$translation->hasField($field_name)) {
+          continue;
+        }
+        $own_uuids = [];
+        foreach ($translation->get($field_name) as $item) {
+          \assert($item instanceof ComponentTreeItem);
+          $own_uuids[] = $item->getUuid();
+        }
+        foreach ($translation->get($field_name) as $item) {
+          \assert($item instanceof ComponentTreeItem);
+          $changed = CanvasConfigUpdater::rewriteExposedSlotReferenceToMachineName($item, $exposed_slots, $own_uuids) || $changed;
+        }
+      }
+    }
+    if ($changed) {
+      // Rewrite the revision in place; do not spawn a new one.
+      if ($revisionable) {
+        $entity->setNewRevision(FALSE);
+      }
+      $entity->save();
+    }
+  }
+
+  $sandbox['progress'] += \count($batch);
+  $sandbox['#finished'] = $sandbox['total'] == 0 ? 1 : ($sandbox['progress'] / $sandbox['total']);
+}
+
+/**
+ * Do the same for auto-saved drafts, which hold their own component trees.
+ */
+function canvas_post_update_0031_auto_save_exposed_slot_machine_names(): void {
+  $store = \Drupal::keyValue(AutoSaveManager::AUTO_SAVE_STORE);
+  $entity_type_manager = \Drupal::entityTypeManager();
+  $changed_keys = [];
+  foreach ($store->getAll() as $key => $entry) {
+    if (!\is_array($entry) || !\array_key_exists('data', $entry) || !\is_array($entry['data'])) {
+      continue;
+    }
+    if (!isset($entry['entity_type']) || !\is_string($entry['entity_type'])) {
+      continue;
+    }
+    if (!$entity_type_manager->getDefinition($entry['entity_type'], FALSE)?->entityClassImplements(ContentEntityInterface::class)) {
+      // Config entities have no content template of their own, so their
+      // component trees never contain bonsai roots.
+      continue;
+    }
+    // Reconstruct the draft to learn its bundle; the snapshot is raw field
+    // values, which is also what gets rewritten below.
+    $draft = $entity_type_manager->getStorage($entry['entity_type'])->create($entry['data']);
+    $exposed_slots = _canvas_exposed_slots_for($entry['entity_type'], $draft->bundle());
+    if ($exposed_slots === []) {
+      continue;
+    }
+    if (_canvas_rewrite_exposed_slots_in_raw($entry['data'], $exposed_slots)) {
+      $store->set($key, $entry);
+      $changed_keys[] = $key;
+    }
+  }
+  if ($changed_keys !== []) {
+    \Drupal::service(CacheTagsInvalidatorInterface::class)->invalidateTags([AutoSaveManager::CACHE_TAG]);
+  }
+}
+
+/**
+ * Rewrites bonsai roots in a raw auto-save snapshot of a content entity.
+ *
+ * A component instance is any associative array carrying a `uuid` alongside a
+ * `component_id`. Only instances whose `parent_uuid` is absent from the same
+ * field's own set of UUIDs, and whose (`parent_uuid`, `slot`) pair matches an
+ * exposed slot, are rewritten. Mutates $data by reference; returns TRUE if
+ * changed.
+ *
+ * @param array<string, array{'component_uuid': string, 'slot_name': string, 'label': string}> $exposed_slots
+ *
+ * @see \Drupal\canvas\CanvasConfigUpdater::rewriteExposedSlotReferenceToMachineName()
+ */
+function _canvas_rewrite_exposed_slots_in_raw(array &$data, array $exposed_slots): bool {
+  $changed = FALSE;
+  foreach ($data as &$field_value) {
+    if (!\is_array($field_value)) {
+      continue;
+    }
+    // A component tree field value is a list of component instances.
+    $own_uuids = [];
+    foreach ($field_value as $delta_value) {
+      if (\is_array($delta_value) && isset($delta_value['uuid'], $delta_value['component_id']) && \is_string($delta_value['uuid'])) {
+        $own_uuids[] = $delta_value['uuid'];
+      }
+    }
+    if ($own_uuids === []) {
+      // Not a component tree; recurse in case it nests one.
+      $changed = _canvas_rewrite_exposed_slots_in_raw($field_value, $exposed_slots) || $changed;
+      continue;
+    }
+    foreach ($field_value as &$delta_value) {
+      if (!\is_array($delta_value) || !isset($delta_value['parent_uuid'], $delta_value['slot'])) {
+        continue;
+      }
+      if (\in_array($delta_value['parent_uuid'], $own_uuids, TRUE)) {
+        continue;
+      }
+      foreach ($exposed_slots as $exposed_slot_name => $exposed_slot) {
+        if (($exposed_slot['component_uuid'] ?? NULL) === $delta_value['parent_uuid'] && ($exposed_slot['slot_name'] ?? NULL) === $delta_value['slot']) {
+          $delta_value['parent_uuid'] = NULL;
+          $delta_value['slot'] = (string) $exposed_slot_name;
+          $changed = TRUE;
+          break;
+        }
+      }
+    }
+    unset($delta_value);
+  }
+  unset($field_value);
+  return $changed;
+}

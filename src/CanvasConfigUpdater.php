@@ -239,6 +239,58 @@ class CanvasConfigUpdater {
   }
 
   /**
+   * Rewrites a bonsai root to reference its exposed slot by machine name.
+   *
+   * Content entities used to fill a slot exposed by their content template by
+   * storing the UUID and slot name that the exposed slot happened to resolve
+   * to. Those pointers broke the moment a site builder moved the exposed slot
+   * elsewhere in the content template's component tree. A bonsai root now
+   * stores the exposed slot's own machine name in `slot`, and nothing in
+   * `parent_uuid`, so moving the exposed slot leaves the content intact.
+   *
+   * Returns TRUE when it changed the item.
+   *
+   * @param \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem $item
+   *   The component instance to rewrite, if it is a bonsai root in the old
+   *   form.
+   * @param array<string, array{'component_uuid': string, 'slot_name': string, 'label': string}> $exposed_slots
+   *   The exposed slots of the content template that applies to the entity
+   *   holding $item.
+   * @param string[] $own_uuids
+   *   The UUIDs of every component instance in $item's own component tree.
+   *
+   * @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem::schema()
+   * @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::isInExposedSlot()
+   */
+  public static function rewriteExposedSlotReferenceToMachineName(ComponentTreeItem $item, array $exposed_slots, array $own_uuids): bool {
+    $parent_uuid = $item->getParentUuid();
+    $slot = $item->getSlot();
+    if ($parent_uuid === NULL || $slot === NULL) {
+      // Either a component instance at the root of the tree, or already
+      // rewritten: a bonsai root has a slot but no parent UUID.
+      return FALSE;
+    }
+    if (\in_array($parent_uuid, $own_uuids, TRUE)) {
+      // The parent lives in this same component tree, so this is an ordinary
+      // nested component instance, not a bonsai root.
+      return FALSE;
+    }
+    foreach ($exposed_slots as $exposed_slot_name => $exposed_slot) {
+      if (($exposed_slot['component_uuid'] ?? NULL) === $parent_uuid && ($exposed_slot['slot_name'] ?? NULL) === $slot) {
+        $item->set('parent_uuid', NULL);
+        $item->set('slot', (string) $exposed_slot_name);
+        return TRUE;
+      }
+    }
+    // Nothing resolves this pointer: it names a component instance and slot
+    // that no exposed slot refers to. Leave it untouched. Such dangling
+    // references were already tolerated — they do not render, and validation
+    // reports them — and guessing an exposed slot for them would silently move
+    // content somewhere the content creator never put it.
+    return FALSE;
+  }
+
+  /**
    * Whether a config tree has a block instance with a boolean `label_display`.
    *
    * Read-only predicate: the coercion runs in preSave via

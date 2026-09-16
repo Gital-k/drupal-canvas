@@ -247,16 +247,19 @@ final class ComponentTreeStructureConstraintValidator extends ConstraintValidato
     $root = $payload['root'];
 
     if (empty($component_instance['parent_uuid'])) {
-      // The mirror image of the "a parent UUID requires a slot name" check
-      // below: a slot name without a parent UUID is meaningless, because a
-      // slot can only be identified relative to a parent component instance.
-      if (!empty($component_instance['slot'])) {
-        $context->buildViolation('Invalid component tree item with UUID %uuid. A parent UUID must be present if a slot name is provided.', [
-          '%uuid' => $component_instance['uuid'],
-        ])
-          ->atPath('slot')
-          ->addViolation();
+      if (empty($component_instance['slot'])) {
+        // Neither a parent component instance nor a slot: a component instance
+        // at the root of this component tree.
+        return;
       }
+      // A slot without a parent component instance is the root of a "bonsai
+      // tree": a subtree a content entity contributes to a slot its content
+      // template exposes. `slot` then holds the exposed slot's machine name,
+      // not the name of a slot on a component instance in this tree — the
+      // component instance holding the exposed slot lives in the content
+      // template's component tree.
+      // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::isInExposedSlot()
+      self::validateExposedSlotName($component_instance, $context, $entity_type_manager, $root);
       return;
     }
 
@@ -309,27 +312,11 @@ final class ComponentTreeStructureConstraintValidator extends ConstraintValidato
       return;
     }
 
+    // TRICKY: a content entity's component instances never name a parent that
+    // lives in its content template's component tree. Subtrees contributed to
+    // an exposed slot name that slot's machine name instead, and are handled
+    // by the `empty($component_instance['parent_uuid'])` branch above.
     $parent = \array_filter($tree, static fn (array $item) => $item['uuid'] === $component_instance['parent_uuid']);
-
-    if ($root instanceof EntityAdapter) {
-      // We might have a subtree here that works with a content template.
-      // Attempt to fetch the template.
-      $entity = $root->getValue();
-      \assert($entity instanceof EntityInterface);
-      $content_template_storage = $entity_type_manager->getStorage(ContentTemplate::ENTITY_TYPE_ID);
-      $template_id = implode('.', [
-        $entity->getEntityTypeId(),
-        $entity->bundle(),
-        // Only the full view mode can expose slots.
-        // @see `type: canvas.content_template.*.*.*`'s
-        'full',
-      ]);
-      $template = $content_template_storage->load($template_id);
-      if ($template instanceof ContentTemplate) {
-        $template_tree = $template->getComponentTree();
-        $parent = \array_merge($parent, $template_tree->getValue());
-      }
-    }
 
     if (\count($parent) === 0) {
       $context->buildViolation('Invalid component tree item with UUID %uuid references an invalid parent %parent_uuid.', [
@@ -384,6 +371,74 @@ final class ComponentTreeStructureConstraintValidator extends ConstraintValidato
         ->atPath('slot')
         ->addViolation();
     }
+  }
+
+  /**
+   * Validates the root of a bonsai tree against its content template.
+   *
+   * Only a content entity can grow a bonsai tree, and only into a slot its
+   * content template exposes. The stored `slot` is the exposed slot's machine
+   * name, which stays valid when the site builder moves the exposed slot
+   * elsewhere in the content template's component tree.
+   *
+   * @param array $component_instance
+   *   The component instance to validate; its `parent_uuid` is empty and its
+   *   `slot` is not.
+   * @param \Symfony\Component\Validator\Context\ExecutionContextInterface $context
+   *   The execution context to add violations to.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
+   *   The entity type manager.
+   * @param mixed $root
+   *   The root of the validated data; an entity adapter for a content entity.
+   */
+  private static function validateExposedSlotName(array $component_instance, ExecutionContextInterface $context, EntityTypeManagerInterface $entity_type_manager, mixed $root): void {
+    if (!$root instanceof EntityAdapter) {
+      // Config entities (content templates, patterns, page regions, page
+      // variants) and field default values have no content template of their
+      // own, so they cannot contribute to an exposed slot. For them a slot
+      // without a parent component instance remains meaningless.
+      $context->buildViolation('Invalid component tree item with UUID %uuid. A parent UUID must be present if a slot name is provided.', [
+        '%uuid' => $component_instance['uuid'],
+      ])
+        ->atPath('slot')
+        ->addViolation();
+      return;
+    }
+
+    $entity = $root->getValue();
+    \assert($entity instanceof EntityInterface);
+    $template_id = \implode('.', [
+      $entity->getEntityTypeId(),
+      $entity->bundle(),
+      // Only the full view mode can expose slots.
+      // @see `type: canvas.content_template.*.*.*`'s `ValidExposedSlot` constraint
+      'full',
+    ]);
+    $template = $entity_type_manager->getStorage(ContentTemplate::ENTITY_TYPE_ID)->load($template_id);
+    $exposed_slots = $template instanceof ContentTemplate ? $template->getExposedSlots() : [];
+
+    if (\array_key_exists($component_instance['slot'], $exposed_slots)) {
+      return;
+    }
+
+    if (\count($exposed_slots) === 0) {
+      $context->buildViolation('Invalid component subtree. The content template %template exposes no slots, yet the component instance with UUID %uuid claims to fill the exposed slot %invalid_slot_name.', [
+        '%template' => $template_id,
+        '%uuid' => $component_instance['uuid'],
+        '%invalid_slot_name' => $component_instance['slot'],
+      ])
+        ->atPath('slot')
+        ->addViolation();
+      return;
+    }
+
+    $context->buildViolation('Invalid component subtree. This component subtree claims to fill an exposed slot that the content template %template does not expose: %invalid_slot_name. Exposed slots are: %valid_slot_names.', [
+      '%template' => $template_id,
+      '%invalid_slot_name' => $component_instance['slot'],
+      '%valid_slot_names' => \implode(', ', \array_keys($exposed_slots)),
+    ])
+      ->atPath('slot')
+      ->addViolation();
   }
 
   /**

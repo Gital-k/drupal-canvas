@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use ColinODell\PsrTestLogger\TestLogger;
+use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\Entity\EntityViewMode;
@@ -388,8 +390,13 @@ HTML;
               'expression' => 'ℹ︎string␟value',
             ],
           ],
-          'slot' => 'the_body',
-          'parent_uuid' => '2842cc6f-9e2b-42a5-8400-e7d6363e08bf',
+          // The entity references the exposed slot by its machine name, and
+          // stores no parent UUID: the component instance holding the exposed
+          // slot lives in the content template's component tree, not in this
+          // one. That is what lets the exposed slot be moved.
+          // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::isInExposedSlot()
+          'slot' => 'custom_content',
+          'parent_uuid' => NULL,
         ],
         // If the entity is targeting a slot that doesn't exist in the template,
         // or is not exposed, it shouldn't be an error.
@@ -399,7 +406,7 @@ HTML;
           'uuid' => '9a1ec750-e016-44fb-9bd2-9a7acb497bd7',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'slot' => 'ignore_me',
-          'parent_uuid' => '2842cc6f-9e2b-42a5-8400-e7d6363e08bf',
+          'parent_uuid' => NULL,
           'inputs' => [
             'heading' => [
               'sourceType' => 'static:field_item:string',
@@ -448,11 +455,198 @@ HTML;
     self::assertCount(1, $violations);
     $violation = $violations->get(0);
     self::assertSame('field_component_tree.1.slot', $violation->getPropertyPath());
-    self::assertSame('Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">ignore_me</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.', (string) $violation->getMessage());
+    self::assertSame('Invalid component subtree. This component subtree claims to fill an exposed slot that the content template <em class="placeholder">node.article.full</em> does not expose: <em class="placeholder">ignore_me</em>. Exposed slots are: <em class="placeholder">custom_content</em>.', (string) $violation->getMessage());
 
     // If we delete the field item, all good!
     $node->get('field_component_tree')->removeItem(1);
     self::assertEntityIsValid($node);
+
+    // The point of referencing an exposed slot by machine name: the site
+    // builder can move the exposed slot elsewhere in the content template's
+    // component tree, and the content filling it keeps rendering. Move
+    // `custom_content` from the `the_body` slot of the existing component
+    // instance to the `the_footer` slot of a newly added one.
+    $template = ContentTemplate::load('node.article.full');
+    \assert($template instanceof ContentTemplate);
+    $component_tree = $template->get('component_tree');
+    \assert(\is_array($component_tree));
+    $component_tree[] = [
+      'uuid' => 'b0d4bb1d-9c24-4d2a-9e1e-6b6c4a84e0a1',
+      'component_id' => 'sdc.canvas_test_sdc.props-slots',
+      'component_version' => '0e79e884426a53ae',
+      'inputs' => [
+        'heading' => [
+          'sourceType' => PropSource::EntityField->value,
+          'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
+        ],
+      ],
+    ];
+    $template
+      ->set('component_tree', $component_tree)
+      ->set('exposed_slots', [
+        'custom_content' => [
+          'component_uuid' => 'b0d4bb1d-9c24-4d2a-9e1e-6b6c4a84e0a1',
+          'slot_name' => 'the_footer',
+          'label' => 'Custom content area',
+        ],
+      ])
+      ->save();
+
+    // The node itself was not touched, yet its component instance now renders
+    // inside the moved exposed slot. Before referencing exposed slots by
+    // machine name this was impossible: the node stored the UUID and slot name
+    // the exposed slot happened to resolve to, so moving it stranded the
+    // content.
+    self::assertEntityIsValid($node);
+    $build = $viewBuilder->view($node);
+    $crawler = $this->crawlerForRenderArray($build);
+    self::assertCount(1, $crawler->filter('h1:contains("Now we\'re cooking with gas!")'));
+    // It really moved: it now renders in the exposed slot's new home, the
+    // `the_footer` slot, and no longer in `the_body`.
+    self::assertCount(1, $crawler->filter('div.component--props-slots--footer h1:contains("Now we\'re cooking with gas!")'));
+    self::assertCount(0, $crawler->filter('div.component--props-slots--body h1:contains("Now we\'re cooking with gas!")'));
+  }
+
+  /**
+   * Tests migrating stored UUID + slot pointers to exposed slot machine names.
+   *
+   * @legacy-covers \Drupal\canvas\CanvasConfigUpdater::rewriteExposedSlotReferenceToMachineName
+   * @legacy-covers \canvas_post_update_0031_content_exposed_slot_machine_names
+   */
+  public function testExposedSlotReferencesAreMigratedToMachineNames(): void {
+    $this->createComponentTreeField('node', 'article', 'field_component_tree');
+
+    $exposed_slot_holder_uuid = '2842cc6f-9e2b-42a5-8400-e7d6363e08bf';
+    ContentTemplate::create([
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => [
+        [
+          'uuid' => $exposed_slot_holder_uuid,
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '0e79e884426a53ae',
+          'inputs' => [
+            'heading' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
+            ],
+          ],
+        ],
+      ],
+      'exposed_slots' => [
+        'custom_content' => [
+          'component_uuid' => $exposed_slot_holder_uuid,
+          'slot_name' => 'the_body',
+          'label' => 'Custom content area',
+        ],
+      ],
+    ])->setStatus(TRUE)->save();
+
+    // A node storing the pre-#3528458 form: the bonsai root names the UUID and
+    // slot the exposed slot happened to resolve to.
+    $bonsai_root_uuid = '6ea0de84-858a-4f00-9ef5-de02525c8865';
+    $node = $this->createNode([
+      'type' => 'article',
+      'title' => 'The Real Deal',
+      'field_component_tree' => [
+        [
+          'uuid' => $bonsai_root_uuid,
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'inputs' => [
+            'heading' => [
+              'sourceType' => 'static:field_item:string',
+              'value' => "Now we're cooking with gas!",
+              'expression' => 'ℹ︎string␟value',
+            ],
+          ],
+          'slot' => 'the_body',
+          'parent_uuid' => $exposed_slot_holder_uuid,
+        ],
+        // A child of the bonsai root: its parent is in this very tree, so it is
+        // an ordinary nested component instance and must not be rewritten.
+        [
+          'uuid' => '1c1f4d3a-0d2f-4d7f-9a58-4b0e6e0d0a11',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'inputs' => [
+            'heading' => [
+              'sourceType' => 'static:field_item:string',
+              'value' => 'Nested inside the bonsai root.',
+              'expression' => 'ℹ︎string␟value',
+            ],
+          ],
+          'slot' => 'the_body',
+          'parent_uuid' => $bonsai_root_uuid,
+        ],
+        // A pointer no exposed slot resolves: `the_colophon` is a real slot of
+        // the template's component instance, but it is not exposed. Rewriting
+        // it would move content the content creator never put there.
+        [
+          'uuid' => '9a1ec750-e016-44fb-9bd2-9a7acb497bd7',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'inputs' => [
+            'heading' => [
+              'sourceType' => 'static:field_item:string',
+              'value' => 'Dangling.',
+              'expression' => 'ℹ︎string␟value',
+            ],
+          ],
+          'slot' => 'the_colophon',
+          'parent_uuid' => $exposed_slot_holder_uuid,
+        ],
+      ],
+    ]);
+
+    $template = ContentTemplate::load('node.article.full');
+    \assert($template instanceof ContentTemplate);
+    $exposed_slots = $template->getExposedSlots();
+    $own_uuids = [];
+    foreach ($node->get('field_component_tree') as $item) {
+      \assert($item instanceof ComponentTreeItem);
+      $own_uuids[] = $item->getUuid();
+    }
+
+    $changed = [];
+    foreach ($node->get('field_component_tree') as $delta => $item) {
+      \assert($item instanceof ComponentTreeItem);
+      $changed[$delta] = CanvasConfigUpdater::rewriteExposedSlotReferenceToMachineName($item, $exposed_slots, $own_uuids);
+    }
+    // Only the bonsai root was rewritten.
+    self::assertSame([0 => TRUE, 1 => FALSE, 2 => FALSE], $changed);
+
+    $tree = $node->get('field_component_tree');
+    \assert($tree instanceof ComponentTreeItemList);
+    $bonsai_root = $tree->get(0);
+    \assert($bonsai_root instanceof ComponentTreeItem);
+    self::assertNull($bonsai_root->getParentUuid());
+    self::assertSame('custom_content', $bonsai_root->getSlot());
+
+    // The nested child still points at the bonsai root, in the same slot.
+    $nested = $tree->get(1);
+    \assert($nested instanceof ComponentTreeItem);
+    self::assertSame($bonsai_root_uuid, $nested->getParentUuid());
+    self::assertSame('the_body', $nested->getSlot());
+
+    // The unresolvable pointer is left exactly as it was.
+    $dangling = $tree->get(2);
+    \assert($dangling instanceof ComponentTreeItem);
+    self::assertSame($exposed_slot_holder_uuid, $dangling->getParentUuid());
+    self::assertSame('the_colophon', $dangling->getSlot());
+
+    // Running the migration again changes nothing: it is idempotent.
+    foreach ($node->get('field_component_tree') as $item) {
+      \assert($item instanceof ComponentTreeItem);
+      self::assertFalse(CanvasConfigUpdater::rewriteExposedSlotReferenceToMachineName($item, $exposed_slots, $own_uuids));
+    }
+
+    // The migrated tree is what the renderer now expects: the bonsai root lands
+    // in the exposed slot.
+    $viewBuilder = $this->container->get(EntityTypeManagerInterface::class)->getViewBuilder('node');
+    self::assertInstanceOf(ContentTemplateAwareViewBuilder::class, $viewBuilder);
+    $build = $viewBuilder->view($node);
+    $crawler = $this->crawlerForRenderArray($build);
+    self::assertCount(1, $crawler->filter('div.component--props-slots--body h1:contains("Now we\'re cooking with gas!")'));
+    self::assertStringNotContainsString('Dangling.', $crawler->text());
   }
 
 }
