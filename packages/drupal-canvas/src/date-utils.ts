@@ -29,10 +29,20 @@ export interface CanvasDateFormatOptions {
   timeStyle?: Intl.DateTimeFormatOptions['timeStyle'];
 }
 
-/** Reads the Drupal-selected locale from drupalSettings, falling back to 'en'. */
+/**
+ * Reads the Drupal-selected locale from Canvas runtime settings when present,
+ * falling back to core drupalSettings and then 'en'.
+ */
 const getDrupalLocale = (): string =>
+  (globalThis as {
+    drupalSettings?: {
+      canvasData?: { v0?: { locale?: string } };
+      langcode?: string;
+    };
+  }).drupalSettings?.canvasData?.v0?.locale ??
   (globalThis as { drupalSettings?: { langcode?: string } }).drupalSettings
-    ?.langcode ?? 'en';
+    ?.langcode ??
+  'en';
 
 /**
  * Creates an `Intl.DateTimeFormat` instance, falling back to 'en' locale if

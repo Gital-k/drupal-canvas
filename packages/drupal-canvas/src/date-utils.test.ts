@@ -9,17 +9,31 @@ import {
 
 import type { CanvasDateFormatOptions } from './date-utils';
 
-/** Helper to set drupalSettings.langcode for the duration of a test. */
-function setLocale(langcode: string): void {
-  (globalThis as { drupalSettings?: { langcode?: string } }).drupalSettings = {
+/** Helper to set locale settings for the duration of a test. */
+function setLocale(
+  langcode: string,
+  canvasLocale: string | null = langcode,
+): void {
+  (
+    globalThis as {
+      drupalSettings?: {
+        canvasData?: { v0?: { locale?: string | null } };
+        langcode?: string;
+      };
+    }
+  ).drupalSettings = {
     langcode,
+    canvasData: {
+      v0: {
+        locale: canvasLocale,
+      },
+    },
   };
 }
 
 /** Helper to clear drupalSettings after each test. */
 function clearLocale(): void {
-  delete (globalThis as { drupalSettings?: { langcode?: string } })
-    .drupalSettings;
+  delete (globalThis as { drupalSettings?: unknown }).drupalSettings;
 }
 
 describe('canvasFormatDate', () => {
@@ -78,6 +92,16 @@ describe('canvasFormatDate', () => {
     const result = canvasFormatDate('2026-01-15');
     expect(result).toMatch(/\d+[/\-.]\d+/);
     expect(result).not.toBe('2026-01-15');
+  });
+
+  it('prefers canvasData.v0.locale over drupalSettings.langcode', () => {
+    setLocale('en', 'fr');
+    const frenchResult = canvasFormatDate('2026-01-15');
+    setLocale('en', 'en');
+    const englishResult = canvasFormatDate('2026-01-15');
+    expect(frenchResult).not.toBe('2026-01-15');
+    expect(englishResult).not.toBe('2026-01-15');
+    expect(frenchResult).not.toBe(englishResult);
   });
 
   it('accepts a dateStyle option that overrides the default short style', () => {
