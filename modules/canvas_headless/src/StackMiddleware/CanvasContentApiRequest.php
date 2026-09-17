@@ -26,6 +26,8 @@ final class CanvasContentApiRequest implements HttpKernelInterface {
 
   public const PREVIEW_VIEW_MODE_QUERY = 'viewMode';
 
+  public const PREVIEW_LANGUAGE_QUERY = 'language';
+
   public const PAGE_VARIANT_PREVIEW_QUERY = 'pageVariant';
 
   public const COMPONENT_PREVIEW_QUERY = 'componentId';
@@ -34,6 +36,7 @@ final class CanvasContentApiRequest implements HttpKernelInterface {
     self::PREVIEW_VIEW_MODE_QUERY,
     self::PAGE_VARIANT_PREVIEW_QUERY,
     self::COMPONENT_PREVIEW_QUERY,
+    self::PREVIEW_LANGUAGE_QUERY,
   ];
 
   public function __construct(

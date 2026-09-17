@@ -96,6 +96,22 @@ final class CanvasContentApiRequestTest extends UnitTestCase {
   }
 
   /**
+   * The preview hint cannot replace a route-owned language query parameter.
+   */
+  public function testPreviewLanguageIsNamespaced(): void {
+    $kernel = $this->createMock(HttpKernelInterface::class);
+    $kernel->expects($this->once())->method('handle')->willReturnCallback(static function (Request $request): Response {
+      self::assertSame('route-owned', $request->query->get('language'));
+      self::assertSame(['language' => 'fr'], $request->attributes->get(CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY));
+      return new Response();
+    });
+    (new CanvasContentApiRequest($kernel))->handle(Request::create('/canvas/content-api?' . http_build_query([
+      'requestUri' => '/page/1?language=route-owned',
+      'language' => 'fr',
+    ])));
+  }
+
+  /**
    * Tests internal routing for page and detached preview requests.
    *
    * @param array<string, string> $api_query_parameters
