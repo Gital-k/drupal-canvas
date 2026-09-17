@@ -4,8 +4,8 @@ import { useParams } from 'react-router';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import BrandKitIcon from '@assets/icons/brand-kit.svg?react';
 import ExtensionIcon from '@assets/icons/extension-sm.svg?react';
-import TemplateIcon from '@assets/icons/template.svg?react';
 import HeadlessIcon from '@assets/icons/headless.svg?react';
+import TemplateIcon from '@assets/icons/template.svg?react';
 import {
   CodeIcon,
   FileTextIcon,
