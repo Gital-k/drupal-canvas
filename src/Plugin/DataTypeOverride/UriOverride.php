@@ -23,8 +23,15 @@ class UriOverride extends Uri {
       return $this->value;
     }
 
+    // ⚠️ The authority must be encoded too, not just the path: this data type
+    // also represents stream wrapper URIs, whose first segment after `://` is
+    // a directory or — for a file stored at the stream wrapper root — the file
+    // name itself, both of which `parse_url()` reports as the authority.
+    // Leaving it unencoded returns an invalid URI for any such file name
+    // containing a space or a non-ASCII character.
+    // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\FileUriItemOverride
     $uri = $components['scheme'] . '://'
-      . $components['host']
+      . UrlHelper::encodePath($components['host'])
       . UrlHelper::encodePath($components['path'] ?? '');
 
     if (\array_key_exists('query', $components) && strlen($components['query'])) {
