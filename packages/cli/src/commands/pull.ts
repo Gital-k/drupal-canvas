@@ -4,10 +4,10 @@ import { Option } from 'commander';
 import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
 import {
-  CANVAS_COLOR_REF_PREFIX,
+  buildColorLookupByUuid,
   discoverCanvasProject,
   loadComponentsMetadata,
-  UUID_PATTERN,
+  transformColorExamplesInProps,
 } from '@drupal-canvas/discovery';
 import { resolveHostGlobalCssPath } from '@drupal-canvas/vite-compat';
 
@@ -244,89 +244,17 @@ export function buildSkippedLocalOnlyPullResources(
 }
 
 /**
- * Transforms a single color example value for storage in component.yml.
- *
- * - canvas-color:<uuid> → canvas-color:<cssVarKey> (strips -- prefix from cssVariable)
- * - canvas-color:<cssVarKey> → left unchanged (already in authored format)
- * - Free-pick CSS strings or any other value → left unchanged
- */
-function resolveColorExampleToVarKey(
-  exampleValue: unknown,
-  colorsByUuid: Map<string, BrandKitColorEntry>,
-): unknown {
-  if (typeof exampleValue !== 'string') {
-    return exampleValue;
-  }
-
-  if (!exampleValue.startsWith(CANVAS_COLOR_REF_PREFIX)) {
-    return exampleValue;
-  }
-
-  const ref = exampleValue.slice(CANVAS_COLOR_REF_PREFIX.length);
-
-  // Only transform UUID references; cssVarKey references are already authored format.
-  if (!UUID_PATTERN.test(ref)) {
-    return exampleValue;
-  }
-
-  const entry = colorsByUuid.get(ref);
-  if (!entry) {
-    // UUID not found in brand kit — leave unchanged to avoid data loss.
-    return exampleValue;
-  }
-
-  // Strip the -- prefix from cssVariable to get the cssVarKey.
-  const cssVarKey = entry.cssVariable.startsWith('--')
-    ? entry.cssVariable.slice(2)
-    : entry.cssVariable;
-
-  return `${CANVAS_COLOR_REF_PREFIX}${cssVarKey}`;
-}
-
-/**
  * Transforms color examples in component props from UUID refs to cssVarKey refs.
  */
 function resolveColorExamplesInProps(
   props: Record<string, unknown>,
   colorsByUuid: Map<string, BrandKitColorEntry>,
 ): Record<string, unknown> {
-  const properties = props.properties as Record<string, unknown> | undefined;
-  if (!properties) {
-    return props;
-  }
-
-  const resolvedProperties: Record<string, unknown> = {};
-
-  for (const [propName, propDefinition] of Object.entries(properties)) {
-    if (
-      typeof propDefinition === 'object' &&
-      propDefinition !== null &&
-      '$ref' in propDefinition &&
-      (propDefinition as { $ref?: string }).$ref ===
-        'json-schema-definitions://canvas.module/color'
-    ) {
-      const def = propDefinition as {
-        examples?: unknown[];
-        [key: string]: unknown;
-      };
-      if (Array.isArray(def.examples) && def.examples.length > 0) {
-        const resolved = resolveColorExampleToVarKey(
-          def.examples[0],
-          colorsByUuid,
-        );
-        resolvedProperties[propName] = {
-          ...def,
-          examples: [resolved],
-        };
-      } else {
-        resolvedProperties[propName] = def;
-      }
-    } else {
-      resolvedProperties[propName] = propDefinition;
-    }
-  }
-
-  return { ...props, properties: resolvedProperties };
+  return transformColorExamplesInProps(
+    props,
+    colorsByUuid,
+    'toVarKey',
+  ) as Record<string, unknown>;
 }
 
 /**
@@ -359,9 +287,7 @@ export function createComponentsPullTask(
 
   function buildMetadata(component: Component): Metadata {
     // Build UUID → BrandKitColorEntry map from the shared ref.
-    const colorsByUuid = new Map<string, BrandKitColorEntry>(
-      brandKitColorsRef.colors.map((c) => [c.id, c]),
-    );
+    const colorsByUuid = buildColorLookupByUuid(brandKitColorsRef.colors);
 
     const metadata: Metadata = {
       name: component.name,

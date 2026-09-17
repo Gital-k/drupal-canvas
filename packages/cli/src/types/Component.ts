@@ -1,4 +1,4 @@
-import type { ColorTokenValue } from '@drupal-canvas/discovery';
+import type { BrandKitColorEntry } from '@drupal-canvas/discovery';
 import type {
   AssetLibrary,
   CodeComponentSerialized as Component,
@@ -6,6 +6,7 @@ import type {
 } from '@drupal-canvas/ui/types/CodeComponent';
 
 export { AssetLibrary, Component, DataDependencies };
+export type { BrandKitColorEntry };
 
 /**
  * A server-side uploaded artifact reference tracked in the asset library manifest.
@@ -72,17 +73,6 @@ export interface BrandKitFontEntry {
 
 export interface BrandKitFontEntryWithUrl extends BrandKitFontEntry {
   url: string;
-}
-
-/** Color config entity as returned by the HTTP API (matches backend Color). */
-export interface BrandKitColorEntry {
-  /** Server-assigned id (the entity UUID). */
-  id: string;
-  name: string;
-  cssVariable: string;
-  value: ColorTokenValue;
-  displayFormat?: 'rgb' | 'hex' | 'hsl' | null;
-  weight: number;
 }
 
 /** Payload accepted by the color create/update endpoints (no server id). */

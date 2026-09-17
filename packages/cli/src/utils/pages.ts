@@ -1,5 +1,6 @@
 import {
   CANVAS_COLOR_REF_PREFIX,
+  COLOR_PROP_SCHEMA_REF,
   serializeColorValue,
 } from '@drupal-canvas/discovery';
 
@@ -12,8 +13,6 @@ import type {
 } from '@drupal-canvas/discovery';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
 import type { Page } from '../types/Page';
-
-const COLOR_PROP_SCHEMA_REF = 'json-schema-definitions://canvas.module/color';
 
 interface PageToAuthoredSpecOptions {
   componentMetadata?: ComponentMetadata[];

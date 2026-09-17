@@ -1,5 +1,8 @@
 import fs from 'fs/promises';
-import { loadComponentsMetadata } from '@drupal-canvas/discovery';
+import {
+  COLOR_PROP_SCHEMA_REF,
+  loadComponentsMetadata,
+} from '@drupal-canvas/discovery';
 
 import { authoredElementMapToComponentTree } from './authored-elements';
 import {
@@ -13,17 +16,16 @@ import { processInPool } from './request-pool';
 import { isRecord } from './utils';
 
 import type {
+  BrandKitColorEntry,
   ComponentMetadata,
   DiscoveredPage,
   DiscoveryResult,
 } from '@drupal-canvas/discovery';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
 import type { ApiService } from '../services/api';
-import type { BrandKitColorEntry } from '../types/Component';
 import type { Page, PageListItem } from '../types/Page';
 import type { Result } from '../types/Result';
 
-const COLOR_PROP_SCHEMA_REF = 'json-schema-definitions://canvas.module/color';
 const PAGE_PUSH_CONCURRENCY = 1;
 
 export async function pagesHaveColorProps(

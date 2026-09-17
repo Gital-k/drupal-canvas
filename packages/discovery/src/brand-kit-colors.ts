@@ -32,6 +32,10 @@ export const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/;
 /** Prefix used for brand kit color references in stored values. */
 export const CANVAS_COLOR_REF_PREFIX = 'canvas-color:';
 
+/** JSON Schema $ref for Canvas color props. */
+export const COLOR_PROP_SCHEMA_REF =
+  'json-schema-definitions://canvas.module/color';
+
 /**
  * UUID pattern used to distinguish canvas-color:<uuid> from canvas-color:<cssVarKey>.
  * Case-insensitive (standard 8-4-4-4-12 format).
@@ -52,6 +56,20 @@ export interface ColorTokenValue {
   components: number[];
   alpha?: number | null;
   hex?: string | null;
+}
+
+/**
+ * Color config entity as returned by the HTTP API.
+ * Matches the backend `canvas.color.*` config entity structure.
+ */
+export interface BrandKitColorEntry {
+  /** Server-assigned id (the entity UUID). */
+  id: string;
+  name: string;
+  cssVariable: string;
+  value: ColorTokenValue;
+  displayFormat?: 'rgb' | 'hex' | 'hsl' | null;
+  weight: number;
 }
 
 /**
@@ -534,4 +552,138 @@ export function readBrandKitColors(
     return [];
   }
   return normalizeBrandKitColors((parsed as { colors?: unknown }).colors);
+}
+
+/**
+ * Builds a Map from CSS variable (e.g. "--brand-red") to BrandKitColorEntry.
+ * Useful for push operations that convert cssVarKey → UUID.
+ */
+export function buildColorLookupByCssVariable(
+  colors: BrandKitColorEntry[],
+): Map<string, BrandKitColorEntry> {
+  return new Map(colors.map((c) => [c.cssVariable, c]));
+}
+
+/**
+ * Builds a Map from UUID to BrandKitColorEntry.
+ * Useful for pull operations that convert UUID → cssVarKey.
+ */
+export function buildColorLookupByUuid(
+  colors: BrandKitColorEntry[],
+): Map<string, BrandKitColorEntry> {
+  return new Map(colors.map((c) => [c.id, c]));
+}
+
+export type ColorRefTransformDirection = 'toVarKey' | 'toUuid';
+
+/**
+ * Transforms a color reference string between authored (cssVarKey) and
+ * server (UUID) formats.
+ *
+ * - `toVarKey`: canvas-color:<uuid> → canvas-color:<cssVarKey> (for pull)
+ * - `toUuid`: canvas-color:<cssVarKey> → canvas-color:<uuid> (for push)
+ *
+ * Non-color values and already-transformed references pass through unchanged.
+ *
+ * @param value - The prop value to potentially transform
+ * @param lookup - Map keyed by the source format (UUID for toVarKey, cssVariable for toUuid)
+ * @param direction - Transform direction
+ */
+export function transformColorRef(
+  value: unknown,
+  lookup: Map<string, BrandKitColorEntry>,
+  direction: ColorRefTransformDirection,
+): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  if (!value.startsWith(CANVAS_COLOR_REF_PREFIX)) {
+    return value;
+  }
+
+  const ref = value.slice(CANVAS_COLOR_REF_PREFIX.length);
+  const isUuid = UUID_PATTERN.test(ref);
+
+  if (direction === 'toVarKey') {
+    // Pull: UUID → cssVarKey. Skip if already a cssVarKey.
+    if (!isUuid) {
+      return value;
+    }
+    const entry = lookup.get(ref);
+    if (!entry) {
+      return value; // UUID not found; preserve to avoid data loss
+    }
+    const cssVarKey = entry.cssVariable.startsWith('--')
+      ? entry.cssVariable.slice(2)
+      : entry.cssVariable;
+    return `${CANVAS_COLOR_REF_PREFIX}${cssVarKey}`;
+  }
+
+  // Push: cssVarKey → UUID. Skip if already a UUID.
+  if (isUuid) {
+    return value;
+  }
+  const entry = lookup.get(`--${ref}`);
+  if (!entry) {
+    return value; // Color not on server; Drupal will reject appropriately
+  }
+  return `${CANVAS_COLOR_REF_PREFIX}${entry.id}`;
+}
+
+/**
+ * Transforms color examples in a component props schema.
+ *
+ * Iterates `props.properties`, finds color props by `$ref`, and applies
+ * `transformColorRef()` to the first example value.
+ *
+ * @param props - Component props schema object with `properties`
+ * @param lookup - Color lookup map (keyed appropriately for direction)
+ * @param direction - Transform direction
+ */
+export function transformColorExamplesInProps(
+  props: Record<string, unknown> | null | undefined,
+  lookup: Map<string, BrandKitColorEntry>,
+  direction: ColorRefTransformDirection,
+): Record<string, unknown> | null | undefined {
+  if (!props) {
+    return props;
+  }
+  const properties = props.properties as Record<string, unknown> | undefined;
+  if (!properties) {
+    return props;
+  }
+
+  const transformedProperties: Record<string, unknown> = {};
+
+  for (const [propName, propDefinition] of Object.entries(properties)) {
+    if (
+      typeof propDefinition === 'object' &&
+      propDefinition !== null &&
+      '$ref' in propDefinition &&
+      (propDefinition as { $ref?: string }).$ref === COLOR_PROP_SCHEMA_REF
+    ) {
+      const def = propDefinition as {
+        examples?: unknown[];
+        [key: string]: unknown;
+      };
+      if (Array.isArray(def.examples) && def.examples.length > 0) {
+        const transformed = transformColorRef(
+          def.examples[0],
+          lookup,
+          direction,
+        );
+        transformedProperties[propName] = {
+          ...def,
+          examples: [transformed],
+        };
+      } else {
+        transformedProperties[propName] = def;
+      }
+    } else {
+      transformedProperties[propName] = propDefinition;
+    }
+  }
+
+  return { ...props, properties: transformedProperties };
 }

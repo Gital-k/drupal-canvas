@@ -1,14 +1,18 @@
 import {
   CANVAS_COLOR_REF_PREFIX,
+  COLOR_PROP_SCHEMA_REF,
+  transformColorRef,
   UUID_PATTERN,
 } from '@drupal-canvas/discovery';
 
 import { isRecord } from './utils';
 
-import type { ComponentMetadata } from '@drupal-canvas/discovery';
+import type {
+  BrandKitColorEntry,
+  ComponentMetadata,
+} from '@drupal-canvas/discovery';
 import type { CodeComponentPropSerialized } from '@drupal-canvas/ui/types/CodeComponent';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
-import type { BrandKitColorEntry } from '../types/Component';
 
 export interface UnreconciledMediaProp {
   elementId: string;
@@ -22,8 +26,6 @@ export interface UnreconciledColorProp {
   propName: string;
   key: string;
 }
-
-const COLOR_PROP_SCHEMA_REF = 'json-schema-definitions://canvas.module/color';
 
 /**
  * Describes how to identify and extract external URLs from a specific media
@@ -199,25 +201,7 @@ const colorTransformer: PropTransformer = {
   },
 
   serialize(value, { colorsByCssVariable }) {
-    if (typeof value !== 'string') {
-      return value;
-    }
-
-    if (!value.startsWith(CANVAS_COLOR_REF_PREFIX)) {
-      return value;
-    }
-
-    const ref = value.slice(CANVAS_COLOR_REF_PREFIX.length);
-    if (UUID_PATTERN.test(ref)) {
-      return value;
-    }
-
-    const entry = colorsByCssVariable?.get(`--${ref}`);
-    if (entry) {
-      return `${CANVAS_COLOR_REF_PREFIX}${entry.id}`;
-    }
-
-    return value;
+    return transformColorRef(value, colorsByCssVariable ?? new Map(), 'toUuid');
   },
 };
 

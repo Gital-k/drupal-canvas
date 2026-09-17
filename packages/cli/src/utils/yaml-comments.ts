@@ -5,11 +5,10 @@
  */
 
 import * as yaml from 'yaml';
+import { COLOR_PROP_SCHEMA_REF } from '@drupal-canvas/discovery';
 
 import type { ColorFolderEntry } from '../types/Component';
 import type { Metadata } from '../types/Metadata';
-
-const COLOR_PROP_SCHEMA_REF = 'json-schema-definitions://canvas.module/color';
 
 /**
  * Serializes metadata to YAML with folder-aware comments on color props.
