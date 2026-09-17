@@ -50,11 +50,11 @@ export async function validatePages(
 
   for (const page of discoveredPages) {
     const fileName = path.basename(page.path);
-
     try {
       const fileContent = await fs.readFile(page.path, 'utf-8');
       const spec = JSON.parse(fileContent) as Record<string, unknown>;
       const pageTitle = typeof spec.title === 'string' ? spec.title : undefined;
+      const elements = (spec.elements as AuthoredSpecElementMap) ?? {};
 
       const details: { heading?: string; content: string }[] = [];
 
@@ -84,7 +84,6 @@ export async function validatePages(
       }
 
       // Validate page elements against the component catalog.
-      const elements = (spec.elements as AuthoredSpecElementMap) ?? {};
       const elementsResult = validateElements(elements, context);
       if (!elementsResult.success && elementsResult.details) {
         details.push(...elementsResult.details);
