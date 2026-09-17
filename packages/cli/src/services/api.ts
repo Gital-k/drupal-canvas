@@ -26,6 +26,7 @@ import type {
   BrandKitColorEntry,
   BrandKitColorPayload,
   BrandKitFontEntry,
+  ColorFolderEntry,
   Component,
   UploadedArtifact,
   UploadedArtifactResult,
@@ -1269,6 +1270,18 @@ export class ApiService {
       await this.client.delete(
         `/canvas/api/v0/config/color/${encodeURIComponent(id)}`,
       );
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Get all folders; client-side filter to type: color for color folders.
+   */
+  async getFolders(): Promise<ColorFolderEntry[]> {
+    try {
+      const response = await this.client.get('/canvas/api/v0/config/folder');
+      return response.data;
     } catch (error) {
       this.handleApiError(error);
     }

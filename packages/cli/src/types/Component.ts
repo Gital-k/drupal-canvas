@@ -97,3 +97,14 @@ export interface BrandKit {
   /** Derived from the site's color entities; only present when colors exist. */
   colors?: BrandKitColorEntry[];
 }
+
+/** Color folder config entity as returned by the HTTP API (matches backend Folder). */
+export interface ColorFolderEntry {
+  /** Server-assigned id (the entity UUID). */
+  id: string;
+  name: string;
+  type: string;
+  weight: number;
+  /** Array of color UUIDs contained in this folder. */
+  items: string[];
+}

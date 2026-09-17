@@ -1,7 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Option } from 'commander';
-import yaml from 'js-yaml';
 import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
 import {
@@ -43,6 +42,7 @@ import {
   COMMAND_RESULT_REPORT_OPTIONS,
   reportResults,
 } from '../utils/report-results';
+import { dumpMetadataWithComments } from '../utils/yaml-comments.js';
 
 import type {
   ComponentMetadata,
@@ -57,7 +57,11 @@ import type {
 } from '@drupal-canvas/ui/types/CodeComponent';
 import type { Command } from 'commander';
 import type { ApiService } from '../services/api';
-import type { BrandKitColorEntry, Component } from '../types/Component';
+import type {
+  BrandKitColorEntry,
+  ColorFolderEntry,
+  Component,
+} from '../types/Component';
 import type { ContentTemplateListItem } from '../types/ContentTemplate';
 import type { Metadata } from '../types/Metadata';
 import type { PageListItem } from '../types/Page';
@@ -333,11 +337,20 @@ interface BrandKitColorsRef {
   colors: BrandKitColorEntry[];
 }
 
+/**
+ * Shared ref populated by the brand kit task prepare() and used during
+ * component task execute() for folder-aware color prop comments.
+ */
+interface ColorFolderRef {
+  folders: ColorFolderEntry[];
+}
+
 export function createComponentsPullTask(
   apiService: ApiService,
   componentDir: string,
   skipOverwrite: boolean,
   brandKitColorsRef: BrandKitColorsRef,
+  colorFolderRef: ColorFolderRef,
 ): PullTask {
   let components: Record<string, Component> = {};
   const localComponentMap = new Map<string, DiscoveredComponent>();
@@ -377,8 +390,12 @@ export function createComponentsPullTask(
     paths: { metadataPath: string; jsPath: string; cssPath: string },
   ): Promise<void[]> {
     const metadata = buildMetadata(component);
+    const yamlWithComments = dumpMetadataWithComments(
+      metadata,
+      colorFolderRef.folders,
+    );
     const writes: Promise<void>[] = [
-      fs.writeFile(paths.metadataPath, yaml.dump(metadata), 'utf-8'),
+      fs.writeFile(paths.metadataPath, yamlWithComments, 'utf-8'),
     ];
 
     if (component.sourceCodeJs) {
@@ -1133,6 +1150,7 @@ export function createBrandKitPullTask(
   projectRoot: string,
   skipOverwrite: boolean = false,
   brandKitColorsRef: BrandKitColorsRef,
+  colorFolderRef: ColorFolderRef,
 ): PullTask {
   let totalFontVariants = 0;
   let newCount = 0;
@@ -1144,14 +1162,19 @@ export function createBrandKitPullTask(
     stopLabel: 'Pulled brand kit',
 
     async prepare(): Promise<PullTaskPrepareResult> {
-      const [brandKit, brandKitConfig] = await Promise.all([
+      const [brandKit, brandKitConfig, folders] = await Promise.all([
         apiService.getBrandKit(),
         readBrandKitConfig(projectRoot),
+        apiService.getFolders(),
       ]);
 
       // Populate the shared ref so component pull can resolve color examples.
       remoteColors = brandKit.colors ?? [];
       brandKitColorsRef.colors = remoteColors;
+
+      // Populate the shared ref so component pull can add folder comments.
+      const colorFolders = folders.filter((f) => f.type === 'color');
+      colorFolderRef.folders = colorFolders;
 
       const summaryLines: string[] = [];
       const remoteFonts = brandKit.fonts ?? [];
@@ -1379,6 +1402,9 @@ export function pullCommand(program: Command): void {
         // Shared ref to pass brand kit colors from brand kit task to component task.
         const brandKitColorsRef: BrandKitColorsRef = { colors: [] };
 
+        // Shared ref to pass color folders from brand kit task to component task.
+        const colorFolderRef: ColorFolderRef = { folders: [] };
+
         // Build pull tasks.
         const projectRoot = process.cwd();
         const tasks: PullTask[] = [
@@ -1387,6 +1413,7 @@ export function pullCommand(program: Command): void {
             config.componentDir,
             options.skipOverwrite ?? false,
             brandKitColorsRef,
+            colorFolderRef,
           ),
           createAssetsPullTask(
             apiService,
@@ -1403,6 +1430,7 @@ export function pullCommand(program: Command): void {
               projectRoot,
               options.skipOverwrite ?? false,
               brandKitColorsRef,
+              colorFolderRef,
             ),
           );
         }

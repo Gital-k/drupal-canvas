@@ -473,7 +473,13 @@ describe.runIf(isConfigured)('brand kit colors integration', () => {
     );
 
     try {
-      const task = createBrandKitPullTask(api, tmpDir, false, { colors: [] });
+      const task = createBrandKitPullTask(
+        api,
+        tmpDir,
+        false,
+        { colors: [] },
+        { folders: [] },
+      );
       const prepared = await task.prepare();
       expect(prepared.summaryLines.length).toBeGreaterThan(0);
 

@@ -42,10 +42,9 @@ function collapseResolvedColorPropValue(value: unknown): unknown {
     return value;
   }
 
+  const cssVariableValue = resolvedColor?.cssVariable;
   const cssVariable =
-    typeof resolvedColor.cssVariable === 'string'
-      ? resolvedColor.cssVariable
-      : null;
+    typeof cssVariableValue === 'string' ? cssVariableValue : null;
   if (cssVariable && cssVariable.startsWith('--') && cssVariable.length > 2) {
     return `${CANVAS_COLOR_REF_PREFIX}${cssVariable.slice(2)}`;
   }

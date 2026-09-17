@@ -1229,6 +1229,7 @@ describe('defineComponentCatalog', () => {
         props: {
           properties: {
             color: {
+              title: 'Color',
               type: 'string',
               $ref: 'json-schema-definitions://canvas.module/color',
             },
