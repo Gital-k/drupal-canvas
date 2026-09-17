@@ -223,6 +223,38 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
   }
 
   /**
+   * Tests that content API responses vary by the Authorization header.
+   *
+   * Preview requests carry credentials in the Authorization header. A shared
+   * cache (CDN) stores the anonymous (published) response; without
+   * Authorization in Vary it could serve that cached copy to a preview request,
+   * hiding draft (auto-save) changes. Varying by Authorization makes the shared
+   * cache treat token-authenticated requests as distinct, so they reach Drupal.
+   */
+  public function testContentResponseVariesByAuthorization(): void {
+    $event = $this->event(new CacheableJsonResponse(['content' => []]));
+
+    $this->subscriber()->addCacheability($event);
+
+    $response = $event->getResponse();
+    self::assertContains('Authorization', $response->getVary());
+  }
+
+  /**
+   * Tests that adding Authorization to Vary preserves existing Vary values.
+   */
+  public function testContentResponseVaryPreservesExisting(): void {
+    $response = new CacheableJsonResponse(['content' => []]);
+    $response->setVary('Cookie');
+    $event = $this->event($response);
+
+    $this->subscriber()->addCacheability($event);
+
+    self::assertContains('Authorization', $response->getVary());
+    self::assertContains('Cookie', $response->getVary());
+  }
+
+  /**
    * Tests that the global subscriber does not change unrelated responses.
    */
   public function testOrdinaryResponsesAreUnchanged(): void {

@@ -66,6 +66,11 @@ final class CanvasContentResponseSubscriber implements EventSubscriberInterface 
       return;
     }
 
+    // Vary by Authorization so shared caches (CDNs) do not serve a cached
+    // anonymous response to a preview request, which would hide draft changes.
+    // @see \Drupal\Core\EventSubscriber\FinishResponseSubscriber::onRespond()
+    $response->setVary('Authorization', replace: FALSE);
+
     // Route rebuilds and path alias changes invalidate the route_match tag.
     $cacheability = (new CacheableMetadata())
       ->addCacheContexts([
