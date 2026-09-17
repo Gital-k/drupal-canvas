@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\PropSource;
 
-// cspell:ignore Qqzr
+// cspell:ignore Qqzr Ünïcode
 
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
@@ -21,9 +21,13 @@ use Drupal\Core\Field\Plugin\Field\FieldWidget\EntityReferenceAutocompleteWidget
 use Drupal\Core\Field\Plugin\Field\FieldWidget\NumberWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\StringTextfieldWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\UriWidget;
+use Drupal\Core\File\FileExists;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\datetime_range\Plugin\Field\FieldWidget\DateRangeDatelistWidget;
 use Drupal\datetime_range\Plugin\Field\FieldWidget\DateRangeDefaultWidget;
+use Drupal\file\Entity\File;
+use Drupal\media\Entity\Media;
 use Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget;
 use Drupal\node\Entity\NodeType;
 use Drupal\user\Entity\User;
@@ -802,6 +806,94 @@ class StaticPropSourceTest extends PropSourceTestBase {
     self::assertNotContains('languages:' . LanguageInterface::TYPE_CONTENT, $en_result->getCacheContexts());
     self::assertNotContains('languages:' . LanguageInterface::TYPE_CONTENT, $es_result->getCacheContexts());
     self::assertNotContains('languages:' . LanguageInterface::TYPE_CONTENT, $no_host_result->getCacheContexts());
+  }
+
+  /**
+   * Tests stream wrapper image URIs for file names that need URL encoding.
+   *
+   * `parse_url()` reports the first segment after `public://` as the URI's
+   * authority, not as part of its path. A file stored at the root of the stream
+   * wrapper therefore has its entire file name reported as the authority, which
+   * UriOverride used to leave unencoded — returning an invalid URI, and
+   * tripping its own `UrlHelper::isValid()` assertion. Both storage locations
+   * must be encoded identically.
+   *
+   * File names containing a space or a non-ASCII character are what surface
+   * this: for every other file name, encoding is a no-op.
+   *
+   * @todo A percent-encoded stream wrapper URI no longer identifies the stored file, so it cannot be used for server-side image style rendering. Resolve in https://git.drupalcode.org/project/canvas/-/work_items/3590913.
+   *
+   * @see \Drupal\canvas\Plugin\DataTypeOverride\UriOverride
+   * @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\FileUriItemOverride
+   * @see json-schema-definitions://canvas.module/stream-wrapper-image-uri
+   */
+  #[DataProvider('providerStreamWrapperUriNeedingEncoding')]
+  public function testStreamWrapperUriForFileNameNeedingEncoding(string $directory, string $file_name, string $expected_uri): void {
+    $file_system = \Drupal::service(FileSystemInterface::class);
+    \assert($file_system instanceof FileSystemInterface);
+    if ($directory !== '') {
+      $file_system->prepareDirectory($directory, FileSystemInterface::CREATE_DIRECTORY);
+    }
+    $file_uri = ($directory === '' ? 'public://' : $directory . '/') . $file_name;
+    $file_system->copy(\Drupal::root() . '/core/tests/fixtures/files/image-2.jpg', $file_uri, FileExists::Replace);
+    $file = File::create(['uri' => $file_uri, 'status' => 1]);
+    $file->save();
+    $media = Media::create([
+      'bundle' => 'image',
+      'name' => 'Image with a file name needing encoding',
+      'field_media_image' => [
+        [
+          'target_id' => $file->id(),
+          'alt' => 'Hot air balloons',
+          'title' => 'Hot air balloons',
+        ],
+      ],
+    ]);
+    $media->save();
+    $this->setUpCurrentUser([], ['view media', 'access content']);
+
+    $prop_source = StaticPropSource::parse([
+      'sourceType' => 'static:field_item:entity_reference',
+      'value' => ['target_id' => $media->id()],
+      // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+      'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟value',
+      'sourceTypeSettings' => [
+        'storage' => ['target_type' => 'media'],
+        'instance' => [
+          'handler' => 'default:media',
+          'handler_settings' => ['target_bundles' => ['image' => 'image']],
+        ],
+      ],
+    ]);
+    $evaluated = $prop_source->evaluate(User::create(), is_required: TRUE)->value;
+
+    self::assertSame($expected_uri, $evaluated);
+    // Which is what `stream-wrapper-image-uri` promises: a valid URI.
+    // @see \Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint
+    self::assertTrue(UrlHelper::isValid($evaluated));
+  }
+
+  public static function providerStreamWrapperUriNeedingEncoding(): \Generator {
+    yield 'file name with a space, at the stream wrapper root' => [
+      '',
+      'hot air balloons.jpg',
+      'public://hot%20air%20balloons.jpg',
+    ];
+    yield 'file name with a space, in a subdirectory' => [
+      'public://2026-05',
+      'hot air balloons.jpg',
+      'public://2026-05/hot%20air%20balloons.jpg',
+    ];
+    yield 'non-ASCII file name, at the stream wrapper root' => [
+      '',
+      'Ünïcode.jpg',
+      'public://%C3%9Cn%C3%AFcode.jpg',
+    ];
+    yield 'non-ASCII file name, in a subdirectory' => [
+      'public://2026-05',
+      'Ünïcode.jpg',
+      'public://2026-05/%C3%9Cn%C3%AFcode.jpg',
+    ];
   }
 
 }
