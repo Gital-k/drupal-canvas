@@ -106,4 +106,4 @@ variant uses one, the module can be uninstalled.
 
 Consumers updated for page variants: `canvas_translate` (config translation),
 `canvas_oauth` (a `canvas_page_variant` OAuth scope), and `canvas_ai` (agents
-build only the `content` region; the variant supplies the surrounding chrome).
+place components only in the `content` region).
