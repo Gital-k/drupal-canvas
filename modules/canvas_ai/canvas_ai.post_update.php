@@ -323,11 +323,12 @@ function canvas_ai_post_update_0011_reimport_default_agents(): void {
 /**
  * Reimport the page and template builder agents as their prompts changed.
  *
- * Page variants supply the header, footer, and any other chrome around the
- * page, so both agents now always build in the content region. The
- * region-specific instructions and the [canvas_ai:available_regions] token
- * were removed from their system prompts, and the template builder's
- * description no longer advertises header and footer generation.
+ * Both prompts now state that the content region is the only region where
+ * components can be placed; the template builder adds header, navigation,
+ * footer or sidebar sections only when the user explicitly asks for them,
+ * still in the content region. The region-specific instructions and the
+ * [canvas_ai:available_regions] token were removed from both system prompts,
+ * and the template builder's description no longer mentions regions.
  *
  * Sites that update after this change already get the new prompts from 0011,
  * which re-imports every agent's system prompt but not the template builder's
