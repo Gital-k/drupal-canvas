@@ -7,6 +7,7 @@ import * as p from '@clack/prompts';
 import {
   CANVAS_COLOR_REF_PREFIX,
   discoverCanvasProject,
+  loadComponentsMetadata,
   UUID_PATTERN,
 } from '@drupal-canvas/discovery';
 import { resolveHostGlobalCssPath } from '@drupal-canvas/vite-compat';
@@ -44,6 +45,7 @@ import {
 } from '../utils/report-results';
 
 import type {
+  ComponentMetadata,
   DiscoveredComponent,
   DiscoveredContentTemplate,
   DiscoveredPage,
@@ -558,8 +560,10 @@ export function createPagesPullTask(
   apiService: ApiService,
   pagesDir: string,
   skipOverwrite: boolean,
+  componentDir?: string,
 ): PullTask {
   let pages: Record<string, PageListItem> = {};
+  let componentMetadata: ComponentMetadata[] = [];
   const localPageMap = new Map<string, DiscoveredPage>();
   const localPageSlugMap = new Map<string, DiscoveredPage>();
 
@@ -589,8 +593,13 @@ export function createPagesPullTask(
     async prepare(): Promise<PullTaskPrepareResult> {
       const [fetchedPages, discoveryResult] = await Promise.all([
         apiService.listPages(),
-        discoverCanvasProject({ pagesRoot: pagesDir }),
+        discoverCanvasProject({
+          pagesRoot: pagesDir,
+          ...(componentDir ? { componentRoot: componentDir } : {}),
+        }),
       ]);
+
+      componentMetadata = await loadComponentsMetadata(discoveryResult);
 
       pages = fetchedPages;
 
@@ -652,7 +661,9 @@ export function createPagesPullTask(
             continue;
           }
 
-          const localData = pageToAuthoredSpec(fullPage);
+          const localData = pageToAuthoredSpec(fullPage, {
+            componentMetadata,
+          });
 
           const fileName = getPageSlug(page);
           const filePath =
@@ -1402,6 +1413,7 @@ export function pullCommand(program: Command): void {
               apiService,
               config.pagesDir,
               options.skipOverwrite ?? false,
+              config.componentDir,
             ),
           );
         }

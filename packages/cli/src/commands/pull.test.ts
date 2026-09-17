@@ -1153,9 +1153,41 @@ describe('Pull Command', () => {
       } as unknown as ApiService;
     }
 
+    async function writeColorComponentMetadataFile(): Promise<void> {
+      const componentDir = path.join(tmpDir, 'color-card');
+      await fs.mkdir(componentDir, { recursive: true });
+      await fs.writeFile(
+        path.join(componentDir, 'index.tsx'),
+        'export default function ColorCard() { return null; }\n',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(componentDir, 'component.yml'),
+        [
+          'name: Color Card',
+          'machineName: color-card',
+          'status: true',
+          'required: []',
+          'props:',
+          '  properties:',
+          '    accent:',
+          '      title: Accent',
+          '      type: string',
+          '      $ref: json-schema-definitions://canvas.module/color',
+          '    free:',
+          '      title: Free',
+          '      type: string',
+          '      $ref: json-schema-definitions://canvas.module/color',
+          'slots: {}',
+          'dataDependencies: {}',
+        ].join('\n'),
+        'utf-8',
+      );
+    }
+
     it('should return empty summary when no pages', async () => {
       const api = mockApiService({});
-      const task = createPagesPullTask(api, tmpDir, false);
+      const task = createPagesPullTask(api, tmpDir, false, tmpDir);
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual([]);
@@ -1170,7 +1202,7 @@ describe('Pull Command', () => {
           '/about',
         ),
       });
-      const task = createPagesPullTask(api, tmpDir, false);
+      const task = createPagesPullTask(api, tmpDir, false, tmpDir);
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual(['Pages: 1 pull (1 new)']);
@@ -1201,13 +1233,14 @@ describe('Pull Command', () => {
           '/contact',
         ),
       });
-      const task = createPagesPullTask(api, tmpDir, false);
+      const task = createPagesPullTask(api, tmpDir, false, tmpDir);
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual(['Pages: 2 pull (1 new, 1 existing)']);
     });
 
     it('should write new page files on execute', async () => {
+      await writeColorComponentMetadataFile();
       const detail = mockPage(
         1,
         '27a539f5-2dd0-471a-a364-8fee7a024a73',
@@ -1216,12 +1249,44 @@ describe('Pull Command', () => {
         [
           {
             uuid: 'hero-uuid',
-            component_id: 'js.hero',
+            component_id: 'js.color-card',
             component_version: 'v1',
             parent_uuid: null,
             slot: null,
-            inputs: { heading: 'About Us' },
-            inputs_resolved: { heading: 'About Us' },
+            inputs: {
+              accent: 'canvas-color:88888888-8888-4888-8888-888888888888',
+              free: '#687df7e3',
+            },
+            inputs_resolved: {
+              accent: {
+                value: {
+                  colorSpace: 'srgb',
+                  components: [
+                    0.40784313725490196, 0.49019607843137253,
+                    0.9686274509803922,
+                  ],
+                  alpha: 0.8901960784313725,
+                  hex: '#687df7',
+                },
+                cssColorValue: 'rgba(104, 125, 247, 0.89)',
+                cssVariable: '--baguette-legs',
+                colorName: 'Baguette Legs',
+              },
+              free: {
+                value: {
+                  colorSpace: 'srgb',
+                  components: [
+                    0.40784313725490196, 0.49019607843137253,
+                    0.9686274509803922,
+                  ],
+                  alpha: 0.8901960784313725,
+                  hex: '#687df7',
+                },
+                cssColorValue: 'rgba(104, 125, 247, 0.89)',
+                cssVariable: null,
+                colorName: null,
+              },
+            },
             label: null,
           },
         ],
@@ -1238,7 +1303,7 @@ describe('Pull Command', () => {
         },
         { 1: detail },
       );
-      const task = createPagesPullTask(api, tmpDir, false);
+      const task = createPagesPullTask(api, tmpDir, false, tmpDir);
 
       await task.prepare();
       const results = await task.execute();
@@ -1253,8 +1318,11 @@ describe('Pull Command', () => {
       const content = JSON.parse(await fs.readFile(filePath, 'utf-8'));
       expect(content.title).toBe('About');
       expect(content.elements['hero-uuid']).toEqual({
-        type: 'js.hero',
-        props: { heading: 'About Us' },
+        type: 'js.color-card',
+        props: {
+          accent: 'canvas-color:baguette-legs',
+          free: '#687df7e3',
+        },
       });
     });
 
@@ -1277,7 +1345,7 @@ describe('Pull Command', () => {
         },
         { 1: detail },
       );
-      const task = createPagesPullTask(api, tmpDir, false);
+      const task = createPagesPullTask(api, tmpDir, false, tmpDir);
 
       await task.prepare();
       const results = await task.execute();
@@ -1321,7 +1389,7 @@ describe('Pull Command', () => {
         },
         { 1: detail },
       );
-      const task = createPagesPullTask(api, tmpDir, false);
+      const task = createPagesPullTask(api, tmpDir, false, tmpDir);
 
       await task.prepare();
       const results = await task.execute();
@@ -1368,7 +1436,7 @@ describe('Pull Command', () => {
         },
         { 1: detail },
       );
-      const task = createPagesPullTask(api, tmpDir, false);
+      const task = createPagesPullTask(api, tmpDir, false, tmpDir);
 
       await task.prepare();
       const results = await task.execute();
@@ -1401,7 +1469,7 @@ describe('Pull Command', () => {
           '/about',
         ),
       });
-      const task = createPagesPullTask(api, tmpDir, true);
+      const task = createPagesPullTask(api, tmpDir, true, tmpDir);
 
       await task.prepare();
       const results = await task.execute();
@@ -1435,7 +1503,7 @@ describe('Pull Command', () => {
           '/about',
         ),
       });
-      const task = createPagesPullTask(api, tmpDir, true);
+      const task = createPagesPullTask(api, tmpDir, true, tmpDir);
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual(['Pages: 1 pull (1 existing)']);
@@ -1471,7 +1539,7 @@ describe('Pull Command', () => {
           '/',
         ),
       });
-      const task = createPagesPullTask(api, tmpDir, true);
+      const task = createPagesPullTask(api, tmpDir, true, tmpDir);
 
       const { summaryLines } = await task.prepare();
       expect(summaryLines).toEqual(['Pages: 1 pull (1 existing)']);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  collectUnreconciledColorProps,
   collectUnreconciledMediaProps,
   getUnreconciledMedia,
   serializeElementMapForServer,
@@ -101,6 +102,60 @@ describe('serializePropsForServer — passthrough', () => {
   it('passes through props that have no schema entry', () => {
     expect(serializePropsForServer({ unknown: 'value' }, {})).toEqual({
       unknown: 'value',
+    });
+  });
+});
+
+describe('serializePropsForServer - color transformer', () => {
+  it('serializes canvas-color cssVarKey refs to UUID refs', () => {
+    const schemas: Record<string, CodeComponentPropSerialized> = {
+      accent: {
+        title: 'Accent',
+        type: 'string',
+        $ref: 'json-schema-definitions://canvas.module/color',
+      },
+    };
+    const colorsByCssVariable = new Map([
+      [
+        '--baguette-legs',
+        {
+          id: '88888888-8888-4888-8888-888888888888',
+          name: 'Baguette Legs',
+          cssVariable: '--baguette-legs',
+          value: {
+            colorSpace: 'srgb' as const,
+            components: [0, 0, 1],
+            alpha: null,
+            hex: '#0000ff',
+          },
+          weight: 0,
+        },
+      ],
+    ]);
+
+    expect(
+      serializePropsForServer(
+        { accent: 'canvas-color:baguette-legs' },
+        schemas,
+        {},
+        colorsByCssVariable,
+      ),
+    ).toEqual({
+      accent: 'canvas-color:88888888-8888-4888-8888-888888888888',
+    });
+  });
+
+  it('passes through free-pick CSS strings for color props', () => {
+    const schemas: Record<string, CodeComponentPropSerialized> = {
+      accent: {
+        title: 'Accent',
+        type: 'string',
+        $ref: 'json-schema-definitions://canvas.module/color',
+      },
+    };
+
+    expect(serializePropsForServer({ accent: '#687df7e3' }, schemas)).toEqual({
+      accent: '#687df7e3',
     });
   });
 });
@@ -284,6 +339,60 @@ describe('serializeElementMapForServer', () => {
       },
     });
   });
+
+  it('serializes color props in elements to UUID refs', () => {
+    const colorMetadata: ComponentMetadata[] = [
+      {
+        name: 'Color Card',
+        machineName: 'color-card',
+        status: true,
+        required: [],
+        slots: {},
+        props: {
+          properties: {
+            accent: {
+              title: 'Accent',
+              type: 'string',
+              $ref: 'json-schema-definitions://canvas.module/color',
+            },
+          },
+        },
+      },
+    ];
+    const elements: AuthoredSpecElementMap = {
+      node: {
+        type: 'js.color-card',
+        props: {
+          accent: 'canvas-color:baguette-legs',
+        },
+      },
+    };
+    const remoteColors = [
+      {
+        id: '88888888-8888-4888-8888-888888888888',
+        name: 'Baguette Legs',
+        cssVariable: '--baguette-legs',
+        value: {
+          colorSpace: 'srgb' as const,
+          components: [0, 0, 1],
+          alpha: null,
+          hex: '#0000ff',
+        },
+        weight: 0,
+      },
+    ];
+
+    expect(
+      serializeElementMapForServer(elements, colorMetadata, remoteColors),
+    ).toEqual({
+      node: {
+        type: 'js.color-card',
+        props: {
+          accent: 'canvas-color:88888888-8888-4888-8888-888888888888',
+        },
+      },
+    });
+  });
 });
 
 describe('getUnreconciledMedia', () => {
@@ -383,6 +492,45 @@ describe('collectUnreconciledMediaProps', () => {
         propName: 'image',
         src: 'https://example.com/example.jpg',
         mediaType: 'image',
+      },
+    ]);
+  });
+});
+
+describe('collectUnreconciledColorProps', () => {
+  it('flags color refs that do not exist on the remote brand kit', () => {
+    const colorMetadata: ComponentMetadata[] = [
+      {
+        name: 'Color Card',
+        machineName: 'color-card',
+        status: true,
+        required: [],
+        slots: {},
+        props: {
+          properties: {
+            accent: {
+              title: 'Accent',
+              type: 'string',
+              $ref: 'json-schema-definitions://canvas.module/color',
+            },
+          },
+        },
+      },
+    ];
+    const elements: AuthoredSpecElementMap = {
+      node: {
+        type: 'js.color-card',
+        props: {
+          accent: 'canvas-color:missing-color',
+        },
+      },
+    };
+
+    expect(collectUnreconciledColorProps(elements, colorMetadata, [])).toEqual([
+      {
+        elementId: 'node',
+        propName: 'accent',
+        key: 'missing-color',
       },
     ]);
   });

@@ -1,8 +1,14 @@
+import {
+  CANVAS_COLOR_REF_PREFIX,
+  UUID_PATTERN,
+} from '@drupal-canvas/discovery';
+
 import { isRecord } from './utils';
 
 import type { ComponentMetadata } from '@drupal-canvas/discovery';
 import type { CodeComponentPropSerialized } from '@drupal-canvas/ui/types/CodeComponent';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
+import type { BrandKitColorEntry } from '../types/Component';
 
 export interface UnreconciledMediaProp {
   elementId: string;
@@ -10,6 +16,14 @@ export interface UnreconciledMediaProp {
   src: string;
   mediaType: string;
 }
+
+export interface UnreconciledColorProp {
+  elementId: string;
+  propName: string;
+  key: string;
+}
+
+const COLOR_PROP_SCHEMA_REF = 'json-schema-definitions://canvas.module/color';
 
 /**
  * Describes how to identify and extract external URLs from a specific media
@@ -80,6 +94,7 @@ interface PropTransformer {
     context: {
       schema: CodeComponentPropSerialized;
       provenance?: unknown;
+      colorsByCssVariable?: Map<string, BrandKitColorEntry>;
     },
   ): unknown;
 }
@@ -173,9 +188,43 @@ const mediaTransformer: PropTransformer = {
   },
 };
 
+/**
+ * Color props (`$ref: json-schema-definitions://canvas.module/color`).
+ * Authored: CSS string or canvas-color:<cssVarKey>. Server: CSS string or
+ * canvas-color:<uuid>.
+ */
+const colorTransformer: PropTransformer = {
+  matches(schema) {
+    return schema.$ref === COLOR_PROP_SCHEMA_REF;
+  },
+
+  serialize(value, { colorsByCssVariable }) {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    if (!value.startsWith(CANVAS_COLOR_REF_PREFIX)) {
+      return value;
+    }
+
+    const ref = value.slice(CANVAS_COLOR_REF_PREFIX.length);
+    if (UUID_PATTERN.test(ref)) {
+      return value;
+    }
+
+    const entry = colorsByCssVariable?.get(`--${ref}`);
+    if (entry) {
+      return `${CANVAS_COLOR_REF_PREFIX}${entry.id}`;
+    }
+
+    return value;
+  },
+};
+
 // All transformers. Order matters: the first match wins.
 const transformers: PropTransformer[] = [
   mediaTransformer,
+  colorTransformer,
   formattedTextTransformer,
   linkTransformer,
 ];
@@ -191,6 +240,7 @@ export function serializePropsForServer(
   props: Record<string, unknown>,
   propSchemas: Record<string, CodeComponentPropSerialized>,
   provenance: Record<string, unknown> = {},
+  colorsByCssVariable?: Map<string, BrandKitColorEntry>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
@@ -208,6 +258,7 @@ export function serializePropsForServer(
       result[key] = transformer.serialize(value, {
         schema,
         provenance: provenance[key],
+        colorsByCssVariable,
       });
     } else {
       result[key] = value;
@@ -223,11 +274,15 @@ export function serializePropsForServer(
 export function serializeElementMapForServer(
   elements: AuthoredSpecElementMap,
   metadata: ComponentMetadata[],
+  remoteBrandKitColors: BrandKitColorEntry[] = [],
 ): AuthoredSpecElementMap {
   const schemaMap = new Map(
     metadata.map((m) => [`js.${m.machineName}`, m.props.properties ?? {}]),
   );
   const result: AuthoredSpecElementMap = {};
+  const colorsByCssVariable = new Map(
+    remoteBrandKitColors.map((color) => [color.cssVariable, color]),
+  );
 
   for (const [id, element] of Object.entries(elements)) {
     const propSchemas = schemaMap.get(element.type);
@@ -242,6 +297,7 @@ export function serializeElementMapForServer(
         element.props as Record<string, unknown>,
         propSchemas,
         element._provenance,
+        colorsByCssVariable,
       ),
     };
   }
@@ -276,6 +332,50 @@ export function collectUnreconciledMediaProps(
           src: match.url,
           mediaType: match.mediaType,
         });
+      }
+    }
+  }
+
+  return unreconciled;
+}
+
+export function collectUnreconciledColorProps(
+  elements: AuthoredSpecElementMap,
+  metadata: ComponentMetadata[],
+  remoteBrandKitColors: BrandKitColorEntry[],
+): UnreconciledColorProp[] {
+  const schemaMap = new Map(
+    metadata.map((m) => [`js.${m.machineName}`, m.props.properties ?? {}]),
+  );
+  const knownCssVariables = new Set(
+    remoteBrandKitColors.map((color) => color.cssVariable),
+  );
+  const unreconciled: UnreconciledColorProp[] = [];
+
+  for (const [elementId, element] of Object.entries(elements)) {
+    const propSchemas = schemaMap.get(element.type);
+    if (!propSchemas || !isRecord(element.props)) {
+      continue;
+    }
+
+    for (const [propName, value] of Object.entries(element.props)) {
+      const schema = propSchemas[propName];
+      if (!schema || schema.$ref !== COLOR_PROP_SCHEMA_REF) {
+        continue;
+      }
+      if (typeof value !== 'string') {
+        continue;
+      }
+      if (!value.startsWith(CANVAS_COLOR_REF_PREFIX)) {
+        continue;
+      }
+
+      const key = value.slice(CANVAS_COLOR_REF_PREFIX.length);
+      if (UUID_PATTERN.test(key)) {
+        continue;
+      }
+      if (!knownCssVariables.has(`--${key}`)) {
+        unreconciled.push({ elementId, propName, key });
       }
     }
   }

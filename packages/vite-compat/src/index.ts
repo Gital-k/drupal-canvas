@@ -12,10 +12,7 @@ import {
 } from '@drupal-canvas/discovery';
 import drupalCanvas from '@drupal-canvas/vite-plugin';
 
-import type {
-  ColorTokenValue,
-  NormalizedBrandKitColor,
-} from '@drupal-canvas/discovery';
+import type { NormalizedBrandKitColor } from '@drupal-canvas/discovery';
 import type { Manifest, Plugin, UserConfig } from 'vite';
 
 // The following packages are bundled by Drupal Canvas and are provided by
@@ -310,54 +307,11 @@ function resolveColorPropExampleForPreview(
   return example;
 }
 
-function isColorTokenValueRecord(value: unknown): value is ColorTokenValue {
-  const colorToken = asRecord(value);
-  if (!colorToken) {
-    return false;
-  }
-
-  const colorSpace = colorToken.colorSpace;
-  const components = colorToken.components;
-
-  return (
-    (colorSpace === 'srgb' || colorSpace === 'hsl') &&
-    Array.isArray(components) &&
-    components.every((component) => typeof component === 'number')
-  );
-}
-
 function resolvePageColorPropValue(
   value: unknown,
-  colorsByCssVariable: Map<string, NormalizedBrandKitColor>,
+  brandKitColors: NormalizedBrandKitColor[],
 ): unknown {
-  const propValue = asRecord(value);
-  if (!propValue) {
-    return value;
-  }
-
-  const token = propValue.value;
-  if (!isColorTokenValueRecord(token)) {
-    return value;
-  }
-
-  const cssVariable =
-    typeof propValue.cssVariable === 'string' ? propValue.cssVariable : null;
-  if (cssVariable) {
-    const brandKitColor = colorsByCssVariable.get(cssVariable);
-    if (brandKitColor?.token) {
-      return {
-        ...propValue,
-        value: brandKitColor.token,
-        cssColorValue: colorTokenToCss(brandKitColor.token),
-        colorName: brandKitColor.name,
-      };
-    }
-  }
-
-  return {
-    ...propValue,
-    cssColorValue: colorTokenToCss(token),
-  };
+  return resolveColorPropExampleForPreview(value, brandKitColors);
 }
 
 export function resolvePageColorPropsForPreview<T>(
@@ -373,10 +327,6 @@ export function resolvePageColorPropsForPreview<T>(
   if (!elements) {
     return spec;
   }
-
-  const colorsByCssVariable = new Map(
-    brandKitColors.map((color) => [color.cssVariable, color]),
-  );
 
   let hasElementUpdates = false;
   const nextElements: Record<string, unknown> = {};
@@ -395,7 +345,7 @@ export function resolvePageColorPropsForPreview<T>(
     for (const [propName, rawPropValue] of Object.entries(props)) {
       const nextPropValue = resolvePageColorPropValue(
         rawPropValue,
-        colorsByCssVariable,
+        brandKitColors,
       );
       nextProps[propName] = nextPropValue;
       hasPropUpdates ||= nextPropValue !== rawPropValue;

@@ -9,7 +9,10 @@ import {
   getPathAliasChange,
 } from './page-path-alias-validation';
 import { pageResultName } from './page-result-name';
-import { collectUnreconciledMediaProps } from './prop-transforms';
+import {
+  collectUnreconciledColorProps,
+  collectUnreconciledMediaProps,
+} from './prop-transforms';
 import {
   buildElementsValidationContext,
   validateElements,
@@ -17,12 +20,14 @@ import {
 
 import type { DiscoveryResult } from '@drupal-canvas/discovery';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
+import type { BrandKitColorEntry } from '../types/Component';
 import type { PageListItem } from '../types/Page';
 import type { Result } from '../types/Result';
 
 export interface PageValidationOptions {
   remotePageByUuid?: Map<string, PageListItem>;
   availablePageVariantIds?: ReadonlySet<string>;
+  remoteBrandKitColors?: BrandKitColorEntry[];
 }
 
 /**
@@ -92,6 +97,17 @@ export async function validatePages(
         details.push({
           heading: `elements.${entry.elementId}.props.${entry.propName}`,
           content: `Unreconciled external media URL "${entry.src}". Run \`canvas reconcile-media\` to resolve.`,
+        });
+      }
+      const unreconciledColors = collectUnreconciledColorProps(
+        elements,
+        metadata,
+        options.remoteBrandKitColors ?? [],
+      );
+      for (const entry of unreconciledColors) {
+        details.push({
+          heading: `elements.${entry.elementId}.props.${entry.propName}`,
+          content: `Unknown brand kit color key "${entry.key}". Run \`canvas pull --include-brand-kit\` to refresh local colors, or push the color before referencing it.`,
         });
       }
 

@@ -6,6 +6,7 @@ import * as p from '@clack/prompts';
 import {
   detectHeadlessSdk,
   discoverCanvasProject,
+  loadComponentsMetadata,
 } from '@drupal-canvas/discovery';
 
 import {
@@ -49,6 +50,7 @@ import {
 } from '../utils/prepare-page-variants-push';
 import {
   collectPageResults,
+  pagesHaveColorProps,
   preparePages,
   pushPages,
 } from '../utils/prepare-pages-push';
@@ -936,6 +938,23 @@ export function pushCommand(program: Command): void {
           }
         }
 
+        if (discoveredPages.length > 0 && remoteBrandKitColors.length === 0) {
+          const componentMetadata =
+            await loadComponentsMetadata(discoveryResult);
+          const requiresRemoteColors = await pagesHaveColorProps(
+            discoveredPages,
+            componentMetadata,
+          );
+          if (requiresRemoteColors) {
+            try {
+              const brandKit = await apiService.getBrandKit();
+              remoteBrandKitColors = brandKit.colors ?? [];
+            } catch {
+              remoteBrandKitColors = [];
+            }
+          }
+        }
+
         // Fetch remote pages early for the planned operations summary.
         const remotePages =
           includesPages && discoveredPages.length > 0
@@ -1618,6 +1637,7 @@ export function pushCommand(program: Command): void {
                 await validatePages(discoveryResult, {
                   remotePageByUuid,
                   availablePageVariantIds,
+                  remoteBrandKitColors,
                 })
               ).results,
             markStarted: () =>
@@ -1629,6 +1649,7 @@ export function pushCommand(program: Command): void {
                 discoveredPages,
                 componentVersions,
                 discoveryResult,
+                remoteBrandKitColors,
               );
             },
             push: (validPages) =>

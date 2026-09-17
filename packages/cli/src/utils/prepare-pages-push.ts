@@ -10,12 +10,57 @@ import {
 import { pageResultName } from './page-result-name';
 import { serializeElementMapForServer } from './prop-transforms';
 import { processInPool } from './request-pool';
+import { isRecord } from './utils';
 
-import type { DiscoveredPage, DiscoveryResult } from '@drupal-canvas/discovery';
+import type {
+  ComponentMetadata,
+  DiscoveredPage,
+  DiscoveryResult,
+} from '@drupal-canvas/discovery';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
 import type { ApiService } from '../services/api';
+import type { BrandKitColorEntry } from '../types/Component';
 import type { Page, PageListItem } from '../types/Page';
 import type { Result } from '../types/Result';
+
+const COLOR_PROP_SCHEMA_REF = 'json-schema-definitions://canvas.module/color';
+
+export async function pagesHaveColorProps(
+  discoveredPages: DiscoveredPage[],
+  componentMetadata: ComponentMetadata[],
+): Promise<boolean> {
+  const colorPropComponents = new Set<string>();
+  for (const metadata of componentMetadata) {
+    const hasColorProp = Object.values(metadata.props.properties ?? {}).some(
+      (schema) => schema.$ref === COLOR_PROP_SCHEMA_REF,
+    );
+    if (hasColorProp) {
+      colorPropComponents.add(`js.${metadata.machineName}`);
+    }
+  }
+
+  if (colorPropComponents.size === 0 || discoveredPages.length === 0) {
+    return false;
+  }
+
+  for (const page of discoveredPages) {
+    const fileContent = await fs.readFile(page.path, 'utf-8');
+    const spec = JSON.parse(fileContent) as { elements?: unknown };
+    const elements = isRecord(spec.elements)
+      ? (spec.elements as AuthoredSpecElementMap)
+      : {};
+    for (const element of Object.values(elements)) {
+      if (!colorPropComponents.has(element.type)) {
+        continue;
+      }
+      if (isRecord(element.props) && Object.keys(element.props).length > 0) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
 
 export interface PagePushResult {
   title: string;
@@ -58,6 +103,7 @@ export async function preparePages(
   discoveredPages: DiscoveredPage[],
   componentVersions: Map<string, string>,
   discoveryResult: DiscoveryResult,
+  remoteBrandKitColors: BrandKitColorEntry[] = [],
 ): Promise<{
   valid: Array<{ index: number; result: PreparedPage }>;
   failed: PagePreparationFailure[];
@@ -79,6 +125,7 @@ export async function preparePages(
       const elements = serializeElementMapForServer(
         spec.elements ?? {},
         componentMetadata,
+        remoteBrandKitColors,
       );
       const components = authoredElementMapToComponentTree(
         elements,

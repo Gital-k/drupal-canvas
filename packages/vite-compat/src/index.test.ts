@@ -365,7 +365,7 @@ describe('vite-compat', () => {
   });
 
   describe('resolvePageColorPropsForPreview', () => {
-    it('recomputes page color props from local brand kit colors', () => {
+    it('resolves authored page color strings for preview', () => {
       const spec = {
         root: 'canvas:component-tree',
         elements: {
@@ -377,27 +377,8 @@ describe('vite-compat', () => {
           'node-1': {
             type: 'js.canvas_test_code_components_color_three_colors',
             props: {
-              brandPastel: {
-                value: {
-                  colorSpace: 'srgb',
-                  components: [1, 0.678, 1],
-                  hex: '#ffadff',
-                },
-                cssColorValue: 'rgb(255, 173, 255)',
-                cssVariable: '--baguette-legs',
-                colorName: 'Baguette Legs',
-              },
-              free: {
-                value: {
-                  colorSpace: 'srgb',
-                  components: [1, 0, 0],
-                  alpha: 1,
-                  hex: '#ff0000',
-                },
-                cssColorValue: 'rgb(255, 0, 0)',
-                cssVariable: null,
-                colorName: null,
-              },
+              brandPastel: 'canvas-color:baguette-legs',
+              free: '#ff0000',
               title: 'Hello',
             },
           },
@@ -434,7 +415,7 @@ describe('vite-compat', () => {
         value: {
           colorSpace: 'srgb',
           components: [1, 0, 0],
-          alpha: 1,
+          alpha: null,
           hex: '#ff0000',
         },
         cssColorValue: '#ff0000',
@@ -444,23 +425,14 @@ describe('vite-compat', () => {
       expect(props.title).toBe('Hello');
     });
 
-    it('falls back to page color token when brand kit entry is missing', () => {
+    it('returns raw string for unknown brand kit color refs', () => {
       const spec = {
         root: 'root',
         elements: {
           root: {
             type: 'js.canvas_test_code_components_color_three_colors',
             props: {
-              brandPastel: {
-                value: {
-                  colorSpace: 'srgb',
-                  components: [1, 0.678, 1],
-                  hex: '#ffadff',
-                },
-                cssColorValue: 'rgb(255, 173, 255)',
-                cssVariable: '--baguette-legs',
-                colorName: 'Baguette Legs',
-              },
+              brandPastel: 'canvas-color:baguette-legs',
             },
           },
         },
@@ -468,16 +440,7 @@ describe('vite-compat', () => {
 
       const result = resolvePageColorPropsForPreview(spec, []);
       const props = result.elements.root.props as Record<string, unknown>;
-      expect(props.brandPastel).toEqual({
-        value: {
-          colorSpace: 'srgb',
-          components: [1, 0.678, 1],
-          hex: '#ffadff',
-        },
-        cssColorValue: '#ffadff',
-        cssVariable: '--baguette-legs',
-        colorName: 'Baguette Legs',
-      });
+      expect(props.brandPastel).toBe('canvas-color:baguette-legs');
     });
   });
 
