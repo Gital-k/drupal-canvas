@@ -29,8 +29,12 @@ const SEL = {
 };
 
 const LAYOUT_SCREENSHOT_OPTIONS = {
-  // Allow up to 10% of the compared pixels to differ.
-  maxDiffPixelRatio: 0.1,
+  // Allow up to 4% of the compared pixels to differ. Measured against these
+  // fixtures, worst-case cross-environment aliasing (a full 1px diagonal shift)
+  // moves ~2.5% of pixels, while a real content change such as adding new
+  // subheaders moves ~6%. A 10% ratio let that content change pass unnoticed;
+  // 4% keeps headroom over aliasing while still flagging genuine layout drift.
+  maxDiffPixelRatio: 0.04,
   // Raise the per-pixel color-difference threshold so small cross-environment
   // rendering differences are not counted as differing pixels.
   threshold: 0.3,
