@@ -6,6 +6,7 @@ namespace Drupal\Tests\canvas_headless\Unit;
 
 use Drupal\canvas_headless\CanvasContentProblemResponse;
 use Drupal\canvas_headless\EventSubscriber\CanvasContentResponseSubscriber;
+use Drupal\canvas_headless\PreviewLanguageRedirectResponse;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Cache\CacheableJsonResponse;
@@ -38,6 +39,7 @@ use Symfony\Component\HttpKernel\KernelEvents;
  */
 #[CoversClass(CanvasContentResponseSubscriber::class)]
 #[CoversClass(CanvasContentProblemResponse::class)]
+#[CoversClass(PreviewLanguageRedirectResponse::class)]
 #[Group('canvas_headless')]
 final class CanvasContentResponseSubscriberTest extends UnitTestCase {
 
@@ -56,6 +58,23 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
 
     });
     \Drupal::setContainer($container);
+  }
+
+  /**
+   * Only the language transport response bypasses navigation conversion.
+   */
+  public function testLanguageTransportRedirect(): void {
+    $redirect = new PreviewLanguageRedirectResponse('/canvas/content-api?requestUri=%2Ffr%2Fpage%2F1');
+    // Simulate core's finish-response subscriber replacing cache headers.
+    $redirect->headers->set('Cache-Control', 'no-cache, must-revalidate');
+    $event = $this->event($redirect);
+    CanvasContentResponseSubscriber::convertRedirect($event);
+    self::assertSame($redirect, $event->getResponse());
+    self::assertSame(302, $redirect->getStatusCode());
+    self::assertSame('/canvas/content-api?requestUri=%2Ffr%2Fpage%2F1', $redirect->headers->get('Location'));
+    self::assertSame(0, $redirect->getCacheableMetadata()->getCacheMaxAge());
+    self::assertTrue($redirect->headers->hasCacheControlDirective('no-store'));
+    self::assertTrue($redirect->headers->hasCacheControlDirective('private'));
   }
 
   /**

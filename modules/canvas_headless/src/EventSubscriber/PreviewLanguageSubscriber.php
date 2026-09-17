@@ -4,24 +4,21 @@ declare(strict_types=1);
 
 namespace Drupal\canvas_headless\EventSubscriber;
 
+use Drupal\canvas_headless\PreviewLanguageRedirectResponse;
 use Drupal\canvas_headless\PreviewTokenInspector;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\PathProcessor\InboundPathProcessorInterface;
 use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\Core\StringTranslation\TranslationManager;
 use Drupal\Core\Url;
-use Drupal\language\ConfigurableLanguageManagerInterface;
-use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUrl;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Applies the read-only preview language before routing the content request.
+ * Redirects read-only previews through the site's language negotiation.
  *
  * @internal
  */
@@ -29,10 +26,8 @@ final class PreviewLanguageSubscriber implements EventSubscriberInterface {
 
   public function __construct(
     private readonly LanguageManagerInterface $languageManager,
-    private readonly ConfigFactoryInterface $configFactory,
     private readonly AccountProxyInterface $currentUser,
-    private readonly TranslationManager $translation,
-    private readonly ModuleHandlerInterface $moduleHandler,
+    private readonly ?InboundPathProcessorInterface $languagePathProcessor,
   ) {}
 
   public function onRequest(RequestEvent $event): void {
@@ -49,67 +44,63 @@ final class PreviewLanguageSubscriber implements EventSubscriberInterface {
     if ($language === NULL) {
       throw new NotFoundHttpException();
     }
-    // The subscriber is registered even on monolingual sites. Guard the
-    // optional language module before dereferencing its negotiation class.
-    if (!$this->moduleHandler->moduleExists('language')) {
-      return;
-    }
     if ($this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId() === $langcode) {
       return;
     }
-
-    // Use the site's switch-link query and URL generation, just like coupled
-    // previews. Strip an existing prefix before generating a different one.
-    $path = $request->getPathInfo();
-    $negotiation = $this->configFactory->get('language.negotiation');
-    if ($negotiation->get('url.source') === LanguageNegotiationUrl::CONFIG_PATH_PREFIX) {
-      foreach ($negotiation->get('url.prefixes') ?? [] as $prefix) {
-        if ($prefix !== '' && ($path === '/' . $prefix || str_starts_with($path, '/' . $prefix . '/'))) {
-          $path = $path === '/' . $prefix ? '/' : substr($path, strlen($prefix) + 1);
-          break;
-        }
-      }
+    // One transport redirect is enough for core prefix/session negotiation.
+    // If the site cannot honor the hint, fail rather than loop or render EN.
+    if ($this->languagePathProcessor === NULL || $request->attributes->get(CanvasContentApiRequest::LANGUAGE_REDIRECT_QUERY)) {
+      throw new NotFoundHttpException('The requested preview language could not be negotiated.');
     }
+
+    // Internal URLs use core inbound processing to resolve prefixes and aliases
+    // to routes before generating the target-language URL. For unroutable
+    // detached previews, let core strip the language prefix instead.
+    $path = $request->getPathInfo();
     $url = Url::fromUri('internal:' . $path);
-    $query = $request->query->all();
+    if (!$url->isRouted()) {
+      $path = $this->languagePathProcessor->processInbound($path, $request);
+      $url = Url::fromUri('base:' . $path, ['path_processing' => TRUE]);
+    }
+    $query = ($url->getOption('query') ?? []) + $request->query->all();
     $links = $this->languageManager->getLanguageSwitchLinks(LanguageInterface::TYPE_CONTENT, $url);
     if ($links instanceof \stdClass) {
       $query = ($links->links[$langcode]['query'] ?? []) + $query;
     }
+    // The middleware reconstructs this cache-context mirror on the next hop.
+    unset($query[CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY]);
     $url->setOption('language', $language)->setOption('query', $query);
+    // Routing has not run yet: do not rely on the router's request context for
+    // the installation base. Core outbound processors can still reject/change
+    // this base (e.g. domain negotiation), which is checked below.
+    $url->setOption('base_url', $request->getBaseUrl());
     $target = $url->toString();
-    // Domain negotiation remains unsupported: never move a bearer credential
-    // to another origin or pretend a foreign host is the current request.
+    // Never redirect a bearer credential to another origin. Domain negotiation
+    // remains unsupported, just as it is for the embedded preview session.
     if (!str_starts_with($target, '/') || str_starts_with($target, '//')) {
       throw new NotFoundHttpException('Cross-domain preview language negotiation is not supported.');
     }
-    $query_string = (string) (parse_url($target, PHP_URL_QUERY) ?? '');
-    parse_str($query_string, $query);
-    $headers = $request->headers->all();
-    $request->initialize(
-      $query,
-      $request->request->all(),
-      $request->attributes->all(),
-      $request->cookies->all(),
-      $request->files->all(),
-      [...$request->server->all(), 'REQUEST_URI' => $target, 'QUERY_STRING' => $query_string],
-      $request->getContent(),
-    );
-    $request->headers->add($headers);
-    $request->setRequestFormat(CanvasContentApiRequest::REQUEST_FORMAT);
-
-    // Negotiation is lazy and cached. Re-negotiate against the updated request
-    // before routing, entity conversion, config loading, or rendering occurs.
-    $this->languageManager->reset();
-    if ($this->languageManager instanceof ConfigurableLanguageManagerInterface) {
-      $this->languageManager->setConfigOverrideLanguage($this->languageManager->getCurrentLanguage());
+    // Generated URLs include the installation base; requestUri is Drupal-root
+    // relative. Remove only that exact base, never a language/path segment.
+    $base = $request->getBaseUrl();
+    if ($base !== '') {
+      if (!str_starts_with($target, $base . '/') && !str_starts_with($target, $base . '?') && $target !== $base) {
+        throw new NotFoundHttpException('The preview language URL is outside the Drupal installation.');
+      }
+      $target = substr($target, strlen($base));
+      if ($target === '' || str_starts_with($target, '?')) {
+        $target = '/' . $target;
+      }
     }
-    $this->translation->setDefaultLangcode($this->languageManager->getCurrentLanguage()->getId());
+    $event->setResponse(new PreviewLanguageRedirectResponse($base . CanvasContentApiRequest::API_PATH . '?' . http_build_query([
+      'requestUri' => $target,
+      ...$context,
+      CanvasContentApiRequest::LANGUAGE_REDIRECT_QUERY => '1',
+    ])));
   }
 
   public static function getSubscribedEvents(): array {
-    // After authentication (300) and core language initialization (255), but
-    // before routing (32), including translation-aware entity access checks.
+    // After authentication and language initialization, before routing/access.
     return [KernelEvents::REQUEST => ['onRequest', 250]];
   }
 

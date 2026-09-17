@@ -84,6 +84,17 @@ paths:
                       external: false
                       url: /new-path
                       statusCode: 301
+        '302':
+          description: >-
+            Non-cacheable, same-origin language negotiation transport redirect
+            for a preview-scoped request. Follow Location back to this endpoint
+            with the same authorization. At most one language redirect is issued;
+            unsuccessful negotiation on that hop returns 404.
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Same-origin content API URL retaining preview context.
         '400':
           $ref: '#/components/responses/ProblemDetailsResponse'
         '401':

@@ -18,7 +18,7 @@ services:
       - { name: path_processor_inbound, priority: -1000 }
   Drupal\canvas_headless\EventSubscriber\PreviewLanguageSubscriber:
     arguments:
-      $translation: '@string_translation'
+      $languagePathProcessor: '@?path_processor_language'
   Drupal\canvas_headless\EventSubscriber\CanvasContentResponseSubscriber: {}
   Drupal\canvas_headless\EventSubscriber\DetachedPreviewRouteSubscriber: {}
   Drupal\canvas_headless\CanvasContentEntityRenderer: {}

@@ -13,6 +13,7 @@ use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Marker;
 use Drupal\canvas_headless\Grant\PreviewAssertionGrant;
 use Drupal\canvas_headless\PreviewAssertionFactory;
+use Drupal\canvas_headless\PreviewLanguageRedirectResponse;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\consumers\Entity\Consumer;
 use Drupal\Core\Cache\CacheableJsonResponse;
@@ -1064,9 +1065,16 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
   /**
    * Tests draft trees plus translation overrides for both template kinds.
    */
-  public function testTranslatedTemplateDrafts(): void {
+  #[\PHPUnit\Framework\Attributes\DataProvider('previewLanguageNegotiationCases')]
+  public function testTranslatedTemplateDrafts(string $path_prefix, bool $session): void {
     ConfigurableLanguage::createFromLangcode('fr')->save();
-    $this->config('language.negotiation')->set('url.prefixes', ['en' => '', 'fr' => 'fr'])->save();
+    $this->config('language.negotiation')->set('url.prefixes', ['en' => 'en', 'fr' => 'fr'])->save();
+    if ($session) {
+      $this->config('language.negotiation')->set('session.parameter', 'content_language')->save();
+      $this->config('language.types')
+        ->set('negotiation.language_content.enabled', ['language-session' => -10, 'language-selected' => 12])
+        ->set('negotiation.language_interface.enabled', ['language-session' => -10, 'language-selected' => 12])->save();
+    }
     $language_manager = $this->container->get(LanguageManagerInterface::class);
     self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
     $variant = $this->createPageVariant('translated', 'Stored chrome', 'Stored footer');
@@ -1108,8 +1116,10 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       ['/page/' . $page->id(), [], 'Stored component heading'],
       ['/node/' . $node->id(), ['viewMode' => 'full'], 'French template'],
       ['/', ['pageVariant' => 'translated'], 'French chrome'],
+      ['/unroutable', ['pageVariant' => 'translated'], 'French chrome'],
+      ['/en/unroutable', ['pageVariant' => 'translated'], 'French chrome'],
     ] as [$path, $context, $expected]) {
-      $data = self::responseData($this->renderContentPath($path, ['language' => 'fr'] + $context));
+      $data = self::responseData($this->renderContentPath($path_prefix . $path, ['language' => 'fr'] + $context));
       $content = json_encode($data['content'], JSON_THROW_ON_ERROR);
       self::assertStringContainsString($expected, $content);
       self::assertStringContainsString('French chrome', $content);
@@ -1164,6 +1174,84 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
   public static function inaccessibleTranslationCases(): iterable {
     yield 'stored translation' => [FALSE];
     yield 'auto-saved translation' => [TRUE];
+  }
+
+  /**
+   * Transport redirects retain context and queries without duplicating the base.
+   */
+  #[\PHPUnit\Framework\Attributes\DataProvider('previewInstallationBases')]
+  public function testLanguageRedirectAliasesAndBasePath(string $base, string $script): void {
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    $this->config('language.negotiation')->set('url.prefixes', ['en' => 'en', 'fr' => 'fr'])->save();
+    $page = $this->createPage();
+    $page->addTranslation('fr', ['title' => 'French alias page', 'status' => TRUE]);
+    $page->save();
+    foreach (['en' => '/english-page', 'fr' => '/page-francaise'] as $langcode => $alias) {
+      PathAlias::create(['path' => '/page/' . $page->id(), 'alias' => $alias, 'langcode' => $langcode])->save();
+    }
+    $this->container->get('kernel')->rebuildContainer();
+    $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE));
+    $server = ['SCRIPT_NAME' => $script, 'SCRIPT_FILENAME' => '/var/www' . $script];
+    $context = ['language' => 'fr', 'viewMode' => 'full'];
+    $request = Request::create($base . '/canvas/content-api?' . http_build_query([
+      'requestUri' => '/en/english-page?language=route-owned&viewMode=route-owned&filter%5Btag%5D=one',
+      ...$context,
+    ]), server: $server);
+    $response = $this->request($request);
+    self::assertInstanceOf(PreviewLanguageRedirectResponse::class, $response);
+    self::assertSame(302, $response->getStatusCode());
+    self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
+    self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
+    self::assertStringStartsWith($base . '/canvas/content-api?', $response->getTargetUrl());
+    $redirect_request = Request::create($response->getTargetUrl(), server: $server);
+    $redirect_query = $redirect_request->query->all();
+    $redirected_uri = $redirect_request->query->getString('requestUri');
+    self::assertSame('fr', $redirect_query['language']);
+    self::assertSame('full', $redirect_query['viewMode']);
+    self::assertSame('1', $redirect_query[CanvasContentApiRequest::LANGUAGE_REDIRECT_QUERY]);
+    self::assertSame('/fr/page-francaise', parse_url($redirected_uri, PHP_URL_PATH));
+    parse_str((string) parse_url($redirected_uri, PHP_URL_QUERY), $route_query);
+    self::assertSame(['language' => 'route-owned', 'viewMode' => 'route-owned', 'filter' => ['tag' => 'one']], $route_query);
+    $result = $this->request($redirect_request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $result);
+    self::assertSame('French alias page', self::responseData($result)['head']['title']);
+  }
+
+  public static function previewInstallationBases(): iterable {
+    yield 'root' => ['', '/index.php'];
+    yield 'subdirectory' => ['/drupal', '/drupal/index.php'];
+    yield 'front controller' => ['/drupal/index.php', '/drupal/index.php'];
+  }
+
+  /**
+   * A site that cannot negotiate the hint must not redirect indefinitely.
+   */
+  public function testLanguageRedirectStopsAfterOneHop(): void {
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    $this->config('language.types')
+      ->set('negotiation.language_content.enabled', ['language-selected' => 12])
+      ->set('negotiation.language_interface.enabled', ['language-selected' => 12])->save();
+    $page = $this->createPage();
+    $this->container->get('kernel')->rebuildContainer();
+    $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE));
+    $this->expectException(NotFoundHttpException::class);
+    $this->expectExceptionMessage('The requested preview language could not be negotiated.');
+    $this->renderContentPath('/page/' . $page->id(), ['language' => 'fr']);
+  }
+
+  /**
+   * Domain negotiation must not send the preview credential to another host.
+   */
+  public function testLanguageRedirectRejectsForeignOrigin(): void {
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    $this->config('language.negotiation')->set('url.source', 'domain')
+      ->set('url.domains', ['en' => 'localhost', 'fr' => 'french.example'])->save();
+    $page = $this->createPage();
+    $this->container->get('kernel')->rebuildContainer();
+    $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE));
+    $this->expectException(NotFoundHttpException::class);
+    $this->expectExceptionMessage('Cross-domain preview language negotiation is not supported.');
+    $this->renderContentPath('/page/' . $page->id(), ['language' => 'fr']);
   }
 
   public static function previewLanguageNegotiationCases(): iterable {
@@ -1295,6 +1383,12 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       ]),
     );
     $response = $this->request($request);
+    if ($response instanceof PreviewLanguageRedirectResponse) {
+      self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
+      self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
+      self::assertStringStartsWith('/canvas/content-api?', $response->getTargetUrl());
+      $response = $this->request(Request::create($response->getTargetUrl()));
+    }
     self::assertInstanceOf(CacheableJsonResponse::class, $response);
     return $response;
   }

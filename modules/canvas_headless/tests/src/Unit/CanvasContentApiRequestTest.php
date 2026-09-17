@@ -9,14 +9,11 @@ use Drupal\canvas_headless\EventSubscriber\PreviewLanguageSubscriber;
 use Drupal\canvas_headless\Grant\PreviewAssertionGrant;
 use Drupal\canvas_headless\Routing\DetachedPreviewRouteProcessor;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Routing\CacheableRouteProviderInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\Core\StringTranslation\TranslationManager;
 use Drupal\simple_oauth\Authentication\TokenAuthUserInterface;
 use Drupal\simple_oauth\Entity\Oauth2TokenInterface;
 use Drupal\simple_oauth\Oauth2ScopeInterface;
@@ -257,20 +254,15 @@ final class CanvasContentApiRequestTest extends UnitTestCase {
     $language_manager = $this->createMock(LanguageManagerInterface::class);
     $language_manager->expects($this->once())->method('getLanguage')
       ->with($langcode)->willReturn($known ? new Language(['id' => 'en']) : NULL);
-    $language_manager->expects($this->never())->method('getCurrentLanguage');
-    $config_factory = $this->createMock(ConfigFactoryInterface::class);
-    $config_factory->expects($this->never())->method('get');
-    $module_handler = $this->createMock(ModuleHandlerInterface::class);
-    $module_handler->expects($known ? $this->once() : $this->never())
-      ->method('moduleExists')->with('language')->willReturn(FALSE);
+    $language_manager->expects($known ? $this->once() : $this->never())
+      ->method('getCurrentLanguage')->willReturn(new Language(['id' => 'en']));
+    $language_manager->expects($this->never())->method('getLanguageSwitchLinks');
     $current_user = $this->createMock(AccountProxyInterface::class);
     $current_user->method('getAccount')->willReturn($this->previewTokenAccount());
     $subscriber = new PreviewLanguageSubscriber(
       $language_manager,
-      $config_factory,
       $current_user,
-      $this->createMock(TranslationManager::class),
-      $module_handler,
+      NULL,
     );
     $request = Request::create('/page/1');
     $request->attributes->set(CanvasContentApiRequest::REQUESTED_URI_ATTRIBUTE, '/page/1');

@@ -66,9 +66,14 @@ SDK's `fetchPage()` forwards it only while the draft session is live. It does
 not change the editable editor iframe or add a public frontend language option.
 
 The content endpoint honors this `language` hint only for preview-scoped tokens.
-It uses the site's language-switch URL/query negotiation before routing and
-rendering, including translation access checks, per-language page auto-saves,
-and template translation overrides merged onto draft trees. A configured language
+When negotiation must change, it sends one private, non-cacheable HTTP 302 back
+to the same-origin content endpoint with the language-specific `requestUri` and
+preview context. `fetchPage()` follows this transport redirect with the same
+credential; it is not a frontend navigation result. A fresh request uses the
+site's language-switch URL/query negotiation before routing and rendering,
+including translation access checks, per-language page auto-saves, and template
+translation overrides merged onto draft trees. If negotiation still does not
+match after that hop, the endpoint returns 404 rather than redirecting again. A configured language
 without a translation retains Drupal's fallback; an unknown language returns 400
 when minting an assertion and 404 from the content endpoint.
 
