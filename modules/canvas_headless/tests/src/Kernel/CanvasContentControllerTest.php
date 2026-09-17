@@ -18,6 +18,7 @@ use Drupal\consumers\Entity\Consumer;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Routing\RouteBuilderInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -1066,7 +1067,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
   public function testTranslatedTemplateDrafts(): void {
     ConfigurableLanguage::createFromLangcode('fr')->save();
     $this->config('language.negotiation')->set('url.prefixes', ['en' => '', 'fr' => 'fr'])->save();
-    $language_manager = $this->container->get('language_manager');
+    $language_manager = $this->container->get(LanguageManagerInterface::class);
     self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
     $variant = $this->createPageVariant('translated', 'Stored chrome', 'Stored footer');
     $tree = $variant->getComponentTree()->getValue();

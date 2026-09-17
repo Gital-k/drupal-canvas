@@ -7,6 +7,7 @@ namespace Drupal\canvas_headless\EventSubscriber;
 use Drupal\canvas_headless\PreviewTokenInspector;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -31,6 +32,7 @@ final class PreviewLanguageSubscriber implements EventSubscriberInterface {
     private readonly ConfigFactoryInterface $configFactory,
     private readonly AccountProxyInterface $currentUser,
     private readonly TranslationManager $translation,
+    private readonly ModuleHandlerInterface $moduleHandler,
   ) {}
 
   public function onRequest(RequestEvent $event): void {
@@ -46,6 +48,11 @@ final class PreviewLanguageSubscriber implements EventSubscriberInterface {
     $language = $this->languageManager->getLanguage($langcode);
     if ($language === NULL) {
       throw new NotFoundHttpException();
+    }
+    // The subscriber is registered even on monolingual sites. Guard the
+    // optional language module before dereferencing its negotiation class.
+    if (!$this->moduleHandler->moduleExists('language')) {
+      return;
     }
     if ($this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId() === $langcode) {
       return;
