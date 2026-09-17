@@ -210,6 +210,7 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
     $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
     $this->refreshContainer();
     $this->setUpAiDevHops();
+    $this->keepToolCallsInHistory();
 
     $state = [
       'looped' => 2,
@@ -247,6 +248,7 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
     $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
     $this->refreshContainer();
     $this->setUpAiDevHops();
+    $this->keepToolCallsInHistory();
 
     $temp_store = $this->container->get(CanvasAiTempStore::class);
     $temp_store->setStoredConversationState('test-conversation', 'canvas_agent', ['looped' => 1]);
@@ -277,6 +279,7 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
     $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
     $this->refreshContainer();
     $this->setUpAiDevHops();
+    $this->keepToolCallsInHistory();
 
     $agent = $this->createMock(AiAgentEntityWrapper::class);
     $agent->method('determineSolvability')->willReturn(AiAgentInterface::JOB_SOLVABLE);
@@ -308,6 +311,7 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
     $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
     $this->refreshContainer();
     $this->setUpAiDevHops();
+    $this->keepToolCallsInHistory();
 
     $agent = $this->createMock(AiAgentEntityWrapper::class);
     $agent->expects(self::never())->method('fromArray');
@@ -344,6 +348,7 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
     $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
     $this->refreshContainer();
     $this->setUpAiDevHops();
+    $this->keepToolCallsInHistory();
 
     $temp_store = $this->container->get(CanvasAiTempStore::class);
     $temp_store->setStoredConversationState('test-conversation', 'canvas_agent', [
@@ -389,6 +394,7 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
     $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
     $this->refreshContainer();
     $this->setUpAiDevHops();
+    $this->keepToolCallsInHistory();
 
     $temp_store = $this->container->get(CanvasAiTempStore::class);
     $temp_store->setStoredConversationState('test-conversation', 'canvas_agent', [
@@ -424,6 +430,58 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
       'agent_id' => 'canvas_component_agent',
       'state' => ['looped' => 1, 'context_tools' => []],
     ], $temp_store->getStoredConversationState('test-conversation'));
+  }
+
+  /**
+   * Nothing is kept or resumed for a conversation unless the site opted in.
+   *
+   * The setting is off after install. A turn then seeds the agent from the
+   * client transcript even when a conversation state exists, and drops that
+   * state when it ends, so turning the setting off is enough to stop resuming.
+   *
+   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::keepsToolCallsInHistory()
+   * @see canvas_dev_ai_install()
+   */
+  public function testConversationStateNeedsTheOptIn(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
+    $this->refreshContainer();
+    $this->setUpAiDevHops();
+    self::assertFalse($this->config('canvas_dev_ai.settings')->get('keep_tool_calls_in_history'));
+
+    $temp_store = $this->container->get(CanvasAiTempStore::class);
+    $temp_store->setStoredConversationState('test-conversation', 'canvas_agent', [
+      'looped' => 3,
+      'chat_history' => [['role' => 'user', 'text' => 'Add a hero']],
+    ]);
+
+    $agent = $this->createMock(AiAgentEntityWrapper::class);
+    $agent->expects(self::never())->method('fromArray');
+    $agent->expects(self::once())->method('setChatHistory');
+    $agent->method('determineSolvability')->willReturn(AiAgentInterface::JOB_SOLVABLE);
+    $agent->method('isFinished')->willReturn(TRUE);
+    $agent->method('toArray')->willReturn(['looped' => 1, 'context_tools' => []]);
+    $agent->method('solve')->willReturn('It is blue.');
+    $this->useMockedAgent($agent);
+
+    $response = $this->hop([
+      'messages' => [
+        ['role' => 'user', 'text' => 'Add a hero'],
+        ['role' => 'assistant', 'text' => 'The hero is placed.'],
+        ['role' => 'user', 'text' => 'Make it blue'],
+      ],
+      'request_id' => 'turn-2',
+    ]);
+    self::assertTrue($response['status']);
+    self::assertNull($temp_store->getStoredConversationState('test-conversation'));
+  }
+
+  /**
+   * Opts the site in to keeping the agent state between turns.
+   *
+   * @see \Drupal\canvas_dev_ai\Form\CanvasDevAiAgentSelectionForm
+   */
+  private function keepToolCallsInHistory(): void {
+    $this->config('canvas_dev_ai.settings')->set('keep_tool_calls_in_history', TRUE)->save();
   }
 
   /**

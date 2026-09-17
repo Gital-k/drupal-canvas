@@ -40,8 +40,10 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
  * A turn is one user message, run as several requests under one request_id:
  * the agent pauses after each tool decision and the client re-POSTs until
  * it reports finished. A conversation is several turns under one
- * conversation_id: the agent's own history, tool calls and results included,
- * is kept when a turn ends and resumed by the next.
+ * conversation_id: when the site opts in on the Agents & Tools form, the
+ * agent's own history, tool calls and results included, is kept when a turn
+ * ends and resumed by the next. Otherwise every turn is seeded from the client
+ * transcript, which carries text only.
  *
  * @todo Replace the single request/response call with the real hop loop in https://git.drupalcode.org/project/canvas/-/work_items/3591777
  *
@@ -442,7 +444,9 @@ final class CanvasDevAiBuilder extends ControllerBase {
     // case seeds from the transcript instead of failing the turn.
     // @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::render()
     $conversation_id = self::getConversationId($prompt);
-    $conversation = $conversation_id === '' ? NULL : $this->canvasAiTempStore->getStoredConversationState($conversation_id);
+    $conversation = $conversation_id !== '' && $this->keepsToolCallsInHistory()
+      ? $this->canvasAiTempStore->getStoredConversationState($conversation_id)
+      : NULL;
     if ($conversation !== NULL && $conversation['agent_id'] === $agent_id) {
       // The loop counter is serialized with the state and drives three things
       // in the agent: the chat input is appended to the history on loop 1
@@ -462,9 +466,10 @@ final class CanvasDevAiBuilder extends ControllerBase {
   /**
    * Keeps the agent's history for the conversation's next turn.
    *
-   * Called when a turn ended with the agent finished. A tool call the agent
-   * parked but never ran would be run by the turn that resumes the state,
-   * so a state still carrying one is not kept.
+   * Called when a turn ended with the agent finished. Nothing is kept unless
+   * the site opted in. A tool call the agent parked but never ran would be run
+   * by the turn that resumes the state, so a state still carrying one is not
+   * kept either.
    *
    * @param array $prompt
    *   The decoded prompt.
@@ -477,6 +482,12 @@ final class CanvasDevAiBuilder extends ControllerBase {
   private function storeConversationState(array $prompt, string $agent_id, AiAgentEntityWrapper $agent): void {
     $conversation_id = self::getConversationId($prompt);
     if ($conversation_id === '') {
+      return;
+    }
+    if (!$this->keepsToolCallsInHistory()) {
+      // Drop what an earlier turn may have kept while the setting was on, so
+      // turning it off means nothing is resumed from then on.
+      $this->canvasAiTempStore->deleteStoredConversationState($conversation_id);
       return;
     }
     $state = $agent->toArray();
@@ -522,6 +533,18 @@ final class CanvasDevAiBuilder extends ControllerBase {
   private static function getConversationId(array $prompt): string {
     $conversation_id = $prompt['conversation_id'] ?? '';
     return \is_string($conversation_id) ? $conversation_id : '';
+  }
+
+  /**
+   * Whether finished turns keep their agent state for the conversation.
+   *
+   * Off by default: the kept tool calls and results are sent to the model on
+   * every later turn, so the site opts in on the Agents & Tools form.
+   *
+   * @see \Drupal\canvas_dev_ai\Form\CanvasDevAiAgentSelectionForm
+   */
+  private function keepsToolCallsInHistory(): bool {
+    return (bool) $this->config('canvas_dev_ai.settings')->get('keep_tool_calls_in_history');
   }
 
   /**

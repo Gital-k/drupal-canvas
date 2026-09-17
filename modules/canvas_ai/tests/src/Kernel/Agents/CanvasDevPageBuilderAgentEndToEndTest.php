@@ -369,14 +369,19 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
    * Turn 2 resumes the agent history turn 1 built, tool messages included.
    *
    * The dev wizard sends the same conversation_id with every turn of one chat.
-   * The backend resumes the agent from the state turn 1 finished with instead
-   * of rebuilding it from the client transcript, which carries text only, so
-   * the model's first request of turn 2 still holds the edit_components call
-   * turn 1 made and its result: the agent need not repeat that work.
+   * With the site opted in, the backend resumes the agent from the state turn
+   * 1 finished with instead of rebuilding it from the client transcript, which
+   * carries text only, so the model's first request of turn 2 still holds the
+   * edit_components call turn 1 made and its result: the agent need not repeat
+   * that work.
    *
    * @see https://git.drupalcode.org/project/canvas/-/work_items/3592032
    */
   public function testSecondTurnResumesTheHistoryOfTheFirst(): void {
+    // Off after install: keeping the history costs tokens on every later turn.
+    // @see \Drupal\canvas_dev_ai\Form\CanvasDevAiAgentSelectionForm
+    $this->config('canvas_dev_ai.settings')->set('keep_tool_calls_in_history', TRUE)->save();
+
     $layout = [
       'regions' => [
         'content' => [
