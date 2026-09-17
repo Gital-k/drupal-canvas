@@ -944,6 +944,7 @@ canvas.boot.app:
     _canvas_extension_page_access: 'TRUE'
     extension_id: '[a-z][a-z0-9_]*'
   options:
+    _admin_route: TRUE
     _format: 'json'
 
 canvas.boot.empty:
@@ -956,6 +957,7 @@ canvas.boot.empty:
   requirements:
     _canvas_ui_access: 'TRUE'
   options:
+    _admin_route: TRUE
     _format: 'json'
 
 canvas.boot.entity:
@@ -968,6 +970,7 @@ canvas.boot.entity:
     _canvas_component_tree_edit_access: TRUE
     _entity_access: 'entity.update'
   options:
+    _admin_route: TRUE
     parameters:
       entity:
         type: entity:{entity_type}

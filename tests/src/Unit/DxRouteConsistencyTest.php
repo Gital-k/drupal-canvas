@@ -35,6 +35,12 @@ final class DxRouteConsistencyTest extends UnitTestCase {
     foreach ($canvas_api_routes as $canvas_api_route_name => $canvas_api_route) {
       $this->assertStringStartsWith('/canvas/api/v0/', $canvas_api_route['path'], "`$canvas_api_route_name` route path starts with '/canvas/api/v0/'." . print_r($canvas_api_route, TRUE));
       $this->assertArrayHasKey('methods', $canvas_api_route, "`$canvas_api_route_name` route definition specifies `methods`.");
+      // Only the routes serving the Canvas UI itself are admin routes; the
+      // HTTP API routes backing it are not pages, so marking them as admin
+      // routes would wrongly opt them in to admin-only behavior such as the
+      // admin theme and admin language negotiation.
+      // @see https://www.drupal.org/i/3562587
+      $this->assertArrayNotHasKey('_admin_route', $canvas_api_route['options'] ?? [], "`$canvas_api_route_name` is an HTTP API route, so it is not an admin route.");
     }
 
     return $canvas_api_routes;

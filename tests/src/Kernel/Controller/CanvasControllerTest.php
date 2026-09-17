@@ -12,8 +12,11 @@ use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Render\HtmlResponse;
+use Drupal\Core\Routing\AdminContext;
+use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\Url;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
@@ -218,6 +221,75 @@ final class CanvasControllerTest extends CanvasKernelTestBase {
 
     self::assertSame('Canvas test site', $this->drupalSettings['canvas']['siteName']);
     self::assertSame('http://localhost', $this->drupalSettings['canvas']['siteUrl']);
+  }
+
+  /**
+   * Tests that a Canvas UI route is an admin route, in the front end theme.
+   *
+   * Editing a page in Canvas is as administrative as editing a node, so Drupal
+   * and contributed modules must be able to recognize it as such and refrain
+   * from applying front end only optimizations to it.
+   *
+   * Marking these routes as admin routes must not change the theme the Canvas
+   * UI is served with: \Drupal\canvas\Controller\CanvasController derives the
+   * global assets for the component preview <iframe>s from the active theme,
+   * and those previews must look like the site's front end.
+   *
+   * @param string $route_name
+   *   The Canvas UI route to test.
+   * @param string $path
+   *   The path to request, with `ENTITY_ID` standing in for the test page's ID.
+   *
+   * @see \Drupal\canvas\Theme\CanvasThemeNegotiator
+   * @see \Drupal\user\Theme\AdminNegotiator
+   * @see https://www.drupal.org/i/3562587
+   */
+  #[DataProvider('canvasUiRouteData')]
+  public function testCanvasUiRouteIsAdminRouteInFrontEndTheme(string $route_name, string $path): void {
+    $this->enableModules(['canvas_test_extension_page']);
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $this->container->get(ThemeInstallerInterface::class)->install(['olivero', 'claro']);
+    $this->config('system.theme')->set('default', 'olivero')->set('admin', 'claro')->save();
+
+    // Without `view the administration theme`, core's AdminNegotiator never
+    // applies, and this test could not detect a theme change at all.
+    // @see \Drupal\user\Theme\AdminNegotiator::applies()
+    $this->setUpCurrentUser([], [
+      'access content',
+      'view the administration theme',
+      Page::CREATE_PERMISSION,
+      Page::EDIT_PERMISSION,
+    ]);
+
+    $page = Page::create([
+      'title' => 'Test page',
+      'description' => 'This is a test page.',
+      'components' => [],
+    ]);
+    $page->save();
+
+    $route_provider = $this->container->get(RouteProviderInterface::class);
+    $admin_context = $this->container->get(AdminContext::class);
+    self::assertTrue($admin_context->isAdminRoute($route_provider->getRouteByName($route_name)));
+
+    $path = \str_replace('ENTITY_ID', (string) $page->id(), $path);
+    $response = $this->request(Request::create($path));
+    self::assertSame(200, $response->getStatusCode());
+
+    // The global assets handed to the component preview <iframe>s must come
+    // from the site's front end theme, not from the admin theme.
+    // @see ui/src/components/ComponentPreview.tsx
+    $global_assets = \implode("\n", $this->drupalSettings['canvas']['globalAssets']);
+    self::assertStringContainsString('olivero', $global_assets);
+    self::assertStringNotContainsString('claro', $global_assets);
+  }
+
+  public static function canvasUiRouteData(): \Generator {
+    // Every route serving the Canvas UI, not just the two the issue reported.
+    // @see \Drupal\canvas\Theme\CanvasThemeNegotiator
+    yield 'page extension' => ['canvas.boot.app', '/canvas/app/canvas_test_page'];
+    yield 'no entity' => ['canvas.boot.empty', '/canvas'];
+    yield 'entity' => ['canvas.boot.entity', '/canvas/editor/' . Page::ENTITY_TYPE_ID . '/ENTITY_ID'];
   }
 
   public static function permissionsData(): array {
