@@ -1,5 +1,7 @@
+import { v4 as uuidv4 } from 'uuid';
 import { createApi } from '@reduxjs/toolkit/query/react';
 
+import { BRAND_KIT_ID } from '@/features/brandKit/constants';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import { baseQueryWithAutoSaves } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
@@ -13,6 +15,18 @@ export interface UploadedArtifact {
   uri: string;
   url: string;
 }
+
+/**
+ * Patches the Brand kit cache entry the colors UI reads from.
+ *
+ * @param mutate - Mutates the draft color list in place.
+ */
+const patchColors = (mutate: (colors: BrandKitColor[]) => void) =>
+  brandKitApi.util.updateQueryData('getBrandKit', BRAND_KIT_ID, (draft) => {
+    // The list is omitted entirely while the Brand kit has no colors.
+    draft.colors ??= [];
+    mutate(draft.colors);
+  });
 
 /**
  * A single component instance using a specific color.
@@ -140,9 +154,32 @@ export const brandKitApi = createApi({
         method: 'POST',
         body,
       }),
+      async onQueryStarted(color, { dispatch, queryFulfilled }) {
+        // Insert a temporary row with a fake client id, then replace it with
+        // the server row so the UI never keeps a fake id.
+        const pendingId = `pending-${uuidv4()}`;
+        const patchResult = dispatch(
+          patchColors((colors) => {
+            colors.push({ ...color, id: pendingId });
+          }),
+        );
+        try {
+          const { data: created } = await queryFulfilled;
+          dispatch(
+            patchColors((colors) => {
+              const index = colors.findIndex((c) => c.id === pendingId);
+              if (index !== -1) {
+                colors[index] = created;
+              }
+            }),
+          );
+        } catch {
+          patchResult.undo();
+        }
+      },
       invalidatesTags: [
         { type: 'BrandKits', id: 'LIST' },
-        { type: 'BrandKits', id: 'global' },
+        { type: 'BrandKits', id: BRAND_KIT_ID },
       ],
     }),
     updateColor: builder.mutation<
@@ -154,17 +191,29 @@ export const brandKitApi = createApi({
         method: 'PATCH',
         body: changes,
       }),
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+      async onQueryStarted({ id, changes }, { dispatch, queryFulfilled }) {
+        // Apply the edit to the cache before the request goes out, so the color
+        // row and the preview update without waiting for the round trip.
+        const patchResult = dispatch(
+          patchColors((colors) => {
+            const color = colors.find((candidate) => candidate.id === id);
+            if (color) {
+              Object.assign(color, changes);
+            }
+          }),
+        );
         try {
           await queryFulfilled;
+          // Trigger a server preview refresh so it immediately picks up color
+          // edits: a color prop resolves to a literal baked into the markup.
           dispatch(setUpdatePreview(true));
-        } catch (err) {
-          console.error(err);
+        } catch {
+          patchResult.undo();
         }
       },
       invalidatesTags: [
         { type: 'BrandKits', id: 'LIST' },
-        { type: 'BrandKits', id: 'global' },
+        { type: 'BrandKits', id: BRAND_KIT_ID },
       ],
     }),
     deleteColor: builder.mutation<void, string>({
@@ -174,7 +223,7 @@ export const brandKitApi = createApi({
       }),
       invalidatesTags: [
         { type: 'BrandKits', id: 'LIST' },
-        { type: 'BrandKits', id: 'global' },
+        { type: 'BrandKits', id: BRAND_KIT_ID },
       ],
     }),
     getColorUsageDetails: builder.query<ColorUsageDetailsResponse, string>({

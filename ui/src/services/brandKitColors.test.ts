@@ -1,0 +1,263 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { configureStore } from '@reduxjs/toolkit';
+
+import { brandKitApi } from '@/services/brandKit';
+
+import type { BrandKit, BrandKitColor } from '@/types/CodeComponent';
+
+const BRAND_KIT_ID = 'global';
+
+const makeColor = (id: string, hex: string): BrandKitColor => ({
+  id,
+  name: id,
+  cssVariable: `--${id}`,
+  weight: 0,
+  value: { colorSpace: 'srgb', components: [0, 0, 0], alpha: null, hex },
+});
+
+/** The colors the fake server currently stores. */
+let serverColors: BrandKitColor[] = [];
+
+/** Settles the write the test is holding open. */
+let releaseWrite: (status: number) => void = () => {};
+
+/** When set, the auto-save read waits on this before responding. */
+let heldAutoSave: Promise<void> | null = null;
+
+const jsonResponse = (body: unknown, status: number) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+const brandKitBody = (): BrandKit => ({
+  id: BRAND_KIT_ID,
+  label: 'Global brand kit',
+  fonts: null,
+  colors: serverColors,
+});
+
+beforeEach(() => {
+  heldAutoSave = null;
+  vi.stubGlobal(
+    'fetch',
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      const { url, method } = request;
+
+      // Mutations fetch a CSRF token first; answer it so the write itself is
+      // the only request under the test's control.
+      if (url.includes('session/token')) {
+        return new Response('test-csrf-token', { status: 200 });
+      }
+      // Reads, including the reconcile refetch that invalidation triggers,
+      // always return current server truth.
+      if (method === 'GET') {
+        if (url.includes('/config/auto-save/brand_kit/')) {
+          if (heldAutoSave) {
+            await heldAutoSave;
+          }
+          return jsonResponse({ data: brandKitBody(), autoSaves: {} }, 200);
+        }
+        return jsonResponse(brandKitBody(), 200);
+      }
+
+      // RTK Query passes a fully built Request, so `init` carries no body.
+      const body = await request
+        .clone()
+        .json()
+        .catch(() => undefined);
+      const id = url.split('/').pop() ?? '';
+      // The write is held open so a test can assert the optimistic state while
+      // it is still in flight, then decide how it settles.
+      // The server assigns an id on create; the client never sends one.
+      const created = { ...(body ?? {}), id: 'assigned-by-server' };
+      return new Promise<Response>((resolve) => {
+        releaseWrite = (status) => {
+          if (status >= 400) {
+            resolve(jsonResponse({ errors: ['Rejected'] }, status));
+            return;
+          }
+          if (method === 'POST') {
+            serverColors = [...serverColors, created as BrandKitColor];
+            resolve(jsonResponse(created, status));
+            return;
+          }
+          serverColors = serverColors.map((color) =>
+            color.id === id ? { ...color, ...(body ?? {}) } : color,
+          );
+          resolve(jsonResponse({ ...body, id }, status));
+        };
+      });
+    },
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+/** Lets pending microtasks and timers run. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/**
+ * Builds a store subscribed to the Brand kit query, seeded from the fake
+ * server. The live subscription keeps the cache entry from being evicted when
+ * the mutation invalidates it.
+ */
+const setup = async (colors: BrandKitColor[]) => {
+  serverColors = colors;
+  const store = configureStore({
+    reducer: {
+      [brandKitApi.reducerPath]: brandKitApi.reducer,
+      // The base query reads `state.configuration` for the base URL. Color
+      // mutations are excluded from auto-save injection, so no other slice is
+      // needed here.
+      configuration: () => ({ baseUrl: 'http://localhost/' }),
+    },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware().concat(brandKitApi.middleware),
+  });
+
+  // Await the initial load: if it were still in flight it would land on top of
+  // the optimistic patch and silently overwrite it.
+  await store.dispatch(
+    brandKitApi.endpoints.getBrandKit.initiate(BRAND_KIT_ID),
+  );
+  await flush();
+
+  const readHex = (id: string): string | null | undefined =>
+    brandKitApi.endpoints.getBrandKit
+      .select(BRAND_KIT_ID)(store.getState())
+      .data?.colors?.find((color) => color.id === id)?.value.hex;
+
+  /** Reads the color the auto-save draft carries, which the UI must ignore. */
+  const readDraftHex = (id: string): string | null | undefined =>
+    brandKitApi.endpoints.getAutoSave
+      .select(BRAND_KIT_ID)(store.getState())
+      .data?.data.colors?.find((color) => color.id === id)?.value.hex;
+
+  // Deliberately not async: returning the mutation promise from an async
+  // helper would make `await editColor(...)` wait on a request the test has
+  // not settled yet. Callers await `flush()` themselves.
+  const editColor = (id: string, hex: string) =>
+    store.dispatch(
+      brandKitApi.endpoints.updateColor.initiate({
+        id,
+        changes: { value: makeColor(id, hex).value },
+      }),
+    );
+
+  const readIds = (): string[] =>
+    brandKitApi.endpoints.getBrandKit
+      .select(BRAND_KIT_ID)(store.getState())
+      .data?.colors?.map((color) => color.id) ?? [];
+
+  const createColor = (name: string) =>
+    store.dispatch(
+      brandKitApi.endpoints.createColor.initiate({
+        name,
+        cssVariable: `--${name}`,
+        weight: 0,
+        value: makeColor(name, '#00ff00').value,
+      }),
+    );
+
+  return { store, readHex, readIds, readDraftHex, editColor, createColor };
+};
+
+describe('brand kit color optimistic edits', () => {
+  it('applies an edit before the request settles', async () => {
+    const { readHex, editColor } = await setup([makeColor('a', '#ff0000')]);
+
+    const edit = editColor('a', '#00ff00');
+    await flush();
+
+    // The cache already shows the new value while the write is still open.
+    expect(readHex('a')).toBe('#00ff00');
+
+    releaseWrite(200);
+    await edit;
+    await flush();
+    expect(readHex('a')).toBe('#00ff00');
+  });
+
+  it('rolls back to the stored value when the write is rejected', async () => {
+    const { readHex, editColor } = await setup([makeColor('a', '#ff0000')]);
+
+    const edit = editColor('a', '#00ff00');
+    await flush();
+    expect(readHex('a')).toBe('#00ff00');
+
+    releaseWrite(422);
+    await edit;
+    await flush();
+
+    // The UI must not keep showing a value the server refused to store.
+    expect(readHex('a')).toBe('#ff0000');
+  });
+
+  it('shows a new color before the create completes', async () => {
+    const { readIds, createColor } = await setup([makeColor('a', '#ff0000')]);
+
+    const create = createColor('b');
+    await flush();
+
+    // The row is there while the request is still open, under a stand-in id.
+    expect(readIds()).toHaveLength(2);
+    expect(readIds()[1]).toMatch(/^pending-/);
+
+    releaseWrite(201);
+    await create;
+    await flush();
+
+    // The response's id replaces the stand-in, so the row is actionable.
+    expect(readIds()).toEqual(['a', 'assigned-by-server']);
+  });
+
+  it('removes an optimistically added color when the create is rejected', async () => {
+    const { readIds, createColor } = await setup([makeColor('a', '#ff0000')]);
+
+    const create = createColor('b');
+    await flush();
+    expect(readIds()).toHaveLength(2);
+
+    releaseWrite(422);
+    await create;
+    await flush();
+
+    // The rejected color must not linger in a list that claims to be stored.
+    expect(readIds()).toEqual(['a']);
+  });
+
+  it('ignores an auto-save response that lands mid-write', async () => {
+    // Hold the auto-save read open so it resolves *after* the optimistic patch,
+    // carrying pre-edit colors. Were the draft a color source, this response
+    // would revert the swatch to the old color.
+    let releaseAutoSave: () => void = () => {};
+    heldAutoSave = new Promise<void>((resolve) => {
+      releaseAutoSave = resolve;
+    });
+
+    const { store, readHex, readDraftHex, editColor } = await setup([
+      makeColor('a', '#ff0000'),
+    ]);
+    store.dispatch(brandKitApi.endpoints.getAutoSave.initiate(BRAND_KIT_ID));
+    await flush();
+
+    const edit = editColor('a', '#00ff00');
+    await flush();
+    expect(readHex('a')).toBe('#00ff00');
+
+    releaseAutoSave();
+    await flush();
+
+    // The draft did land, and it does carry the pre-edit color.
+    expect(readDraftHex('a')).toBe('#ff0000');
+    // It is not what the colors UI reads.
+    expect(readHex('a')).toBe('#00ff00');
+
+    releaseWrite(200);
+    await edit;
+  });
+});
