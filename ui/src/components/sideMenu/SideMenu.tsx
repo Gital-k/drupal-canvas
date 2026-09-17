@@ -5,10 +5,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import BrandKitIcon from '@assets/icons/brand-kit.svg?react';
 import ExtensionIcon from '@assets/icons/extension-sm.svg?react';
 import TemplateIcon from '@assets/icons/template.svg?react';
+import HeadlessIcon from '@assets/icons/headless.svg?react';
 import {
   CodeIcon,
   FileTextIcon,
-  GlobeIcon,
   LayersIcon,
   PlusIcon,
 } from '@radix-ui/react-icons';
@@ -159,7 +159,7 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
       type: 'link',
       id: 'headless',
       href: '/headless/',
-      icon: <GlobeIcon />,
+      icon: <HeadlessIcon />,
       label: 'Headless frontends',
       // Injected when the user may administer the Canvas Headless frontend
       // list. Unlike the preview settings, this flag is present before the
