@@ -54,8 +54,8 @@ final class PreviewLanguageSubscriber implements EventSubscriberInterface {
     }
 
     // Internal URLs use core inbound processing to resolve prefixes and aliases
-    // to routes before generating the target-language URL. For unroutable
-    // detached previews, let core strip the language prefix instead.
+    // to routes before generating the target-language URL. When a detached
+    // preview has no route, let core strip the language prefix instead.
     $path = $request->getPathInfo();
     $url = Url::fromUri('internal:' . $path);
     if (!$url->isRouted()) {

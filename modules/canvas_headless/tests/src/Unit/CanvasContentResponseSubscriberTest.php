@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_headless\Unit;
 
+// cspell:ignore Fpage Fdestination Fuser Flogin
+
 use Drupal\canvas_headless\CanvasContentProblemResponse;
 use Drupal\canvas_headless\EventSubscriber\CanvasContentResponseSubscriber;
 use Drupal\canvas_headless\PreviewLanguageRedirectResponse;
