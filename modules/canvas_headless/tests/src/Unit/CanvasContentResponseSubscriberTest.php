@@ -15,16 +15,21 @@ use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\EventSubscriber\FinishResponseSubscriber;
+use Drupal\Core\EventSubscriber\RedirectResponseSubscriber;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\PageCache\RequestPolicyInterface;
 use Drupal\Core\PageCache\ResponsePolicyInterface;
+use Drupal\Core\Routing\LocalRedirectResponse;
+use Drupal\Core\Routing\RequestContext;
 use Drupal\Core\Routing\TrustedRedirectResponse;
 use Drupal\Core\Site\Settings;
+use Drupal\Core\Utility\UnroutedUrlAssemblerInterface;
 use Drupal\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
+use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Cookie;
@@ -75,6 +80,41 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
     self::assertSame(0, $redirect->getCacheableMetadata()->getCacheMaxAge());
     self::assertTrue($redirect->headers->hasCacheControlDirective('no-store'));
     self::assertTrue($redirect->headers->hasCacheControlDirective('private'));
+  }
+
+  /**
+   * Core may apply destination only to navigation, never to the transport hop.
+   */
+  public function testDestinationDoesNotOverrideLanguageTransport(): void {
+    $request = Request::create('https://localhost/page/1?destination=/user/login');
+    $context = (new RequestContext())->fromRequest($request);
+    $context->setCompleteBaseUrl('https://localhost');
+    $core = new RedirectResponseSubscriber(
+      $this->createMock(UnroutedUrlAssemblerInterface::class),
+      $context,
+      static fn () => new NullLogger(),
+    );
+    $target = '/canvas/content-api?requestUri=%2Ffr%2Fpage%2F1%3Fdestination%3D%2Fuser%2Flogin&language=fr';
+    $transport = new PreviewLanguageRedirectResponse($target);
+    $transport->setRequestContext($context);
+    $event = $this->event($transport, $request);
+    $core->checkRedirectUrl($event);
+    CanvasContentResponseSubscriber::convertRedirect($event);
+    self::assertSame($transport, $event->getResponse());
+    self::assertSame($target, $transport->getTargetUrl());
+    self::assertSame(0, $transport->getCacheableMetadata()->getCacheMaxAge());
+    self::assertTrue($transport->headers->hasCacheControlDirective('no-store'));
+
+    // The same core subscriber must still honor destination for real navigation.
+    $navigation = new LocalRedirectResponse('/normal-navigation');
+    $navigation->setRequestContext($context);
+    $event = $this->event($navigation, $request);
+    $core->checkRedirectUrl($event);
+    CanvasContentResponseSubscriber::convertRedirect($event);
+    self::assertInstanceOf(CacheableJsonResponse::class, $event->getResponse());
+    self::assertSame([
+      'redirect' => ['external' => FALSE, 'url' => '/user/login', 'statusCode' => 302],
+    ], json_decode((string) $event->getResponse()->getContent(), TRUE, flags: JSON_THROW_ON_ERROR));
   }
 
   /**

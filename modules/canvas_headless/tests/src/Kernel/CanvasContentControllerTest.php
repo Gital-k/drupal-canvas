@@ -1194,7 +1194,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     $server = ['SCRIPT_NAME' => $script, 'SCRIPT_FILENAME' => '/var/www' . $script];
     $context = ['language' => 'fr', 'viewMode' => 'full'];
     $request = Request::create($base . '/canvas/content-api?' . http_build_query([
-      'requestUri' => '/en/english-page?language=route-owned&viewMode=route-owned&filter%5Btag%5D=one',
+      'requestUri' => '/en/english-page?language=route-owned&viewMode=route-owned&filter%5Btag%5D=one&destination=/user/login',
       ...$context,
     ]), server: $server);
     $response = $this->request($request);
@@ -1211,7 +1211,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertSame('1', $redirect_query[CanvasContentApiRequest::LANGUAGE_REDIRECT_QUERY]);
     self::assertSame('/fr/page-francaise', parse_url($redirected_uri, PHP_URL_PATH));
     parse_str((string) parse_url($redirected_uri, PHP_URL_QUERY), $route_query);
-    self::assertSame(['language' => 'route-owned', 'viewMode' => 'route-owned', 'filter' => ['tag' => 'one']], $route_query);
+    self::assertSame(['language' => 'route-owned', 'viewMode' => 'route-owned', 'filter' => ['tag' => 'one'], 'destination' => '/user/login'], $route_query);
     $result = $this->request($redirect_request);
     self::assertInstanceOf(CacheableJsonResponse::class, $result);
     self::assertSame('French alias page', self::responseData($result)['head']['title']);

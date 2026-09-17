@@ -13,10 +13,19 @@ use Drupal\Core\Routing\LocalRedirectResponse;
  */
 final class PreviewLanguageRedirectResponse extends LocalRedirectResponse {
 
-  public function __construct(string $url) {
-    parent::__construct($url);
+  public function __construct(private readonly string $transportTarget) {
+    parent::__construct($transportTarget);
     $this->getCacheableMetadata()->setCacheMaxAge(0);
     $this->headers->set('Cache-Control', 'private, no-store');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function isSafe($url): bool {
+    // Core catches rejected SecuredRedirectResponse destination overrides.
+    // Lock only this hop; do not disable destination for normal navigation.
+    return $url === $this->transportTarget && parent::isSafe($url);
   }
 
 }
