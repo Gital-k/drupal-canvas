@@ -162,13 +162,20 @@ const ColorRow = ({ color }: ColorRowProps) => {
   const menuItems = (
     <>
       <UnifiedMenu.Item
-        onClick={() => setIsRenaming(true)}
+        onClick={() => {
+          // Ensure the edit popover is closed before entering rename mode so it
+          // can't remain open and cover the rename input.
+          setIsEditPopoverOpen(false);
+          setIsRenaming(true);
+        }}
         data-testid="canvas-color-row-rename"
       >
         Rename
       </UnifiedMenu.Item>
       <UnifiedMenu.Item
         onClick={() => {
+          // Close the edit popover so only one popover is open at a time.
+          setIsEditPopoverOpen(false);
           openingPopoverRef.current = true;
           setIsFindInstancesPopoverOpen(true);
         }}
@@ -179,6 +186,8 @@ const ColorRow = ({ color }: ColorRowProps) => {
       <UnifiedMenu.Separator />
       <UnifiedMenu.Item
         onClick={() => {
+          // Close the edit popover so only one popover is open at a time.
+          setIsEditPopoverOpen(false);
           openingPopoverRef.current = true;
           setIsDeletePopoverOpen(true);
         }}
@@ -274,7 +283,16 @@ const ColorRow = ({ color }: ColorRowProps) => {
       )}
 
       {!isRenaming && (
-        <DropdownMenu.Root onOpenChange={setIsMenuOpen}>
+        <DropdownMenu.Root
+          onOpenChange={(open) => {
+            setIsMenuOpen(open);
+            // Close the edit popover when the dots menu opens so they can't
+            // both be open at once.
+            if (open) {
+              setIsEditPopoverOpen(false);
+            }
+          }}
+        >
           <DropdownMenu.Trigger>
             <button
               ref={dotsButtonRef as React.RefObject<HTMLButtonElement>}
@@ -311,7 +329,16 @@ const ColorRow = ({ color }: ColorRowProps) => {
           open={isEditPopoverOpen}
           onOpenChange={setIsEditPopoverOpen}
         >
-          <ContextMenu.Root onOpenChange={setIsMenuOpen}>
+          <ContextMenu.Root
+            onOpenChange={(open) => {
+              setIsMenuOpen(open);
+              // Close the edit popover when the context menu opens so they
+              // can't both be open at once.
+              if (open) {
+                setIsEditPopoverOpen(false);
+              }
+            }}
+          >
             <ContextMenu.Trigger>
               {/*
                 While renaming, the row must not act as a popover trigger so
