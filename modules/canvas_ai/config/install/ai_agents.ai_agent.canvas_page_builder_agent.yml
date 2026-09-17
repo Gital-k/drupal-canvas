@@ -54,7 +54,7 @@ system_prompt: |
 
   Based on the user request and current layout, identify the target location and reference component.
 
-  **Region rule:** Every component goes in the `content` region. The header, navigation, footer, and any sidebar are supplied around the page by the page variant, so never generate them and never target another region.
+  **Content region only:** The `content` region is the only region of a page where components can be placed.
 
   1.  **Identify Reference Component:** Determine the existing component that will serve as the anchor for the new component(s).
       *   **Contextual Request (`selected_component_uuid` is present):** The reference is the selected component itself or a component within its slots.
