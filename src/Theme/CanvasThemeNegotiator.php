@@ -22,12 +22,33 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * Drupal Canvas: `stark` defines no templates, and hence relies on all
  * default templates only.
  *
+ * Finally, it keeps the Canvas UI itself in the site's front end theme. Those
+ * routes are admin routes, so Drupal Core's admin theme negotiator would
+ * otherwise render them using the admin theme.
+ *
  * @see ui/src/components/form/twig-to-jsx-component-map.js
  * @see ui/src/components/form/withRHF.tsx
  */
 final class CanvasThemeNegotiator implements ThemeNegotiatorInterface {
 
   use StringTranslationTrait;
+
+  /**
+   * The routes serving the Canvas UI itself, as opposed to its HTTP API.
+   *
+   * These are admin routes, but they must not use the admin theme: the Canvas
+   * UI derives the global assets for its component preview <iframe>s from the
+   * active theme, and those previews must look like the site's front end.
+   *
+   * @see \Drupal\canvas\Controller\CanvasController
+   * @see \Drupal\user\Theme\AdminNegotiator
+   * @see canvas.routing.yml
+   */
+  private const CANVAS_UI_ROUTES = [
+    'canvas.boot.app',
+    'canvas.boot.empty',
+    'canvas.boot.entity',
+  ];
 
   public function __construct(
     private readonly RequestStack $requestStack,
@@ -41,7 +62,7 @@ final class CanvasThemeNegotiator implements ThemeNegotiatorInterface {
     $route_name = $route_match->getRouteName() ?? '';
     $use_admin_theme = (bool) $this->requestStack->getCurrentRequest()?->query->has('use_admin_theme');
     $use_canvas_stark = str_starts_with($route_name, 'canvas.api.form.');
-    return $use_canvas_stark || $use_admin_theme;
+    return $use_canvas_stark || $use_admin_theme || \in_array($route_name, self::CANVAS_UI_ROUTES, TRUE);
   }
 
   /**
@@ -59,6 +80,9 @@ final class CanvasThemeNegotiator implements ThemeNegotiatorInterface {
       return $admin_theme_name;
     }
     $this->requestStack->getCurrentRequest()?->query->remove('use_admin_theme');
+    if (\in_array($route_match->getRouteName(), self::CANVAS_UI_ROUTES, TRUE)) {
+      return $this->configFactory->get('system.theme')->get('default');
+    }
     return 'canvas_stark';
   }
 

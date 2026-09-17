@@ -162,7 +162,9 @@ services:
   canvas.theme_negotiator.canvas:
     class: Drupal\canvas\Theme\CanvasThemeNegotiator
     tags:
-      # Set priority to 1001 so it is above AjaxBasePageNegotiator (1000).
+      # Set priority to 1001 so it is above AjaxBasePageNegotiator (1000), and
+      # hence also above core's AdminNegotiator (-40): the Canvas UI's routes
+      # are admin routes, but must not use the admin theme.
       - { name: theme_negotiator, priority: 1001 }
   Drupal\canvas\EventSubscriber\PageVariantSelectorSubscriber: ~
   Drupal\canvas\EventSubscriber\ApiExceptionSubscriber: ~
