@@ -196,9 +196,12 @@ test.describe('Language Select', () => {
       page.locator('[data-testid="language-options-popover-trigger"]'),
     ).toHaveCount(1);
     // The current permissions include 'administer languages' so the configure
-    // button should be present.
+    // button and the separator above it should be present.
     await expect(
       page.locator('[data-testid="language-configure-button"]'),
+    ).toBeAttached();
+    await expect(
+      page.locator('[data-testid="language-configure-separator"]'),
     ).toBeAttached();
 
     const frenchOption = page.locator('[data-testid="language-option-fr"]');
@@ -446,9 +449,12 @@ test.describe('Language Select', () => {
     await languageButton.click();
 
     // Confirm a user without the 'administer languages' permission will
-    // not see the language configure button.
+    // not see the language configure button nor the separator above it.
     await expect(
       page.locator('[data-testid="language-configure-button"]'),
+    ).not.toBeAttached();
+    await expect(
+      page.locator('[data-testid="language-configure-separator"]'),
     ).not.toBeAttached();
 
     await openPopover();

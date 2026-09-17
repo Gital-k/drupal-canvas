@@ -335,7 +335,8 @@ const LanguageSelect = () => {
                     }
                   >
                     {language.name}
-                    {language.isDefault && ' (Default)'}
+                    {translations?.available?.[0] === language.id &&
+                      ' (Original)'}
                   </Text>
                 </Flex>
               </DropdownMenu.Item>
@@ -447,19 +448,25 @@ const LanguageSelect = () => {
                 )}
             </Flex>
           ))}
-          <Separator size="4" my="2" />
           {permissions?.configureLanguages && (
-            <DropdownMenu.Item onSelect={handleConfigureLanguages}>
-              <button
-                className={styles.configureButton}
-                data-testid="language-configure-button"
-              >
-                <Flex align="center" gap="2">
-                  <ExternalLinkIcon width="14" height="14" />
-                  <Text size="2">Configure languages</Text>
-                </Flex>
-              </button>
-            </DropdownMenu.Item>
+            <>
+              <Separator
+                size="4"
+                my="2"
+                data-testid="language-configure-separator"
+              />
+              <DropdownMenu.Item onSelect={handleConfigureLanguages}>
+                <button
+                  className={styles.configureButton}
+                  data-testid="language-configure-button"
+                >
+                  <Flex align="center" gap="2">
+                    <ExternalLinkIcon width="14" height="14" />
+                    <Text size="2">Configure languages</Text>
+                  </Flex>
+                </button>
+              </DropdownMenu.Item>
+            </>
           )}
         </DropdownMenu.Content>
       </DropdownMenu.Root>
