@@ -7,20 +7,31 @@ namespace Drupal\Tests\canvas_headless\Unit;
 use Drupal\canvas_headless\CanvasContentProblemResponse;
 use Drupal\canvas_headless\EventSubscriber\CanvasContentResponseSubscriber;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
+use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\EventSubscriber\FinishResponseSubscriber;
+use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\PageCache\RequestPolicyInterface;
+use Drupal\Core\PageCache\ResponsePolicyInterface;
 use Drupal\Core\Routing\TrustedRedirectResponse;
+use Drupal\Core\Site\Settings;
 use Drupal\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
  * Tests Canvas content API response finalization.
@@ -35,6 +46,7 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
    */
   protected function setUp(): void {
     parent::setUp();
+    new Settings([]);
     $container = new ContainerBuilder();
     $container->set('cache_contexts_manager', new class() {
 
@@ -252,6 +264,64 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
 
     self::assertContains('Authorization', $response->getVary());
     self::assertContains('Cookie', $response->getVary());
+  }
+
+  /**
+   * Tests Vary through Canvas and core's real response subscribers.
+   *
+   * @param bool $omit_vary_cookie
+   *   Whether the site opts out of core's default Cookie variation.
+   * @param string[] $existing_vary
+   *   The controller's Vary headers.
+   * @param string[] $expected_vary
+   *   The final Vary headers.
+   */
+  #[DataProvider('varyPipelineProvider')]
+  public function testVaryResponsePipeline(bool $omit_vary_cookie, array $existing_vary, array $expected_vary): void {
+    $settings = Settings::getAll();
+    new Settings(['omit_vary_cookie' => $omit_vary_cookie] + $settings);
+    try {
+      $language_manager = $this->createMock(LanguageManagerInterface::class);
+      $language_manager->method('getCurrentLanguage')->willReturn(new Language(['id' => 'en']));
+      $request_policy = $this->createMock(RequestPolicyInterface::class);
+      $request_policy->method('check')->willReturn(RequestPolicyInterface::ALLOW);
+      $time = $this->createMock(TimeInterface::class);
+      $time->method('getRequestTime')->willReturn(1700000000);
+      $dispatcher = new EventDispatcher();
+      $dispatcher->addSubscriber($this->subscriber());
+      $dispatcher->addSubscriber(new FinishResponseSubscriber(
+        $language_manager,
+        $this->getConfigFactoryStub(['system.performance' => ['cache.page.max_age' => 300]]),
+        $request_policy,
+        $this->createMock(ResponsePolicyInterface::class),
+        $this->createMock(CacheContextsManager::class),
+        $time,
+      ));
+      $response = new CacheableJsonResponse(['content' => []]);
+      $response->setVary($existing_vary);
+      $event = $this->event($response);
+      $dispatcher->dispatch($event, KernelEvents::RESPONSE);
+
+      self::assertSame('max-age=300, public', $response->headers->get('Cache-Control'));
+      self::assertSame($expected_vary, $response->getVary());
+    }
+    finally {
+      new Settings($settings);
+    }
+  }
+
+  /**
+   * Provides core Cookie policy and existing Vary combinations.
+   */
+  public static function varyPipelineProvider(): array {
+    return [
+      'default Cookie' => [FALSE, [], ['Cookie', 'Authorization']],
+      'omit Cookie' => [TRUE, [], ['Authorization']],
+      'custom Vary' => [FALSE, ['Accept-Language'], ['Accept-Language', 'Authorization']],
+      'custom Vary with Cookie omitted' => [TRUE, ['Accept-Language'], ['Accept-Language', 'Authorization']],
+      'explicit Cookie' => [FALSE, ['Cookie'], ['Cookie', 'Authorization']],
+      'explicit Cookie with default omitted' => [TRUE, ['Cookie'], ['Cookie', 'Authorization']],
+    ];
   }
 
   /**

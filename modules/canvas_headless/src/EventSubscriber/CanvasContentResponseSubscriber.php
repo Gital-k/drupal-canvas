@@ -14,6 +14,7 @@ use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\CacheableResponseInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Site\Settings;
 use GuzzleHttp\Psr7\Uri;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -64,6 +65,12 @@ final class CanvasContentResponseSubscriber implements EventSubscriberInterface 
     $response = $event->getResponse();
     if (!$response instanceof CacheableResponseInterface) {
       return;
+    }
+
+    // Preserve core's default Cookie variation before adding our own Vary.
+    // FinishResponseSubscriber only adds Cookie when no Vary is already set.
+    if (!$response->hasVary() && !Settings::get('omit_vary_cookie')) {
+      $response->setVary('Cookie', replace: FALSE);
     }
 
     // Vary by Authorization so shared caches (CDNs) do not serve a cached
