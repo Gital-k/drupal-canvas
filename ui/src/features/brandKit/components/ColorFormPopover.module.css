@@ -84,12 +84,7 @@
   border-top: 1px solid var(--gray-4);
 }
 
-.infoBoxContainer {
-  padding-top: var(--space-3);
-  padding-bottom: var(--space-3);
-}
-
-.fieldLabelContainer {
+.verticalPadding {
   padding-top: var(--space-3);
   padding-bottom: var(--space-3);
 }

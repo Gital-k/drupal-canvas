@@ -358,8 +358,8 @@ const ColorRow = ({ color }: ColorRowProps) => {
       </div>
 
       {/* Menu-triggered popovers — each owns its Popover.Root and anchors to the
-          dots button. These still manage dismissal manually because they are
-          opened from the dropdown menu. */}
+          dots button. They manage dismissal manually because they are opened
+          from the dropdown menu rather than by a direct trigger. */}
       <DeleteColorPopover
         color={color}
         anchorRef={dotsButtonRef}

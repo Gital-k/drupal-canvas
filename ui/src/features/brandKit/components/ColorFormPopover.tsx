@@ -482,7 +482,7 @@ const ColorFormPopover = ({
                 direction="column"
                 gap="1"
                 px="3"
-                className={styles.fieldLabelContainer}
+                className={styles.verticalPadding}
               >
                 <label htmlFor="variableName" className={styles.fieldLabel}>
                   Variable name
@@ -633,7 +633,7 @@ const ColorFormPopover = ({
                   )}
 
                   {!isUsageLoading && (
-                    <Box className={styles.infoBoxContainer} px="3">
+                    <Box className={styles.verticalPadding} px="3">
                       <div
                         className={styles.infoBox}
                         data-testid="canvas-color-edit-info"
