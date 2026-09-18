@@ -53,6 +53,14 @@ describe('Contextual panel', () => {
     cy.findByTestId('canvas-right-panel-menu-button').should('have.focus');
     cy.findByTestId('canvas-right-panel-menu-button').realPress('Enter');
     cy.findByTestId('canvas-contextual-panel').should('be.visible');
+    // Assert that closing the panel while a component is already selected,
+    // then re-selecting that same component (which does not change the
+    // underlying selection value) still reopens the panel.
+    cy.clickComponentInPreview('Hero');
+    cy.findByTestId('canvas-contextual-panel--close-icon').click();
+    cy.findByTestId('canvas-contextual-panel').should('not.be.visible');
+    cy.clickComponentInPreview('Hero');
+    cy.findByTestId('canvas-contextual-panel').should('be.visible');
   });
 
   it('should open the context menu on right-click in primary content menu', () => {

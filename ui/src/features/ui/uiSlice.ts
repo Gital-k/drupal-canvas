@@ -372,6 +372,14 @@ export const uiSlice = createAppSlice({
         } else {
           state.selection.consecutive = action.payload.consecutive || false;
         }
+        // Reopen the right panel whenever something is selected (a component,
+        // a crop/image area, or a prop within it), even if the user had
+        // previously closed the panel manually. This reducer runs on every
+        // dispatch, so re-selecting an already-selected component also
+        // reopens the panel, unlike a useEffect keyed on the selection value.
+        if (action.payload.items.length > 0) {
+          state.rightPanelOpen = true;
+        }
       },
     ),
     setPreviouslyEdited: create.reducer(
