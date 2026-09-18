@@ -232,7 +232,8 @@ The subpaths keep browser bundles free of Node-only code and vice versa:
   session contract, rendered-page types, `isPageRedirect()`, and JSON script
   serialization.
 - `@drupal-canvas/headless/client` — browser-only: the draft session state
-  machine, the `<canvas-draft-session>` element, and preview geometry helpers.
+  machine, the `<canvas-draft-session>` element, iframe navigation, and preview
+  geometry helpers.
 - `@drupal-canvas/headless/server` — server-side, edge-safe: the draft server
   with its activation, renewal, and exit flows, the draft-aware content clients,
   and CSP helpers.

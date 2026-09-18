@@ -8,6 +8,7 @@ import {
   createCanvasGeometryBridge,
   createDraftSession,
   createHeightReporter,
+  createNavigationBridge,
 } from '@drupal-canvas/headless/client';
 
 import type { ReactNode } from 'react';
@@ -97,7 +98,9 @@ export interface DraftSessionProps {
  * server-provided props arrive.
  *
  * Alongside the session machine, this component also runs a content-height
- * reporter (see @drupal-canvas/headless/client's createHeightReporter).
+ * reporter and the iframe navigation bridge from
+ * @drupal-canvas/headless/client. Mount this component only in draft mode;
+ * navigation remains available when the session token expires.
  */
 export function DraftSession({
   tokenExpiresAt,
@@ -215,6 +218,14 @@ export function DraftSession({
       reporter.destroy();
     };
   }, [embedded, editorOrigin]);
+
+  useEffect(() => {
+    if (embedded !== true) {
+      return;
+    }
+    const bridge = createNavigationBridge({ embedded });
+    return () => bridge.destroy();
+  }, [embedded]);
 
   useEffect(() => {
     if (embedded !== true || !editorOrigin) {

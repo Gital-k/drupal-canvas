@@ -41,15 +41,19 @@
  * Alongside the session machine, the element also runs a content-height
  * reporter (./height-report) for the same `editor-origin`: an independent
  * exchange that lets the host size the preview iframe to fit.
+ * Render this element only in draft mode; while embedded, it also owns link
+ * delegation, including when the session token has expired.
  */
 
 import { createDraftSession } from './draft-session';
 import { createCanvasGeometryBridge } from './geometry-bridge';
 import { createHeightReporter } from './height-report';
+import { createNavigationBridge } from './navigation-bridge';
 
 import type { DraftSession, DraftSessionRenewState } from './draft-session';
 import type { CanvasGeometryBridge } from './geometry-bridge';
 import type { HeightReporter } from './height-report';
+import type { NavigationBridge } from './navigation-bridge';
 
 export const DRAFT_SESSION_ELEMENT_TAG = 'canvas-draft-session';
 
@@ -94,6 +98,7 @@ export class DraftSessionElement extends BaseElement {
   #machine: DraftSession | null = null;
   #geometryBridge: CanvasGeometryBridge | null = null;
   #heightReporter: HeightReporter | null = null;
+  #navigationBridge: NavigationBridge | null = null;
   #connected = false;
   #tokenExpiresAt: number | null = null;
   #expired = false;
@@ -118,6 +123,9 @@ export class DraftSessionElement extends BaseElement {
     this.#connected = true;
 
     this.#startEpoch();
+    if (this.#embedded) {
+      this.#navigationBridge = createNavigationBridge({ embedded: true });
+    }
     const editorOrigin = this.getAttribute('editor-origin');
     this.#heightReporter = createHeightReporter({
       editorOrigin,
@@ -137,6 +145,8 @@ export class DraftSessionElement extends BaseElement {
     this.#heightReporter = null;
     this.#geometryBridge?.destroy();
     this.#geometryBridge = null;
+    this.#navigationBridge?.destroy();
+    this.#navigationBridge = null;
   }
 
   attributeChangedCallback(
