@@ -2,7 +2,7 @@
  * Locale-aware date formatting utilities for Canvas Code Components.
  *
  * These functions format ISO date/time strings using the Drupal-selected
- * locale from `drupalSettings.langcode`. They are opt-in: Canvas passes date
+ * locale from `drupalSettings.canvasData.v0.locale`. They are opt-in: Canvas passes date
  * props to templates as raw ISO strings by default. Use these utilities when
  * you want to display a date in the user's locale.
  *
@@ -31,7 +31,15 @@ export interface CanvasDateFormatOptions {
 
 /**
  * Reads the Drupal-selected locale from Canvas runtime settings when present,
- * falling back to core drupalSettings and then 'en'.
+ * falling back to `drupalSettings.langcode` and then 'en'.
+ *
+ * Canvas attaches `canvasData.v0.locale` for every code component that imports
+ * one of these utilities: the import adds `v0.locale` to the component's
+ * `dataDependencies.drupalSettings`. Drupal core only sets
+ * `drupalSettings.langcode` on pages with a machine name form element, so that
+ * fallback is not a locale source on rendered pages.
+ *
+ * @see ui/src/features/code-editor/utils/ast-utils.ts
  */
 const getDrupalLocale = (): string =>
   (
