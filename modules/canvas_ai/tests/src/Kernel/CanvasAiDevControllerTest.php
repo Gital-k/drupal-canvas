@@ -237,40 +237,6 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
   }
 
   /**
-   * A turn that leaves a tool call parked is not kept for the conversation.
-   *
-   * The next turn would run that call, so the conversation state is dropped
-   * rather than replaced.
-   *
-   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::storeConversationState()
-   */
-  public function testParkedToolCallIsNotKeptForTheConversation(): void {
-    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
-    $this->refreshContainer();
-    $this->setUpAiDevHops();
-    $this->keepToolCallsInHistory();
-
-    $temp_store = $this->container->get(CanvasAiTempStore::class);
-    $temp_store->setStoredConversationState('test-conversation', 'canvas_agent', ['looped' => 1]);
-
-    $agent = $this->createMock(AiAgentEntityWrapper::class);
-    $agent->method('determineSolvability')->willReturn(AiAgentInterface::JOB_SOLVABLE);
-    $agent->method('isFinished')->willReturn(TRUE);
-    $agent->method('toArray')->willReturn([
-      'looped' => 1,
-      'context_tools' => [['tools_id' => 'call_1', 'function_name' => 'place_components']],
-    ]);
-    $agent->method('solve')->willReturn('Done.');
-    $this->useMockedAgent($agent);
-
-    $this->hop([
-      'messages' => [['role' => 'user', 'text' => 'Add a hero']],
-    ]);
-
-    self::assertNull($temp_store->getStoredConversationState('test-conversation'));
-  }
-
-  /**
    * A request that sends no conversation_id keeps nothing for a next turn.
    *
    * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::getConversationId()

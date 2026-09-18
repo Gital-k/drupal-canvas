@@ -467,9 +467,9 @@ final class CanvasDevAiBuilder extends ControllerBase {
    * Keeps the agent's history for the conversation's next turn.
    *
    * Called when a turn ended with the agent finished. Nothing is kept unless
-   * the site opted in. A tool call the agent parked but never ran would be run
-   * by the turn that resumes the state, so a state still carrying one is not
-   * kept either.
+   * the site opted in. A state still carrying a tool call the agent parked but
+   * never ran cannot reach here: parking one leaves the agent unfinished, and
+   * an unfinished turn stores its own state for the next hop instead.
    *
    * @param array $prompt
    *   The decoded prompt.
@@ -478,6 +478,8 @@ final class CanvasDevAiBuilder extends ControllerBase {
    *   turn running another agent does not resume this agent's history.
    * @param \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper $agent
    *   The agent that ran the turn.
+   *
+   * @see \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper::determineSolvability()
    */
   private function storeConversationState(array $prompt, string $agent_id, AiAgentEntityWrapper $agent): void {
     $conversation_id = self::getConversationId($prompt);
@@ -490,12 +492,7 @@ final class CanvasDevAiBuilder extends ControllerBase {
       $this->canvasAiTempStore->deleteStoredConversationState($conversation_id);
       return;
     }
-    $state = $agent->toArray();
-    if (!empty($state['context_tools'])) {
-      $this->canvasAiTempStore->deleteStoredConversationState($conversation_id);
-      return;
-    }
-    $this->canvasAiTempStore->setStoredConversationState($conversation_id, $agent_id, $state);
+    $this->canvasAiTempStore->setStoredConversationState($conversation_id, $agent_id, $agent->toArray());
   }
 
   /**
