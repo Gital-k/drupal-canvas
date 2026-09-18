@@ -35,310 +35,6 @@ final class DateResolver {
   private const INTL_DATE_SHORT = 3;
 
   /**
-   * Locale fallback pattern groups for when intl is unavailable.
-   *
-   * This is not a complete list — only intl can provide that. This provides
-   * format info based on the most common web traffic locales.
-   *
-   * The arrays are keyed by format pattern and list supported langcodes.
-   * This keeps common patterns de-duplicated while still allowing explicit
-   * regional overrides (e.g. en-gb vs en).
-   *
-   * @var array<string, array<string, list<string>>>
-   */
-  private const FALLBACK_PATTERN_GROUPS = [
-    'date' => [
-      'n/j/y' => ['en', 'en-us'],
-      'j/n/Y' => ['en-za'],
-      'd/m/Y' => [
-        'en-gb',
-        'en-in',
-        'en-ng',
-        'en-ke',
-        'en-gh',
-        'en-ug',
-        'en-tz',
-        'en-zw',
-        'en-zm',
-        'en-sg',
-        'en-pk',
-        'en-ie',
-        'en-au',
-        'en-nz',
-        'fr',
-        'fr-fr',
-        'fr-ca',
-        'fr-be',
-        'fr-ch',
-        'fr-dz',
-        'fr-ma',
-        'fr-tn',
-        'fr-sn',
-        'fr-ci',
-        'fr-cm',
-        'fr-cd',
-        'es',
-        'es-es',
-        'es-mx',
-        'it',
-        'pt',
-        'pt-br',
-        'pt-pt',
-        'pt-ao',
-        'pt-mz',
-        'ar',
-        'ar-dz',
-        'ar-ma',
-        'ar-tn',
-        'ar-eg',
-        'he',
-        'hi',
-        'bn',
-        'bn-bd',
-        'ta',
-        'te',
-        'mr',
-        'gu',
-        'kn',
-        'ml',
-        'pa',
-        'ur',
-        'ms-sg',
-        'zh-sg',
-        'ta-sg',
-        'af',
-        'am',
-        'sw',
-        'yo',
-        'ig',
-        'ha',
-        'zu',
-        'xh',
-        'st',
-        'id',
-        'ms',
-        'th',
-        'tr',
-        'vi',
-      ],
-      'd.m.Y' => [
-        'de',
-        'de-de',
-        'de-at',
-        'de-ch',
-        'cs',
-        'sk',
-        'pl',
-        'ru',
-        'uk',
-        'bg',
-        'sr',
-        'hr',
-        'sl',
-      ],
-      'd-m-Y' => ['nl', 'nl-nl', 'nl-be', 'da', 'nb', 'nn', 'sv', 'fi'],
-      'Y/m/d' => ['ja', 'zh', 'zh-cn', 'zh-hk', 'zh-tw'],
-      'Y.m.d' => ['ko'],
-      'Y-m-d' => ['hu', 'lt', 'lv', 'et'],
-    ],
-    'date_time' => [
-      'n/j/y, g:i A' => ['en', 'en-us'],
-      'j/n/Y, H:i' => ['en-za'],
-      'd/m/Y, H:i' => [
-        'en-gb',
-        'en-ie',
-        'en-au',
-        'en-nz',
-        'en-ng',
-        'en-ke',
-        'en-gh',
-        'en-ug',
-        'en-tz',
-        'en-zw',
-        'en-zm',
-        'en-sg',
-        'en-pk',
-      ],
-      'd/m/Y, g:i A' => ['en-in'],
-      'd/m/Y H:i' => [
-        'fr',
-        'fr-fr',
-        'fr-ca',
-        'fr-be',
-        'fr-ch',
-        'fr-dz',
-        'fr-ma',
-        'fr-tn',
-        'fr-sn',
-        'fr-ci',
-        'fr-cm',
-        'fr-cd',
-        'es',
-        'es-es',
-        'es-mx',
-        'it',
-        'pt',
-        'pt-br',
-        'pt-pt',
-        'pt-ao',
-        'pt-mz',
-        'ar',
-        'ar-dz',
-        'ar-ma',
-        'ar-tn',
-        'ar-eg',
-        'he',
-        'hi',
-        'bn',
-        'bn-bd',
-        'ta',
-        'te',
-        'mr',
-        'gu',
-        'kn',
-        'ml',
-        'pa',
-        'ur',
-        'ms-sg',
-        'zh-sg',
-        'ta-sg',
-        'af',
-        'am',
-        'sw',
-        'yo',
-        'ig',
-        'ha',
-        'zu',
-        'xh',
-        'st',
-        'id',
-        'ms',
-        'th',
-        'tr',
-        'vi',
-      ],
-      'd.m.Y, H:i' => [
-        'de',
-        'de-de',
-        'de-at',
-        'de-ch',
-        'cs',
-        'sk',
-        'pl',
-        'ru',
-        'uk',
-        'bg',
-        'sr',
-        'hr',
-        'sl',
-      ],
-      'd-m-Y H:i' => ['nl', 'nl-nl', 'nl-be', 'da', 'nb', 'nn', 'sv', 'fi'],
-      'Y/m/d H:i' => ['ja', 'zh', 'zh-cn', 'zh-hk', 'zh-tw'],
-      'Y.m.d H:i' => ['ko'],
-      'Y-m-d H:i' => ['hu', 'lt', 'lv', 'et'],
-    ],
-    'time' => [
-      'g:i A' => ['en', 'en-us'],
-      'H:i' => [
-        'en-gb',
-        'en-in',
-        'en-ng',
-        'en-ke',
-        'en-gh',
-        'en-ug',
-        'en-tz',
-        'en-zw',
-        'en-zm',
-        'en-sg',
-        'en-pk',
-        'en-ie',
-        'en-au',
-        'en-nz',
-        'en-za',
-        'fr',
-        'fr-fr',
-        'fr-ca',
-        'fr-be',
-        'fr-ch',
-        'de',
-        'de-de',
-        'de-at',
-        'de-ch',
-        'es',
-        'es-es',
-        'es-mx',
-        'it',
-        'pt',
-        'pt-br',
-        'pt-pt',
-        'pt-ao',
-        'pt-mz',
-        'nl',
-        'nl-nl',
-        'nl-be',
-        'da',
-        'nb',
-        'nn',
-        'sv',
-        'fi',
-        'ja',
-        'zh',
-        'zh-cn',
-        'zh-hk',
-        'zh-tw',
-        'ko',
-        'cs',
-        'sk',
-        'pl',
-        'ru',
-        'uk',
-        'bg',
-        'sr',
-        'hr',
-        'sl',
-        'hu',
-        'lt',
-        'lv',
-        'et',
-        'af',
-        'am',
-        'sw',
-        'yo',
-        'ig',
-        'ha',
-        'zu',
-        'xh',
-        'st',
-        'ar',
-        'ar-dz',
-        'ar-ma',
-        'ar-tn',
-        'ar-eg',
-        'he',
-        'hi',
-        'bn',
-        'bn-bd',
-        'ta',
-        'te',
-        'mr',
-        'gu',
-        'kn',
-        'ml',
-        'pa',
-        'ur',
-        'ms-sg',
-        'zh-sg',
-        'ta-sg',
-        'id',
-        'ms',
-        'th',
-        'tr',
-        'vi',
-      ],
-    ],
-  ];
-
-  /**
    * Constructs a DateResolver.
    *
    * @param \Drupal\Core\Language\LanguageManagerInterface $languageManager
@@ -427,13 +123,13 @@ final class DateResolver {
   }
 
   /**
-   * Tries intl formatting first; falls back to the static pattern map.
+   * Tries intl formatting first; falls back to the generated pattern map.
    *
    * Both paths produce a locale-appropriate short format. The intl path
    * delegates to ICU data (\IntlDateFormatter), which gives accurate results
-   * for every locale. The fallback path uses a built-in PHP date() pattern map
-   * covering 90%+ of web traffic locales, for environments (e.g. Drupal CI)
-   * where ext-intl is not installed.
+   * for every locale. The fallback path uses PHP date() patterns generated
+   * from ICU data (see DateFallbackPatterns), for environments (e.g. Drupal
+   * CI) where ext-intl is not installed.
    *
    * @param string $iso
    *   ISO date/time string.
@@ -512,10 +208,11 @@ final class DateResolver {
   }
 
   /**
-   * Formats a DateTime using the built-in fallback locale map.
+   * Formats a DateTime using the generated fallback patterns.
    *
-   * Used when the intl extension is unavailable. Covers languages used by
-   * 90%+ of web traffic; falls back to the raw ISO string for other locales.
+   * Used when the intl extension is unavailable. Looks up the langcode, then
+   * its base language ('pt-br' → 'pt'), in DateFallbackPatterns::PATTERNS.
+   * Returns NULL for langcodes that are not listed there.
    *
    * @param \DateTimeInterface $date_time
    *   The date/time to format.
@@ -550,35 +247,10 @@ final class DateResolver {
       ? \explode('-', $normalized, 2)[0]
       : $normalized;
 
-    $locale_map = self::buildFallbackLocaleMap($format_key);
-    $pattern = $locale_map[$normalized] ?? $locale_map[$base] ?? NULL;
-    return \is_string($pattern) ? $date_time->format($pattern) : NULL;
-  }
-
-  /**
-   * Builds and caches the inverted fallback locale-to-pattern map.
-   *
-   * @param string $format_key
-   *   Key into FALLBACK_PATTERN_GROUPS ('date', 'date_time', or 'time').
-   *
-   * @return array<string, string>
-   *   Flat map of langcode to PHP date() format string.
-   */
-  private static function buildFallbackLocaleMap(string $format_key): array {
-    static $cache = [];
-    if (isset($cache[$format_key])) {
-      return $cache[$format_key];
-    }
-    $map = [];
-    foreach (
-      self::FALLBACK_PATTERN_GROUPS[$format_key] ?? [] as $pattern => $codes
-    ) {
-      foreach ($codes as $lc) {
-        $map[$lc] = $pattern;
-      }
-    }
-    $cache[$format_key] = $map;
-    return $map;
+    $patterns = DateFallbackPatterns::PATTERNS[$normalized]
+      ?? DateFallbackPatterns::PATTERNS[$base]
+      ?? NULL;
+    return $patterns === NULL ? NULL : $date_time->format($patterns[$format_key]);
   }
 
   /**

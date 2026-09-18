@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Utility;
 
+use Drupal\canvas\Utility\DateFallbackPatterns;
 use Drupal\canvas\Utility\DateResolver;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
@@ -97,11 +98,15 @@ final class DateResolverTest extends CanvasKernelTestBase {
       'ja (Y/m/d) full ISO' => ['ja', '2026-01-15T14:30:00Z', '2026/01/15'],
       'en-gb (d/m/Y) bare date' => ['en-gb', '2026-01-15', '15/01/2026'],
       'en-gb (d/m/Y) full ISO' => ['en-gb', '2026-01-15T14:30:00Z', '15/01/2026'],
-      'de (d.m.Y) bare date' => ['de', '2026-01-15', '15.01.2026'],
+      'de (d.m.y) bare date' => ['de', '2026-01-15', '15.01.26'],
       'ru (d.m.Y) bare date' => ['ru', '2026-01-15', '15.01.2026'],
-      'ko (Y.m.d) bare date' => ['ko', '2026-01-15', '2026.01.15'],
       'nl (d-m-Y) bare date' => ['nl', '2026-01-15', '15-01-2026'],
-      'hu (Y-m-d) bare date' => ['hu', '2026-01-15', '2026-01-15'],
+      'hu (Y. m. d.) bare date' => ['hu', '2026-01-15', '2026. 01. 15.'],
+      'zh-hans (Y/n/j) bare date' => ['zh-hans', '2026-01-15', '2026/1/15'],
+      'pt-br uses its own row, not pt' => ['pt-br', '2026-01-15', '15/01/2026'],
+      'pt-pt uses its own row, not pt' => ['pt-pt', '2026-01-15', '15/01/26'],
+      'en-ca falls back to en' => ['en-ca', '2026-01-15', '1/15/26'],
+      'FR is matched case-insensitively' => ['FR', '2026-01-15', '15/01/2026'],
     ];
   }
 
@@ -208,6 +213,55 @@ final class DateResolverTest extends CanvasKernelTestBase {
   public function testResolveDateFallbackUnknownLocale(): void {
     $result = $this->makeResolver('xx', FALSE)->resolveDate('2026-01-15');
     self::assertSame('2026-01-15', $result);
+  }
+
+  /**
+   * Fallback: langcodes that date() cannot reproduce are not in the table.
+   *
+   * Korean needs localized AM/PM text, Arabic needs native digits. Both return
+   * the ISO string unchanged instead of a wrong format.
+   */
+  public function testResolveDateFallbackUnsupportedLocale(): void {
+    self::assertArrayNotHasKey('ko', DateFallbackPatterns::PATTERNS);
+    self::assertArrayNotHasKey('ar', DateFallbackPatterns::PATTERNS);
+    self::assertSame('2026-01-15', $this->makeResolver('ko', FALSE)->resolveDate('2026-01-15'));
+    self::assertSame('2026-01-15', $this->makeResolver('ar', FALSE)->resolveDate('2026-01-15'));
+  }
+
+  /**
+   * The fallback path produces the same output as the intl path.
+   *
+   * Protects the generated DateFallbackPatterns::PATTERNS. Runs only with the
+   * ICU version the patterns were generated from, because ICU short patterns
+   * change between versions.
+   */
+  public function testFallbackMatchesIntl(): void {
+    if (!\extension_loaded('intl')) {
+      $this->markTestSkipped('intl extension not loaded.');
+    }
+    // @phpstan-ignore notIdentical.alwaysFalse (INTL_ICU_VERSION depends on the PHP build)
+    if (INTL_ICU_VERSION !== DateFallbackPatterns::ICU_VERSION) {
+      $this->markTestSkipped(\sprintf('Patterns were generated with ICU %s, this PHP has ICU %s.', DateFallbackPatterns::ICU_VERSION, INTL_ICU_VERSION));
+    }
+    // Morning and afternoon, 1-digit and 2-digit day, month and hour,
+    // midnight and noon.
+    $samples = [
+      '2026-01-05T09:05:00Z',
+      '2026-11-25T14:30:00Z',
+      '2026-07-04T00:00:00Z',
+      '2026-03-09T12:00:00Z',
+    ];
+    foreach (\array_keys(DateFallbackPatterns::PATTERNS) as $langcode) {
+      $intl = $this->makeResolver($langcode, TRUE);
+      $fallback = $this->makeResolver($langcode, FALSE);
+      foreach ($samples as $iso) {
+        foreach (['resolveDate', 'resolveDateTime', 'resolveTime'] as $method) {
+          // ICU uses U+202F and U+00A0 where date() uses a normal space.
+          $expected = \str_replace(["\u{202f}", "\u{a0}"], ' ', $intl->$method($iso));
+          self::assertSame($expected, $fallback->$method($iso), "$langcode $method($iso)");
+        }
+      }
+    }
   }
 
   /**
