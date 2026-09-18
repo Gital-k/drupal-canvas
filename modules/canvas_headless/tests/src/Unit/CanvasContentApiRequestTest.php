@@ -4,19 +4,37 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_headless\Unit;
 
+use Drupal\canvas_headless\EventSubscriber\DetachedPreviewRouteSubscriber;
+use Drupal\canvas_headless\EventSubscriber\PreviewLanguageSubscriber;
+use Drupal\canvas_headless\Grant\PreviewAssertionGrant;
+use Drupal\canvas_headless\Routing\DetachedPreviewRouteProcessor;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
+use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\Routing\CacheableRouteProviderInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\simple_oauth\Authentication\TokenAuthUserInterface;
+use Drupal\simple_oauth\Entity\Oauth2TokenInterface;
+use Drupal\simple_oauth\Oauth2ScopeInterface;
+use Drupal\simple_oauth\Plugin\Field\FieldType\Oauth2ScopeReferenceItemListInterface;
 use Drupal\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 /**
- * Tests content API request rewriting.
+ * Tests content API request rewriting and detached preview routing.
  */
 #[CoversClass(CanvasContentApiRequest::class)]
+#[CoversClass(DetachedPreviewRouteProcessor::class)]
+#[CoversClass(DetachedPreviewRouteSubscriber::class)]
+#[CoversClass(PreviewLanguageSubscriber::class)]
 #[Group('canvas_headless')]
 final class CanvasContentApiRequestTest extends UnitTestCase {
 
@@ -39,7 +57,6 @@ final class CanvasContentApiRequestTest extends UnitTestCase {
               CanvasContentApiRequest::COMPONENT_PREVIEW_QUERY => 'route-component',
               CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY => [
                 CanvasContentApiRequest::PREVIEW_VIEW_MODE_QUERY => 'teaser',
-                CanvasContentApiRequest::COMPONENT_PREVIEW_QUERY => 'preview-component',
               ],
             ]),
             $request->getRequestUri(),
@@ -54,7 +71,6 @@ final class CanvasContentApiRequestTest extends UnitTestCase {
             CanvasContentApiRequest::COMPONENT_PREVIEW_QUERY => 'route-component',
             CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY => [
               CanvasContentApiRequest::PREVIEW_VIEW_MODE_QUERY => 'teaser',
-              CanvasContentApiRequest::COMPONENT_PREVIEW_QUERY => 'preview-component',
             ],
           ], $request->query->all());
           self::assertSame(
@@ -64,11 +80,9 @@ final class CanvasContentApiRequestTest extends UnitTestCase {
           self::assertSame(
             [
               CanvasContentApiRequest::PREVIEW_VIEW_MODE_QUERY => 'teaser',
-              CanvasContentApiRequest::COMPONENT_PREVIEW_QUERY => 'preview-component',
             ],
             $request->attributes->get(CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY),
           );
-          self::assertTrue($request->attributes->get('_disable_route_normalizer'));
           self::assertSame('Bearer preview-token', $request->headers->get('Authorization'));
           return new Response();
         },
@@ -79,7 +93,6 @@ final class CanvasContentApiRequestTest extends UnitTestCase {
       http_build_query([
         'requestUri' => '/articles/example?campaign=test&viewMode=route-view-mode&componentId=route-component',
         CanvasContentApiRequest::PREVIEW_VIEW_MODE_QUERY => 'teaser',
-        CanvasContentApiRequest::COMPONENT_PREVIEW_QUERY => 'preview-component',
       ]),
     );
     $request->headers->set('Authorization', 'Bearer preview-token');
@@ -88,24 +101,186 @@ final class CanvasContentApiRequestTest extends UnitTestCase {
   }
 
   /**
-   * Tests that normal page requests retain canonical URL handling.
+   * The preview hint cannot replace a route-owned language query parameter.
    */
-  public function testPageRequestDoesNotDisableRouteNormalizer(): void {
+  public function testPreviewLanguageIsNamespaced(): void {
+    $kernel = $this->createMock(HttpKernelInterface::class);
+    $kernel->expects($this->once())->method('handle')->willReturnCallback(static function (Request $request): Response {
+      self::assertSame('route-owned', $request->query->get('language'));
+      self::assertSame(['language' => 'fr'], $request->attributes->get(CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY));
+      return new Response();
+    });
+    (new CanvasContentApiRequest($kernel))->handle(Request::create('/canvas/content-api?' . http_build_query([
+      'requestUri' => '/page/1?language=route-owned',
+      'language' => 'fr',
+    ])));
+  }
+
+  /**
+   * Tests internal routing for page and detached preview requests.
+   *
+   * @param array<string, string> $api_query_parameters
+   *   Content API query parameters.
+   * @param bool $is_detached_preview
+   *   Whether the request carries a detached preview selector.
+   * @param string $expected_path
+   *   The path passed to the wrapped kernel.
+   */
+  #[DataProvider('previewRoutingProvider')]
+  public function testPreviewRouting(array $api_query_parameters, bool $is_detached_preview, string $expected_path): void {
     $kernel = $this->createMock(HttpKernelInterface::class);
     $kernel->expects($this->once())
       ->method('handle')
       ->willReturnCallback(
-        static function (Request $request): Response {
-          self::assertFalse($request->attributes->has('_disable_route_normalizer'));
+        static function (Request $request) use ($is_detached_preview, $expected_path): Response {
+          self::assertSame($expected_path, $request->getPathInfo());
+          self::assertSame(
+            '/',
+            $request->attributes->get(CanvasContentApiRequest::REQUESTED_URI_ATTRIBUTE),
+          );
+          self::assertSame(
+            $is_detached_preview,
+            $request->attributes->get(CanvasContentApiRequest::DETACHED_PREVIEW_ATTRIBUTE),
+          );
           return new Response();
         },
       );
 
     $request = Request::create(
-      CanvasContentApiRequest::API_PATH . '?requestUri=/articles/example',
+      CanvasContentApiRequest::API_PATH . '?' . http_build_query([
+        'requestUri' => '/',
+        ...$api_query_parameters,
+      ]),
     );
 
     (new CanvasContentApiRequest($kernel))->handle($request);
+  }
+
+  /**
+   * Provides content API requests with different preview selectors.
+   */
+  public static function previewRoutingProvider(): array {
+    return [
+      'normal page' => [[], FALSE, '/'],
+      'component preview' => [
+        [
+          CanvasContentApiRequest::COMPONENT_PREVIEW_QUERY => 'external-card',
+        ],
+        TRUE,
+        '/',
+      ],
+      'page variant preview' => [
+        [
+          CanvasContentApiRequest::PAGE_VARIANT_PREVIEW_QUERY => 'alternate',
+        ],
+        TRUE,
+        '/',
+      ],
+    ];
+  }
+
+  /**
+   * Tests that only authenticated previews use the Canvas-owned route.
+   */
+  #[DataProvider('previewScopeProvider')]
+  public function testDetachedPreviewRouteProcessing(bool $has_preview_scope, string $expected_path): void {
+    $account = $this->createMock(AccountInterface::class);
+    if ($has_preview_scope) {
+      $account = $this->previewTokenAccount();
+    }
+    $current_user = $this->createMock(AccountProxyInterface::class);
+    $current_user->method('getAccount')->willReturn($account);
+    $processor = new DetachedPreviewRouteProcessor($current_user);
+    $request = Request::create('/');
+    $request->attributes->set(
+      CanvasContentApiRequest::DETACHED_PREVIEW_ATTRIBUTE,
+      TRUE,
+    );
+
+    self::assertSame($expected_path, $processor->processInbound('/', $request));
+  }
+
+  /**
+   * Provides preview-scope route processing decisions.
+   */
+  public static function previewScopeProvider(): array {
+    return [
+      'public request' => [FALSE, '/'],
+      'authenticated preview' => [TRUE, CanvasContentApiRequest::API_PATH],
+    ];
+  }
+
+  /**
+   * Tests request preparation for detached preview routing.
+   */
+  #[DataProvider('previewScopeProvider')]
+  public function testPrepareDetachedPreviewRouting(bool $has_preview_scope, string $expected_path): void {
+    $account = $this->createMock(AccountInterface::class);
+    if ($has_preview_scope) {
+      $account = $this->previewTokenAccount();
+    }
+    $current_user = $this->createMock(AccountProxyInterface::class);
+    $current_user->method('getAccount')->willReturn($account);
+    $route_provider = $this->createMock(CacheableRouteProviderInterface::class);
+    $route_provider->expects($this->once())
+      ->method('addExtraCacheKeyPart')
+      ->with('canvas_headless_detached_preview', $has_preview_scope ? '1' : '0');
+    $subscriber = new DetachedPreviewRouteSubscriber($current_user, $route_provider);
+    $processor = new DetachedPreviewRouteProcessor($current_user);
+    $request = Request::create('/');
+    $request->attributes->set(
+      CanvasContentApiRequest::DETACHED_PREVIEW_ATTRIBUTE,
+      TRUE,
+    );
+
+    $subscriber->prepareDetachedPreviewRouting(new RequestEvent(
+      $this->createMock(HttpKernelInterface::class),
+      $request,
+      HttpKernelInterface::MAIN_REQUEST,
+    ));
+
+    self::assertSame(
+      $has_preview_scope,
+      $request->attributes->get('_disable_route_normalizer', FALSE),
+    );
+    self::assertSame($expected_path, $processor->processInbound('/', $request));
+  }
+
+  /**
+   * Missing optional language support never reaches negotiation services.
+   */
+  #[DataProvider('monolingualPreviewLanguageProvider')]
+  public function testPreviewLanguageWithoutLanguageModule(string $langcode, bool $known): void {
+    $language_manager = $this->createMock(LanguageManagerInterface::class);
+    $language_manager->expects($this->once())->method('getLanguage')
+      ->with($langcode)->willReturn($known ? new Language(['id' => 'en']) : NULL);
+    $language_manager->expects($known ? $this->once() : $this->never())
+      ->method('getCurrentLanguage')->willReturn(new Language(['id' => 'en']));
+    $language_manager->expects($this->never())->method('getLanguageSwitchLinks');
+    $current_user = $this->createMock(AccountProxyInterface::class);
+    $current_user->method('getAccount')->willReturn($this->previewTokenAccount());
+    $subscriber = new PreviewLanguageSubscriber(
+      $language_manager,
+      $current_user,
+      NULL,
+    );
+    $request = Request::create('/page/1');
+    $request->attributes->set(CanvasContentApiRequest::REQUESTED_URI_ATTRIBUTE, '/page/1');
+    $request->attributes->set(CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY, ['language' => $langcode]);
+    if (!$known) {
+      $this->expectException(NotFoundHttpException::class);
+    }
+    $subscriber->onRequest(new RequestEvent(
+      $this->createMock(HttpKernelInterface::class),
+      $request,
+      HttpKernelInterface::MAIN_REQUEST,
+    ));
+    self::assertSame('/page/1', $request->getRequestUri());
+  }
+
+  public static function monolingualPreviewLanguageProvider(): iterable {
+    yield 'default language without language module' => ['en', TRUE];
+    yield 'unknown language still rejected' => ['unknown', FALSE];
   }
 
   /**
@@ -190,6 +365,21 @@ final class CanvasContentApiRequestTest extends UnitTestCase {
         HttpKernelInterface::SUB_REQUEST,
       ],
     ];
+  }
+
+  /**
+   * Creates an account carrying the Canvas preview scope.
+   */
+  private function previewTokenAccount(): TokenAuthUserInterface {
+    $preview_scope = $this->createMock(Oauth2ScopeInterface::class);
+    $preview_scope->method('getName')->willReturn(PreviewAssertionGrant::SCOPE);
+    $scopes = $this->createMock(Oauth2ScopeReferenceItemListInterface::class);
+    $scopes->method('getScopes')->willReturn([$preview_scope]);
+    $token = $this->createMock(Oauth2TokenInterface::class);
+    $token->method('get')->with('scopes')->willReturn($scopes);
+    $account = $this->createMock(TokenAuthUserInterface::class);
+    $account->method('getToken')->willReturn($token);
+    return $account;
   }
 
 }

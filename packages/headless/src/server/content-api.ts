@@ -55,8 +55,18 @@ export async function fetchPage(
   if (componentPreviewId) {
     url.searchParams.set(CANVAS_COMPONENT_PREVIEW_QUERY, componentPreviewId);
   }
+  if (liveDraft && draftData?.previewContext?.language) {
+    url.searchParams.set('language', draftData.previewContext.language);
+  }
   if (liveDraft && draftData?.previewContext?.viewMode) {
     url.searchParams.set('viewMode', draftData.previewContext.viewMode);
+  }
+  if (
+    !componentPreviewId &&
+    liveDraft &&
+    draftData?.previewContext?.pageVariant
+  ) {
+    url.searchParams.set('pageVariant', draftData.previewContext.pageVariant);
   }
   const response = await fetchImpl(url, {
     headers,

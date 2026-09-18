@@ -48,15 +48,31 @@ describe('parseDraftData', () => {
     );
   });
 
-  it('round-trips optional content-template preview context', () => {
+  it('round-trips optional editor preview context', () => {
     const draftData = {
       ...validDraftData,
       previewContext: {
+        language: 'fr',
         viewMode: 'teaser',
+        pageVariant: 'alternate',
       },
     };
     expect(parseDraftData(serializeDraftData(draftData))).toEqual(draftData);
   });
+
+  it.each([{ pageVariant: 42 }, { language: 42 }, { language: null }])(
+    'rejects invalid editor preview context %s',
+    (previewContext) => {
+      expect(
+        parseDraftData(
+          JSON.stringify({
+            ...validDraftData,
+            previewContext,
+          }),
+        ),
+      ).toBeNull();
+    },
+  );
 
   it.each([null, undefined, ''])('returns null for %s', (value) => {
     expect(parseDraftData(value)).toBeNull();

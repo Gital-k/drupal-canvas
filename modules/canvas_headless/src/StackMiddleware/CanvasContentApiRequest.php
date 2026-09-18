@@ -22,13 +22,26 @@ final class CanvasContentApiRequest implements HttpKernelInterface {
 
   public const API_QUERY_PARAMETERS_KEY = '_canvas_headless_content_api_query_parameters';
 
+  public const DETACHED_PREVIEW_ATTRIBUTE = '_canvas_headless_detached_preview';
+
   public const PREVIEW_VIEW_MODE_QUERY = 'viewMode';
+
+  public const PREVIEW_LANGUAGE_QUERY = 'language';
+
+  /**
+   * Internal one-hop guard; accepting it can only reject failed negotiation.
+   */
+  public const LANGUAGE_REDIRECT_QUERY = '_canvas_headless_language_redirect';
+
+  public const PAGE_VARIANT_PREVIEW_QUERY = 'pageVariant';
 
   public const COMPONENT_PREVIEW_QUERY = 'componentId';
 
   private const SUPPORTED_API_QUERY_PARAMETERS = [
     self::PREVIEW_VIEW_MODE_QUERY,
+    self::PAGE_VARIANT_PREVIEW_QUERY,
     self::COMPONENT_PREVIEW_QUERY,
+    self::PREVIEW_LANGUAGE_QUERY,
   ];
 
   public function __construct(
@@ -70,6 +83,9 @@ final class CanvasContentApiRequest implements HttpKernelInterface {
       $target_query[self::API_QUERY_PARAMETERS_KEY] = $api_query_parameters;
     }
     $target_query_string = http_build_query($target_query);
+    $is_detached_preview =
+      isset($api_query_parameters[self::COMPONENT_PREVIEW_QUERY]) ||
+      isset($api_query_parameters[self::PAGE_VARIANT_PREVIEW_QUERY]);
     $target_path = (string) parse_url($request_uri, PHP_URL_PATH);
     $target_request_uri = $request->getBaseUrl() . $target_path;
     if ($target_query_string !== '') {
@@ -81,6 +97,8 @@ final class CanvasContentApiRequest implements HttpKernelInterface {
         ...$request->attributes->all(),
         self::REQUESTED_URI_ATTRIBUTE => $request_uri,
         self::API_QUERY_PARAMETERS_KEY => $api_query_parameters,
+        self::DETACHED_PREVIEW_ATTRIBUTE => $is_detached_preview,
+        self::LANGUAGE_REDIRECT_QUERY => ($request->query->all()[self::LANGUAGE_REDIRECT_QUERY] ?? NULL) === '1',
       ],
       server: [
         ...$request->server->all(),
@@ -88,15 +106,6 @@ final class CanvasContentApiRequest implements HttpKernelInterface {
         'REQUEST_URI' => $target_request_uri,
       ],
     );
-    // Component previews render independently of the routed URI's canonical
-    // representation. Let the controller render them before Redirect can
-    // replace homepage and alias requests with a canonical redirect.
-    if (isset($api_query_parameters[self::COMPONENT_PREVIEW_QUERY])) {
-      $target_request->attributes->set(
-        '_disable_route_normalizer',
-        TRUE,
-      );
-    }
     // Dynamic Page Cache varies by request format, keeping this response
     // separate from `html` and `custom_elements` responses for the target.
     $target_request->setRequestFormat(self::REQUEST_FORMAT);

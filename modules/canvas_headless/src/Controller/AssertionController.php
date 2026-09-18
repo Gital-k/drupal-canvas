@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas_headless\Controller;
 
+use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas_headless\PreviewUrlGeneratorInterface;
 use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
@@ -82,7 +83,7 @@ class AssertionController extends ControllerBase {
     $assertion = $this->previewUrlGenerator->issueForPath(
       $path,
       $renewal,
-      static::previewContext($request),
+      $this->previewContext($request),
     );
     // The route requires the permission the generator checks, so a NULL here
     // means the two got out of sync — fail loudly, not with a broken preview.
@@ -137,6 +138,12 @@ class AssertionController extends ControllerBase {
     if (!$entity->access('view')) {
       throw new AccessDeniedHttpException('The entity may not be viewed.');
     }
+    // Page variants are config entities without a canonical URL. Their
+    // headless editor preview enters the frontend at its root path and carries
+    // the edited variant in signed preview context instead.
+    if ($entity instanceof PageVariant) {
+      return '/';
+    }
     try {
       $path = $entity->toUrl()->toString(TRUE)->getGeneratedUrl();
     }
@@ -173,17 +180,30 @@ class AssertionController extends ControllerBase {
   /**
    * Reads optional content-template rendering context.
    *
-   * @return array{viewMode?: string}
+   * @return array{viewMode?: string, pageVariant?: string, language?: string}
    *   The context carried by the signed preview assertion.
    */
-  protected static function previewContext(Request $request): array {
+  protected function previewContext(Request $request): array {
     $context = [];
+    $language = $request->query->get('language', '');
+    if ($language !== '') {
+      if (!\is_string($language) || $this->languageManager()->getLanguage($language) === NULL) {
+        throw new BadRequestHttpException('The language query parameter is invalid.');
+      }
+      $context['language'] = $language;
+    }
     $view_mode = (string) $request->query->get('view_mode', '');
     if ($view_mode !== '') {
       if (preg_match('/^[a-z0-9_]+$/', $view_mode) !== 1) {
         throw new BadRequestHttpException('The view_mode query parameter is invalid.');
       }
       $context['viewMode'] = $view_mode;
+    }
+    if ((string) $request->query->get('entity_type', '') === PageVariant::ENTITY_TYPE_ID) {
+      $page_variant = (string) $request->query->get('entity', '');
+      if ($page_variant !== '') {
+        $context['pageVariant'] = $page_variant;
+      }
     }
     return $context;
   }
