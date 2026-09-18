@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\canvas\Kernel\Utility;
+namespace Drupal\Tests\canvas\Unit\Utility;
 
 use Drupal\canvas\Utility\DateFallbackPatterns;
 use Drupal\canvas\Utility\DateResolver;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use Drupal\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
@@ -18,12 +18,7 @@ use PHPUnit\Framework\Attributes\Group;
  */
 #[CoversClass(DateResolver::class)]
 #[Group('canvas')]
-final class DateResolverTest extends CanvasKernelTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [];
+final class DateResolverTest extends UnitTestCase {
 
   /**
    * Creates a DateResolver wired to a mock language manager.
