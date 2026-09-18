@@ -919,4 +919,140 @@ test.describe('brand kit colors', () => {
     await page.locator(SEL.deletePopConfirm).click();
     await expect(page.locator(SEL.row('Brand Red'))).toBeHidden();
   });
+
+  test('optimistic color edits', async ({ page, drupal, canvas }) => {
+    await drupal.login({ username: 'colormaster', password: 'colormaster' });
+    await canvas.openCanvasRoot();
+    await canvas.openBrandKitPanel();
+
+    const redSwatch = page.locator(SEL.rowSwatch('Brand Red'));
+    await expect(redSwatch).toHaveCSS('background-color', 'rgb(204, 0, 0)');
+
+    // Hold the write open so the assertions below land while it is in flight.
+    let releaseWrite: () => void = () => {};
+    const writeHeld = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    await page.route(/\/canvas\/api\/v0\/config\/color\/.+/, async (route) => {
+      if (route.request().method() !== 'PATCH') {
+        await route.continue();
+        return;
+      }
+      await writeHeld;
+      await route.continue();
+    });
+
+    // Edit "Brand Red" to pure blue (0, 0, 255).
+    await page.locator(SEL.row('Brand Red')).hover();
+    await page.locator(SEL.rowMenu('Brand Red')).click();
+    await page.locator(SEL.menu.edit).click();
+    await expect(page.locator(SEL.form.rgba.r)).toBeVisible();
+    await page.locator(SEL.form.rgba.r).fill('0');
+    await page.locator(SEL.form.rgba.g).fill('0');
+    await page.locator(SEL.form.rgba.b).fill('255');
+    await page.locator(SEL.form.save).click();
+
+    // The row swatch shows the new color while the request is still open, and
+    // the form has already closed. This is the whole point of the optimistic
+    // write: nothing waits for the server.
+    await expect(redSwatch).toHaveCSS('background-color', 'rgb(0, 0, 255)');
+    await expect(page.locator(POP_SEL)).toBeHidden();
+
+    releaseWrite();
+    await expect(redSwatch).toHaveCSS('background-color', 'rgb(0, 0, 255)');
+  });
+
+  // A single scenario covers the held create and the rejected edit: the
+  // site install in the setup dominates the run time, so the two flows share
+  // one, without weakening what either asserts.
+  test('shows a new color before the create completes and rolls back a rejected edit', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.login({ username: 'colormaster', password: 'colormaster' });
+    await canvas.openCanvasRoot();
+    await canvas.openBrandKitPanel();
+
+    // Hold the write open so the assertions below land while it is in flight.
+    let releaseWrite: () => void = () => {};
+    const writeHeld = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    await page.route(/\/canvas\/api\/v0\/config\/color$/, async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      await writeHeld;
+      await route.continue();
+    });
+
+    await page.locator(SEL.newBtn).click();
+    await page.locator(SEL.newColorBtn).click();
+    await page.locator(SEL.form.name).fill('Impatient Amber');
+    await page.locator(SEL.form.rgba.r).fill('255');
+    await page.locator(SEL.form.rgba.g).fill('191');
+    await page.locator(SEL.form.rgba.b).fill('0');
+    await page.locator(SEL.form.save).click();
+
+    // The row is in the list while the request is still open, and the form has
+    // already closed.
+    await expect(page.locator(SEL.row('Impatient Amber'))).toBeVisible();
+    await expect(page.locator(SEL.rowSwatch('Impatient Amber'))).toHaveCSS(
+      'background-color',
+      'rgb(255, 191, 0)',
+    );
+    await expect(page.locator(POP_SEL)).toBeHidden();
+
+    // Let the create and the reconcile refetch it triggers settle, so the
+    // list is not re-rendering under the second flow's clicks.
+    const reconciled = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        response.url().includes('/canvas/api/v0/config/brand_kit/'),
+    );
+    releaseWrite();
+    await reconciled;
+    await expect(page.locator(SEL.row('Impatient Amber'))).toBeVisible();
+
+    // Second flow: a rejected edit rolls back.
+    // Capture the stored color rather than hard-coding the hsl() conversion,
+    // so this asserts "restored to what it was" without depending on how the
+    // browser rounds the components.
+    const greenSwatch = page.locator(SEL.rowSwatch('Brand Green'));
+    const storedGreen = await greenSwatch.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+
+    await page.route(/\/canvas\/api\/v0\/config\/color\/.+/, async (route) => {
+      if (route.request().method() !== 'PATCH') {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        body: JSON.stringify({ errors: [{ detail: 'Rejected by test.' }] }),
+      });
+    });
+
+    await page.locator(SEL.row('Brand Green')).hover();
+    await page.locator(SEL.rowMenu('Brand Green')).click();
+    await page.locator(SEL.menu.edit).click();
+    // Brand Green is stored in the HSL color space, so its form opens in HSLA.
+    await expect(page.locator(SEL.form.hsla.h)).toBeVisible();
+    await page.locator(SEL.form.hsla.h).fill('300');
+    await page.locator(SEL.form.hsla.s).fill('100');
+    await page.locator(SEL.form.hsla.l).fill('50');
+    await page.locator(SEL.form.save).click();
+
+    // The rejected value must not survive anywhere in the UI.
+    await expect(greenSwatch).toHaveCSS('background-color', storedGreen);
+    // The form closed on submit and came back on the rejection, still holding
+    // what was entered, so the edit can be corrected and retried.
+    await expect(page.locator(POP_SEL)).toBeVisible();
+    await expect(page.locator(SEL.form.hsla.h)).toHaveValue('300');
+    await expect(page.getByText(/Failed to update color/)).toBeVisible();
+  });
 });
