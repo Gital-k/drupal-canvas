@@ -932,7 +932,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''"
+        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: ''"
   -
     id:
       -
@@ -995,4 +995,4 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: 3177b7b8-947e-4fc8-9ee4-81b7834d36a9"
+        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: 3177b7b8-947e-4fc8-9ee4-81b7834d36a9"
