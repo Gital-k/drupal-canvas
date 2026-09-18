@@ -115,6 +115,10 @@ describe('isPageRedirect', () => {
           requestUri: '/page',
           params: {},
           managedByCanvas: true,
+          negotiatedLanguage: 'fr',
+          translations: [
+            { langcode: 'en', current: true, url: '/page', external: false },
+          ],
           entity: {
             entityType: 'canvas_page',
             bundle: 'canvas_page',
@@ -134,6 +138,8 @@ describe('isPageRedirect', () => {
           requestUri: '/user/login',
           params: {},
           managedByCanvas: false,
+          negotiatedLanguage: 'en',
+          translations: [],
           entity: null,
         },
       }),

@@ -84,6 +84,20 @@ framework's redirect primitive.
 During an authorized draft session, the same call uses available content drafts.
 Public calls use stored content.
 
+`page.route.negotiatedLanguage` identifies the negotiated content language.
+`page.route.translations` lists accessible existing translations as
+`{ langcode, current, url, external }`. The current entry matches the rendered
+`route.entity.langcode`, which can differ from the negotiated language on
+fallback. Monolingual sites and non-entity routes return an empty list.
+
+Non-external URLs are site-relative Drupal request URIs without the installation
+base path. Pass them unchanged to `fetchPage`, preserving language prefixes and
+query strings. External URLs remain absolute and are not valid `fetchPage`
+input; the SDK does not thereby support Drupal domain negotiation. Map entries
+to public URLs in the frontend. See the
+[multilingual guide](../../docs/multilingual-sites-with-canvas-headless.md#translation-links)
+for a language-switcher example.
+
 Use `fetchEntity({ type, id, viewMode })` when the current request should render
 one specific content entity in a specific content-template view mode, such as
 `server.fetchEntity({ type: 'node', id: '1', viewMode: 'teaser' })`.

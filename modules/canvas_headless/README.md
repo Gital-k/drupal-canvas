@@ -142,6 +142,8 @@ Canvas does not manage the requested entity and view mode.
       "canvas_page": "1"
     },
     "managedByCanvas": true,
+    "negotiatedLanguage": "en",
+    "translations": [],
     "entity": {
       "entityType": "canvas_page",
       "bundle": "canvas_page",
@@ -159,6 +161,17 @@ roots in its `default` slot. Routes Canvas does not manage and managed routes wi
 
 `head` is compatible with the [Unhead](https://unhead.unjs.io/) package. It always contains `title` and may also
 contain `meta`, `link`, and `script`. Canonical links are omitted because the frontend owns its public URLs.
+
+`route.negotiatedLanguage` is the negotiated content-language ID. `route.translations` lists only existing
+translations the requester can view, including the rendered translation. It is empty for monolingual sites and
+non-entity routes. Each entry has `langcode`, `current`, `url`, and `external`; `current` matches
+`route.entity.langcode`, even when Drupal falls back from the negotiated language.
+
+A non-external `url` is a site-relative Drupal request URI, with the installation base path removed and the
+language prefix or query preserved. External URLs remain absolute and are **not valid `fetchPage` input**;
+this does not add SDK support for domain negotiation. Frontends map entries to their own public URLs.
+Preview selectors are not included. Metatag-provided head links pass through unchanged.
+See [multilingual examples](../../docs/multilingual-sites-with-canvas-headless.md#translation-links).
 
 ### Redirect response
 

@@ -52,6 +52,17 @@ export interface DrupalRouteEntity {
   langcode: string;
 }
 
+/** An existing translation the requester may view. */
+export interface DrupalRouteTranslation {
+  langcode: string;
+  /** Matches the rendered entity language, not necessarily the requested one. */
+  current: boolean;
+  /** Drupal request URI without its base path, or an absolute external URL. */
+  url: string;
+  /** External URLs are not valid fetchPage input; map them to public URLs. */
+  external: boolean;
+}
+
 /** The Drupal route that was resolved for the requested frontend URI. */
 export interface DrupalRoute {
   name: string;
@@ -60,6 +71,10 @@ export interface DrupalRoute {
   /** Whether Canvas manages the route's complete component tree. */
   managedByCanvas: boolean;
   entity: DrupalRouteEntity | null;
+  /** Negotiated content language; may differ from entity.langcode on fallback. */
+  negotiatedLanguage: string;
+  /** Empty on monolingual sites and routes without a canonical content entity. */
+  translations: DrupalRouteTranslation[];
 }
 
 /**

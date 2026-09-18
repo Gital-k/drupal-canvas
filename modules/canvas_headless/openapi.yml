@@ -72,6 +72,8 @@ paths:
                       params:
                         canvas_page: '1'
                       managedByCanvas: true
+                      negotiatedLanguage: en
+                      translations: []
                       entity:
                         entityType: canvas_page
                         bundle: canvas_page
@@ -507,7 +509,7 @@ components:
     CanvasRouteContext:
       type: object
       additionalProperties: false
-      required: [name, requestUri, params, managedByCanvas, entity]
+      required: [name, requestUri, params, managedByCanvas, entity, negotiatedLanguage, translations]
       properties:
         name:
           type: string
@@ -523,6 +525,31 @@ components:
           oneOf:
             - $ref: '#/components/schemas/RoutedEntityRef'
             - type: 'null'
+        negotiatedLanguage:
+          type: string
+          description: Negotiated content-language ID, which may differ from the rendered entity language on fallback.
+        translations:
+          type: array
+          description: Accessible existing translations, including the rendered translation. Empty on monolingual sites and non-entity routes. No entries for missing translations.
+          items:
+            $ref: '#/components/schemas/RouteTranslation'
+
+    RouteTranslation:
+      type: object
+      additionalProperties: false
+      required: [langcode, current, url, external]
+      properties:
+        langcode:
+          type: string
+        current:
+          type: boolean
+          description: Matches the rendered entity language, including language fallback.
+        url:
+          type: string
+          description: Site-relative Drupal request URI with base path removed, or an absolute external URL. The frontend maps this to its public URL.
+        external:
+          type: boolean
+          description: External URLs are not valid content API or SDK fetchPage input. This does not imply domain negotiation support in the SDK.
 
     RoutedEntityRef:
       type: object
