@@ -287,10 +287,12 @@ export function createDraftServer(options: DraftServerOptions): DraftServer {
     );
   };
 
-  const resolveApiPrefix = createApiPrefixResolver(getConfig(), fetchImpl);
+  let resolveApiPrefix: ReturnType<typeof createApiPrefixResolver> | undefined;
   const resolveClientConfig = async (): Promise<DraftConfig> => {
+    const clientConfig = getConfig();
+    resolveApiPrefix ??= createApiPrefixResolver(clientConfig, fetchImpl);
     const apiPrefix = await resolveApiPrefix();
-    return { ...getConfig(), ...(apiPrefix && { apiPrefix }) };
+    return { ...clientConfig, ...(apiPrefix && { apiPrefix }) };
   };
 
   return {

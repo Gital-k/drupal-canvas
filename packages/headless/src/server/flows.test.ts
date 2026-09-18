@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DRAFT_DATA_COOKIE_NAME } from '../constants';
 import { serializeDraftData } from '../draft-data';
+import { resolveDraftConfig } from './config';
 import { createDraftServer, redeemAssertion } from './flows';
 import { codeChallenge } from './pkce';
 
@@ -483,6 +484,46 @@ describe('getDraftData', () => {
 });
 
 describe('getClient', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it.each(['environment', 'callback'])(
+    'defers %s configuration until client access',
+    async (source) => {
+      vi.stubEnv('CANVAS_SITE_URL', undefined);
+      const config = vi.fn(() => resolveDraftConfig());
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ jsonapiSettings: { apiPrefix: 'api' } }),
+        );
+      const server = createDraftServer({
+        adapter: makeAdapter().adapter,
+        ...(source === 'callback' && { config }),
+        fetchImpl,
+      });
+
+      expect(config).not.toHaveBeenCalled();
+      expect(fetchImpl).not.toHaveBeenCalled();
+      await expect(server.getPublicClient()).rejects.toThrow(
+        'CANVAS_SITE_URL must be set.',
+      );
+      expect(fetchImpl).not.toHaveBeenCalled();
+
+      vi.stubEnv('CANVAS_SITE_URL', CONFIG.baseUrl);
+      const client = await server.getPublicClient();
+      expect(client.apiPrefix).toBe('api');
+      expect(fetchImpl).toHaveBeenCalledExactlyOnceWith(
+        `${CONFIG.baseUrl}/canvas/api/v0/site-data`,
+        {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+        },
+      );
+    },
+  );
+
   it('resolves the JSON:API prefix from the site-data endpoint', async () => {
     const fetchImpl = vi
       .fn()
@@ -506,25 +547,30 @@ describe('getClient', () => {
     expect(draftClient.apiPrefix).toBe('api');
   });
 
-  it('fetches the prefix once per server instance', async () => {
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({ jsonapiSettings: { apiPrefix: 'api' } }),
-      );
+  it('shares in-flight prefix discovery and caches it per server instance', async () => {
+    let resolveResponse!: (response: Response) => void;
+    const response = new Promise<Response>((resolve) => {
+      resolveResponse = resolve;
+    });
+    const fetchImpl = vi.fn().mockReturnValue(response);
     const { server, seedSession } = makeServer(
       fetchImpl as unknown as typeof fetch,
     );
     seedSession(liveDraftData());
 
-    await server.getPublicClient();
-    await server.getClient();
-    await server.getDraftClient(liveDraftData());
+    const clients = Promise.all([
+      server.getPublicClient(),
+      server.getClient(),
+      server.getDraftClient(liveDraftData()),
+    ]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    resolveResponse(Response.json({ jsonapiSettings: { apiPrefix: 'api' } }));
+    for (const client of await clients) {
+      expect(client.apiPrefix).toBe('api');
+    }
 
-    const siteDataCalls = fetchImpl.mock.calls.filter(([url]) =>
-      String(url).includes('/canvas/api/v0/site-data'),
-    );
-    expect(siteDataCalls).toHaveLength(1);
+    expect((await server.getPublicClient()).apiPrefix).toBe('api');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to the configured prefix when the fetch fails', async () => {
