@@ -246,7 +246,7 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
   public function testContentResponseVariesByAuthorization(): void {
     $event = $this->event(new CacheableJsonResponse(['content' => []]));
 
-    $this->subscriber()->addCacheability($event);
+    CanvasContentResponseSubscriber::addAuthorizationVary($event);
 
     $response = $event->getResponse();
     self::assertContains('Authorization', $response->getVary());
@@ -260,7 +260,7 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
     $response->setVary('Cookie');
     $event = $this->event($response);
 
-    $this->subscriber()->addCacheability($event);
+    CanvasContentResponseSubscriber::addAuthorizationVary($event);
 
     self::assertContains('Authorization', $response->getVary());
     self::assertContains('Cookie', $response->getVary());
@@ -281,22 +281,7 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
     $settings = Settings::getAll();
     new Settings(['omit_vary_cookie' => $omit_vary_cookie] + $settings);
     try {
-      $language_manager = $this->createMock(LanguageManagerInterface::class);
-      $language_manager->method('getCurrentLanguage')->willReturn(new Language(['id' => 'en']));
-      $request_policy = $this->createMock(RequestPolicyInterface::class);
-      $request_policy->method('check')->willReturn(RequestPolicyInterface::ALLOW);
-      $time = $this->createMock(TimeInterface::class);
-      $time->method('getRequestTime')->willReturn(1700000000);
-      $dispatcher = new EventDispatcher();
-      $dispatcher->addSubscriber($this->subscriber());
-      $dispatcher->addSubscriber(new FinishResponseSubscriber(
-        $language_manager,
-        $this->getConfigFactoryStub(['system.performance' => ['cache.page.max_age' => 300]]),
-        $request_policy,
-        $this->createMock(ResponsePolicyInterface::class),
-        $this->createMock(CacheContextsManager::class),
-        $time,
-      ));
+      $dispatcher = $this->responseDispatcher();
       $response = new CacheableJsonResponse(['content' => []]);
       $response->setVary($existing_vary);
       $event = $this->event($response);
@@ -325,6 +310,63 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
   }
 
   /**
+   * Tests that a subrequest response preserves core's main Cookie default.
+   */
+  public function testSubrequestResponseReusedForMainRequest(): void {
+    $dispatcher = $this->responseDispatcher();
+    $response = new CacheableJsonResponse(['content' => []]);
+    $subrequest_event = $this->event($response, request_type: HttpKernelInterface::SUB_REQUEST);
+    $dispatcher->dispatch($subrequest_event, KernelEvents::RESPONSE);
+    self::assertSame([], $response->getVary());
+
+    $main_event = $this->event($response, Request::create(CanvasContentApiRequest::API_PATH), FALSE);
+    $dispatcher->dispatch($main_event, KernelEvents::RESPONSE);
+    self::assertSame(['Cookie', 'Authorization'], $response->getVary());
+    self::assertSame('max-age=300, public', $response->headers->get('Cache-Control'));
+  }
+
+  /**
+   * Tests that late variation does not make private responses cacheable.
+   */
+  public function testPrivateContentResponses(): void {
+    foreach ([new Response('plain'), new CacheableJsonResponse(['content' => []])] as $response) {
+      $response->setVary('Cookie');
+      $event = $this->event($response);
+      $this->responseDispatcher(allow_cache: FALSE)->dispatch($event, KernelEvents::RESPONSE);
+      self::assertSame('must-revalidate, no-cache, private', $response->headers->get('Cache-Control'));
+      self::assertSame(['Authorization'], $response->getVary());
+      self::assertFalse($response->isCacheable());
+    }
+  }
+
+  /**
+   * Tests that a plain response's explicit public cache policy is preserved.
+   */
+  public function testPlainPublicContentResponse(): void {
+    $response = new Response('plain', headers: ['Cache-Control' => 'public, max-age=60', 'Vary' => 'Accept-Language']);
+    $event = $this->event($response);
+    $this->responseDispatcher()->dispatch($event, KernelEvents::RESPONSE);
+    self::assertSame('max-age=60, public', $response->headers->get('Cache-Control'));
+    self::assertSame(['Accept-Language', 'Authorization'], $response->getVary());
+  }
+
+  /**
+   * Tests that Authorization is added to the final converted redirect response.
+   */
+  public function testConvertedRedirectVaryResponsePipeline(): void {
+    $redirect = new TrustedRedirectResponse('/new-path', 301);
+    $event = $this->event($redirect);
+    $this->responseDispatcher()->dispatch($event, KernelEvents::RESPONSE);
+    $response = $event->getResponse();
+    self::assertNotSame($redirect, $response);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertSame(200, $response->getStatusCode());
+    self::assertSame(['Cookie'], $redirect->getVary());
+    self::assertSame(['Cookie', 'Authorization'], $response->getVary());
+    self::assertSame('max-age=300, public', $response->headers->get('Cache-Control'));
+  }
+
+  /**
    * Tests that the global subscriber does not change unrelated responses.
    */
   public function testOrdinaryResponsesAreUnchanged(): void {
@@ -337,6 +379,8 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
     $this->subscriber()->addCacheability($content_event);
     self::assertSame($content, $content_event->getResponse());
     self::assertSame([], $content->getCacheableMetadata()->getCacheTags());
+    $this->responseDispatcher()->dispatch($content_event, KernelEvents::RESPONSE);
+    self::assertSame(['Cookie'], $content->getVary());
 
     $redirect = new TrustedRedirectResponse('/another-route');
     $redirect_event = $this->event(
@@ -504,6 +548,29 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
   }
 
   /**
+   * Registers the real Canvas and core response listeners at their priorities.
+   */
+  private function responseDispatcher(bool $allow_cache = TRUE): EventDispatcher {
+    $language_manager = $this->createMock(LanguageManagerInterface::class);
+    $language_manager->method('getCurrentLanguage')->willReturn(new Language(['id' => 'en']));
+    $request_policy = $this->createMock(RequestPolicyInterface::class);
+    $request_policy->method('check')->willReturn($allow_cache ? RequestPolicyInterface::ALLOW : RequestPolicyInterface::DENY);
+    $time = $this->createMock(TimeInterface::class);
+    $time->method('getRequestTime')->willReturn(1700000000);
+    $dispatcher = new EventDispatcher();
+    $dispatcher->addSubscriber($this->subscriber());
+    $dispatcher->addSubscriber(new FinishResponseSubscriber(
+      $language_manager,
+      $this->getConfigFactoryStub(['system.performance' => ['cache.page.max_age' => 300]]),
+      $request_policy,
+      $this->createMock(ResponsePolicyInterface::class),
+      $this->createMock(CacheContextsManager::class),
+      $time,
+    ));
+    return $dispatcher;
+  }
+
+  /**
    * Creates the response subscriber with optional Redirect integration.
    */
   private function subscriber(
@@ -530,6 +597,7 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
     Response $response,
     ?Request $request = NULL,
     bool $marked = TRUE,
+    int $request_type = HttpKernelInterface::MAIN_REQUEST,
   ): ResponseEvent {
     $request ??= Request::create('/old-path');
     if ($marked) {
@@ -541,7 +609,7 @@ final class CanvasContentResponseSubscriberTest extends UnitTestCase {
     return new ResponseEvent(
       $this->createMock(HttpKernelInterface::class),
       $request,
-      HttpKernelInterface::MAIN_REQUEST,
+      $request_type,
       $response,
     );
   }

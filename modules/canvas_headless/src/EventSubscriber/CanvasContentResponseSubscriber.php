@@ -14,7 +14,6 @@ use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\CacheableResponseInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Site\Settings;
 use GuzzleHttp\Psr7\Uri;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -66,17 +65,6 @@ final class CanvasContentResponseSubscriber implements EventSubscriberInterface 
     if (!$response instanceof CacheableResponseInterface) {
       return;
     }
-
-    // Preserve core's default Cookie variation before adding our own Vary.
-    // FinishResponseSubscriber only adds Cookie when no Vary is already set.
-    if (!$response->hasVary() && !Settings::get('omit_vary_cookie')) {
-      $response->setVary('Cookie', replace: FALSE);
-    }
-
-    // Vary by Authorization so shared caches (CDNs) do not serve a cached
-    // anonymous response to a preview request, which would hide draft changes.
-    // @see \Drupal\Core\EventSubscriber\FinishResponseSubscriber::onRespond()
-    $response->setVary('Authorization', replace: FALSE);
 
     // Route rebuilds and path alias changes invalidate the route_match tag.
     $cacheability = (new CacheableMetadata())
@@ -166,6 +154,16 @@ final class CanvasContentResponseSubscriber implements EventSubscriberInterface 
   }
 
   /**
+   * Adds Authorization variation after core finishes and redirect conversion.
+   */
+  public static function addAuthorizationVary(ResponseEvent $event): void {
+    if ($event->isMainRequest() && self::isContentApiRequest($event->getRequest())) {
+      // Do not let shared caches serve a published response to a draft preview.
+      $event->getResponse()->setVary('Authorization', replace: FALSE);
+    }
+  }
+
+  /**
    * {@inheritdoc}
    */
   public static function getSubscribedEvents(): array {
@@ -174,6 +172,7 @@ final class CanvasContentResponseSubscriber implements EventSubscriberInterface 
         ['convertError', 9],
         ['addCacheability', 8],
         ['convertRedirect', -11],
+        ['addAuthorizationVary', -12],
       ],
     ];
   }
