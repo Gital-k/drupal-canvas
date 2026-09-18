@@ -250,10 +250,23 @@ condition plugin makes sense as a segmentation rule, so personalization narrows 
 }
 ```
 
-Only each rule's identity is listed, not its settings.
+Only each rule's identity is listed, not its settings. Those are exposed separately, as a Drupal form — the same way a
+component instance's props are, and rendered by the client the same way:
 
-Requires the `administer personalization segments` permission: segmentation rules are only ever used to build a
-`Segment`.
+`GET /canvas/api/v0/form/segment-rule/{segmentRuleId}`
+
+That form carries every setting the segmentation rule declares, and their default values. Its fields are named so that
+the values the client collects map onto what a `Segment` stores for that rule, for example `settings[negate]` for the
+rule's `negate` setting. Like a component instance form, it is never submitted to Drupal: the client sends the values it
+collects to the `Segment`'s auto-save endpoint (see 3.1.2 above) instead. A segmentation rule this site does not have
+available — whether because no such condition plugin exists, or because personalization does not allow it — has no
+settings form, and results in a `404` response.
+
+See [the component and entity forms documentation](component-and-entity-forms.md) for how the client transforms such a
+form into React components.
+
+Both endpoints require the `administer personalization segments` permission: segmentation rules are only ever used to
+build a `Segment`.
 
 
 

@@ -9,6 +9,25 @@
 # @see \Drupal\canvas\EventSubscriber\ApiMessageValidatorBase::isCanvasMessage()
 # @see \Drupal\canvas\EventSubscriber\ApiExceptionSubscriber::onException()
 # @see \Drupal\canvas\Theme\CanvasThemeNegotiator::applies()
+canvas.api.form.segment_rule:
+  path: '/canvas/api/v0/form/segment-rule/{segment_rule}'
+  defaults:
+    _form: 'Drupal\canvas_personalization\Form\SegmentRuleSettingsForm'
+    _title: 'Segmentation Rule Settings Form'
+  requirements:
+    _canvas_authentication_required: TRUE
+    # Same gate as the listing this endpoint's `{segment_rule}` comes from.
+    _permission: 'administer personalization segments'
+  options:
+    # The Canvas equivalent of requesting an AJAX response using `?_wrapper_format`.
+    # @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
+    _wrapper_format: 'canvas_template'
+    _format: 'json'
+  # Deliberately GET only: unlike a component instance form, none of the
+  # segmentation rules personalization allows today builds its settings with
+  # `#ajax`, so there is nothing for Drupal's AJAX system to POST back to.
+  methods: [GET]
+
 canvas.api.personalization.segment_rule.list:
   path: '/canvas/api/v0/personalization/segment-rules'
   defaults:

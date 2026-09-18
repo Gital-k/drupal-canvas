@@ -189,6 +189,7 @@ final class DxRouteConsistencyTest extends UnitTestCase {
       '/canvas/api/v0/config/segment/{segment} GET' => ['methods' => ['GET']],
       '/canvas/api/v0/config/segment/{segment} PATCH' => ['methods' => ['PATCH']],
       '/canvas/api/v0/config/segment/{segment} DELETE' => ['methods' => ['DELETE']],
+      '/canvas/api/v0/form/segment-rule/{segment_rule} GET' => ['methods' => ['GET']],
       '/canvas/api/v0/personalization/segment-rules GET' => ['methods' => ['GET']],
     ]);
     ksort($routes);

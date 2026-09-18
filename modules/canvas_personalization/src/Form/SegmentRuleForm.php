@@ -62,16 +62,12 @@ final class SegmentRuleForm extends EntityForm {
       $condition_id = $form_state->getValue('plugin_id') ?? \array_key_first($condition_options);
       $condition = $this->conditionManager->createInstance($condition_id, $segment_rules[$condition_id]['settings'] ?? []);
       \assert($condition instanceof ConditionInterface);
-      $form_state->set($condition_id, $condition);
-      $condition_form = $condition->buildConfigurationForm([], $form_state);
-      $condition_form['#title'] = $this->t('Settings');
+      // Shared with the internal HTTP API that exposes the very same settings
+      // to the Canvas UI, so the two cannot drift apart.
       $form['settings'] = [
         '#prefix' => '<div id="edit-settings">',
-        '#type' => 'container',
-        '#tree' => TRUE,
         '#suffix' => '</div>',
-      ];
-      $form['settings'] += $condition_form;
+      ] + SegmentRuleSettingsForm::buildSettingsElement($condition, $form_state);
     }
     else {
       $form['empty'] = [
