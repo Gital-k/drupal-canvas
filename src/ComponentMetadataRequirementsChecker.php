@@ -6,6 +6,7 @@ namespace Drupal\canvas;
 
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaObjectRef;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
+use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 use Drupal\canvas\PropShape\EphemeralPropShapeRepository;
 use Drupal\canvas\PropShape\StorablePropShape;
@@ -20,6 +21,39 @@ use JsonSchema\Validator;
  * @todo Move into a new \Drupal\Canvas\ComponentMetadataDerivers namespace, alongside ComponentPropExpression
  */
 final class ComponentMetadataRequirementsChecker {
+
+  /**
+   * Finds wildcard `contentMediaType` schemas that lack `x-allowed-schemes`.
+   *
+   * Recurses into array `items` and object `properties`, because shape
+   * matching interprets those nested schemas the same way as top-level props.
+   *
+   * @param string $path
+   *   The JSON Pointer-like path of the schema within the prop, for messages.
+   * @param array<string, mixed> $schema
+   *   The (sub)schema to check.
+   *
+   * @return list<string>
+   *   One message per offending schema.
+   */
+  private static function checkWildcardMediaTypeSchemes(string $path, array $schema): array {
+    $messages = [];
+    if (\is_string($schema['contentMediaType'] ?? NULL) && UriTargetMediaTypeConstraint::isValidWildCard($schema['contentMediaType'])) {
+      $allowed_schemes = $schema['x-allowed-schemes'] ?? NULL;
+      if (!\is_array($allowed_schemes) || $allowed_schemes === [] || !\array_is_list($allowed_schemes)) {
+        $messages[] = \sprintf('Prop "%s" targets "%s" and must declare "x-allowed-schemes" as a non-empty list of URI schemes.', $path, $schema['contentMediaType']);
+      }
+    }
+    if (\is_array($schema['items'] ?? NULL)) {
+      \array_push($messages, ...self::checkWildcardMediaTypeSchemes($path . '/items', $schema['items']));
+    }
+    foreach ($schema['properties'] ?? [] as $property_name => $property_schema) {
+      if (\is_array($property_schema)) {
+        \array_push($messages, ...self::checkWildcardMediaTypeSchemes($path . '/properties/' . $property_name, $property_schema));
+      }
+    }
+    return $messages;
+  }
 
   /**
    * Checks the given component meets requirements.
@@ -141,6 +175,21 @@ final class ComponentMetadataRequirementsChecker {
           $messages[] = \sprintf('Invalid value "%s" for "x-formatting-context". Valid values are "inline" and "block".', $prop['x-formatting-context']);
           continue;
         }
+      }
+
+      // Schemas targeting a wildcard `contentMediaType` (`image/*`, `video/*`,
+      // `application/*`) must declare `x-allowed-schemes`: no SDC prop ever
+      // blindly accepts any URI scheme, it is always either a stream wrapper
+      // URI or a browser-accessible URI. Without it, field properties storing
+      // Drupal-specific URIs (`public://`, `entity:`, `internal:`) would match.
+      // Shape matching reaches such schemas nested in array items and object
+      // properties too, so check the whole prop schema.
+      // @see https://www.drupal.org/node/3542579
+      // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat::toDataTypeShapeRequirements()
+      $wildcard_messages = self::checkWildcardMediaTypeSchemes($prop_name, $prop);
+      if ($wildcard_messages !== []) {
+        \array_push($messages, ...$wildcard_messages);
+        continue;
       }
 
       // Validation for x-canvas-color-picker.

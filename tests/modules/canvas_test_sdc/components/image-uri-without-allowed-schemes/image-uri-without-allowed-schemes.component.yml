@@ -1,0 +1,12 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Image URI without allowed schemes
+props:
+  type: object
+  properties:
+    image_url:
+      title: 'Image URL'
+      type: string
+      format: uri-reference
+      contentMediaType: image/*
+      examples:
+        - https://example.com/cat.png

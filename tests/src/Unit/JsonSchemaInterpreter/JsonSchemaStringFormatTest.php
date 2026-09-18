@@ -45,6 +45,16 @@ final class JsonSchemaStringFormatTest extends UnitTestCase {
     $this->assertSame($expected_constraints, $constraints);
   }
 
+  public function testWildcardContentMediaTypeRequiresAllowedSchemes(): void {
+    $this->expectException(\LogicException::class);
+    $this->expectExceptionMessage('A prop with `contentMediaType: image/*` must declare `x-allowed-schemes` as a non-empty list of URI schemes.');
+    JsonSchemaStringFormat::Uri->toDataTypeShapeRequirements([
+      'type' => 'string',
+      'format' => 'uri',
+      'contentMediaType' => 'image/*',
+    ]);
+  }
+
   public static function providerUriTargetMediaType(): \Generator {
     yield 'wildcard contentMediaType with x-allowed-schemes' => [
       [
@@ -57,18 +67,6 @@ final class JsonSchemaStringFormatTest extends UnitTestCase {
         UriTargetMediaTypeConstraint::PLUGIN_ID,
         UriConstraint::PLUGIN_ID,
         UriSchemeConstraint::PLUGIN_ID,
-        'PrimitiveType',
-      ],
-    ];
-    yield 'wildcard contentMediaType without x-allowed-schemes keeps the media type requirement' => [
-      [
-        'type' => 'string',
-        'format' => 'uri',
-        'contentMediaType' => 'image/*',
-      ],
-      [
-        UriTargetMediaTypeConstraint::PLUGIN_ID,
-        UriConstraint::PLUGIN_ID,
         'PrimitiveType',
       ],
     ];
