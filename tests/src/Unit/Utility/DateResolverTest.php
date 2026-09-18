@@ -234,8 +234,7 @@ final class DateResolverTest extends UnitTestCase {
     if (!\extension_loaded('intl')) {
       $this->markTestSkipped('intl extension not loaded.');
     }
-    // @phpstan-ignore notIdentical.alwaysFalse (INTL_ICU_VERSION depends on the PHP build)
-    if (INTL_ICU_VERSION !== DateFallbackPatterns::ICU_VERSION) {
+    if (!self::matchesGeneratedIcuVersion()) {
       $this->markTestSkipped(\sprintf('Patterns were generated with ICU %s, this PHP has ICU %s.', DateFallbackPatterns::ICU_VERSION, INTL_ICU_VERSION));
     }
     // Morning and afternoon, 1-digit and 2-digit day, month and hour,
@@ -284,6 +283,14 @@ final class DateResolverTest extends UnitTestCase {
       'ja' => ['ja'],
       'en-gb' => ['en-gb'],
     ];
+  }
+
+  private static function matchesGeneratedIcuVersion(): bool {
+    $intl_version = \phpversion('intl');
+    if (!\is_string($intl_version)) {
+      return FALSE;
+    }
+    return \version_compare($intl_version, DateFallbackPatterns::ICU_VERSION, '==');
   }
 
 }
