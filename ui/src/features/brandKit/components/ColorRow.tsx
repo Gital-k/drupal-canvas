@@ -3,7 +3,6 @@ import clsx from 'clsx';
 import parse from 'html-react-parser';
 import { useDraggable } from '@dnd-kit/core';
 import { DotsHorizontalIcon } from '@radix-ui/react-icons';
-import * as Popover from '@radix-ui/react-popover';
 import {
   ContextMenu,
   DropdownMenu,
@@ -213,6 +212,13 @@ const ColorRow = ({ color }: ColorRowProps) => {
       data-is-renaming={isRenaming ? true : undefined}
       data-has-inline-error={renameErrorMessage ? true : undefined}
       data-testid={`canvas-color-row-${color.name}`}
+      onClick={() => {
+        // A direct click on the row opens the edit popover. While renaming,
+        // clicks inside the rename input must not open the popover.
+        if (!isRenaming) {
+          setIsEditPopoverOpen(true);
+        }
+      }}
     >
       {/* Color swatch */}
       <div
@@ -322,44 +328,33 @@ const ColorRow = ({ color }: ColorRowProps) => {
   return (
     <>
       <div ref={setNodeRef} {...attributes} {...listeners}>
-        <ColorFormPopover
-          operation="edit"
-          color={color}
-          anchorRef={dotsButtonRef}
-          open={isEditPopoverOpen}
-          onOpenChange={setIsEditPopoverOpen}
+        <ContextMenu.Root
+          onOpenChange={(open) => {
+            setIsMenuOpen(open);
+            // Close the edit popover when the context menu opens so they
+            // can't both be open at once.
+            if (open) {
+              setIsEditPopoverOpen(false);
+            }
+          }}
         >
-          <ContextMenu.Root
-            onOpenChange={(open) => {
-              setIsMenuOpen(open);
-              // Close the edit popover when the context menu opens so they
-              // can't both be open at once.
-              if (open) {
-                setIsEditPopoverOpen(false);
-              }
-            }}
-          >
-            <ContextMenu.Trigger>
-              {/*
-                While renaming, the row must not act as a popover trigger so
-                clicks inside the rename input don't open the edit popover.
-              */}
-              {isRenaming ? (
-                row
-              ) : (
-                <Popover.Trigger asChild>{row}</Popover.Trigger>
-              )}
-            </ContextMenu.Trigger>
-            <UnifiedMenu.Content menuType="context" align="start" side="right">
-              {menuItems}
-            </UnifiedMenu.Content>
-          </ContextMenu.Root>
-        </ColorFormPopover>
+          <ContextMenu.Trigger>{row}</ContextMenu.Trigger>
+          <UnifiedMenu.Content menuType="context" align="start" side="right">
+            {menuItems}
+          </UnifiedMenu.Content>
+        </ContextMenu.Root>
       </div>
 
-      {/* Menu-triggered popovers — each owns its Popover.Root and anchors to the
-          dots button. They manage dismissal manually because they are opened
-          from the dropdown menu rather than by a direct trigger. */}
+      {/* Anchored popovers — each owns its Popover.Root and anchors to the
+          dots button. They are opened programmatically and manage dismissal
+          manually. */}
+      <ColorFormPopover
+        operation="edit"
+        color={color}
+        anchorRef={dotsButtonRef}
+        open={isEditPopoverOpen}
+        onOpenChange={setIsEditPopoverOpen}
+      />
       <DeleteColorPopover
         color={color}
         anchorRef={dotsButtonRef}
