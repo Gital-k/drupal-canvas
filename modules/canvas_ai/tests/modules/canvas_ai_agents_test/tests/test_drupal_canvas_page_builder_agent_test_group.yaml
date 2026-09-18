@@ -65,7 +65,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:"
   -
     id:
       -
@@ -128,7 +128,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:"
   -
     id:
       -
@@ -203,7 +203,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: cc4bd806-4126-472b-981f-b91a4f9e8ff5\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: cc4bd806-4126-472b-981f-b91a4f9e8ff5"
   -
     id:
       -
@@ -278,7 +278,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: b1fe179c-9069-48ec-9724-a14b9cf650e8\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: b1fe179c-9069-48ec-9724-a14b9cf650e8"
   -
     id:
       -
@@ -341,7 +341,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: 3177b7b8-947e-4fc8-9ee4-81b7834d36a9\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: 3177b7b8-947e-4fc8-9ee4-81b7834d36a9"
   -
     id:
       -
@@ -404,7 +404,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:"
   -
     id:
       -
@@ -467,7 +467,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''\r\navailable_regions: '{\"header\":{\"nodePathPrefix\":0,\"info\":null},\"content\":{\"nodePathPrefix\":1,\"info\":null},\"sidebar\":{\"nodePathPrefix\":2,\"info\":null},\"content_below\":{\"nodePathPrefix\":3,\"info\":null},\"footer_top\":{\"nodePathPrefix\":4,\"info\":null},\"footer_bottom\":{\"nodePathPrefix\":5,\"info\":null}}'"
+        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''"
   -
     id:
       -
@@ -530,7 +530,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''\r\navailable_regions: '{\"header\":{\"nodePathPrefix\":0,\"info\":null},\"content\":{\"nodePathPrefix\":1,\"info\":null},\"sidebar\":{\"nodePathPrefix\":2,\"info\":null},\"content_below\":{\"nodePathPrefix\":3,\"info\":null},\"footer_top\":{\"nodePathPrefix\":4,\"info\":null},\"footer_bottom\":{\"nodePathPrefix\":5,\"info\":null}}'"
+        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''"
   -
     id:
       -
@@ -593,7 +593,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid:\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid:"
   -
     id:
       -
@@ -656,7 +656,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid:\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid:"
   -
     id:
       -
@@ -719,7 +719,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:"
   -
     id:
       -
@@ -794,7 +794,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''\r\navailable_regions: '{\"header\":{\"nodePathPrefix\":0,\"info\":null},\"content\":{\"nodePathPrefix\":1,\"info\":null},\"sidebar\":{\"nodePathPrefix\":2,\"info\":null},\"content_below\":{\"nodePathPrefix\":3,\"info\":null},\"footer_top\":{\"nodePathPrefix\":4,\"info\":null},\"footer_bottom\":{\"nodePathPrefix\":5,\"info\":null}}'"
+        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''"
   -
     id:
       -
@@ -857,7 +857,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:"
   -
     id:
       -
@@ -920,7 +920,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid:\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid:"
   -
     id:
       -
@@ -995,70 +995,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
-  -
-    id:
-      -
-        value: '16'
-    uuid:
-      -
-        value: 4c9927c4-d4f3-4cd0-9d06-4a5c28a969f6
-    label:
-      -
-        value: 'Region Description Drives Heading Level'
-    status:
-      -
-        value: '1'
-    description:
-      -
-        value: 'When a region carries an info description constraining heading level, the agent must honor it and set element=h2 even though the user did not specify a heading level.'
-    uid:
-      -
-        target_id: '1'
-    created:
-      -
-        value: '1780056316'
-    changed:
-      -
-        value: '1782912094'
-    messages:
-      -
-        value: |
-          -
-            role: user
-            content: 'Add a heading with the text "Latest Updates" to the header region. Add the heading directly; do not wrap it in a container, column, or section.'
-    triggering_instructions:
-      -
-        value: 'Add a heading with the text "Latest Updates" to the header region. Add the heading directly; do not wrap it in a container, column, or section.'
-    ai_agent:
-      -
-        target_id: canvas_page_builder_agent
-    rules:
-      -
-        value: |
-          rule_1:
-            tool: 'canvas_ai:set_component_structure'
-            label: 'Heading placed in header region with level forced to h2 by region description'
-            tool_rules: should_be_run
-            tool_order: any
-            tool_loop_order: ''
-            tool_other_tool_order: 'canvas_ai:set_component_structure'
-            parameters:
-              component_structure:
-                type_of_check: yaml_path_equals
-                value: "operations.0.target=header\r\noperations.0.placement=below\r\noperations.0.components.0.sdc\\.canvas_test_sdc\\.heading.props.text=Latest Updates\r\noperations.0.components.0.sdc\\.canvas_test_sdc\\.heading.props.element=h2"
-            remove: null
-          add_rule: null
-          response_rule: ''
-    config_reset:
-      -
-        value: '0'
-    ai_agents_test_group:
-      -
-        target_id: '6'
-    tokens:
-      -
-        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''\r\navailable_regions: '{\"header\":{\"nodePathPrefix\":0,\"info\":\"Heading components placed in this region must always use heading level H2 (element h2).\"},\"content\":{\"nodePathPrefix\":1,\"info\":null},\"sidebar\":{\"nodePathPrefix\":2,\"info\":null},\"content_below\":{\"nodePathPrefix\":3,\"info\":null},\"footer_top\":{\"nodePathPrefix\":4,\"info\":null},\"footer_bottom\":{\"nodePathPrefix\":5,\"info\":null}}'"
+        value: "canvas_layout_fixture: empty-page-with-content-region-enabled\r\nactive_component_uuid:"
   -
     id:
       -
@@ -1121,7 +1058,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: 4c6ef712-5bca-4459-bce6-f7581b5c67bd\r\navailable_regions: '{\"content\":{\"nodePathPrefix\":0,\"info\":null}}'"
+        value: "canvas_layout_fixture: non-empty-page-with-content-region-enabled\r\nactive_component_uuid: 4c6ef712-5bca-4459-bce6-f7581b5c67bd"
   -
     id:
       -
@@ -1196,7 +1133,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''\r\navailable_regions: '{\"header\":{\"nodePathPrefix\":0,\"info\":null},\"content\":{\"nodePathPrefix\":1,\"info\":null},\"sidebar\":{\"nodePathPrefix\":2,\"info\":null},\"content_below\":{\"nodePathPrefix\":3,\"info\":null},\"footer_top\":{\"nodePathPrefix\":4,\"info\":null},\"footer_bottom\":{\"nodePathPrefix\":5,\"info\":null}}'"
+        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''"
   -
     id:
       -
@@ -1259,7 +1196,7 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''\r\navailable_regions: '{\"header\":{\"nodePathPrefix\":0,\"info\":null},\"content\":{\"nodePathPrefix\":1,\"info\":null},\"sidebar\":{\"nodePathPrefix\":2,\"info\":null},\"content_below\":{\"nodePathPrefix\":3,\"info\":null},\"footer_top\":{\"nodePathPrefix\":4,\"info\":null},\"footer_bottom\":{\"nodePathPrefix\":5,\"info\":null}}'"
+        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: ''"
   -
     id:
       -
@@ -1322,4 +1259,4 @@ tests:
         target_id: '6'
     tokens:
       -
-        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: 3177b7b8-947e-4fc8-9ee4-81b7834d36a9\r\navailable_regions: '{\"header\":{\"nodePathPrefix\":0,\"info\":null},\"content\":{\"nodePathPrefix\":1,\"info\":null},\"sidebar\":{\"nodePathPrefix\":2,\"info\":null},\"content_below\":{\"nodePathPrefix\":3,\"info\":null},\"footer_top\":{\"nodePathPrefix\":4,\"info\":null},\"footer_bottom\":{\"nodePathPrefix\":5,\"info\":null}}'"
+        value: "canvas_layout_fixture: page-with-multiple-regions\r\nactive_component_uuid: 3177b7b8-947e-4fc8-9ee4-81b7834d36a9"
