@@ -333,6 +333,88 @@ describe('preview-payload', () => {
     ).toBe('marker.page_content');
   });
 
+  it('resolves canvas-color token refs in the page template spec for preview', async () => {
+    const root = await makeTemporaryDirectory();
+
+    await writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify(
+        {
+          componentDir: 'src/components',
+          pagesDir: 'pages',
+          aliasBaseDir: 'src',
+        },
+        null,
+        2,
+      ),
+    );
+
+    await writeFile(
+      path.join(root, 'canvas.brand-kit.json'),
+      JSON.stringify({ colors: { 'brand-red': '#cc1a1a' } }),
+    );
+
+    await writeFile(
+      path.join(root, 'src/components/nav/component.yml'),
+      'name: Nav\n',
+    );
+    await writeFile(
+      path.join(root, 'src/components/nav/index.tsx'),
+      'export default function Nav() { return null; }',
+    );
+
+    await writeFile(
+      path.join(root, 'pages/home.json'),
+      JSON.stringify({
+        title: 'Home',
+        elements: {
+          hero: { type: 'js.nav', props: {} },
+        },
+      }),
+    );
+
+    await writeFile(
+      path.join(root, 'page-templates/default.json'),
+      JSON.stringify({
+        label: 'Default',
+        default: true,
+        elements: {
+          nav: {
+            type: 'js.nav',
+            props: { backgroundColor: 'canvas-color:brand-red' },
+          },
+          content: { type: 'marker.page_content', props: {} },
+        },
+      }),
+    );
+
+    let capturedPageTemplateSpec: unknown = null;
+
+    await buildPreviewPayload(
+      {
+        mode: 'page',
+        inputPath: 'pages/home.json',
+        projectRoot: root,
+      },
+      {
+        bundleInteractivePreview: async (options) => {
+          capturedPageTemplateSpec = options.pageTemplateSpec ?? null;
+          return { js: '', css: '' };
+        },
+      },
+    );
+
+    const navProps = (
+      capturedPageTemplateSpec as {
+        elements: { nav: { props: Record<string, unknown> } };
+      } | null
+    )?.elements.nav.props;
+    expect(navProps?.backgroundColor).toMatchObject({
+      cssVariable: '--brand-red',
+      cssColorValue: '#cc1a1a',
+    });
+  });
+
   it('keeps interactive render mode and fails when interactive bundle throws', async () => {
     const root = await makeTemporaryDirectory();
 

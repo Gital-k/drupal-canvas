@@ -795,7 +795,10 @@ async function preparePagePreview(options: {
         ),
       };
     }
-    pageTemplateSpec = parsedPageTemplate.pageTemplate.spec;
+    pageTemplateSpec = resolvePageColorPropsForPreview(
+      parsedPageTemplate.pageTemplate.spec,
+      readBrandKitColors(options.projectRoot),
+    );
   }
 
   return {

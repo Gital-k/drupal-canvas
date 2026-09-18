@@ -392,7 +392,10 @@ async function loadPreviewContentTemplateSpec(
   }
 
   return {
-    spec: parsedTemplate.spec,
+    spec: resolvePageColorPropsForPreview(
+      parsedTemplate.spec,
+      readBrandKitColors(discoveryResult.projectRoot),
+    ),
     metadata: parsedTemplate.metadata,
     status: 200,
     error: null,
@@ -478,7 +481,10 @@ async function loadPreviewPageTemplateSpec(
   }
 
   return {
-    spec: parsedPageTemplate.pageTemplate.spec,
+    spec: resolvePageColorPropsForPreview(
+      parsedPageTemplate.pageTemplate.spec,
+      readBrandKitColors(discoveryResult.projectRoot),
+    ),
     status: 200,
     error: null,
     enabled: parsedPageTemplate.pageTemplate.status,
