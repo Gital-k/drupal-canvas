@@ -22,6 +22,11 @@ use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Builds accessible translation request URIs for routed content.
+ *
+ * The optional language_negotiator service is NULL without the language module.
+ * All language plugin references are guarded by the negotiator's presence.
+ *
+ * @drupalOptionalDependency language
  */
 final class CanvasContentTranslationLinks {
 

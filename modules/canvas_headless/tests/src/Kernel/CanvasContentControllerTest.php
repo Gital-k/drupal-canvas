@@ -19,6 +19,7 @@ use Drupal\canvas_headless\PreviewLanguageRedirectResponse;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\consumers\Entity\Consumer;
 use Drupal\Core\Cache\CacheableJsonResponse;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Language\LanguageManagerInterface;
@@ -1184,7 +1185,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertCount(2, $fallback['translations']);
 
     $page->getTranslation('fr')->set('status', FALSE)->save();
-    $this->container->get('entity_type.manager')->getAccessControlHandler('canvas_page')->resetCache();
+    $this->container->get(EntityTypeManagerInterface::class)->getAccessControlHandler('canvas_page')->resetCache();
     $response = $this->renderContentPath('/hello');
     self::assertSame(['en'], array_column(self::responseData($response)['route']['translations'], 'langcode'));
     self::assertContains('user.permissions', $response->getCacheableMetadata()->getCacheContexts());
