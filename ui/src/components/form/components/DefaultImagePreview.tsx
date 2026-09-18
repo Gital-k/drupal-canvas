@@ -10,14 +10,18 @@ import { isPropSourceComponent } from '@/types/Component';
 import type {
   CodeComponentPropDocumentExample,
   CodeComponentPropImageExample,
+  CodeComponentPropVideoExample,
 } from '@/types/CodeComponent';
+import type { FieldDataItem } from '@/types/Component';
 
 import styles from './DefaultImagePreview.module.css';
 
 /**
- * Displays a preview of the default/example image for image props that are
- * showing their default value. For optional props, includes a "Remove" button
- * to allow users to explicitly clear the default value.
+ * Displays a preview of the default/example image for image and video props
+ * that are showing their default value. Video props preview their poster
+ * image, since the video source itself cannot render in an img tag. For
+ * optional props, includes a "Remove" button to allow users to explicitly
+ * clear the default value.
  *
  * The preview renders when ALL of these conditions are met:
  * 1. The prop has a default/example image value defined
@@ -47,6 +51,35 @@ interface DefaultImagePreviewProps {
  * All of these indicate "no explicit user-provided value", meaning we should
  * show the default image preview.
  */
+type DefaultMediaValue =
+  | CodeComponentPropImageExample
+  | CodeComponentPropVideoExample;
+
+/**
+ * Resolves the thumbnail URL and alt text for a default media value.
+ *
+ * Video-shaped props are detected through the dereferenced prop schema, where
+ * the `src` property carries a `video/*` content media type. Their `poster`
+ * image is previewed because the video source cannot render in an img tag,
+ * and `poster` is optional so the URL may be undefined.
+ */
+export const getDefaultPreviewImage = (
+  jsonSchema: FieldDataItem['jsonSchema'] | undefined,
+  defaultValue: DefaultMediaValue | undefined,
+): { url: string | undefined; alt: string } => {
+  const srcSchema = (
+    jsonSchema?.properties as
+      | Record<string, { contentMediaType?: string } | undefined>
+      | undefined
+  )?.src;
+  if (srcSchema?.contentMediaType?.startsWith('video/')) {
+    const video = defaultValue as CodeComponentPropVideoExample | undefined;
+    return { url: video?.poster, alt: 'Default' };
+  }
+  const image = defaultValue as CodeComponentPropImageExample | undefined;
+  return { url: image?.src, alt: image?.alt || 'Default' };
+};
+
 const isEmptyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return true;
   if (Array.isArray(value) && value.length === 0) return true;
@@ -113,13 +146,13 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
 
   // Use the proper interface from CodeComponent.ts
   const defaultImageValue = propData?.default_values?.resolved as
-    | CodeComponentPropImageExample
+    | DefaultMediaValue
     | CodeComponentPropDocumentExample
     | undefined;
 
   const sourceValue = selectedModel.source?.[propName]?.value;
   const resolvedValue = selectedModel.resolved?.[propName] as
-    | CodeComponentPropImageExample
+    | DefaultMediaValue
     | CodeComponentPropDocumentExample
     | undefined;
 
@@ -202,18 +235,21 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
     );
   }
 
-  const imageUrl = defaultImageValue.src;
-  const imageAlt =
-    (defaultImageValue as CodeComponentPropImageExample).alt || 'Default';
+  const { url: imageUrl, alt: imageAlt } = getDefaultPreviewImage(
+    propData?.jsonSchema,
+    defaultImageValue as DefaultMediaValue,
+  );
 
   return (
     <div ref={componentRefCallback} className={styles.defaultImagePreview}>
       <div className={styles.defaultImageContainer}>
-        <img
-          src={imageUrl}
-          alt={imageAlt}
-          className={styles.defaultImageThumbnail}
-        />
+        {imageUrl && (
+          <img
+            src={imageUrl}
+            alt={imageAlt}
+            className={styles.defaultImageThumbnail}
+          />
+        )}
         {isOptional && (
           <button
             type="button"
