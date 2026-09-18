@@ -61,6 +61,9 @@ final class UriTargetFileExtensionsConstraint extends SymfonyConstraint {
     if (!\is_array($extensions) || $extensions === [] || !\array_is_list($extensions)) {
       throw new InvalidArgumentException('The option "allowedExtensions" must be a non-empty list of file extensions.');
     }
+    // File extensions are case-insensitive, matching core's FileExtension
+    // upload validation, so compare them in one case.
+    $this->allowedExtensions = \array_values(\array_unique(\array_map(\strtolower(...), $extensions)));
   }
 
   /**

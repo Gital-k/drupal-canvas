@@ -96,9 +96,11 @@ final class MediaSourceObjectShapes {
     if (!\is_string($source_field_extensions)) {
       return FALSE;
     }
+    // File extensions are case-insensitive, matching core's FileExtension
+    // upload validation, so compare them in one case.
     return \array_intersect(
-      \array_filter(\explode(' ', $source_field_extensions)),
-      $allowed_file_extensions,
+      \array_map(\strtolower(...), \array_filter(\explode(' ', $source_field_extensions))),
+      \array_map(\strtolower(...), $allowed_file_extensions),
     ) !== [];
   }
 

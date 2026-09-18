@@ -70,7 +70,7 @@ final class UriTargetMediaTypeConstraint extends SymfonyConstraint {
    * Example: `image/*`, `video/*`.
    */
   public static function isValidWildCard(string $mimetype): bool {
-    return preg_match('/\w+\/\*/', $mimetype) === 1;
+    return preg_match('/^\w+\/\*$/', $mimetype) === 1;
   }
 
   /**
