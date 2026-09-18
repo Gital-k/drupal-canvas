@@ -172,4 +172,26 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
     ];
   }
 
+  /**
+   * Tests the date formatting filters with values an optional prop can hold.
+   *
+   * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::canvasFormatDate
+   * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::canvasFormatDateTime
+   * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::canvasFormatTime
+   * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::canvasFormatDateRange
+   */
+  #[DataProvider('providerCanvasFormatDateFiltersWithEmptyValues')]
+  public function testCanvasFormatDateFiltersWithEmptyValues(?string $value, string $expected): void {
+    self::assertSame($expected, $this->canvasTwigExtension->canvasFormatDate($value));
+    self::assertSame($expected, $this->canvasTwigExtension->canvasFormatDateTime($value));
+    self::assertSame($expected, $this->canvasTwigExtension->canvasFormatTime($value));
+    self::assertSame($value, $this->canvasTwigExtension->canvasFormatDateRange($value));
+  }
+
+  public static function providerCanvasFormatDateFiltersWithEmptyValues(): \Generator {
+    yield 'NULL (optional prop without a value)' => [NULL, ''];
+    yield 'empty string' => ['', ''];
+    yield 'unparseable string is returned unchanged' => ['not-a-date', 'not-a-date'];
+  }
+
 }

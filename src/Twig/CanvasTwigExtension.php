@@ -317,43 +317,53 @@ final class CanvasTwigExtension extends AbstractExtension {
   /**
    * Formats an ISO date string using the active Drupal locale's short date.
    *
-   * @param string $iso
-   *   ISO date string, e.g. '2026-01-15'.
+   * @param string|null $iso
+   *   ISO date string, e.g. '2026-01-15'. NULL when the prop has no value.
    *
    * @return string
    *   Locale-formatted date, e.g. '1/15/26' (en) or '15/01/2026' (fr).
-   *   Returns $iso unchanged if it cannot be parsed.
+   *   Returns $iso unchanged if it cannot be parsed, or '' for NULL.
    */
-  public function canvasFormatDate(string $iso): string {
+  public function canvasFormatDate(?string $iso): string {
+    if ($iso === NULL) {
+      return '';
+    }
     return $this->dateResolver->resolveDate($iso);
   }
 
   /**
    * Formats an ISO datetime string using the active Drupal locale's format.
    *
-   * @param string $iso
-   *   ISO datetime string, e.g. '2026-01-15T14:30:00Z'.
+   * @param string|null $iso
+   *   ISO datetime string, e.g. '2026-01-15T14:30:00Z'. NULL when the prop has
+   *   no value.
    *
    * @return string
    *   Locale-formatted date+time string. Returns $iso unchanged if
-   *   it cannot be parsed.
+   *   it cannot be parsed, or '' for NULL.
    */
-  public function canvasFormatDateTime(string $iso): string {
+  public function canvasFormatDateTime(?string $iso): string {
+    if ($iso === NULL) {
+      return '';
+    }
     return $this->dateResolver->resolveDateTime($iso);
   }
 
   /**
    * Formats an ISO time/datetime string using the Drupal locale's time format.
    *
-   * @param string $iso
+   * @param string|null $iso
    *   ISO time or datetime string, e.g. '14:30:00' or
-   *   '2026-01-15T14:30:00Z'.
+   *   '2026-01-15T14:30:00Z'. NULL when the prop has no value.
    *
    * @return string
    *   Locale-formatted time string. Returns $iso unchanged if it cannot
-   *   be parsed.
+   *   be parsed, or '' for NULL.
    */
-  public function canvasFormatTime(string $iso): string {
+  public function canvasFormatTime(?string $iso): string {
+    if ($iso === NULL) {
+      return '';
+    }
     return $this->dateResolver->resolveTime($iso);
   }
 

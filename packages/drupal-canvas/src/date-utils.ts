@@ -99,7 +99,8 @@ const parseIso = (iso: string): Date | null => {
 /**
  * Formats an ISO date string using the active Drupal locale's date format.
  *
- * Returns the original `iso` string unchanged if it cannot be parsed.
+ * Returns the original `iso` string unchanged if it cannot be parsed, and an
+ * empty string for `null` or `undefined` (an optional prop without a value).
  *
  * @param iso
  *   ISO date string, e.g. '2026-01-15'.
@@ -110,9 +111,10 @@ const parseIso = (iso: string): Date | null => {
  *   Locale-formatted date string, e.g. '1/15/26' (en) or '15/01/2026' (fr).
  */
 export function canvasFormatDate(
-  iso: string,
+  iso: string | null | undefined,
   options?: Pick<CanvasDateFormatOptions, 'dateStyle'>,
 ): string {
+  if (iso == null) return '';
   const date = parseIso(iso);
   if (!date) return iso;
   return createFormatter(getDrupalLocale(), {
@@ -123,7 +125,8 @@ export function canvasFormatDate(
 /**
  * Formats an ISO datetime string using the active Drupal locale's format.
  *
- * Returns the original `iso` string unchanged if it cannot be parsed.
+ * Returns the original `iso` string unchanged if it cannot be parsed, and an
+ * empty string for `null` or `undefined` (an optional prop without a value).
  *
  * @param iso
  *   ISO datetime string, e.g. '2026-01-15T14:30:00Z'.
@@ -135,9 +138,10 @@ export function canvasFormatDate(
  *   Locale-formatted datetime string.
  */
 export function canvasFormatDateTime(
-  iso: string,
+  iso: string | null | undefined,
   options?: CanvasDateFormatOptions,
 ): string {
+  if (iso == null) return '';
   const date = parseIso(iso);
   if (!date) return iso;
   return createFormatter(getDrupalLocale(), {
@@ -149,7 +153,8 @@ export function canvasFormatDateTime(
 /**
  * Formats an ISO time/datetime string using the active Drupal locale's time format.
  *
- * Returns the original `iso` string unchanged if it cannot be parsed.
+ * Returns the original `iso` string unchanged if it cannot be parsed, and an
+ * empty string for `null` or `undefined` (an optional prop without a value).
  *
  * @param iso
  *   ISO time or datetime string, e.g. '14:30:00' or '2026-01-15T14:30:00Z'.
@@ -160,9 +165,10 @@ export function canvasFormatDateTime(
  *   Locale-formatted time string.
  */
 export function canvasFormatTime(
-  iso: string,
+  iso: string | null | undefined,
   options?: Pick<CanvasDateFormatOptions, 'timeStyle'>,
 ): string {
+  if (iso == null) return '';
   // For bare time strings like 'HH:MM:SS', prefix a dummy date so Date() can parse them.
   const normalized = /^\d{2}:\d{2}/.test(iso) ? `1970-01-01T${iso}` : iso;
   const date = parseIso(normalized);
@@ -175,6 +181,8 @@ export function canvasFormatTime(
 /**
  * Formats the `from` and `to` fields of a Canvas date-range prop.
  *
+ * Returns `null` or `undefined` unchanged (an optional prop without a value).
+ *
  * @param range
  *   Canvas date-range object, e.g. `{ from: '2026-01-15', to: '2026-03-20' }`.
  * @param options
@@ -186,14 +194,15 @@ export function canvasFormatTime(
  *   formatted string.
  */
 export function canvasFormatDateRange<
-  T extends { from?: string | null; to?: string | null },
+  T extends { from?: string | null; to?: string | null } | null | undefined,
 >(range: T, options?: Pick<CanvasDateFormatOptions, 'dateStyle'>): T {
-  const result = { ...range };
+  if (range == null) return range;
+  const result: NonNullable<T> = { ...range };
   if (typeof result.from === 'string') {
-    result.from = canvasFormatDate(result.from, options) as T['from'];
+    result.from = canvasFormatDate(result.from, options) as typeof result.from;
   }
   if (typeof result.to === 'string') {
-    result.to = canvasFormatDate(result.to, options) as T['to'];
+    result.to = canvasFormatDate(result.to, options) as typeof result.to;
   }
   return result;
 }

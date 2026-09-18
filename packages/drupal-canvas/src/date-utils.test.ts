@@ -196,6 +196,25 @@ describe('canvasFormatTime', () => {
   });
 });
 
+describe('optional props without a value', () => {
+  beforeEach(() => setLocale('en'));
+  afterEach(() => clearLocale());
+
+  it.each([null, undefined])(
+    'returns an empty string for %s in the string formatters',
+    (value) => {
+      expect(canvasFormatDate(value)).toBe('');
+      expect(canvasFormatDateTime(value)).toBe('');
+      expect(canvasFormatTime(value)).toBe('');
+    },
+  );
+
+  it('returns null and undefined unchanged from canvasFormatDateRange', () => {
+    expect(canvasFormatDateRange(null)).toBeNull();
+    expect(canvasFormatDateRange(undefined)).toBeUndefined();
+  });
+});
+
 describe('values without a UTC offset in a non-UTC timezone', () => {
   // Node re-reads process.env.TZ on assignment, so the tests below run in
   // Eastern Time (UTC-5 in January) regardless of the machine's timezone.
