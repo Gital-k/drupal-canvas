@@ -1,6 +1,48 @@
 # ⚠️ This is highly experimental and *will* be refactored or even removed.
 # @todo Revisit in https://www.drupal.org/i/3527086
 
+# The internal HTTP API for Canvas' UI.
+# Note these route names deliberately use the parent module's `canvas.api.`
+# prefix: that is what makes Canvas treat them as part of its internal HTTP API
+# — for OpenAPI validation, for JSON error responses and (for `canvas.api.form.`
+# routes) for rendering forms in the `canvas_stark` theme.
+# @see \Drupal\canvas\EventSubscriber\ApiMessageValidatorBase::isCanvasMessage()
+# @see \Drupal\canvas\EventSubscriber\ApiExceptionSubscriber::onException()
+# @see \Drupal\canvas\Theme\CanvasThemeNegotiator::applies()
+canvas.api.form.segment_rule:
+  path: '/canvas/api/v0/form/segment-rule/{segment_rule}'
+  defaults:
+    _form: 'Drupal\canvas_personalization\Form\SegmentRuleSettingsForm'
+    _title: 'Segmentation Rule Settings Form'
+  requirements:
+    _canvas_authentication_required: TRUE
+    # Same gate as the listing this endpoint's `{segment_rule}` comes from.
+    _permission: 'administer personalization segments'
+  options:
+    # The Canvas equivalent of requesting an AJAX response using `?_wrapper_format`.
+    # @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
+    _wrapper_format: 'canvas_template'
+    _format: 'json'
+  # Deliberately GET only: unlike a component instance form, none of the
+  # segmentation rules personalization allows today builds its settings with
+  # `#ajax`, so there is nothing for Drupal's AJAX system to POST back to.
+  methods: [GET]
+
+canvas.api.personalization.segment_rule.list:
+  path: '/canvas/api/v0/personalization/segment-rules'
+  defaults:
+    _controller: 'Drupal\canvas_personalization\Controller\ApiSegmentRuleControllers::list'
+  requirements:
+    _canvas_authentication_required: TRUE
+    # Segmentation rules are only ever used to build a Segment, so this requires
+    # the same permission as administering Segments rather than the broader
+    # `_canvas_ui_access`: nobody else has a reason to learn which condition
+    # plugins this site has installed.
+    _permission: 'administer personalization segments'
+  options:
+    _format: 'json'
+  methods: [GET]
+
 entity.segment.collection:
   path: '/admin/structure/segment'
   defaults:

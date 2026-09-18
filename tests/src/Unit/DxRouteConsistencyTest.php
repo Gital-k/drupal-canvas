@@ -172,9 +172,15 @@ final class DxRouteConsistencyTest extends UnitTestCase {
   /**
    * Adds personalization routes.
    *
-   * For simplicity, we define personalization paths in openapi, but they are
-   * added in Drupal by using a route subscriber.
+   * This test only reads canvas.routing.yml, but openapi.yml documents Canvas'
+   * entire internal HTTP API — including the paths the `canvas_personalization`
+   * module contributes, either by altering the parent module's config routes
+   * through a route subscriber or by defining `canvas.api.*` routes of its own.
    * So: statically add these here for now to avoid failures.
+   *
+   * @todo Discover these from canvas_personalization.routing.yml — and apply the same DX requirements to them — rather than repeating them, in https://www.drupal.org/i/3527086.
+   *
+   * @see \Drupal\canvas_personalization\EventSubscriber\ApiConfigRouteSubscriber
    */
   private static function includeDynamicPersonalizationPaths(array $array_with_paths_as_keys): array {
     $routes = array_merge($array_with_paths_as_keys, [
@@ -183,6 +189,8 @@ final class DxRouteConsistencyTest extends UnitTestCase {
       '/canvas/api/v0/config/segment/{segment} GET' => ['methods' => ['GET']],
       '/canvas/api/v0/config/segment/{segment} PATCH' => ['methods' => ['PATCH']],
       '/canvas/api/v0/config/segment/{segment} DELETE' => ['methods' => ['DELETE']],
+      '/canvas/api/v0/form/segment-rule/{segment_rule} GET' => ['methods' => ['GET']],
+      '/canvas/api/v0/personalization/segment-rules GET' => ['methods' => ['GET']],
     ]);
     ksort($routes);
     return $routes;

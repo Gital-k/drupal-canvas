@@ -2368,6 +2368,21 @@ paths:
               schema:
                 type: object
                 description: A Drupal AJAX response.
+  '/canvas/api/v0/form/segment-rule/{segmentRuleId}':
+    description: The settings — and their defaults — of a single Segmentation Rule, as a Drupal form.
+    get:
+      summary: Gets the settings form for a Segmentation Rule.
+      parameters:
+        - name: segmentRuleId
+          in: path
+          required: true
+          description: The Segmentation Rule plugin ID
+          schema:
+            type: string
+          example: utm_parameters
+      responses:
+        '200':
+          $ref: '#/components/responses/FormResponse'
   '/canvas/api/v0/layout-content-template-draft/{entityTypeId}/{entityId}':
     description: >
       Resolves a content template draft (provided in the request body) against
@@ -3264,6 +3279,13 @@ paths:
           $ref: '#/components/responses/ClientErrorResponse'
         '403':
           $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/personalization/segment-rules:
+    description: Endpoint for discovering the Segmentation Rules that this site has available.
+    get:
+      summary: Lists the Segmentation Rules that this site has available.
+      responses:
+        '200':
+          $ref: '#/components/responses/AvailableSegmentationRulesResponse'
   /canvas/api/v0/push/complete:
     description: Signal that a CLI push completed successfully.
     post:
@@ -5151,6 +5173,28 @@ components:
         weight:
           type: integer
           description: Sort order weight for the color
+    AvailableSegmentationRule:
+      title: Available Segmentation Rule
+      description: >
+        A Segmentation Rule that this site has available, i.e. that a Segment's
+        `rules` may be keyed by. Only its identity is described here; its
+        settings are exposed as a Drupal form instead.
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - label
+      properties:
+        id:
+          type: string
+          description: The Segmentation Rule plugin ID
+          examples:
+            - utm_parameters
+        label:
+          type: string
+          description: Human-readable label
+          examples:
+            - UTM Parameters
     SegmentationRule:
       title: Segmentation Rule
       type: object
@@ -6144,6 +6188,24 @@ components:
               message:
                 type: string
                 example: Global regions were replaced by page templates.
+    AvailableSegmentationRulesResponse:
+      description: Available Segmentation Rules listing, keyed by Segmentation Rule plugin ID
+      content:
+        application/json:
+          schema:
+            type: object
+            minProperties: 0
+            additionalProperties:
+              $ref: '#/components/schemas/AvailableSegmentationRule'
+          examples:
+            default:
+              value:
+                current_theme:
+                  id: current_theme
+                  label: Current Theme
+                utm_parameters:
+                  id: utm_parameters
+                  label: UTM Parameters
     ExtensionsResponse:
       description: Canvas Extensions listing
       content:
