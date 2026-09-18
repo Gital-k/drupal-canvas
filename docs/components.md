@@ -112,6 +112,47 @@ _Note:_ this list of criteria is not final, it will keep evolving _at least_ unt
 - Schema references support (stored in per-extension `/schema.json` files), upstream issue: [#3352063](https://www.drupal.org/project/drupal/issues/3352063)
 - … likely more to come, see the [full list](https://www.drupal.org/project/canvas/issues/3462705)
 
+#### 3.1.3 Grouping props into collapsible fieldsets (`x-group`, `x-group-open`)
+
+Props whose schema sets the same `x-group` value are rendered together inside one collapsible fieldset in the props
+form, instead of as a flat list. The `x-group` value is used as the fieldset's title. `x-group-open` controls whether
+that fieldset is expanded (`true`, the default) or collapsed (`false`) when the props form first renders; it only makes
+sense alongside `x-group`.
+
+```yaml
+props:
+  type: object
+  properties:
+    item1_label:
+      type: string
+      title: 'Bar 1 — Label'
+      x-group: 'Bar 1'
+    item1_percent:
+      type: integer
+      title: 'Bar 1 — Percent'
+      x-group: 'Bar 1'
+    item2_label:
+      type: string
+      title: 'Bar 2 — Label'
+      x-group: 'Bar 2'
+      # This fieldset starts collapsed instead of the default expanded state.
+      x-group-open: false
+    item2_percent:
+      type: integer
+      title: 'Bar 2 — Percent'
+      x-group: 'Bar 2'
+```
+
+`x-group` and `x-group-open` are [custom JSON Schema annotations](https://json-schema.org/understanding-json-schema/reference/non_json_data#contentmediatype)
+(hence the `x-` prefix), so they do not break `SDC` outside of Canvas: unrecognized keywords are ignored per the JSON
+Schema spec. They are purely presentational — they do not affect `prop shape` matching (see
+[`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)) or the stored/submitted values, which
+remain keyed by prop name exactly as for an ungrouped prop.
+
+Implemented in `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::buildComponentInstanceForm()`,
+as a `#type: details` element (`#open` reflecting `x-group-open`), using Form API's `#group` mechanism (the same one
+`vertical_tabs` panes use internally) to move the grouped props' rendering into it.
+
 
 ### 3.2 `Block` `component`s
 

@@ -82,6 +82,42 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     self::assertStringContainsString('The title for the cta', $crawler->text());
   }
 
+  /**
+   * Tests that props sharing an `x-group` are rendered inside one fieldset.
+   *
+   * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::buildComponentInstanceForm
+   */
+  public function testXGroupFieldset(): void {
+    $node = $this->createNode(['type' => 'article', 'title' => 'Test node']);
+    self::assertCount(0, $node->validate());
+    $node->save();
+
+    // `banner`'s `heading` and `text` props share `x-group: 'Heading &
+    // content'`; `text` (the second prop of the group, not the first)
+    // declares `x-group-open: false`. `image` has no `x-group`.
+    // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\SingleDirectoryComponentTest::testDiscovery()
+    $component_id = 'sdc.canvas_test_sdc.banner';
+    $form_canvas_props = $this->getFormCanvasPropsForComponent($component_id);
+    $component_entity = Component::load($component_id);
+    \assert($component_entity instanceof ComponentInterface);
+    $crawler = $this->getCrawlerForFormRequest(
+      '/canvas/api/v0/form/component-instance/node/1',
+      $component_entity,
+      $form_canvas_props
+    );
+
+    $details_elements = $crawler->filter('details');
+    self::assertCount(1, $details_elements, 'One `<details>` for the single `x-group` value shared by `heading` and `text`.');
+    $details_html = $details_elements->outerHtml();
+    self::assertStringContainsString('Heading &amp; content', $details_html, 'The details element legend must show the `x-group` value.');
+    self::assertStringContainsString('My banner title', $details_html, "The heading prop's widget must be rendered inside the details element.");
+    self::assertStringContainsString('Content', $details_html, "The text prop's own title must be rendered inside the details element.");
+    self::assertStringNotContainsString('open="open"', $details_html, '`x-group-open: false` (declared on the second prop of the group) must render collapsed.');
+
+    self::assertStringNotContainsString('Image', $details_html, 'The prop without `x-group` must not be inside the details element.');
+    self::assertStringContainsString('Image', $crawler->text(), 'The prop without `x-group` must still be rendered, just outside the details element.');
+  }
+
   #[DataProvider('providerOptionalImages')]
   public function testOptionalImageAndHeading(string $component, array $values_to_set, array $expected_form_canvas_props): void {
     $actual_form_canvas_props = $this->getFormCanvasPropsForComponent($component);
