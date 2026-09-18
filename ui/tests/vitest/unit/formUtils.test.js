@@ -379,6 +379,26 @@ Value`,
     expect(asObject.singleColor).to.deep.equal(['green']);
     expect(asObject.emptyColors).to.deep.equal([]);
   });
+
+  it('Should keep a multi-value select nested in a grouped prop as an array', () => {
+    // A `<select multiple>` nested inside a grouped/tree prop. Without
+    // appending each element separately, URLSearchParams comma-joins the array
+    // into a single entry, so qs.parse yields ['col-6,col-md-4'] instead of a
+    // proper array.
+    const formStateWithNestedMultiSelect = {
+      'canvas_component_props[all-props][layout][layout_classes][]': [
+        'col-6',
+        'col-md-4',
+      ],
+    };
+    const asObject = formStateToObject(
+      formStateWithNestedMultiSelect,
+      'all-props',
+    );
+    expect(asObject.layout).to.deep.equal({
+      layout_classes: ['col-6', 'col-md-4'],
+    });
+  });
 });
 
 describe('Get prop values from form state', () => {
