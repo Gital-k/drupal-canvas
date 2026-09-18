@@ -31,6 +31,35 @@ Opening an entity in the Canvas editor then loads the first frontend in the list
 In cloned environments, regenerate the Simple OAuth keypair per environment; with shared keys, preview credentials
 minted on one clone would redeem on another.
 
+## Published route previews
+
+The module embeds the first configured frontend on published canonical entity
+pages rendered by a Canvas component tree or an enabled `full` content template.
+Any selected page variant must also be headless-compatible.
+
+Embedding requires a logged-in user with `access canvas headless preview` and
+access to the Drupal route. Other visitors and unsupported routes keep Drupal's
+normal rendering.
+
+Previews render saved content, templates, and page variants with the current
+user's permissions. Drupal's toolbar, administration navigation, and status
+messages remain visible around the iframe.
+
+Custom frontend Content Security Policies must allow the Drupal origin in
+`frame-ancestors`.
+
+### Navigation
+
+Eligible links open outside the iframe: Drupal-resolved paths use their Drupal
+URL, while unresolved paths and external links use their original URL.
+`target="_blank"` opens a new tab.
+
+Drupal's unsaved node preview route is not changed.
+
+### Building the browser code
+
+Build browser assets with `npm run packages:build` from the repository root.
+
 ## Browser support
 
 - Chromium-based browsers: works over HTTPS, and without HTTPS on a plain-http `localhost` dev server.

@@ -21,6 +21,7 @@ services:
       $languagePathProcessor: '@?path_processor_language'
   Drupal\canvas_headless\EventSubscriber\CanvasContentResponseSubscriber: {}
   Drupal\canvas_headless\EventSubscriber\DetachedPreviewRouteSubscriber: {}
+  Drupal\canvas_headless\EventSubscriber\EmbeddedPreviewSubscriber: {}
   Drupal\canvas_headless\CanvasContentEntityRenderer: {}
   Drupal\canvas_headless\CanvasContentTranslationLinks:
     arguments:

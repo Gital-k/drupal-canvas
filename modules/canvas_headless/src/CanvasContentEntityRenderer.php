@@ -79,7 +79,7 @@ final class CanvasContentEntityRenderer {
     // not part of a headless application's component tree. Ignore the complete
     // variant rather than rendering its wrapper as markup. The already built
     // main content still determines whether Canvas manages this route.
-    if (self::containsThemePageTemplate($variant)) {
+    if (!self::isHeadlessCompatiblePageVariant($variant)) {
       return [
         'build' => $build,
         'cacheability' => $cacheability,
@@ -251,7 +251,7 @@ final class CanvasContentEntityRenderer {
       }
     }
 
-    if (self::containsThemePageTemplate($variant)) {
+    if (!self::isHeadlessCompatiblePageVariant($variant)) {
       return self::unsupported($cacheability);
     }
 
@@ -275,16 +275,16 @@ final class CanvasContentEntityRenderer {
   }
 
   /**
-   * Whether the variant contains Drupal's coupled theme page template.
+   * Whether a page variant can be rendered by a headless application.
    */
-  private static function containsThemePageTemplate(PageVariant $variant): bool {
+  public static function isHeadlessCompatiblePageVariant(PageVariant $variant): bool {
     foreach ($variant->getComponentTree()->getValue() as $component) {
       $component_id = $component['component_id'] ?? NULL;
       if (\is_string($component_id) && \str_starts_with($component_id, self::THEME_PAGE_TEMPLATE_COMPONENT_PREFIX)) {
-        return TRUE;
+        return FALSE;
       }
     }
-    return FALSE;
+    return TRUE;
   }
 
   /**
