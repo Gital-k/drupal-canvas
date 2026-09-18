@@ -3,3 +3,8 @@ services:
     class: Drupal\canvas_personalization\EventSubscriber\ApiConfigRouteSubscriber
     tags:
       - { name: event_subscriber }
+
+  # Controllers.
+  Drupal\canvas_personalization\Controller\ApiSegmentRuleControllers:
+    arguments:
+      $conditionManager: '@Drupal\Core\Executable\ExecutableManagerInterface'

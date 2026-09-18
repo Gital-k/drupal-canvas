@@ -230,11 +230,30 @@ We don't need to make this call, as the user will in the UI, but for reference:
 
 #### 3.1.3. Getting available segmentation rules
 
-WIP
+Segmentation rules are defined by `condition` plugins, so which ones exist depends on the installed modules. Not every
+condition plugin makes sense as a segmentation rule, so personalization narrows them down through
+`hook_plugin_filter_condition__canvas_personalization_alter()`. That narrowed set is what the Drupal UI offers, what
+`Segment::addSegmentRule()` accepts and what validation of a stored `Segment` accepts.
 
-The segmentation rules are dynamic based on the installed modules. Those are defined by plugins (`condition`).
+`GET /canvas/api/v0/personalization/segment-rules` lists that narrowed set, keyed by segmentation rule plugin ID:
 
-For the moment we can hard-code the expected segmentation rules, but these will be dynamic. See https://www.drupal.org/i/3525610.
+```json
+{
+  "current_theme": {
+    "id": "current_theme",
+    "label": "Current Theme"
+  },
+  "utm_parameters": {
+    "id": "utm_parameters",
+    "label": "UTM Parameters"
+  }
+}
+```
+
+Only each rule's identity is listed, not its settings.
+
+Requires the `administer personalization segments` permission: segmentation rules are only ever used to build a
+`Segment`.
 
 
 
