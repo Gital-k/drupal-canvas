@@ -1005,6 +1005,67 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
   }
 
   /**
+   * Tests that a pdf-only media type yields one expression per reference field.
+   *
+   * Scalar-driven matching and media-source-driven matching are independent
+   * paths. A File media type allowing only `pdf` is reachable through both:
+   * its extension list maps to a single MIME media type (`application`), so
+   * the scalar path finds its source field, and its extensions intersect the
+   * document shape's list, so the media-source path finds it too. The result
+   * must still contain each expression once.
+   *
+   * Sibling keywords next to `$ref` in the SDC prop (title, description,
+   * examples) must not affect the result either.
+   *
+   * @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher::matchDocumentShapeToMediaTypes()
+   */
+  public function testDocumentShapeMatchesOnceThroughMediaReference(): void {
+    $this->createFileMediaTypeWithExtensions('whitepapers', 'pdf');
+    FieldStorageConfig::create([
+      'field_name' => 'field_whitepaper',
+      'entity_type' => 'node',
+      'type' => 'entity_reference',
+      'settings' => ['target_type' => 'media'],
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'field_whitepaper',
+      'entity_type' => 'node',
+      'bundle' => 'foo',
+      'settings' => [
+        'handler_settings' => [
+          'target_bundles' => ['whitepapers' => 'whitepapers'],
+        ],
+      ],
+    ])->save();
+
+    $matcher = \Drupal::service(EntityFieldPropSourceMatcher::class);
+    \assert($matcher instanceof EntityFieldPropSourceMatcher);
+    $prop_shapes = [
+      'canonical' => JsonSchemaObjectRef::Document->asPropShape(),
+      'with sibling keywords' => PropShape::standardize([
+        'title' => 'Whitepaper',
+        'description' => 'A downloadable whitepaper.',
+        'type' => 'object',
+        '$ref' => JsonSchemaObjectRef::Document->value,
+        'examples' => [['src' => 'https://example.com/whitepaper.pdf']],
+      ]),
+    ];
+    foreach ($prop_shapes as $label => $prop_shape) {
+      $expressions = \array_map(
+        fn (EntityFieldPropSource $s): string => (string) $s->expression,
+        $matcher->match(FALSE, $prop_shape, 'node', 'foo'),
+      );
+      $whitepaper_expressions = \array_values(\array_filter($expressions, fn (string $e): bool => \str_contains($e, 'field_whitepaper')));
+      self::assertSame(
+        ['ℹ︎␜entity:node:foo␝field_whitepaper␞␟entity␜␜entity:media:whitepapers␝field_media_file_3␞␟{src↝entity␜␜entity:file␝uri␞␟url,filename↝entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:file␝filemime␞␟value}'],
+        $whitepaper_expressions,
+        $label,
+      );
+      self::assertSame($expressions, \array_values(\array_unique($expressions)), $label);
+    }
+  }
+
+  /**
    * Creates a File media type whose source field allows the given extensions.
    */
   private function createFileMediaTypeWithExtensions(string $id, string $file_extensions): void {

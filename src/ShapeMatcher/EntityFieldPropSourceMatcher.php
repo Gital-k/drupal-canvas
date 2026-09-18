@@ -359,6 +359,15 @@ final class EntityFieldPropSourceMatcher {
       }
     }
 
+    // Media-source-based matches are authoritative for the fields they cover:
+    // they map every object prop the media source can provide, and anything
+    // the scalar heuristics composed for the same field on top of unrelated
+    // entity fields (revision author, log message, …) is noise.
+    $media_source_matches = $this->matchDocumentShapeToMediaTypes($entity_data_definition, $levels_to_recurse, $is_required_in_json_schema, $schema, $cardinality_in_json_schema);
+    foreach ($media_source_matches as $media_source_match) {
+      unset($inverted[$media_source_match->getFieldName()]);
+    }
+
     // Scan the selected scalar matches that will populate the object: detect
     // which ones have prefixes that should be avoided (because they overlap
     // with reference matches).
@@ -434,7 +443,7 @@ final class EntityFieldPropSourceMatcher {
       ...$matches_references,
       ...$matches,
       ...self::matchContentEntityReferenceShape($entity_data_definition, $schema),
-      ...$this->matchDocumentShapeToMediaTypes($entity_data_definition, $levels_to_recurse, $is_required_in_json_schema, $schema, $cardinality_in_json_schema),
+      ...$media_source_matches,
     ];
   }
 
@@ -472,11 +481,9 @@ final class EntityFieldPropSourceMatcher {
     if ($cardinality_in_json_schema !== 1 || !$this->entityTypeManager->hasDefinition('media')) {
       return [];
     }
-    // TRICKY: `$schema` is resolved, so the `$ref` key is gone. Compare
-    // against the resolved canonical shape instead — loosely, because key
-    // order may differ.
-    // @see \Drupal\canvas\Plugin\ComponentPluginManager::resolveJsonSchemaReferences()
-    if ($schema != JsonSchemaObjectRef::Document->asPropShape()->resolvedSchema) {
+    // `$schema` is resolved, so the `$ref` key is gone; standardizing maps it
+    // back to the well-known shape it came from.
+    if (JsonSchemaObjectRef::tryFromSchema($schema) !== JsonSchemaObjectRef::Document) {
       return [];
     }
     $media_source_class = MediaSourceObjectShapes::SCHEMA_TO_MEDIA_SOURCE[JsonSchemaObjectRef::Document->value];

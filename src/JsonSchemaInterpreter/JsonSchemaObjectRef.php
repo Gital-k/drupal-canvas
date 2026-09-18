@@ -39,6 +39,23 @@ enum JsonSchemaObjectRef: string {
   }
 
   /**
+   * Identifies which Canvas-provided object shape a prop schema is, if any.
+   *
+   * Works on raw and resolved schemas alike: the schema is standardized first,
+   * which strips keywords that do not define the shape (`title`,
+   * `description`, `examples`, …) and maps it back to its well-known `$ref`.
+   *
+   * @param JsonSchema $prop_schema
+   *   The JSON schema for a component prop, raw or with `$ref`s resolved.
+   *
+   * @see \Drupal\canvas\PropShape\PropShape::standardize()
+   */
+  public static function tryFromSchema(array $prop_schema): ?self {
+    $ref = PropShape::standardize($prop_schema)->schema['$ref'] ?? NULL;
+    return \is_string($ref) ? self::tryFrom($ref) : NULL;
+  }
+
+  /**
    * Returns the full `{type: object, $ref: <URI>}` prop shape array.
    *
    * @return array{type: string, '$ref': string}
