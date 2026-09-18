@@ -28,8 +28,8 @@ import type { Result } from '../types/Result';
 
 const PAGE_PUSH_CONCURRENCY = 1;
 
-export async function pagesHaveColorProps(
-  discoveredPages: DiscoveredPage[],
+export async function entitiesHaveColorProps(
+  discovered: Array<{ path: string }>,
   componentMetadata: ComponentMetadata[],
 ): Promise<boolean> {
   const colorPropComponents = new Set<string>();
@@ -42,12 +42,12 @@ export async function pagesHaveColorProps(
     }
   }
 
-  if (colorPropComponents.size === 0 || discoveredPages.length === 0) {
+  if (colorPropComponents.size === 0 || discovered.length === 0) {
     return false;
   }
 
-  for (const page of discoveredPages) {
-    const fileContent = await fs.readFile(page.path, 'utf-8');
+  for (const item of discovered) {
+    const fileContent = await fs.readFile(item.path, 'utf-8');
     const spec = JSON.parse(fileContent) as { elements?: unknown };
     const elements = isRecord(spec.elements)
       ? (spec.elements as AuthoredSpecElementMap)

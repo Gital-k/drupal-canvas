@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   collectPageResults,
-  pagesHaveColorProps,
+  entitiesHaveColorProps,
   preparePages,
   pushPages,
 } from './prepare-pages-push';
@@ -145,7 +145,7 @@ describe('preparePages', () => {
   });
 });
 
-describe('pagesHaveColorProps', () => {
+describe('entitiesHaveColorProps', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -192,7 +192,7 @@ describe('pagesHaveColorProps', () => {
       },
     ];
 
-    await expect(pagesHaveColorProps(pages, metadata)).resolves.toBe(true);
+    await expect(entitiesHaveColorProps(pages, metadata)).resolves.toBe(true);
   });
 
   it('returns false when no page uses components with color props', async () => {
@@ -230,7 +230,50 @@ describe('pagesHaveColorProps', () => {
       },
     ];
 
-    await expect(pagesHaveColorProps(pages, metadata)).resolves.toBe(false);
+    await expect(entitiesHaveColorProps(pages, metadata)).resolves.toBe(false);
+  });
+
+  it('returns true when a content-template-shaped file uses a component with color props', async () => {
+    const templatePath = path.join(tmpDir, 'node.article.full.json');
+    await fs.writeFile(
+      templatePath,
+      JSON.stringify({
+        label: 'Article — Full',
+        entityType: 'node',
+        bundle: 'article',
+        viewMode: 'full',
+        elements: {
+          card: {
+            type: 'js.color-card',
+            props: { accent: 'canvas-color:brand-red' },
+          },
+        },
+      }),
+      'utf-8',
+    );
+
+    const metadata: ComponentMetadata[] = [
+      {
+        name: 'Color Card',
+        machineName: 'color-card',
+        status: true,
+        required: [],
+        slots: {},
+        props: {
+          properties: {
+            accent: {
+              title: 'Accent',
+              type: 'string',
+              $ref: 'json-schema-definitions://canvas.module/color',
+            },
+          },
+        },
+      },
+    ];
+
+    await expect(
+      entitiesHaveColorProps([{ path: templatePath }], metadata),
+    ).resolves.toBe(true);
   });
 });
 

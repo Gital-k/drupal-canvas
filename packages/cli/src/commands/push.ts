@@ -50,7 +50,7 @@ import {
 } from '../utils/prepare-page-variants-push';
 import {
   collectPageResults,
-  pagesHaveColorProps,
+  entitiesHaveColorProps,
   preparePages,
   pushPages,
 } from '../utils/prepare-pages-push';
@@ -938,11 +938,19 @@ export function pushCommand(program: Command): void {
           }
         }
 
-        if (discoveredPages.length > 0 && remoteBrandKitColors.length === 0) {
+        const allDiscoveredEntities = [
+          ...discoveredPages,
+          ...discoveredContentTemplates,
+          ...discoveredPageTemplates,
+        ];
+        if (
+          allDiscoveredEntities.length > 0 &&
+          remoteBrandKitColors.length === 0
+        ) {
           const componentMetadata =
             await loadComponentsMetadata(discoveryResult);
-          const requiresRemoteColors = await pagesHaveColorProps(
-            discoveredPages,
+          const requiresRemoteColors = await entitiesHaveColorProps(
+            allDiscoveredEntities,
             componentMetadata,
           );
           if (requiresRemoteColors) {
@@ -1588,6 +1596,7 @@ export function pushCommand(program: Command): void {
                     discoveredPageTemplates,
                     componentVersions,
                     discoveryResult,
+                    remoteBrandKitColors,
                   );
                 }
               : undefined,
@@ -1724,6 +1733,7 @@ export function pushCommand(program: Command): void {
                 discoveredContentTemplates,
                 componentVersions,
                 discoveryResult,
+                remoteBrandKitColors,
               );
             },
             push: (validTemplates) =>

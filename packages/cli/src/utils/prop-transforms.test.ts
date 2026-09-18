@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  collapseColorPropsInElements,
   collectUnreconciledColorProps,
   collectUnreconciledMediaProps,
   getUnreconciledMedia,
@@ -533,5 +534,144 @@ describe('collectUnreconciledColorProps', () => {
         key: 'missing-color',
       },
     ]);
+  });
+});
+
+describe('collapseColorPropsInElements', () => {
+  const colorMetadata: ComponentMetadata[] = [
+    {
+      name: 'Color Card',
+      machineName: 'color-card',
+      status: true,
+      required: [],
+      slots: {},
+      props: {
+        properties: {
+          accent: {
+            title: 'Accent',
+            type: 'string',
+            $ref: 'json-schema-definitions://canvas.module/color',
+          },
+          label: {
+            title: 'Label',
+            type: 'string',
+          },
+        },
+      },
+    },
+  ];
+
+  it('collapses a resolved brand kit color to a canvas-color token ref', () => {
+    const elements: AuthoredSpecElementMap = {
+      card: {
+        type: 'js.color-card',
+        props: {
+          accent: {
+            value: {
+              colorSpace: 'srgb',
+              components: [0.8, 0.1, 0.1],
+              hex: '#cc1a1a',
+            },
+            cssVariable: '--brand-red',
+          },
+        },
+      },
+    };
+
+    const result = collapseColorPropsInElements(elements, colorMetadata);
+    expect((result.card.props as Record<string, unknown>).accent).toBe(
+      'canvas-color:brand-red',
+    );
+  });
+
+  it('collapses a resolved free-pick color with no cssVariable to a hex string', () => {
+    const elements: AuthoredSpecElementMap = {
+      card: {
+        type: 'js.color-card',
+        props: {
+          accent: {
+            value: {
+              colorSpace: 'srgb',
+              components: [0.4, 0.78, 0.5],
+              hex: '#66c880',
+            },
+            cssVariable: null,
+          },
+        },
+      },
+    };
+
+    const result = collapseColorPropsInElements(elements, colorMetadata);
+    expect((result.card.props as Record<string, unknown>).accent).toBe(
+      '#66c880',
+    );
+  });
+
+  it('collapses a resolved color with alpha to a hex+alpha string', () => {
+    const elements: AuthoredSpecElementMap = {
+      card: {
+        type: 'js.color-card',
+        props: {
+          accent: {
+            value: {
+              colorSpace: 'srgb',
+              components: [0.4, 0.78, 0.5],
+              hex: '#66c880',
+              alpha: 0.5,
+            },
+            cssVariable: null,
+          },
+        },
+      },
+    };
+
+    const result = collapseColorPropsInElements(elements, colorMetadata);
+    // alpha 0.5 → Math.round(0.5 * 255) = 128 = 0x80
+    expect((result.card.props as Record<string, unknown>).accent).toBe(
+      '#66c88080',
+    );
+  });
+
+  it('passes through non-color props unchanged', () => {
+    const elements: AuthoredSpecElementMap = {
+      card: {
+        type: 'js.color-card',
+        props: {
+          label: 'Hello',
+          accent: {
+            value: {
+              colorSpace: 'srgb',
+              components: [0.8, 0.1, 0.1],
+              hex: '#cc1a1a',
+            },
+            cssVariable: '--brand-red',
+          },
+        },
+      },
+    };
+
+    const result = collapseColorPropsInElements(elements, colorMetadata);
+    expect((result.card.props as Record<string, unknown>).label).toBe('Hello');
+  });
+
+  it('passes through elements with no matching component metadata unchanged', () => {
+    const elements: AuthoredSpecElementMap = {
+      unknown: {
+        type: 'js.unknown-component',
+        props: {
+          accent: {
+            value: {
+              colorSpace: 'srgb',
+              components: [0, 0, 0],
+              hex: '#000000',
+            },
+            cssVariable: '--some-color',
+          },
+        },
+      },
+    };
+
+    const result = collapseColorPropsInElements(elements, colorMetadata);
+    expect(result).toBe(elements);
   });
 });

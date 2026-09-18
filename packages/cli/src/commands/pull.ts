@@ -641,8 +641,10 @@ export function createContentTemplatesPullTask(
   apiService: ApiService,
   contentTemplatesDir: string,
   skipOverwrite: boolean,
+  componentDir?: string,
 ): PullTask {
   let templates: Record<string, ContentTemplateListItem> = {};
+  let componentMetadata: ComponentMetadata[] = [];
   const localById = new Map<string, DiscoveredContentTemplate>();
 
   return {
@@ -652,9 +654,13 @@ export function createContentTemplatesPullTask(
     async prepare(): Promise<PullTaskPrepareResult> {
       const [fetchedTemplates, discoveryResult] = await Promise.all([
         apiService.listContentTemplates(),
-        discoverCanvasProject({ contentTemplatesRoot: contentTemplatesDir }),
+        discoverCanvasProject({
+          contentTemplatesRoot: contentTemplatesDir,
+          ...(componentDir ? { componentRoot: componentDir } : {}),
+        }),
       ]);
 
+      componentMetadata = await loadComponentsMetadata(discoveryResult);
       templates = fetchedTemplates;
 
       for (const discovered of discoveryResult.contentTemplates) {
@@ -693,7 +699,10 @@ export function createContentTemplatesPullTask(
 
           const fullTemplate = await apiService.getContentTemplate(listItem.id);
 
-          const authored = contentTemplateToAuthored(fullTemplate);
+          const authored = contentTemplateToAuthored(
+            fullTemplate,
+            componentMetadata,
+          );
 
           const filePath =
             discovered?.path ??
@@ -741,9 +750,11 @@ export function createPageTemplatesPullTask(
   apiService: ApiService,
   pageTemplatesDir: string,
   skipOverwrite: boolean,
+  componentDir?: string,
 ): PullTask {
   let pageVariants: Record<string, PageVariant> = {};
   let defaultVariantId: string | null = null;
+  let componentMetadata: ComponentMetadata[] = [];
   const localPageTemplateMap = new Map<string, DiscoveredPageTemplate>();
 
   return {
@@ -754,9 +765,13 @@ export function createPageTemplatesPullTask(
       const [fetched, defaultVariant, discoveryResult] = await Promise.all([
         apiService.listPageVariants(),
         apiService.getDefaultPageVariant(),
-        discoverCanvasProject({ pageTemplatesRoot: pageTemplatesDir }),
+        discoverCanvasProject({
+          pageTemplatesRoot: pageTemplatesDir,
+          ...(componentDir ? { componentRoot: componentDir } : {}),
+        }),
       ]);
 
+      componentMetadata = await loadComponentsMetadata(discoveryResult);
       pageVariants = fetched;
       defaultVariantId = defaultVariant.default_page_variant;
       for (const discovered of discoveryResult.pageTemplates) {
@@ -821,6 +836,7 @@ export function createPageTemplatesPullTask(
           const localData = pageVariantToAuthoredSpec(
             variant,
             variant.id === defaultVariantId,
+            componentMetadata,
           );
           const filePath =
             discovered?.path ??
@@ -1378,6 +1394,7 @@ export function pullCommand(program: Command): void {
               apiService,
               config.pageTemplatesDir,
               options.skipOverwrite ?? false,
+              config.componentDir,
             ),
           );
         }
@@ -1388,6 +1405,7 @@ export function pullCommand(program: Command): void {
               apiService,
               path.resolve(projectRoot, config.contentTemplatesDir),
               options.skipOverwrite ?? false,
+              config.componentDir,
             ),
           );
         }
