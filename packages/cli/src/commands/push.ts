@@ -1468,6 +1468,17 @@ export function pushCommand(program: Command): void {
               colorPruneFailures = result.outcomes.filter(
                 (outcome) => !outcome.success,
               );
+              // Re-fetch if new colors were created so page serialization can
+              // resolve their UUIDs — the pre-push snapshot doesn't include them.
+              if (result.created > 0) {
+                try {
+                  const refreshed = await apiService.getBrandKit();
+                  remoteBrandKitColors = refreshed.colors ?? [];
+                } catch {
+                  // Non-fatal: pages that reference newly created colors will
+                  // fail validation, which is the same outcome as before this fix.
+                }
+              }
             }
           } catch (err) {
             colorSpinner.stop('Brand kit colors push failed', 2);

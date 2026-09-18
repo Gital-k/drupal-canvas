@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Color;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageVariant;
 use Drupal\Core\Authentication\AuthenticationProviderInterface;
@@ -96,6 +97,7 @@ class CanvasOauthAuthenticationProvider implements AuthenticationProviderInterfa
       BrandKit::ENTITY_TYPE_ID,
       Color::ENTITY_TYPE_ID,
       ContentTemplate::ENTITY_TYPE_ID,
+      Folder::ENTITY_TYPE_ID,
       PageVariant::ENTITY_TYPE_ID,
     ];
 

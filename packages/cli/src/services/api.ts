@@ -1281,7 +1281,8 @@ export class ApiService {
   async getFolders(): Promise<ColorFolderEntry[]> {
     try {
       const response = await this.client.get('/canvas/api/v0/config/folder');
-      return response.data;
+      const data = response.data as Record<string, ColorFolderEntry>;
+      return Object.values(data);
     } catch (error) {
       this.handleApiError(error);
     }
