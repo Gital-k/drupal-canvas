@@ -224,10 +224,10 @@ formatting utilities. Both Twig filters and JSX functions automatically:
   `drupal-canvas` adds the `v0.locale` entry to the code component's
   `dataDependencies.drupalSettings`, which attaches that setting wherever the
   component is rendered.
-- Apply `timeZone: 'UTC'` so stored dates are never shifted by the viewer's
-  local UTC offset. (Canvas stores dates without timezone information; a date
-  entered as 11 PM UTC must display as 11 PM, not 3 AM the following day in
-  an Eastern Time browser.)
+- Treat a value without a UTC offset as UTC and apply `timeZone: 'UTC'`, so
+  stored dates are never shifted by the viewer's local UTC offset. (Canvas
+  stores dates without timezone information; a date entered as 11 PM UTC must
+  display as 11 PM, not 3 AM the following day in an Eastern Time browser.)
 
 **Twig:**
 

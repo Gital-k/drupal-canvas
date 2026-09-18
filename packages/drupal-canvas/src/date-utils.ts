@@ -79,10 +79,20 @@ const createFormatter = (
   }
 };
 
-/** Parses an ISO string to a Date object, returning null on failure. */
+/**
+ * Parses an ISO string to a Date object, returning null on failure.
+ *
+ * ECMAScript parses a date-time string without a UTC offset as local time,
+ * whereas date-only strings are parsed as UTC. Canvas treats every stored
+ * value as UTC (the PHP side appends `Z` before formatting), so a `Z` is
+ * appended to date-time strings that carry no offset. Without it, the UTC
+ * formatter would shift the value by the viewer's UTC offset.
+ */
 const parseIso = (iso: string): Date | null => {
   if (!iso) return null;
-  const d = new Date(iso);
+  const hasTimePart = /[T ]\d{2}:\d{2}/.test(iso);
+  const hasOffset = /(Z|[+-]\d{2}(:?\d{2})?)$/i.test(iso);
+  const d = new Date(hasTimePart && !hasOffset ? `${iso}Z` : iso);
   return isNaN(d.getTime()) ? null : d;
 };
 

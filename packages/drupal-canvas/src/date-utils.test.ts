@@ -196,6 +196,57 @@ describe('canvasFormatTime', () => {
   });
 });
 
+describe('values without a UTC offset in a non-UTC timezone', () => {
+  // Node re-reads process.env.TZ on assignment, so the tests below run in
+  // Eastern Time (UTC-5 in January) regardless of the machine's timezone.
+  const originalTz = process.env.TZ;
+  beforeEach(() => {
+    process.env.TZ = 'America/New_York';
+    setLocale('en');
+  });
+  afterEach(() => {
+    if (originalTz === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = originalTz;
+    }
+    clearLocale();
+  });
+
+  const normalize = (value: string): string => value.replaceAll(' ', ' ');
+
+  it('treats a datetime without an offset as UTC', () => {
+    // Without the fix the value parses as 04:30 local, i.e. 09:30 UTC.
+    expect(normalize(canvasFormatDateTime('2026-01-16T04:30:00'))).toBe(
+      normalize(canvasFormatDateTime('2026-01-16T04:30:00Z')),
+    );
+    expect(normalize(canvasFormatDateTime('2026-01-16T04:30:00'))).toBe(
+      '1/16/26, 4:30 AM',
+    );
+  });
+
+  it('treats a datetime with milliseconds and no offset as UTC', () => {
+    expect(normalize(canvasFormatDateTime('2026-01-16T04:30:00.000'))).toBe(
+      '1/16/26, 4:30 AM',
+    );
+  });
+
+  it('treats a bare time as UTC', () => {
+    expect(normalize(canvasFormatTime('14:30:00'))).toBe('2:30 PM');
+    expect(normalize(canvasFormatTime('14:30'))).toBe('2:30 PM');
+  });
+
+  it('converts a datetime with an explicit non-UTC offset to UTC', () => {
+    expect(normalize(canvasFormatDateTime('2026-01-15T23:30:00-05:00'))).toBe(
+      '1/16/26, 4:30 AM',
+    );
+  });
+
+  it('does not shift a date-only value', () => {
+    expect(canvasFormatDate('2026-01-16')).toBe('1/16/26');
+  });
+});
+
 describe('canvasFormatDateRange', () => {
   beforeEach(() => setLocale('en'));
   afterEach(() => clearLocale());
