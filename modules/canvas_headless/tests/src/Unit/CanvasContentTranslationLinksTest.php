@@ -8,6 +8,7 @@ use Drupal\canvas_headless\CanvasContentTranslationLinks;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Entity\ContentEntityInterface;
@@ -26,6 +27,7 @@ use Drupal\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -34,6 +36,25 @@ use Symfony\Component\HttpFoundation\Request;
 #[CoversClass(CanvasContentTranslationLinks::class)]
 #[Group('canvas_headless')]
 final class CanvasContentTranslationLinksTest extends UnitTestCase {
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
+    parent::setUp();
+    // Cache::mergeContexts() validates tokens through Drupal's container when
+    // PHP assertions are enabled. Declare the fixture's context IDs so this
+    // test uses real token validation.
+    $container = new ContainerBuilder();
+    $container->set('cache_contexts_manager', new CacheContextsManager($container, [
+      'languages',
+      'oauth2_scopes',
+      'url',
+      'url.query_args',
+      'user.permissions',
+    ]));
+    \Drupal::setContainer($container);
+  }
 
   /**
    * Tests switcher precedence and cacheability independently of URL processing.
