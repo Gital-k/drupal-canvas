@@ -278,7 +278,7 @@ YAML;
     $this->assertSame('Component structure processed successfully.', $result);
 
     // User A may use Canvas AI, but may not view the media item.
-    $user_a = $this->createUser([CanvasAiPermissions::USE_CANVAS_AI]);
+    $user_a = $this->createUserWithoutMediaAccess();
     $this->assertFalse($media->access('view', $user_a));
     $this->container->get(AccountProxyInterface::class)->setAccount($user_a);
     $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, $this->getCurrentLayout('multi_region_empty'));

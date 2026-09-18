@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Traits;
 
+use Drupal\canvas_ai\CanvasAiPermissions;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
 use Drupal\media\MediaInterface;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\user\Entity\User;
 
 /**
  * Sets up image props that are populated by a media item.
@@ -21,6 +24,7 @@ trait ImageMediaPropTestTrait {
 
   use MediaTypeCreationTrait;
   use TestFileCreationTrait;
+  use UserCreationTrait;
 
   /**
    * The error an agent gets for a media item the current user may not view.
@@ -47,6 +51,20 @@ trait ImageMediaPropTestTrait {
     $this->installEntitySchema('media');
     $this->installSchema('file', ['file_usage']);
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
+  }
+
+  /**
+   * Creates a user that may use Canvas AI but may not view media items.
+   *
+   * @return \Drupal\user\Entity\User
+   *   The saved user account.
+   */
+  private function createUserWithoutMediaAccess(): User {
+    $user = $this->createUser([CanvasAiPermissions::USE_CANVAS_AI]);
+    if (!$user instanceof User) {
+      throw new \Exception('Failed to create test user.');
+    }
+    return $user;
   }
 
   /**
