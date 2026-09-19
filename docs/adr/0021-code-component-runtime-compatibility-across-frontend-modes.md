@@ -651,6 +651,17 @@ regions with a composed page tree, as described in
 existing behavior for compatibility, but add no new region-provider integration.
 Consumers should use page variants and the composed component tree instead.
 
+### Retain authoring utilities for Workbench and CLI
+
+Keep the six utilities from `drupal-canvas/json-render-utils` and their types
+for Workbench, CLI, and authoring workflows. They convert, render, register, and
+validate authored Canvas trees and json-render specs, not the resolved content
+tree returned by the Headless SDK's `fetchPage()`.
+
+Do not deprecate them or extend them for headless rendering. Headless
+applications use `CanvasComponentTree` and the SDK's component registry
+machinery instead.
+
 ## Remaining decisions
 
 - Compatibility decisions for the other runtime APIs listed in Scope.
