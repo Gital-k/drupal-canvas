@@ -374,6 +374,21 @@ Canvas tree:
 </JsonApiClientProvider>
 ```
 
+Headless rendering integrations accept explicit, serializable JSON:API runtime
+configuration: the resolved upstream JSON:API URL, local proxy URL, supporting
+endpoint mappings, and nonsecret preview state, including the resource version.
+The SDK's server integration prepares this configuration; framework adapters
+pass it to the React rendering integration. Do not infer it from the component
+tree or include it in the page/site data contract.
+
+The rendering integration creates the browser client from this configuration.
+Server-side client creation additionally uses the current request's session
+through the SDK's server integration, without serializing credentials. The
+generic React renderer must not import server session code. If automatic client
+configuration is unavailable, retain an explicitly supplied outer
+`JsonApiClientProvider`; otherwise leave the client unavailable and use the
+hook's missing-provider behavior.
+
 Replacing the provided client updates consumers but does not itself clear SWR
 caches. Browser data refresh and cache clearing require separate integration.
 
@@ -470,16 +485,22 @@ attempt to solve them.
 
 #### Draft reads and response compatibility
 
-Move the SDK's draft-read behavior into the shared client. Apply it where the
-client runs: in the browser for proxied requests and on the server for direct
-requests. The proxy does not repeat this work:
+Implement the SDK's draft-read behavior in the shared client, adapting the
+existing headless implementation as needed. Apply it where the client runs: in
+the browser for proxied requests and on the server for direct requests. Resolve
+working copies before applying the configured serializer so the behavior does
+not depend on a deserialized response shape. Use the shared client's default
+serialization in the headless factories as well; preserving the old headless
+client's default response shape is not required. The proxy does not repeat this
+work:
 
 - Resource reads use the session's resource version unless the caller selects
   one explicitly.
 - Collection reads fetch each item's working copy in a separate request because
-  Drupal returns default revisions in collections. If an item fetch fails, keep
-  the original item. This does not discover every unpublished entity or make
-  collection filtering and sorting use working-copy values.
+  Drupal returns default revisions in collections. If an ordinary item fetch
+  fails, keep the original item. Preview-session errors must propagate rather
+  than being hidden by this fallback. This does not discover every unpublished
+  entity or make collection filtering and sorting use working-copy values.
 - Raw responses bypass working-copy changes, as they do today.
 
 The client handles serialization and raw-response options; the proxy does not
