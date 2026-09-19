@@ -204,9 +204,14 @@ interface CanvasContext {
 ```
 
 `fetchPage()` returns `CanvasContext` as `page.context`. The renderer accepts
-`context?: CanvasContext` so existing renderer usage remains valid. Without
-context, the hooks return `null` and report the missing integration as described
-above.
+`context?: CanvasContext` so existing renderer usage remains valid. When
+supplied, the renderer wraps its tree in a provider using that context. When
+omitted, it inherits the surrounding `CanvasContextProvider` without adding
+another provider. If neither supplies context, the hooks return `null` and
+report the missing integration as described above.
+
+An explicit `context` prop takes precedence over an outer provider, including
+`null` page or site values; it does not merge with inherited context.
 
 Export `CanvasContextProvider` from `drupal-canvas` with a `context` prop and
 React children. The rendering integrations use this provider internally.
@@ -216,16 +221,12 @@ outside the Canvas tree, such as a site header:
 ```tsx
 <CanvasContextProvider context={page.context}>
   <SiteHeader />
-  <CanvasComponentTree
-    tree={page.content}
-    context={page.context}
-    components={componentRegistry}
-  />
+  <CanvasComponentTree tree={page.content} components={componentRegistry} />
 </CanvasContextProvider>
 ```
 
-The explicit provider is optional; the tree renderer still establishes its own
-provider from its `context` prop.
+Both forms are supported: pass `page.context` to the renderer for standalone
+usage, or wrap the renderer and other components in an explicit provider.
 
 #### Drupal-rendered Code Components
 
