@@ -144,7 +144,7 @@ describe('authoredElementMapToComponentTree', () => {
       {
         uuid: buttonId,
         component_id: 'js.button',
-        component_version: '',
+        component_version: null,
         inputs: { label: 'Read more' },
         parent_uuid: heroId,
         slot: 'actions',
@@ -201,7 +201,7 @@ describe('authoredElementMapToComponentTree', () => {
       {
         uuid: spacerId,
         component_id: 'js.spacer',
-        component_version: '',
+        component_version: null,
         inputs: {},
         parent_uuid: null,
         slot: null,
