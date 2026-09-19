@@ -454,6 +454,132 @@ copy. Accept this preview-only overhead in exchange for keeping draft behavior
 in one client implementation and the proxy limited to HTTP forwarding,
 authentication, and access controls.
 
+### Prefetch SWR data for server-rendered content without changing portable components
+
+React-based headless applications can render Code Components on the server and
+hydrate them in the browser. This lets the initial HTML contain meaningful
+content while preserving hooks and browser interactivity. The same components
+remain usable in Drupal's browser-side runtime. This approach does not require
+React Server Components or a particular headless framework.
+
+In Next.js, `CanvasComponentTree` currently establishes a `'use client'`
+boundary for registered components. This allows hooks and interactivity; it does
+not prevent Next.js from rendering their initial HTML on the server. Keep that
+boundary. Other React integrations can use their framework's server-rendering
+and hydration mechanisms without adopting Next.js's boundary model.
+
+A React Server Component (RSC) runs only on the server. It can be an `async`
+function that awaits data before returning markup. Its implementation is not
+sent to the browser. A Client Component can also produce HTML on the server, but
+its JavaScript is sent to the browser for hydration and later interaction. Both
+can put meaningful content in the initial HTML when their data is ready.
+
+An async Server Component is not portable to Drupal's current Code Component
+runtime. Drupal renders Code Components in browser-side Preact, not an RSC
+runtime. Browsers support `async`/`await` in fetch functions and event handlers;
+the restriction is making the component function itself async. Keep shared Code
+Components synchronous and handle asynchronous data separately.
+
+Running registered components as RSCs would require moving them outside the
+Next.js renderer's `'use client'` boundary. Components using hooks or
+interactivity would then need their own client boundary, either in their modules
+or through shared wrappers. Removing the current boundary would not turn
+existing SWR fetches into server-side requests. Keep it and use server
+prefetching with SWR fallback data instead.
+
+Server-rendering a component does not automatically fetch its SWR data. In the
+normal `useSWR(key, fetcher)` flow, SWR reads available cache or fallback data
+during rendering and starts fetching after the component mounts in the browser.
+The server render does not wait for that fetcher. Without prefetched data, the
+initial HTML therefore contains the component's loading or empty state, not the
+content that arrives later.
+
+In any server-rendered React integration, rendering a component on the server
+does not make its fetcher server-only. SWR revalidation, pagination, and other
+requests triggered after hydration run in the browser. Those requests need the
+application proxy to use headless preview authentication. Providing a JSON:API
+client through context alone does not change when SWR fetches.
+
+Headless application authors can prefetch data on the server and supply it
+through SWR's `SWRConfig` provider. A descendant Code Component's `useSWR()`
+call reads the matching fallback during server rendering, so its data-filled
+markup appears in the initial HTML. The component stays portable: in Drupal,
+without prefetched data, it fetches in the browser as before.
+
+For example, a portable component can use a string key:
+
+```tsx
+const client = useJsonApiClient();
+const { data } = useSWR(client ? 'articles' : null, () =>
+  client!.getCollection('node--article'),
+);
+```
+
+The headless application fetches the same data before rendering:
+
+```tsx
+const client = await getClient();
+const articles = await client.getCollection('node--article');
+
+return (
+  <SwrFallback fallback={{ articles }}>
+    <CanvasComponentTree tree={page.content} context={page.context} />
+  </SwrFallback>
+);
+```
+
+Here, `getClient()` is the SDK's request-aware server client factory. It
+configures the same shared `drupal-canvas` client implementation used by
+`useJsonApiClient()`, not a separate client implementation. Server prefetch code
+runs before the component tree renders, so it obtains the client directly rather
+than calling a React context hook. It calls Drupal directly, using the current
+preview session when applicable. The tree renderer supplies the JSON:API client
+context when rendering the component.
+
+In Next.js, `SwrFallback` is an application-owned client wrapper around
+`SWRConfig`:
+
+```tsx
+'use client';
+
+import { SWRConfig } from 'swr';
+
+import type { ReactNode } from 'react';
+
+export function SwrFallback({
+  fallback,
+  children,
+}: {
+  fallback: Record<string, unknown>;
+  children: ReactNode;
+}) {
+  return <SWRConfig value={{ fallback }}>{children}</SWRConfig>;
+}
+```
+
+Fallback keys and response shapes must match the component's requests. For array
+or object keys, use SWR's `unstable_serialize` to create the matching fallback
+key. Share key and query helpers where useful to avoid mismatches.
+
+Next.js sends both the rendered HTML and the serialized fallback data needed for
+hydration. Only include data the current visitor may receive; never include
+clients or credentials. Keep prefetched data request-scoped, and ensure the
+server and browser start with the same data and preview state. SWR may
+revalidate in the browser afterward, using the proxy. Application authors choose
+the revalidation policy; preview changes must refresh or clear SWR data as well
+as update the JSON:API client.
+
+The context hook does not automatically prefetch SWR requests. Without matching
+fallback data, server rendering may produce only the component's loading state.
+This approach uses SWR's existing provider and application-owned server
+fetching; it does not introduce automatic request discovery or a Canvas
+data-loader contract.
+
+The framework-independent client leaves room for future component data loaders
+or Suspense-aware server fetching. A separate headless renderer could also
+support RSCs without changing the portable component model. None of these are
+required by this decision.
+
 ## Remaining decisions
 
 - Public types for the client provider, and how preview renewal triggers browser
@@ -469,7 +595,10 @@ same component-facing contract through different data-delivery paths.
 Implementation spans Drupal context generation, dependency detection, the island
 renderer, the headless response, and React integration. Verification must cover
 field parity, separate islands and trees, concurrent requests, hydration,
-navigation, preview updates, missing context, and editor data inspection.
+navigation, preview updates, missing context, and editor data inspection. Verify
+that matching SWR fallback data produces content in the initial server-rendered
+HTML and is retained during hydration, while components without fallback still
+fetch normally in the browser.
 
 JSON:API consolidation also requires a headless server endpoint for portable
 browser reads. Verify public and authenticated requests, custom prefixes,
