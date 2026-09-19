@@ -254,6 +254,33 @@ Providers must not call both getters on every island mount merely to obtain
 data. Preserve data inspection through deduplicated reporting of hook usage,
 separate from the shared context mechanism.
 
+#### Workbench previews
+
+Workbench must support the same context hooks without requiring changes to Code
+Components. Its interactive preview renders through `renderSpec()` in
+`packages/workbench/src/client/PreviewFrameApp.tsx`, rather than through
+`CanvasComponentTree`. Its generated preview entry in
+`packages/workbench/src/server/preview-payload.ts` also renders directly. Both
+paths must wrap the rendered output in `CanvasContextProvider`, including page
+templates and their page content.
+
+Change only the component-facing API, not Workbench's data-loading behavior. The
+existing Vite integration loads `/canvas/api/v0/site-data` and exposes the
+result through `drupalSettings`. Populate the provider from the same settings,
+preserving existing values and fallbacks, including Drupal theme assets. Keep
+`getPageData()` and `getSiteData()` working for backward compatibility.
+
+Workbench does not currently load page-specific Drupal context. Preserve the
+existing page-data defaults: `pageTitle: ''`, `breadcrumbs: []`, and
+`mainEntity: null`. These are the Workbench provider's page-context values, not
+a missing-provider condition. Do not introduce page selection, additional page
+requests, or authored fixtures as part of this change.
+
+The interactive iframe stays mounted across preview targets. Ensure the provider
+reflects the current settings during preview updates and hot updates. Verify
+that hooks and legacy getters expose equivalent data in both preview rendering
+paths.
+
 #### Navigation URLs and headless theme assets
 
 Preserve the existing Drupal-generated navigation URLs, including breadcrumbs,
