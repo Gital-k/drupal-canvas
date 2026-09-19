@@ -399,11 +399,11 @@ Choose request behavior from the session:
 Connect session errors to preview renewal. Update the browser client's preview
 configuration and refresh affected data after renewal or preview changes.
 
-The existing headless preview authentication already supports operations under
-the editor's Drupal permissions, including writes. The proxy reuses that access;
-it does not add a separate read-only restriction. Drupal remains responsible for
-authorizing each operation. Writes affect Drupal content, not an isolated
-preview copy.
+Preview authorization follows
+[ADR 14](0014-headless-draft-preview-user-bound-tokens-via-jwt-assertion-grant.md):
+tokens carry the editor's permissions capped by a view-only permission ceiling,
+not their full permissions. The proxy reuses that policy, and Drupal authorizes
+each operation. This ADR does not introduce preview mutation support.
 
 Restrict requests to the configured Drupal backend and supported endpoint paths.
 Reject arbitrary destinations and validate paths and redirects to keep requests
@@ -440,7 +440,8 @@ languages, errors, and response shapes.
 The proxy must support all requests made by `JsonApiClient`, including
 supporting endpoints outside the JSON:API prefix, such as path resolution.
 Forward requests without method-specific processing, subject to the configured
-backend and endpoint boundaries.
+backend and endpoint boundaries and Drupal's authorization policy. Supporting a
+client method does not grant preview tokens permission to perform it.
 
 The browser client's transport maps supported Drupal URLs to the local proxy,
 preserving paths and query parameters. This includes absolute pagination links
@@ -455,7 +456,6 @@ authentication, and access controls.
 
 ## Remaining decisions
 
-- CSRF protection for proxied writes and cache invalidation after mutations.
 - Public types for the client provider, and how preview renewal triggers browser
   data refresh and cache clearing.
 - Compatibility decisions for the other runtime APIs listed in Scope.
@@ -474,6 +474,7 @@ navigation, preview updates, missing context, and editor data inspection.
 JSON:API consolidation also requires a headless server endpoint for portable
 browser reads. Verify public and authenticated requests, custom prefixes,
 working-copy resources and collections, response serialization, session expiry
-and renewal, embedded-preview cookies, cache isolation, authorized and denied
-writes, CSRF protection, and rejection of arbitrary destinations. Keep explicit
-client construction and legacy Drupal and Workbench behavior covered.
+and renewal, embedded-preview cookies, cache isolation, ADR 14's permission
+ceiling and documented exception, CSRF protection, and rejection of arbitrary
+destinations. Keep explicit client construction and legacy Drupal and Workbench
+behavior covered.
