@@ -348,7 +348,9 @@ integrations can still construct a client explicitly.
 - The headless SDK reads the backend URL from explicit configuration or
   `CANVAS_SITE_URL`. It discovers the JSON:API prefix through
   `/canvas/api/v0/site-data`. If discovery fails, it uses the configured prefix
-  or `CANVAS_JSONAPI_PREFIX`.
+  or `CANVAS_JSONAPI_PREFIX`. Combine the backend URL and resolved prefix into
+  the full upstream JSON:API base URL. An explicit full URL override takes
+  precedence over discovery.
 - The SDK supplies authentication to server requests and nonsecret preview
   configuration, including the resource version, to the browser client. Its
   public and draft client factories create the shared client instead of
@@ -356,14 +358,17 @@ integrations can still construct a client explicitly.
 
 #### Headless browser requests use a JSON:API proxy
 
-Add a same-origin JSON:API proxy to the headless application. Configure its full
-upstream JSON:API base URL on the server. Map the proxy's local prefix to that
-URL and forward the remaining path and query parameters, rather than listing
-individual resource routes. The hook's browser client sends both public and
-draft requests through it, using ordinary JSON:API paths and query parameters
-rather than a client-operation protocol. The proxy forwards requests and
-response bodies without processing JSON:API documents. Server code uses the same
-client but calls Drupal directly.
+Add a same-origin JSON:API proxy to the headless application. The application
+configures its local URL; the SDK resolves the full upstream JSON:API base URL
+on the server through discovery or an explicit override. Configure supporting
+endpoint paths on the same Drupal backend when needed by the client. Browser
+requests cannot change the configured backend. Map local proxy paths to these
+upstream endpoints and preserve the remaining path and query parameters, rather
+than listing individual resource routes. The hook's browser client sends both
+public and draft requests through it, using ordinary JSON:API paths and query
+parameters rather than a client-operation protocol. The proxy forwards requests
+and response bodies without processing JSON:API documents. Server code uses the
+same client but calls Drupal directly.
 
 ```text
 Code Component → shared browser client → application proxy → Drupal
@@ -400,10 +405,10 @@ it does not add a separate read-only restriction. Drupal remains responsible for
 authorizing each operation. Writes affect Drupal content, not an isolated
 preview copy.
 
-Restrict requests to the server-configured JSON:API base URL. Reject arbitrary
-destinations and validate paths and redirects to keep requests within that
-boundary. Do not forward arbitrary browser authentication headers or Drupal
-response cookies. Restrict browser access to the application's origin and
+Restrict requests to the configured Drupal backend and supported endpoint paths.
+Reject arbitrary destinations and validate paths and redirects to keep requests
+within that boundary. Do not forward arbitrary browser authentication headers or
+Drupal response cookies. Restrict browser access to the application's origin and
 protect state-changing requests against CSRF; CORS restrictions alone are not
 CSRF protection.
 
@@ -432,10 +437,16 @@ safe response headers, except when the proxy rejects a request or reports a
 session error. Direct and proxied reads must agree on supported query options,
 languages, errors, and response shapes.
 
-Route pagination and other supported Drupal links through the proxy in the
-client's transport layer, without rewriting response bodies. Do not let an
-absolute Drupal URL bypass the proxy. Methods that use endpoints outside the
-configured JSON:API base URL require a separate compatibility decision.
+The proxy must support all requests made by `JsonApiClient`, including
+supporting endpoints outside the JSON:API prefix, such as path resolution.
+Forward requests without method-specific processing, subject to the configured
+backend and endpoint boundaries.
+
+The browser client's transport maps supported Drupal URLs to the local proxy,
+preserving paths and query parameters. This includes absolute pagination links
+and supporting endpoints, without rewriting response bodies. Do not let an
+absolute Drupal URL bypass the proxy. Verify the upstream client's complete
+method list and required endpoints before finalizing path configuration.
 
 Draft collections make an additional browser-to-proxy request for each working
 copy. Accept this preview-only overhead in exchange for keeping draft behavior
@@ -444,9 +455,6 @@ authentication, and access controls.
 
 ## Remaining decisions
 
-- The proxy's mount path and client-side mapping of Drupal URLs to the proxy.
-  Check index discovery, pagination links, language prefixes, views, and path
-  resolution against the configured JSON:API base URL.
 - CSRF protection for proxied writes and cache invalidation after mutations.
 - Public types for the client provider, and how preview renewal triggers browser
   data refresh and cache clearing.
