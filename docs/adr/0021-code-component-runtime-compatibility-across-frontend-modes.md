@@ -26,9 +26,9 @@ and distribute the data is outside this ADR's scope.
 
 Every public `drupal-canvas` runtime API needs an explicit compatibility
 decision for the two React Code Component environments: support both, deprecate
-the API with replacement guidance, or identify unsupported headless usage with
-actionable warnings and graceful fallback behavior. This includes data access,
-Drupal integration, components, and rendering utilities.
+the API with replacement guidance, or reject unsupported usage with actionable
+errors. This includes data access, Drupal integration, components, and rendering
+utilities.
 
 ## Decision
 
@@ -137,9 +137,10 @@ The hooks expose the data currently returned by `getPageData()` and
   information.
 
 Deprecate `getPageData()` and `getSiteData()` in favor of the hooks, but keep
-them working in Drupal-rendered Code Components for backward compatibility. The
-getters are not supported in headless frontends. Components that need to work in
-both frontend modes must migrate to the hooks.
+them working in Drupal-rendered Code Components and Workbench for backward
+compatibility. Outside those environments, the getters throw actionable
+migration errors as described below. Components that need to work in both
+frontend modes must migrate to the hooks.
 
 A shared Code Component uses the same hooks in either frontend:
 
@@ -335,10 +336,42 @@ Do not include the client in `page.context`. Server rendering and browser
 hydration each create their own client with the right connection to Drupal. Keep
 preview tokens out of React context and serialized page data.
 
-Keep `new JsonApiClient()` working in Drupal-rendered Code Components and
-Workbench. Components shared across frontend modes use the hook instead of
-reading global Drupal settings through the constructor. Server code and custom
-integrations can still construct a client explicitly.
+Keep the legacy `new JsonApiClient()` API working in Drupal-rendered Code
+Components and Workbench. Outside those environments, it throws an actionable
+migration error, even when an explicit backend URL is supplied. Components
+shared across frontend modes use `useJsonApiClient()`; headless server code uses
+the SDK's `getClient()`.
+
+This restriction applies to the legacy public constructor, not the shared client
+implementation. SDK factories and rendering integrations use a separate internal
+construction path to create the shared client without invoking the legacy
+environment guard.
+
+#### Legacy API compatibility and errors
+
+`getPageData()`, `getSiteData()`, and the legacy `new JsonApiClient()` API
+remain backward-compatible in Drupal-rendered frontends and both Workbench
+preview paths. They throw immediately when invoked in headless or any other
+environment. Importing these APIs alone does not throw.
+
+Each error identifies the unsupported API and gives concrete migration guidance:
+
+- `getPageData()`: use `usePageContext()` in React components, or read
+  `page.context.page` from the Headless SDK's page response outside components.
+- `getSiteData()`: use `useSiteContext()` in React components, or read
+  `page.context.site` from that response outside components.
+- `new JsonApiClient()`: use `useJsonApiClient()` in React components, or the
+  SDK's `getClient()` in headless server code.
+
+Use an explicit runtime marker established by Drupal and Workbench integrations
+to identify the supported legacy environments. Do not treat the presence of
+`window`, a backend URL, or a user-created `drupalSettings` object as proof that
+the caller is running in Drupal or Workbench. This marker is a compatibility
+check, not a security boundary.
+
+These errors do not return empty defaults or promise graceful fallback. They
+require callers to migrate. The new hooks retain their separate missing-provider
+behavior: return `null` and emit a deduplicated developer warning.
 
 #### Public client-provider API
 
@@ -714,5 +747,7 @@ browser reads. Verify public and authenticated requests, custom prefixes,
 working-copy resources and collections, response serialization, session expiry
 and renewal, embedded-preview cookies, cache isolation, ADR 14's permission
 ceiling and documented exception, CSRF protection, and rejection of arbitrary
-destinations. Keep explicit client construction and legacy Drupal and Workbench
-behavior covered.
+destinations. Verify that SDK factories can construct the shared client while
+legacy getter and constructor calls throw outside Drupal and Workbench with
+clear migration guidance. Keep legacy Drupal and both Workbench preview paths
+covered.
