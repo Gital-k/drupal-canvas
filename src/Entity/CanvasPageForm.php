@@ -72,7 +72,10 @@ final class CanvasPageForm extends ContentEntityForm {
       $form['metatags']['widget'][0]['tokens']['#access'] = FALSE;
       $form['metatags']['widget'][0]['image_help']['#access'] = FALSE;
       $form['metatags']['widget'][0]['intro_text']['#access'] = FALSE;
-      $form['metatags']['widget'][0]['advanced']['#access'] = FALSE;
+      // Unset advanced metatags entirely to prevent validation errors.
+      // Setting #access = FALSE still submits values which can cause validation
+      // errors like "The submitted value 1 in the Robots element is not allowed".
+      unset($form['metatags']['widget'][0]['advanced']);
     }
 
     if (isset($form['metatags']['widget'][0]['basic']['title'])) {
