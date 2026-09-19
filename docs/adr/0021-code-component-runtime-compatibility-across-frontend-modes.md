@@ -334,6 +334,43 @@ Workbench. Components shared across frontend modes use the hook instead of
 reading global Drupal settings through the constructor. Server code and custom
 integrations can still construct a client explicitly.
 
+#### Public client-provider API
+
+Export `useJsonApiClient`, `JsonApiClientProvider`, and
+`JsonApiClientProviderProps` from `drupal-canvas`. Use the shared
+`JsonApiClient` type rather than introducing a separate React-specific client
+interface:
+
+```tsx
+interface JsonApiClientProviderProps {
+  client: JsonApiClient;
+  children: ReactNode;
+}
+
+function useJsonApiClient(): JsonApiClient | null;
+```
+
+The provider receives an already configured client. It does not construct one or
+manage authentication. The hook returns the nearest provider's client, or `null`
+with the deduplicated warning described above when no provider exists.
+
+Rendering integrations own client creation and reuse. When configuration or
+preview state changes, they supply the appropriate client. Client instances are
+runtime objects, never serialized props across a server/browser boundary.
+
+Application authors can provide a client explicitly for components outside the
+Canvas tree:
+
+```tsx
+<JsonApiClientProvider client={client}>
+  <SiteHeader />
+  {children}
+</JsonApiClientProvider>
+```
+
+Replacing the provided client updates consumers but does not itself clear SWR
+caches. Browser data refresh and cache clearing require separate integration.
+
 #### Configuration and responsibilities
 
 - Drupal supplies its backend URL and JSON:API settings. Keep existing
@@ -582,8 +619,7 @@ required by this decision.
 
 ## Remaining decisions
 
-- Public types for the client provider, and how preview renewal triggers browser
-  data refresh and cache clearing.
+- How preview renewal triggers browser data refresh and cache clearing.
 - Compatibility decisions for the other runtime APIs listed in Scope.
 
 ## Consequences
