@@ -643,6 +643,14 @@ HTML.
 Verify `Image` with Drupal media images, derivatives, and SVGs on a separate
 headless origin, including server rendering and hydration.
 
+### Deprecate region APIs
+
+Deprecate `Region` and `RegionsProvider`. Page variants replace theme-global
+regions with a composed page tree, as described in
+[ADR 19](0019-page-variants-replace-theme-global-regions.md). Preserve their
+existing behavior for compatibility, but add no new region-provider integration.
+Consumers should use page variants and the composed component tree instead.
+
 ## Remaining decisions
 
 - Compatibility decisions for the other runtime APIs listed in Scope.
