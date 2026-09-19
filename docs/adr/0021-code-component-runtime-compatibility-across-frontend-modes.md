@@ -128,8 +128,8 @@ Replace `getPageData()` with `usePageContext()` and `getSiteData()` with
 Components. The replacement hooks synchronously read React context; they do not
 fetch data or read global Drupal settings directly.
 
-The hooks expose the data currently returned by `getPageData()` and
-`getSiteData()`:
+When context is available, the hooks return objects with the same shapes as
+`getPageData()` and `getSiteData()`:
 
 - Page context: page title, breadcrumbs, and primary entity metadata, including
   language and translation information. The primary entity can be `null`.
@@ -162,9 +162,11 @@ export default function PageHeader() {
 }
 ```
 
-Unavailable context returns `null`, distinct from valid empty data or a page
-without a primary entity. Report missing integration through a deduplicated,
-actionable developer warning.
+When no provider exists or its corresponding page or site value is `null`,
+return `null` and emit a deduplicated, actionable developer warning. Do not
+replace missing context with a default object. A supplied object with
+`mainEntity: null`, empty theme assets, or other valid empty values is not
+missing context and does not trigger a warning.
 
 #### React-based headless rendering
 
@@ -213,8 +215,10 @@ interface CanvasContext {
 `context?: CanvasContext` so existing renderer usage remains valid. When
 supplied, the renderer wraps its tree in a provider using that context. When
 omitted, it inherits the surrounding `CanvasContextProvider` without adding
-another provider. If neither supplies context, the hooks return `null` and
-report the missing integration as described above.
+another provider. If neither supplies context, or the corresponding value is
+`null`, the corresponding hook returns `null` and warns as described above. The
+return types are `usePageContext(): PageContext | null` and
+`useSiteContext(): SiteContext | null`.
 
 An explicit `context` prop takes precedence over an outer provider, including
 `null` page or site values; it does not merge with inherited context.
@@ -254,36 +258,32 @@ When a preview replaces or rerenders an island, supply fresh context. Changes to
 the provider. Component-only previews must supply preview context or report it
 as unavailable, not reuse an unrelated page's context.
 
-Keep settings extraction separate from editor instrumentation. The existing
-getters send `_canvas_useswr_data_fetch` messages to populate the code editor's
-Component data panel; these messages do not fetch data or refresh previews.
-Providers must not call both getters on every island mount merely to obtain
-data. Preserve data inspection through deduplicated reporting of hook usage,
-separate from the shared context mechanism.
+Keep settings extraction separate from editor instrumentation. Preserve the
+getters' `_canvas_useswr_data_fetch` messages for the code editor's Component
+data panel; these messages must not fetch data or refresh previews. Providers
+must not call both getters on every island mount merely to obtain data. Preserve
+data inspection through deduplicated reporting of hook usage, separate from the
+shared context mechanism.
 
 #### Workbench previews
 
 Workbench must support the same context hooks without requiring changes to Code
-Components. Its interactive preview renders through `renderSpec()` in
-`packages/workbench/src/client/PreviewFrameApp.tsx`, rather than through
-`CanvasComponentTree`. Its generated preview entry in
-`packages/workbench/src/server/preview-payload.ts` also renders directly. Both
-paths must wrap the rendered output in `CanvasContextProvider`, including page
+Components. Wrap both the interactive preview's `renderSpec()` output and the
+generated preview entry's output in `CanvasContextProvider`, including page
 templates and their page content.
 
 Change only the component-facing API, not Workbench's data-loading behavior. The
-existing Vite integration loads `/canvas/api/v0/site-data`. Fetch once and pass
-the data directly to the provider, preserving existing values and fallbacks,
-including Drupal theme assets. Also populate `drupalSettings` for legacy
-consumers, including `getPageData()`, `getSiteData()`, and the current
-`JsonApiClient`. This is a compatibility mechanism, not the data source for the
-new context API.
+Vite integration must load `/canvas/api/v0/site-data` once and pass the data
+directly to the provider, preserving existing values and fallbacks, including
+Drupal theme assets. Also populate `drupalSettings` for legacy consumers,
+including `getPageData()`, `getSiteData()`, and the legacy `JsonApiClient`. This
+is a compatibility mechanism, not the data source for the new context API.
 
-Workbench does not currently load page-specific Drupal context. Preserve the
-existing page-data defaults: `pageTitle: ''`, `breadcrumbs: []`, and
-`mainEntity: null`. These are the Workbench provider's page-context values, not
-a missing-provider condition. Do not introduce page selection, additional page
-requests, or authored fixtures as part of this change.
+Do not load page-specific Drupal context in Workbench. Use the page defaults:
+`pageTitle: ''`, `breadcrumbs: []`, and `mainEntity: null`. These are the
+Workbench provider's page-context values, not a missing-provider condition. Do
+not introduce page selection, additional page requests, or authored fixtures as
+part of this change.
 
 The interactive iframe stays mounted across preview targets. Ensure the provider
 reflects the current data during preview updates and hot updates. Verify that
@@ -310,8 +310,8 @@ context unavailable or trigger a missing-context warning.
 
 ### Consolidate JSON:API clients behind a context hook
 
-Combine the existing `drupal-canvas` client and the headless SDK's draft client
-into one implementation in `drupal-canvas`. Both already extend
+Combine the `drupal-canvas` client and the headless SDK's draft client into one
+implementation in `drupal-canvas`, extending
 `@drupal-api-client/json-api-client`. The SDK remains responsible for
 environment configuration and preview sessions; the shared client stays usable
 in browsers.
@@ -369,9 +369,57 @@ to identify the supported legacy environments. Do not treat the presence of
 the caller is running in Drupal or Workbench. This marker is a compatibility
 check, not a security boundary.
 
-These errors do not return empty defaults or promise graceful fallback. They
-require callers to migrate. The new hooks retain their separate missing-provider
-behavior: return `null` and emit a deduplicated developer warning.
+These errors require migration rather than returning defaults. In contrast,
+`usePageContext()`, `useSiteContext()`, and `useJsonApiClient()` return `null`
+and emit a deduplicated warning when their required context is missing.
+
+Include a short AI-agent migration prompt in these errors:
+
+> Replace `getPageData()`, `getSiteData()`, and `new JsonApiClient()` with
+> `usePageContext()`, `useSiteContext()`, and `useJsonApiClient()` in function
+> components or custom hooks. Call hooks unconditionally at the top level before
+> any possible return; handle missing context or clients. Outside components and
+> custom hooks, use SDK page context data or `getClient()` in headless server
+> code; pass data or a client to browser helpers. Preserve output, types, hook
+> order, and access controls. Never expose credentials.
+
+#### Migrate safe getter calls with a pull codemod
+
+Make getter migration a codemod—an automatic source-code rewrite—run as part of
+pull, with no separate opt-in or opt-out. Enable conversion only when the
+connected Drupal site advertises context-hook support through
+`/canvas/api/v0/site-data` and the installed `drupal-canvas` package exports
+both hooks. If either check fails or cannot be verified, leave getter calls
+unchanged and report the limitation with migration guidance. Extend Drupal's
+import-based dependency detection together with the hooks so migrated components
+still receive their data.
+
+Convert imported `getPageData()` and `getSiteData()` calls to `usePageContext()`
+and `useSiteContext()` only when every getter usage in that component file is
+safe: the imported binding is resolved, the call has no arguments, it occupies
+an unconditional valid hook position in a function component with no earlier
+possible return, and the replacement introduces no identifier conflicts.
+Preserve hook ordering and behavior, and avoid type changes other than the
+nullable hook results described below. If these safety checks are uncertain,
+leave the file unchanged. Other safe component files may still migrate. Client
+construction and pulled helper modules receive diagnostics only, not automatic
+conversion.
+
+The codemod assumes rendering integrations supply page and site context. Replace
+otherwise safe calls directly; do not skip them solely because the hooks return
+nullable types. Generate no null guards, fallback values, or non-null
+assertions. Strict TypeScript checks may still require follow-up for nullable
+results; report this limitation with the successful conversions.
+
+Keep import changes minimal and account for aliases. Remove legacy imports only
+when unused.
+
+Show planned conversions before pull confirmation and honor `--yes`. Never
+modify files protected by `--skip-overwrite`. Report successful conversions with
+file names and API replacements, as well as per-file warnings for remaining
+cases. For those cases, print one consolidated file list and AI-agent migration
+prompt in the terminal, using the guidance above; do not insert prompts into
+source files.
 
 #### Public client-provider API
 
@@ -469,7 +517,7 @@ Server code → shared server client → Drupal
 Put the shared endpoint logic in the framework-independent headless SDK.
 Framework adapters or custom application integrations mount the route and
 provide access to the request and session. The proxy must not depend on React or
-a React-specific adapter. This endpoint does not exist yet.
+a React-specific adapter.
 
 Reuse the SDK's preview session: a framework draft flag and an HTTP-only cookie
 containing the token. Keep the `Secure`, `SameSite=None`, and `Partitioned`
@@ -484,8 +532,7 @@ Choose request behavior from the session:
 - Valid preview session: authenticate with the editor's credentials. The client
   supplies the resource version in the query; the proxy does not add it.
 - Expired or invalid preview session: return a session error, not public
-  content. The SDK's current `getClient()` falls back to public content on
-  expiry, so the endpoint cannot reuse that behavior unchanged.
+  content. Do not use a client factory's public-content fallback in this path.
 
 Reuse the existing preview renewal and recovery lifecycle described below; do
 not introduce a separate renewal mechanism for JSON:API requests.
@@ -512,15 +559,13 @@ resource version. Application-owned fetching caches follow the policy below.
 Keep the renewal and recovery lifecycle from
 [ADR 15](0015-headless-draft-preview-session-renewal-re-anchored-in-drupal-session.md)
 unchanged. This ADR does not add automatic refresh or clearing of SWR or other
-application caches after renewal. The existing implementation already leaves
-these freshness and stale-data trade-offs to applications; this change does not
-attempt to solve them.
+application caches after renewal. Leave these freshness and stale-data
+trade-offs to applications.
 
 #### Draft reads and response compatibility
 
-Implement the SDK's draft-read behavior in the shared client, adapting the
-existing headless implementation as needed. Apply it where the client runs: in
-the browser for proxied requests and on the server for direct requests. Resolve
+Implement the SDK's draft-read behavior in the shared client. Apply it in the
+browser for proxied requests and on the server for direct requests. Resolve
 working copies before applying the configured serializer so the behavior does
 not depend on a deserialized response shape. Use the shared client's default
 serialization in the headless factories as well; preserving the old headless
@@ -534,7 +579,7 @@ work:
   fails, keep the original item. Preview-session errors must propagate rather
   than being hidden by this fallback. This does not discover every unpublished
   entity or make collection filtering and sorting use working-copy values.
-- Raw responses bypass working-copy changes, as they do today.
+- Raw responses bypass working-copy changes.
 
 The client handles serialization and raw-response options; the proxy does not
 need to interpret them. Preserve Drupal's response bodies, status codes, and
@@ -567,11 +612,11 @@ content while preserving hooks and browser interactivity. The same components
 remain usable in Drupal's browser-side runtime. This approach does not require
 React Server Components or a particular headless framework.
 
-In Next.js, `CanvasComponentTree` currently establishes a `'use client'`
-boundary for registered components. This allows hooks and interactivity; it does
-not prevent Next.js from rendering their initial HTML on the server. Keep that
-boundary. Other React integrations can use their framework's server-rendering
-and hydration mechanisms without adopting Next.js's boundary model.
+In Next.js, keep `CanvasComponentTree`'s `'use client'` boundary for registered
+components. This allows hooks and interactivity without preventing Next.js from
+rendering their initial HTML on the server. Other React integrations can use
+their framework's server-rendering and hydration mechanisms without adopting
+Next.js's boundary model.
 
 A React Server Component (RSC) runs only on the server. It can be an `async`
 function that awaits data before returning markup. Its implementation is not
@@ -579,8 +624,8 @@ sent to the browser. A Client Component can also produce HTML on the server, but
 its JavaScript is sent to the browser for hydration and later interaction. Both
 can put meaningful content in the initial HTML when their data is ready.
 
-An async Server Component is not portable to Drupal's current Code Component
-runtime. Drupal renders Code Components in browser-side Preact, not an RSC
+Keep Drupal Code Components compatible with browser-side Preact rather than
+requiring an RSC runtime. An async Server Component is not portable to that
 runtime. Browsers support `async`/`await` in fetch functions and event handlers;
 the restriction is making the component function itself async. Keep shared Code
 Components synchronous and handle asynchronous data separately.
@@ -588,9 +633,9 @@ Components synchronous and handle asynchronous data separately.
 Running registered components as RSCs would require moving them outside the
 Next.js renderer's `'use client'` boundary. Components using hooks or
 interactivity would then need their own client boundary, either in their modules
-or through shared wrappers. Removing the current boundary would not turn
-existing SWR fetches into server-side requests. Keep it and use server
-prefetching with SWR fallback data instead.
+or through shared wrappers. Removing this boundary would not turn SWR fetches
+into server-side requests. Keep it and use server prefetching with SWR fallback
+data instead.
 
 Server-rendering a component does not automatically fetch its SWR data. In the
 normal `useSWR(key, fetcher)` flow, SWR reads available cache or fallback data
@@ -692,7 +737,7 @@ required by this decision.
 
 ### APIs supported unchanged
 
-These APIs already work in both frontend modes and require no changes:
+Support these APIs unchanged in both frontend modes:
 
 - `sortLinksetMenu`
 - `sortMenu`
@@ -750,4 +795,8 @@ ceiling and documented exception, CSRF protection, and rejection of arbitrary
 destinations. Verify that SDK factories can construct the shared client while
 legacy getter and constructor calls throw outside Drupal and Workbench with
 clear migration guidance. Keep legacy Drupal and both Workbench preview paths
-covered.
+covered. Verify nullable hook results and warnings for missing context, while
+valid empty page/site values remain available without warnings. Check pull's
+capability gates, all-or-nothing getter migration per file, alias handling, hook
+ordering, types, confirmation and overwrite protection, and successful and
+skipped-file reports.
