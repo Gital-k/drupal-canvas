@@ -434,8 +434,8 @@ Choose request behavior from the session:
   content. The SDK's current `getClient()` falls back to public content on
   expiry, so the endpoint cannot reuse that behavior unchanged.
 
-Connect session errors to preview renewal. Update the browser client's preview
-configuration and refresh affected data after renewal or preview changes.
+Reuse the existing preview renewal and recovery lifecycle described below; do
+not introduce a separate renewal mechanism for JSON:API requests.
 
 Preview authorization follows
 [ADR 14](0014-headless-draft-preview-user-bound-tokens-via-jwt-assertion-grant.md):
@@ -451,9 +451,17 @@ protect state-changing requests against CSRF; CORS restrictions alone are not
 CSRF protection.
 
 Keep authenticated draft responses out of shared caches with private, no-store
-responses. Disable client caches or separate them by session and resource
-version. Clear stale browser data when preview state changes so draft content
-cannot carry over into public mode or another session.
+responses. Disable JSON:API client caches or separate them by session and
+resource version. Application-owned fetching caches follow the policy below.
+
+#### Preview renewal and application caches
+
+Keep the renewal and recovery lifecycle from
+[ADR 15](0015-headless-draft-preview-session-renewal-re-anchored-in-drupal-session.md)
+unchanged. This ADR does not add automatic refresh or clearing of SWR or other
+application caches after renewal. The existing implementation already leaves
+these freshness and stale-data trade-offs to applications; this change does not
+attempt to solve them.
 
 #### Draft reads and response compatibility
 
@@ -604,8 +612,8 @@ hydration. Only include data the current visitor may receive; never include
 clients or credentials. Keep prefetched data request-scoped, and ensure the
 server and browser start with the same data and preview state. SWR may
 revalidate in the browser afterward, using the proxy. Application authors choose
-the revalidation policy; preview changes must refresh or clear SWR data as well
-as update the JSON:API client.
+the revalidation and cache-isolation policy. Token renewal alone does not
+trigger SWR cache clearing.
 
 The context hook does not automatically prefetch SWR requests. Without matching
 fallback data, server rendering may produce only the component's loading state.
@@ -620,7 +628,6 @@ required by this decision.
 
 ## Remaining decisions
 
-- How preview renewal triggers browser data refresh and cache clearing.
 - Compatibility decisions for the other runtime APIs listed in Scope.
 
 ## Consequences
