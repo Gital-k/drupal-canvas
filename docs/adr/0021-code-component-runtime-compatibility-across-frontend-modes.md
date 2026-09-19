@@ -626,12 +626,18 @@ or Suspense-aware server fetching. A separate headless renderer could also
 support RSCs without changing the portable component model. None of these are
 required by this decision.
 
-### Keep menu, node-path, and class-name helpers unchanged
+### APIs supported unchanged
 
-Support `sortLinksetMenu`, `sortMenu`, `getNodePath`, and `cn` unchanged in both
-frontend modes, preserving their contracts, import paths, and aliases. They
-operate on supplied values without runtime context. Do not add headless URL
-rewriting to `getNodePath`.
+Support these APIs unchanged in both frontend modes:
+
+- `sortLinksetMenu`
+- `sortMenu`
+- `getNodePath`
+- `cn`
+- `FormattedText`
+
+`FormattedText` callers remain responsible for supplying trusted or sanitized
+HTML.
 
 ## Remaining decisions
 
