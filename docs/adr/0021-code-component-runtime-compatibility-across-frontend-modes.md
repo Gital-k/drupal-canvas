@@ -301,8 +301,137 @@ Drupal-rendered Code Components retain their existing theme assets. Shared
 components must handle empty asset URLs. Empty theme assets do not make site
 context unavailable or trigger a missing-context warning.
 
+### Consolidate JSON:API clients behind a context hook
+
+Combine the existing `drupal-canvas` client and the headless SDK's draft client
+into one implementation in `drupal-canvas`. Both already extend
+`@drupal-api-client/json-api-client`. The SDK remains responsible for
+environment configuration and preview sessions; the shared client stays usable
+in browsers.
+
+React Code Components use `useJsonApiClient()` from `drupal-canvas`. The hook
+reads a client from context. It does not fetch data or create a client on each
+render. Components can use the client with SWR or another fetching library.
+
+The Drupal island renderer, headless React renderer, and both Workbench preview
+paths add the provider automatically. Export `JsonApiClientProvider` with a
+`client` prop for components outside the Canvas tree. Reuse the client while its
+configuration and session stay unchanged. Without a provider, the hook returns
+`null` and warns how to fix the missing integration, without repeating warnings.
+
+Do not include the client in `page.context`. Server rendering and browser
+hydration each create their own client with the right connection to Drupal. Keep
+preview tokens out of React context and serialized page data.
+
+Keep `new JsonApiClient()` working in Drupal-rendered Code Components and
+Workbench. Components shared across frontend modes use the hook instead of
+reading global Drupal settings through the constructor. Server code and custom
+integrations can still construct a client explicitly.
+
+#### Configuration and responsibilities
+
+- Drupal supplies its backend URL and JSON:API settings. Keep existing
+  authentication behavior: credentials and Drupal permissions determine which
+  content is accessible. In Drupal previews, the provider configures the shared
+  client to request `rel:working-copy`, using the editor's Drupal session and an
+  explicit preview flag. Normal page rendering and legacy `new JsonApiClient()`
+  calls keep their existing revision behavior. Unsaved Canvas editor state is
+  outside this change's scope.
+- Workbench uses its existing live Drupal configuration. Keep its data loading,
+  previews, and settings for legacy consumers unchanged.
+- The headless SDK reads the backend URL from explicit configuration or
+  `CANVAS_SITE_URL`. It discovers the JSON:API prefix through
+  `/canvas/api/v0/site-data`. If discovery fails, it uses the configured prefix
+  or `CANVAS_JSONAPI_PREFIX`.
+- The SDK supplies authentication to server requests and nonsecret preview
+  configuration, including the resource version, to the browser client. Its
+  public and draft client factories create the shared client instead of
+  maintaining a separate subclass.
+
+#### Headless browser requests use a JSON:API proxy
+
+Add a read-only, same-origin JSON:API proxy to the headless application. The
+hook's browser client sends both public and draft requests through it, using
+ordinary JSON:API paths and query parameters rather than a client-operation
+protocol. The proxy forwards requests and response bodies without processing
+JSON:API documents. Server code uses the same client but calls Drupal directly.
+
+```text
+Code Component → shared browser client → application proxy → Drupal
+Server code → shared server client → Drupal
+```
+
+Put the shared endpoint logic in the headless SDK. React headless adapters mount
+the route and provide access to the request and session. This endpoint does not
+exist yet.
+
+Reuse the SDK's preview session: a framework draft flag and an HTTP-only cookie
+containing the token. Keep the `Secure`, `SameSite=None`, and `Partitioned`
+cookie attributes needed for embedded previews. The browser sends these cookies
+with same-origin requests, but component JavaScript cannot read the token. The
+endpoint gets credentials and draft state from the session, not from values
+supplied by component code.
+
+Choose request behavior from the session:
+
+- No preview session: make unauthenticated Drupal requests.
+- Valid preview session: authenticate with the editor's credentials. The client
+  supplies the resource version in the query; the proxy does not add it.
+- Expired or invalid preview session: return a session error, not public
+  content. The SDK's current `getClient()` falls back to public content on
+  expiry, so the endpoint cannot reuse that behavior unchanged.
+
+Connect session errors to preview renewal. Update the browser client's preview
+configuration and refresh affected data after renewal or preview changes.
+
+Restrict the endpoint to supported reads from the configured Drupal backend.
+Reject writes and arbitrary URLs. Check paths and redirects to prevent sending
+credentials to another origin. Do not forward arbitrary browser authentication
+headers or Drupal response cookies. Restrict browser access to the application's
+origin; do not enable permissive CORS for these cookie-authenticated requests.
+
+Keep authenticated draft responses out of shared caches with private, no-store
+responses. Disable client caches or separate them by session and resource
+version. Clear stale browser data when preview state changes so draft content
+cannot carry over into public mode or another session.
+
+#### Draft reads and response compatibility
+
+Move the SDK's draft-read behavior into the shared client. Apply it where the
+client runs: in the browser for proxied requests and on the server for direct
+requests. The proxy does not repeat this work:
+
+- Resource reads use the session's resource version unless the caller selects
+  one explicitly.
+- Collection reads fetch each item's working copy in a separate request because
+  Drupal returns default revisions in collections. If an item fetch fails, keep
+  the original item. This does not discover every unpublished entity or make
+  collection filtering and sorting use working-copy values.
+- Raw responses bypass working-copy changes, as they do today.
+
+The client handles serialization and raw-response options; the proxy does not
+need to interpret them. Preserve Drupal's response bodies, status codes, and
+safe response headers, except when the proxy rejects a request or reports a
+session error. Direct and proxied reads must agree on supported query options,
+languages, errors, and response shapes.
+
+Route pagination and other supported Drupal links through the proxy in the
+client's transport layer, without rewriting response bodies. Do not let an
+absolute Drupal URL bypass the proxy. Start with resource and collection reads;
+other inherited methods are not automatically supported by the read-only proxy.
+
+Draft collections make an additional browser-to-proxy request for each working
+copy. Accept this preview-only overhead in exchange for keeping draft behavior
+in one client implementation and the proxy limited to HTTP forwarding,
+authentication, and access controls.
+
 ## Remaining decisions
 
+- The proxy's mount path, exact supported routes and options, and client-side
+  mapping of Drupal URLs to the proxy. Check index discovery, pagination links,
+  views, and path resolution, which may use other endpoints.
+- Public types for the client provider, and how preview renewal triggers browser
+  data refresh and cache clearing.
 - Compatibility decisions for the other runtime APIs listed in Scope.
 
 ## Consequences
@@ -315,3 +444,10 @@ Implementation spans Drupal context generation, dependency detection, the island
 renderer, the headless response, and React integration. Verification must cover
 field parity, separate islands and trees, concurrent requests, hydration,
 navigation, preview updates, missing context, and editor data inspection.
+
+JSON:API consolidation also requires a headless server endpoint for portable
+browser reads. Verify public and authenticated requests, custom prefixes,
+working-copy resources and collections, response serialization, session expiry
+and renewal, embedded-preview cookies, cache isolation, and rejection of writes
+and arbitrary destinations. Keep explicit client construction and legacy Drupal
+and Workbench behavior covered.
