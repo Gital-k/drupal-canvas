@@ -116,6 +116,11 @@ contracts of each runtime API, even when their types are not separately exported
 by name. This includes page and site data, menu inputs and outputs, component
 props, and catalog validation results.
 
+Types follow the decisions for their APIs: retain authoring types with the
+Workbench and CLI utilities, preserve upstream JSON:API contracts, and keep the
+existing types for unchanged and deprecated APIs. Replacement hooks and
+providers use the public types defined below.
+
 ### Replace page and site getters with context hooks
 
 Replace `getPageData()` with `usePageContext()` and `getSiteData()` with
