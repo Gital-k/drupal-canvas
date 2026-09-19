@@ -628,16 +628,20 @@ required by this decision.
 
 ### APIs supported unchanged
 
-Support these APIs unchanged in both frontend modes:
+These APIs already work in both frontend modes and require no changes:
 
 - `sortLinksetMenu`
 - `sortMenu`
 - `getNodePath`
 - `cn`
 - `FormattedText`
+- `Image` (`drupal-canvas/next-image-standalone`)
 
 `FormattedText` callers remain responsible for supplying trusted or sanitized
 HTML.
+
+Verify `Image` with Drupal media images, derivatives, and SVGs on a separate
+headless origin, including server rendering and hydration.
 
 ## Remaining decisions
 
