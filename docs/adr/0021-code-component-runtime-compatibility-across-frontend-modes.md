@@ -603,6 +603,11 @@ export function SwrFallback({
 }
 ```
 
+`DefaultSerializer` adds non-enumerable `getMeta()` and `getLinks()` methods
+that do not survive JSON serialization into hydration fallback data.
+Applications whose components use these methods must account for that
+limitation; ordinary field access is unaffected.
+
 Fallback keys and response shapes must match the component's requests. For array
 or object keys, use SWR's `unstable_serialize` to create the matching fallback
 key. Share key and query helpers where useful to avoid mismatches.
@@ -636,6 +641,8 @@ These APIs already work in both frontend modes and require no changes:
 - `cn`
 - `FormattedText`
 - `Image` (`drupal-canvas/next-image-standalone`)
+- `DefaultSerializer` and `createCache`, upstream re-exports from
+  `drupal-canvas/jsonapi-client`.
 
 `FormattedText` callers remain responsible for supplying trusted or sanitized
 HTML.
@@ -661,10 +668,6 @@ tree returned by the Headless SDK's `fetchPage()`.
 Do not deprecate them or extend them for headless rendering. Headless
 applications use `CanvasComponentTree` and the SDK's component registry
 machinery instead.
-
-## Remaining decisions
-
-- Compatibility decisions for the other runtime APIs listed in Scope.
 
 ## Consequences
 
