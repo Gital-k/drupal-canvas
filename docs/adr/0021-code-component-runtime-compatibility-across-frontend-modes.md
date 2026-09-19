@@ -265,10 +265,12 @@ paths must wrap the rendered output in `CanvasContextProvider`, including page
 templates and their page content.
 
 Change only the component-facing API, not Workbench's data-loading behavior. The
-existing Vite integration loads `/canvas/api/v0/site-data` and exposes the
-result through `drupalSettings`. Populate the provider from the same settings,
-preserving existing values and fallbacks, including Drupal theme assets. Keep
-`getPageData()` and `getSiteData()` working for backward compatibility.
+existing Vite integration loads `/canvas/api/v0/site-data`. Fetch once and pass
+the data directly to the provider, preserving existing values and fallbacks,
+including Drupal theme assets. Also populate `drupalSettings` for legacy
+consumers, including `getPageData()`, `getSiteData()`, and the current
+`JsonApiClient`. This is a compatibility mechanism, not the data source for the
+new context API.
 
 Workbench does not currently load page-specific Drupal context. Preserve the
 existing page-data defaults: `pageTitle: ''`, `breadcrumbs: []`, and
@@ -277,9 +279,8 @@ a missing-provider condition. Do not introduce page selection, additional page
 requests, or authored fixtures as part of this change.
 
 The interactive iframe stays mounted across preview targets. Ensure the provider
-reflects the current settings during preview updates and hot updates. Verify
-that hooks and legacy getters expose equivalent data in both preview rendering
-paths.
+reflects the current data during preview updates and hot updates. Verify that
+hooks and legacy getters expose equivalent data in both preview rendering paths.
 
 #### Navigation URLs and headless theme assets
 
