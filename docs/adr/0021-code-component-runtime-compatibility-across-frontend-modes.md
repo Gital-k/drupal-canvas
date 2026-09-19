@@ -309,6 +309,12 @@ into one implementation in `drupal-canvas`. Both already extend
 environment configuration and preview sessions; the shared client stays usable
 in browsers.
 
+Although this ADR targets React Code Component compatibility, the JSON:API
+client and its supporting utilities must be framework-agnostic. Configuration,
+draft handling, proxy logic, and URL mapping must work without React in any
+frontend framework. React hooks and providers are a convenience layer over this
+shared implementation, not a requirement for using it.
+
 React Code Components use `useJsonApiClient()` from `drupal-canvas`. The hook
 reads a client from context. It does not fetch data or create a client on each
 render. Components can use the client with SWR or another fetching library.
@@ -350,20 +356,24 @@ integrations can still construct a client explicitly.
 
 #### Headless browser requests use a JSON:API proxy
 
-Add a read-only, same-origin JSON:API proxy to the headless application. The
-hook's browser client sends both public and draft requests through it, using
-ordinary JSON:API paths and query parameters rather than a client-operation
-protocol. The proxy forwards requests and response bodies without processing
-JSON:API documents. Server code uses the same client but calls Drupal directly.
+Add a same-origin JSON:API proxy to the headless application. Configure its full
+upstream JSON:API base URL on the server. Map the proxy's local prefix to that
+URL and forward the remaining path and query parameters, rather than listing
+individual resource routes. The hook's browser client sends both public and
+draft requests through it, using ordinary JSON:API paths and query parameters
+rather than a client-operation protocol. The proxy forwards requests and
+response bodies without processing JSON:API documents. Server code uses the same
+client but calls Drupal directly.
 
 ```text
 Code Component → shared browser client → application proxy → Drupal
 Server code → shared server client → Drupal
 ```
 
-Put the shared endpoint logic in the headless SDK. React headless adapters mount
-the route and provide access to the request and session. This endpoint does not
-exist yet.
+Put the shared endpoint logic in the framework-independent headless SDK.
+Framework adapters or custom application integrations mount the route and
+provide access to the request and session. The proxy must not depend on React or
+a React-specific adapter. This endpoint does not exist yet.
 
 Reuse the SDK's preview session: a framework draft flag and an HTTP-only cookie
 containing the token. Keep the `Secure`, `SameSite=None`, and `Partitioned`
@@ -384,11 +394,18 @@ Choose request behavior from the session:
 Connect session errors to preview renewal. Update the browser client's preview
 configuration and refresh affected data after renewal or preview changes.
 
-Restrict the endpoint to supported reads from the configured Drupal backend.
-Reject writes and arbitrary URLs. Check paths and redirects to prevent sending
-credentials to another origin. Do not forward arbitrary browser authentication
-headers or Drupal response cookies. Restrict browser access to the application's
-origin; do not enable permissive CORS for these cookie-authenticated requests.
+The existing headless preview authentication already supports operations under
+the editor's Drupal permissions, including writes. The proxy reuses that access;
+it does not add a separate read-only restriction. Drupal remains responsible for
+authorizing each operation. Writes affect Drupal content, not an isolated
+preview copy.
+
+Restrict requests to the server-configured JSON:API base URL. Reject arbitrary
+destinations and validate paths and redirects to keep requests within that
+boundary. Do not forward arbitrary browser authentication headers or Drupal
+response cookies. Restrict browser access to the application's origin and
+protect state-changing requests against CSRF; CORS restrictions alone are not
+CSRF protection.
 
 Keep authenticated draft responses out of shared caches with private, no-store
 responses. Disable client caches or separate them by session and resource
@@ -417,8 +434,8 @@ languages, errors, and response shapes.
 
 Route pagination and other supported Drupal links through the proxy in the
 client's transport layer, without rewriting response bodies. Do not let an
-absolute Drupal URL bypass the proxy. Start with resource and collection reads;
-other inherited methods are not automatically supported by the read-only proxy.
+absolute Drupal URL bypass the proxy. Methods that use endpoints outside the
+configured JSON:API base URL require a separate compatibility decision.
 
 Draft collections make an additional browser-to-proxy request for each working
 copy. Accept this preview-only overhead in exchange for keeping draft behavior
@@ -427,9 +444,10 @@ authentication, and access controls.
 
 ## Remaining decisions
 
-- The proxy's mount path, exact supported routes and options, and client-side
-  mapping of Drupal URLs to the proxy. Check index discovery, pagination links,
-  views, and path resolution, which may use other endpoints.
+- The proxy's mount path and client-side mapping of Drupal URLs to the proxy.
+  Check index discovery, pagination links, language prefixes, views, and path
+  resolution against the configured JSON:API base URL.
+- CSRF protection for proxied writes and cache invalidation after mutations.
 - Public types for the client provider, and how preview renewal triggers browser
   data refresh and cache clearing.
 - Compatibility decisions for the other runtime APIs listed in Scope.
@@ -448,6 +466,6 @@ navigation, preview updates, missing context, and editor data inspection.
 JSON:API consolidation also requires a headless server endpoint for portable
 browser reads. Verify public and authenticated requests, custom prefixes,
 working-copy resources and collections, response serialization, session expiry
-and renewal, embedded-preview cookies, cache isolation, and rejection of writes
-and arbitrary destinations. Keep explicit client construction and legacy Drupal
-and Workbench behavior covered.
+and renewal, embedded-preview cookies, cache isolation, authorized and denied
+writes, CSRF protection, and rejection of arbitrary destinations. Keep explicit
+client construction and legacy Drupal and Workbench behavior covered.
