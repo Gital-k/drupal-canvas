@@ -12,3 +12,6 @@ Workbench runtime for the legacy getters and `new JsonApiClient()`.
 Generated previews resolve one site-data snapshot for the legacy
 `drupalSettings` and the hooks: discovered site data, then the static
 settings, then the preview origin.
+
+The generated entry resolves that snapshot from the same inputs as the
+bootstrap script instead of reading the legacy settings back.
