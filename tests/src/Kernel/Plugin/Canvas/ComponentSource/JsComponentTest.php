@@ -1816,7 +1816,9 @@ final class JsComponentTest extends JsonSchemaPropsComponentSourceBaseTestBase {
    * @see https://git.drupalcode.org/project/canvas/-/merge_requests/1332#note_1424036
    */
   private static function expectImagePropsInExampleOrderOn113(int $width, int $height, string $alt): array {
-    return version_compare(\Drupal::VERSION, '11.4', '>=')
+    // The threshold is `11.4-dev`, not `11.4`: version_compare() sorts
+    // `11.4-dev` below `11.4`, and dev checkouts already cast on save.
+    return version_compare(\Drupal::VERSION, '11.4-dev', '>=')
       ? ['alt' => $alt, 'width' => $width, 'height' => $height]
       : ['width' => $width, 'height' => $height, 'alt' => $alt];
   }
