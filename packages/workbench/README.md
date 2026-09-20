@@ -29,10 +29,11 @@ npx canvas-workbench
 The `canvas-workbench` binary starts the packaged Workbench Vite runtime in your
 current working directory.
 
-On startup, Workbench scans its client modules and your configured `componentDir`
-for dependencies before the first preview. Libraries such as SWR are optimized
-when your components import them; projects that do not use them need not install
-them. Workbench continues to supply its own shared React runtime.
+On startup, Workbench scans its client modules and your configured
+`componentDir` for dependencies before the first preview. Libraries such as SWR
+are optimized when your components import them; projects that do not use them
+need not install them. Workbench continues to supply its own shared React
+runtime.
 
 ## Configuration
 
