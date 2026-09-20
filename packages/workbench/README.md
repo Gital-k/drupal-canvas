@@ -160,8 +160,10 @@ For end-user guidance, see:
   changes. Source-only edits update the preview via Vite HMR without remounting
   the iframe; in-place edits to component metadata, mocks, and page specs
   refresh the mounted iframe with the fresh data, so component state survives
-  while props and mock data update. Only structural changes (a component, page,
-  or template added or removed) remount the iframe.
+  while props and mock data update. The iframe is remounted when the discovery
+  structure changes (a component, page, or template added or removed) and when
+  one of those files, a mock file included, is added or removed rather than
+  edited in place.
 
 ## Strict preview MVP contract
 
