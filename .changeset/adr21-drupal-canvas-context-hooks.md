@@ -31,3 +31,10 @@ classified by the credentials the request actually carried, selected working
 copies take precedence over included copies of the same resource, and URLs
 keep the backend's site path for JSON:API, the Decoupled Router and index
 lookups.
+
+Shared caching also stays off, absent an explicit scope, for the legacy
+client, custom transports and browser clients with default credentials; a
+401 is classified by the configured credential lifecycle (with
+`fetchAuthenticates` for custom transports) and credential acquisition
+failures never downgrade a draft read; `apiSiteUrl` localizes a JSON:API base
+on another site.
