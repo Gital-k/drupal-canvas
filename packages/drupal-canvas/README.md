@@ -161,7 +161,7 @@ import useSWR from 'swr';
 
 export default function List() {
   const client = useJsonApiClient();
-  const { data, error, isLoading } = useSWR(client ? 'articles' : null, () =>
+  const { data, error } = useSWR(client ? 'articles' : null, () =>
     client.getCollection('node--article', {
       queryString: new DrupalJsonApiParams()
         .addInclude(['field_tags'])
@@ -170,7 +170,9 @@ export default function List() {
   );
 
   if (error) return 'An error has occurred.';
-  if (isLoading || !data) return 'Loading...';
+  // Test for data, not `isLoading`: with prefetched SWR fallback data the
+  // data is present while SWR still reports loading during revalidation.
+  if (!data) return 'Loading...';
   return (
     <ul>
       {data.map((article) => (
