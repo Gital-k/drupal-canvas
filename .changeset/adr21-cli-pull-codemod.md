@@ -21,3 +21,7 @@ twice.
 React wrappers are recognized by their `react` import binding and only for
 their component argument, and a replacement hook name shadowed anywhere in
 the file leaves the file unchanged.
+
+Component positions are decided syntactically before the name (named
+callbacks passed to other calls are not components), and re-exported getters
+leave the file unchanged.
