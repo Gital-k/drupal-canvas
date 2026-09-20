@@ -12,4 +12,3 @@ so `usePageContext()` and `useSiteContext()` work in headless components.
 Server rendering follows one contract in every React adapter: prefetch draft
 data with `getClient()` and supply SWR fallback data; the hook's client is the
 same on both sides of hydration.
-
