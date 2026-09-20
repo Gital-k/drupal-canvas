@@ -1,4 +1,10 @@
-import { createElement } from 'react';
+import { createElement, useMemo } from 'react';
+import {
+  CanvasContextProvider,
+  createJsonApiClient,
+  JsonApiClientProvider,
+  useHasJsonApiClient,
+} from 'drupal-canvas';
 
 import '@drupal-canvas/headless/preview.css';
 
@@ -18,11 +24,14 @@ import {
   reportMissingCanvasComponentUuid,
 } from '@drupal-canvas/headless';
 
+import { useJsonApiRuntimeConfig } from './jsonapi-runtime';
+
 import type { ElementType, ReactNode } from 'react';
 import type {
   CanvasComponentTreeElement,
   CanvasMarker as CanvasMarkerProps,
 } from '@drupal-canvas/headless';
+import type { CanvasContext, JsonApiRuntimeConfig } from 'drupal-canvas';
 
 /** App component implementations keyed by component.yml machine name. */
 export type CanvasComponentRegistry = Record<string, ElementType>;
@@ -30,6 +39,33 @@ export type CanvasComponentRegistry = Record<string, ElementType>;
 export interface CanvasComponentTreeProps {
   tree: CanvasComponentTreeElement | null;
   components: CanvasComponentRegistry;
+  /**
+   * The page and site context from `fetchPage()` (`page.context`). When
+   * supplied, the tree renders inside its own `CanvasContextProvider`,
+   * taking precedence over any outer provider, `null` values included. When
+   * omitted, an outer `CanvasContextProvider` is inherited without adding
+   * another provider.
+   */
+  context?: CanvasContext;
+  /**
+   * The nonsecret JSON:API runtime configuration prepared by the SDK's
+   * server integration (`getJsonApiRuntimeConfig()`). When omitted, the
+   * configuration of the nearest `JsonApiRuntimeProvider` applies (framework
+   * adapters supply it from their server integration). With configuration,
+   * the renderer creates the browser client for `useJsonApiClient()`, which
+   * sends requests through the application's same-origin proxy. Without
+   * configuration, an outer `JsonApiClientProvider` is inherited; otherwise
+   * the hook reports the missing provider.
+   *
+   * Server rendering: this client component cannot reach the request's
+   * draft session (only serializable props cross the server/client boundary
+   * and credentials are never serialized). For public rendering it creates
+   * a direct, unauthenticated client. In a live draft session it creates no
+   * client, so a component that fetches during rendering can never receive
+   * public content masquerading as a draft; prefetch draft data with the
+   * SDK's `getClient()` and supply it as SWR fallback data instead.
+   */
+  jsonApi?: JsonApiRuntimeConfig;
 }
 
 interface CanvasElementProps {
@@ -48,7 +84,79 @@ interface CanvasElementProps {
 export function CanvasComponentTree({
   tree,
   components,
+  context,
+  jsonApi,
 }: CanvasComponentTreeProps) {
+  const rendered = <CanvasTreeContent tree={tree} components={components} />;
+  const withClient = (
+    <CanvasTreeClientProvider jsonApi={jsonApi}>
+      {rendered}
+    </CanvasTreeClientProvider>
+  );
+  return context === undefined ? (
+    withClient
+  ) : (
+    <CanvasContextProvider context={context}>
+      {withClient}
+    </CanvasContextProvider>
+  );
+}
+
+/**
+ * Creates the JSON:API client for the tree from the runtime configuration,
+ * reusing it while the configuration stays unchanged. Without configuration
+ * an outer provider is inherited.
+ */
+function CanvasTreeClientProvider({
+  jsonApi: explicitConfig,
+  children,
+}: {
+  jsonApi?: JsonApiRuntimeConfig;
+  children: ReactNode;
+}) {
+  const runtimeConfig = useJsonApiRuntimeConfig();
+  const hasOuterClient = useHasJsonApiClient();
+  // Precedence: the explicit prop, then the adapter-supplied runtime
+  // configuration, then an outer JsonApiClientProvider.
+  const jsonApi = explicitConfig ?? runtimeConfig;
+  const key = jsonApi ? JSON.stringify(jsonApi) : null;
+  const client = useMemo(() => {
+    if (!jsonApi) {
+      return null;
+    }
+    if (typeof window !== 'undefined') {
+      // Browser: through the application's same-origin proxy, which
+      // authenticates from the session cookie.
+      return createJsonApiClient({ ...jsonApi, credentials: 'same-origin' });
+    }
+    if (jsonApi.preview) {
+      // Server rendering in a live draft session: no request-aware client
+      // can be created here (see the jsonApi prop), and a public client
+      // would let draft rendering silently fall back to published content.
+      return null;
+    }
+    // Server rendering of public content: direct, unauthenticated.
+    return createJsonApiClient({
+      ...jsonApi,
+      proxyUrl: undefined,
+      resourceVersion: null,
+      preview: false,
+    });
+    // The serialized configuration is the identity of the client.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  if (client === null || (hasOuterClient && !jsonApi)) {
+    return <>{children}</>;
+  }
+  return (
+    <JsonApiClientProvider client={client}>{children}</JsonApiClientProvider>
+  );
+}
+
+function CanvasTreeContent({
+  tree,
+  components,
+}: Pick<CanvasComponentTreeProps, 'tree' | 'components'>) {
   const editor = isCanvasComponentTreeDraft(tree);
   const previewContentRegion = editor && hasCanvasPreviewContentRegion(tree);
   const emptyRegion =

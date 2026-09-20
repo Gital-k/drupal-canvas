@@ -35,7 +35,8 @@
     "type-check": "tsc --noEmit --pretty"
   },
   "dependencies": {
-    "@drupal-canvas/headless": "^0.6.0"
+    "@drupal-canvas/headless": "^0.6.0",
+    "drupal-canvas": "^0.5.1"
   },
   "peerDependencies": {
     "react": ">=18.0.0"

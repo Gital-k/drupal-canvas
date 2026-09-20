@@ -781,6 +781,30 @@ describe('getDataDependenciesFromAst', () => {
     });
   });
 
+  it('should detect needed drupalSettings when using the context hooks', () => {
+    const code = `
+      import useSWR from 'swr';
+      import {
+        usePageContext as usePage,
+        useSiteContext,
+        useJsonApiClient,
+      } from 'drupal-canvas';
+    `;
+    const ast = parse(code, { sourceType: 'module' });
+    const result = getDataDependenciesFromAst(ast);
+    expect(result).to.deep.equal({
+      drupalSettings: [
+        'v0.breadcrumbs',
+        'v0.pageTitle',
+        'v0.mainEntity',
+        'v0.baseUrl',
+        'v0.branding',
+        'v0.themeAssets',
+        'v0.jsonapiSettings',
+      ],
+    });
+  });
+
   it('should not include drupalSettings property when it stays empty', () => {
     const code = `
       import useSWR from 'swr';
