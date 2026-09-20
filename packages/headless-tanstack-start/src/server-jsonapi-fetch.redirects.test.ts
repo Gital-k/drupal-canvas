@@ -97,6 +97,64 @@ describe('serverJsonApiFetch redirects', () => {
     ).rejects.toThrow(/Too many redirects/);
   });
 
+  it('honors explicit redirect modes and re-sends Request bodies', async () => {
+    answers.set('/api/canvas/jsonapi/jsonapi/node/article', async () =>
+      redirect(307, '/api/canvas/jsonapi/jsonapi/node/article/final'),
+    );
+    const seen: Array<{ method: string; body: string }> = [];
+    answers.set(
+      '/api/canvas/jsonapi/jsonapi/node/article/final',
+      async (request) => {
+        seen.push({ method: request.method, body: await request.text() });
+        return Response.json({ ok: true });
+      },
+    );
+    // `manual`: the redirect is returned as is; `error`: it fails.
+    const manual = await serverJsonApiFetch(
+      '/api/canvas/jsonapi/jsonapi/node/article',
+      { redirect: 'manual' },
+    );
+    expect(manual.status).toBe(307);
+    expect(manual.headers.get('location')).toBe(
+      '/api/canvas/jsonapi/jsonapi/node/article/final',
+    );
+    await expect(
+      serverJsonApiFetch('/api/canvas/jsonapi/jsonapi/node/article', {
+        redirect: 'error',
+      }),
+    ).rejects.toThrow(/does not allow redirects/);
+    expect(seen).toEqual([]);
+
+    // A Request object's body is replayed on 307, like a string init body.
+    const response = await serverJsonApiFetch(
+      new Request(
+        'https://app.example/api/canvas/jsonapi/jsonapi/node/article',
+        {
+          method: 'POST',
+          body: '{"data":{"id":"r"}}',
+          headers: { 'content-type': 'application/vnd.api+json' },
+        },
+      ),
+    );
+    expect(response.status).toBe(200);
+    expect(seen).toEqual([{ method: 'POST', body: '{"data":{"id":"r"}}' }]);
+
+    // A streamed init body cannot be replayed: the redirect fails, as in Fetch.
+    await expect(
+      serverJsonApiFetch('/api/canvas/jsonapi/jsonapi/node/article', {
+        method: 'POST',
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{}'));
+            controller.close();
+          },
+        }),
+        // @ts-expect-error duplex is required for stream bodies in Node.
+        duplex: 'half',
+      }),
+    ).rejects.toThrow(/cannot be re-sent/);
+  });
+
   it('returns 502 refusals from the handler unchanged', async () => {
     answers.set('/api/canvas/jsonapi/jsonapi/node/article/a', async () =>
       Response.json({ error: 'redirect_not_allowed' }, { status: 502 }),
