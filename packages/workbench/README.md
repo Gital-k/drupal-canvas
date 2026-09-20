@@ -77,7 +77,9 @@ Page context uses the Workbench defaults (`pageTitle: ''`, `breadcrumbs: []`,
 data the Vite integration loads once from `/canvas/api/v0/site-data`
 (`CANVAS_SITE_URL`), with the same fallbacks as before. The legacy
 `getPageData()`, `getSiteData()`, and `new JsonApiClient()` APIs keep working
-through `drupalSettings` in both paths.
+through `drupalSettings` in both paths, resolved from the same snapshot as the
+hooks: discovered site data first, then the static `CANVAS_SITE_URL` and
+`CANVAS_JSONAPI_PREFIX` settings, then the preview origin.
 
 ## Preview build command
 
