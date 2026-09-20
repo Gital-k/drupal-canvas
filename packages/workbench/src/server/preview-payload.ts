@@ -185,7 +185,13 @@ export function buildPreviewRuntimeEntrySource(options: {
   pageTemplateSpec?: Spec | null;
   componentSources: BundleComponentSource[];
   cssEntryPaths: string[];
+  /** The static settings; the site data module supplies the rest. */
+  runtimeSettings?: PreviewRuntimeSettings;
 }): string {
+  const runtimeSettings = options.runtimeSettings ?? {
+    baseUrl: null,
+    jsonapiPrefix: null,
+  };
   const componentImports = options.componentSources
     .map(
       (source, index) =>
@@ -239,19 +245,18 @@ export function buildPreviewRuntimeEntrySource(options: {
     'if (pageTemplateSpec) { registry["marker.page_content"] = () => pageContent; }',
     'const renderedNode = pageTemplateSpec ? renderSpec(pageTemplateSpec, registry) : pageContent;',
     // The same providers the interactive preview mounts: Workbench page
-    // defaults and the site data loaded once by the Vite integration. The
-    // backend base URL and JSON:API prefix come from the legacy settings the
-    // bootstrap script resolved (discovered site data, then the static
-    // settings, then the preview origin), so the hooks and `getSiteData()`
-    // describe the same backend.
+    // defaults and the site data loaded once by the Vite integration,
+    // resolved with the static settings and the preview origin exactly as
+    // the bootstrap script resolves the legacy settings — from the same
+    // inputs, not from the legacy settings themselves.
     // @see ../lib/workbench-context.ts
-    // @see buildPreviewBootstrapScript()
+    // @see resolvePreviewSiteData()
     WORKBENCH_CONTEXT_RUNTIME_SOURCE,
-    'const canvasLegacySettings = (window.drupalSettings && window.drupalSettings.canvasData && window.drupalSettings.canvasData.v0) || {};',
-    'const canvasPreviewBaseUrl = canvasLegacySettings.baseUrl || window.location.origin;',
-    'const canvasResolvedSiteData = { ...(canvasSiteData || {}), baseUrl: canvasPreviewBaseUrl, jsonapiSettings: canvasLegacySettings.jsonapiSettings === undefined ? (canvasSiteData ? canvasSiteData.jsonapiSettings : undefined) : canvasLegacySettings.jsonapiSettings };',
-    'const canvasContext = createWorkbenchContext(canvasResolvedSiteData, canvasPreviewBaseUrl);',
-    'const canvasJsonApiConfig = createWorkbenchJsonApiConfig(canvasResolvedSiteData, canvasPreviewBaseUrl);',
+    WORKBENCH_SITE_DATA_RUNTIME_SOURCE,
+    `const canvasStaticSettings = ${JSON.stringify(runtimeSettings)};`,
+    'const canvasResolvedSiteData = resolvePreviewSiteData(canvasStaticSettings, canvasSiteData);',
+    'const canvasContext = createWorkbenchContext(canvasResolvedSiteData, canvasPreviewOrigin);',
+    'const canvasJsonApiConfig = createWorkbenchJsonApiConfig(canvasResolvedSiteData, canvasPreviewOrigin);',
     'const withClient = canvasJsonApiConfig ? React.createElement(JsonApiClientProvider, { client: createJsonApiClient(canvasJsonApiConfig) }, renderedNode) : renderedNode;',
     'createRoot(container).render(React.createElement(CanvasContextProvider, { context: canvasContext }, withClient));',
   ].join('\n');
@@ -332,8 +337,13 @@ function toPayload(
  * data the Vite integration discovered wins, the static `CANVAS_SITE_URL` /
  * `CANVAS_JSONAPI_PREFIX` settings fill what discovery did not provide, and
  * the preview origin is the last resort (applied in the browser). The legacy
- * `drupalSettings` bootstrap and the context hooks read the same snapshot, so
- * `getSiteData()` and `useSiteContext()` never disagree about the backend.
+ * `drupalSettings` bootstrap resolves it on the server and the generated
+ * entry resolves it in the browser from the same inputs (the inlined static
+ * settings and the site data module), so `getSiteData()` and
+ * `useSiteContext()` never disagree about the backend without either reading
+ * the other's output.
+ *
+ * Mirrored by `WORKBENCH_SITE_DATA_RUNTIME_SOURCE` below; keep them in sync.
  */
 export function resolvePreviewSiteData(
   runtimeSettings: PreviewRuntimeSettings,
@@ -360,6 +370,25 @@ export function resolvePreviewSiteData(
     ...(jsonapiSettings !== undefined && { jsonapiSettings }),
   };
 }
+
+/**
+ * The browser-side mirror of `resolvePreviewSiteData()` and of the bootstrap
+ * script's origin fallback, inlined into the generated entry.
+ */
+const WORKBENCH_SITE_DATA_RUNTIME_SOURCE = [
+  'function resolvePreviewSiteData(runtimeSettings, siteData) {',
+  '  const baseUrl = (siteData && siteData.baseUrl) || runtimeSettings.baseUrl || undefined;',
+  '  const discoveredPrefix = siteData && siteData.jsonapiSettings && siteData.jsonapiSettings.apiPrefix;',
+  '  const jsonapiSettings = siteData && siteData.jsonapiSettings === null',
+  '    ? null',
+  '    : (discoveredPrefix || runtimeSettings.jsonapiPrefix)',
+  '      ? { ...(siteData && siteData.jsonapiSettings), apiPrefix: discoveredPrefix || runtimeSettings.jsonapiPrefix }',
+  '      : undefined;',
+  '  if (!siteData && !baseUrl && jsonapiSettings === undefined) { return null; }',
+  '  return { ...siteData, ...(baseUrl ? { baseUrl } : {}), ...(jsonapiSettings !== undefined ? { jsonapiSettings } : {}) };',
+  '}',
+  "const canvasPreviewOrigin = ['http:', 'https:'].includes(window.location.protocol) ? window.location.origin : 'http://localhost';",
+].join('\n');
 
 function buildPreviewBootstrapScript(
   runtimeSettings: PreviewRuntimeSettings,
@@ -547,6 +576,7 @@ export async function bundleInteractivePreview(options: {
   pageTemplateSpec?: Spec | null;
   componentSources: BundleComponentSource[];
   cssEntryPaths: string[];
+  runtimeSettings?: PreviewRuntimeSettings;
 }): Promise<InteractiveBundleResult> {
   const require = createRequire(import.meta.url);
   const reactPackageRoot = path.dirname(require.resolve('react/package.json'));
@@ -568,6 +598,7 @@ export async function bundleInteractivePreview(options: {
     pageTemplateSpec: options.pageTemplateSpec,
     componentSources: options.componentSources,
     cssEntryPaths: options.cssEntryPaths,
+    runtimeSettings: options.runtimeSettings,
   });
   const canvasViteConfig = createCanvasViteBuildConfig({
     hostRoot: options.projectRoot,
@@ -1095,6 +1126,7 @@ export async function buildPreviewPayload(
           : null,
       componentSources: preparedResult.prepared.bundleSources,
       cssEntryPaths: uniqueCssPaths,
+      runtimeSettings,
     });
 
     const iframeHtml = buildIframeHtml(
