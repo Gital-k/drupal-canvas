@@ -168,14 +168,20 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     ] as $account) {
       $this->setCurrentAccount($account);
       $result = $this->renderPage($page);
-      self::assertSame('Stored title', self::responseData($result)['head']['title']);
+      $data = self::responseData($result);
+      self::assertSame('Stored title', $data['head']['title']);
+      // The context describes the same entity as the head and the content.
+      self::assertSame('Stored title', $data['context']['page']['pageTitle']);
       self::assertNotContains(AutoSaveManager::CACHE_TAG, $result->getCacheableMetadata()->getCacheTags());
       self::assertContains('oauth2_scopes', $result->getCacheableMetadata()->getCacheContexts());
     }
 
     $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE));
     $result = $this->renderPage($page);
-    self::assertSame('Auto-saved title', self::responseData($result)['head']['title']);
+    $data = self::responseData($result);
+    self::assertSame('Auto-saved title', $data['head']['title']);
+    self::assertSame('Auto-saved title', $data['context']['page']['pageTitle']);
+    self::assertSame($page->uuid(), $data['context']['page']['mainEntity']['uuid']);
     self::assertContains(AutoSaveManager::CACHE_TAG, $result->getCacheableMetadata()->getCacheTags());
     self::assertContains('oauth2_scopes', $result->getCacheableMetadata()->getCacheContexts());
   }
@@ -1107,6 +1113,10 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       'fr',
       $data['route']['entity']['langcode'],
     );
+    // The context follows the selected translation's auto-save too.
+    self::assertSame('French draft title', $data['context']['page']['pageTitle']);
+    self::assertSame('fr', $data['context']['page']['mainEntity']['requestedLanguage']);
+    self::assertSame('fr', $data['context']['page']['mainEntity']['renderedLanguage']);
   }
 
   /**
