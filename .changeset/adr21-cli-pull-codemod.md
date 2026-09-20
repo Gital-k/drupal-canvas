@@ -12,3 +12,8 @@ custom hook, with no possible earlier return and no identifier conflicts.
 Planned conversions show before the pull is confirmed and honor `--yes` and
 `--skip-overwrite`; remaining cases, `new JsonApiClient()` construction, and
 helper modules are reported with an AI-agent migration prompt.
+
+The codemod resolves namespace imports conservatively (bare hook calls with a
+root import, unchanged files on shadowed or computed namespace use), treats
+only `memo`/`forwardRef` wrappers as components, and never imports a hook
+twice.
