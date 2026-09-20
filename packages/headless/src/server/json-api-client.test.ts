@@ -52,6 +52,26 @@ describe('JSON:API client factories', () => {
         apiUrl: 'https://cdn.example/drupal/jsonapi',
       }),
     ).toBe('https://cdn.example/drupal/jsonapi');
+    // A foreign override with its site base URL is localizable there.
+    expect(
+      resolveJsonApiEndpoints({
+        baseUrl: 'https://drupal.example/sub',
+        jsonApiUrl: 'https://api.example/mount/api',
+        jsonApiSiteUrl: 'https://api.example/mount',
+      }),
+    ).toEqual({
+      baseUrl: 'https://drupal.example/sub',
+      apiPrefix: 'api',
+      apiUrl: 'https://api.example/mount/api',
+      apiSiteUrl: 'https://api.example/mount',
+    });
+    expect(() =>
+      resolveJsonApiEndpoints({
+        baseUrl: 'https://drupal.example/sub',
+        jsonApiUrl: 'https://api.example/other/api',
+        jsonApiSiteUrl: 'https://api.example/mount',
+      }),
+    ).toThrow(/not under its site base URL/);
     // Under the backend base URL (site in a subdirectory), the override is a
     // prefix relative to the site.
     expect(
