@@ -171,6 +171,65 @@ export default function Title() {
     ]);
   });
 
+  it('recognizes React wrappers by their binding and only their component argument', () => {
+    // `memo` from somewhere else, or shadowed, is not React's.
+    const foreign = `import { memo } from './cache';
+import { getPageData } from 'drupal-canvas';
+
+const Title = memo(() => <h1>{getPageData().pageTitle}</h1>);
+export default Title;
+`;
+    expect(migrateGetterCalls(foreign, 'index.jsx').changed).toBe(false);
+    const shadowed = `import { memo } from 'react';
+import { getPageData } from 'drupal-canvas';
+
+function memo(fn) { return fn; }
+const Title = memo(() => <h1>{getPageData().pageTitle}</h1>);
+export default Title;
+`;
+    expect(migrateGetterCalls(shadowed, 'index.jsx').changed).toBe(false);
+    // A comparator callback is not the component.
+    const comparator = `import { memo } from 'react';
+import { getPageData } from 'drupal-canvas';
+
+const Title = memo(
+  (props) => <h1>{props.title}</h1>,
+  (a, b) => getPageData().pageTitle === a.title,
+);
+export default Title;
+`;
+    const result = migrateGetterCalls(comparator, 'index.jsx');
+    expect(result.changed).toBe(false);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('not a component or custom hook'),
+    ]);
+    // Aliased and namespace React imports are React's wrappers.
+    const aliased = `import * as R from 'react';
+import { forwardRef as fr } from 'react';
+import { getPageData } from 'drupal-canvas';
+
+export const A = R.memo(() => <h1>{getPageData().pageTitle}</h1>);
+export const B = fr((props, ref) => <h1 ref={ref}>{getPageData().pageTitle}</h1>);
+`;
+    expect(migrateGetterCalls(aliased, 'index.jsx').changed).toBe(true);
+  });
+
+  it('leaves a file unchanged when the replacement name is shadowed anywhere', () => {
+    const source = `import { usePageContext } from 'drupal-canvas';
+import { getPageData } from '@/lib/drupal-utils';
+
+export default function Title({ usePageContext }) {
+  const page = getPageData();
+  return <h1>{page.pageTitle}{usePageContext}</h1>;
+}
+`;
+    const result = migrateGetterCalls(source, 'index.jsx');
+    expect(result.changed).toBe(false);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('`usePageContext` is already declared'),
+    ]);
+  });
+
   it('does not treat arbitrary call wrappers as components', () => {
     const source = `import { getPageData } from 'drupal-canvas';
 import { registerCallback } from './registry';
