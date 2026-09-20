@@ -49,10 +49,10 @@
       "types": "./src/component-preview-page.tsx",
       "default": "./src/component-preview-page.tsx"
     },
-    "./CanvasComponentTreeClient": {
-      "import": "./src/canvas-component-tree-client.tsx",
-      "types": "./src/canvas-component-tree-client.tsx",
-      "default": "./src/canvas-component-tree-client.tsx"
+    "./CanvasRuntime": {
+      "import": "./src/canvas-runtime.tsx",
+      "types": "./src/canvas-runtime.tsx",
+      "default": "./src/canvas-runtime.tsx"
     }
   },
   "scripts": {
