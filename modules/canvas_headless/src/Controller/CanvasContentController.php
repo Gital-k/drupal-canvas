@@ -8,6 +8,7 @@ use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas_headless\CanvasContentContextBuilder;
 use Drupal\canvas_headless\CanvasContentEntityRenderer;
 use Drupal\canvas_headless\CanvasContentHeadBuilder;
 use Drupal\canvas_headless\PreviewTokenInspector;
@@ -40,6 +41,7 @@ final class CanvasContentController {
     private readonly AutoSaveManager $autoSaveManager,
     private readonly CanvasContentEntityRenderer $entityRenderer,
     private readonly CanvasContentHeadBuilder $headBuilder,
+    private readonly CanvasContentContextBuilder $contextBuilder,
     #[Autowire(service: 'custom_elements.canvas_render_converter')]
     private readonly JsComponentCanvasRenderConverter $canvasRenderConverter,
     #[Autowire(service: 'custom_elements.normalizer')]
@@ -158,6 +160,10 @@ final class CanvasContentController {
       };
     }
 
+    // The page and site context React Code Components read through the
+    // `drupal-canvas` context hooks, generated for the routed request.
+    $context = $this->contextBuilder->build($cacheability);
+
     $response = new CacheableJsonResponse([
       'content' => $content,
       'head' => $head_result['head'],
@@ -167,6 +173,7 @@ final class CanvasContentController {
         $rendered_entity,
         $managed_by_canvas,
       ),
+      'context' => $context,
     ]);
     $response->addCacheableDependency($cacheability);
     return $response;

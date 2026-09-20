@@ -44,6 +44,32 @@ import HelloCard from './components/canvas/hello-card';
 />;
 ```
 
+Pass `context={page.context}` so registered components can read the page and
+site context through `usePageContext()` and `useSiteContext()` from
+`drupal-canvas`: the renderer wraps the tree in `CanvasContextProvider`. An
+explicit `context` prop takes precedence over an outer provider, `null` values
+included; when omitted, an outer `CanvasContextProvider` is inherited.
+
+`useJsonApiClient()` is served from the nonsecret JSON:API runtime configuration
+the SDK's server integration prepares (`getJsonApiRuntimeConfig()`): either the
+`jsonApi` prop, or the nearest `JsonApiRuntimeProvider` (framework adapters
+supply one, for example the Next.js `CanvasRuntime` server component; TanStack
+Start applications render it in the root route from loader data). Without
+configuration an outer `JsonApiClientProvider` is inherited, and without that
+the hook reports the missing provider. In the browser the client sends requests
+through the application's same-origin proxy. Server rendering creates its own
+client from the same configuration. Adapters whose server rendering runs inside
+the request pass `jsonApiFetch`, a request-aware transport that answers the
+client's proxy-mapped requests in-process with the current request's draft
+session (TanStack Start does this), so the hook returns the same non-null,
+draft-aware client on both sides of hydration and SWR fallback data renders into
+the initial HTML without a hydration mismatch; credentials never cross the
+server/client boundary. Without such a transport, public rendering gets a
+direct, unauthenticated client, and a live draft session gets no client, so
+draft rendering never falls back to published content. Data needed in the
+initial HTML is prefetched with the SDK's `getClient()` and supplied as SWR
+fallback data (see `@drupal-canvas/headless`).
+
 Named Canvas slots become React props with rendered `ReactNode` values; a
 `default` slot becomes `children`. Drupal markup strings are inserted as trusted
 HTML. Because React does not natively support rendering comment nodes, draft
