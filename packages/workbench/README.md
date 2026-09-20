@@ -158,7 +158,10 @@ For end-user guidance, see:
   `/__canvas/preview-manifest`, serves the shell on `/component/...`,
   `/page/...`, and `/page-template/...`, and watches the host project for file
   changes. Source-only edits update the preview via Vite HMR without remounting
-  the iframe.
+  the iframe; in-place edits to component metadata, mocks, and page specs
+  refresh the mounted iframe with the fresh data, so component state survives
+  while props and mock data update. Only structural changes (a component, page,
+  or template added or removed) remount the iframe.
 
 ## Strict preview MVP contract
 
