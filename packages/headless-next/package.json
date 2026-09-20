@@ -53,10 +53,10 @@
       "import": "./dist/component-preview-page.js",
       "default": "./dist/component-preview-page.js"
     },
-    "./CanvasComponentTreeClient": {
-      "types": "./dist/canvas-component-tree-client.d.ts",
-      "import": "./dist/canvas-component-tree-client.js",
-      "default": "./dist/canvas-component-tree-client.js"
+    "./CanvasRuntime": {
+      "types": "./dist/canvas-runtime.d.ts",
+      "import": "./dist/canvas-runtime.js",
+      "default": "./dist/canvas-runtime.js"
     }
   },
   "scripts": {
