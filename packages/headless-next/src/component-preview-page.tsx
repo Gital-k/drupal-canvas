@@ -42,7 +42,7 @@ export async function ComponentPreviewPage({
         }
         nextjs-portal { display: none !important; }
       `}</style>
-      <CanvasComponentTree tree={page.content} />
+      <CanvasComponentTree tree={page.content} context={page.context} />
     </main>
   );
 }
