@@ -61,6 +61,12 @@ export interface JsonApiRuntimeConfig {
    * Decoupled Router and other supporting endpoints stay under `baseUrl`.
    */
   apiUrl?: string;
+  /**
+   * The site base URL (origin plus install path) of the site serving a
+   * foreign `apiUrl`; a locale prefix goes between it and the JSON:API prefix.
+   * Without it a foreign `apiUrl` accepts no locale prefix.
+   */
+  apiSiteUrl?: string;
   /** Decoupled Router path without surrounding slashes. */
   routerPrefix?: string;
   /**
@@ -89,22 +95,36 @@ export interface JsonApiClientConfig extends JsonApiRuntimeConfig {
   serializer?: JsonApiClientOptions['serializer'] | null;
   /**
    * Client cache. Keys are scoped by resource version and `cacheScope`. A
-   * session-sensitive client — authenticated, sending cookies (`credentials`
-   * `same-origin`/`include`), going through the proxy, previewing, or
-   * reading a resource version — caches only with an explicit `cacheScope`:
-   * without one, responses fetched with one session could be served to
-   * another client sharing the cache, so the cache is ignored.
+   * client that may carry a session — authenticated, sending cookies
+   * (`credentials` `same-origin`/`include`, or unspecified in a browser,
+   * where fetch sends same-origin cookies by default), going through the
+   * proxy, using a custom `fetch` transport, previewing, or reading a
+   * resource version — caches only with an explicit `cacheScope`: without
+   * one, responses fetched with one session could be served to another
+   * client sharing the cache, so the cache is ignored.
    */
   cache?: Cache;
   /**
    * Distinguishes cache entries of different sessions sharing one cache
-   * object. Defaults to `public` for clients that carry no session.
-   * Session-sensitive clients must set a scope unique to the session (for
-   * example the session subject and token expiry) to cache at all.
+   * object. Defaults to `public` for clients that provably carry no session.
+   * Every other client must set a scope unique to the session (for example
+   * the session subject and token expiry), or `public` for a transport known
+   * to be anonymous, to cache at all.
    */
   cacheScope?: string;
-  /** Fetch implementation; defaults to the global `fetch`. */
+  /**
+   * Fetch implementation; defaults to the global `fetch`. A transport that
+   * attaches session credentials itself declares so with
+   * `fetchAuthenticates`, since the client cannot see what it sends.
+   */
   fetch?: typeof fetch;
+  /**
+   * Whether the custom `fetch` transport authenticates requests with session
+   * credentials of its own. A 401 answered to such a request (unless the
+   * request opted out with `disableAuthentication`) is then a rejected
+   * session (`DraftSessionError`) rather than an ordinary failure.
+   */
+  fetchAuthenticates?: boolean;
   /** Credentials mode for requests, e.g. `same-origin` for Drupal previews. */
   credentials?: RequestCredentials;
   /**
@@ -175,6 +195,7 @@ function createTransport(config: JsonApiClientConfig): typeof fetch {
           proxyUrl: config.proxyUrl,
           apiPrefix: config.apiPrefix,
           apiUrl: config.apiUrl,
+          apiSiteUrl: config.apiSiteUrl,
           routerPrefix: config.routerPrefix,
         }) ?? url;
     }
@@ -183,15 +204,22 @@ function createTransport(config: JsonApiClientConfig): typeof fetch {
       request.credentials = config.credentials;
     }
     const response = await fetchImpl(url, request);
-    // A direct request that actually carried the session credentials and is
-    // answered with 401 means Drupal rejected them (expired or revoked
-    // token). Requests without them (`disableAuthentication`), 403 and other
-    // failures are ordinary resource-level outcomes and stay with the caller.
-    if (
-      !config.proxyUrl &&
-      response.status === 401 &&
-      new Headers(request.headers).has('authorization')
-    ) {
+    // A direct request that carried the session credentials and is answered
+    // with 401 means Drupal rejected them (an expired or revoked token, an
+    // ended cookie session). The credentials are those of the configured
+    // lifecycle: the Authorization header the client added, the cookies a
+    // credentialed request sends, or what a transport declared to attach.
+    // Requests that opted out (`disableAuthentication`, `credentials:
+    // 'omit'`), 403 and other failures are ordinary resource-level outcomes
+    // and stay with the caller.
+    const optedOut = request.credentials === 'omit';
+    const carriesSession =
+      new Headers(request.headers).has('authorization') ||
+      (!optedOut &&
+        (config.credentials === 'same-origin' ||
+          config.credentials === 'include' ||
+          config.fetchAuthenticates === true));
+    if (!config.proxyUrl && response.status === 401 && carriesSession) {
       throw new DraftSessionError(
         'The draft preview session was rejected by Drupal.',
         401,
@@ -256,20 +284,25 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
     const api = resolveJsonApiBase(baseUrl, {
       apiPrefix: config.apiPrefix,
       apiUrl,
+      apiSiteUrl: config.apiSiteUrl,
     });
     const apiPrefix = api.apiPrefix;
     const routerPrefix =
       trimSlashes(config.routerPrefix ?? DEFAULT_ROUTER_PREFIX) ||
       DEFAULT_ROUTER_PREFIX;
     const resourceVersion = config.resourceVersion || null;
-    // Responses of a client that carries a session — through credentials,
-    // cookies, the proxy, or preview reads — are session-specific: without a
-    // scope that identifies the session, a shared cache must not hold them.
+    // Responses of a client that may carry a session — through credentials,
+    // cookies (explicit, or a browser's same-origin default when none are
+    // specified), the proxy, a custom transport, or preview reads — are
+    // session-specific: without a scope that identifies the session, a
+    // shared cache must not hold them.
     const sessionSensitive =
       Boolean(config.authentication) ||
       Boolean(config.proxyUrl) ||
+      Boolean(config.fetch) ||
       config.credentials === 'same-origin' ||
       config.credentials === 'include' ||
+      (config.credentials === undefined && typeof window !== 'undefined') ||
       Boolean(config.preview) ||
       resourceVersion !== null;
     const cache =
@@ -298,6 +331,10 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
       baseUrl,
       apiPrefix,
       ...(apiUrl && { apiUrl }),
+      ...(apiUrl &&
+        config.apiSiteUrl && {
+          apiSiteUrl: normalizeBaseUrl(config.apiSiteUrl),
+        }),
       routerPrefix,
       ...(config.proxyUrl && { proxyUrl: config.proxyUrl }),
       resourceVersion,
@@ -313,6 +350,30 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
     };
     router.createURL = ({ localeSegment, path }) =>
       `${baseUrl}/${localeSegment ? `${localeSegment}/` : ''}${routerPrefix}?path=${path}`;
+  }
+
+  /**
+   * Obtaining or renewing the configured credentials is part of the session
+   * lifecycle: a failure there (for example an OAuth renewal answered with
+   * `invalid_grant`) is a rejected session, never an ordinary request error
+   * that a collection read could paper over with published items.
+   */
+  override async addAuthorizationHeader(
+    options: RequestInit | undefined,
+  ): Promise<RequestInit> {
+    try {
+      return await super.addAuthorizationHeader(options);
+    } catch (error) {
+      if (isDraftSessionError(error)) {
+        throw error;
+      }
+      throw new DraftSessionError(
+        `The session credentials could not be obtained: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        401,
+      );
+    }
   }
 
   /**
@@ -332,9 +393,9 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
       resourceId,
       queryString,
     } = segments;
-    if (localeSegment && this.apiBase.foreign) {
+    if (localeSegment && !this.apiBase.siteKnown) {
       throw new Error(
-        `[drupal-canvas] A locale path prefix ("${localeSegment}") cannot be applied to a JSON:API base URL on another site (${this.apiBase.base}). Point baseUrl at that site or omit the locale.`,
+        `[drupal-canvas] A locale path prefix ("${localeSegment}") cannot be applied to a JSON:API base URL on another site (${this.apiBase.base}) without its site base URL (apiSiteUrl).`,
       );
     }
     const prefixUrl = `${this.apiBase.base}/${localeSegment ? `${localeSegment}/` : ''}${this.apiPrefix}`;
@@ -647,7 +708,9 @@ class LegacyJsonApiClient extends CanvasJsonApiClient {
       routerPrefix: decoupledRouterApiPrefix,
       authentication,
       cache,
-      cacheScope: 'legacy',
+      // No manufactured scope: the legacy client runs in a browser with the
+      // editor's cookies, so a shared cache needs a caller-provided scope.
+      cacheScope: (options as { cacheScope?: string } | undefined)?.cacheScope,
       fetch: customFetch as typeof fetch | undefined,
       serializer:
         options && 'serializer' in options ? (serializer ?? null) : undefined,
