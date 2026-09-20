@@ -8,6 +8,7 @@ import {
   buildPreviewPayload,
   buildPreviewRuntimeEntrySource,
   bundleInteractivePreview,
+  resolvePreviewSiteData,
   withBrandKitColorCss,
 } from './preview-payload';
 
@@ -401,8 +402,13 @@ props:
     );
 
     let capturedPageTemplateSpec: unknown = null;
+    const siteData = {
+      baseUrl: 'https://canvas.example.test',
+      branding: { homeUrl: '/', siteName: 'Color and context', siteSlogan: '' },
+      jsonapiSettings: { apiPrefix: 'jsonapi' },
+    };
 
-    await buildPreviewPayload(
+    const payload = await buildPreviewPayload(
       {
         mode: 'page',
         inputPath: 'pages/home.json',
@@ -411,7 +417,7 @@ props:
       {
         bundleInteractivePreview: async (options) => {
           capturedPageTemplateSpec = options.pageTemplateSpec ?? null;
-          return { js: '', css: '' };
+          return { js: '', css: '.nav{display:block;}', siteData };
         },
       },
     );
@@ -425,6 +431,17 @@ props:
       cssVariable: '--brand-red',
       cssColorValue: '#cc1a1a',
     });
+    expect(payload.ok).toBe(true);
+    expect(payload.iframeHtml).toContain('--brand-red:');
+    expect(payload.iframeHtml?.indexOf('--brand-red:')).toBeLessThan(
+      payload.iframeHtml?.indexOf('.nav{') ?? -1,
+    );
+    expect(payload.iframeHtml).toContain(
+      JSON.stringify({ branding: siteData.branding }),
+    );
+    expect(payload.iframeHtml).toContain(
+      'window.drupalSettings.canvasData.v0.jsonapiSettings.apiPrefix = "jsonapi";',
+    );
   });
 
   it('keeps interactive render mode and fails when interactive bundle throws', async () => {
@@ -553,8 +570,16 @@ props:
     expect(source).toContain(
       "import canvasSiteData from 'virtual:drupal-canvas/site-data';",
     );
+    // The hooks resolve the backend from the legacy settings the bootstrap
+    // script produced from the same site data, so both agree.
     expect(source).toContain(
-      'const canvasContext = createWorkbenchContext(canvasSiteData, window.location.origin);',
+      'const canvasPreviewBaseUrl = canvasLegacySettings.baseUrl || window.location.origin;',
+    );
+    expect(source).toContain(
+      'const canvasContext = createWorkbenchContext(canvasResolvedSiteData, canvasPreviewBaseUrl);',
+    );
+    expect(source).toContain(
+      'const canvasJsonApiConfig = createWorkbenchJsonApiConfig(canvasResolvedSiteData, canvasPreviewBaseUrl);',
     );
     expect(source).toContain(
       'React.createElement(CanvasContextProvider, { context: canvasContext }, withClient)',
@@ -579,11 +604,80 @@ props:
       'window.__drupalCanvasRuntime = { environment: "workbench" };',
     );
     expect(html).toContain(
-      'for (const [key, value] of Object.entries({"branding":{"homeUrl":"/","siteName":"Site","siteSlogan":""},"jsonapiSettings":{"apiPrefix":"jsonapi"}}))',
+      'for (const [key, value] of Object.entries({"branding":{"homeUrl":"/","siteName":"Site","siteSlogan":""}}))',
+    );
+    expect(html).toContain(
+      'window.drupalSettings.canvasData.v0.jsonapiSettings.apiPrefix = "jsonapi";',
     );
     expect(html).toContain(
       'window.drupalSettings.canvasData.v0.baseUrl = canvasPreviewBaseUrl;',
     );
+  });
+
+  it('resolves one site-data snapshot for the legacy settings and the hooks', () => {
+    // Discovered site data wins over the static settings; the static
+    // settings fill what discovery did not provide.
+    expect(
+      resolvePreviewSiteData(
+        { baseUrl: 'https://static.example.test', jsonapiPrefix: 'static' },
+        {
+          baseUrl: 'https://discovered.example.test',
+          jsonapiSettings: { apiPrefix: 'discovered' },
+          branding: { homeUrl: '/', siteName: 'Site', siteSlogan: '' },
+        },
+      ),
+    ).toEqual({
+      baseUrl: 'https://discovered.example.test',
+      jsonapiSettings: { apiPrefix: 'discovered' },
+      branding: { homeUrl: '/', siteName: 'Site', siteSlogan: '' },
+    });
+    expect(
+      resolvePreviewSiteData(
+        { baseUrl: 'https://static.example.test', jsonapiPrefix: 'static' },
+        { branding: { homeUrl: '/', siteName: 'Site', siteSlogan: '' } },
+      ),
+    ).toEqual({
+      baseUrl: 'https://static.example.test',
+      jsonapiSettings: { apiPrefix: 'static' },
+      branding: { homeUrl: '/', siteName: 'Site', siteSlogan: '' },
+    });
+    // "JSON:API not installed" survives for legacy clients and hooks alike.
+    expect(
+      resolvePreviewSiteData(
+        { baseUrl: null, jsonapiPrefix: 'static' },
+        { baseUrl: 'https://site.example.test', jsonapiSettings: null },
+      ),
+    ).toEqual({ baseUrl: 'https://site.example.test', jsonapiSettings: null });
+    expect(
+      resolvePreviewSiteData({ baseUrl: null, jsonapiPrefix: null }, null),
+    ).toBeNull();
+
+    const html = buildIframeHtml(
+      'console.log("runtime");',
+      '',
+      { baseUrl: 'https://static.example.test', jsonapiPrefix: 'static' },
+      {
+        baseUrl: 'https://discovered.example.test',
+        jsonapiSettings: { apiPrefix: 'discovered' },
+      },
+    );
+    expect(html).toContain(
+      'const canvasPreviewBaseUrl = "https://discovered.example.test";',
+    );
+    expect(html).toContain(
+      'window.drupalSettings.canvasData.v0.jsonapiSettings.apiPrefix = "discovered";',
+    );
+    expect(html).not.toContain('static.example.test');
+    const notInstalled = buildIframeHtml(
+      '',
+      '',
+      { baseUrl: null, jsonapiPrefix: 'static' },
+      { baseUrl: 'https://site.example.test', jsonapiSettings: null },
+    );
+    expect(notInstalled).toContain(
+      'window.drupalSettings.canvasData.v0.jsonapiSettings = null;',
+    );
+    expect(notInstalled).not.toContain('apiPrefix = "static"');
   });
 
   it('builds runtime source that bootstraps React and drupalSettings defaults', () => {

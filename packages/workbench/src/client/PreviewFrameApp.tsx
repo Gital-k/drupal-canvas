@@ -134,17 +134,22 @@ class FrameRenderBoundary extends Component<
  * The provider stays mounted across preview targets and hot updates.
  */
 function WorkbenchProviders({ children }: { children: ReactNode }) {
+  // The same base URL the legacy settings resolved to (see main.tsx), so the
+  // hooks and `getSiteData()` agree.
+  const fallbackBaseUrl =
+    (
+      window as unknown as {
+        drupalSettings?: { canvasData?: { v0?: { baseUrl?: string } } };
+      }
+    ).drupalSettings?.canvasData?.v0?.baseUrl || window.location.origin;
   const context = useMemo(
-    () => createWorkbenchContext(siteData, window.location.origin),
-    [],
+    () => createWorkbenchContext(siteData, fallbackBaseUrl),
+    [fallbackBaseUrl],
   );
   const client = useMemo(() => {
-    const config = createWorkbenchJsonApiConfig(
-      siteData,
-      window.location.origin,
-    );
+    const config = createWorkbenchJsonApiConfig(siteData, fallbackBaseUrl);
     return config ? createJsonApiClient(config) : null;
-  }, []);
+  }, [fallbackBaseUrl]);
   const content = client ? (
     <JsonApiClientProvider client={client}>{children}</JsonApiClientProvider>
   ) : (
