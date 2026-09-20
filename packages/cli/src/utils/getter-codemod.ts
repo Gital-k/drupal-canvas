@@ -94,6 +94,9 @@ interface NamespaceBinding {
   declaration: ImportDeclaration;
 }
 
+/** Component wrappers whose callback is the component itself. */
+const COMPONENT_WRAPPERS = new Set(['memo', 'forwardRef']);
+
 interface Edit {
   start: number;
   end: number;
@@ -199,6 +202,40 @@ function isReference(node: Identifier, parent: Node | undefined): boolean {
   }
 }
 
+/** Whether an identifier occurrence declares a binding rather than uses one. */
+function isBindingDeclaration(node: Identifier, parents: Node[]): boolean {
+  const parent = parents[parents.length - 1];
+  if (!parent) {
+    return false;
+  }
+  switch (parent.type) {
+    case 'VariableDeclarator':
+      return parent.id === node;
+    case 'FunctionDeclaration':
+    case 'FunctionExpression':
+    case 'ArrowFunctionExpression':
+    case 'ObjectMethod':
+    case 'ClassMethod':
+    case 'ClassPrivateMethod':
+      return (parent.params as Node[]).includes(node);
+    case 'ObjectPattern':
+    case 'ArrayPattern':
+    case 'RestElement':
+      return true;
+    case 'AssignmentPattern':
+      return parent.left === node;
+    case 'ObjectProperty':
+      return (
+        parent.value === node &&
+        parents[parents.length - 2]?.type === 'ObjectPattern'
+      );
+    case 'CatchClause':
+      return parent.param === node;
+    default:
+      return false;
+  }
+}
+
 /** Whether a function node is a component or custom hook by name. */
 function isComponentOrHook(fn: Node, parents: Node[]): boolean {
   let name: string | null = null;
@@ -220,9 +257,13 @@ function isComponentOrHook(fn: Node, parents: Node[]): boolean {
       return true;
     } else if (
       parent?.type === 'CallExpression' &&
-      parents[parents.length - 2]?.type === 'VariableDeclarator'
+      parents[parents.length - 2]?.type === 'VariableDeclarator' &&
+      isComponentWrapper(parent.callee)
     ) {
-      // `const Comp = memo(() => ...)` / `forwardRef(...)`.
+      // `const Comp = memo(() => ...)` / `React.forwardRef(...)`: only the
+      // known React wrappers make the callback a component; any other call
+      // (a registration helper, a store creator) does not, whatever the
+      // result is named.
       const declarator = parents[parents.length - 2] as { id: Node };
       name = declarator.id.type === 'Identifier' ? declarator.id.name : null;
     }
@@ -231,6 +272,20 @@ function isComponentOrHook(fn: Node, parents: Node[]): boolean {
     return false;
   }
   return /^[A-Z]/.test(name) || /^use[A-Z0-9]/.test(name);
+}
+
+function isComponentWrapper(callee: Node): boolean {
+  if (callee.type === 'Identifier') {
+    return COMPONENT_WRAPPERS.has(callee.name);
+  }
+  return (
+    callee.type === 'MemberExpression' &&
+    !callee.computed &&
+    callee.object.type === 'Identifier' &&
+    callee.object.name === 'React' &&
+    callee.property.type === 'Identifier' &&
+    COMPONENT_WRAPPERS.has(callee.property.name)
+  );
 }
 
 function functionBody(fn: Node): Node | null {
@@ -314,9 +369,16 @@ function hookPositionProblem(
   return null;
 }
 
-/** Collects every declared identifier name in the file (any scope). */
-function declaredNames(ast: File): Set<string> {
-  const names = new Set<string>();
+/**
+ * Counts every declaration of each identifier name in the file, in any scope
+ * and binding form (variables, functions, classes, parameters, destructuring
+ * patterns, catch parameters, imports).
+ */
+function declarationCounts(ast: File): Map<string, number> {
+  const counts = new Map<string, number>();
+  const declare = (name: string) => {
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  };
   walk(ast.program, (node, parents) => {
     const parent = parents[parents.length - 1];
     if (node.type !== 'Identifier') {
@@ -327,47 +389,52 @@ function declaredNames(ast: File): Set<string> {
     }
     switch (parent.type) {
       case 'VariableDeclarator':
-        if (parent.id === node) names.add(node.name);
+        if (parent.id === node) declare(node.name);
         break;
       case 'FunctionDeclaration':
       case 'FunctionExpression':
       case 'ClassDeclaration':
       case 'ClassExpression':
-        if ((parent as { id?: Node }).id === node) names.add(node.name);
+        if ((parent as { id?: Node }).id === node) declare(node.name);
         if ('params' in parent && (parent.params as Node[]).includes(node)) {
-          names.add(node.name);
+          declare(node.name);
         }
         break;
       case 'ArrowFunctionExpression':
-        if ((parent.params as Node[]).includes(node)) names.add(node.name);
+      case 'ObjectMethod':
+      case 'ClassMethod':
+      case 'ClassPrivateMethod':
+        if ((parent.params as Node[]).includes(node)) declare(node.name);
         break;
       case 'ImportSpecifier':
       case 'ImportDefaultSpecifier':
       case 'ImportNamespaceSpecifier':
-        if (parent.local === node) names.add(node.name);
+        if (parent.local === node) declare(node.name);
         break;
       case 'ObjectPattern':
       case 'ArrayPattern':
       case 'RestElement':
+        declare(node.name);
+        break;
       case 'AssignmentPattern':
-        names.add(node.name);
+        if (parent.left === node) declare(node.name);
         break;
       case 'ObjectProperty':
         if (
           parent.value === node &&
           parents[parents.length - 2]?.type === 'ObjectPattern'
         ) {
-          names.add(node.name);
+          declare(node.name);
         }
         break;
       case 'CatchClause':
-        if (parent.param === node) names.add(node.name);
+        if (parent.param === node) declare(node.name);
         break;
       default:
         break;
     }
   });
-  return names;
+  return counts;
 }
 
 function parseSource(source: string, filename: string): File {
@@ -471,13 +538,16 @@ export function migrateGetterCalls(
   const localGetters = new Map(
     getterBindings.map((binding) => [binding.local, binding]),
   );
-  const names = declaredNames(ast);
+  const declarations = declarationCounts(ast);
+  const names = new Set(declarations.keys());
   const callsByGetter = new Map<GetterName, CallExpression[]>();
-  /** Getters called through a named import (needing a hook import). */
+  /** Getters whose hook needs a named import from `drupal-canvas`. */
   const namedGetters = new Set<GetterName>();
   const edits: Edit[] = [];
   let unsafe = false;
   let usesGetters = false;
+  /** A namespace import used in a way whose members cannot be verified. */
+  let unverifiableNamespace: string | null = null;
 
   const noteUnsafe = (reason: string) => {
     unsafe = true;
@@ -503,15 +573,27 @@ export function migrateGetterCalls(
     if (node.type !== 'Identifier') {
       return;
     }
-    // Namespace member calls: `utils.getPageData()`.
+    // Namespace imports: `utils.getPageData()`. Only a plain, non-computed
+    // member access can be verified; a computed access (`utils[name]`) or
+    // the namespace used as a value could reach a getter without this codemod
+    // seeing it, which would break the all-or-nothing guarantee.
     if (
-      parent?.type === 'MemberExpression' &&
-      parent.object === node &&
       namespaceBindings.some((binding) => binding.local === node.name) &&
-      parent.property.type === 'Identifier' &&
-      parent.property.name in GETTER_HOOKS &&
-      !parent.computed
+      isReference(node, parent) &&
+      !isBindingDeclaration(node, parents)
     ) {
+      if (
+        parent?.type !== 'MemberExpression' ||
+        parent.object !== node ||
+        parent.computed ||
+        parent.property.type !== 'Identifier'
+      ) {
+        unverifiableNamespace ??= node.name;
+        return;
+      }
+      if (!(parent.property.name in GETTER_HOOKS)) {
+        return;
+      }
       usesGetters = true;
       const getter = parent.property.name as GetterName;
       const grandparent = parents[parents.length - 2];
@@ -532,12 +614,15 @@ export function migrateGetterCalls(
         noteUnsafe(`\`${node.name}.${getter}()\` is ${problem}`);
         return;
       }
-      const property = parent.property;
+      // The hooks are exported by the `drupal-canvas` root only, so the
+      // member call becomes a plain hook call with a named import; this also
+      // keeps the hook visible to the import-based data dependency detection.
       edits.push({
-        start: property.start!,
-        end: property.end!,
+        start: parent.start!,
+        end: parent.end!,
         text: GETTER_HOOKS[getter],
       });
+      namedGetters.add(getter);
       const calls = callsByGetter.get(getter) ?? [];
       calls.push(grandparent);
       callsByGetter.set(getter, calls);
@@ -584,9 +669,20 @@ export function migrateGetterCalls(
   }
 
   // Binding resolution and identifier conflicts.
+  if (unverifiableNamespace !== null) {
+    noteUnsafe(
+      `\`${unverifiableNamespace}\` is used in a way whose members cannot be verified (computed access or use as a value)`,
+    );
+  }
+  for (const binding of namespaceBindings) {
+    if ((declarations.get(binding.local) ?? 0) > 1) {
+      noteUnsafe(
+        `\`${binding.local}\` is declared more than once in the file (a local declaration shadows the import)`,
+      );
+    }
+  }
   for (const binding of getterBindings) {
-    const declarations = countDeclarations(ast, binding.local);
-    if (declarations > 1) {
+    if ((declarations.get(binding.local) ?? 0) > 1) {
       noteUnsafe(`\`${binding.local}\` is declared more than once in the file`);
     }
     const hook = GETTER_HOOKS[binding.getter];
@@ -621,10 +717,14 @@ export function migrateGetterCalls(
     });
   }
 
-  // Import rewrites.
+  // Import rewrites. Hooks the file already imports from `drupal-canvas`
+  // are reused, never imported twice.
   const hooksNeeded = new Set<HookName>();
   for (const getter of namedGetters) {
-    hooksNeeded.add(GETTER_HOOKS[getter]);
+    const hook = GETTER_HOOKS[getter];
+    if (!isHookImport(existingHookImport, hook)) {
+      hooksNeeded.add(hook);
+    }
   }
   const bindingsByDeclaration = new Map<ImportDeclaration, GetterBinding[]>();
   for (const binding of getterBindings) {
@@ -750,34 +850,6 @@ function isHookImport(
         specifier.local.name === hook,
     )
   );
-}
-
-function countDeclarations(ast: File, name: string): number {
-  let count = 0;
-  walk(ast.program, (node, parents) => {
-    const parent = parents[parents.length - 1];
-    if (node.type !== 'Identifier' || node.name !== name || !parent) {
-      return;
-    }
-    if (
-      (parent.type === 'VariableDeclarator' && parent.id === node) ||
-      ((parent.type === 'FunctionDeclaration' ||
-        parent.type === 'FunctionExpression' ||
-        parent.type === 'ClassDeclaration') &&
-        parent.id === node) ||
-      ((parent.type === 'FunctionDeclaration' ||
-        parent.type === 'FunctionExpression' ||
-        parent.type === 'ArrowFunctionExpression') &&
-        (parent.params as Node[]).includes(node)) ||
-      ((parent.type === 'ImportSpecifier' ||
-        parent.type === 'ImportDefaultSpecifier' ||
-        parent.type === 'ImportNamespaceSpecifier') &&
-        parent.local === node)
-    ) {
-      count += 1;
-    }
-  });
-  return count;
 }
 
 /** Removes one specifier from an import, including its separating comma. */
