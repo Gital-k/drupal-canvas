@@ -96,6 +96,121 @@ describe('context hook support', () => {
     ).toBe(null);
   });
 
+  it('respects condition order and a terminal denial of the root subpath', () => {
+    // A null target for a matching condition denies the subpath; a later
+    // condition is not a fallback.
+    expect(
+      resolveRuntimeEntry({
+        exports: { '.': { default: null, import: './hooks.js' } },
+      }),
+    ).toBe(null);
+    expect(
+      resolveRuntimeEntry({
+        exports: { '.': { import: null, default: './hooks.js' } },
+      }),
+    ).toBe(null);
+    expect(resolveRuntimeEntry({ exports: { '.': null } })).toBe(null);
+    // Object order decides between supported conditions.
+    expect(
+      resolveRuntimeEntry({
+        exports: { '.': { default: './default.js', import: './import.js' } },
+      }),
+    ).toBe('./default.js');
+    // Unsupported conditions are skipped, in order.
+    expect(
+      resolveRuntimeEntry({
+        exports: {
+          '.': {
+            require: './cjs.js',
+            node: { import: './node.js' },
+            import: './import.js',
+          },
+        },
+      }),
+    ).toBe('./import.js');
+    // A nested object without a match continues to the next condition.
+    expect(
+      resolveRuntimeEntry({
+        exports: { '.': { import: { require: './x.js' }, default: './d.js' } },
+      }),
+    ).toBe('./d.js');
+  });
+
+  it('terminates on circular re-exports and reports them as unverifiable', async () => {
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'export * from "./a.js";\nexport function usePageContext() {}\nexport function useSiteContext() {}\n',
+      'dist/a.js': 'export * from "./index.js";\nexport const other = 1;\n',
+    });
+    const result = await Promise.race([
+      checkInstalledPackage(root),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('hung')), 5000),
+      ),
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('circularly');
+    // Mutual named re-exports terminate too.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'export { usePageContext, useSiteContext } from "./a.js";\n',
+      'dist/a.js':
+        'export { usePageContext, useSiteContext } from "./index.js";\n',
+    });
+    expect((await checkInstalledPackage(root)).reason).toContain('circularly');
+  });
+
+  it('rejects an unresolved export graph even when the hooks are found locally', async () => {
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'export * from "./missing.js";\nexport function usePageContext() {}\nexport function useSiteContext() {}\n',
+    });
+    const result = await checkInstalledPackage(root);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('could not be verified');
+    expect(result.reason).toContain('missing.js');
+  });
+
+  it('applies star export semantics: explicit wins, conflicting stars are ambiguous, one binding is not', async () => {
+    // Two stars providing a hook from different bindings: ambiguous.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js': 'export * from "./a.js";\nexport * from "./b.js";\n',
+      'dist/a.js':
+        'export function usePageContext() {}\nexport function useSiteContext() {}\n',
+      'dist/b.js': 'export const usePageContext = () => null;\n',
+    });
+    const conflicting = await checkInstalledPackage(root);
+    expect(conflicting.ok).toBe(false);
+    expect(conflicting.reason).toContain('`usePageContext()` ambiguously');
+    // The same binding reached through two stars is one export.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js': 'export * from "./a.js";\nexport * from "./b.js";\n',
+      'dist/a.js':
+        'export function usePageContext() {}\nexport function useSiteContext() {}\n',
+      'dist/b.js': 'export { usePageContext } from "./a.js";\n',
+    });
+    expect(await checkInstalledPackage(root)).toEqual({ ok: true });
+    // An explicit export shadows star exports of the same name.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'export * from "./a.js";\nexport * from "./b.js";\nexport { hook as usePageContext } from "./c.js";\n',
+      'dist/a.js':
+        'export function usePageContext() {}\nexport function useSiteContext() {}\n',
+      'dist/b.js': 'export const usePageContext = () => null;\n',
+      'dist/c.js': 'export function hook() {}\n',
+    });
+    expect(await checkInstalledPackage(root)).toEqual({ ok: true });
+    // A star that provides only unrelated names does not hide a missing hook.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'export * from "./a.js";\nexport function usePageContext() {}\n',
+      'dist/a.js': 'export const other = 1;\n',
+    });
+    expect((await checkInstalledPackage(root)).reason).toContain(
+      'does not export `useSiteContext()`',
+    );
+  });
+
   it('accepts the built package format and local aliases and re-exports', async () => {
     await writePackage(root, '0.5.1');
     expect(await checkInstalledPackage(root)).toEqual({ ok: true });
@@ -214,7 +329,7 @@ export { type useSiteContext } from "./types";
       path.join(packageRoot, 'dist', 'index.js'),
       packageRoot,
     );
-    expect([...exports.names]).toEqual([]);
+    expect(exports.names.size).toBe(0);
     expect(exports.unverifiable[0]).toContain('re-exports everything');
   });
 
