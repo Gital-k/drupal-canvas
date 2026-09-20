@@ -8,12 +8,30 @@ import type { CanvasComponentTreeProps as ReactCanvasComponentTreeProps } from '
 
 export type CanvasComponentTreeProps = Pick<
   ReactCanvasComponentTreeProps,
-  'tree'
+  'tree' | 'context' | 'jsonApi'
 >;
 
-/** Renders a Canvas tree with every component discovered by canvas(). */
-export function CanvasComponentTree({ tree }: CanvasComponentTreeProps) {
-  return <ReactCanvasComponentTree tree={tree} components={canvasComponents} />;
+/**
+ * Renders a Canvas tree with every component discovered by canvas().
+ *
+ * Pass `context={page.context}` so `usePageContext()` and `useSiteContext()`
+ * see the routed page's data, and `jsonApi` from `getJsonApiRuntimeConfig()`
+ * (read in a server function alongside `fetchPage()`) so `useJsonApiClient()`
+ * reaches Drupal through the application's same-origin proxy.
+ */
+export function CanvasComponentTree({
+  tree,
+  context,
+  jsonApi,
+}: CanvasComponentTreeProps) {
+  return (
+    <ReactCanvasComponentTree
+      tree={tree}
+      context={context}
+      jsonApi={jsonApi}
+      components={canvasComponents}
+    />
+  );
 }
 
 export default CanvasComponentTree;
