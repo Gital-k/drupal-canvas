@@ -27,3 +27,6 @@ The proxy surfaces a session token Drupal rejects (401) as the session error,
 passes 304 through, merges Drupal's `Vary` with `Cookie`, and only rewrites
 redirect statuses. `CANVAS_JSONAPI_URL` overrides JSON:API requests only; path
 translation stays on `CANVAS_SITE_URL`.
+
+`CANVAS_JSONAPI_SITE_URL` gives a JSON:API URL on another site its site base,
+so language-prefixed reads and the proxy resolve under it.

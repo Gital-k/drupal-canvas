@@ -30,6 +30,7 @@ export interface JsonApiEndpoints {
   baseUrl: string;
   apiPrefix?: string;
   apiUrl?: string;
+  apiSiteUrl?: string;
 }
 
 /**
@@ -40,18 +41,24 @@ export interface JsonApiEndpoints {
  * another host or path never redirects path translation there.
  */
 export function resolveJsonApiEndpoints(
-  config: Pick<DraftConfig, 'baseUrl' | 'apiPrefix' | 'jsonApiUrl'>,
+  config: Pick<
+    DraftConfig,
+    'baseUrl' | 'apiPrefix' | 'jsonApiUrl' | 'jsonApiSiteUrl'
+  >,
 ): JsonApiEndpoints {
   if (config.jsonApiUrl) {
     // Under the backend base URL the override is a prefix (a locale prefix
-    // goes between the site path and it); elsewhere it is a foreign base.
+    // goes between the site path and it); elsewhere it is a foreign base,
+    // localizable through its own site base URL.
     const api = resolveJsonApiBase(config.baseUrl, {
       apiUrl: config.jsonApiUrl,
+      apiSiteUrl: config.jsonApiSiteUrl,
     });
     return {
       baseUrl: config.baseUrl,
       apiPrefix: api.apiPrefix,
       apiUrl: `${api.base}/${api.apiPrefix}`,
+      ...(api.foreign && api.siteKnown && { apiSiteUrl: api.base }),
     };
   }
   return {
@@ -79,7 +86,11 @@ export function resolveJsonApiUrl(endpoints: JsonApiEndpoints): string {
 export function resolveJsonApiRuntimeConfig(
   config: Pick<
     DraftConfig,
-    'baseUrl' | 'apiPrefix' | 'jsonApiUrl' | 'jsonApiProxyPath'
+    | 'baseUrl'
+    | 'apiPrefix'
+    | 'jsonApiUrl'
+    | 'jsonApiSiteUrl'
+    | 'jsonApiProxyPath'
   >,
   draftData: DraftData | null,
 ): JsonApiRuntimeConfig {
@@ -89,6 +100,7 @@ export function resolveJsonApiRuntimeConfig(
     baseUrl: endpoints.baseUrl,
     ...(endpoints.apiPrefix && { apiPrefix: endpoints.apiPrefix }),
     ...(endpoints.apiUrl && { apiUrl: endpoints.apiUrl }),
+    ...(endpoints.apiSiteUrl && { apiSiteUrl: endpoints.apiSiteUrl }),
     proxyUrl: config.jsonApiProxyPath ?? '/api/canvas/jsonapi',
     resourceVersion: live ? draftData.resourceVersion : null,
     preview: live,
@@ -104,7 +116,10 @@ export function resolveJsonApiRuntimeConfig(
  * default applies.
  */
 export function getPublicClient(
-  config: Pick<DraftConfig, 'baseUrl' | 'apiPrefix' | 'jsonApiUrl'>,
+  config: Pick<
+    DraftConfig,
+    'baseUrl' | 'apiPrefix' | 'jsonApiUrl' | 'jsonApiSiteUrl'
+  >,
 ): CanvasJsonApiClient {
   return createJsonApiClient({
     ...resolveJsonApiEndpoints(config),
@@ -126,7 +141,10 @@ export function getPublicClient(
  * visible indicator instead of silently downgrading.
  */
 export function getDraftClient(
-  config: Pick<DraftConfig, 'baseUrl' | 'apiPrefix' | 'jsonApiUrl'>,
+  config: Pick<
+    DraftConfig,
+    'baseUrl' | 'apiPrefix' | 'jsonApiUrl' | 'jsonApiSiteUrl'
+  >,
   draftData: DraftData,
 ): CanvasJsonApiClient {
   const token = getSessionToken(draftData);
