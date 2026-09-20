@@ -18,18 +18,23 @@ import type { DraftData } from '../draft-data';
 import type { DraftConfig } from './config';
 
 /**
- * The resolved upstream JSON:API endpoints: the backend base URL and the
- * JSON:API prefix relative to it.
+ * The resolved upstream JSON:API endpoints: the backend base URL (where the
+ * supporting endpoints such as path translation live), the JSON:API prefix
+ * relative to it, and — with a full URL override — the separate JSON:API base
+ * URL.
  */
 export interface JsonApiEndpoints {
   baseUrl: string;
   apiPrefix?: string;
+  apiUrl?: string;
 }
 
 /**
  * Resolves the upstream JSON:API endpoints. An explicit full URL override
- * (`jsonApiUrl`) takes precedence over the discovered or configured prefix;
- * its origin becomes the client base URL and its path the prefix.
+ * (`jsonApiUrl`) takes precedence over the discovered or configured prefix
+ * for JSON:API requests only: the backend base URL keeps serving the
+ * Decoupled Router and the other supporting endpoints, so an override on
+ * another host or path never redirects path translation there.
  */
 export function resolveJsonApiEndpoints(
   config: Pick<DraftConfig, 'baseUrl' | 'apiPrefix' | 'jsonApiUrl'>,
@@ -38,8 +43,9 @@ export function resolveJsonApiEndpoints(
     const url = new URL(config.jsonApiUrl);
     const apiPrefix = url.pathname.replace(/^\/+|\/+$/g, '');
     return {
-      baseUrl: url.origin,
+      baseUrl: config.baseUrl,
       ...(apiPrefix && { apiPrefix }),
+      apiUrl: `${url.origin}${apiPrefix ? `/${apiPrefix}` : ''}`,
     };
   }
   return {
@@ -52,7 +58,10 @@ export function resolveJsonApiEndpoints(
  * The full upstream JSON:API base URL the endpoints resolve to.
  */
 export function resolveJsonApiUrl(endpoints: JsonApiEndpoints): string {
-  return `${endpoints.baseUrl.replace(/\/+$/, '')}/${endpoints.apiPrefix ?? 'jsonapi'}`;
+  return (
+    endpoints.apiUrl ??
+    `${endpoints.baseUrl.replace(/\/+$/, '')}/${endpoints.apiPrefix ?? 'jsonapi'}`
+  );
 }
 
 /**
@@ -73,6 +82,7 @@ export function resolveJsonApiRuntimeConfig(
   return {
     baseUrl: endpoints.baseUrl,
     ...(endpoints.apiPrefix && { apiPrefix: endpoints.apiPrefix }),
+    ...(endpoints.apiUrl && { apiUrl: endpoints.apiUrl }),
     proxyUrl: config.jsonApiProxyPath ?? '/api/canvas/jsonapi',
     resourceVersion: live ? draftData.resourceVersion : null,
     preview: live,
