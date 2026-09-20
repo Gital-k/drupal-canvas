@@ -753,6 +753,7 @@ export async function buildPreviewArtifact(
             bundleResult.js,
             withBrandKitColorCss(options.projectRoot, bundleResult.css),
             runtimeSettings,
+            bundleResult.siteData,
           );
           const fileName = `component-mock-${String(mockIndex + 1).padStart(2, '0')}.html`;
 
