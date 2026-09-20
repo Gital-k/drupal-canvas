@@ -1,7 +1,7 @@
 import { useJsonApiClient, usePageContext } from 'drupal-canvas';
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CANVAS_SETTINGS_UPDATED_EVENT,
@@ -74,6 +74,66 @@ describe('canvas island client renderer', () => {
     expect(wrapIslandComponent(Probe, publicIsland)).not.toBe(
       wrapIslandComponent(Probe, previewIsland),
     );
+  });
+
+  it('re-renders islands after Drupal merges settings from an AJAX response', async () => {
+    // Drupal's AJAX `settings` command, as core implements it for a
+    // settings-only response: merge, no behavior attachment.
+    class AjaxCommands {
+      settings(
+        _ajax: unknown,
+        response: { settings: Record<string, unknown>; merge: boolean },
+      ) {
+        const target = (globalThis as { drupalSettings: Settings })
+          .drupalSettings;
+        if (response.merge) {
+          Object.assign(target.canvasData.v0, response.settings);
+        }
+      }
+    }
+    const drupal = {
+      behaviors: {} as Record<string, { attach: () => void }>,
+      AjaxCommands,
+    };
+    (globalThis as { Drupal?: unknown }).Drupal = drupal;
+    // The `canvas/astro.hydration` library depends on `core/drupal`, so the
+    // module evaluates with Drupal present: load it fresh in that state.
+    vi.resetModules();
+    const [preact, hooks, canvas, client] = await Promise.all([
+      import('preact'),
+      import('preact/test-utils'),
+      import('drupal-canvas'),
+      import('./canvas-client'),
+    ]);
+    const FreshProbe: ComponentType<Record<string, unknown>> = () =>
+      preact.h('p', null, canvas.usePageContext()?.pageTitle ?? 'no-page');
+    expect(drupal.behaviors.canvasIslandSettings).toBeDefined();
+    const element = island(false);
+    await hooks.act(() => {
+      preact.render(
+        preact.h(client.wrapIslandComponent(FreshProbe, element), {}),
+        element,
+      );
+    });
+    expect(element.textContent).toBe('First title');
+
+    await hooks.act(() => {
+      new AjaxCommands().settings(null, {
+        settings: { pageTitle: 'AJAX title' },
+        merge: true,
+      });
+    });
+    expect(element.textContent).toBe('AJAX title');
+    // Behavior attachment (after an `insert` command) announces it too.
+    (
+      globalThis as { drupalSettings: Settings }
+    ).drupalSettings.canvasData.v0.pageTitle = 'Attached title';
+    await hooks.act(() => {
+      drupal.behaviors.canvasIslandSettings.attach();
+    });
+    expect(element.textContent).toBe('Attached title');
+    delete (globalThis as { Drupal?: unknown }).Drupal;
+    vi.resetModules();
   });
 
   it('refreshes mounted islands when the settings update is announced', async () => {
