@@ -100,6 +100,17 @@ the root route's loader calls (alongside the session state) and render
 `CanvasComponentTree` also accepts it as an explicit `jsonApi` prop. The
 configuration is serializable and carries no credentials.
 
+During server rendering, `CanvasComponentTree` gives the client a request-aware
+transport: the client's proxy-mapped requests are answered in-process by the
+same JSON:API proxy handler the browser reaches over HTTP, with the current
+request's draft session (TanStack Start renders inside the request, so the
+session helpers are available). `useJsonApiClient()` therefore returns the same
+draft-aware client on the server and in the browser, SWR fallback data supplied
+through `SWRConfig` renders into the initial HTML, and hydration does not
+mismatch. The transport is an isomorphic function: TanStack Start's compiler
+keeps the server implementation out of browser bundles (this package is a
+framework package to it, so it is compiled in every environment).
+
 The `canvas()` plugin supplies a registry of every discovered component
 implementation, and the renderer consumes it automatically. During development
 the registry updates when components are added, removed, or renamed.
