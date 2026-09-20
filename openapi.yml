@@ -3362,6 +3362,7 @@ paths:
                   - branding
                   - jsonapiSettings
                   - themeAssets
+                  - capabilities
                 properties:
                   baseUrl:
                     type: string
@@ -3413,6 +3414,19 @@ paths:
                             format: uri-reference
                           mimeType:
                             type: string
+                  capabilities:
+                    type: object
+                    description: Runtime capabilities advertised to tooling.
+                    required:
+                      - contextHooks
+                    properties:
+                      contextHooks:
+                        type: boolean
+                        description: >-
+                          Whether Code Component islands render inside the
+                          shared context providers, so components may use the
+                          `usePageContext()`, `useSiteContext()`, and
+                          `useJsonApiClient()` hooks from `drupal-canvas`.
         '401':
           $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':
