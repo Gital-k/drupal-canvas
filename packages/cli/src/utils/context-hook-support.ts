@@ -11,9 +11,6 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import axios from 'axios';
 
-/** The first `drupal-canvas` release exporting the context hooks. */
-export const CONTEXT_HOOKS_MIN_PACKAGE_VERSION = '0.6.0';
-
 export interface ContextHookSupport {
   /** Whether both gates passed. */
   supported: boolean;
@@ -37,25 +34,6 @@ async function fetchSiteData(siteUrl: string): Promise<unknown> {
     },
   );
   return response.data;
-}
-
-/** Compares two dotted version strings; prerelease suffixes are ignored. */
-export function compareVersions(a: string, b: string): number {
-  const parse = (value: string) =>
-    value
-      .replace(/^v/, '')
-      .split('-')[0]
-      .split('.')
-      .map((part) => Number.parseInt(part, 10) || 0);
-  const left = parse(a);
-  const right = parse(b);
-  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference !== 0) {
-      return difference;
-    }
-  }
-  return 0;
 }
 
 async function readManifestName(candidate: string): Promise<string | null> {
@@ -110,8 +88,21 @@ async function locatePackageJson(projectRoot: string): Promise<string | null> {
 }
 
 /**
+ * Whether a declaration file exports `name`: on an `export` statement (a
+ * direct `export declare function name` or an `export { ..., name, ... }`
+ * list), not merely mentioned somewhere in the file.
+ */
+export function declaresExport(declarations: string, name: string): boolean {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(
+    `^export\\b(?:[^\\n{]*\\b${escaped}\\b|\\s*(?:type\\s+)?\\{[^}]*(?:^|[\\s,])${escaped}\\s*(?:,|\\}))`,
+    'm',
+  ).test(declarations);
+}
+
+/**
  * Checks whether the installed `drupal-canvas` package of a project exports
- * the context hooks.
+ * the context hooks, whatever version it reports.
  */
 export async function checkInstalledPackage(
   projectRoot: string,
@@ -124,16 +115,13 @@ export async function checkInstalledPackage(
         'the `drupal-canvas` package is not installed in this project (run `npm install drupal-canvas@latest`)',
     };
   }
-  let version = '';
   let typesEntry = '';
   try {
     const manifest = JSON.parse(
       await fs.readFile(packageJsonPath, 'utf-8'),
     ) as {
-      version?: string;
       exports?: Record<string, { types?: string } | string>;
     };
-    version = manifest.version ?? '';
     const rootExport = manifest.exports?.['.'];
     typesEntry =
       typeof rootExport === 'object' && rootExport?.types
@@ -145,25 +133,21 @@ export async function checkInstalledPackage(
       reason: 'the installed `drupal-canvas` package could not be read',
     };
   }
-  if (compareVersions(version, CONTEXT_HOOKS_MIN_PACKAGE_VERSION) < 0) {
-    return {
-      ok: false,
-      reason: `the installed \`drupal-canvas\` version ${version || '(unknown)'} predates the context hooks (${CONTEXT_HOOKS_MIN_PACKAGE_VERSION} or later is required; run \`npm install drupal-canvas@latest\`)`,
-    };
-  }
+  // The capability is what the installed package exports, whatever its
+  // version says: the root entry's declarations must export both hooks.
   try {
     const declarations = await fs.readFile(
       path.join(path.dirname(packageJsonPath), typesEntry),
       'utf-8',
     );
     if (
-      !declarations.includes('usePageContext') ||
-      !declarations.includes('useSiteContext')
+      !declaresExport(declarations, 'usePageContext') ||
+      !declaresExport(declarations, 'useSiteContext')
     ) {
       return {
         ok: false,
         reason:
-          'the installed `drupal-canvas` package does not export `usePageContext()` and `useSiteContext()`',
+          'the installed `drupal-canvas` package does not export `usePageContext()` and `useSiteContext()` (run `npm install drupal-canvas@latest`)',
       };
     }
   } catch {
