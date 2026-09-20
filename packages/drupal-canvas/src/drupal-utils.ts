@@ -1,5 +1,11 @@
 import { assertLegacyRuntime } from './migration.js';
 
+export type {
+  CanvasContext,
+  PageContext,
+  SiteContext,
+} from './context-types.js';
+
 interface Linkset {
   linkset: LinksetItem[];
 }

@@ -229,6 +229,31 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertContains('canvas_page:' . $page->id(), $response->getCacheableMetadata()->getCacheTags());
     self::assertContains('canvas_page_view', $response->getCacheableMetadata()->getCacheTags());
     self::assertContains('url', $response->getCacheableMetadata()->getCacheContexts());
+    // The page and site context for the `drupal-canvas` context hooks.
+    self::assertSame('Stored title', $data['context']['page']['pageTitle']);
+    self::assertSame([['key' => '<front>', 'text' => 'Home', 'url' => '/']], $data['context']['page']['breadcrumbs']);
+    self::assertSame([
+      'bundle' => 'canvas_page',
+      'entityTypeId' => 'canvas_page',
+      'uuid' => $page->uuid(),
+      'requestedLanguage' => 'en',
+      'renderedLanguage' => 'en',
+      'translations' => [],
+    ], $data['context']['page']['mainEntity']);
+    self::assertSame([
+      'branding' => [
+        'homeUrl' => '/user/login',
+        'siteName' => '',
+        'siteSlogan' => '',
+      ],
+      'baseUrl' => 'http://localhost',
+      'themeAssets' => [
+        'logo' => ['url' => ''],
+        'favicon' => ['url' => '', 'mimeType' => ''],
+      ],
+    ], $data['context']['site']);
+    self::assertContains('config:system.site', $response->getCacheableMetadata()->getCacheTags());
+    self::assertContains('url.site', $response->getCacheableMetadata()->getCacheContexts());
 
     $page->setComponentTree([])->save();
     $empty_response = $this->renderPage($page);
@@ -905,6 +930,26 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
         'params' => [],
         'managedByCanvas' => FALSE,
         'entity' => NULL,
+      ],
+      // Routes without a primary entity still carry page and site context.
+      'context' => [
+        'page' => [
+          'pageTitle' => 'Log in',
+          'breadcrumbs' => [],
+          'mainEntity' => NULL,
+        ],
+        'site' => [
+          'branding' => [
+            'homeUrl' => '/user/login',
+            'siteName' => '',
+            'siteSlogan' => '',
+          ],
+          'baseUrl' => 'http://localhost',
+          'themeAssets' => [
+            'logo' => ['url' => ''],
+            'favicon' => ['url' => '', 'mimeType' => ''],
+          ],
+        ],
       ],
     ], self::responseData($without_entity));
 
