@@ -40,10 +40,19 @@ export interface JsonApiProxyEndpoints {
   /**
    * Absolute upstream JSON:API base URL when JSON:API is not served under the
    * backend base URL and `apiPrefix` (for example on another host or path).
-   * Its path becomes the JSON:API prefix; the supporting endpoints (path
-   * translation) stay under the backend base URL.
+   * Under the backend base URL it is a prefix override; elsewhere its site is
+   * `apiSiteUrl` (or, without one, its origin) and the rest its prefix. The
+   * supporting endpoints (path translation) stay under the backend base URL.
    */
   apiUrl?: string;
+  /**
+   * The site base URL (origin plus install path) of the site serving a
+   * foreign `apiUrl`, for example `https://api.example/mount` for
+   * `https://api.example/mount/api`: a locale prefix goes between it and the
+   * JSON:API prefix (`https://api.example/mount/fr/api`). Without it a foreign
+   * base accepts no locale prefix, since its site root is unknown.
+   */
+  apiSiteUrl?: string;
 }
 
 /** Where JSON:API requests go, resolved from the endpoint configuration. */
@@ -55,11 +64,13 @@ export interface ResolvedJsonApiBase {
   base: string;
   /** The JSON:API prefix relative to `base`, without surrounding slashes. */
   apiPrefix: string;
-  /**
-   * Whether JSON:API lives on another site than the backend base URL. Such a
-   * base has no known site root, so no locale path prefix can be applied.
-   */
+  /** Whether JSON:API lives on another site than the backend base URL. */
   foreign: boolean;
+  /**
+   * Whether `base` is a site root (so a locale path prefix can be applied):
+   * always for the backend site, for a foreign base only with `apiSiteUrl`.
+   */
+  siteKnown: boolean;
 }
 
 /**
@@ -81,6 +92,22 @@ export function resolveJsonApiBase(
         apiPrefix:
           trimSlashes(api.slice(site.length)) || DEFAULT_JSONAPI_PREFIX,
         foreign: false,
+        siteKnown: true,
+      };
+    }
+    if (endpoints.apiSiteUrl) {
+      const apiSite = normalizeBaseUrl(endpoints.apiSiteUrl);
+      if (api !== apiSite && !api.startsWith(`${apiSite}/`)) {
+        throw new Error(
+          `[drupal-canvas] The JSON:API URL (${api}) is not under its site base URL (${apiSite}).`,
+        );
+      }
+      return {
+        base: apiSite,
+        apiPrefix:
+          trimSlashes(api.slice(apiSite.length)) || DEFAULT_JSONAPI_PREFIX,
+        foreign: true,
+        siteKnown: true,
       };
     }
     const url = new URL(api);
@@ -88,12 +115,14 @@ export function resolveJsonApiBase(
       base: url.origin,
       apiPrefix: trimSlashes(url.pathname) || DEFAULT_JSONAPI_PREFIX,
       foreign: true,
+      siteKnown: false,
     };
   }
   return {
     base: site,
     apiPrefix: trimSlashes(endpoints.apiPrefix || DEFAULT_JSONAPI_PREFIX),
     foreign: false,
+    siteKnown: true,
   };
 }
 
