@@ -209,8 +209,15 @@ the Canvas Headless SDK build on. It extends
 configured resource version (collection items are hydrated with their working
 copies before serialization; raw responses bypass this), mapping of browser
 requests to a same-origin proxy (including absolute pagination links and the
-Decoupled Router endpoint), `DraftSessionError` for expired preview sessions,
-and caches separated by resource version and session scope.
+Decoupled Router endpoint), `DraftSessionError` for rejected preview sessions
+(the proxy's session error, or a 401 answered to an authenticated direct
+request), and caches separated by resource version and session scope: an
+authenticated client caches only with an explicit, session-unique `cacheScope`.
+Draft collection reads hydrate each item with its working copy, keeping the
+read's locale, sparse fieldsets, includes, and an explicitly selected resource
+version, and merge the working copies' included resources into the document.
+`apiUrl` points JSON:API at a separate base URL while the Decoupled Router stays
+under `baseUrl`.
 
 ```js
 import { createJsonApiClient } from 'drupal-canvas/jsonapi-client';
