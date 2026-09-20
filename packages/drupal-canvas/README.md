@@ -210,14 +210,19 @@ configured resource version (collection items are hydrated with their working
 copies before serialization; raw responses bypass this), mapping of browser
 requests to a same-origin proxy (including absolute pagination links and the
 Decoupled Router endpoint), `DraftSessionError` for rejected preview sessions
-(the proxy's session error, or a 401 answered to an authenticated direct
-request), and caches separated by resource version and session scope: an
-authenticated client caches only with an explicit, session-unique `cacheScope`.
-Draft collection reads hydrate each item with its working copy, keeping the
-read's locale, sparse fieldsets, includes, and an explicitly selected resource
-version, and merge the working copies' included resources into the document.
-`apiUrl` points JSON:API at a separate base URL while the Decoupled Router stays
-under `baseUrl`.
+(the proxy's session error, or a 401 answered to a direct request that carried
+the session credentials), and caches separated by resource version and session
+scope: a client that carries a session (authentication, cookies, the proxy, a
+preview or a resource version) caches only with an explicit, session-unique
+`cacheScope`. Draft collection reads hydrate each item with its working copy,
+keeping the read's locale, sparse fieldsets, includes, and an explicitly
+selected resource version; the working copies' included resources are merged
+into the document, and a resource that is itself primary is never duplicated in
+`included`, so relationships resolve to the selected working copy. URLs keep the
+backend's site path (`https://host/sub/fr/jsonapi/...`, also for the Decoupled
+Router and index lookups); `apiUrl` under `baseUrl` is a prefix override, and
+`apiUrl` on another site is a foreign JSON:API base that accepts no locale
+prefix while the Decoupled Router stays under `baseUrl`.
 
 ```js
 import { createJsonApiClient } from 'drupal-canvas/jsonapi-client';
