@@ -84,7 +84,7 @@ describe('canvas island client renderer', () => {
         _ajax: unknown,
         response: { settings: Record<string, unknown>; merge: boolean },
       ) {
-        const target = (globalThis as { drupalSettings: Settings })
+        const target = (globalThis as unknown as { drupalSettings: Settings })
           .drupalSettings;
         if (response.merge) {
           Object.assign(target.canvasData.v0, response.settings);
@@ -126,7 +126,7 @@ describe('canvas island client renderer', () => {
     expect(element.textContent).toBe('AJAX title');
     // Behavior attachment (after an `insert` command) announces it too.
     (
-      globalThis as { drupalSettings: Settings }
+      globalThis as unknown as { drupalSettings: Settings }
     ).drupalSettings.canvasData.v0.pageTitle = 'Attached title';
     await hooks.act(() => {
       drupal.behaviors.canvasIslandSettings.attach();
