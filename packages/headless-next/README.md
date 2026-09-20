@@ -113,6 +113,10 @@ explicit `jsonApi` prop replaces the configuration `CanvasRuntime` supplies.
 Server rendering a component does not run its SWR fetcher: prefetch data with
 `getClient()` in the page and supply it through a client `SWRConfig` wrapper
 (`fallback`) so the initial HTML contains it — see `@drupal-canvas/headless`.
+During server rendering the hook's client is the same draft-aware client as in
+the browser, so fallback data renders and hydration matches, but it performs no
+network requests in a draft session (`ServerRenderingDraftFetchError` names the
+fix); public pages get a direct client.
 
 ## Data access
 
