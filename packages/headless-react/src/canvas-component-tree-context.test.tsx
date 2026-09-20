@@ -179,13 +179,14 @@ describe('CanvasComponentTree runtime configuration', () => {
     expect(explicit).toContain('https://explicit.example|/api/canvas/jsonapi');
   });
 
-  it('creates no client during server rendering of a live draft session', () => {
+  it('creates the server-side client from the adapter transport, direct for public rendering', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const globalWithWindow = globalThis as { window?: unknown };
     const savedWindow = globalWithWindow.window;
     // Simulate server rendering.
     delete globalWithWindow.window;
     try {
+      const transport = vi.fn<typeof fetch>();
       const draftHtml = renderToStaticMarkup(
         <CanvasComponentTree
           tree={tree}
@@ -196,9 +197,12 @@ describe('CanvasComponentTree runtime configuration', () => {
             resourceVersion: 'rel:working-copy',
             preview: true,
           }}
+          jsonApiFetch={transport}
         />,
       );
-      expect(draftHtml).toContain('|no-client');
+      // Request-aware: the client keeps the proxy mapping (and the draft
+      // resource version) and sends through the adapter's transport.
+      expect(draftHtml).toContain('https://drupal.example|/api/canvas/jsonapi');
       const publicHtml = renderToStaticMarkup(
         <CanvasComponentTree
           tree={tree}
