@@ -44,7 +44,11 @@ export interface JsonApiProxyOptions {
   getConfig: () => Promise<
     Pick<
       DraftConfig,
-      'baseUrl' | 'apiPrefix' | 'jsonApiUrl' | 'jsonApiProxyPath'
+      | 'baseUrl'
+      | 'apiPrefix'
+      | 'jsonApiUrl'
+      | 'jsonApiSiteUrl'
+      | 'jsonApiProxyPath'
     >
   >;
   /** Whether the framework's draft flag is on for the current request. */
@@ -215,6 +219,7 @@ export function createJsonApiProxyHandler(
       baseUrl: endpoints.baseUrl,
       apiPrefix: endpoints.apiPrefix,
       apiUrl: endpoints.apiUrl,
+      apiSiteUrl: endpoints.apiSiteUrl,
       proxyUrl: config.jsonApiProxyPath ?? '/api/canvas/jsonapi',
     };
 

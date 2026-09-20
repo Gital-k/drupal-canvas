@@ -212,17 +212,25 @@ requests to a same-origin proxy (including absolute pagination links and the
 Decoupled Router endpoint), `DraftSessionError` for rejected preview sessions
 (the proxy's session error, or a 401 answered to a direct request that carried
 the session credentials), and caches separated by resource version and session
-scope: a client that carries a session (authentication, cookies, the proxy, a
-preview or a resource version) caches only with an explicit, session-unique
-`cacheScope`. Draft collection reads hydrate each item with its working copy,
-keeping the read's locale, sparse fieldsets, includes, and an explicitly
-selected resource version; the working copies' included resources are merged
-into the document, and a resource that is itself primary is never duplicated in
-`included`, so relationships resolve to the selected working copy. URLs keep the
-backend's site path (`https://host/sub/fr/jsonapi/...`, also for the Decoupled
-Router and index lookups); `apiUrl` under `baseUrl` is a prefix override, and
-`apiUrl` on another site is a foreign JSON:API base that accepts no locale
-prefix while the Decoupled Router stays under `baseUrl`.
+scope: a client that may carry a session (authentication, cookies — explicit or
+a browser's same-origin default — the proxy, a custom `fetch` transport, a
+preview or a resource version) caches only with an explicit `cacheScope`, so the
+legacy client and any transport-injected client share no cache without a
+caller-provided scope. A 401 is a rejected session when the request carried the
+configured credentials (the Authorization header, cookies, or a transport
+declared with `fetchAuthenticates`); `disableAuthentication` opts a request out,
+and failing to obtain or renew credentials is a rejected session too. Draft
+collection reads hydrate each item with its working copy, keeping the read's
+locale, sparse fieldsets, includes, and an explicitly selected resource version;
+the working copies' included resources are merged into the document, and a
+resource that is itself primary is never duplicated in `included`, so
+relationships resolve to the selected working copy. URLs keep the backend's site
+path (`https://host/sub/fr/jsonapi/...`, also for the Decoupled Router and index
+lookups); `apiUrl` under `baseUrl` is a prefix override, and `apiUrl` on another
+site is a foreign JSON:API base: with `apiSiteUrl` (that site's base URL,
+install path included) a locale prefix goes between them
+(`https://api.example/mount/fr/api`), without it no locale prefix applies; the
+Decoupled Router stays under `baseUrl` either way.
 
 ```js
 import { createJsonApiClient } from 'drupal-canvas/jsonapi-client';
