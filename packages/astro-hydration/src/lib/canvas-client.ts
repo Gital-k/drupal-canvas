@@ -99,23 +99,65 @@ function subscribeToSettings(listener: () => void): () => void {
   };
 }
 
+type DrupalGlobal = {
+  behaviors?: Record<string, { attach?: (...args: unknown[]) => void }>;
+  AjaxCommands?: {
+    prototype: {
+      settings?: (...args: unknown[]) => unknown;
+    };
+  };
+};
+
+const PATCHED = Symbol.for('drupal-canvas.settings-command');
+
+/**
+ * Connects to Drupal's settings lifecycle. The AJAX `settings` command is
+ * where a response's settings reach `drupalSettings`; core attaches no
+ * behavior for a settings-only response, so the command itself announces the
+ * update after merging. Behavior attachment (after `insert` commands, which
+ * merge settings first) announces it too. The command is patched when the
+ * AJAX framework is present, re-checked on every attachment in case the
+ * framework was loaded later.
+ */
+function connectToDrupal(): void {
+  const drupal = (globalThis as { Drupal?: DrupalGlobal }).Drupal;
+  if (!drupal) {
+    return;
+  }
+  const commands = drupal.AjaxCommands?.prototype as
+    | (DrupalGlobal['AjaxCommands'] extends infer T
+        ? T extends { prototype: infer P }
+          ? P & { [PATCHED]?: boolean }
+          : never
+        : never)
+    | undefined;
+  if (commands?.settings && !commands[PATCHED]) {
+    const settings = commands.settings;
+    commands.settings = function (this: unknown, ...args: unknown[]) {
+      const result = settings.apply(this, args);
+      notifyCanvasSettingsUpdated();
+      return result;
+    };
+    commands[PATCHED] = true;
+  }
+  if (drupal.behaviors && !drupal.behaviors.canvasIslandSettings) {
+    drupal.behaviors.canvasIslandSettings = {
+      attach: () => {
+        connectToDrupal();
+        notifyCanvasSettingsUpdated();
+      },
+    };
+  }
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener(CANVAS_SETTINGS_UPDATED_EVENT, () =>
     notifyCanvasSettingsUpdated(),
   );
-  // Drupal attaches behaviors after every AJAX response, once the response's
-  // settings are merged into `drupalSettings`: that is the settings update
-  // signal on a Drupal page.
-  const drupal = (
-    globalThis as {
-      Drupal?: { behaviors?: Record<string, { attach?: () => void }> };
-    }
-  ).Drupal;
-  if (drupal?.behaviors && !drupal.behaviors.canvasIslandSettings) {
-    drupal.behaviors.canvasIslandSettings = {
-      attach: () => notifyCanvasSettingsUpdated(),
-    };
-  }
+  // The `canvas/astro.hydration` library depends on `core/drupal`, so the
+  // Drupal object exists before this module (a deferred module script)
+  // evaluates.
+  connectToDrupal();
 }
 
 /**
