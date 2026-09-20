@@ -13,26 +13,17 @@ import { reportCanvasData } from './data-inspection.js';
 import { warnOnce } from './warnings.js';
 
 import type { ReactNode } from 'react';
-import type { PageData, SiteData } from './drupal-utils.js';
+import type {
+  CanvasContext,
+  PageContext,
+  SiteContext,
+} from './context-types.js';
 
-/**
- * The page context: the same shape `getPageData()` returns. The primary
- * entity can be `null` on routes without one.
- */
-export type PageContext = PageData;
-
-/**
- * The site context: the same shape `getSiteData()` returns. Headless
- * frontends receive empty theme asset URLs; that is valid site context, not
- * missing context.
- */
-export type SiteContext = SiteData;
-
-/** The context a rendering integration supplies to a component tree. */
-export interface CanvasContext {
-  page: PageContext | null;
-  site: SiteContext | null;
-}
+export type {
+  CanvasContext,
+  PageContext,
+  SiteContext,
+} from './context-types.js';
 
 export interface CanvasContextProviderProps {
   context: CanvasContext;

@@ -87,9 +87,16 @@ readonly final class CodeComponentDataProvider {
   /**
    * Returns the Breadcrumbs for V0 of drupalSettings.canvasData.
    *
+   * @param \Drupal\Core\Cache\RefinableCacheableDependencyInterface|null $cacheability
+   *   (optional) When given, the cacheability of the built breadcrumb is added
+   *   to it. Not needed when attaching `drupalSettings`, whose page already
+   *   renders the breadcrumb; needed by API responses that embed the data.
+   *
    * @return array[]
    */
-  public function getCanvasDataBreadcrumbsV0(): array {
+  public function getCanvasDataBreadcrumbsV0(?RefinableCacheableDependencyInterface $cacheability = NULL): array {
+    $breadcrumb = $this->breadcrumbManager->build($this->routeMatch);
+    $cacheability?->addCacheableDependency($breadcrumb);
     return [
       self::V0 => [
         'breadcrumbs' => \array_map(static function (Link $link) {
@@ -99,7 +106,7 @@ readonly final class CodeComponentDataProvider {
             'text' => $link->getText(),
             'url' => $url->toString() ?? '',
           ];
-        }, $this->breadcrumbManager->build($this->routeMatch)->getLinks()),
+        }, $breadcrumb->getLinks()),
       ],
     ];
   }
