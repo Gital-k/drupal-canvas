@@ -333,8 +333,13 @@ configuration and session stay unchanged. Without a provider, the hook returns
 `null` and warns how to fix the missing integration, without repeating warnings.
 
 Do not include the client in `page.context`. Server rendering and browser
-hydration each create their own client with the right connection to Drupal. Keep
-preview tokens out of React context and serialized page data.
+hydration each create their own client from the same nonsecret configuration,
+so the hook returns a client on both sides and prefetched SWR fallback data
+renders without a hydration mismatch. In a draft session the server-rendered
+client reaches no draft data: it refuses network requests with an actionable
+error, and draft data enters the initial HTML only through the server
+integration's prefetch and SWR fallback data. Keep preview tokens out of React
+context and serialized page data.
 
 Keep the legacy `new JsonApiClient()` API working in Drupal-rendered Code
 Components and Workbench. Outside those environments, it throws an actionable
@@ -463,12 +468,16 @@ pass it to the React rendering integration. Do not infer it from the component
 tree or include it in the page/site data contract.
 
 The rendering integration creates the browser client from this configuration.
-Server-side client creation additionally uses the current request's session
-through the SDK's server integration, without serializing credentials. The
-generic React renderer must not import server session code. If automatic client
-configuration is unavailable, retain an explicitly supplied outer
-`JsonApiClientProvider`; otherwise leave the client unavailable and use the
-hook's missing-provider behavior.
+Server rendering creates its client from the same configuration: a direct,
+unauthenticated client for public content, and for a live draft session the
+same draft-aware client the browser gets, except that it performs no network
+requests — a draft request made while rendering fails with an error that names
+the prefetch path. The request's session is used only by the SDK's server
+integration (`getClient()`), never by the renderer, and credentials are never
+serialized. The generic React renderer must not import server session code. If
+automatic client configuration is unavailable, retain an explicitly supplied
+outer `JsonApiClientProvider`; otherwise leave the client unavailable and use
+the hook's missing-provider behavior.
 
 Replacing the provided client updates consumers but does not itself clear SWR
 caches. Browser data refresh and cache clearing require separate integration.
@@ -655,6 +664,38 @@ through SWR's `SWRConfig` provider. A descendant Code Component's `useSWR()`
 call reads the matching fallback during server rendering, so its data-filled
 markup appears in the initial HTML. The component stays portable: in Drupal,
 without prefetched data, it fetches in the browser as before.
+
+Two client instances take part, and they never merge. The server integration's
+client (`getClient()`) carries the request's session, talks to Drupal directly,
+and produces the prefetched data. The hook's client is created by the renderer
+from nonsecret configuration on both sides of hydration; on the server it has no
+network access in a draft session, in the browser it reaches Drupal through the
+application proxy.
+
+```mermaid
+flowchart TD
+  subgraph Server["Server rendering (one request)"]
+    S1["Server integration: getClient()<br/>carries the request's session"]
+    S2["Drupal JSON:API<br/>(working copies)"]
+    S3["SWRConfig fallback<br/>(request-scoped, serialized with the HTML)"]
+    S4["Renderer: hook client from nonsecret configuration<br/>draft session: no network, actionable error<br/>public: direct unauthenticated client"]
+    S5["Code Component<br/>useJsonApiClient() + useSWR(key)<br/>reads the fallback"]
+    S1 -->|prefetch| S2
+    S2 -->|prefetched data| S3
+    S3 --> S5
+    S4 -->|provides client| S5
+  end
+  subgraph Browser["Browser after hydration"]
+    B1["Renderer: hook client from the same configuration"]
+    B2["Code Component<br/>hydrates from the fallback,<br/>then SWR revalidates"]
+    B3["Application JSON:API proxy<br/>authenticates from the session cookie"]
+    B4["Drupal JSON:API"]
+    B1 -->|provides client| B2
+    B2 -->|requests| B3
+    B3 -->|session credentials| B4
+  end
+  S5 -.->|same markup and data| B2
+```
 
 For example, a portable component can use a string key:
 
