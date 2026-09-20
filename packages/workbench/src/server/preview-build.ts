@@ -748,6 +748,7 @@ export async function buildPreviewArtifact(
             ),
             componentSources: registrySources,
             cssEntryPaths: uniqueCssEntryPaths,
+            runtimeSettings,
           });
           const mockHtml = buildIframeHtml(
             bundleResult.js,
