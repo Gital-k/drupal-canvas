@@ -75,6 +75,7 @@
     "zod": "^4.2.0"
   },
   "devDependencies": {
+    "@types/react": "^19.2.0",
     "jsdom": "^26.1.0",
     "react-dom": "^18.3.1",
     "tsdown": "^0.22.12",
@@ -86,5 +87,8 @@
     "dev": "NODE_ENV=development tsdown --watch",
     "type-check": "tsc --noEmit --pretty",
     "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
   }
 }
