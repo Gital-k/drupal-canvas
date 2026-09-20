@@ -6,7 +6,10 @@
  * subclass: draft reads, serialization, and proxy mapping live there.
  */
 
-import { createJsonApiClient } from 'drupal-canvas/jsonapi-client';
+import {
+  createJsonApiClient,
+  resolveJsonApiBase,
+} from 'drupal-canvas/jsonapi-client';
 
 import { getSessionToken } from '../token';
 
@@ -40,12 +43,15 @@ export function resolveJsonApiEndpoints(
   config: Pick<DraftConfig, 'baseUrl' | 'apiPrefix' | 'jsonApiUrl'>,
 ): JsonApiEndpoints {
   if (config.jsonApiUrl) {
-    const url = new URL(config.jsonApiUrl);
-    const apiPrefix = url.pathname.replace(/^\/+|\/+$/g, '');
+    // Under the backend base URL the override is a prefix (a locale prefix
+    // goes between the site path and it); elsewhere it is a foreign base.
+    const api = resolveJsonApiBase(config.baseUrl, {
+      apiUrl: config.jsonApiUrl,
+    });
     return {
       baseUrl: config.baseUrl,
-      ...(apiPrefix && { apiPrefix }),
-      apiUrl: `${url.origin}${apiPrefix ? `/${apiPrefix}` : ''}`,
+      apiPrefix: api.apiPrefix,
+      apiUrl: `${api.base}/${api.apiPrefix}`,
     };
   }
   return {
