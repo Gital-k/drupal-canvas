@@ -24,6 +24,8 @@ import {
   reportMissingCanvasComponentUuid,
 } from '@drupal-canvas/headless';
 
+import { useJsonApiRuntimeConfig } from './jsonapi-runtime';
+
 import type { ElementType, ReactNode } from 'react';
 import type {
   CanvasComponentTreeElement,
@@ -47,12 +49,21 @@ export interface CanvasComponentTreeProps {
   context?: CanvasContext;
   /**
    * The nonsecret JSON:API runtime configuration prepared by the SDK's
-   * server integration (`getJsonApiRuntimeConfig()`). When supplied, the
-   * renderer creates the client for `useJsonApiClient()`: in the browser it
-   * sends requests through the application's same-origin proxy; during
-   * server rendering it reaches the backend directly without credentials.
-   * When omitted, an outer `JsonApiClientProvider` is inherited; otherwise
+   * server integration (`getJsonApiRuntimeConfig()`). When omitted, the
+   * configuration of the nearest `JsonApiRuntimeProvider` applies (framework
+   * adapters supply it from their server integration). With configuration,
+   * the renderer creates the browser client for `useJsonApiClient()`, which
+   * sends requests through the application's same-origin proxy. Without
+   * configuration, an outer `JsonApiClientProvider` is inherited; otherwise
    * the hook reports the missing provider.
+   *
+   * Server rendering: this client component cannot reach the request's
+   * draft session (only serializable props cross the server/client boundary
+   * and credentials are never serialized). For public rendering it creates
+   * a direct, unauthenticated client. In a live draft session it creates no
+   * client, so a component that fetches during rendering can never receive
+   * public content masquerading as a draft; prefetch draft data with the
+   * SDK's `getClient()` and supply it as SWR fallback data instead.
    */
   jsonApi?: JsonApiRuntimeConfig;
 }
@@ -97,36 +108,44 @@ export function CanvasComponentTree({
  * an outer provider is inherited.
  */
 function CanvasTreeClientProvider({
-  jsonApi,
+  jsonApi: explicitConfig,
   children,
 }: {
   jsonApi?: JsonApiRuntimeConfig;
   children: ReactNode;
 }) {
+  const runtimeConfig = useJsonApiRuntimeConfig();
   const hasOuterClient = useHasJsonApiClient();
+  // Precedence: the explicit prop, then the adapter-supplied runtime
+  // configuration, then an outer JsonApiClientProvider.
+  const jsonApi = explicitConfig ?? runtimeConfig;
   const key = jsonApi ? JSON.stringify(jsonApi) : null;
   const client = useMemo(() => {
     if (!jsonApi) {
       return null;
     }
-    // Server rendering has no browser proxy to reach: it calls the backend
-    // directly, without credentials. Data that must be rendered on the
-    // server is prefetched with the SDK's server client and supplied as
-    // SWR fallback data instead.
-    const browser = typeof window !== 'undefined';
+    if (typeof window !== 'undefined') {
+      // Browser: through the application's same-origin proxy, which
+      // authenticates from the session cookie.
+      return createJsonApiClient({ ...jsonApi, credentials: 'same-origin' });
+    }
+    if (jsonApi.preview) {
+      // Server rendering in a live draft session: no request-aware client
+      // can be created here (see the jsonApi prop), and a public client
+      // would let draft rendering silently fall back to published content.
+      return null;
+    }
+    // Server rendering of public content: direct, unauthenticated.
     return createJsonApiClient({
       ...jsonApi,
-      ...(browser
-        ? { credentials: 'same-origin' as const }
-        : { proxyUrl: undefined, resourceVersion: null, preview: false }),
+      proxyUrl: undefined,
+      resourceVersion: null,
+      preview: false,
     });
     // The serialized configuration is the identity of the client.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  if (client === null) {
-    return <>{children}</>;
-  }
-  if (hasOuterClient && !jsonApi) {
+  if (client === null || (hasOuterClient && !jsonApi)) {
     return <>{children}</>;
   }
   return (
