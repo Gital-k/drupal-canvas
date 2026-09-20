@@ -150,9 +150,13 @@ state-changing requests that do not carry a same-origin `Sec-Fetch-Site` or
   Responses are `private, no-store`.
 - Expired or invalid session: the proxy answers a session error (HTTP 401,
   `{ "error": "draft_session_expired" }`, header
-  `X-Canvas-Draft-Session: expired`), never public content. The shared client
-  surfaces it as `DraftSessionError`, and the existing renewal and recovery
-  lifecycle applies.
+  `X-Canvas-Draft-Session: expired`), never public content — also when Drupal
+  itself rejects the session token with 401. Resource-level denials (403) pass
+  through unchanged. The shared client surfaces the session error as
+  `DraftSessionError`, and the existing renewal and recovery lifecycle applies.
+- Responses vary on `Cookie` in addition to what Drupal varies on; 304 answers
+  to conditional requests pass through; redirects inside the boundary are
+  rewritten to the proxy, the rest refused.
 
 Preview tokens carry the editor's permissions capped by the view-only ceiling of
 ADR 14, and Drupal authorizes every operation; the proxy grants nothing.
@@ -174,7 +178,8 @@ Responses are deserialized with `DefaultSerializer`.
 Configuration: `CANVAS_SITE_URL` is the backend; the JSON:API prefix is
 discovered from `/canvas/api/v0/site-data`, with `CANVAS_JSONAPI_PREFIX` as the
 fallback; `CANVAS_JSONAPI_URL` sets the full upstream JSON:API base URL and
-takes precedence over discovery.
+takes precedence over discovery for JSON:API requests only — the supporting
+endpoints (Decoupled Router path translation) stay on `CANVAS_SITE_URL`.
 
 ### Server rendering and SWR
 

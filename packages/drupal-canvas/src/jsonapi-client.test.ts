@@ -1,3 +1,4 @@
+// @cspell:ignore Aworking Alatest
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createJsonApiClient, isDraftSessionError } from './jsonapi-client';
@@ -165,8 +166,8 @@ describe('createJsonApiClient', () => {
         .map((call) => call.url)
         .sort(),
     ).toEqual([
-      'https://drupal.example/jsonapi/node/article/a?resourceVersion=rel%3Aworking-copy',
-      'https://drupal.example/jsonapi/node/article/b?resourceVersion=rel%3Aworking-copy',
+      'https://drupal.example/jsonapi/node/article/a?include=field_tags&resourceVersion=rel%3Aworking-copy',
+      'https://drupal.example/jsonapi/node/article/b?include=field_tags&resourceVersion=rel%3Aworking-copy',
     ]);
     expect(deserialize).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
@@ -255,6 +256,264 @@ describe('createJsonApiClient', () => {
     const result = await client.fetch('https://drupal.example/oauth/token');
     expect(result.error?.message).toContain('not a supported');
     expect(calls).toHaveLength(0);
+  });
+
+  it('keeps the applicable read options for working-copy item reads and merges included resources', async () => {
+    const { fetch, calls } = fakeFetch((url) => {
+      if (url.includes('/node/article/a?')) {
+        return jsonResponse({
+          data: {
+            type: 'node--article',
+            id: 'a',
+            attributes: { title: 'Draft A' },
+            relationships: {
+              field_tags: { data: [{ type: 'taxonomy_term--tags', id: 't1' }] },
+            },
+          },
+          included: [
+            {
+              type: 'taxonomy_term--tags',
+              id: 't1',
+              attributes: { name: 'Draft tag' },
+            },
+            {
+              type: 'taxonomy_term--tags',
+              id: 't2',
+              attributes: { name: 'New tag' },
+            },
+          ],
+        });
+      }
+      if (url.includes('/node/article/b?')) {
+        return jsonResponse({ errors: [{ status: '404' }] }, { status: 404 });
+      }
+      return jsonResponse({
+        ...articleCollection(),
+        included: [
+          {
+            type: 'taxonomy_term--tags',
+            id: 't1',
+            attributes: { name: 'Published tag' },
+          },
+          {
+            type: 'taxonomy_term--tags',
+            id: 't0',
+            attributes: { name: 'Other tag' },
+          },
+        ],
+      });
+    });
+    const client = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      resourceVersion: 'rel:working-copy',
+      serializer: null,
+      fetch,
+    });
+    const document = (await client.getCollection('node--article', {
+      locale: 'de',
+      queryString:
+        'include=field_tags&fields[node--article]=title,field_tags&fields[taxonomy_term--tags]=name&filter[status]=1&page[limit]=5&sort=-created&resourceVersion=rel%3Alatest-version',
+    })) as {
+      data: Array<{ attributes: { title: string } }>;
+      included: Array<{ id: string; attributes: { name: string } }>;
+    };
+    expect(calls[0].url).toBe(
+      'https://drupal.example/de/jsonapi/node/article?include=field_tags&fields[node--article]=title,field_tags&fields[taxonomy_term--tags]=name&filter[status]=1&page[limit]=5&sort=-created&resourceVersion=rel%3Alatest-version',
+    );
+    const itemUrls = calls
+      .slice(1)
+      .map((call) => call.url)
+      .sort();
+    expect(itemUrls).toEqual([
+      'https://drupal.example/de/jsonapi/node/article/a?include=field_tags&fields%5Bnode--article%5D=title%2Cfield_tags&fields%5Btaxonomy_term--tags%5D=name&resourceVersion=rel%3Alatest-version',
+      'https://drupal.example/de/jsonapi/node/article/b?include=field_tags&fields%5Bnode--article%5D=title%2Cfield_tags&fields%5Btaxonomy_term--tags%5D=name&resourceVersion=rel%3Alatest-version',
+    ]);
+    expect(document.data.map((item) => item.attributes.title)).toEqual([
+      'Draft A',
+      'Published B',
+    ]);
+    // Working-copy includes replace the collection's resources of the same
+    // identity; the rest of the collection's includes are kept.
+    expect(
+      document.included.map((resource) => [
+        resource.id,
+        resource.attributes.name,
+      ]),
+    ).toEqual([
+      ['t1', 'Draft tag'],
+      ['t0', 'Other tag'],
+      ['t2', 'New tag'],
+    ]);
+  });
+
+  it('surfaces a rejected session on direct authenticated requests and keeps ordinary item failures', async () => {
+    const unauthorized = (url: string) =>
+      url.includes('/node/article/a?')
+        ? jsonResponse({ errors: [{ status: '401' }] }, { status: 401 })
+        : jsonResponse(articleCollection());
+    const authenticated = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      resourceVersion: 'rel:working-copy',
+      authentication: {
+        type: 'Custom',
+        credentials: { value: 'Bearer expired' },
+      },
+      serializer: null,
+      fetch: fakeFetch(unauthorized).fetch,
+    });
+    await expect(
+      authenticated.getCollection('node--article'),
+    ).rejects.toSatisfy(isDraftSessionError);
+    await expect(
+      authenticated.getResource('node--article', 'a'),
+    ).rejects.toSatisfy(isDraftSessionError);
+
+    // 403 is a resource-level denial: the published item stays.
+    const forbidden = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      resourceVersion: 'rel:working-copy',
+      authentication: {
+        type: 'Custom',
+        credentials: { value: 'Bearer valid' },
+      },
+      serializer: null,
+      fetch: fakeFetch((url) =>
+        url.includes('/node/article/a?')
+          ? jsonResponse({ errors: [{ status: '403' }] }, { status: 403 })
+          : jsonResponse(articleCollection()),
+      ).fetch,
+    });
+    const document = (await forbidden.getCollection('node--article')) as {
+      data: Array<{ attributes: { title: string } }>;
+    };
+    expect(document.data[0].attributes.title).toBe('Published A');
+
+    // Unauthenticated clients see 401 as an ordinary failure.
+    const anonymous = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      resourceVersion: 'rel:working-copy',
+      serializer: null,
+      fetch: fakeFetch(unauthorized).fetch,
+    });
+    const anonymousDocument = (await anonymous.getCollection(
+      'node--article',
+    )) as { data: Array<{ attributes: { title: string } }> };
+    expect(anonymousDocument.data[0].attributes.title).toBe('Published A');
+  });
+
+  it('does not cache authenticated responses without an explicit session scope', async () => {
+    const store = new Map<string, unknown>();
+    const cache: Cache = {
+      get: async <T>(key: string) => store.get(key) as T,
+      set: async (key, value) => {
+        store.set(key, value);
+      },
+    };
+    const makeClient = (token: string, cacheScope?: string) =>
+      createJsonApiClient({
+        baseUrl: 'https://drupal.example',
+        authentication: {
+          type: 'Custom',
+          credentials: { value: `Bearer ${token}` },
+        },
+        cache,
+        ...(cacheScope && { cacheScope }),
+        serializer: null,
+        fetch: fakeFetch(() =>
+          jsonResponse({
+            data: {
+              type: 'node--article',
+              id: 'a',
+              attributes: { title: token },
+            },
+          }),
+        ).fetch,
+      });
+    const a = makeClient('session-a');
+    const b = makeClient('session-b');
+    await a.getResource('node--article', 'a');
+    const seenByB = (await b.getResource('node--article', 'a')) as {
+      data: { attributes: { title: string } };
+    };
+    expect(seenByB.data.attributes.title).toBe('session-b');
+    expect(store.size).toBe(0);
+
+    // With a session-unique scope, caching works and stays separated.
+    const scopedA = makeClient('session-a', 'session:a');
+    const scopedB = makeClient('session-b', 'session:b');
+    await scopedA.getResource('node--article', 'a');
+    const scopedSeenByB = (await scopedB.getResource('node--article', 'a')) as {
+      data: { attributes: { title: string } };
+    };
+    expect(scopedSeenByB.data.attributes.title).toBe('session-b');
+    expect([...store.keys()].sort()).toEqual([
+      expect.stringContaining('default:session:a:'),
+      expect.stringContaining('default:session:b:'),
+    ]);
+  });
+
+  it('builds JSON:API URLs on a separate JSON:API base and keeps the router on the backend', async () => {
+    const { fetch, calls } = fakeFetch((url) =>
+      url.includes('translate-path')
+        ? jsonResponse({
+            resolved: 'https://drupal.example/about',
+            isHomePath: false,
+            entity: {
+              canonical: 'https://drupal.example/about',
+              type: 'node',
+              bundle: 'page',
+              id: '1',
+              uuid: 'u1',
+            },
+            label: 'About',
+            jsonapi: {
+              individual: 'https://api.example/drupal/api/node/page/u1',
+              resourceName: 'node--page',
+              basePath: '/drupal/api',
+              entryPoint: 'https://api.example/drupal/api',
+            },
+            meta: { deprecated: {} },
+          })
+        : jsonResponse({
+            data: { type: 'node--page', id: 'u1', attributes: {} },
+          }),
+    );
+    const client = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      apiUrl: 'https://api.example/drupal/api/',
+      serializer: null,
+      fetch,
+    });
+    expect(client.runtimeConfig).toMatchObject({
+      baseUrl: 'https://drupal.example',
+      apiPrefix: 'drupal/api',
+      apiUrl: 'https://api.example/drupal/api',
+    });
+    await client.getResource('node--page', 'u1', { locale: 'de' });
+    await client.getResourceByPath('/about');
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://api.example/de/drupal/api/node/page/u1',
+      'https://drupal.example/router/translate-path?path=/about',
+      'https://api.example/drupal/api/node/page/u1',
+    ]);
+
+    // Through the proxy, both endpoints map to the application.
+    const proxied = fakeFetch(() =>
+      jsonResponse({ data: { type: 'node--page', id: 'u1', attributes: {} } }),
+    );
+    const browser = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      apiUrl: 'https://api.example/drupal/api',
+      proxyUrl: '/api/canvas/jsonapi',
+      serializer: null,
+      fetch: proxied.fetch,
+    });
+    await browser.getResource('node--page', 'u1');
+    await browser.fetch('https://drupal.example/router/translate-path?path=/x');
+    expect(proxied.calls.map((call) => call.url)).toEqual([
+      '/api/canvas/jsonapi/drupal/api/node/page/u1',
+      '/api/canvas/jsonapi/router/translate-path?path=/x',
+    ]);
   });
 
   it('separates cache entries by resource version and scope', async () => {
