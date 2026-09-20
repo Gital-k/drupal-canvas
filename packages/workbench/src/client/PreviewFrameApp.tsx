@@ -8,10 +8,16 @@ import {
   useState,
 } from 'react';
 import {
+  CanvasContextProvider,
+  createJsonApiClient,
+  JsonApiClientProvider,
+} from 'drupal-canvas';
+import {
   defineComponentRegistry,
   renderSpec,
 } from 'drupal-canvas/json-render-utils';
 import { useNavigate } from 'react-router';
+import siteData from 'virtual:drupal-canvas/site-data';
 import { PreviewErrorAlert } from '@wb/client/components/preview-error-alert';
 import { fetchDiscoveryResult } from '@wb/lib/discovery-client';
 import { fetchPreviewManifest } from '@wb/lib/preview-client';
@@ -21,6 +27,10 @@ import {
 } from '@wb/lib/preview-contract';
 import { getPreviewTargetKey } from '@wb/lib/preview-target-key';
 import { resolveWorkbenchPreviewNavigation } from '@wb/lib/resolve-workbench-preview-navigation';
+import {
+  createWorkbenchContext,
+  createWorkbenchJsonApiConfig,
+} from '@wb/lib/workbench-context';
 
 import type { ErrorInfo, ReactNode } from 'react';
 import type { EnrichedDiscoveryResult } from '@wb/lib/discovery-client';
@@ -116,6 +126,38 @@ class FrameRenderBoundary extends Component<
 
     return this.props.children;
   }
+}
+
+/**
+ * Supplies the `drupal-canvas` context to every previewed component: the
+ * Workbench page defaults and the site data the Vite integration loaded once.
+ * The provider stays mounted across preview targets and hot updates.
+ */
+function WorkbenchProviders({ children }: { children: ReactNode }) {
+  // The same base URL the legacy settings resolved to (see main.tsx), so the
+  // hooks and `getSiteData()` agree.
+  const fallbackBaseUrl =
+    (
+      window as unknown as {
+        drupalSettings?: { canvasData?: { v0?: { baseUrl?: string } } };
+      }
+    ).drupalSettings?.canvasData?.v0?.baseUrl || window.location.origin;
+  const context = useMemo(
+    () => createWorkbenchContext(siteData, fallbackBaseUrl),
+    [fallbackBaseUrl],
+  );
+  const client = useMemo(() => {
+    const config = createWorkbenchJsonApiConfig(siteData, fallbackBaseUrl);
+    return config ? createJsonApiClient(config) : null;
+  }, [fallbackBaseUrl]);
+  const content = client ? (
+    <JsonApiClientProvider client={client}>{children}</JsonApiClientProvider>
+  ) : (
+    children
+  );
+  return (
+    <CanvasContextProvider context={context}>{content}</CanvasContextProvider>
+  );
 }
 
 export function PreviewFrameApp() {
@@ -397,7 +439,7 @@ export function PreviewFrameApp() {
         }}
       >
         {activeRender ? (
-          <>
+          <WorkbenchProviders>
             <RenderSignal
               renderId={activeRender.renderId}
               type={activeRender.type}
@@ -413,7 +455,7 @@ export function PreviewFrameApp() {
               }}
             />
             {activeRender.node}
-          </>
+          </WorkbenchProviders>
         ) : previewError ? (
           <PreviewErrorAlert message={previewError} />
         ) : null}
