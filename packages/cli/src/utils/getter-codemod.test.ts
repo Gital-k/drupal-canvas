@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parse } from '@babel/parser';
 
 import { diagnoseLegacyApiUsage, migrateGetterCalls } from './getter-codemod';
 
@@ -55,6 +56,54 @@ const Branding = () => {
 export default Branding;
 `);
   });
+
+  it.each([
+    ['drupal-canvas/drupal-utils', 'sortMenu', 'getPageData', 'getSiteData'],
+    [
+      'drupal-canvas',
+      'usePageContext, useSiteContext',
+      'getPageData',
+      'getSiteData',
+    ],
+    [
+      'drupal-canvas/drupal-utils',
+      '/* keep this alias */ sortMenu as menu',
+      'getPageData as readPage',
+      'getSiteData as readSite',
+    ],
+  ])(
+    'removes adjacent trailing getters from %s while retaining %s',
+    (module, retained, pageImport, siteImport) => {
+      const pageCall = pageImport.split(' as ').at(-1);
+      const siteCall = siteImport.split(' as ').at(-1);
+      const source = `import { ${retained}, ${pageImport}, ${siteImport} } from '${module}';
+// Keep the component comment, too.
+export default function Header() {
+  const page = ${pageCall}();
+  const site = ${siteCall}();
+  return <h1>{page.pageTitle}{site.branding.siteName}</h1>;
+}
+`;
+      const result = migrateGetterCalls(source, 'index.jsx');
+      expect(result.changed).toBe(true);
+      expect(result.warnings).toEqual([]);
+      expect(() =>
+        parse(result.source, { sourceType: 'module', plugins: ['jsx'] }),
+      ).not.toThrow();
+      expect(result.source).toContain(retained);
+      expect(result.source).toContain('// Keep the component comment, too.');
+      expect(result.source).toContain('const page = usePageContext();');
+      expect(result.source).toContain('const site = useSiteContext();');
+      expect(result.source).not.toMatch(/getPageData|getSiteData/);
+      expect(result.conversions).toEqual([
+        { from: 'getPageData', to: 'usePageContext', calls: 1 },
+        { from: 'getSiteData', to: 'useSiteContext', calls: 1 },
+      ]);
+      expect(migrateGetterCalls(result.source, 'index.jsx').source).toBe(
+        result.source,
+      );
+    },
+  );
 
   it('replaces a getter-only legacy import and handles aliases', () => {
     const source = `import { getPageData as readPage } from '@/lib/drupal-utils';
