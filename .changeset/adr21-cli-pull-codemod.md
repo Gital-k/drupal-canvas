@@ -17,3 +17,7 @@ The codemod resolves namespace imports conservatively (bare hook calls with a
 root import, unchanged files on shadowed or computed namespace use), treats
 only `memo`/`forwardRef` wrappers as components, and never imports a hook
 twice.
+
+React wrappers are recognized by their `react` import binding and only for
+their component argument, and a replacement hook name shadowed anywhere in
+the file leaves the file unchanged.
