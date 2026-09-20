@@ -162,7 +162,10 @@ final class CanvasContentController {
 
     // The page and site context React Code Components read through the
     // `drupal-canvas` context hooks, generated for the routed request.
-    $context = $this->contextBuilder->build($cacheability);
+    $context = $this->contextBuilder->build(
+      $cacheability,
+      $rendered_entity instanceof ContentEntityInterface ? $rendered_entity : NULL,
+    );
 
     $response = new CacheableJsonResponse([
       'content' => $content,
