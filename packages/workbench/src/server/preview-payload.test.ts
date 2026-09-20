@@ -456,6 +456,10 @@ describe('preview-payload', () => {
       spec: { root: 'root', elements: {} },
       componentSources: [],
       cssEntryPaths: [],
+      runtimeSettings: {
+        baseUrl: 'https://static.example.test',
+        jsonapiPrefix: 'static',
+      },
     });
     expect(source).toContain(
       "import { CanvasContextProvider, JsonApiClientProvider, createJsonApiClient } from 'drupal-canvas';",
@@ -463,17 +467,28 @@ describe('preview-payload', () => {
     expect(source).toContain(
       "import canvasSiteData from 'virtual:drupal-canvas/site-data';",
     );
-    // The hooks resolve the backend from the legacy settings the bootstrap
-    // script produced from the same site data, so both agree.
+    // The hooks resolve the backend from the same inputs as the bootstrap
+    // script (inlined static settings, site data module, preview origin),
+    // never from the legacy settings global.
     expect(source).toContain(
-      'const canvasPreviewBaseUrl = canvasLegacySettings.baseUrl || window.location.origin;',
+      'const canvasStaticSettings = {"baseUrl":"https://static.example.test","jsonapiPrefix":"static"};',
     );
     expect(source).toContain(
-      'const canvasContext = createWorkbenchContext(canvasResolvedSiteData, canvasPreviewBaseUrl);',
+      'const canvasResolvedSiteData = resolvePreviewSiteData(canvasStaticSettings, canvasSiteData);',
     );
     expect(source).toContain(
-      'const canvasJsonApiConfig = createWorkbenchJsonApiConfig(canvasResolvedSiteData, canvasPreviewBaseUrl);',
+      'const canvasContext = createWorkbenchContext(canvasResolvedSiteData, canvasPreviewOrigin);',
     );
+    expect(source).toContain(
+      'const canvasJsonApiConfig = createWorkbenchJsonApiConfig(canvasResolvedSiteData, canvasPreviewOrigin);',
+    );
+    expect(source).not.toContain('canvasLegacySettings');
+    expect(source.indexOf('window.drupalSettings')).toBeLessThan(
+      source.indexOf('const canvasResolvedSiteData'),
+    );
+    expect(
+      source.slice(source.indexOf('const canvasStaticSettings')),
+    ).not.toContain('drupalSettings');
     expect(source).toContain(
       'React.createElement(CanvasContextProvider, { context: canvasContext }, withClient)',
     );
