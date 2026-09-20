@@ -244,42 +244,52 @@ function isBindingDeclaration(node: Identifier, parents: Node[]): boolean {
   }
 }
 
-/** Whether a function node is a component or custom hook by name. */
+/**
+ * Whether a function node is a component or custom hook: first by its
+ * syntactic position (a declaration, a variable's initializer, a default
+ * export, or the component argument of a React wrapper in one of those
+ * positions), then by the name that position gives it. A function anywhere
+ * else — another call's argument, a comparator callback, a property value —
+ * is not a component, whatever its own name says.
+ */
 function isComponentOrHook(
   fn: Node,
   parents: Node[],
   wrappers: WrapperBindings,
 ): boolean {
+  const parent = parents[parents.length - 1];
   let name: string | null = null;
-  if (
-    (fn.type === 'FunctionDeclaration' || fn.type === 'FunctionExpression') &&
-    fn.id
-  ) {
-    name = fn.id.name;
-  } else {
-    const parent = parents[parents.length - 1];
-    if (
-      parent?.type === 'VariableDeclarator' &&
-      parent.id.type === 'Identifier'
-    ) {
-      name = parent.id.name;
-    } else if (parent?.type === 'ExportDefaultDeclaration') {
-      // An anonymous default export is the component of a Code Component
-      // file.
+  if (fn.type === 'FunctionDeclaration') {
+    name = fn.id?.name ?? null;
+    if (name === null && parent?.type === 'ExportDefaultDeclaration') {
       return true;
-    } else if (
-      parent?.type === 'CallExpression' &&
-      parent.arguments[0] === fn &&
-      parents[parents.length - 2]?.type === 'VariableDeclarator' &&
-      isComponentWrapper(parent.callee, wrappers)
-    ) {
-      // `const Comp = memo(() => ...)` / `React.forwardRef(...)`: only React's
-      // own wrappers make their first argument a component; a comparator
-      // callback, a registration helper, or a store creator does not,
-      // whatever the result is named.
-      const declarator = parents[parents.length - 2] as { id: Node };
-      name = declarator.id.type === 'Identifier' ? declarator.id.name : null;
     }
+  } else if (parent?.type === 'VariableDeclarator' && parent.init === fn) {
+    name = parent.id.type === 'Identifier' ? parent.id.name : null;
+  } else if (parent?.type === 'ExportDefaultDeclaration') {
+    // The default export is the component of a Code Component file.
+    return true;
+  } else if (
+    parent?.type === 'CallExpression' &&
+    parent.arguments[0] === fn &&
+    isComponentWrapper(parent.callee, wrappers)
+  ) {
+    // `const Comp = memo(() => ...)` / `export default React.forwardRef(...)`:
+    // only React's own wrappers make their first argument a component, and
+    // only where the wrapped result is itself in a component position.
+    const grandparent = parents[parents.length - 2];
+    if (
+      grandparent?.type === 'VariableDeclarator' &&
+      grandparent.init === parent
+    ) {
+      name = grandparent.id.type === 'Identifier' ? grandparent.id.name : null;
+    } else if (grandparent?.type === 'ExportDefaultDeclaration') {
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
   }
   if (name === null) {
     return false;
@@ -686,7 +696,17 @@ export function migrateGetterCalls(
       return;
     }
     const binding = localGetters.get(node.name);
-    if (!binding || !isReference(node, parent)) {
+    if (!binding) {
+      return;
+    }
+    if (parent?.type === 'ExportSpecifier' && parent.local === node) {
+      // `export { getPageData }`: removing the import would leave the export
+      // dangling, and the re-export keeps the getter alive elsewhere.
+      usesGetters = true;
+      noteUnsafe(`\`${binding.local}\` is re-exported`);
+      return;
+    }
+    if (!isReference(node, parent)) {
       return;
     }
     usesGetters = true;
