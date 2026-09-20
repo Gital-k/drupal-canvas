@@ -3,7 +3,10 @@ import {
   readComponentManifest,
   writeComponentManifest,
 } from '@drupal-canvas/headless/components-endpoint';
-import { resolveDraftConfig } from '@drupal-canvas/headless/server';
+import {
+  DEFAULT_JSONAPI_PROXY_PATH,
+  resolveDraftConfig,
+} from '@drupal-canvas/headless/server';
 import { canvasComponentRegistry } from '@drupal-canvas/headless/vite';
 import {
   addComponent,
@@ -52,8 +55,9 @@ export interface CanvasModuleOptions {
  * The Drupal Canvas headless module for Nuxt:
  *
  * - Mounts the draft session routes (/api/draft, /api/draft/renew,
- *   /api/disable-draft, /api/draft/session) and the component metadata
- *   endpoint (/api/canvas/components).
+ *   /api/disable-draft, /api/draft/session), the component metadata
+ *   endpoint (/api/canvas/components), and the same-origin JSON:API proxy
+ *   (/api/canvas/jsonapi/**).
  * - Merges the CSP `frame-ancestors` directive into every response,
  *   keeping responses 'self'-only by default and admitting the exact
  *   editor origin from a draft session's signed renewal URL while
@@ -92,6 +96,9 @@ export default defineNuxtModule<CanvasModuleOptions>({
   },
   setup(options, nuxt) {
     const resolver = createResolver(import.meta.url);
+    const jsonApiProxyPath =
+      process.env.CANVAS_JSONAPI_PROXY_PATH?.replace(/\/+$/, '') ||
+      DEFAULT_JSONAPI_PROXY_PATH;
     if (nuxt.options.dev) {
       resolveDraftConfig();
       // Workspace consumers resolve the linked core package outside the app
@@ -190,6 +197,12 @@ export default defineNuxtModule<CanvasModuleOptions>({
       addServerHandler({
         route: options.componentsRoutePath,
         handler: resolver.resolve('./runtime/server/routes/components'),
+      });
+      // The same-origin JSON:API proxy for portable Code Components, at the
+      // path the SDK's runtime configuration points browser clients at.
+      addServerHandler({
+        route: `${jsonApiProxyPath}/**`,
+        handler: resolver.resolve('./runtime/server/routes/jsonapi-proxy'),
       });
     }
 
