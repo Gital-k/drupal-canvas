@@ -105,7 +105,7 @@ class CanvasConfigUpdater {
       }
       if (\count($settings) > 0) {
         $current = $javaScriptComponent->get('dataDependencies');
-        $current['drupalSettings'] = \array_unique(\array_merge($current['drupalSettings'] ?? [], $settings));
+        $current['drupalSettings'] = \array_values(\array_unique(\array_merge($current['drupalSettings'] ?? [], $settings)));
         $javaScriptComponent->set('dataDependencies', $current);
       }
       else {
