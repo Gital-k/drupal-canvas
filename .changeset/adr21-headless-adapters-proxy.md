@@ -14,3 +14,6 @@ adapter's `CanvasComponentTree` answers the client's proxy-mapped requests
 in-process through the proxy handler with the current request's draft session,
 so `useJsonApiClient()` is the same draft-aware client on both sides of
 hydration and SWR fallback data renders into the initial HTML.
+
+The TanStack Start server transport honors explicit `redirect` modes and
+re-sends `Request` bodies on redirects that keep the method.
