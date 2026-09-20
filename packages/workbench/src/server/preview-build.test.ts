@@ -227,6 +227,7 @@ describe('preview-build', () => {
         bundleInteractivePreview: async () => ({
           js: 'console.log("mock-runtime");',
           css: '.mock { color: red; }',
+          siteData: null,
         }),
       },
     );
@@ -364,6 +365,7 @@ describe('preview-build', () => {
         bundleInteractivePreview: async () => ({
           js: 'console.log("mock-runtime");',
           css: '.mock { color: red; }',
+          siteData: null,
         }),
       },
     );
@@ -420,6 +422,7 @@ describe('preview-build', () => {
           return {
             js: 'console.log("mock-runtime");',
             css: '.mock { color: red; }',
+            siteData: null,
           };
         },
       },
