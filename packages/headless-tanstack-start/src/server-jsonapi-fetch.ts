@@ -31,37 +31,68 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 export const serverJsonApiFetch: typeof fetch = async (input, init) => {
   const pageUrl = getRequest().url;
+  const proxyOrigin = new URL(pageUrl).origin;
+  const source = input instanceof Request ? input : null;
   const url = new URL(toUrlString(input), pageUrl);
-  // Re-target the request at the proxy URL, keeping method, headers, body
-  // and signal.
-  const request =
-    input instanceof Request
-      ? new Request(url, init ? new Request(input, init) : input)
-      : new Request(url, init);
+  const method = (init?.method ?? source?.method ?? 'GET').toUpperCase();
+  const headers = new Headers(init?.headers ?? source?.headers);
+  const signal = init?.signal ?? source?.signal ?? undefined;
+  const redirectMode = init?.redirect ?? source?.redirect ?? 'follow';
+  // The body, in a form that can be sent again after a redirect: a string,
+  // buffer or form body as given, a Request's body read once into memory. A
+  // stream given as `init.body` is sent as is and cannot be replayed.
+  let body: BodyInit | null = null;
+  let replayable = true;
+  if (init?.body !== undefined && init.body !== null) {
+    body = init.body;
+    replayable = !(init.body instanceof ReadableStream);
+  } else if (source?.body) {
+    body = await source.clone().arrayBuffer();
+  }
   // The request is issued by the application's own server-rendering pass,
   // which is what this provenance signal states. The page request's own
   // provenance (for example `cross-site` while Drupal's editor embeds the
   // preview) describes the visitor's navigation, not this request, and is
   // deliberately not forwarded.
-  request.headers.set('sec-fetch-site', 'same-origin');
-  // A string or buffer body can be re-sent on a redirect; a stream cannot.
-  const replayableBody =
-    init?.body !== undefined &&
-    init.body !== null &&
-    !(init.body instanceof ReadableStream)
-      ? init.body
-      : null;
+  headers.set('sec-fetch-site', 'same-origin');
+  const build = (
+    target: URL,
+    requestMethod: string,
+    requestHeaders: Headers,
+    requestBody: BodyInit | null,
+  ) =>
+    new Request(target, {
+      method: requestMethod,
+      headers: requestHeaders,
+      body:
+        requestMethod === 'GET' || requestMethod === 'HEAD'
+          ? null
+          : requestBody,
+      signal,
+      ...(requestBody instanceof ReadableStream ? { duplex: 'half' } : {}),
+    } as RequestInit);
 
-  // Follow redirects the way a browser's fetch does (`redirect: 'follow'`):
-  // the proxy handler only ever emits Locations inside the boundary,
-  // rewritten to the proxy path, and refuses the rest with 502, so following
-  // stays on the application's own proxy and no credential leaves it.
-  let current = request;
+  // Follow redirects the way a browser's fetch does for the requested
+  // redirect mode: the proxy handler only ever emits Locations inside the
+  // boundary, rewritten to the proxy path, and refuses the rest with 502, so
+  // following stays on the application's own proxy and no credential leaves
+  // it.
+  let current = build(url, method, headers, body);
+  let currentMethod = method;
+  let currentHeaders = headers;
   for (let hop = 0; ; hop += 1) {
     const response = await handleJsonApiProxy(current);
     const location = response.headers.get('location');
     if (!REDIRECT_STATUSES.has(response.status) || location === null) {
       return response;
+    }
+    if (redirectMode === 'manual') {
+      return response;
+    }
+    if (redirectMode === 'error') {
+      throw new TypeError(
+        'The JSON:API proxy answered a redirect and the request does not allow redirects.',
+      );
     }
     if (hop >= MAX_REDIRECTS) {
       throw new TypeError(
@@ -69,7 +100,6 @@ export const serverJsonApiFetch: typeof fetch = async (input, init) => {
       );
     }
     const target = new URL(location, current.url);
-    const proxyOrigin = new URL(pageUrl).origin;
     if (target.origin !== proxyOrigin) {
       throw new TypeError(
         `The JSON:API proxy redirected outside the application (${target.origin}).`,
@@ -80,31 +110,24 @@ export const serverJsonApiFetch: typeof fetch = async (input, init) => {
     // body and its headers, everything else re-sends the body.
     const switchToGet =
       response.status === 303
-        ? current.method !== 'HEAD'
+        ? currentMethod !== 'HEAD'
         : (response.status === 301 || response.status === 302) &&
-          current.method === 'POST';
-    const method = switchToGet ? 'GET' : current.method;
-    const headers = new Headers(current.headers);
-    let body: BodyInit | null = null;
-    if (method === 'GET' || method === 'HEAD') {
-      headers.delete('content-type');
-      headers.delete('content-length');
-      headers.delete('content-encoding');
-    } else {
-      if (replayableBody === null && current.body !== null) {
-        // Fetch fails a redirect whose body cannot be replayed.
-        throw new TypeError(
-          'The JSON:API proxy redirected a request whose body cannot be re-sent.',
-        );
-      }
-      body = replayableBody;
+          currentMethod === 'POST';
+    const nextMethod = switchToGet ? 'GET' : currentMethod;
+    const nextHeaders = new Headers(currentHeaders);
+    if (nextMethod === 'GET' || nextMethod === 'HEAD') {
+      nextHeaders.delete('content-type');
+      nextHeaders.delete('content-length');
+      nextHeaders.delete('content-encoding');
+    } else if (body !== null && !replayable) {
+      // Fetch fails a redirect whose body cannot be replayed.
+      throw new TypeError(
+        'The JSON:API proxy redirected a request whose body cannot be re-sent.',
+      );
     }
-    current = new Request(target, {
-      method,
-      headers,
-      body,
-      signal: current.signal,
-    });
+    current = build(target, nextMethod, nextHeaders, body);
+    currentMethod = nextMethod;
+    currentHeaders = nextHeaders;
   }
 };
 
