@@ -36,6 +36,9 @@ const { getNodePath, sortMenu } = await import('drupal-canvas/jsonapi-utils');
 // customElements (not available server-side)
 if (typeof window !== 'undefined' && typeof customElements !== 'undefined') {
   await import('../lib/canvas-island.ts');
+  // The client renderer Drupal points every island at; it wraps Astro's Preact
+  // renderer with the drupal-canvas context providers.
+  await import('../lib/canvas-client.ts');
 }
 
 export default function () {}
