@@ -1,4 +1,4 @@
-import { trimSlashes } from 'drupal-canvas/jsonapi-client';
+import { resolveJsonApiBase, trimSlashes } from 'drupal-canvas/jsonapi-client';
 
 /** The default same-origin path the application mounts the JSON:API proxy at. */
 export const DEFAULT_JSONAPI_PROXY_PATH = '/api/canvas/jsonapi';
@@ -24,6 +24,14 @@ export interface DraftConfig {
    * `baseUrl`.
    */
   jsonApiUrl?: string;
+  /**
+   * The site base URL (origin plus install path) of the site serving a
+   * `jsonApiUrl` on another site, e.g. `https://api.example.com/mount` for
+   * `https://api.example.com/mount/api`; a language prefix goes between it
+   * and the JSON:API prefix. Without it such a JSON:API URL serves no
+   * language-prefixed reads. `CANVAS_JSONAPI_SITE_URL`.
+   */
+  jsonApiSiteUrl?: string;
   /**
    * The same-origin path the application mounts the JSON:API proxy at.
    * Browser clients send every backend request through it.
@@ -59,6 +67,19 @@ export function resolveDraftConfig(
     process.env.CANVAS_JSONAPI_URL ??
     ''
   ).replace(/\/+$/, '');
+  const jsonApiSiteUrl = (
+    overrides.jsonApiSiteUrl ??
+    process.env.CANVAS_JSONAPI_SITE_URL ??
+    ''
+  ).replace(/\/+$/, '');
+  if (jsonApiUrl) {
+    // Validates the URL override against the site base URLs (throws with
+    // the mismatch spelled out).
+    resolveJsonApiBase(baseUrl, {
+      apiUrl: jsonApiUrl,
+      ...(jsonApiSiteUrl && { apiSiteUrl: jsonApiSiteUrl }),
+    });
+  }
   const jsonApiProxyPath =
     overrides.jsonApiProxyPath ??
     process.env.CANVAS_JSONAPI_PROXY_PATH ??
@@ -77,6 +98,7 @@ export function resolveDraftConfig(
     baseUrl: baseUrl.replace(/\/+$/, ''),
     ...(apiPrefix && { apiPrefix }),
     ...(jsonApiUrl && { jsonApiUrl }),
+    ...(jsonApiUrl && jsonApiSiteUrl && { jsonApiSiteUrl }),
     jsonApiProxyPath: jsonApiProxyPath.replace(/\/+$/, ''),
   };
 }
