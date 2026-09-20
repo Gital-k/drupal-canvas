@@ -252,6 +252,12 @@ final class AstroIslandTest extends CanvasKernelTestBase {
       self::assertCount(1, $element);
       self::assertSame('true', $element->attr('data-canvas-preview'));
       self::assertSame('only', $element->attr('client'));
+      // Extra attributes are merged after the island's own, so they close
+      // the start tag; markup expectations rely on this order.
+      self::assertMatchesRegularExpression(
+        '/^<canvas-island [^>]*client="only"[^>]* data-canvas-preview="true">/',
+        $element->outerHtml(),
+      );
     }
   }
 
