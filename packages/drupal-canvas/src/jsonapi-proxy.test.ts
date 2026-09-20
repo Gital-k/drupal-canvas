@@ -109,7 +109,7 @@ describe('proxy path resolution', () => {
     ).toBeNull();
   });
 
-  it('keeps supporting endpoints on the backend with a separate JSON:API base', () => {
+  it('keeps supporting endpoints on the backend with a foreign JSON:API base', () => {
     const options = {
       baseUrl: 'https://drupal.example/site',
       proxyUrl: '/api/canvas/jsonapi',
@@ -117,17 +117,17 @@ describe('proxy path resolution', () => {
     };
     expect(
       mapJsonApiRequestToProxy(
-        'https://api.example/de/drupal/api/node/article?page[limit]=5',
+        'https://api.example/drupal/api/node/article?page[limit]=5',
         options,
       ),
-    ).toBe('/api/canvas/jsonapi/de/drupal/api/node/article?page[limit]=5');
+    ).toBe('/api/canvas/jsonapi/drupal/api/node/article?page[limit]=5');
     expect(
       mapProxyPathToUpstream(
-        '/api/canvas/jsonapi/de/drupal/api/node/article',
+        '/api/canvas/jsonapi/drupal/api/node/article',
         options,
       ),
     ).toEqual({
-      url: 'https://api.example/de/drupal/api/node/article',
+      url: 'https://api.example/drupal/api/node/article',
       endpoint: 'jsonapi',
     });
     expect(
@@ -167,6 +167,58 @@ describe('proxy path resolution', () => {
     ).toBeNull();
     expect(
       mapJsonApiRequestToProxy('https://cdn.example/image.png', options),
+    ).toBeNull();
+  });
+
+  it('treats a same-site JSON:API URL override as a prefix under the site path', () => {
+    const options = {
+      baseUrl: 'https://drupal.example/sub/',
+      proxyUrl: '/api/canvas/jsonapi',
+      apiUrl: 'https://drupal.example/sub/api',
+    };
+    expect(
+      mapJsonApiRequestToProxy(
+        'https://drupal.example/sub/fr/api/node/article',
+        options,
+      ),
+    ).toBe('/api/canvas/jsonapi/fr/api/node/article');
+    expect(
+      mapProxyPathToUpstream(
+        '/api/canvas/jsonapi/fr/api/node/article',
+        options,
+      ),
+    ).toEqual({
+      url: 'https://drupal.example/sub/fr/api/node/article',
+      endpoint: 'jsonapi',
+    });
+    expect(
+      mapProxyPathToUpstream(
+        '/api/canvas/jsonapi/router/translate-path',
+        options,
+      ),
+    ).toEqual({
+      url: 'https://drupal.example/sub/router/translate-path',
+      endpoint: 'router',
+    });
+    // The site's own default prefix is outside the boundary, and so is any
+    // backend URL outside the site path: neither leaves unmapped.
+    expect(() =>
+      mapJsonApiRequestToProxy(
+        'https://drupal.example/sub/jsonapi/node/article',
+        options,
+      ),
+    ).toThrowError(/not a supported/);
+    expect(() =>
+      mapJsonApiRequestToProxy(
+        'https://drupal.example/router/translate-path',
+        options,
+      ),
+    ).toThrowError(/not a supported/);
+    expect(
+      mapProxyPathToUpstream(
+        '/api/canvas/jsonapi/jsonapi/node/article',
+        options,
+      ),
     ).toBeNull();
   });
 

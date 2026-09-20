@@ -46,21 +46,54 @@ export interface JsonApiProxyEndpoints {
   apiUrl?: string;
 }
 
-/** The JSON:API origin and prefix an endpoint configuration resolves to. */
+/** Where JSON:API requests go, resolved from the endpoint configuration. */
+export interface ResolvedJsonApiBase {
+  /**
+   * The absolute base URL (origin plus any site path) a locale prefix and
+   * the JSON:API prefix are appended to, without a trailing slash.
+   */
+  base: string;
+  /** The JSON:API prefix relative to `base`, without surrounding slashes. */
+  apiPrefix: string;
+  /**
+   * Whether JSON:API lives on another site than the backend base URL. Such a
+   * base has no known site root, so no locale path prefix can be applied.
+   */
+  foreign: boolean;
+}
+
+/**
+ * Resolves the JSON:API base and prefix. A full URL override under the
+ * backend base URL is a prefix override (a locale prefix goes between the
+ * site path and the prefix, as Drupal serves it); an override elsewhere is a
+ * foreign base whose path is the prefix.
+ */
 export function resolveJsonApiBase(
   baseUrl: string,
   endpoints: Partial<JsonApiProxyEndpoints> = {},
-): { origin: string; apiPrefix: string } {
+): ResolvedJsonApiBase {
+  const site = normalizeBaseUrl(baseUrl);
   if (endpoints.apiUrl) {
-    const api = new URL(normalizeBaseUrl(endpoints.apiUrl));
+    const api = normalizeBaseUrl(endpoints.apiUrl);
+    if (api === site || api.startsWith(`${site}/`)) {
+      return {
+        base: site,
+        apiPrefix:
+          trimSlashes(api.slice(site.length)) || DEFAULT_JSONAPI_PREFIX,
+        foreign: false,
+      };
+    }
+    const url = new URL(api);
     return {
-      origin: api.origin,
-      apiPrefix: trimSlashes(api.pathname) || DEFAULT_JSONAPI_PREFIX,
+      base: url.origin,
+      apiPrefix: trimSlashes(url.pathname) || DEFAULT_JSONAPI_PREFIX,
+      foreign: true,
     };
   }
   return {
-    origin: normalizeBaseUrl(baseUrl),
+    base: site,
     apiPrefix: trimSlashes(endpoints.apiPrefix || DEFAULT_JSONAPI_PREFIX),
+    foreign: false,
   };
 }
 
@@ -127,9 +160,7 @@ export function resolveJsonApiProxyPath(
     return null;
   }
   const apiPrefix = splitSegments(
-    endpoints.apiUrl
-      ? resolveJsonApiBase('http://localhost', endpoints).apiPrefix
-      : endpoints.apiPrefix || DEFAULT_JSONAPI_PREFIX,
+    endpoints.apiPrefix || DEFAULT_JSONAPI_PREFIX,
   );
   const routerPrefix = splitSegments(
     endpoints.routerPrefix || DEFAULT_ROUTER_PREFIX,
@@ -202,26 +233,41 @@ export function mapJsonApiRequestToProxy(
   } & Partial<JsonApiProxyEndpoints>,
 ): string | null {
   const api = resolveJsonApiBase(options.baseUrl, options);
-  // With a separate JSON:API base, JSON:API requests live on its origin and
-  // the supporting endpoints on the backend base URL. Without one, both are
-  // relative to the backend base URL.
+  const site = normalizeBaseUrl(options.baseUrl);
+  const endpoints = {
+    apiPrefix: api.apiPrefix,
+    routerPrefix: options.routerPrefix,
+  };
+  // With a foreign JSON:API base, JSON:API requests live there and the
+  // supporting endpoints on the backend base URL. Otherwise both are
+  // relative to the backend base URL (a same-site override is a prefix).
   const targets: Array<{
     base: string;
     endpoint: JsonApiProxyEndpointName | null;
-  }> = options.apiUrl
+  }> = api.foreign
     ? [
-        { base: api.origin, endpoint: 'jsonapi' },
-        { base: options.baseUrl, endpoint: 'router' },
+        { base: api.base, endpoint: 'jsonapi' },
+        { base: site, endpoint: 'router' },
       ]
-    : [{ base: options.baseUrl, endpoint: null }];
+    : [{ base: site, endpoint: null }];
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    return null;
+  }
+  // Any URL on a backend origin is the backend's: outside the site path or
+  // the supported endpoints it must never leave through the proxy unmapped.
   let onBackend = false;
   for (const target of targets) {
+    if (new URL(target.base).origin === origin) {
+      onBackend = true;
+    }
     const relative = toBackendRelativePath(url, target.base);
     if (relative === null) {
       continue;
     }
-    onBackend = true;
-    const resolved = resolveJsonApiProxyPath(relative.path, options);
+    const resolved = resolveJsonApiProxyPath(relative.path, endpoints);
     if (
       resolved !== null &&
       (target.endpoint === null || resolved.endpoint === target.endpoint)
@@ -259,13 +305,17 @@ export function mapProxyPathToUpstream(
   }
   const path =
     proxyPath === '' ? proxiedPath : proxiedPath.slice(proxyPath.length);
-  const resolved = resolveJsonApiProxyPath(path, options);
+  const api = resolveJsonApiBase(options.baseUrl, options);
+  const resolved = resolveJsonApiProxyPath(path, {
+    apiPrefix: api.apiPrefix,
+    routerPrefix: options.routerPrefix,
+  });
   if (resolved === null) {
     return null;
   }
   const upstreamBase =
     resolved.endpoint === 'jsonapi'
-      ? resolveJsonApiBase(options.baseUrl, options).origin
+      ? api.base
       : normalizeBaseUrl(options.baseUrl);
   return {
     url: `${upstreamBase}${resolved.path}`,
