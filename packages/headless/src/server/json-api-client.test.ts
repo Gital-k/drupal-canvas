@@ -38,7 +38,20 @@ describe('JSON:API client factories', () => {
         apiPrefix: 'api',
         jsonApiUrl: 'https://cdn.example/drupal/jsonapi/',
       }),
-    ).toEqual({ baseUrl: 'https://cdn.example', apiPrefix: 'drupal/jsonapi' });
+    ).toEqual({
+      // The override serves JSON:API only; supporting endpoints (path
+      // translation) stay on the backend base URL.
+      baseUrl: 'https://drupal.example',
+      apiPrefix: 'drupal/jsonapi',
+      apiUrl: 'https://cdn.example/drupal/jsonapi',
+    });
+    expect(
+      resolveJsonApiUrl({
+        baseUrl: 'https://drupal.example',
+        apiPrefix: 'drupal/jsonapi',
+        apiUrl: 'https://cdn.example/drupal/jsonapi',
+      }),
+    ).toBe('https://cdn.example/drupal/jsonapi');
     expect(
       resolveJsonApiUrl({
         baseUrl: 'https://drupal.example',

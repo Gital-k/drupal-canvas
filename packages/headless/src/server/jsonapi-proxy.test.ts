@@ -136,7 +136,7 @@ describe('JSON:API proxy', () => {
       'Bearer secret-token',
     );
     expect(response.headers.get('cache-control')).toBe('private, no-store');
-    expect(response.headers.get('vary')).toBeNull();
+    expect(response.headers.get('vary')).toBe('Cookie');
   });
 
   it.each([
@@ -210,6 +210,90 @@ describe('JSON:API proxy', () => {
     expect(fetchImpl.mock.calls[0][0]).toBe(
       'https://api.example/drupal/api/node/article',
     );
+    // Path translation is a supporting endpoint of the backend site, not of
+    // the JSON:API override.
+    const translated = await handler(
+      proxyRequest('/api/canvas/jsonapi/router/translate-path?path=/about'),
+    );
+    expect(translated.status).toBe(200);
+    expect(fetchImpl.mock.calls[1][0]).toBe(
+      'https://drupal.example/router/translate-path?path=/about',
+    );
+    // The backend base URL's own JSON:API prefix is outside the boundary
+    // while an override is configured.
+    expect(
+      (await handler(proxyRequest('/api/canvas/jsonapi/jsonapi/node/article')))
+        .status,
+    ).toBe(404);
+  });
+
+  it('surfaces a rejected session token as a session error and keeps resource denials', async () => {
+    const rejecting = makeHarness(
+      { enabled: true, draftData: liveDraftData() },
+      (url) =>
+        url.includes('/node/article/a')
+          ? Response.json({ errors: [{ status: '401' }] }, { status: 401 })
+          : Response.json({ errors: [{ status: '403' }] }, { status: 403 }),
+    );
+    const rejected = await rejecting.handler(
+      proxyRequest('/api/canvas/jsonapi/jsonapi/node/article/a'),
+    );
+    expect(rejected.status).toBe(401);
+    expect(rejected.headers.get(JSONAPI_PROXY_SESSION_HEADER)).toBe('expired');
+    expect(await rejected.json()).toMatchObject({
+      error: JSONAPI_DRAFT_SESSION_EXPIRED_ERROR,
+    });
+    const denied = await rejecting.handler(
+      proxyRequest('/api/canvas/jsonapi/jsonapi/node/article/b'),
+    );
+    expect(denied.status).toBe(403);
+    expect(denied.headers.get(JSONAPI_PROXY_SESSION_HEADER)).toBeNull();
+    // Unauthenticated 401s are ordinary upstream answers.
+    const anonymous = makeHarness({ enabled: false, draftData: null }, () =>
+      Response.json({ errors: [{ status: '401' }] }, { status: 401 }),
+    );
+    const plain = await anonymous.handler(
+      proxyRequest('/api/canvas/jsonapi/jsonapi/node/article/a'),
+    );
+    expect(plain.status).toBe(401);
+    expect(plain.headers.get(JSONAPI_PROXY_SESSION_HEADER)).toBeNull();
+  });
+
+  it('passes 304 through and merges the upstream Vary with Cookie', async () => {
+    const { handler } = makeHarness(
+      { enabled: false, draftData: null },
+      () =>
+        new Response(null, {
+          status: 304,
+          headers: {
+            ETag: '"abc"',
+            Vary: 'Accept-Language, accept, Cookie',
+            'Cache-Control': 'max-age=30',
+          },
+        }),
+    );
+    const response = await handler(
+      proxyRequest('/api/canvas/jsonapi/jsonapi/node/article', {
+        headers: { 'if-none-match': '"abc"' },
+      }),
+    );
+    expect(response.status).toBe(304);
+    expect(response.headers.get('etag')).toBe('"abc"');
+    expect(response.headers.get('vary')).toBe(
+      'Accept-Language, accept, Cookie',
+    );
+    expect(response.headers.get('cache-control')).toBe('max-age=30');
+
+    const star = makeHarness({ enabled: false, draftData: null }, () =>
+      Response.json({ data: [] }, { headers: { Vary: '*' } }),
+    );
+    expect(
+      (
+        await star.handler(
+          proxyRequest('/api/canvas/jsonapi/jsonapi/node/article'),
+        )
+      ).headers.get('vary'),
+    ).toBe('*');
   });
 
   it('refuses cross-site and provenance-less state-changing requests', async () => {
