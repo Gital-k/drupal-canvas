@@ -1,11 +1,16 @@
 // @cspell:ignore Aworking Alatest
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createJsonApiClient, isDraftSessionError } from './jsonapi-client';
+import {
+  createJsonApiClient,
+  isDraftSessionError,
+  JsonApiClient,
+} from './jsonapi-client';
 import {
   JSONAPI_PROXY_SESSION_EXPIRED,
   JSONAPI_PROXY_SESSION_HEADER,
 } from './jsonapi-proxy';
+import { declareCanvasRuntime } from './runtime';
 
 import type { Cache } from '@drupal-api-client/api-client';
 
@@ -708,6 +713,222 @@ describe('createJsonApiClient', () => {
     ]);
   });
 
+  it('never shares a cache between clients that may carry a session without a caller-provided scope', async () => {
+    const store = new Map<string, unknown>();
+    const cache: Cache = {
+      get: async <T>(key: string) => store.get(key) as T,
+      set: async (key, value) => {
+        store.set(key, value);
+      },
+    };
+    const article = (title: string) =>
+      jsonResponse({
+        data: { type: 'node--article', id: 'a', attributes: { title } },
+      });
+    // Legacy constructor: two differently authenticated clients sharing one
+    // cache in the editor's browser must not see each other's responses.
+    declareCanvasRuntime('drupal');
+    (globalThis as { drupalSettings?: unknown }).drupalSettings = {
+      canvasData: { v0: { baseUrl: 'https://drupal.example' } },
+    };
+    try {
+      const legacy = (token: string) =>
+        new JsonApiClient(undefined, {
+          authentication: {
+            type: 'Custom',
+            credentials: { value: `Bearer ${token}` },
+          },
+          cache,
+          serializer: null as unknown as undefined,
+          customFetch: fakeFetch(() => article(token)).fetch,
+        } as never);
+      await legacy('session-a').getResource('node--article', 'a');
+      const seenByB = (await legacy('session-b').getResource(
+        'node--article',
+        'a',
+      )) as { data: { attributes: { title: string } } };
+      expect(seenByB.data.attributes.title).toBe('session-b');
+      expect(store.size).toBe(0);
+    } finally {
+      delete (globalThis as { drupalSettings?: unknown }).drupalSettings;
+      delete (globalThis as { __drupalCanvasRuntime?: unknown })
+        .__drupalCanvasRuntime;
+    }
+    // A custom transport with no other signal may authenticate on its own.
+    const viaTransport = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      serializer: null,
+      cache,
+      fetch: fakeFetch(() => article('transport')).fetch,
+    });
+    await viaTransport.getResource('node--article', 'a');
+    expect(store.size).toBe(0);
+    // In a browser, unspecified credentials mean same-origin cookies.
+    const globalWithWindow = globalThis as { window?: unknown };
+    globalWithWindow.window = {};
+    vi.stubGlobal('fetch', async () => article('browser'));
+    try {
+      const browser = createJsonApiClient({
+        baseUrl: 'https://drupal.example',
+        serializer: null,
+        cache,
+      });
+      await browser.getResource('node--article', 'a');
+      expect(store.size).toBe(0);
+      const anonymous = createJsonApiClient({
+        baseUrl: 'https://drupal.example',
+        serializer: null,
+        cache,
+        credentials: 'omit',
+      });
+      await anonymous.getResource('node--article', 'a');
+      expect(store.size).toBe(1);
+    } finally {
+      delete globalWithWindow.window;
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('treats credential lifecycle failures and 401s on credentialed requests as rejected sessions', async () => {
+    // OAuth: the token endpoint refuses the renewal before an item read.
+    let tokenRequests = 0;
+    const oauth = fakeFetch((url, init) => {
+      if (url.endsWith('/oauth/token')) {
+        tokenRequests += 1;
+        return tokenRequests === 1
+          ? jsonResponse({
+              access_token: 't1',
+              token_type: 'Bearer',
+              expires_in: 0,
+            })
+          : jsonResponse({ error: 'invalid_grant' }, { status: 400 });
+      }
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer t1');
+      return jsonResponse(articleCollection());
+    });
+    vi.stubGlobal('fetch', oauth.fetch);
+    try {
+      const client = createJsonApiClient({
+        baseUrl: 'https://drupal.example',
+        resourceVersion: 'rel:working-copy',
+        authentication: {
+          type: 'OAuth',
+          credentials: { clientId: 'id', clientSecret: 'secret' },
+        },
+        serializer: null,
+        fetch: oauth.fetch,
+      });
+      // The collection read succeeded with the first token; the renewal for
+      // the item reads fails and must not downgrade to published items.
+      await expect(client.getCollection('node--article')).rejects.toSatisfy(
+        (error: unknown) =>
+          isDraftSessionError(error) &&
+          /could not be obtained/.test((error as Error).message),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    // Cookie preview (Drupal islands): a credentialed request answered 401.
+    const cookieClient = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      resourceVersion: 'rel:working-copy',
+      preview: true,
+      credentials: 'same-origin',
+      serializer: null,
+      fetch: fakeFetch((url) =>
+        url.includes('/node/article/a?')
+          ? jsonResponse({ errors: [{ status: '401' }] }, { status: 401 })
+          : jsonResponse(articleCollection()),
+      ).fetch,
+    });
+    await expect(cookieClient.getCollection('node--article')).rejects.toSatisfy(
+      isDraftSessionError,
+    );
+    // Opting out sends no cookies: an ordinary failure, published item kept.
+    const optedOut = (await cookieClient.getCollection('node--article', {
+      disableAuthentication: true,
+    })) as { data: Array<{ attributes: { title: string } }> };
+    expect(optedOut.data[0].attributes.title).toBe('Published A');
+
+    // A custom transport that declares it authenticates.
+    const declared = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      resourceVersion: 'rel:working-copy',
+      fetchAuthenticates: true,
+      serializer: null,
+      fetch: fakeFetch((url) =>
+        url.includes('/node/article/a?')
+          ? jsonResponse({ errors: [{ status: '401' }] }, { status: 401 })
+          : jsonResponse(articleCollection()),
+      ).fetch,
+    });
+    await expect(declared.getCollection('node--article')).rejects.toSatisfy(
+      isDraftSessionError,
+    );
+    // Without the declaration a transport's 401 stays ordinary; 403 always.
+    const undeclared = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      resourceVersion: 'rel:working-copy',
+      serializer: null,
+      fetch: fakeFetch((url) =>
+        url.includes('/node/article/a?')
+          ? jsonResponse({ errors: [{ status: '401' }] }, { status: 401 })
+          : url.includes('/node/article/b?')
+            ? jsonResponse({ errors: [{ status: '403' }] }, { status: 403 })
+            : jsonResponse(articleCollection()),
+      ).fetch,
+    });
+    const kept = (await undeclared.getCollection('node--article')) as {
+      data: Array<{ attributes: { title: string } }>;
+    };
+    expect(kept.data.map((item) => item.attributes.title)).toEqual([
+      'Published A',
+      'Published B',
+    ]);
+  });
+
+  it('localizes a foreign JSON:API base through its site base URL, directly and through the proxy', async () => {
+    const { fetch, calls } = fakeFetch(() => jsonResponse({ data: [] }));
+    const client = createJsonApiClient({
+      baseUrl: 'https://drupal.example/sub',
+      apiUrl: 'https://api.example/mount/api',
+      apiSiteUrl: 'https://api.example/mount/',
+      serializer: null,
+      fetch,
+    });
+    expect(client.runtimeConfig).toMatchObject({
+      baseUrl: 'https://drupal.example/sub',
+      apiPrefix: 'api',
+      apiUrl: 'https://api.example/mount/api',
+      apiSiteUrl: 'https://api.example/mount',
+    });
+    await client.getCollection('node--page', { locale: 'fr' });
+    await client.getResourceByPath('/about', { locale: 'fr' }).catch(() => {});
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://api.example/mount/fr/api/node/page',
+      'https://drupal.example/sub/fr/router/translate-path?path=/about',
+    ]);
+    const proxied = fakeFetch(() => jsonResponse({ data: [] }));
+    const browser = createJsonApiClient({
+      baseUrl: 'https://drupal.example/sub',
+      apiUrl: 'https://api.example/mount/api',
+      apiSiteUrl: 'https://api.example/mount',
+      proxyUrl: '/api/canvas/jsonapi',
+      serializer: null,
+      fetch: proxied.fetch,
+    });
+    await browser.getCollection('node--page', { locale: 'fr' });
+    expect(proxied.calls[0].url).toBe('/api/canvas/jsonapi/fr/api/node/page');
+    expect(() =>
+      createJsonApiClient({
+        baseUrl: 'https://drupal.example/sub',
+        apiUrl: 'https://api.example/other/api',
+        apiSiteUrl: 'https://api.example/mount',
+      }),
+    ).toThrow(/not under its site base URL/);
+  });
+
   it('separates cache entries by resource version and scope', async () => {
     const store = new Map<string, unknown>();
     const cache: Cache = {
@@ -721,6 +942,8 @@ describe('createJsonApiClient', () => {
       baseUrl: 'https://drupal.example',
       serializer: null,
       cache,
+      // A custom transport may authenticate; the caller vouches it is public.
+      cacheScope: 'public',
       fetch,
     });
     const draftClient = createJsonApiClient({
