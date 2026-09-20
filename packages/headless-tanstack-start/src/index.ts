@@ -63,6 +63,8 @@ export type {
 } from '@drupal-canvas/headless/components-endpoint';
 export {
   CanvasComponentTree,
+  JsonApiRuntimeProvider,
   type CanvasComponentRegistry,
   type CanvasComponentTreeProps,
+  type JsonApiRuntimeProviderProps,
 } from '@drupal-canvas/headless-react';
