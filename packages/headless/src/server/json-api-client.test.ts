@@ -52,6 +52,18 @@ describe('JSON:API client factories', () => {
         apiUrl: 'https://cdn.example/drupal/jsonapi',
       }),
     ).toBe('https://cdn.example/drupal/jsonapi');
+    // Under the backend base URL (site in a subdirectory), the override is a
+    // prefix relative to the site.
+    expect(
+      resolveJsonApiEndpoints({
+        baseUrl: 'https://drupal.example/sub',
+        jsonApiUrl: 'https://drupal.example/sub/api',
+      }),
+    ).toEqual({
+      baseUrl: 'https://drupal.example/sub',
+      apiPrefix: 'api',
+      apiUrl: 'https://drupal.example/sub/api',
+    });
     expect(
       resolveJsonApiUrl({
         baseUrl: 'https://drupal.example',

@@ -24,3 +24,10 @@ options (locale, sparse fieldsets, includes, an explicit resource version)
 for working-copy item reads and merges their included resources, and accepts
 `apiUrl` for JSON:API served from a separate base URL while the Decoupled
 Router stays on `baseUrl`.
+
+Caching is disabled without an explicit scope for every client that carries
+a session (cookies, the proxy, previews, resource versions), 401s are
+classified by the credentials the request actually carried, selected working
+copies take precedence over included copies of the same resource, and URLs
+keep the backend's site path for JSON:API, the Decoupled Router and index
+lookups.
