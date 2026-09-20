@@ -57,6 +57,19 @@ describe('resolveDraftConfig', () => {
     vi.unstubAllEnvs();
   });
 
+  it('reads and validates the JSON:API site base URL from the environment', () => {
+    vi.stubEnv('CANVAS_SITE_URL', 'https://drupal.example/sub');
+    vi.stubEnv('CANVAS_JSONAPI_URL', 'https://api.example/mount/api');
+    vi.stubEnv('CANVAS_JSONAPI_SITE_URL', 'https://api.example/mount/');
+    expect(resolveDraftConfig()).toMatchObject({
+      jsonApiUrl: 'https://api.example/mount/api',
+      jsonApiSiteUrl: 'https://api.example/mount',
+    });
+    vi.stubEnv('CANVAS_JSONAPI_SITE_URL', 'https://api.example/elsewhere');
+    expect(() => resolveDraftConfig()).toThrow(/not under its site base URL/);
+    vi.unstubAllEnvs();
+  });
+
   it('reads the full JSON:API URL override and the proxy path from the environment', () => {
     vi.stubEnv('CANVAS_SITE_URL', 'https://drupal.example');
     vi.stubEnv('CANVAS_JSONAPI_URL', 'https://api.example/drupal/jsonapi/');

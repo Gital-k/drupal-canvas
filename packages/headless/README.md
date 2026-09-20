@@ -181,7 +181,10 @@ fallback; `CANVAS_JSONAPI_URL` sets the full upstream JSON:API base URL and
 takes precedence over discovery for JSON:API requests only — the supporting
 endpoints (Decoupled Router path translation) stay on `CANVAS_SITE_URL`. An
 override under `CANVAS_SITE_URL` is a prefix (a language prefix goes between the
-site path and it); an override on another site accepts no language prefix.
+site path and it); an override on another site is localized through
+`CANVAS_JSONAPI_SITE_URL`, that site's base URL including its install path
+(`https://api.example/mount` for `https://api.example/mount/api`, giving
+`https://api.example/mount/fr/api`), and accepts no language prefix without it.
 
 ### Server rendering and SWR
 
