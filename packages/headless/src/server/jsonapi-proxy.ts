@@ -78,6 +78,30 @@ const FORWARDED_RESPONSE_HEADERS = [
 
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
 
+/** Statuses whose Location header a client follows. */
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+/** Merges a `Vary` header value with additional header names. */
+function mergeVary(upstream: string | null, ...names: string[]): string {
+  const values = [...(upstream ?? '').split(','), ...names]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (values.includes('*')) {
+    return '*';
+  }
+  const seen = new Set<string>();
+  return values
+    .filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .join(', ');
+}
+
 const SUPPORTED_METHODS = ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'];
 
 function problem(
@@ -190,6 +214,7 @@ export function createJsonApiProxyHandler(
     const boundary = {
       baseUrl: endpoints.baseUrl,
       apiPrefix: endpoints.apiPrefix,
+      apiUrl: endpoints.apiUrl,
       proxyUrl: config.jsonApiProxyPath ?? '/api/canvas/jsonapi',
     };
 
@@ -254,6 +279,20 @@ export function createJsonApiProxyHandler(
       );
     }
 
+    // Drupal answering an authenticated request with 401 rejected the
+    // session token (expired or revoked): surface it as a session error so
+    // clients never mistake it for an ordinary item failure and fall back to
+    // published content. 403 and other statuses are resource-level outcomes
+    // and pass through.
+    if (authenticated && upstreamResponse.status === 401) {
+      return problem(
+        401,
+        JSONAPI_DRAFT_SESSION_EXPIRED_ERROR,
+        'The Drupal backend rejected the draft preview session. Renew the session from the Canvas editor, or open the preview from Drupal again.',
+        { [JSONAPI_PROXY_SESSION_HEADER]: JSONAPI_PROXY_SESSION_EXPIRED },
+      );
+    }
+
     const responseHeaders = new Headers();
     for (const name of FORWARDED_RESPONSE_HEADERS) {
       const value = upstreamResponse.headers.get(name);
@@ -261,20 +300,28 @@ export function createJsonApiProxyHandler(
         responseHeaders.set(name, value);
       }
     }
+    // Responses depend on the absence of a session cookie, in addition to
+    // whatever the backend varies on (for example Accept-Language).
+    responseHeaders.set(
+      'Vary',
+      mergeVary(upstreamResponse.headers.get('vary'), 'Cookie'),
+    );
     if (authenticated) {
       responseHeaders.set('Cache-Control', 'private, no-store');
     } else {
       const upstreamCacheControl =
         upstreamResponse.headers.get('cache-control');
       responseHeaders.set('Cache-Control', upstreamCacheControl ?? 'no-store');
-      // Public responses depend on the absence of a session cookie.
-      responseHeaders.set('Vary', 'Cookie');
     }
 
+    const status = upstreamResponse.status;
+    // 304 is a conditional-request answer, not a redirect: pass it through.
+    if (status === 304) {
+      return new Response(null, { status, headers: responseHeaders });
+    }
     // Redirects stay within the same boundary and are rewritten to the proxy
     // so the browser follows them same-origin; anything else is refused.
-    const status = upstreamResponse.status;
-    if (status >= 300 && status < 400) {
+    if (REDIRECT_STATUSES.has(status)) {
       const location = upstreamResponse.headers.get('location');
       let rewritten: string | null = null;
       if (location !== null) {
