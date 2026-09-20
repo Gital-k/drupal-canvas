@@ -306,9 +306,16 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
       }
     });
     if ($is_preview) {
-      // Previews mark code component islands for the client renderer.
+      // Previews mark code component islands for the client renderer, in the
+      // renderable and, as the last attribute of the element, in the markup.
       // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+      // @see \Drupal\canvas\Element\AstroIsland::preRenderIsland()
       $expectation['expected_renderable'] = self::markIslandsAsPreview($expectation['expected_renderable']);
+      $expectation['expected_html'] = preg_replace(
+        '/<canvas-island([^>]*)>/',
+        '<canvas-island$1 data-canvas-preview="true">',
+        $expectation['expected_html'],
+      );
     }
 
     // Add slot placeholders to the expected renderable array.
