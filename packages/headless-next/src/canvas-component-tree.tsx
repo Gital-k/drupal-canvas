@@ -1,34 +1,39 @@
-import { CanvasComponentTreeClient } from './canvas-component-tree-client';
-import { getJsonApiRuntimeConfig } from './server';
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
+/// <reference path="./virtual.d.ts" />
 
-import type { CanvasComponentTreeClientProps } from './canvas-component-tree-client';
+'use client';
 
-export type CanvasComponentTreeProps = CanvasComponentTreeClientProps;
+import canvasComponents from '@drupal-canvas/headless-next-generated-components';
+import { CanvasComponentTree as ReactCanvasComponentTree } from '@drupal-canvas/headless-react';
+
+import type { CanvasComponentTreeProps as ReactCanvasComponentTreeProps } from '@drupal-canvas/headless-react';
+
+export type CanvasComponentTreeProps = Pick<
+  ReactCanvasComponentTreeProps,
+  'tree' | 'context' | 'jsonApi'
+>;
 
 /**
  * Renders a Canvas tree with every component discovered by withCanvas().
  *
- * A server component: it prepares the request's nonsecret JSON:API runtime
- * configuration (proxy path, resolved endpoints, preview state) and hands the
- * tree to the client boundary, so `useJsonApiClient()` works in registered
- * components without application code. Pass `context={page.context}` so
- * `usePageContext()` and `useSiteContext()` see the routed page's data; an
- * explicit `jsonApi` prop replaces the automatic configuration.
- *
- * Render it from server components (pages, layouts). From a client component,
- * use `CanvasComponentTreeClient` and pass `jsonApi` from a server function.
+ * A client boundary: registered components render on the server for the
+ * initial HTML and hydrate in the browser, where hooks and interactivity run.
+ * Pass `context={page.context}` so `usePageContext()` and `useSiteContext()`
+ * see the routed page's data. `useJsonApiClient()` is configured by the
+ * `CanvasRuntime` server component (rendered once in the root layout), or by
+ * an explicit `jsonApi` prop.
  */
-export async function CanvasComponentTree({
+export function CanvasComponentTree({
   tree,
   context,
   jsonApi,
 }: CanvasComponentTreeProps) {
-  const runtimeConfig = jsonApi ?? (await getJsonApiRuntimeConfig());
   return (
-    <CanvasComponentTreeClient
+    <ReactCanvasComponentTree
       tree={tree}
       context={context}
-      jsonApi={runtimeConfig}
+      jsonApi={jsonApi}
+      components={canvasComponents}
     />
   );
 }
