@@ -93,55 +93,88 @@ async function locatePackageJson(projectRoot: string): Promise<string | null> {
   }
 }
 
-type ExportConditions = string | { [condition: string]: ExportConditions };
+type ExportConditions =
+  | string
+  | null
+  | { [condition: string]: ExportConditions };
+
+/** The export conditions an `import` of the package matches, by priority. */
+const IMPORT_CONDITIONS = new Set(['import', 'default']);
+
+type ConditionMatch =
+  | { kind: 'resolved'; target: string }
+  | { kind: 'denied' }
+  | { kind: 'none' };
+
+/**
+ * Matches export conditions the way Node does for an `import`: the keys are
+ * tried in the object's own order, the first supported condition decides,
+ * and a `null` target is a terminal denial (the subpath is not exported),
+ * never skipped in favour of a later condition.
+ */
+function matchConditions(value: ExportConditions | undefined): ConditionMatch {
+  if (value === null) {
+    return { kind: 'denied' };
+  }
+  if (typeof value === 'string') {
+    return { kind: 'resolved', target: value };
+  }
+  if (!value || typeof value !== 'object') {
+    return { kind: 'none' };
+  }
+  for (const [condition, target] of Object.entries(value)) {
+    if (!IMPORT_CONDITIONS.has(condition)) {
+      continue;
+    }
+    const match = matchConditions(target);
+    if (match.kind !== 'none') {
+      return match;
+    }
+  }
+  return { kind: 'none' };
+}
 
 /**
  * Resolves the root entry of a package manifest the way an `import` of the
- * package does: the `.` export under the `import` condition (then `default`),
- * nested conditions included, else `module`/`main`. Null when the manifest
- * gives no usable entry.
+ * package does: the `.` export under the `import` condition, then `default`,
+ * in the manifest's own condition order, nested conditions included; else
+ * `module`/`main`. Null when the manifest gives no usable entry or denies
+ * the root subpath.
  */
 export function resolveRuntimeEntry(manifest: {
   exports?: ExportConditions | { [key: string]: ExportConditions };
   module?: string;
   main?: string;
 }): string | null {
-  const pick = (value: ExportConditions | undefined): string | null => {
-    if (typeof value === 'string') {
-      return value;
-    }
-    if (!value || typeof value !== 'object') {
-      return null;
-    }
-    for (const condition of ['import', 'default']) {
-      if (condition in value) {
-        const resolved = pick(value[condition]);
-        if (resolved !== null) {
-          return resolved;
-        }
-      }
-    }
-    return null;
-  };
   const exports = manifest.exports;
-  if (exports !== undefined) {
-    if (typeof exports === 'string') {
-      return exports;
-    }
-    const subpaths = exports as { [key: string]: ExportConditions };
-    const rootEntry =
-      '.' in subpaths
-        ? pick(subpaths['.'])
-        : pick(subpaths as ExportConditions);
-    return rootEntry;
+  if (exports === undefined) {
+    return manifest.module ?? manifest.main ?? null;
   }
-  return manifest.module ?? manifest.main ?? null;
+  const subpaths =
+    exports !== null &&
+    typeof exports === 'object' &&
+    Object.keys(exports).some((key) => key.startsWith('.'))
+      ? (exports as { [key: string]: ExportConditions })
+      : null;
+  const match = matchConditions(
+    subpaths ? subpaths['.'] : (exports as ExportConditions),
+  );
+  return match.kind === 'resolved' ? match.target : null;
 }
 
 /** The runtime value exports of a module, statically determined. */
 export interface RuntimeExports {
-  /** Names exported as runtime values (not types). */
-  names: Set<string>;
+  /**
+   * Names exported as runtime values (not types), each with the identity of
+   * the binding it resolves to (`<file>::<local>`), so re-exports of one
+   * binding through several paths are recognized as the same export.
+   */
+  names: Map<string, string>;
+  /**
+   * Names that several `export *` sources provide from different bindings:
+   * not exported at all, as in ECMAScript module semantics.
+   */
+  ambiguous: Set<string>;
   /** Why some exports could not be determined; empty when fully verified. */
   unverifiable: string[];
 }
@@ -250,26 +283,49 @@ async function resolveRelativeModule(
   return null;
 }
 
+/** The state shared by one export graph traversal. */
+interface Traversal {
+  /** Completed results per file. */
+  done: Map<string, RuntimeExports>;
+  /** Files whose traversal is in progress: reaching one again is a cycle. */
+  active: Set<string>;
+}
+
 /**
  * Determines the runtime value exports of an ES module file without running
  * it: declarations exported in place, local bindings exported by name or
  * alias (including bindings imported from relative modules of the same
  * package), and relative re-exports (`export { a as b } from`, `export *
- * from`). Type-only exports are ignored. Re-exports from other packages,
- * CommonJS export writes, and unresolvable modules are reported as
- * unverifiable rather than guessed.
+ * from`). Type-only exports are ignored. Explicit exports take precedence
+ * over `export *`, and a name that different star sources provide from
+ * different bindings is ambiguous and not exported, as in ECMAScript.
+ * Re-exports from other packages, CommonJS export writes, unresolvable
+ * modules and circular re-exports are reported as unverifiable rather than
+ * guessed.
  */
 export async function collectRuntimeExports(
   file: string,
   packageRoot: string,
-  visited = new Map<string, Promise<RuntimeExports>>(),
+  traversal: Traversal = { done: new Map(), active: new Set() },
 ): Promise<RuntimeExports> {
-  const cached = visited.get(file);
-  if (cached) {
-    return cached;
+  const done = traversal.done.get(file);
+  if (done) {
+    return done;
   }
-  const promise = (async (): Promise<RuntimeExports> => {
-    const result: RuntimeExports = { names: new Set(), unverifiable: [] };
+  const relative = path.relative(packageRoot, file);
+  const result: RuntimeExports = {
+    names: new Map(),
+    ambiguous: new Set(),
+    unverifiable: [],
+  };
+  if (traversal.active.has(file)) {
+    // A cycle back into a module still being traversed: its exports are not
+    // known yet, and waiting for them would wait forever.
+    result.unverifiable.push(`${relative} is re-exported circularly`);
+    return result;
+  }
+  traversal.active.add(file);
+  try {
     let ast: File;
     try {
       // Published entries are JavaScript; a package exporting TypeScript
@@ -282,12 +338,13 @@ export async function collectRuntimeExports(
       });
     } catch (error) {
       result.unverifiable.push(
-        `${path.relative(packageRoot, file)} could not be parsed as an ES module (${
+        `${relative} could not be parsed as an ES module (${
           error instanceof Error ? error.message : String(error)
         })`,
       );
       return result;
     }
+    const identity = (local: string) => `${relative}::${local}`;
     /** Module-level runtime bindings declared in this file. */
     const local = new Set<string>();
     /** Local bindings imported from relative modules: local → [file, name]. */
@@ -338,97 +395,87 @@ export async function collectRuntimeExports(
         default:
           if (hasDynamicExports(statement)) {
             result.unverifiable.push(
-              `${path.relative(packageRoot, file)} assigns exports dynamically (CommonJS)`,
+              `${relative} assigns exports dynamically (CommonJS)`,
             );
           }
           break;
       }
     }
+    const sourceExports = async (
+      specifier: string,
+    ): Promise<RuntimeExports | null> => {
+      const target = specifier.startsWith('.')
+        ? await resolveRelativeModule(file, specifier, packageRoot)
+        : null;
+      if (target === null) {
+        return null;
+      }
+      const exports = await collectRuntimeExports(
+        target,
+        packageRoot,
+        traversal,
+      );
+      result.unverifiable.push(...exports.unverifiable);
+      return exports;
+    };
+    /** Resolves a local binding to the identity of what it refers to. */
     const resolveLocal = async (
       name: string,
       exported: string,
-    ): Promise<void> => {
+    ): Promise<string | null> => {
       if (local.has(name)) {
-        result.names.add(exported);
-        return;
+        return identity(name);
       }
       const source = imported.get(name);
       if (source) {
         if (source.name === '*') {
-          result.names.add(exported);
-          return;
+          return `${relative}::*${source.source}`;
         }
-        const target = await resolveRelativeModule(
-          file,
-          source.source,
-          packageRoot,
-        );
-        if (target === null) {
+        const exports = await sourceExports(source.source);
+        if (exports === null) {
           result.unverifiable.push(
-            `${path.relative(packageRoot, file)} imports \`${name}\` from an unresolvable module (${source.source})`,
+            `${relative} imports \`${name}\` from an unresolvable module (${source.source})`,
           );
-          return;
+          return null;
         }
-        const exports = await collectRuntimeExports(
-          target,
-          packageRoot,
-          visited,
-        );
-        result.unverifiable.push(...exports.unverifiable);
-        if (exports.names.has(source.name)) {
-          result.names.add(exported);
-        }
-        return;
+        return exports.names.get(source.name) ?? null;
       }
       if (external.has(name)) {
         result.unverifiable.push(
-          `${path.relative(packageRoot, file)} re-exports \`${exported}\` from another package`,
+          `${relative} re-exports \`${exported}\` from another package`,
         );
-        return;
+        return null;
       }
       result.unverifiable.push(
-        `${path.relative(packageRoot, file)} exports \`${exported}\` from an unknown binding \`${name}\``,
+        `${relative} exports \`${exported}\` from an unknown binding \`${name}\``,
       );
+      return null;
     };
+    // Explicit exports first: they take precedence over star exports.
+    const stars: RuntimeExports[] = [];
     for (const statement of ast.program.body) {
       if (statement.type === 'ExportDefaultDeclaration') {
-        result.names.add('default');
+        result.names.set('default', identity('default'));
         continue;
       }
       if (statement.type === 'ExportAllDeclaration') {
         if (statement.exportKind === 'type') {
           continue;
         }
-        const target = statement.source.value.startsWith('.')
-          ? await resolveRelativeModule(
-              file,
-              statement.source.value,
-              packageRoot,
-            )
-          : null;
-        if (target === null) {
+        const exports = await sourceExports(statement.source.value);
+        if (exports === null) {
           result.unverifiable.push(
-            `${path.relative(packageRoot, file)} re-exports everything from ${statement.source.value}`,
+            `${relative} re-exports everything from ${statement.source.value}`,
           );
           continue;
         }
-        const exports = await collectRuntimeExports(
-          target,
-          packageRoot,
-          visited,
-        );
-        result.unverifiable.push(...exports.unverifiable);
-        for (const name of exports.names) {
-          if (name !== 'default') {
-            result.names.add(name);
-          }
-        }
+        stars.push(exports);
         continue;
       }
-      if (statement.type !== 'ExportNamedDeclaration') {
-        continue;
-      }
-      if (statement.exportKind === 'type') {
+      if (
+        statement.type !== 'ExportNamedDeclaration' ||
+        statement.exportKind === 'type'
+      ) {
         continue;
       }
       const declaration = statement.declaration;
@@ -438,63 +485,84 @@ export async function collectRuntimeExports(
             declaration.type === 'ClassDeclaration') &&
           declaration.id
         ) {
-          result.names.add(declaration.id.name);
+          result.names.set(declaration.id.name, identity(declaration.id.name));
         } else if (declaration.type === 'VariableDeclaration') {
           for (const declarator of declaration.declarations) {
             patternNames(declarator.id).forEach((name) =>
-              result.names.add(name),
+              result.names.set(name, identity(name)),
             );
           }
         }
         continue;
       }
-      const source = statement.source?.value;
-      let sourceExports: RuntimeExports | null = null;
-      if (source !== undefined) {
-        const target = source.startsWith('.')
-          ? await resolveRelativeModule(file, source, packageRoot)
-          : null;
-        if (target === null) {
+      let from: RuntimeExports | null | undefined;
+      if (statement.source) {
+        from = await sourceExports(statement.source.value);
+        if (from === null) {
           result.unverifiable.push(
-            `${path.relative(packageRoot, file)} re-exports from ${source}`,
+            `${relative} re-exports from ${statement.source.value}`,
           );
           continue;
         }
-        sourceExports = await collectRuntimeExports(
-          target,
-          packageRoot,
-          visited,
-        );
-        result.unverifiable.push(...sourceExports.unverifiable);
       }
       for (const specifier of statement.specifiers) {
         if (specifier.type === 'ExportNamespaceSpecifier') {
-          result.names.add(specifier.exported.name);
+          result.names.set(
+            specifier.exported.name,
+            `${relative}::*ns:${statement.source?.value ?? ''}`,
+          );
           continue;
         }
-        if (specifier.type !== 'ExportSpecifier') {
-          continue;
-        }
-        if (specifier.exportKind === 'type') {
+        if (
+          specifier.type !== 'ExportSpecifier' ||
+          specifier.exportKind === 'type'
+        ) {
           continue;
         }
         const exported =
           specifier.exported.type === 'Identifier'
             ? specifier.exported.name
             : specifier.exported.value;
-        if (sourceExports) {
-          if (sourceExports.names.has(specifier.local.name)) {
-            result.names.add(exported);
-          }
-        } else {
-          await resolveLocal(specifier.local.name, exported);
+        const resolved = from
+          ? (from.names.get(specifier.local.name) ?? null)
+          : await resolveLocal(specifier.local.name, exported);
+        if (resolved !== null) {
+          result.names.set(exported, resolved);
         }
       }
     }
+    // Star exports: every name not exported explicitly, unless two stars
+    // provide it from different bindings.
+    const starNames = new Map<string, string>();
+    for (const exports of stars) {
+      for (const name of exports.ambiguous) {
+        result.ambiguous.add(name);
+      }
+      for (const [name, binding] of exports.names) {
+        if (name === 'default' || result.names.has(name)) {
+          continue;
+        }
+        const seen = starNames.get(name);
+        if (seen !== undefined && seen !== binding) {
+          result.ambiguous.add(name);
+          continue;
+        }
+        starNames.set(name, binding);
+      }
+    }
+    for (const [name, binding] of starNames) {
+      if (!result.ambiguous.has(name) && !result.names.has(name)) {
+        result.names.set(name, binding);
+      }
+    }
+    for (const name of result.ambiguous) {
+      result.names.delete(name);
+    }
     return result;
-  })();
-  visited.set(file, promise);
-  return promise;
+  } finally {
+    traversal.active.delete(file);
+    traversal.done.set(file, result);
+  }
 }
 
 const REQUIRED_HOOKS = ['usePageContext', 'useSiteContext'] as const;
@@ -541,15 +609,30 @@ export async function checkInstalledPackage(
     path.resolve(packageRoot, entry),
     packageRoot,
   );
-  const missing = REQUIRED_HOOKS.filter((hook) => !exports.names.has(hook));
-  if (missing.length === 0) {
-    return { ok: true };
-  }
+  // Any part of the export graph that could not be determined leaves the
+  // whole set uncertain, whatever was found elsewhere: fail closed.
   if (exports.unverifiable.length > 0) {
     return {
       ok: false,
       reason: `the installed \`drupal-canvas\` package's exports could not be verified (${[...new Set(exports.unverifiable)].join('; ')}); run \`npm install drupal-canvas@latest\` and pull again`,
     };
+  }
+  const ambiguous = REQUIRED_HOOKS.filter((hook) =>
+    exports.ambiguous.has(hook),
+  );
+  if (ambiguous.length > 0) {
+    return {
+      ok: false,
+      reason: `the installed \`drupal-canvas\` package exports ${ambiguous
+        .map((hook) => `\`${hook}()\``)
+        .join(
+          ' and ',
+        )} ambiguously (conflicting \`export *\` sources); run \`npm install drupal-canvas@latest\``,
+    };
+  }
+  const missing = REQUIRED_HOOKS.filter((hook) => !exports.names.has(hook));
+  if (missing.length === 0) {
+    return { ok: true };
   }
   return {
     ok: false,
