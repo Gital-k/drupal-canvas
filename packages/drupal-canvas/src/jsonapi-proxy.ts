@@ -37,6 +37,31 @@ export interface JsonApiProxyEndpoints {
   apiPrefix: string;
   /** Decoupled Router path without surrounding slashes. */
   routerPrefix: string;
+  /**
+   * Absolute upstream JSON:API base URL when JSON:API is not served under the
+   * backend base URL and `apiPrefix` (for example on another host or path).
+   * Its path becomes the JSON:API prefix; the supporting endpoints (path
+   * translation) stay under the backend base URL.
+   */
+  apiUrl?: string;
+}
+
+/** The JSON:API origin and prefix an endpoint configuration resolves to. */
+export function resolveJsonApiBase(
+  baseUrl: string,
+  endpoints: Partial<JsonApiProxyEndpoints> = {},
+): { origin: string; apiPrefix: string } {
+  if (endpoints.apiUrl) {
+    const api = new URL(normalizeBaseUrl(endpoints.apiUrl));
+    return {
+      origin: api.origin,
+      apiPrefix: trimSlashes(api.pathname) || DEFAULT_JSONAPI_PREFIX,
+    };
+  }
+  return {
+    origin: normalizeBaseUrl(baseUrl),
+    apiPrefix: trimSlashes(endpoints.apiPrefix || DEFAULT_JSONAPI_PREFIX),
+  };
 }
 
 export type JsonApiProxyEndpointName = 'jsonapi' | 'router';
@@ -102,7 +127,9 @@ export function resolveJsonApiProxyPath(
     return null;
   }
   const apiPrefix = splitSegments(
-    endpoints.apiPrefix || DEFAULT_JSONAPI_PREFIX,
+    endpoints.apiUrl
+      ? resolveJsonApiBase('http://localhost', endpoints).apiPrefix
+      : endpoints.apiPrefix || DEFAULT_JSONAPI_PREFIX,
   );
   const routerPrefix = splitSegments(
     endpoints.routerPrefix || DEFAULT_ROUTER_PREFIX,
@@ -174,19 +201,42 @@ export function mapJsonApiRequestToProxy(
     proxyUrl: string;
   } & Partial<JsonApiProxyEndpoints>,
 ): string | null {
-  const relative = toBackendRelativePath(url, options.baseUrl);
-  if (relative === null) {
+  const api = resolveJsonApiBase(options.baseUrl, options);
+  // With a separate JSON:API base, JSON:API requests live on its origin and
+  // the supporting endpoints on the backend base URL. Without one, both are
+  // relative to the backend base URL.
+  const targets: Array<{
+    base: string;
+    endpoint: JsonApiProxyEndpointName | null;
+  }> = options.apiUrl
+    ? [
+        { base: api.origin, endpoint: 'jsonapi' },
+        { base: options.baseUrl, endpoint: 'router' },
+      ]
+    : [{ base: options.baseUrl, endpoint: null }];
+  let onBackend = false;
+  for (const target of targets) {
+    const relative = toBackendRelativePath(url, target.base);
+    if (relative === null) {
+      continue;
+    }
+    onBackend = true;
+    const resolved = resolveJsonApiProxyPath(relative.path, options);
+    if (
+      resolved !== null &&
+      (target.endpoint === null || resolved.endpoint === target.endpoint)
+    ) {
+      return `${options.proxyUrl.replace(/\/+$/, '')}${resolved.path}${relative.search}`;
+    }
+  }
+  if (!onBackend) {
     return null;
   }
-  const resolved = resolveJsonApiProxyPath(relative.path, options);
-  if (resolved === null) {
-    throw new Error(
-      `[drupal-canvas] The browser JSON:API client only reaches the Drupal ` +
-        `backend through the application proxy, and "${relative.path}" is ` +
-        'not a supported JSON:API or path-translation endpoint.',
-    );
-  }
-  return `${options.proxyUrl.replace(/\/+$/, '')}${resolved.path}${relative.search}`;
+  throw new Error(
+    `[drupal-canvas] The browser JSON:API client only reaches the Drupal ` +
+      `backend through the application proxy, and "${url}" is ` +
+      'not a supported JSON:API or path-translation endpoint.',
+  );
 }
 
 /**
@@ -213,8 +263,12 @@ export function mapProxyPathToUpstream(
   if (resolved === null) {
     return null;
   }
+  const upstreamBase =
+    resolved.endpoint === 'jsonapi'
+      ? resolveJsonApiBase(options.baseUrl, options).origin
+      : normalizeBaseUrl(options.baseUrl);
   return {
-    url: `${normalizeBaseUrl(options.baseUrl)}${resolved.path}`,
+    url: `${upstreamBase}${resolved.path}`,
     endpoint: resolved.endpoint,
   };
 }

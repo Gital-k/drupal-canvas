@@ -22,3 +22,8 @@ Make React Code Components portable to headless frontends.
   of shared caches.
 - `DraftServer.getJsonApiRuntimeConfig()` prepares the nonsecret configuration
   browser clients are created from.
+
+The proxy surfaces a session token Drupal rejects (401) as the session error,
+passes 304 through, merges Drupal's `Vary` with `Cookie`, and only rewrites
+redirect statuses. `CANVAS_JSONAPI_URL` overrides JSON:API requests only; path
+translation stays on `CANVAS_SITE_URL`.
