@@ -5,6 +5,11 @@ import {
   useSiteContext,
 } from './context.js';
 import {
+  drupalSettingsToCanvasContext,
+  drupalSettingsToJsonApiRuntimeConfig,
+  readCanvasDataV0,
+} from './drupal-settings.js';
+import {
   getPageData,
   getSiteData,
   sortMenu as sortLinksetMenu,
@@ -56,6 +61,7 @@ export type {
   JsonApiRuntimeConfig,
 } from './jsonapi-client.js';
 export type { JsonApiClientProviderProps } from './jsonapi-client-context.js';
+export type { CanvasDataV0 } from './drupal-settings.js';
 export type { CanvasRuntimeEnvironment } from './runtime.js';
 
 export {
@@ -82,6 +88,9 @@ export {
   declareCanvasRuntime,
   getCanvasRuntime,
   isLegacyRuntimeSupported,
+  readCanvasDataV0,
+  drupalSettingsToCanvasContext,
+  drupalSettingsToJsonApiRuntimeConfig,
   AGENT_MIGRATION_PROMPT,
   LEGACY_API_GUIDANCE,
   formatLegacyApiError,
