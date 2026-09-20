@@ -42,7 +42,16 @@ final class SiteDataController extends ApiControllerBase {
     $cacheability->addCacheableDependency(
       $this->configFactory->get($this->themeManager->getActiveTheme()->getName() . '.settings')
     );
-    $response = new CacheableJsonResponse($data[CodeComponentDataProvider::V0]);
+    // Capabilities advertised to tooling. Canvas CLI's pull codemod converts
+    // legacy getter calls to the context hooks only when the site renders
+    // Code Component islands inside the shared context providers.
+    // @see docs/adr/0021-code-component-runtime-compatibility-across-frontend-modes.md
+    $payload = $data[CodeComponentDataProvider::V0] + [
+      'capabilities' => [
+        'contextHooks' => TRUE,
+      ],
+    ];
+    $response = new CacheableJsonResponse($payload);
     $response->addCacheableDependency($cacheability);
     return $response;
   }
