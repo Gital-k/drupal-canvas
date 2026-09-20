@@ -230,6 +230,61 @@ export default function Title({ usePageContext }) {
     ]);
   });
 
+  it("decides component positions syntactically, not by a callback's own name", () => {
+    const namedComparator = `import { memo } from 'react';
+import { getPageData } from 'drupal-canvas';
+
+const Title = memo(() => null, function Compare() { return getPageData(); });
+export default Title;
+`;
+    const comparator = migrateGetterCalls(namedComparator, 'index.jsx');
+    expect(comparator.changed).toBe(false);
+    expect(comparator.warnings).toEqual([
+      expect.stringContaining('not a component or custom hook'),
+    ]);
+    const namedCallback = `import { getPageData } from 'drupal-canvas';
+import { registerCallback } from './registry';
+
+registerCallback(function Header() { return getPageData().pageTitle; });
+`;
+    expect(migrateGetterCalls(namedCallback, 'index.jsx').changed).toBe(false);
+    // Declarations, initializers, and default exports are component
+    // positions, whatever the function expression is called.
+    const positions = `import { memo } from 'react';
+import { getPageData } from 'drupal-canvas';
+
+const Title = function named() { return <h1>{getPageData().pageTitle}</h1>; };
+export function Heading() { return <h2>{getPageData().pageTitle}</h2>; }
+export default memo(function Wrapped() { return <h3>{getPageData().pageTitle}</h3>; });
+`;
+    const result = migrateGetterCalls(positions, 'index.jsx');
+    expect(result.changed).toBe(true);
+    expect(result.conversions).toEqual([
+      { from: 'getPageData', to: 'usePageContext', calls: 3 },
+    ]);
+  });
+
+  it('leaves a file unchanged when a getter is re-exported', () => {
+    const source = `import { getPageData } from 'drupal-canvas';
+
+export { getPageData };
+export default function Header() {
+  return <h1>{getPageData().pageTitle}</h1>;
+}
+`;
+    const result = migrateGetterCalls(source, 'index.jsx');
+    expect(result.changed).toBe(false);
+    expect(result.usesGetters).toBe(true);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('`getPageData` is re-exported'),
+    ]);
+    const aliased = `import { getPageData } from 'drupal-canvas';
+
+export { getPageData as pageData };
+`;
+    expect(migrateGetterCalls(aliased, 'index.jsx').changed).toBe(false);
+  });
+
   it('does not treat arbitrary call wrappers as components', () => {
     const source = `import { getPageData } from 'drupal-canvas';
 import { registerCallback } from './registry';
