@@ -835,9 +835,13 @@ export function migrateGetterCalls(
           !callsByGetter.has(binding.getter) ||
           isHookImport(existingHookImport, GETTER_HOOKS[binding.getter]),
       );
-      for (const binding of dropped) {
-        edits.push(removeSpecifierEdit(source, declaration, binding.specifier));
-      }
+      edits.push(
+        ...removeSpecifierEdits(
+          source,
+          declaration,
+          dropped.map((binding) => binding.specifier),
+        ),
+      );
       continue;
     }
     // Legacy alias source (`@/lib/drupal-utils`): the hooks live in
@@ -858,9 +862,13 @@ export function migrateGetterCalls(
         hooksToAdd.clear();
       }
     } else {
-      for (const binding of bindings) {
-        edits.push(removeSpecifierEdit(source, declaration, binding.specifier));
-      }
+      edits.push(
+        ...removeSpecifierEdits(
+          source,
+          declaration,
+          bindings.map((binding) => binding.specifier),
+        ),
+      );
     }
   }
   if (hooksToAdd.size > 0) {
@@ -922,6 +930,29 @@ function isHookImport(
         specifier.local.name === hook,
     )
   );
+}
+
+/** Coalesces deletions within one import before applying source offsets. */
+function removeSpecifierEdits(
+  source: string,
+  declaration: ImportDeclaration,
+  specifiers: ImportSpecifier[],
+): Edit[] {
+  const removals = specifiers
+    .map((specifier) => removeSpecifierEdit(source, declaration, specifier))
+    .sort((a, b) => a.start - b.start);
+  const merged: Edit[] = [];
+  for (const removal of removals) {
+    const previous = merged.at(-1);
+    // Adjacent trailing specifiers consume the same separator. Applying
+    // both deletions separately would consume retained source as well.
+    if (previous && removal.start <= previous.end) {
+      previous.end = Math.max(previous.end, removal.end);
+    } else {
+      merged.push(removal);
+    }
+  }
+  return merged;
 }
 
 /** Removes one specifier from an import, including its separating comma. */

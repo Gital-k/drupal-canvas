@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parse } from '@babel/parser';
 
 import { setConfig } from '../config';
 import { readValidatedComponentMetadata } from '../utils/component-metadata';
@@ -638,6 +639,46 @@ export default function Crumbs({ show }) {
         expect.stringContaining('nullable results'),
       ]);
     });
+
+    it.each([
+      "import { sortMenu, getPageData, getSiteData } from 'drupal-canvas/drupal-utils';",
+      "import { usePageContext, useSiteContext, getPageData, getSiteData } from 'drupal-canvas';",
+    ])(
+      'writes valid migrated source for adjacent trailing getters: %s',
+      async (imports) => {
+        const source = `${imports}
+export default function Header() {
+  const page = getPageData();
+  const site = getSiteData();
+  return <h1>{page.pageTitle}{site.branding.siteName}</h1>;
+}
+`;
+        const api = {
+          listComponents: vi.fn().mockResolvedValue({
+            a: getterComponent('header', source),
+          }),
+        } as unknown as ApiService;
+        const task = createComponentsPullTask(api, tmpDir, false, {
+          supported: true,
+          reasons: [],
+        });
+        await task.prepare();
+        await task.execute();
+        const written = await fs.readFile(
+          path.join(tmpDir, 'header', 'index.tsx'),
+          'utf-8',
+        );
+        expect(() =>
+          parse(written, {
+            sourceType: 'module',
+            plugins: ['jsx', 'typescript'],
+          }),
+        ).not.toThrow();
+        expect(written).toContain('const page = usePageContext();');
+        expect(written).toContain('const site = useSiteContext();');
+        expect(written).not.toMatch(/getPageData|getSiteData/);
+      },
+    );
 
     it('converts nothing further on a second pull', async () => {
       const api = {
