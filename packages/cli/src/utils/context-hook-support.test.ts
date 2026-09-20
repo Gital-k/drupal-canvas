@@ -211,6 +211,61 @@ describe('context hook support', () => {
     );
   });
 
+  it('fails closed on named re-exports and imported aliases the source does not provide, even when a star supplies the hooks', async () => {
+    // A named re-export of a name the source lacks: native linking fails.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'export { absent as usePageContext } from "./empty.js";\nexport * from "./hooks.js";\n',
+      'dist/empty.js': 'export const other = 1;\n',
+      'dist/hooks.js':
+        'export function usePageContext() {}\nexport function useSiteContext() {}\n',
+    });
+    let result = await checkInstalledPackage(root);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('could not be verified');
+    expect(result.reason).toContain('`absent`');
+    // The same through an imported alias.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'import { absent } from "./empty.js";\nexport { absent as usePageContext };\nexport * from "./hooks.js";\n',
+      'dist/empty.js': 'export const other = 1;\n',
+      'dist/hooks.js':
+        'export function usePageContext() {}\nexport function useSiteContext() {}\n',
+    });
+    result = await checkInstalledPackage(root);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('does not export');
+    // A default import from a module without a default export.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'import hook from "./named.js";\nexport { hook as usePageContext };\nexport function useSiteContext() {}\n',
+      'dist/named.js': 'export const named = 1;\n',
+    });
+    expect((await checkInstalledPackage(root)).reason).toContain(
+      'could not be verified',
+    );
+    // A named re-export of a name the source exports ambiguously.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'export { usePageContext } from "./both.js";\nexport { useSiteContext } from "./hooks.js";\n',
+      'dist/both.js':
+        'export * from "./hooks.js";\nexport * from "./other.js";\n',
+      'dist/hooks.js':
+        'export function usePageContext() {}\nexport function useSiteContext() {}\n',
+      'dist/other.js': 'export const usePageContext = () => null;\n',
+    });
+    result = await checkInstalledPackage(root);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('ambiguously');
+    // Resolvable aliases keep working.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'import { page } from "./hooks.js";\nexport { page as usePageContext };\nexport { site as useSiteContext } from "./hooks.js";\n',
+      'dist/hooks.js': 'export function page() {}\nexport function site() {}\n',
+    });
+    expect(await checkInstalledPackage(root)).toEqual({ ok: true });
+  });
+
   it('accepts the built package format and local aliases and re-exports', async () => {
     await writePackage(root, '0.5.1');
     expect(await checkInstalledPackage(root)).toEqual({ ok: true });
