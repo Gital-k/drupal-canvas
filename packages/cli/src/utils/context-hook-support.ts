@@ -418,6 +418,29 @@ export async function collectRuntimeExports(
       result.unverifiable.push(...exports.unverifiable);
       return exports;
     };
+    /**
+     * The identity of `name` as exported by a source module, or null with
+     * an unverifiable reason: a name the source does not export (native
+     * linking would fail) or exports ambiguously is never silently omitted,
+     * since a star export could otherwise fill the gap.
+     */
+    const linked = (
+      exports: RuntimeExports,
+      name: string,
+      source: string,
+      exported: string,
+    ): string | null => {
+      const binding = exports.names.get(name);
+      if (binding !== undefined) {
+        return binding;
+      }
+      result.unverifiable.push(
+        exports.ambiguous.has(name)
+          ? `${relative} re-exports \`${exported}\` from \`${name}\`, which ${source} exports ambiguously`
+          : `${relative} re-exports \`${exported}\` from \`${name}\`, which ${source} does not export`,
+      );
+      return null;
+    };
     /** Resolves a local binding to the identity of what it refers to. */
     const resolveLocal = async (
       name: string,
@@ -438,7 +461,7 @@ export async function collectRuntimeExports(
           );
           return null;
         }
-        return exports.names.get(source.name) ?? null;
+        return linked(exports, source.name, source.source, exported);
       }
       if (external.has(name)) {
         result.unverifiable.push(
@@ -524,7 +547,12 @@ export async function collectRuntimeExports(
             ? specifier.exported.name
             : specifier.exported.value;
         const resolved = from
-          ? (from.names.get(specifier.local.name) ?? null)
+          ? linked(
+              from,
+              specifier.local.name,
+              statement.source?.value ?? '',
+              exported,
+            )
           : await resolveLocal(specifier.local.name, exported);
         if (resolved !== null) {
           result.names.set(exported, resolved);
