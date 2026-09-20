@@ -32,9 +32,18 @@ test.describe('Context hooks', () => {
         name: 'This is a page title for testing purposes',
       }),
     ).toBeVisible();
-    // Hook usage is reported to the Component data panel, once per value.
+    // Hook usage is reported to the Component data panel, once per value:
+    // one entry (an accordion trigger) named after the hook. The locator is
+    // scoped to the panel because the code editor also shows the call
+    // `usePageContext()` as source text.
     await page.getByRole('tab', { name: 'Data Fetch' }).click();
-    await expect(page.getByText('usePageContext()')).toHaveCount(1);
+    const dataFetchPanel = page.getByRole('tabpanel', { name: 'Data Fetch' });
+    await expect(
+      dataFetchPanel.getByRole('button', { name: 'usePageContext()' }),
+    ).toHaveCount(1);
+    await expect(
+      dataFetchPanel.getByRole('region', { name: 'usePageContext()' }),
+    ).toContainText('This is a page title for testing purposes');
     await canvas.publishAllChanges(['PageTitleHook', 'Global CSS']);
     await canvas.saveCodeComponent('js.pagetitlehook');
     await canvas.addComponent({ id: 'js.pagetitlehook' }, { hasInputs: false });
