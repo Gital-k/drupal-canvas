@@ -29,6 +29,7 @@ import {
   JSONAPI_PROXY_SESSION_HEADER,
   mapJsonApiRequestToProxy,
   normalizeBaseUrl,
+  resolveJsonApiBase,
   trimSlashes,
 } from './jsonapi-proxy.js';
 import { assertLegacyRuntime } from './migration.js';
@@ -38,6 +39,8 @@ import type {
   GetOptions,
   JsonApiClientOptions,
 } from '@drupal-api-client/json-api-client';
+
+type EndpointUrlSegments = Parameters<UpstreamJsonApiClient['createURL']>[0];
 
 /**
  * Serializable JSON:API runtime configuration. Rendering integrations receive
@@ -50,6 +53,14 @@ export interface JsonApiRuntimeConfig {
   baseUrl: string;
   /** JSON:API prefix without surrounding slashes. Default: `jsonapi`. */
   apiPrefix?: string;
+  /**
+   * Absolute upstream JSON:API base URL when JSON:API is not served under
+   * `baseUrl`/`apiPrefix` (for example `https://api.example/drupal/jsonapi`).
+   * Takes precedence over `apiPrefix`: its path is the JSON:API prefix and its
+   * origin the JSON:API origin (a locale segment precedes the prefix). The
+   * Decoupled Router and other supporting endpoints stay under `baseUrl`.
+   */
+  apiUrl?: string;
   /** Decoupled Router path without surrounding slashes. */
   routerPrefix?: string;
   /**
@@ -76,12 +87,18 @@ export interface JsonApiClientConfig extends JsonApiRuntimeConfig {
    * raw JSON:API documents.
    */
   serializer?: JsonApiClientOptions['serializer'] | null;
-  /** Client cache. Keys are scoped by resource version and `cacheScope`. */
+  /**
+   * Client cache. Keys are scoped by resource version and `cacheScope`. An
+   * authenticated client caches only with an explicit `cacheScope`: without
+   * one, responses fetched with one session could be served to another
+   * client sharing the cache, so the cache is ignored.
+   */
   cache?: Cache;
   /**
    * Distinguishes cache entries of different sessions sharing one cache
-   * object. Defaults to `authenticated` when authentication is configured and
-   * `public` otherwise.
+   * object. Defaults to `public` for unauthenticated clients. Authenticated
+   * clients must set a scope unique to the session (for example the session
+   * subject and token expiry) to cache at all.
    */
   cacheScope?: string;
   /** Fetch implementation; defaults to the global `fetch`. */
@@ -105,8 +122,9 @@ export interface JsonApiClientConfig extends JsonApiRuntimeConfig {
 }
 
 /**
- * Thrown when the application proxy reports that the draft preview session
- * expired or is invalid. Never swallowed by the client's fallbacks.
+ * Thrown when the draft preview session is rejected: the application proxy
+ * reports it expired or invalid, or Drupal answers an authenticated request
+ * with 401. Never swallowed by the client's fallbacks.
  */
 export class DraftSessionError extends Error {
   readonly status: number;
@@ -154,6 +172,7 @@ function createTransport(config: JsonApiClientConfig): typeof fetch {
           baseUrl: config.baseUrl,
           proxyUrl: config.proxyUrl,
           apiPrefix: config.apiPrefix,
+          apiUrl: config.apiUrl,
           routerPrefix: config.routerPrefix,
         }) ?? url;
     }
@@ -162,6 +181,15 @@ function createTransport(config: JsonApiClientConfig): typeof fetch {
       request.credentials = config.credentials;
     }
     const response = await fetchImpl(url, request);
+    // A direct, authenticated request answered with 401 means Drupal rejected
+    // the session credentials (expired or revoked token); 403 and other
+    // failures are ordinary resource-level outcomes and stay with the caller.
+    if (config.authentication && !config.proxyUrl && response.status === 401) {
+      throw new DraftSessionError(
+        'The draft preview session was rejected by Drupal.',
+        401,
+      );
+    }
     if (
       config.proxyUrl &&
       response.headers.get(JSONAPI_PROXY_SESSION_HEADER) ===
@@ -212,19 +240,32 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
   /** The resource version applied to reads, or `null`. */
   readonly resourceVersion: string | null;
 
+  /** The JSON:API origin when it differs from the backend base URL. */
+  private readonly apiOrigin: string | null;
+
   constructor(config: JsonApiClientConfig) {
     const baseUrl = normalizeBaseUrl(config.baseUrl);
-    const apiPrefix =
-      trimSlashes(config.apiPrefix ?? DEFAULT_JSONAPI_PREFIX) ||
-      DEFAULT_JSONAPI_PREFIX;
+    const apiUrl = config.apiUrl ? normalizeBaseUrl(config.apiUrl) : undefined;
+    const api = resolveJsonApiBase(baseUrl, {
+      apiPrefix: config.apiPrefix,
+      apiUrl,
+    });
+    const apiPrefix = api.apiPrefix || DEFAULT_JSONAPI_PREFIX;
     const routerPrefix =
       trimSlashes(config.routerPrefix ?? DEFAULT_ROUTER_PREFIX) ||
       DEFAULT_ROUTER_PREFIX;
     const resourceVersion = config.resourceVersion || null;
-    const cacheScope = [
-      resourceVersion ?? 'default',
-      config.cacheScope ?? (config.authentication ? 'authenticated' : 'public'),
-    ].join(':');
+    // Authenticated responses are session-specific: without a scope that
+    // identifies the session, a shared cache must not hold them.
+    const cache =
+      config.cache && (!config.authentication || config.cacheScope)
+        ? scopeCache(
+            config.cache,
+            [resourceVersion ?? 'default', config.cacheScope ?? 'public'].join(
+              ':',
+            ),
+          )
+        : undefined;
     const serializer =
       config.serializer === undefined
         ? new DefaultSerializer()
@@ -234,19 +275,48 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
       apiPrefix,
       decoupledRouterApiPrefix: routerPrefix,
       serializer,
-      cache: config.cache ? scopeCache(config.cache, cacheScope) : undefined,
+      cache,
       authentication: config.authentication,
       customFetch: createTransport({ ...config, baseUrl }),
     });
     this.runtimeConfig = {
       baseUrl,
       apiPrefix,
+      ...(apiUrl && { apiUrl }),
       routerPrefix,
       ...(config.proxyUrl && { proxyUrl: config.proxyUrl }),
       resourceVersion,
       preview: config.preview ?? false,
     };
     this.resourceVersion = resourceVersion;
+    this.apiOrigin = apiUrl && api.origin !== baseUrl ? api.origin : null;
+  }
+
+  /**
+   * Builds JSON:API URLs on the separate JSON:API origin when one is
+   * configured; index lookups and everything else stay upstream.
+   */
+  override async createURL(segments: EndpointUrlSegments): Promise<string> {
+    if (this.apiOrigin === null || this.indexLookup) {
+      return super.createURL(segments);
+    }
+    const {
+      localeSegment,
+      entityTypeId,
+      bundleId,
+      viewName,
+      viewDisplayId,
+      resourceId,
+      queryString,
+    } = segments;
+    const locale = localeSegment ? `${localeSegment}/` : '';
+    const path = viewName
+      ? `${locale}${this.apiPrefix}/views/${viewName}/${viewDisplayId}`
+      : `${locale}${this.apiPrefix}/${entityTypeId}/${bundleId}${resourceId ? `/${resourceId}` : ''}`;
+    return new URL(
+      `/${path}${queryString ? `?${queryString}` : ''}`,
+      this.apiOrigin,
+    ).toString();
   }
 
   /**
@@ -324,10 +394,10 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
     const status = response.status;
     let document: unknown = status === 204 ? '' : await response.json();
     if (status < 400 && isCollectionDocument(document)) {
-      document = {
-        ...document,
-        data: await this.hydrateWorkingCopies(type, document.data, init),
-      };
+      document = await this.hydrateWorkingCopies(type, document, init, {
+        localeSegment,
+        queryString: options?.queryString,
+      });
     }
     const result = (
       this.serializer?.deserialize
@@ -340,24 +410,63 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
     return result;
   }
 
+  /**
+   * Replaces each collection item with its working copy. Item reads keep the
+   * read options that apply to a single resource — the locale, sparse
+   * fieldsets, includes, and a resource version the caller selected
+   * explicitly — but not collection-only parameters (filter, sort, page).
+   * Included resources returned with the working copies replace the
+   * collection's included resources of the same identity, so relationships
+   * of a working copy resolve against the document.
+   */
   private async hydrateWorkingCopies(
     type: string,
-    items: JsonApiResourceIdentifier[],
+    document: JsonApiCollectionDocument & { data: JsonApiResourceIdentifier[] },
     init: RequestInit,
-  ): Promise<unknown[]> {
+    read: { localeSegment?: string; queryString?: string },
+  ): Promise<JsonApiCollectionDocument> {
     const { entityTypeId, bundleId } =
       UpstreamJsonApiClient.getEntityTypeIdAndBundleId(type);
-    return Promise.all(
-      items.map(async (item) => {
+    const itemParams = new URLSearchParams();
+    for (const [key, value] of new URLSearchParams(read.queryString ?? '')) {
+      if (
+        key === 'include' ||
+        key === 'resourceVersion' ||
+        /^fields\[[^\]]+\]$/.test(key)
+      ) {
+        itemParams.append(key, value);
+      }
+    }
+    if (!itemParams.has('resourceVersion')) {
+      itemParams.set('resourceVersion', this.resourceVersion as string);
+    }
+    const included = new Map<string, unknown>();
+    const includedKey = (resource: unknown): string | null =>
+      typeof resource === 'object' &&
+      resource !== null &&
+      typeof (resource as JsonApiResourceIdentifier).type === 'string' &&
+      typeof (resource as JsonApiResourceIdentifier).id === 'string'
+        ? `${(resource as JsonApiResourceIdentifier).type}:${(resource as JsonApiResourceIdentifier).id}`
+        : null;
+    if (Array.isArray(document.included)) {
+      for (const resource of document.included) {
+        const key = includedKey(resource);
+        if (key !== null) {
+          included.set(key, resource);
+        }
+      }
+    }
+    const data = await Promise.all(
+      document.data.map(async (item) => {
         if (typeof item?.id !== 'string') {
           return item;
         }
         const url = await this.createURL({
-          localeSegment: this.defaultLocale,
+          localeSegment: read.localeSegment,
           entityTypeId,
           bundleId,
           resourceId: item.id,
-          queryString: `resourceVersion=${encodeURIComponent(this.resourceVersion as string)}`,
+          queryString: itemParams.toString(),
         });
         try {
           const { response, error } = await this.fetch(url, init);
@@ -367,13 +476,27 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
           if (!response.ok) {
             return item;
           }
-          const workingCopy = (await response.json()) as { data?: unknown };
-          return workingCopy &&
-            typeof workingCopy === 'object' &&
-            'data' in workingCopy &&
-            workingCopy.data
-            ? workingCopy.data
-            : item;
+          const workingCopy = (await response.json()) as {
+            data?: unknown;
+            included?: unknown;
+          };
+          if (
+            !workingCopy ||
+            typeof workingCopy !== 'object' ||
+            !('data' in workingCopy) ||
+            !workingCopy.data
+          ) {
+            return item;
+          }
+          if (Array.isArray(workingCopy.included)) {
+            for (const resource of workingCopy.included) {
+              const key = includedKey(resource);
+              if (key !== null) {
+                included.set(key, resource);
+              }
+            }
+          }
+          return workingCopy.data;
         } catch (error) {
           if (isDraftSessionError(error)) {
             throw error;
@@ -382,6 +505,11 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
         }
       }),
     );
+    return {
+      ...document,
+      data,
+      ...(included.size > 0 && { included: [...included.values()] }),
+    };
   }
 }
 
@@ -477,6 +605,7 @@ export {
   mapJsonApiRequestToProxy,
   mapProxyPathToUpstream,
   normalizeBaseUrl,
+  resolveJsonApiBase,
   resolveJsonApiProxyPath,
   toBackendRelativePath,
   trimSlashes,
