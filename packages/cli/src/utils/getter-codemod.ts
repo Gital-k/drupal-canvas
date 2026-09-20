@@ -94,8 +94,16 @@ interface NamespaceBinding {
   declaration: ImportDeclaration;
 }
 
-/** Component wrappers whose callback is the component itself. */
+/** React wrappers whose first argument is the component itself. */
 const COMPONENT_WRAPPERS = new Set(['memo', 'forwardRef']);
+
+/** The React wrapper bindings of a file, resolved from its `react` import. */
+interface WrapperBindings {
+  /** Local names bound to `memo`/`forwardRef` named imports from `react`. */
+  named: Set<string>;
+  /** Local names bound to React's default or namespace import. */
+  react: Set<string>;
+}
 
 interface Edit {
   start: number;
@@ -237,7 +245,11 @@ function isBindingDeclaration(node: Identifier, parents: Node[]): boolean {
 }
 
 /** Whether a function node is a component or custom hook by name. */
-function isComponentOrHook(fn: Node, parents: Node[]): boolean {
+function isComponentOrHook(
+  fn: Node,
+  parents: Node[],
+  wrappers: WrapperBindings,
+): boolean {
   let name: string | null = null;
   if (
     (fn.type === 'FunctionDeclaration' || fn.type === 'FunctionExpression') &&
@@ -257,13 +269,14 @@ function isComponentOrHook(fn: Node, parents: Node[]): boolean {
       return true;
     } else if (
       parent?.type === 'CallExpression' &&
+      parent.arguments[0] === fn &&
       parents[parents.length - 2]?.type === 'VariableDeclarator' &&
-      isComponentWrapper(parent.callee)
+      isComponentWrapper(parent.callee, wrappers)
     ) {
-      // `const Comp = memo(() => ...)` / `React.forwardRef(...)`: only the
-      // known React wrappers make the callback a component; any other call
-      // (a registration helper, a store creator) does not, whatever the
-      // result is named.
+      // `const Comp = memo(() => ...)` / `React.forwardRef(...)`: only React's
+      // own wrappers make their first argument a component; a comparator
+      // callback, a registration helper, or a store creator does not,
+      // whatever the result is named.
       const declarator = parents[parents.length - 2] as { id: Node };
       name = declarator.id.type === 'Identifier' ? declarator.id.name : null;
     }
@@ -274,18 +287,57 @@ function isComponentOrHook(fn: Node, parents: Node[]): boolean {
   return /^[A-Z]/.test(name) || /^use[A-Z0-9]/.test(name);
 }
 
-function isComponentWrapper(callee: Node): boolean {
+function isComponentWrapper(callee: Node, wrappers: WrapperBindings): boolean {
   if (callee.type === 'Identifier') {
-    return COMPONENT_WRAPPERS.has(callee.name);
+    return wrappers.named.has(callee.name);
   }
   return (
     callee.type === 'MemberExpression' &&
     !callee.computed &&
     callee.object.type === 'Identifier' &&
-    callee.object.name === 'React' &&
+    wrappers.react.has(callee.object.name) &&
     callee.property.type === 'Identifier' &&
     COMPONENT_WRAPPERS.has(callee.property.name)
   );
+}
+
+/**
+ * Resolves which local names are React's wrappers: named imports of
+ * `memo`/`forwardRef` from `react` and the React default or namespace import,
+ * each declared exactly once in the file (a shadowed name is not a wrapper).
+ */
+function resolveWrapperBindings(
+  ast: File,
+  declarations: Map<string, number>,
+): WrapperBindings {
+  const wrappers: WrapperBindings = { named: new Set(), react: new Set() };
+  for (const statement of ast.program.body) {
+    if (
+      statement.type !== 'ImportDeclaration' ||
+      statement.importKind === 'type' ||
+      statement.source.value !== 'react'
+    ) {
+      continue;
+    }
+    for (const specifier of statement.specifiers) {
+      const local = specifier.local.name;
+      if ((declarations.get(local) ?? 0) !== 1) {
+        continue;
+      }
+      if (
+        specifier.type === 'ImportSpecifier' &&
+        COMPONENT_WRAPPERS.has(importedName(specifier))
+      ) {
+        wrappers.named.add(local);
+      } else if (
+        specifier.type === 'ImportDefaultSpecifier' ||
+        specifier.type === 'ImportNamespaceSpecifier'
+      ) {
+        wrappers.react.add(local);
+      }
+    }
+  }
+  return wrappers;
 }
 
 function functionBody(fn: Node): Node | null {
@@ -322,6 +374,7 @@ function containsExit(node: Node): boolean {
 function hookPositionProblem(
   call: CallExpression,
   parents: Node[],
+  wrappers: WrapperBindings,
 ): string | null {
   // Find the innermost enclosing function.
   let fnIndex = -1;
@@ -335,7 +388,7 @@ function hookPositionProblem(
     return 'called at module level, outside a function component or custom hook';
   }
   const fn = parents[fnIndex];
-  if (!isComponentOrHook(fn, parents.slice(0, fnIndex))) {
+  if (!isComponentOrHook(fn, parents.slice(0, fnIndex), wrappers)) {
     return 'called inside a function that is not a component or custom hook';
   }
   const between = parents.slice(fnIndex + 1);
@@ -539,7 +592,7 @@ export function migrateGetterCalls(
     getterBindings.map((binding) => [binding.local, binding]),
   );
   const declarations = declarationCounts(ast);
-  const names = new Set(declarations.keys());
+  const wrappers = resolveWrapperBindings(ast, declarations);
   const callsByGetter = new Map<GetterName, CallExpression[]>();
   /** Getters whose hook needs a named import from `drupal-canvas`. */
   const namedGetters = new Set<GetterName>();
@@ -609,7 +662,11 @@ export function migrateGetterCalls(
         noteUnsafe(`\`${node.name}.${getter}()\` is called with arguments`);
         return;
       }
-      const problem = hookPositionProblem(grandparent, parents.slice(0, -2));
+      const problem = hookPositionProblem(
+        grandparent,
+        parents.slice(0, -2),
+        wrappers,
+      );
       if (problem) {
         noteUnsafe(`\`${node.name}.${getter}()\` is ${problem}`);
         return;
@@ -641,7 +698,7 @@ export function migrateGetterCalls(
       noteUnsafe(`\`${binding.local}()\` is called with arguments`);
       return;
     }
-    const problem = hookPositionProblem(parent, parents.slice(0, -1));
+    const problem = hookPositionProblem(parent, parents.slice(0, -1), wrappers);
     if (problem) {
       noteUnsafe(`\`${binding.local}()\` is ${problem}`);
       return;
@@ -685,20 +742,15 @@ export function migrateGetterCalls(
     if ((declarations.get(binding.local) ?? 0) > 1) {
       noteUnsafe(`\`${binding.local}\` is declared more than once in the file`);
     }
-    const hook = GETTER_HOOKS[binding.getter];
-    if (names.has(hook) && !isHookImport(existingHookImport, hook)) {
-      noteUnsafe(
-        `the replacement name \`${hook}\` is already declared in the file`,
-      );
-    }
   }
+  // The replacement hook name must resolve to the `drupal-canvas` import at
+  // every call site: any other declaration of that name (a parameter, a
+  // local, another import), whether or not the hook is already imported,
+  // could shadow it somewhere in the file.
   for (const [getter] of callsByGetter) {
     const hook = GETTER_HOOKS[getter];
-    if (
-      namespaceBindings.length > 0 &&
-      names.has(hook) &&
-      !isHookImport(existingHookImport, hook)
-    ) {
+    const allowed = isHookImport(existingHookImport, hook) ? 1 : 0;
+    if ((declarations.get(hook) ?? 0) > allowed) {
       noteUnsafe(
         `the replacement name \`${hook}\` is already declared in the file`,
       );
