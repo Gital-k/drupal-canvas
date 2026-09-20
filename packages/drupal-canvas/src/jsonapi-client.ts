@@ -23,7 +23,6 @@ import {
 } from '@drupal-api-client/json-api-client';
 
 import {
-  DEFAULT_JSONAPI_PREFIX,
   DEFAULT_ROUTER_PREFIX,
   JSONAPI_PROXY_SESSION_EXPIRED,
   JSONAPI_PROXY_SESSION_HEADER,
@@ -39,6 +38,7 @@ import type {
   GetOptions,
   JsonApiClientOptions,
 } from '@drupal-api-client/json-api-client';
+import type { ResolvedJsonApiBase } from './jsonapi-proxy.js';
 
 type EndpointUrlSegments = Parameters<UpstreamJsonApiClient['createURL']>[0];
 
@@ -88,17 +88,19 @@ export interface JsonApiClientConfig extends JsonApiRuntimeConfig {
    */
   serializer?: JsonApiClientOptions['serializer'] | null;
   /**
-   * Client cache. Keys are scoped by resource version and `cacheScope`. An
-   * authenticated client caches only with an explicit `cacheScope`: without
-   * one, responses fetched with one session could be served to another
-   * client sharing the cache, so the cache is ignored.
+   * Client cache. Keys are scoped by resource version and `cacheScope`. A
+   * session-sensitive client — authenticated, sending cookies (`credentials`
+   * `same-origin`/`include`), going through the proxy, previewing, or
+   * reading a resource version — caches only with an explicit `cacheScope`:
+   * without one, responses fetched with one session could be served to
+   * another client sharing the cache, so the cache is ignored.
    */
   cache?: Cache;
   /**
    * Distinguishes cache entries of different sessions sharing one cache
-   * object. Defaults to `public` for unauthenticated clients. Authenticated
-   * clients must set a scope unique to the session (for example the session
-   * subject and token expiry) to cache at all.
+   * object. Defaults to `public` for clients that carry no session.
+   * Session-sensitive clients must set a scope unique to the session (for
+   * example the session subject and token expiry) to cache at all.
    */
   cacheScope?: string;
   /** Fetch implementation; defaults to the global `fetch`. */
@@ -181,10 +183,15 @@ function createTransport(config: JsonApiClientConfig): typeof fetch {
       request.credentials = config.credentials;
     }
     const response = await fetchImpl(url, request);
-    // A direct, authenticated request answered with 401 means Drupal rejected
-    // the session credentials (expired or revoked token); 403 and other
+    // A direct request that actually carried the session credentials and is
+    // answered with 401 means Drupal rejected them (expired or revoked
+    // token). Requests without them (`disableAuthentication`), 403 and other
     // failures are ordinary resource-level outcomes and stay with the caller.
-    if (config.authentication && !config.proxyUrl && response.status === 401) {
+    if (
+      !config.proxyUrl &&
+      response.status === 401 &&
+      new Headers(request.headers).has('authorization')
+    ) {
       throw new DraftSessionError(
         'The draft preview session was rejected by Drupal.',
         401,
@@ -240,8 +247,8 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
   /** The resource version applied to reads, or `null`. */
   readonly resourceVersion: string | null;
 
-  /** The JSON:API origin when it differs from the backend base URL. */
-  private readonly apiOrigin: string | null;
+  /** Where JSON:API requests go (base URL, prefix, foreign site or not). */
+  private readonly apiBase: ResolvedJsonApiBase;
 
   constructor(config: JsonApiClientConfig) {
     const baseUrl = normalizeBaseUrl(config.baseUrl);
@@ -250,15 +257,23 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
       apiPrefix: config.apiPrefix,
       apiUrl,
     });
-    const apiPrefix = api.apiPrefix || DEFAULT_JSONAPI_PREFIX;
+    const apiPrefix = api.apiPrefix;
     const routerPrefix =
       trimSlashes(config.routerPrefix ?? DEFAULT_ROUTER_PREFIX) ||
       DEFAULT_ROUTER_PREFIX;
     const resourceVersion = config.resourceVersion || null;
-    // Authenticated responses are session-specific: without a scope that
-    // identifies the session, a shared cache must not hold them.
+    // Responses of a client that carries a session — through credentials,
+    // cookies, the proxy, or preview reads — are session-specific: without a
+    // scope that identifies the session, a shared cache must not hold them.
+    const sessionSensitive =
+      Boolean(config.authentication) ||
+      Boolean(config.proxyUrl) ||
+      config.credentials === 'same-origin' ||
+      config.credentials === 'include' ||
+      Boolean(config.preview) ||
+      resourceVersion !== null;
     const cache =
-      config.cache && (!config.authentication || config.cacheScope)
+      config.cache && (!sessionSensitive || config.cacheScope)
         ? scopeCache(
             config.cache,
             [resourceVersion ?? 'default', config.cacheScope ?? 'public'].join(
@@ -289,17 +304,25 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
       preview: config.preview ?? false,
     };
     this.resourceVersion = resourceVersion;
-    this.apiOrigin = apiUrl && api.origin !== baseUrl ? api.origin : null;
+    this.apiBase = api;
+    // The Decoupled Router endpoint lives on the backend site, under its
+    // path: `<baseUrl>/<locale>/<routerPrefix>` (the upstream builder resolves
+    // root-relative and would drop a site path such as `/sub`).
+    const router = this.router as unknown as {
+      createURL: (segments: { localeSegment?: string; path: string }) => string;
+    };
+    router.createURL = ({ localeSegment, path }) =>
+      `${baseUrl}/${localeSegment ? `${localeSegment}/` : ''}${routerPrefix}?path=${path}`;
   }
 
   /**
-   * Builds JSON:API URLs on the separate JSON:API origin when one is
-   * configured; index lookups and everything else stay upstream.
+   * Builds JSON:API URLs as Drupal serves them: the backend base URL
+   * including any site path, then a locale prefix, then the JSON:API prefix
+   * (the upstream builder resolves root-relative and would drop a site path
+   * such as `/sub`). A same-site full URL override is a prefix override; a
+   * foreign one has no known site root, so a locale prefix is refused.
    */
   override async createURL(segments: EndpointUrlSegments): Promise<string> {
-    if (this.apiOrigin === null || this.indexLookup) {
-      return super.createURL(segments);
-    }
     const {
       localeSegment,
       entityTypeId,
@@ -309,14 +332,39 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
       resourceId,
       queryString,
     } = segments;
-    const locale = localeSegment ? `${localeSegment}/` : '';
-    const path = viewName
-      ? `${locale}${this.apiPrefix}/views/${viewName}/${viewDisplayId}`
-      : `${locale}${this.apiPrefix}/${entityTypeId}/${bundleId}${resourceId ? `/${resourceId}` : ''}`;
-    return new URL(
-      `/${path}${queryString ? `?${queryString}` : ''}`,
-      this.apiOrigin,
-    ).toString();
+    if (localeSegment && this.apiBase.foreign) {
+      throw new Error(
+        `[drupal-canvas] A locale path prefix ("${localeSegment}") cannot be applied to a JSON:API base URL on another site (${this.apiBase.base}). Point baseUrl at that site or omit the locale.`,
+      );
+    }
+    const prefixUrl = `${this.apiBase.base}/${localeSegment ? `${localeSegment}/` : ''}${this.apiPrefix}`;
+    const query = queryString ? `?${queryString}` : '';
+    if (this.indexLookup) {
+      // The JSON:API index lists every resource type's collection URL.
+      const cacheKey = `${localeSegment ? `${localeSegment}/` : ''}${this.apiPrefix}`;
+      let index = await this.getCachedResponse<{
+        links?: Record<string, { href?: string }>;
+      }>(cacheKey);
+      if (!index) {
+        const { response, error } = await this.fetch(prefixUrl);
+        if (error) {
+          throw error;
+        }
+        index = (await response.json()) as typeof index;
+        if (this.cache && response.status < 400) {
+          await this.cache.set(cacheKey, index);
+        }
+      }
+      const href =
+        index?.links?.[`${entityTypeId}${bundleId ? `--${bundleId}` : ''}`]
+          ?.href;
+      if (href) {
+        return `${href}${resourceId ? `/${resourceId}` : ''}${query}`;
+      }
+    }
+    return viewName
+      ? `${prefixUrl}/views/${viewName}/${viewDisplayId}${query}`
+      : `${prefixUrl}/${entityTypeId}/${bundleId}${resourceId ? `/${resourceId}` : ''}${query}`;
   }
 
   /**
@@ -505,10 +553,24 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
         }
       }),
     );
+    // A compound document holds one resource object per identity, and the
+    // selected primary resources (the working copies) take precedence: an
+    // included copy of a resource that is itself primary would let the
+    // serializer resolve relationships to that other (published) copy.
+    for (const item of data) {
+      const key = includedKey(item);
+      if (key !== null) {
+        included.delete(key);
+      }
+    }
     return {
       ...document,
       data,
-      ...(included.size > 0 && { included: [...included.values()] }),
+      ...(included.size > 0
+        ? { included: [...included.values()] }
+        : Array.isArray(document.included)
+          ? { included: [] }
+          : {}),
     };
   }
 }

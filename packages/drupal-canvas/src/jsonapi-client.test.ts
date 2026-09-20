@@ -452,7 +452,7 @@ describe('createJsonApiClient', () => {
     ]);
   });
 
-  it('builds JSON:API URLs on a separate JSON:API base and keeps the router on the backend', async () => {
+  it('builds JSON:API URLs on a foreign JSON:API base and keeps the router on the backend', async () => {
     const { fetch, calls } = fakeFetch((url) =>
       url.includes('translate-path')
         ? jsonResponse({
@@ -489,13 +489,17 @@ describe('createJsonApiClient', () => {
       apiPrefix: 'drupal/api',
       apiUrl: 'https://api.example/drupal/api',
     });
-    await client.getResource('node--page', 'u1', { locale: 'de' });
+    await client.getResource('node--page', 'u1');
     await client.getResourceByPath('/about');
     expect(calls.map((call) => call.url)).toEqual([
-      'https://api.example/de/drupal/api/node/page/u1',
+      'https://api.example/drupal/api/node/page/u1',
       'https://drupal.example/router/translate-path?path=/about',
       'https://api.example/drupal/api/node/page/u1',
     ]);
+    // A foreign base has no known site root for a locale prefix.
+    await expect(
+      client.getResource('node--page', 'u1', { locale: 'de' }),
+    ).rejects.toThrow(/locale path prefix/);
 
     // Through the proxy, both endpoints map to the application.
     const proxied = fakeFetch(() =>
@@ -513,6 +517,194 @@ describe('createJsonApiClient', () => {
     expect(proxied.calls.map((call) => call.url)).toEqual([
       '/api/canvas/jsonapi/drupal/api/node/page/u1',
       '/api/canvas/jsonapi/router/translate-path?path=/x',
+    ]);
+  });
+
+  it('keeps the site path and puts the locale between it and the prefix, for every method and the router', async () => {
+    const { fetch, calls } = fakeFetch((url) =>
+      url.includes('translate-path')
+        ? jsonResponse({ message: 'not found' }, { status: 404 })
+        : url.endsWith('/sub/fr/api')
+          ? jsonResponse({
+              links: {
+                'node--page': {
+                  href: 'https://drupal.example/sub/fr/api/node/page',
+                },
+              },
+            })
+          : jsonResponse({ data: [] }),
+    );
+    const client = createJsonApiClient({
+      baseUrl: 'https://drupal.example/sub/',
+      apiUrl: 'https://drupal.example/sub/api',
+      serializer: null,
+      fetch,
+    });
+    expect(client.runtimeConfig).toMatchObject({
+      baseUrl: 'https://drupal.example/sub',
+      apiPrefix: 'api',
+    });
+    await client.getCollection('node--page', { locale: 'fr' });
+    await client.getResource('node--page', 'u1');
+    await client.getView('content--page_1', { locale: 'fr' });
+    await client.getResourceByPath('/about', { locale: 'fr' });
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://drupal.example/sub/fr/api/node/page',
+      'https://drupal.example/sub/api/node/page/u1',
+      'https://drupal.example/sub/fr/api/views/content/page_1',
+      'https://drupal.example/sub/fr/router/translate-path?path=/about',
+    ]);
+
+    // Index lookups read the index at the same base and follow its links.
+    const indexed = createJsonApiClient({
+      baseUrl: 'https://drupal.example/sub',
+      apiUrl: 'https://drupal.example/sub/api',
+      serializer: null,
+      fetch,
+      upstreamOptions: { indexLookup: true },
+    });
+    calls.length = 0;
+    await indexed.getResource('node--page', 'u1', { locale: 'fr' });
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://drupal.example/sub/fr/api',
+      'https://drupal.example/sub/fr/api/node/page/u1',
+    ]);
+
+    // Through the proxy, the old `/sub/jsonapi` prefix is outside the
+    // boundary and a backend URL outside the site path never leaves unmapped.
+    const proxied = fakeFetch(() => jsonResponse({ data: [] }));
+    const browser = createJsonApiClient({
+      baseUrl: 'https://drupal.example/sub',
+      apiUrl: 'https://drupal.example/sub/api',
+      proxyUrl: '/api/canvas/jsonapi',
+      serializer: null,
+      fetch: proxied.fetch,
+    });
+    await browser.getCollection('node--page', { locale: 'fr' });
+    await browser.fetch(
+      'https://drupal.example/sub/router/translate-path?path=/x',
+    );
+    expect(proxied.calls.map((call) => call.url)).toEqual([
+      '/api/canvas/jsonapi/fr/api/node/page',
+      '/api/canvas/jsonapi/router/translate-path?path=/x',
+    ]);
+    for (const outside of [
+      'https://drupal.example/sub/jsonapi/node/page',
+      'https://drupal.example/router/translate-path?path=/x',
+    ]) {
+      const { response, error } = await browser.fetch(outside);
+      expect(response).toBeNull();
+      expect(error?.message).toMatch(/not a supported/);
+    }
+    expect(proxied.calls).toHaveLength(2);
+  });
+
+  it('classifies 401 by the credentials the request actually carried', async () => {
+    const { fetch, calls } = fakeFetch(() =>
+      jsonResponse({ errors: [{ status: '401' }] }, { status: 401 }),
+    );
+    const client = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      authentication: { type: 'Custom', credentials: { value: 'Bearer t' } },
+      serializer: null,
+      fetch,
+    });
+    // No Authorization header was sent: an ordinary 401, also raw.
+    const raw = (await client.getResource('node--article', 'a', {
+      disableAuthentication: true,
+      rawResponse: true,
+    })) as { response: Response };
+    expect(raw.response.status).toBe(401);
+    expect(new Headers(calls[0].init?.headers).has('authorization')).toBe(
+      false,
+    );
+    await expect(client.getResource('node--article', 'a')).rejects.toSatisfy(
+      isDraftSessionError,
+    );
+    expect(new Headers(calls[1].init?.headers).has('authorization')).toBe(true);
+  });
+
+  it('gives selected working copies precedence over included copies of the same resource', async () => {
+    const { fetch } = fakeFetch((url) => {
+      if (url.includes('/node/article/a?')) {
+        return jsonResponse({
+          data: {
+            type: 'node--article',
+            id: 'a',
+            attributes: { title: 'Draft A' },
+            relationships: {
+              related: { data: { type: 'node--article', id: 'b' } },
+            },
+          },
+          included: [
+            {
+              type: 'node--article',
+              id: 'b',
+              attributes: { title: 'Published B (via A)' },
+            },
+          ],
+        });
+      }
+      if (url.includes('/node/article/b?')) {
+        return jsonResponse({
+          data: {
+            type: 'node--article',
+            id: 'b',
+            attributes: { title: 'Draft B' },
+          },
+        });
+      }
+      return jsonResponse(articleCollection());
+    });
+    const client = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      resourceVersion: 'rel:working-copy',
+      fetch,
+    });
+    const items = (await client.getCollection('node--article', {
+      queryString: 'include=related',
+    })) as Array<{ id: string; title: string; related?: { title: string } }>;
+    expect(items.map((item) => item.title)).toEqual(['Draft A', 'Draft B']);
+    expect(items[0].related?.title).toBe('Draft B');
+  });
+
+  it('does not cache session-carrying clients without an explicit scope', async () => {
+    const store = new Map<string, unknown>();
+    const cache: Cache = {
+      get: async <T>(key: string) => store.get(key) as T,
+      set: async (key, value) => {
+        store.set(key, value);
+      },
+    };
+    const { fetch } = fakeFetch(() => jsonResponse(articleCollection()));
+    for (const config of [
+      { proxyUrl: '/api/canvas/jsonapi' },
+      { credentials: 'same-origin' as const },
+      { credentials: 'include' as const },
+      { preview: true },
+      { resourceVersion: 'rel:working-copy' },
+    ]) {
+      const client = createJsonApiClient({
+        baseUrl: 'https://drupal.example',
+        serializer: null,
+        cache,
+        fetch,
+        ...config,
+      });
+      await client.getCollection('node--article');
+      expect(store.size, JSON.stringify(config)).toBe(0);
+    }
+    const scoped = createJsonApiClient({
+      baseUrl: 'https://drupal.example',
+      proxyUrl: '/api/canvas/jsonapi',
+      cacheScope: 'session:a',
+      serializer: null,
+      cache,
+      fetch,
+    });
+    await scoped.getCollection('node--article');
+    expect([...store.keys()]).toEqual([
+      expect.stringContaining('default:session:a:'),
     ]);
   });
 
