@@ -5,29 +5,59 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   checkInstalledPackage,
-  declaresExport,
+  collectRuntimeExports,
   evaluateContextHookSupport,
+  resolveRuntimeEntry,
 } from './context-hook-support';
+
+/** The shape the published package takes: chunks plus one export list. */
+const BUILT_ENTRY = `import { a as warnOnce } from "./warnings-abc123.js";
+import { getPageData } from "./drupal-utils.js";
+import { useContext } from "react";
+function usePageContext() {
+  warnOnce("x");
+  return useContext(null);
+}
+function useSiteContext() {
+  return null;
+}
+export { getPageData, usePageContext, useSiteContext };
+`;
 
 async function writePackage(
   root: string,
   version: string,
-  declarations = 'export declare function usePageContext(): unknown;\nexport declare function useSiteContext(): unknown;\n',
+  files: Record<string, string> = {
+    'dist/index.js': BUILT_ENTRY,
+    'dist/warnings-abc123.js':
+      'function warnOnce() {}\nexport { warnOnce as a };\n',
+    'dist/drupal-utils.js': 'export function getPageData() {}\n',
+  },
+  manifest: Record<string, unknown> = {
+    exports: {
+      '.': {
+        import: './dist/index.js',
+        types: './dist/index.d.ts',
+        default: './dist/index.js',
+      },
+    },
+  },
 ): Promise<void> {
   const dir = path.join(root, 'node_modules', 'drupal-canvas');
+  await fs.rm(dir, { recursive: true, force: true });
   await fs.mkdir(path.join(dir, 'dist'), { recursive: true });
   await fs.writeFile(
     path.join(dir, 'package.json'),
-    JSON.stringify({
-      name: 'drupal-canvas',
-      version,
-      exports: {
-        '.': { types: './dist/index.d.ts', import: './dist/index.js' },
-      },
-    }),
+    JSON.stringify({ name: 'drupal-canvas', version, ...manifest }),
   );
-  await fs.writeFile(path.join(dir, 'dist', 'index.d.ts'), declarations);
-  await fs.writeFile(path.join(dir, 'dist', 'index.js'), 'export {};');
+  await fs.writeFile(
+    path.join(dir, 'dist', 'index.d.ts'),
+    'export declare function usePageContext(): unknown;\nexport declare function useSiteContext(): unknown;\n',
+  );
+  for (const [file, source] of Object.entries(files)) {
+    await fs.mkdir(path.dirname(path.join(dir, file)), { recursive: true });
+    await fs.writeFile(path.join(dir, file), source);
+  }
 }
 
 describe('context hook support', () => {
@@ -42,43 +72,150 @@ describe('context hook support', () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  it('recognizes exported names in declaration files', () => {
-    const list =
-      'declare function usePageContext(): unknown;\ndeclare function useSiteContext(): unknown;\nexport { type Foo, usePageContext, useSiteContext };\n';
-    expect(declaresExport(list, 'usePageContext')).toBe(true);
-    expect(declaresExport(list, 'useSiteContext')).toBe(true);
-    expect(declaresExport(list, 'useContext')).toBe(false);
-    const direct = 'export declare function useSiteContext(): unknown;\n';
-    expect(declaresExport(direct, 'useSiteContext')).toBe(true);
-    // A mention is not an export.
+  it('resolves the root runtime entry under the import conditions', () => {
     expect(
-      declaresExport(
-        '/** Use usePageContext() from drupal-canvas@latest. */\nexport declare const cn: unknown;\n',
-        'usePageContext',
-      ),
-    ).toBe(false);
+      resolveRuntimeEntry({
+        exports: { '.': { import: './dist/index.js', default: './dist/x.js' } },
+      }),
+    ).toBe('./dist/index.js');
+    expect(
+      resolveRuntimeEntry({
+        exports: {
+          '.': { import: { types: './t.d.ts', default: './dist/esm.js' } },
+        },
+      }),
+    ).toBe('./dist/esm.js');
+    expect(resolveRuntimeEntry({ exports: './dist/only.js' })).toBe(
+      './dist/only.js',
+    );
+    expect(resolveRuntimeEntry({ module: './m.js', main: './c.js' })).toBe(
+      './m.js',
+    );
+    expect(
+      resolveRuntimeEntry({ exports: { '.': { types: './t.d.ts' } } }),
+    ).toBe(null);
   });
 
-  it('gates on the installed package exporting both hooks, whatever its version', async () => {
-    expect((await checkInstalledPackage(root)).ok).toBe(false);
-    // A package that exports the hooks qualifies regardless of its version
-    // (a locally packed pre-release build, for example).
+  it('accepts the built package format and local aliases and re-exports', async () => {
     await writePackage(root, '0.5.1');
     expect(await checkInstalledPackage(root)).toEqual({ ok: true });
-    await writePackage(root, '0.6.0', 'export declare const cn: unknown;');
+
+    await writePackage(root, '0.5.1', {
+      'dist/index.js': `import { pageHook } from "./context.js";
+export { pageHook as usePageContext };
+export { site as useSiteContext } from "./site.js";
+`,
+      'dist/context.js': 'export const pageHook = () => null;\n',
+      'dist/site.js': 'function site() {}\nexport { site };\n',
+    });
+    expect(await checkInstalledPackage(root)).toEqual({ ok: true });
+
+    await writePackage(root, '0.5.1', {
+      'dist/index.js': 'export * from "./hooks/index.js";\n',
+      'dist/hooks/index.js':
+        'export function usePageContext() {}\nexport function useSiteContext() {}\n',
+    });
+    expect(await checkInstalledPackage(root)).toEqual({ ok: true });
+  });
+
+  it('rejects declarations, type-only exports, comments and misleading names without runtime exports', async () => {
+    // Declarations promise the hooks; the runtime entry exports nothing.
+    await writePackage(root, '0.6.0', { 'dist/index.js': 'export {};\n' });
+    expect((await checkInstalledPackage(root)).reason).toContain(
+      'does not export `usePageContext()` and `useSiteContext()` as runtime values',
+    );
+    await writePackage(root, '0.6.0', {
+      'dist/index.js': `/* export { usePageContext, useSiteContext } */
+function helper(usePageContext, useSiteContext) { return [usePageContext, useSiteContext]; }
+const useSiteContextFactory = () => null;
+export { helper, useSiteContextFactory };
+`,
+    });
     expect((await checkInstalledPackage(root)).reason).toContain(
       'does not export',
     );
+    // A package exporting TypeScript source: type-only exports are not
+    // runtime values.
     await writePackage(
       root,
       '0.6.0',
-      'export declare function usePageContext(): unknown;\n// useSiteContext arrives later\n',
+      {
+        'src/index.ts': `export type { usePageContext } from "./types";
+export { type useSiteContext } from "./types";
+`,
+        'src/types.ts':
+          'export const usePageContext = 1;\nexport const useSiteContext = 1;\n',
+      },
+      { exports: { '.': { import: './src/index.ts' } } },
     );
     expect((await checkInstalledPackage(root)).reason).toContain(
       'does not export',
     );
-    await writePackage(root, '0.6.0');
-    expect(await checkInstalledPackage(root)).toEqual({ ok: true });
+    // One of two is not enough.
+    await writePackage(root, '0.6.0', {
+      'dist/index.js': 'export function usePageContext() {}\n',
+    });
+    expect((await checkInstalledPackage(root)).reason).toContain(
+      'does not export `useSiteContext()`',
+    );
+  });
+
+  it('fails closed with guidance when exports cannot be determined statically', async () => {
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'module.exports = { usePageContext() {}, useSiteContext() {} };\n',
+    });
+    let result = await checkInstalledPackage(root);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('could not be verified');
+    expect(result.reason).toContain('CommonJS');
+
+    await writePackage(root, '0.6.0', {
+      'dist/index.js':
+        'export { usePageContext, useSiteContext } from "some-other-package";\n',
+    });
+    result = await checkInstalledPackage(root);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('could not be verified');
+
+    await writePackage(root, '0.6.0', {
+      'dist/index.js': 'export * from "./missing.js";\n',
+    });
+    expect((await checkInstalledPackage(root)).reason).toContain(
+      'could not be verified',
+    );
+
+    await writePackage(root, '0.6.0', { 'dist/index.js': 'export {' });
+    expect((await checkInstalledPackage(root)).reason).toContain(
+      'could not be parsed',
+    );
+
+    await writePackage(
+      root,
+      '0.6.0',
+      { 'dist/index.js': BUILT_ENTRY },
+      { exports: { '.': { types: './dist/index.d.ts' } } },
+    );
+    expect((await checkInstalledPackage(root)).reason).toContain(
+      'declares no root entry',
+    );
+  });
+
+  it('never follows re-exports outside the package', async () => {
+    await writePackage(root, '0.6.0', {
+      'dist/index.js': 'export * from "../../outside.js";\n',
+    });
+    await fs.writeFile(
+      path.join(root, 'node_modules', 'outside.js'),
+      'export function usePageContext() {}\nexport function useSiteContext() {}\n',
+    );
+    const packageRoot = path.join(root, 'node_modules', 'drupal-canvas');
+    const exports = await collectRuntimeExports(
+      path.join(packageRoot, 'dist', 'index.js'),
+      packageRoot,
+    );
+    expect([...exports.names]).toEqual([]);
+    expect(exports.unverifiable[0]).toContain('re-exports everything');
   });
 
   it('requires the site to advertise context hooks', async () => {
