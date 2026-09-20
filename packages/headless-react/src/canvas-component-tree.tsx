@@ -58,27 +58,41 @@ export interface CanvasComponentTreeProps {
    * the hook reports the missing provider.
    *
    * Server rendering creates its own client from the same configuration.
-   * With `jsonApiFetch` it uses the current request's session through that
-   * transport; without a transport, public rendering gets a direct,
-   * unauthenticated client, and a live draft session gets no client, so a
-   * component fetching during rendering can never receive public content
-   * masquerading as a draft (SWR fallback data then stays unused during
-   * server rendering — see `jsonApiFetch`).
+   * For public rendering it is a direct, unauthenticated client. In a live
+   * draft session it is the same non-null, draft-aware client the browser
+   * gets — so SWR keys stay enabled and prefetched fallback data renders into
+   * the initial HTML without a hydration mismatch — but it performs no
+   * network requests: draft data is not fetched during server rendering, and
+   * a request made while rendering (rather than in an effect) fails with
+   * `ServerRenderingDraftFetchError`, which names the fix. Prefetch draft
+   * data on the server with the SDK's `getClient()` and supply it as SWR
+   * fallback data; SWR fetches in the browser after hydration.
    */
   jsonApi?: JsonApiRuntimeConfig;
-  /**
-   * Fetch implementation for the client created from `jsonApi`. Framework
-   * adapters whose server rendering runs inside the request (TanStack Start)
-   * supply a request-aware transport here: it answers the client's
-   * proxy-mapped requests in-process with the current request's draft
-   * session, so the server-rendered client is the same non-null,
-   * draft-aware client the browser gets, without serializing credentials.
-   * The generic renderer never imports server code; the transport is the
-   * adapter's. In the browser, omit it (the default `fetch` goes through the
-   * proxy).
-   */
-  jsonApiFetch?: typeof fetch;
 }
+
+/**
+ * Thrown when a draft-session client created for server rendering is asked
+ * to perform a network request. Not a session error: the session is fine, it
+ * is just not reachable while rendering on the server.
+ */
+export class ServerRenderingDraftFetchError extends Error {
+  constructor() {
+    super(
+      '[drupal-canvas] Draft data is not fetched during server rendering: the ' +
+        'draft preview session is only reachable from the server integration. ' +
+        "Prefetch this data on the server with the SDK's getClient() and " +
+        'supply it as SWR fallback data (SWRConfig `fallback`); requests run ' +
+        'in the browser after hydration.',
+    );
+    this.name = 'ServerRenderingDraftFetchError';
+  }
+}
+
+/** The transport of a draft-session client during server rendering. */
+const serverRenderingDraftFetch: typeof fetch = async () => {
+  throw new ServerRenderingDraftFetchError();
+};
 
 interface CanvasElementProps {
   node: CanvasComponentTreeElement;
@@ -98,11 +112,10 @@ export function CanvasComponentTree({
   components,
   context,
   jsonApi,
-  jsonApiFetch,
 }: CanvasComponentTreeProps) {
   const rendered = <CanvasTreeContent tree={tree} components={components} />;
   const withClient = (
-    <CanvasTreeClientProvider jsonApi={jsonApi} jsonApiFetch={jsonApiFetch}>
+    <CanvasTreeClientProvider jsonApi={jsonApi}>
       {rendered}
     </CanvasTreeClientProvider>
   );
@@ -117,16 +130,14 @@ export function CanvasComponentTree({
 
 /**
  * Creates the JSON:API client for the tree from the runtime configuration,
- * reusing it while the configuration and transport stay unchanged. Without
- * configuration an outer provider is inherited.
+ * reusing it while the configuration stays unchanged. Without configuration
+ * an outer provider is inherited.
  */
 function CanvasTreeClientProvider({
   jsonApi: explicitConfig,
-  jsonApiFetch,
   children,
 }: {
   jsonApi?: JsonApiRuntimeConfig;
-  jsonApiFetch?: typeof fetch;
   children: ReactNode;
 }) {
   const runtimeConfig = useJsonApiRuntimeConfig();
@@ -142,23 +153,17 @@ function CanvasTreeClientProvider({
     if (typeof window !== 'undefined') {
       // Browser: through the application's same-origin proxy, which
       // authenticates from the session cookie.
-      return createJsonApiClient({
-        ...jsonApi,
-        credentials: 'same-origin',
-        fetch: jsonApiFetch,
-      });
-    }
-    if (jsonApiFetch) {
-      // Server rendering with the adapter's request-aware transport: the
-      // same proxy-mapped, draft-aware requests, answered in-process with the
-      // current request's session.
-      return createJsonApiClient({ ...jsonApi, fetch: jsonApiFetch });
+      return createJsonApiClient({ ...jsonApi, credentials: 'same-origin' });
     }
     if (jsonApi.preview) {
-      // Server rendering in a live draft session without a transport: no
-      // request-aware client exists here, and a public client would let
-      // draft rendering silently fall back to published content.
-      return null;
+      // Server rendering in a live draft session: the same client as the
+      // browser's (so SWR fallback data renders and hydration matches), but
+      // draft data is prefetched by the server integration, never fetched
+      // while rendering — see the `jsonApi` prop.
+      return createJsonApiClient({
+        ...jsonApi,
+        fetch: serverRenderingDraftFetch,
+      });
     }
     // Server rendering of public content: direct, unauthenticated.
     return createJsonApiClient({
@@ -169,7 +174,7 @@ function CanvasTreeClientProvider({
     });
     // The serialized configuration is the identity of the client.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, jsonApiFetch]);
+  }, [key]);
   if (client === null || (hasOuterClient && !jsonApi)) {
     return <>{children}</>;
   }

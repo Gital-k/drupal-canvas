@@ -173,7 +173,10 @@ site path and it); an override on another site is localized through
 Server rendering a component does not run its SWR fetcher. To put data in the
 initial HTML, prefetch it with `getClient()` and supply it as SWR fallback data;
 the portable component keeps using its string key, and in Drupal it fetches in
-the browser as before:
+the browser as before. The React renderers give server rendering the same
+draft-aware client the browser gets (so fallback data renders and hydration
+matches) without network access in a draft session: draft data reaches the
+initial HTML only through this prefetch.
 
 ```tsx
 const client = await getClient();
