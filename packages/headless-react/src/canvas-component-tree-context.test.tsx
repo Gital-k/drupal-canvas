@@ -139,3 +139,77 @@ describe('CanvasComponentTree context and client', () => {
     ).toContain('https://outer.example|direct');
   });
 });
+
+describe('CanvasComponentTree runtime configuration', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const runtime = {
+    baseUrl: 'https://drupal.example',
+    apiPrefix: 'jsonapi',
+    proxyUrl: '/api/canvas/jsonapi',
+    resourceVersion: null,
+    preview: false,
+  };
+
+  it('uses the nearest JsonApiRuntimeProvider when no jsonApi prop is given', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { JsonApiRuntimeProvider } = await import('./jsonapi-runtime');
+    const html = renderToStaticMarkup(
+      <JsonApiRuntimeProvider config={runtime}>
+        <CanvasComponentTree
+          tree={tree}
+          components={{ header: Header }}
+          context={context}
+        />
+      </JsonApiRuntimeProvider>,
+    );
+    expect(html).toContain('https://drupal.example|/api/canvas/jsonapi');
+    const explicit = renderToStaticMarkup(
+      <JsonApiRuntimeProvider config={runtime}>
+        <CanvasComponentTree
+          tree={tree}
+          components={{ header: Header }}
+          context={context}
+          jsonApi={{ ...runtime, baseUrl: 'https://explicit.example' }}
+        />
+      </JsonApiRuntimeProvider>,
+    );
+    expect(explicit).toContain('https://explicit.example|/api/canvas/jsonapi');
+  });
+
+  it('creates no client during server rendering of a live draft session', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const globalWithWindow = globalThis as { window?: unknown };
+    const savedWindow = globalWithWindow.window;
+    // Simulate server rendering.
+    delete globalWithWindow.window;
+    try {
+      const draftHtml = renderToStaticMarkup(
+        <CanvasComponentTree
+          tree={tree}
+          components={{ header: Header }}
+          context={context}
+          jsonApi={{
+            ...runtime,
+            resourceVersion: 'rel:working-copy',
+            preview: true,
+          }}
+        />,
+      );
+      expect(draftHtml).toContain('|no-client');
+      const publicHtml = renderToStaticMarkup(
+        <CanvasComponentTree
+          tree={tree}
+          components={{ header: Header }}
+          context={context}
+          jsonApi={runtime}
+        />,
+      );
+      expect(publicHtml).toContain('https://drupal.example|direct');
+    } finally {
+      globalWithWindow.window = savedWindow;
+    }
+  });
+});
