@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   checkInstalledPackage,
-  compareVersions,
+  declaresExport,
   evaluateContextHookSupport,
 } from './context-hook-support';
 
@@ -42,18 +42,38 @@ describe('context hook support', () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  it('compares versions numerically', () => {
-    expect(compareVersions('0.6.0', '0.6.0')).toBe(0);
-    expect(compareVersions('0.5.1', '0.6.0')).toBeLessThan(0);
-    expect(compareVersions('1.0.0-beta.1', '0.6.0')).toBeGreaterThan(0);
-    expect(compareVersions('0.10.0', '0.6.0')).toBeGreaterThan(0);
+  it('recognizes exported names in declaration files', () => {
+    const list =
+      'declare function usePageContext(): unknown;\ndeclare function useSiteContext(): unknown;\nexport { type Foo, usePageContext, useSiteContext };\n';
+    expect(declaresExport(list, 'usePageContext')).toBe(true);
+    expect(declaresExport(list, 'useSiteContext')).toBe(true);
+    expect(declaresExport(list, 'useContext')).toBe(false);
+    const direct = 'export declare function useSiteContext(): unknown;\n';
+    expect(declaresExport(direct, 'useSiteContext')).toBe(true);
+    // A mention is not an export.
+    expect(
+      declaresExport(
+        '/** Use usePageContext() from drupal-canvas@latest. */\nexport declare const cn: unknown;\n',
+        'usePageContext',
+      ),
+    ).toBe(false);
   });
 
-  it('requires the installed package to export both hooks', async () => {
+  it('gates on the installed package exporting both hooks, whatever its version', async () => {
     expect((await checkInstalledPackage(root)).ok).toBe(false);
+    // A package that exports the hooks qualifies regardless of its version
+    // (a locally packed pre-release build, for example).
     await writePackage(root, '0.5.1');
-    expect((await checkInstalledPackage(root)).reason).toContain('0.5.1');
+    expect(await checkInstalledPackage(root)).toEqual({ ok: true });
     await writePackage(root, '0.6.0', 'export declare const cn: unknown;');
+    expect((await checkInstalledPackage(root)).reason).toContain(
+      'does not export',
+    );
+    await writePackage(
+      root,
+      '0.6.0',
+      'export declare function usePageContext(): unknown;\n// useSiteContext arrives later\n',
+    );
     expect((await checkInstalledPackage(root)).reason).toContain(
       'does not export',
     );
