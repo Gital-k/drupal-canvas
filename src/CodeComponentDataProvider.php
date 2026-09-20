@@ -200,7 +200,13 @@ readonly final class CodeComponentDataProvider {
    *
    * @return array
    */
-  public function getCanvasDataMainEntityV0(?RefinableCacheableDependencyInterface $cacheability = NULL): array {
+  public function getCanvasDataMainEntityV0(?RefinableCacheableDependencyInterface $cacheability = NULL, ?EntityInterface $main_entity = NULL): array {
+    if ($main_entity !== NULL) {
+      // The caller selected the entity being rendered (for example the
+      // auto-saved copy of a previewed entity); describe that one rather than
+      // the stored entity of the route.
+      return $this->buildMainEntityData($main_entity, $cacheability);
+    }
     // List of likely route parameters to check for the entity.
     $likelyEntityIdentifiers = ['preview_entity', 'node', 'entity', 'canvas_page'];
     $currentRouteParams = $this->routeMatch->getParameters()->keys();
@@ -211,48 +217,60 @@ readonly final class CodeComponentDataProvider {
     $mergedIdentifiers = array_merge($likelyEntityIdentifiers, $remainingParams);
 
     foreach ($mergedIdentifiers as $identifier) {
-
       $entity = $this->routeMatch->getParameter($identifier);
-
       if ($entity instanceof EntityInterface) {
-        // The requested language is negotiated from the request (e.g. the URL
-        // prefix). The rendered language is the translation the entity actually
-        // loaded as; it falls back to the default when the requested language
-        // has no translation. They differ on `/de/page/1` when the page has no
-        // German translation: requested `de`, rendered `en`.
-        $requested_langcode = $this->languageManager
-          ->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)
-          ->getId();
-        $rendered_langcode = $entity->language()->getId();
-        $translations = [];
-        if ($entity instanceof TranslatableInterface) {
-          // JsComponent::renderComponent() bubbles these dependencies before
-          // hook_js_settings_alter() attaches the data during asset rendering.
-          $translations = EntityTranslationMetadata::build(
-            $entity,
-            $this->languageManager,
-            $requested_langcode,
-            static fn (EntityInterface $translation, LanguageInterface $language): string => $translation
-              ->toUrl('canonical', ['language' => $language])
-              ->toString(),
-            cacheability: $cacheability,
-          );
-        }
-        return [
-          self::V0 => [
-            'mainEntity' => [
-              'bundle' => $entity->bundle(),
-              'entityTypeId' => $entity->getEntityTypeId(),
-              'uuid' => $entity->uuid(),
-              'requestedLanguage' => $requested_langcode,
-              'renderedLanguage' => $rendered_langcode,
-              'translations' => $translations,
-            ],
-          ],
-        ];
+        return $this->buildMainEntityData($entity, $cacheability);
       }
     }
     return [];
+  }
+
+  /**
+   * Describes one entity as the page's main entity.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity, in the translation being rendered.
+   * @param \Drupal\Core\Cache\RefinableCacheableDependencyInterface|null $cacheability
+   *   Receives the access cacheability of the translation list.
+   *
+   * @return array[]
+   */
+  private function buildMainEntityData(EntityInterface $entity, ?RefinableCacheableDependencyInterface $cacheability): array {
+    // The requested language is negotiated from the request (e.g. the URL
+    // prefix). The rendered language is the translation the entity actually
+    // loaded as; it falls back to the default when the requested language
+    // has no translation. They differ on `/de/page/1` when the page has no
+    // German translation: requested `de`, rendered `en`.
+    $requested_langcode = $this->languageManager
+      ->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)
+      ->getId();
+    $rendered_langcode = $entity->language()->getId();
+    $translations = [];
+    if ($entity instanceof TranslatableInterface) {
+      // JsComponent::renderComponent() bubbles these dependencies before
+      // hook_js_settings_alter() attaches the data during asset rendering.
+      $translations = EntityTranslationMetadata::build(
+        $entity,
+        $this->languageManager,
+        $requested_langcode,
+        static fn (EntityInterface $translation, LanguageInterface $language): string => $translation
+          ->toUrl('canonical', ['language' => $language])
+          ->toString(),
+        cacheability: $cacheability,
+      );
+    }
+    return [
+      self::V0 => [
+        'mainEntity' => [
+          'bundle' => $entity->bundle(),
+          'entityTypeId' => $entity->getEntityTypeId(),
+          'uuid' => $entity->uuid(),
+          'requestedLanguage' => $requested_langcode,
+          'renderedLanguage' => $rendered_langcode,
+          'translations' => $translations,
+        ],
+      ],
+    ];
   }
 
 }
