@@ -58,17 +58,16 @@ Start applications render it in the root route from loader data). Without
 configuration an outer `JsonApiClientProvider` is inherited, and without that
 the hook reports the missing provider. In the browser the client sends requests
 through the application's same-origin proxy. Server rendering creates its own
-client from the same configuration. Adapters whose server rendering runs inside
-the request pass `jsonApiFetch`, a request-aware transport that answers the
-client's proxy-mapped requests in-process with the current request's draft
-session (TanStack Start does this), so the hook returns the same non-null,
-draft-aware client on both sides of hydration and SWR fallback data renders into
-the initial HTML without a hydration mismatch; credentials never cross the
-server/client boundary. Without such a transport, public rendering gets a
-direct, unauthenticated client, and a live draft session gets no client, so
-draft rendering never falls back to published content. Data needed in the
-initial HTML is prefetched with the SDK's `getClient()` and supplied as SWR
-fallback data (see `@drupal-canvas/headless`).
+client from the same configuration: public rendering gets a direct,
+unauthenticated client; a live draft session gets the same non-null, draft-aware
+client the browser gets, so SWR keys stay enabled, prefetched fallback data
+renders into the initial HTML, and hydration does not mismatch — but that client
+performs no network requests. Draft data is not fetched during server rendering:
+a request made while rendering fails with `ServerRenderingDraftFetchError`,
+which names the fix. Prefetch draft data on the server with the SDK's
+`getClient()` and supply it as SWR fallback data (see
+`@drupal-canvas/headless`); SWR fetches in the browser after hydration, through
+the proxy. This contract is the same for every React adapter.
 
 Named Canvas slots become React props with rendered `ReactNode` values; a
 `default` slot becomes `children`. Drupal markup strings are inserted as trusted

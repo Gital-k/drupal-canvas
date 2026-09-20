@@ -15,6 +15,7 @@ export {
 } from './draft-session';
 export {
   CanvasComponentTree,
+  ServerRenderingDraftFetchError,
   type CanvasComponentRegistry,
   type CanvasComponentTreeProps,
 } from './canvas-component-tree';
