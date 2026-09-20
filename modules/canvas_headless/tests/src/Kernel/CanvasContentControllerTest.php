@@ -168,14 +168,20 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     ] as $account) {
       $this->setCurrentAccount($account);
       $result = $this->renderPage($page);
-      self::assertSame('Stored title', self::responseData($result)['head']['title']);
+      $data = self::responseData($result);
+      self::assertSame('Stored title', $data['head']['title']);
+      // The context describes the same entity as the head and the content.
+      self::assertSame('Stored title', $data['context']['page']['pageTitle']);
       self::assertNotContains(AutoSaveManager::CACHE_TAG, $result->getCacheableMetadata()->getCacheTags());
       self::assertContains('oauth2_scopes', $result->getCacheableMetadata()->getCacheContexts());
     }
 
     $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE));
     $result = $this->renderPage($page);
-    self::assertSame('Auto-saved title', self::responseData($result)['head']['title']);
+    $data = self::responseData($result);
+    self::assertSame('Auto-saved title', $data['head']['title']);
+    self::assertSame('Auto-saved title', $data['context']['page']['pageTitle']);
+    self::assertSame($page->uuid(), $data['context']['page']['mainEntity']['uuid']);
     self::assertContains(AutoSaveManager::CACHE_TAG, $result->getCacheableMetadata()->getCacheTags());
     self::assertContains('oauth2_scopes', $result->getCacheableMetadata()->getCacheContexts());
   }
@@ -229,6 +235,31 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertContains('canvas_page:' . $page->id(), $response->getCacheableMetadata()->getCacheTags());
     self::assertContains('canvas_page_view', $response->getCacheableMetadata()->getCacheTags());
     self::assertContains('url', $response->getCacheableMetadata()->getCacheContexts());
+    // The page and site context for the `drupal-canvas` context hooks.
+    self::assertSame('Stored title', $data['context']['page']['pageTitle']);
+    self::assertSame([['key' => '<front>', 'text' => 'Home', 'url' => '/']], $data['context']['page']['breadcrumbs']);
+    self::assertSame([
+      'bundle' => 'canvas_page',
+      'entityTypeId' => 'canvas_page',
+      'uuid' => $page->uuid(),
+      'requestedLanguage' => 'en',
+      'renderedLanguage' => 'en',
+      'translations' => [],
+    ], $data['context']['page']['mainEntity']);
+    self::assertSame([
+      'branding' => [
+        'homeUrl' => '/user/login',
+        'siteName' => '',
+        'siteSlogan' => '',
+      ],
+      'baseUrl' => 'http://localhost',
+      'themeAssets' => [
+        'logo' => ['url' => ''],
+        'favicon' => ['url' => '', 'mimeType' => ''],
+      ],
+    ], $data['context']['site']);
+    self::assertContains('config:system.site', $response->getCacheableMetadata()->getCacheTags());
+    self::assertContains('url.site', $response->getCacheableMetadata()->getCacheContexts());
 
     $page->setComponentTree([])->save();
     $empty_response = $this->renderPage($page);
@@ -906,6 +937,26 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
         'managedByCanvas' => FALSE,
         'entity' => NULL,
       ],
+      // Routes without a primary entity still carry page and site context.
+      'context' => [
+        'page' => [
+          'pageTitle' => 'Log in',
+          'breadcrumbs' => [],
+          'mainEntity' => NULL,
+        ],
+        'site' => [
+          'branding' => [
+            'homeUrl' => '/user/login',
+            'siteName' => '',
+            'siteSlogan' => '',
+          ],
+          'baseUrl' => 'http://localhost',
+          'themeAssets' => [
+            'logo' => ['url' => ''],
+            'favicon' => ['url' => '', 'mimeType' => ''],
+          ],
+        ],
+      ],
     ], self::responseData($without_entity));
 
     $node = Node::create([
@@ -1062,6 +1113,10 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       'fr',
       $data['route']['entity']['langcode'],
     );
+    // The context follows the selected translation's auto-save too.
+    self::assertSame('French draft title', $data['context']['page']['pageTitle']);
+    self::assertSame('fr', $data['context']['page']['mainEntity']['requestedLanguage']);
+    self::assertSame('fr', $data['context']['page']['mainEntity']['renderedLanguage']);
   }
 
   /**
