@@ -57,15 +57,27 @@ export interface CanvasComponentTreeProps {
    * configuration, an outer `JsonApiClientProvider` is inherited; otherwise
    * the hook reports the missing provider.
    *
-   * Server rendering: this client component cannot reach the request's
-   * draft session (only serializable props cross the server/client boundary
-   * and credentials are never serialized). For public rendering it creates
-   * a direct, unauthenticated client. In a live draft session it creates no
-   * client, so a component that fetches during rendering can never receive
-   * public content masquerading as a draft; prefetch draft data with the
-   * SDK's `getClient()` and supply it as SWR fallback data instead.
+   * Server rendering creates its own client from the same configuration.
+   * With `jsonApiFetch` it uses the current request's session through that
+   * transport; without a transport, public rendering gets a direct,
+   * unauthenticated client, and a live draft session gets no client, so a
+   * component fetching during rendering can never receive public content
+   * masquerading as a draft (SWR fallback data then stays unused during
+   * server rendering — see `jsonApiFetch`).
    */
   jsonApi?: JsonApiRuntimeConfig;
+  /**
+   * Fetch implementation for the client created from `jsonApi`. Framework
+   * adapters whose server rendering runs inside the request (TanStack Start)
+   * supply a request-aware transport here: it answers the client's
+   * proxy-mapped requests in-process with the current request's draft
+   * session, so the server-rendered client is the same non-null,
+   * draft-aware client the browser gets, without serializing credentials.
+   * The generic renderer never imports server code; the transport is the
+   * adapter's. In the browser, omit it (the default `fetch` goes through the
+   * proxy).
+   */
+  jsonApiFetch?: typeof fetch;
 }
 
 interface CanvasElementProps {
@@ -86,10 +98,11 @@ export function CanvasComponentTree({
   components,
   context,
   jsonApi,
+  jsonApiFetch,
 }: CanvasComponentTreeProps) {
   const rendered = <CanvasTreeContent tree={tree} components={components} />;
   const withClient = (
-    <CanvasTreeClientProvider jsonApi={jsonApi}>
+    <CanvasTreeClientProvider jsonApi={jsonApi} jsonApiFetch={jsonApiFetch}>
       {rendered}
     </CanvasTreeClientProvider>
   );
@@ -104,14 +117,16 @@ export function CanvasComponentTree({
 
 /**
  * Creates the JSON:API client for the tree from the runtime configuration,
- * reusing it while the configuration stays unchanged. Without configuration
- * an outer provider is inherited.
+ * reusing it while the configuration and transport stay unchanged. Without
+ * configuration an outer provider is inherited.
  */
 function CanvasTreeClientProvider({
   jsonApi: explicitConfig,
+  jsonApiFetch,
   children,
 }: {
   jsonApi?: JsonApiRuntimeConfig;
+  jsonApiFetch?: typeof fetch;
   children: ReactNode;
 }) {
   const runtimeConfig = useJsonApiRuntimeConfig();
@@ -127,12 +142,22 @@ function CanvasTreeClientProvider({
     if (typeof window !== 'undefined') {
       // Browser: through the application's same-origin proxy, which
       // authenticates from the session cookie.
-      return createJsonApiClient({ ...jsonApi, credentials: 'same-origin' });
+      return createJsonApiClient({
+        ...jsonApi,
+        credentials: 'same-origin',
+        fetch: jsonApiFetch,
+      });
+    }
+    if (jsonApiFetch) {
+      // Server rendering with the adapter's request-aware transport: the
+      // same proxy-mapped, draft-aware requests, answered in-process with the
+      // current request's session.
+      return createJsonApiClient({ ...jsonApi, fetch: jsonApiFetch });
     }
     if (jsonApi.preview) {
-      // Server rendering in a live draft session: no request-aware client
-      // can be created here (see the jsonApi prop), and a public client
-      // would let draft rendering silently fall back to published content.
+      // Server rendering in a live draft session without a transport: no
+      // request-aware client exists here, and a public client would let
+      // draft rendering silently fall back to published content.
       return null;
     }
     // Server rendering of public content: direct, unauthenticated.
@@ -144,7 +169,7 @@ function CanvasTreeClientProvider({
     });
     // The serialized configuration is the identity of the client.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, jsonApiFetch]);
   if (client === null || (hasOuterClient && !jsonApi)) {
     return <>{children}</>;
   }
