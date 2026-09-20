@@ -559,6 +559,173 @@ describe('Pull Command', () => {
     });
   });
 
+  describe('getter migration codemod', () => {
+    let tmpDir: string;
+
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'pull-codemod-'));
+    });
+
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    const getterComponent = (machineName: string, source: string): Component =>
+      ({ ...mockComponent(machineName), sourceCodeJs: source }) as Component;
+
+    const safeSource = `import { getPageData } from 'drupal-canvas';
+
+export default function Title() {
+  const { pageTitle } = getPageData();
+  return <h1>{pageTitle}</h1>;
+}
+`;
+    const unsafeSource = `import { getPageData } from 'drupal-canvas';
+
+export default function Crumbs({ show }) {
+  if (!show) {
+    return null;
+  }
+  const { breadcrumbs } = getPageData();
+  return <nav>{breadcrumbs.length}</nav>;
+}
+`;
+
+    it('plans and applies conversions when both gates pass', async () => {
+      const api = {
+        listComponents: vi.fn().mockResolvedValue({
+          a: getterComponent('title', safeSource),
+          b: getterComponent('crumbs', unsafeSource),
+          c: mockComponent('plain'),
+        }),
+      } as unknown as ApiService;
+      const task = createComponentsPullTask(api, tmpDir, false, {
+        supported: true,
+        reasons: [],
+      });
+
+      const { summaryLines } = await task.prepare();
+      expect(summaryLines).toEqual([
+        'Components: 3 pull (3 new)',
+        'Components: 1 getter migration to context hooks',
+        '  title: getPageData() → usePageContext()',
+      ]);
+
+      const outcome = await task.execute();
+      const written = await fs.readFile(
+        path.join(tmpDir, 'title', 'index.tsx'),
+        'utf-8',
+      );
+      expect(written).toContain(
+        "import { usePageContext } from 'drupal-canvas';",
+      );
+      expect(written).toContain('const { pageTitle } = usePageContext();');
+      expect(
+        await fs.readFile(path.join(tmpDir, 'crumbs', 'index.tsx'), 'utf-8'),
+      ).toBe(unsafeSource);
+      expect(
+        outcome.results.find((r) => r.itemName === 'title')?.details,
+      ).toEqual([{ content: 'Migrated getPageData() → usePageContext()' }]);
+      expect(
+        outcome.results.find((r) => r.itemName === 'crumbs')?.details?.[0]
+          ?.content,
+      ).toContain(
+        'Not migrated: `getPageData()` is called after a possible early return',
+      );
+      expect(outcome.notes).toEqual([
+        expect.stringContaining('not migrated automatically): crumbs'),
+        expect.stringContaining('Migration prompt for AI agents:'),
+        expect.stringContaining('nullable results'),
+      ]);
+    });
+
+    it('converts nothing further on a second pull', async () => {
+      const api = {
+        listComponents: vi.fn().mockResolvedValue({
+          a: getterComponent('title', safeSource),
+        }),
+      } as unknown as ApiService;
+      const first = createComponentsPullTask(api, tmpDir, false, {
+        supported: true,
+        reasons: [],
+      });
+      await first.prepare();
+      await first.execute();
+      const migrated = await fs.readFile(
+        path.join(tmpDir, 'title', 'index.tsx'),
+        'utf-8',
+      );
+
+      const secondApi = {
+        listComponents: vi.fn().mockResolvedValue({
+          a: getterComponent('title', migrated),
+        }),
+      } as unknown as ApiService;
+      const second = createComponentsPullTask(secondApi, tmpDir, false, {
+        supported: true,
+        reasons: [],
+      });
+      const { summaryLines } = await second.prepare();
+      expect(summaryLines).toEqual(['Components: 1 pull (1 existing)']);
+      const outcome = await second.execute();
+      expect(outcome.notes).toBeUndefined();
+      expect(
+        await fs.readFile(path.join(tmpDir, 'title', 'index.tsx'), 'utf-8'),
+      ).toBe(migrated);
+    });
+
+    it('keeps sources unchanged and reports the limitation when a gate fails', async () => {
+      const api = {
+        listComponents: vi.fn().mockResolvedValue({
+          a: getterComponent('title', safeSource),
+        }),
+      } as unknown as ApiService;
+      const task = createComponentsPullTask(api, tmpDir, false, {
+        supported: false,
+        reasons: ['the site does not advertise context-hook support'],
+      });
+      const { summaryLines } = await task.prepare();
+      expect(summaryLines).toEqual(['Components: 1 pull (1 new)']);
+      const outcome = await task.execute();
+      expect(
+        await fs.readFile(path.join(tmpDir, 'title', 'index.tsx'), 'utf-8'),
+      ).toBe(safeSource);
+      expect(outcome.notes?.[0]).toContain('left unchanged');
+      expect(outcome.notes?.[1]).toContain('does not advertise');
+      expect(outcome.notes?.[2]).toContain('Migration prompt for AI agents:');
+    });
+
+    it('never touches files protected by skipOverwrite', async () => {
+      const dir = path.join(tmpDir, 'title');
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(
+        path.join(dir, 'component.yml'),
+        yaml.dump({ name: 'title', machineName: 'title', status: true }),
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(dir, 'index.jsx'),
+        'export default () => null;',
+        'utf-8',
+      );
+      const api = {
+        listComponents: vi.fn().mockResolvedValue({
+          a: getterComponent('title', safeSource),
+        }),
+      } as unknown as ApiService;
+      const task = createComponentsPullTask(api, tmpDir, true, {
+        supported: true,
+        reasons: [],
+      });
+      const { summaryLines } = await task.prepare();
+      expect(summaryLines).toEqual(['Components: 1 pull (1 existing)']);
+      await task.execute();
+      expect(await fs.readFile(path.join(dir, 'index.jsx'), 'utf-8')).toBe(
+        'export default () => null;',
+      );
+    });
+  });
+
   describe('createAssetsPullTask', () => {
     let tmpDir: string;
     let globalCssPath: string;
