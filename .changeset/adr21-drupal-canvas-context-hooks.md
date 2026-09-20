@@ -16,3 +16,11 @@ React-based headless frontends.
   They keep working in Drupal-rendered Code Components and Canvas Workbench
   previews and throw an actionable migration error elsewhere.
 - `Region` and `RegionsProvider` are deprecated in favor of page variants.
+
+The shared client treats a 401 answered to an authenticated direct request as
+a rejected session (`DraftSessionError`), caches authenticated responses only
+with an explicit session-unique `cacheScope`, keeps the applicable read
+options (locale, sparse fieldsets, includes, an explicit resource version)
+for working-copy item reads and merges their included resources, and accepts
+`apiUrl` for JSON:API served from a separate base URL while the Decoupled
+Router stays on `baseUrl`.

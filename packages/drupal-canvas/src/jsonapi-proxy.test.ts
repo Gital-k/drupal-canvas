@@ -109,6 +109,67 @@ describe('proxy path resolution', () => {
     ).toBeNull();
   });
 
+  it('keeps supporting endpoints on the backend with a separate JSON:API base', () => {
+    const options = {
+      baseUrl: 'https://drupal.example/site',
+      proxyUrl: '/api/canvas/jsonapi',
+      apiUrl: 'https://api.example/drupal/api/',
+    };
+    expect(
+      mapJsonApiRequestToProxy(
+        'https://api.example/de/drupal/api/node/article?page[limit]=5',
+        options,
+      ),
+    ).toBe('/api/canvas/jsonapi/de/drupal/api/node/article?page[limit]=5');
+    expect(
+      mapProxyPathToUpstream(
+        '/api/canvas/jsonapi/de/drupal/api/node/article',
+        options,
+      ),
+    ).toEqual({
+      url: 'https://api.example/de/drupal/api/node/article',
+      endpoint: 'jsonapi',
+    });
+    expect(
+      mapJsonApiRequestToProxy(
+        'https://drupal.example/site/router/translate-path?path=/about',
+        options,
+      ),
+    ).toBe('/api/canvas/jsonapi/router/translate-path?path=/about');
+    expect(
+      mapProxyPathToUpstream(
+        '/api/canvas/jsonapi/router/translate-path',
+        options,
+      ),
+    ).toEqual({
+      url: 'https://drupal.example/site/router/translate-path',
+      endpoint: 'router',
+    });
+    // The backend's own prefix and the JSON:API host's other paths are
+    // outside the boundary.
+    expect(() =>
+      mapJsonApiRequestToProxy(
+        'https://drupal.example/site/jsonapi/node/article',
+        options,
+      ),
+    ).toThrowError(/not a supported/);
+    expect(() =>
+      mapJsonApiRequestToProxy(
+        'https://api.example/router/translate-path',
+        options,
+      ),
+    ).toThrowError(/not a supported/);
+    expect(
+      mapProxyPathToUpstream(
+        '/api/canvas/jsonapi/jsonapi/node/article',
+        options,
+      ),
+    ).toBeNull();
+    expect(
+      mapJsonApiRequestToProxy('https://cdn.example/image.png', options),
+    ).toBeNull();
+  });
+
   it('maps upstream URLs to the proxy and back', () => {
     const options = {
       baseUrl: 'https://drupal.example',
