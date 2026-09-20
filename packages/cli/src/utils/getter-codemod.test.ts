@@ -85,8 +85,111 @@ export default function Title() {
 `;
     const result = migrateGetterCalls(source, 'index.jsx');
     expect(result.changed).toBe(true);
-    expect(result.source).toContain('const page = drupal.usePageContext();');
-    expect(result.source).not.toContain('import { usePageContext }');
+    // The hooks are root exports only; the member call becomes a plain hook
+    // call with a named import, which the data dependency detection sees.
+    expect(result.source).toContain('const page = usePageContext();');
+    expect(result.source).toContain(
+      "import { usePageContext } from 'drupal-canvas';",
+    );
+    expect(result.source).toContain("import * as drupal from 'drupal-canvas';");
+    expect(result.source).not.toContain('drupal.usePageContext');
+  });
+
+  it('converts namespace calls on the legacy helper modules to root hook imports', () => {
+    const source = `import * as utils from '@/lib/drupal-utils';
+
+export default function Title() {
+  const page = utils.getPageData();
+  return <h1>{page.pageTitle}</h1>;
+}
+`;
+    const result = migrateGetterCalls(source, 'index.jsx');
+    expect(result.changed).toBe(true);
+    expect(result.source).toContain('const page = usePageContext();');
+    expect(result.source).toContain(
+      "import { usePageContext } from 'drupal-canvas';",
+    );
+    expect(result.source).not.toContain('utils.usePageContext');
+  });
+
+  it('reuses an existing hook import instead of importing it twice', () => {
+    const source = `import { usePageContext } from 'drupal-canvas';
+import { getPageData } from '@/lib/drupal-utils';
+
+export default function Title() {
+  const page = getPageData();
+  const again = usePageContext();
+  return <h1>{page.pageTitle}{again.pageTitle}</h1>;
+}
+`;
+    const result = migrateGetterCalls(source, 'index.jsx');
+    expect(result.changed).toBe(true);
+    expect(result.source.match(/usePageContext/g)).toHaveLength(3);
+    expect(result.source).toContain(
+      "import { usePageContext } from 'drupal-canvas';",
+    );
+    expect(result.source).not.toContain('usePageContext, usePageContext');
+    expect(result.source).not.toContain('drupal-utils');
+  });
+
+  it('leaves a file unchanged when a local declaration shadows the namespace import', () => {
+    const source = `import * as drupal from 'drupal-canvas';
+
+export default function Title({ drupal }) {
+  const page = drupal.getPageData();
+  return <h1>{page.pageTitle}</h1>;
+}
+`;
+    const result = migrateGetterCalls(source, 'index.jsx');
+    expect(result.changed).toBe(false);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('`drupal` is declared more than once'),
+    ]);
+  });
+
+  it('leaves a file unchanged when the namespace is used in an unverifiable way', () => {
+    const computed = `import * as drupal from 'drupal-canvas';
+
+export default function Title() {
+  const page = drupal['getPageData']();
+  return <h1>{page.pageTitle}</h1>;
+}
+`;
+    expect(migrateGetterCalls(computed, 'index.jsx').changed).toBe(false);
+    const asValue = `import * as drupal from 'drupal-canvas';
+
+const api = drupal;
+export default function Title() {
+  const page = drupal.getPageData();
+  return <h1>{page.pageTitle}{api.getSiteData().branding.siteName}</h1>;
+}
+`;
+    const result = migrateGetterCalls(asValue, 'index.jsx');
+    expect(result.changed).toBe(false);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('cannot be verified'),
+    ]);
+  });
+
+  it('does not treat arbitrary call wrappers as components', () => {
+    const source = `import { getPageData } from 'drupal-canvas';
+import { registerCallback } from './registry';
+
+const Data = registerCallback(() => getPageData());
+export default Data;
+`;
+    const result = migrateGetterCalls(source, 'index.jsx');
+    expect(result.changed).toBe(false);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('not a component or custom hook'),
+    ]);
+    const wrapped = `import React from 'react';
+import { getPageData } from 'drupal-canvas';
+
+const Title = React.memo(() => <h1>{getPageData().pageTitle}</h1>);
+export default Title;
+`;
+    expect(migrateGetterCalls(wrapped, 'index.jsx').changed).toBe(true);
   });
 
   it('converts both getters and keeps a diagnostic for the client constructor', () => {
