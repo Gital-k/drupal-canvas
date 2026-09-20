@@ -305,6 +305,11 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
         $value .= '.draft';
       }
     });
+    if ($is_preview) {
+      // Previews mark code component islands for the client renderer.
+      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+      $expectation['expected_renderable'] = self::markIslandsAsPreview($expectation['expected_renderable']);
+    }
 
     // Add slot placeholders to the expected renderable array.
     $expectation['expected_renderable'] = self::addSlotPlaceholders($expectation['expected_renderable']);
@@ -312,6 +317,18 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
     $expectation['expected_html'] = preg_replace('#(<div class="canvas--slot-empty-placeholder">.*?</div>)(.*?)(?=<!--)#', '<div class="canvas--slot-empty-placeholder"></div>', $expectation['expected_html']);
 
     return $expectation;
+  }
+
+  private static function markIslandsAsPreview(array $renderable): array {
+    if (($renderable['#type'] ?? NULL) === 'astro_island') {
+      $renderable['#attributes'] = ['data-canvas-preview' => 'true'];
+    }
+    foreach ($renderable as $key => $value) {
+      if (\is_array($value)) {
+        $renderable[$key] = self::markIslandsAsPreview($value);
+      }
+    }
+    return $renderable;
   }
 
   public static function overwriteRenderableExpectations(array $expectation, array $overwrites): array {
@@ -1309,6 +1326,7 @@ HTML,
                                       '#prefix' => Markup::create('<!-- canvas-start-2f57ba57-f32a-4a7b-9896-9d1104b446f1 -->'),
                                       '#suffix' => Markup::create('<!-- canvas-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 -->'),
                                       '#uuid' => '2f57ba57-f32a-4a7b-9896-9d1104b446f1',
+                                      '#attributes' => [],
                                     ],
                                   ],
                                   'b4bc6c8f-66f7-458a-99a9-41c29b2801e7' => [
@@ -1386,6 +1404,7 @@ HTML,
                                       '#prefix' => Markup::create('<!-- canvas-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 -->'),
                                       '#suffix' => Markup::create('<!-- canvas-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 -->'),
                                       '#uuid' => 'b4bc6c8f-66f7-458a-99a9-41c29b2801e7',
+                                      '#attributes' => [],
                                     ],
                                   ],
                                   '9f09ecd8-ec65-408c-b5c8-ef036e6aeb97' => [
