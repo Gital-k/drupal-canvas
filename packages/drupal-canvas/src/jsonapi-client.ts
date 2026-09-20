@@ -467,4 +467,21 @@ class LegacyJsonApiClient extends CanvasJsonApiClient {
 }
 
 export * from '@drupal-api-client/json-api-client';
+export {
+  DEFAULT_JSONAPI_PREFIX,
+  DEFAULT_ROUTER_PREFIX,
+  isSafeProxyPath,
+  JSONAPI_DRAFT_SESSION_EXPIRED_ERROR,
+  JSONAPI_PROXY_SESSION_EXPIRED,
+  JSONAPI_PROXY_SESSION_HEADER,
+  mapJsonApiRequestToProxy,
+  mapProxyPathToUpstream,
+  normalizeBaseUrl,
+  resolveJsonApiProxyPath,
+  toBackendRelativePath,
+  trimSlashes,
+  type JsonApiProxyEndpointName,
+  type JsonApiProxyEndpoints,
+  type ResolvedJsonApiProxyPath,
+} from './jsonapi-proxy.js';
 export { LegacyJsonApiClient as JsonApiClient };
