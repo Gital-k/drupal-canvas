@@ -2,9 +2,10 @@
 
 /**
  * Server rendering of a live draft session with SWR fallback data, then
- * browser hydration of that HTML: the request-aware client created on the
+ * browser hydration of that HTML: the draft-aware client created on the
  * server keeps the SWR key enabled, so the fallback renders on both sides
- * and hydration does not mismatch (ADR 21, "Server rendering and SWR").
+ * and hydration does not mismatch, while draft data is never fetched during
+ * server rendering (ADR 21, "Server rendering and SWR").
  */
 
 import { act } from 'react';
@@ -14,7 +15,10 @@ import { renderToString } from 'react-dom/server';
 import useSWR, { SWRConfig } from 'swr';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { CanvasComponentTree } from './canvas-component-tree';
+import {
+  CanvasComponentTree,
+  ServerRenderingDraftFetchError,
+} from './canvas-component-tree';
 
 import type { CanvasContext, JsonApiRuntimeConfig } from 'drupal-canvas';
 
@@ -60,7 +64,7 @@ function ArticleTitle() {
 
 const tree = { element: 'js-article', props: { canvasUuid: 'article' } };
 
-function App({ jsonApiFetch }: { jsonApiFetch?: typeof fetch }) {
+function App() {
   return (
     <SWRConfig
       value={{
@@ -74,7 +78,6 @@ function App({ jsonApiFetch }: { jsonApiFetch?: typeof fetch }) {
         components={{ article: ArticleTitle }}
         context={context}
         jsonApi={draftRuntime}
-        jsonApiFetch={jsonApiFetch}
       />
     </SWRConfig>
   );
@@ -98,20 +101,18 @@ describe('draft server rendering with SWR fallback and hydration', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders the fallback on the server through a request-aware client and hydrates without mismatch', async () => {
+  it('renders the fallback on the server through a non-null draft client and hydrates without mismatch', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // Server: the adapter's transport answers in-process. It is not called
-    // during rendering (SWR reads the fallback), but the client exists and
-    // is wired to it.
-    const serverTransport = vi.fn<typeof fetch>(async () =>
-      jsonApiResponse('Draft article from the server'),
-    );
-    const html = renderOnServer(<App jsonApiFetch={serverTransport} />);
+    // Server: the client exists (the SWR key stays enabled) and SWR reads the
+    // fallback; no network request is made.
+    const serverFetch = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', serverFetch);
+    const html = renderOnServer(<App />);
     expect(html).toContain('Draft article');
     expect(html).not.toContain('Loading');
-    expect(serverTransport).not.toHaveBeenCalled();
+    expect(serverFetch).not.toHaveBeenCalled();
     expect(
       warn.mock.calls.map(([message]) => String(message)),
     ).not.toContainEqual(expect.stringContaining('useJsonApiClient()'));
@@ -150,14 +151,19 @@ describe('draft server rendering with SWR fallback and hydration', () => {
     expect(init?.credentials).toBe('same-origin');
   });
 
-  it('sends server-side requests through the adapter transport with draft semantics', async () => {
+  it('refuses draft network requests during server rendering with an actionable error', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const serverTransport = vi.fn<typeof fetch>(async () =>
-      jsonApiResponse('Draft article from the server'),
-    );
+    const serverFetch = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', serverFetch);
     let pending: Promise<Article> | undefined;
     function Fetcher() {
       const client = useJsonApiClient();
+      // Non-null: the same configuration as the browser client.
+      expect(client?.runtimeConfig).toMatchObject({
+        proxyUrl: '/api/canvas/jsonapi',
+        resourceVersion: 'rel:working-copy',
+        preview: true,
+      });
       pending = client?.getResource('node--article', 'a') as
         | Promise<Article>
         | undefined;
@@ -169,16 +175,13 @@ describe('draft server rendering with SWR fallback and hydration', () => {
         components={{ article: Fetcher }}
         context={context}
         jsonApi={draftRuntime}
-        jsonApiFetch={serverTransport}
       />,
     );
     expect(pending).toBeDefined();
-    await expect(pending).resolves.toMatchObject({
-      title: 'Draft article from the server',
-    });
-    expect(serverTransport).toHaveBeenCalledTimes(1);
-    expect(String(serverTransport.mock.calls[0][0])).toMatch(
-      /^\/api\/canvas\/jsonapi\/jsonapi\/node\/article\/a\?.*resourceVersion=rel(%3A|:)working-copy/,
+    await expect(pending).rejects.toBeInstanceOf(
+      ServerRenderingDraftFetchError,
     );
+    await expect(pending).rejects.toThrow(/getClient\(\)/);
+    expect(serverFetch).not.toHaveBeenCalled();
   });
 });
