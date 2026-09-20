@@ -161,7 +161,9 @@ Configuration: `CANVAS_SITE_URL` is the backend; the JSON:API prefix is
 discovered from `/canvas/api/v0/site-data`, with `CANVAS_JSONAPI_PREFIX` as the
 fallback; `CANVAS_JSONAPI_URL` sets the full upstream JSON:API base URL and
 takes precedence over discovery for JSON:API requests only — the supporting
-endpoints (Decoupled Router path translation) stay on `CANVAS_SITE_URL`.
+endpoints (Decoupled Router path translation) stay on `CANVAS_SITE_URL`. An
+override under `CANVAS_SITE_URL` is a prefix (a language prefix goes between the
+site path and it); an override on another site accepts no language prefix.
 
 ### Server rendering and SWR
 
