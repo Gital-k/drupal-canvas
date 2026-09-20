@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  buildIframeHtml,
   buildPreviewPayload,
   buildPreviewRuntimeEntrySource,
   bundleInteractivePreview,
@@ -134,6 +135,7 @@ describe('preview-payload', () => {
           return {
             js: 'console.log("interactive");',
             css: 'body{background:black;color:white;}',
+            siteData: null,
           };
         },
       },
@@ -203,6 +205,7 @@ describe('preview-payload', () => {
           return {
             js: 'console.log("interactive");',
             css: 'body{margin:0;}',
+            siteData: null,
           };
         },
       },
@@ -316,6 +319,7 @@ describe('preview-payload', () => {
           return {
             js: 'console.log("interactive-page");',
             css: '.page{display:block;}',
+            siteData: null,
           };
         },
       },
@@ -534,6 +538,51 @@ props:
     ]);
     expect(payload.errors[0]?.message).toContain(
       'components discovered under componentDir ("src/components")',
+    );
+  });
+
+  it('wraps generated previews in the drupal-canvas context providers', () => {
+    const source = buildPreviewRuntimeEntrySource({
+      spec: { root: 'root', elements: {} },
+      componentSources: [],
+      cssEntryPaths: [],
+    });
+    expect(source).toContain(
+      "import { CanvasContextProvider, JsonApiClientProvider, createJsonApiClient } from 'drupal-canvas';",
+    );
+    expect(source).toContain(
+      "import canvasSiteData from 'virtual:drupal-canvas/site-data';",
+    );
+    expect(source).toContain(
+      'const canvasContext = createWorkbenchContext(canvasSiteData, window.location.origin);',
+    );
+    expect(source).toContain(
+      'React.createElement(CanvasContextProvider, { context: canvasContext }, withClient)',
+    );
+    expect(source).toContain(
+      'page: { pageTitle: "", breadcrumbs: [], mainEntity: null }',
+    );
+  });
+
+  it('declares the Workbench runtime and site data in the bootstrap script', () => {
+    const html = buildIframeHtml(
+      'console.log("runtime");',
+      '',
+      { baseUrl: 'https://canvas.example.test', jsonapiPrefix: null },
+      {
+        baseUrl: 'https://canvas.example.test',
+        branding: { homeUrl: '/', siteName: 'Site', siteSlogan: '' },
+        jsonapiSettings: { apiPrefix: 'jsonapi' },
+      },
+    );
+    expect(html).toContain(
+      'window.__drupalCanvasRuntime = { environment: "workbench" };',
+    );
+    expect(html).toContain(
+      'for (const [key, value] of Object.entries({"branding":{"homeUrl":"/","siteName":"Site","siteSlogan":""},"jsonapiSettings":{"apiPrefix":"jsonapi"}}))',
+    );
+    expect(html).toContain(
+      'window.drupalSettings.canvasData.v0.baseUrl = canvasPreviewBaseUrl;',
     );
   });
 
