@@ -227,6 +227,43 @@ describe('JSON:API proxy', () => {
     ).toBe(404);
   });
 
+  it('localizes a foreign JSON:API override through its site base URL', async () => {
+    const { handler, fetchImpl } = makeHarness(
+      { enabled: false, draftData: null },
+      undefined,
+      {
+        baseUrl: 'https://drupal.example/sub',
+        jsonApiUrl: 'https://api.example/mount/api',
+        jsonApiSiteUrl: 'https://api.example/mount',
+        jsonApiProxyPath: '/api/canvas/jsonapi',
+      },
+    );
+    expect(
+      (await handler(proxyRequest('/api/canvas/jsonapi/fr/api/node/article')))
+        .status,
+    ).toBe(200);
+    expect(fetchImpl.mock.calls[0][0]).toBe(
+      'https://api.example/mount/fr/api/node/article',
+    );
+    expect(
+      (
+        await handler(
+          proxyRequest('/api/canvas/jsonapi/fr/router/translate-path?path=/x'),
+        )
+      ).status,
+    ).toBe(200);
+    expect(fetchImpl.mock.calls[1][0]).toBe(
+      'https://drupal.example/sub/fr/router/translate-path?path=/x',
+    );
+    expect(
+      (
+        await handler(
+          proxyRequest('/api/canvas/jsonapi/mount/api/node/article'),
+        )
+      ).status,
+    ).toBe(404);
+  });
+
   it('surfaces a rejected session token as a session error and keeps resource denials', async () => {
     const rejecting = makeHarness(
       { enabled: true, draftData: liveDraftData() },
