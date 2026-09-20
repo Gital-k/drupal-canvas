@@ -1,5 +1,10 @@
 import { act } from 'react';
 import {
+  useJsonApiClient,
+  usePageContext,
+  useSiteContext,
+} from 'drupal-canvas';
+import {
   defineComponentRegistry,
   renderSpec,
 } from 'drupal-canvas/json-render-utils';
@@ -31,6 +36,7 @@ vi.mock('@wb/lib/discovery-client', () => ({
     ],
     warnings: [],
     stats: { scannedFiles: 0, ignoredFiles: 0 },
+    componentSchemas: new Map(),
   }),
 }));
 
@@ -224,6 +230,56 @@ describe('PreviewFrameApp', () => {
     expect(renderSpecMock.mock.calls.at(-2)?.[0]).toBe(validSpec);
     expect(renderSpecMock.mock.calls.at(-1)?.[0]).toBe(pageTemplateSpec);
     expect(registry).toHaveProperty('marker.page_content');
+  });
+
+  it('supplies page and site context and a JSON:API client to previewed components', async () => {
+    const seen: Array<{
+      page: ReturnType<typeof usePageContext>;
+      site: ReturnType<typeof useSiteContext>;
+      client: ReturnType<typeof useJsonApiClient>;
+    }> = [];
+    function Probe() {
+      seen.push({
+        page: usePageContext(),
+        site: useSiteContext(),
+        client: useJsonApiClient(),
+      });
+      return null;
+    }
+    await act(async () => {
+      root = createRoot(container);
+      root.render(
+        <MemoryRouter>
+          <PreviewFrameApp />
+        </MemoryRouter>,
+      );
+    });
+
+    renderSpecMock.mockReturnValueOnce(<Probe />);
+    await dispatchRenderRequest(makeRequest('page-a', 'page'), renderSpecMock);
+
+    expect(seen.at(-1)?.page).toEqual({
+      pageTitle: '',
+      breadcrumbs: [],
+      mainEntity: null,
+    });
+    expect(seen.at(-1)?.site).toEqual({
+      branding: {
+        homeUrl: '/',
+        siteName: 'Workbench test site',
+        siteSlogan: '',
+      },
+      baseUrl: 'https://drupal.example',
+      themeAssets: {
+        logo: { url: 'https://drupal.example/logo.svg' },
+        favicon: {
+          url: 'https://drupal.example/favicon.ico',
+          mimeType: 'image/x-icon',
+        },
+      },
+    });
+    expect(seen.at(-1)?.client?.baseUrl).toBe('https://drupal.example');
+    expect(seen.at(-1)?.client?.apiPrefix).toBe('jsonapi');
   });
 
   it('posts shell-sync when an internal page link is clicked', async () => {
