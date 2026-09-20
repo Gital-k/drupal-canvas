@@ -18,3 +18,8 @@ export {
   type CanvasComponentRegistry,
   type CanvasComponentTreeProps,
 } from './canvas-component-tree';
+export {
+  JsonApiRuntimeProvider,
+  useJsonApiRuntimeConfig,
+  type JsonApiRuntimeProviderProps,
+} from './jsonapi-runtime';
