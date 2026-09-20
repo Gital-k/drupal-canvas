@@ -282,6 +282,68 @@ describe('PreviewFrameApp', () => {
     expect(seen.at(-1)?.client?.apiPrefix).toBe('jsonapi');
   });
 
+  it('re-renders the same target in place with fresh props, keeping component state', async () => {
+    // A mock edit reaches the mounted iframe as a new render request for the
+    // same render id: the component keeps its state, its props change.
+    const { useState } = await import('react');
+    function Counter({ title }: { title: string }) {
+      const [count, setCount] = useState(0);
+      return (
+        <button data-testid="counter" onClick={() => setCount(count + 1)}>
+          {title}:{count}
+        </button>
+      );
+    }
+    await act(async () => {
+      root = createRoot(container);
+      root.render(
+        <MemoryRouter>
+          <PreviewFrameApp />
+        </MemoryRouter>,
+      );
+    });
+    renderSpecMock.mockImplementationOnce(
+      (spec) =>
+        (
+          <Counter
+            key="counter"
+            title={String(spec.elements.root.props.title)}
+          />
+        ) as unknown as string,
+    );
+    const first = makeRequest('card:mock-1', 'component');
+    first.payload.spec = {
+      root: 'root',
+      elements: { root: { type: 'js.card', props: { title: 'Before' } } },
+    };
+    await dispatchRenderRequest(first, renderSpecMock);
+    const counter = () =>
+      container.querySelector('[data-testid="counter"]') as HTMLButtonElement;
+    expect(counter().textContent).toBe('Before:0');
+    await act(async () => {
+      counter().click();
+    });
+    expect(counter().textContent).toBe('Before:1');
+
+    renderSpecMock.mockImplementationOnce(
+      (spec) =>
+        (
+          <Counter
+            key="counter"
+            title={String(spec.elements.root.props.title)}
+          />
+        ) as unknown as string,
+    );
+    const second = makeRequest('card:mock-1', 'component');
+    second.payload.spec = {
+      root: 'root',
+      elements: { root: { type: 'js.card', props: { title: 'After' } } },
+    };
+    await dispatchRenderRequest(second, renderSpecMock);
+    // Same element, fresh props, state kept: no remount happened.
+    expect(counter().textContent).toBe('After:1');
+  });
+
   it('posts shell-sync when an internal page link is clicked', async () => {
     const postMessageSpy = vi.spyOn(window.parent, 'postMessage');
     await act(async () => {
