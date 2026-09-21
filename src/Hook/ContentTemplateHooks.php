@@ -31,7 +31,6 @@ final class ContentTemplateHooks {
     private readonly RouteMatchInterface $routeMatch,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityFieldManagerInterface $entityFieldManager,
-    private readonly ContentTemplateRepository $contentTemplateRepository,
   ) {
   }
 
@@ -69,14 +68,14 @@ final class ContentTemplateHooks {
    * Implements hook_entity_type_alter.
    */
   #[Hook('entity_type_alter')]
-  public function entityTypeAlter(array $definitions): void {
+  public static function entityTypeAlter(array $definitions): void {
     /** @var \Drupal\Core\Entity\EntityTypeInterface $entity_type */
     foreach ($definitions as $entity_type) {
       // Note: as soon as a ContentTemplate exists for a certain content entity
       // type + view mode, the original template will NOT be used anymore:
       // - not the view mode-specific one, such as `node--teaser.html.twig`
       // - not the generic one, such as `node.html.twig`
-      if ($this->contentTemplateRepository->isSupportedEntityType($entity_type)) {
+      if (ContentTemplateRepository::isSupportedEntityType($entity_type)) {
         // @see \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder::createInstance()
         $entity_type->setHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY, $entity_type->getViewBuilderClass())
           ->setViewBuilderClass(ContentTemplateAwareViewBuilder::class);

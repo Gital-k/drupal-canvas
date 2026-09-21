@@ -22,7 +22,6 @@ final class ContentTemplateEntityTypeConstraintValidator extends ConstraintValid
   use AutowireTrait;
 
   public function __construct(
-    private readonly ContentTemplateRepository $contentTemplateRepository,
     private readonly EntityTypeManagerInterface $entityTypeManager,
   ) {}
 
@@ -50,7 +49,7 @@ final class ContentTemplateEntityTypeConstraintValidator extends ConstraintValid
       return;
     }
 
-    if (!$this->contentTemplateRepository->isSupportedEntityType($entity_type)) {
+    if (!ContentTemplateRepository::isSupportedEntityType($entity_type)) {
       $this->context->buildViolation($constraint->message)
         ->setInvalidValue($value)
         ->addViolation();

@@ -26,7 +26,6 @@ final class FieldUiHooks {
     private readonly MessengerInterface $messenger,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     TranslationInterface $string_translation,
-    private readonly ContentTemplateRepository $contentTemplateRepository,
   ) {
     $this->setStringTranslation($string_translation);
   }
@@ -67,7 +66,7 @@ final class FieldUiHooks {
     $bundle = $display->getTargetBundle();
 
     $target_entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
-    if (!$this->contentTemplateRepository->isSupportedEntityType($target_entity_type)) {
+    if (!ContentTemplateRepository::isSupportedEntityType($target_entity_type)) {
       return;
     }
 

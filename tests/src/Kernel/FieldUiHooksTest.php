@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\canvas\ContentTemplateRepository;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Hook\FieldUiHooks;
 use Drupal\Component\Render\MarkupInterface;
@@ -140,7 +139,6 @@ final class FieldUiHooksTest extends CanvasKernelTestBase {
       $messenger,
       $this->container->get(EntityTypeManagerInterface::class),
       $this->container->get(TranslationInterface::class),
-      $this->container->get(ContentTemplateRepository::class),
     );
     $field_ui_hooks->formEntityViewDisplayEditFormAlter($form, $form_state);
   }
