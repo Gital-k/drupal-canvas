@@ -55,6 +55,7 @@ final class PageVariantSelectorSubscriber implements EventSubscriberInterface {
     $theme_config = $this->configFactory->get('system.theme');
     $admin_theme = (string) $theme_config->get('admin');
     $default_theme = (string) $theme_config->get('default');
+    $event->addCacheableDependency($theme_config);
     if ($admin_theme !== ''
       && $admin_theme !== $default_theme
       && $this->themeManager->getActiveTheme()->getName() === $admin_theme) {
