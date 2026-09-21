@@ -251,9 +251,11 @@ final class ApiConfigControllers extends ApiControllerBase {
       $additional_cacheability->getCacheTags(),
       function (string $tag) use ($individual_bundle_entity_cache_tag_prefixes_to_ignore) {
         foreach ($individual_bundle_entity_cache_tag_prefixes_to_ignore as $prefix) {
-          return !str_starts_with($tag, $prefix);
+          if (str_starts_with($tag, $prefix)) {
+            return FALSE;
+          }
         }
-        return FALSE;
+        return TRUE;
       }
     ));
 
