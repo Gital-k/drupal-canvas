@@ -42,7 +42,15 @@ export default defineConfig({
     dbUrl: process.env.DB_URL,
     defaultTheme: 'olivero',
     adminTheme: 'claro',
-    coreDir: process.env.DRUPAL_ROOT_CORE || getCoreDir(),
+    // DRUPAL_ROOT_CORE points at the core directory itself, and
+    // DRUPAL_TEST_DRUPAL_ROOT at the Drupal web root, matching
+    // @drupal/playwright. Either overrides the parent-directory search, so
+    // the checkout can live outside the Drupal tree.
+    coreDir:
+      process.env.DRUPAL_ROOT_CORE ||
+      (process.env.DRUPAL_TEST_DRUPAL_ROOT
+        ? `${process.env.DRUPAL_TEST_DRUPAL_ROOT}/core`
+        : getCoreDir()),
     testWebserverUser: process.env.DRUPAL_TEST_WEBSERVER_USER,
     args: minimist(process.argv),
     setupFile: path.resolve('../tests/src/TestSite/CanvasTestSetup.php'),

@@ -7,6 +7,14 @@ import { promisify } from 'util';
 const exec = promisify(execNode);
 
 export const getRootDir = (): string => {
+  // DRUPAL_TEST_DRUPAL_ROOT overrides the parent-directory search, matching
+  // @drupal/playwright, so the checkout can live outside the Drupal tree.
+  if (
+    process.env.DRUPAL_TEST_DRUPAL_ROOT &&
+    process.env.DRUPAL_TEST_DRUPAL_ROOT.length
+  ) {
+    return process.env.DRUPAL_TEST_DRUPAL_ROOT;
+  }
   let dir = process.cwd();
   let found = false;
   for (let i = 0; i < 15; i++) {

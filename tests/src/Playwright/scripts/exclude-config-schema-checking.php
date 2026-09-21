@@ -24,9 +24,15 @@ use Symfony\Component\Yaml\Yaml;
 
 // Locate and load the Composer autoloader by walking up from this script, so
 // the script works regardless of the working directory it is invoked from.
-$dir = __DIR__;
+// DRUPAL_TEST_DRUPAL_ROOT overrides the search, matching @drupal/playwright,
+// so the checkout can live outside the Drupal tree.
 $autoloader = NULL;
-for ($i = 0; $i < 15; $i++) {
+$drupal_root = getenv('DRUPAL_TEST_DRUPAL_ROOT');
+if (is_string($drupal_root) && $drupal_root !== '' && is_file($drupal_root . '/autoload.php')) {
+  $autoloader = $drupal_root . '/autoload.php';
+}
+$dir = __DIR__;
+for ($i = 0; $autoloader === NULL && $i < 15; $i++) {
   if (is_file($dir . '/autoload.php')) {
     $autoloader = $dir . '/autoload.php';
     break;

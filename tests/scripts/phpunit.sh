@@ -86,7 +86,10 @@ load_env_file ".env.defaults"
 set +a
 
 # Ensure test results can be written.
-DRUPAL_WEB_ROOT=$(realpath "$(pwd)/../../../")
+# DRUPAL_TEST_DRUPAL_ROOT overrides the assumption that the module lives at
+# <web-root>/modules/contrib/canvas, matching @drupal/playwright, so the
+# checkout can live outside the Drupal tree.
+DRUPAL_WEB_ROOT=$(realpath "${DRUPAL_TEST_DRUPAL_ROOT:-$(pwd)/../../../}")
 mkdir -p test-results
 if [ -n "$DRUPAL_TEST_WEBSERVER_USER" ]; then
   sudo chown "$DRUPAL_TEST_WEBSERVER_USER" test-results
@@ -110,7 +113,16 @@ for arg in "$@"; do
 done
 
 if [ -n "$PHPUNIT_DIRECT_FILE" ]; then
-  exec php "$DRUPAL_WEB_ROOT/vendor/bin/phpunit" --configuration "$(pwd)" "$PHPUNIT_DIRECT_FILE" "${PASSTHROUGH_ARGS[@]}"
+  PHPUNIT_BIN="$DRUPAL_WEB_ROOT/vendor/bin/phpunit"
+  # Sites with a nested docroot keep the vendor directory next to it.
+  if [ ! -f "$PHPUNIT_BIN" ]; then
+    PHPUNIT_BIN="$(realpath "$DRUPAL_WEB_ROOT/..")/vendor/bin/phpunit"
+  fi
+  # The bootstrap path in phpunit.xml.dist is relative to the module
+  # directory, so resolve it against the web root instead.
+  exec php "$PHPUNIT_BIN" --configuration "$(pwd)" \
+    --bootstrap "$DRUPAL_WEB_ROOT/core/tests/bootstrap.php" \
+    "$PHPUNIT_DIRECT_FILE" "${PASSTHROUGH_ARGS[@]}"
 fi
 
 DRUPAL_VERSION=$(sed -n "s/.*const VERSION = '\([^']*\)'.*/\1/p" "$DRUPAL_WEB_ROOT/core/lib/Drupal.php")
