@@ -172,8 +172,6 @@ export const MANIFEST_ENV_VARIABLE = 'CANVAS_COMPONENT_MANIFEST_JSON';
  *   silently.
  * - Watches local component definitions in development and updates the
  *   generated implementation registry when components are added or removed.
- * - Adds the SDK packages to `transpilePackages` (the adapter packages
- *   ship TypeScript source).
  * - Sends `Content-Security-Policy: frame-ancestors`, admitting the app
  *   itself and every origin named by CANVAS_EDITOR_ORIGINS (default: the
  *   origin of CANVAS_SITE_URL). Merged into the app's own `headers()` rules,
@@ -230,15 +228,6 @@ export function withCanvas(
       }
     }
 
-    const transpilePackages = [
-      ...new Set([
-        ...(config.transpilePackages ?? []),
-        '@drupal-canvas/headless',
-        '@drupal-canvas/headless-next',
-        '@drupal-canvas/headless-react',
-      ]),
-    ];
-
     const userHeaders = config.headers;
     const headers: NonNullable<NextConfig['headers']> = async () => {
       // When several rules match a path and set the same key, Next.js keeps
@@ -282,7 +271,6 @@ export function withCanvas(
 
     return {
       ...config,
-      transpilePackages,
       turbopack: {
         ...config.turbopack,
         resolveAlias: {
