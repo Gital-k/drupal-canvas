@@ -498,16 +498,15 @@ export function createComponentsPullTask(
                 .join(', ')}`,
             });
           }
+          const warnings =
+            migration?.warnings.map((warning) => `Not migrated: ${warning}`) ??
+            [];
           if (
             migration &&
-            (!migration.changed || migration.warnings.length > 0)
+            ((!migration.changed && migration.usesGetters) ||
+              migration.constructsClient)
           ) {
-            for (const warning of migration.warnings) {
-              details.push({ content: `Not migrated: ${warning}` });
-            }
-            if (!migration.changed && migration.usesGetters) {
-              notMigrated.push(remoteComponent.machineName);
-            }
+            notMigrated.push(remoteComponent.machineName);
           }
 
           if (discovered) {
@@ -549,6 +548,7 @@ export function createComponentsPullTask(
             itemName: component.machineName,
             success: true,
             ...(details.length > 0 && { details }),
+            ...(warnings.length > 0 && { warnings }),
           });
         } catch (error) {
           results.push({
@@ -582,7 +582,7 @@ export function createComponentsPullTask(
       }
       if (notMigrated.length > 0) {
         notes.push(
-          `Components still using getPageData()/getSiteData() (not migrated automatically): ${notMigrated.join(', ')}`,
+          `Components still using getPageData()/getSiteData()/new JsonApiClient() (not migrated automatically): ${notMigrated.join(', ')}`,
           `Migration prompt for AI agents: ${GETTER_MIGRATION_PROMPT}`,
         );
       }
