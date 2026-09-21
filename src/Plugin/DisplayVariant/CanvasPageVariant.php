@@ -175,10 +175,12 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
       ($is_preview ? '.draft' : '');
     $build['#attached']['library'][] = 'canvas/brand_kit.' . BrandKit::GLOBAL_ID .
       ($is_preview ? '.draft' : '');
-    // Both rendering paths depend on the site default selection. A change to
-    // it must invalidate the cached page.
-    // @see \Drupal\canvas\PageVariantResolver
-    $cacheability = CacheableMetadata::createFromObject($this->configFactory->get('canvas.settings'));
+    $cacheability = CacheableMetadata::createFromRenderArray($build)
+      ->addCacheableDependency($this)
+      // Both rendering paths depend on the site default selection. A change to
+      // it must invalidate the cached page.
+      // @see \Drupal\canvas\PageVariantResolver
+      ->addCacheableDependency($this->configFactory->get('canvas.settings'));
     if ($is_preview) {
       // A preview renders the negotiated language's translation override, so
       // its output varies by interface language. The override itself needs no
