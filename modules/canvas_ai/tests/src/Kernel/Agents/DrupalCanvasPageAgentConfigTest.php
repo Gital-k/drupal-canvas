@@ -86,12 +86,16 @@ final class DrupalCanvasPageAgentConfigTest extends CanvasKernelTestBase {
       $this->assertEmpty($agent->get('tool_settings')[$tool_id]['restrict_multiple_calls']);
     }
 
-    // The catalog is injected once on the first hop; the layout on every hop.
+    // Both information tools feed the system prompt on every hop. Neither is
+    // limited to a loop: a tool limited that way is appended to the chat
+    // history as a user message instead, which a history kept across turns
+    // would repeat on every turn.
+    // @see \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper::getDefaultInformationTools()
     $information_tools = Yaml::parse($agent->get('default_information_tools'));
     $catalog = $information_tools['available_components'];
     $this->assertSame('canvas_ai:get_component_context', $catalog['tool']);
     $this->assertSame(['catalog_only' => TRUE], $catalog['parameters']);
-    $this->assertSame([1], $catalog['available_on_loop']);
+    $this->assertArrayNotHasKey('available_on_loop', $catalog);
     $layout = $information_tools['current_layout'];
     $this->assertSame('canvas_ai:get_current_layout', $layout['tool']);
     $this->assertArrayNotHasKey('available_on_loop', $layout);
