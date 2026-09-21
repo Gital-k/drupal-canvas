@@ -7,7 +7,10 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ErrorBoundary from '@/components/error/ErrorBoundary';
 import ConflictWarning from '@/features/editor/ConflictWarning';
 import EditorFrame from '@/features/editorFrame/EditorFrame';
-import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
+import {
+  clearLatestError,
+  selectLatestError,
+} from '@/features/error-handling/queryErrorSlice';
 import { FORM_TYPES } from '@/features/form/constants';
 import { clearFieldValues } from '@/features/form/formStateSlice';
 import LayoutLoader from '@/features/layout/LayoutLoader';
@@ -57,6 +60,9 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
     dispatch(setFirstLoadComplete(false));
     dispatch(resetPageData());
     dispatch(clearFieldValues(FORM_TYPES.ENTITY_FORM));
+    // An error from the entity edited before must not decide what this one
+    // shows: nothing else ever clears it.
+    dispatch(clearLatestError());
   }, [dispatch, entityId, entityType]);
 
   if (latestError) {

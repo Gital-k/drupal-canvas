@@ -11,6 +11,8 @@ import {
   SIDEBAR_MAX_PX,
   SIDEBAR_MIN_PX,
 } from '@/features/editor/editorLayoutStorage';
+import NoEditAccessWarning from '@/features/editor/NoEditAccessWarning';
+import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
 import { setActivePanel } from '@/features/ui/primaryPanelSlice';
 import {
   EditorFrameContext,
@@ -33,6 +35,7 @@ interface EditorLayoutProps {
 const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const editorFrameMode = useAppSelector(selectEditorFrameMode);
+  const latestError = useAppSelector(selectLatestError);
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const isMultiSelect = useAppSelector(selectIsMultiSelect);
 
@@ -155,6 +158,22 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
   const showHandle = !isPanelHidden;
 
   const resizeCursor = getResizeCursor(rightWidthPx);
+
+  // The layout is what the editor edits. Without access to it there is
+  // nothing to edit and nothing a retry would fix, so the canvas and the
+  // contextual panel give way to an explanation.
+  if (
+    latestError?.status === '403' &&
+    latestError.endpointName === 'getPageLayout'
+  ) {
+    return (
+      <div ref={layoutRef} className={styles.layout}>
+        <div className={styles.center}>
+          <NoEditAccessWarning />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={layoutRef} className={styles.layout}>
