@@ -656,7 +656,7 @@ canvas.api.layout.post.content_template:
   path: '/canvas/api/v0/layout-content-template/{entity}/{preview_entity}'
   options:
     requirements:
-      <<: *layout_get_route_requirements
+      <<: *layout_patch_route_requirements
       _canvas_preview_entity_view_access: TRUE
     parameters:
       <<: *layout_get_route_content_template_parameters
