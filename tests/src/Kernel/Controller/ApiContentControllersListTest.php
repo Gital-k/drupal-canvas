@@ -8,6 +8,7 @@ namespace Drupal\Tests\canvas\Kernel\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiContentControllers;
+use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
@@ -593,6 +594,46 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
     ];
     $actual_cache_tags = $cache_metadata->getCacheTags();
     self::assertEquals($expected_cache_tags, $actual_cache_tags, 'Cache tags should match');
+  }
+
+  /**
+   * Tests that a page the user may not update is listed without edit links.
+   *
+   * A module altering `update` access on a page (for example through
+   * hook_ENTITY_TYPE_access()) must not remove the page from the list, but
+   * the page must be returned without the links that require `update` access.
+   *
+   * @legacy-covers ::list
+   * @legacy-covers ::getEntityOperations
+   */
+  public function testListOmitsEditLinksWhenUpdateForbidden(): void {
+    $this->enableModules(['canvas_test_access']);
+    $forbidden_page_id = (int) $this->pages['unpublished']->id();
+    $editable_page_id = (int) $this->pages['searchable']->id();
+    \Drupal::keyValue('canvas_test_access')->set('forbid_update_ids', [$forbidden_page_id]);
+
+    $data = $this->executeListRequest();
+
+    // The page is still listed, but only the links not requiring `update`
+    // access are present.
+    self::assertArrayHasKey($forbidden_page_id, $data);
+    self::assertEqualsCanonicalizing(
+      [CanvasUriDefinitions::LINK_REL_DUPLICATE, CanvasUriDefinitions::LINK_REL_DELETE],
+      array_keys($data[$forbidden_page_id]['links']),
+    );
+
+    // Other pages are not affected.
+    self::assertArrayHasKey($editable_page_id, $data);
+    self::assertEqualsCanonicalizing(
+      [
+        CanvasUriDefinitions::LINK_REL_EDIT,
+        CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE,
+        CanvasUriDefinitions::LINK_REL_UNPUBLISH,
+        CanvasUriDefinitions::LINK_REL_DUPLICATE,
+        CanvasUriDefinitions::LINK_REL_DELETE,
+      ],
+      array_keys($data[$editable_page_id]['links']),
+    );
   }
 
 }
