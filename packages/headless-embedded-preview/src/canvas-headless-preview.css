@@ -15,6 +15,11 @@
   max-height: 50%;
 }
 
+.canvas-headless-preview > .node-preview-container {
+  position: static;
+  flex-shrink: 0;
+}
+
 .canvas-headless-preview__frame,
 .canvas-headless-preview__error {
   flex: 1;

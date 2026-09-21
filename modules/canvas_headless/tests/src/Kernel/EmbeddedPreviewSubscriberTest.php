@@ -15,6 +15,8 @@ use Drupal\canvas_headless\PreviewUrlGeneratorInterface;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\EntityViewBuilder;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Render\MainContent\HtmlRenderer;
 use Drupal\Core\Render\PageDisplayVariantSelectionEvent;
@@ -204,13 +206,24 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
     $template->setStatus(TRUE)->save();
     $event = $this->selectVariant($node, dispatch: TRUE);
     self::assertSame(EmbeddedHeadlessPreviewPageVariant::PLUGIN_ID, $event->getPluginId());
-    $node->setUnpublished();
-    $event = $this->selectVariant($node, 'entity.node.revision');
-    self::assertSame(EmbeddedHeadlessPreviewPageVariant::PLUGIN_ID, $event->getPluginId());
-    self::assertSame(0, $event->getCacheMaxAge());
-    $plugin = $this->container->get('plugin.manager.display_variant')->createInstance($event->getPluginId(), $event->getPluginConfiguration());
-    self::assertInstanceOf(EmbeddedHeadlessPreviewPageVariant::class, $plugin);
-    $build = $plugin->build();
+    foreach (['entity.node.preview', 'entity.node.revision'] as $route_name) {
+      $node->setUnpublished();
+      $event = $this->selectVariant($node, $route_name);
+      self::assertSame(EmbeddedHeadlessPreviewPageVariant::PLUGIN_ID, $event->getPluginId());
+      self::assertSame(0, $event->getCacheMaxAge());
+      $plugin = $this->container->get('plugin.manager.display_variant')->createInstance($event->getPluginId(), $event->getPluginConfiguration());
+      self::assertInstanceOf(EmbeddedHeadlessPreviewPageVariant::class, $plugin);
+      $plugin->setMainContent(['#attached' => ['page_top' => ['node_preview' => ['#markup' => 'Preview controls']]]]);
+      $build = $plugin->build();
+      self::assertSame(['node/drupal.node.preview'], $build['#attached']['library']);
+    }
+    // A view mode without a Canvas template retains core's preview.
+    self::assertSame('simple_page', $this->selectVariant($node, 'entity.node.preview', view_mode: 'teaser')->getPluginId());
+    $new_node = Node::create(['type' => 'article', 'title' => 'Unsaved', 'status' => FALSE]);
+    self::assertSame(EmbeddedHeadlessPreviewPageVariant::PLUGIN_ID, $this->selectVariant($new_node, 'entity.node.preview')->getPluginId());
+    $template->disable()->save();
+    self::assertSame('simple_page', $this->selectVariant($node, 'entity.node.preview')->getPluginId());
+
     $this->enableModules(['taxonomy', 'canvas_headless_test']);
     $this->installEntitySchema('taxonomy_term');
     $this->installConfig(['taxonomy']);
@@ -224,7 +237,13 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
       'status' => TRUE,
     ])->save();
     $term = Term::create(['vid' => 'topics', 'name' => 'Unpublished term', 'status' => FALSE]);
-    foreach (['revision', 'latest_version'] as $operation) {
+    // An enabled template also needs a template-aware view builder.
+    $entity_type_manager = $this->container->get(EntityTypeManagerInterface::class);
+    $entity_type_manager->clearCachedDefinitions();
+    $entity_type_manager->getDefinition('taxonomy_term')->setViewBuilderClass(EntityViewBuilder::class);
+    self::assertSame('simple_page', $this->selectVariant($term, 'entity.taxonomy_term.preview')->getPluginId());
+    $entity_type_manager->clearCachedDefinitions();
+    foreach (['preview', 'revision', 'latest_version'] as $operation) {
       $event = $this->selectVariant($term, 'entity.taxonomy_term.' . $operation);
       self::assertSame(EmbeddedHeadlessPreviewPageVariant::PLUGIN_ID, $event->getPluginId());
       self::assertSame(0, $event->getCacheMaxAge());
@@ -352,7 +371,7 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
         self::assertContains('user.permissions', $event->getCacheContexts());
         self::assertContains('user.roles:authenticated', $event->getCacheContexts());
 
-        foreach (['revision', 'latest_version'] as $operation) {
+        foreach (['preview', 'revision', 'latest_version'] as $operation) {
           self::assertSame('simple_page', $this->selectVariant($entity, 'entity.' . $entity->getEntityTypeId() . '.' . $operation)->getPluginId());
         }
 
@@ -370,7 +389,7 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
     $anonymous_account = new AnonymousUserSession();
     self::assertTrue($anonymous_account->hasPermission(PreviewUrlGeneratorInterface::PREVIEW_PERMISSION));
     $this->container->get(AccountProxyInterface::class)->setAccount($anonymous_account);
-    foreach (['canonical', 'revision', 'latest_version'] as $operation) {
+    foreach (['canonical', 'preview', 'revision', 'latest_version'] as $operation) {
       self::assertSame('simple_page', $this->selectVariant($node, 'entity.node.' . $operation)->getPluginId());
     }
   }
@@ -396,26 +415,29 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
     ?string $route_name = NULL,
     bool $is_content_api_request = FALSE,
     bool $dispatch = FALSE,
+    string $view_mode = 'full',
     bool $is_main_request = TRUE,
   ): PageDisplayVariantSelectionEvent {
     $entity_type_id = $entity->getEntityTypeId();
     $parameter_name = $entity_type_id === Page::ENTITY_TYPE_ID ? 'canvas_page' : $entity_type_id;
     $route_name ??= 'entity.' . $entity_type_id . '.canonical';
     $parameter_name = match (TRUE) {
+      str_ends_with($route_name, '.preview') => $entity_type_id . '_preview',
       str_ends_with($route_name, '.revision') => $entity_type_id . '_revision',
       default => $parameter_name,
     };
-    $route = new Route('/' . $parameter_name . '/{' . $parameter_name . '}');
+    $route = new Route('/' . $parameter_name . '/{' . $parameter_name . '}' . (str_ends_with($route_name, '.preview') ? '/{view_mode_id}' : ''));
     $route_match = new RouteMatch(
       $route_name,
       $route,
-      [$parameter_name => $entity],
+      [$parameter_name => $entity, 'view_mode_id' => $view_mode],
       [$parameter_name => (string) $entity->id()],
     );
     $path = $entity_type_id === Page::ENTITY_TYPE_ID
       ? '/page/' . $entity->id()
       : '/node/' . $entity->id();
     $path = match ($route_name) {
+      'entity.node.preview' => '/node/preview/' . $entity->uuid() . '/' . $view_mode,
       'entity.node.revision' => '/node/' . $entity->id() . '/revisions/' . $entity->getRevisionId() . '/view',
       default => $path,
     };

@@ -45,10 +45,10 @@ class CanvasHeadlessHooks {
   ) {}
 
   /**
-   * Lets field expressions read the entity authorized by a revision route.
+   * Lets field expressions read the exact entity authorized by a preview route.
    *
-   * Revision access may permit reading an unpublished revision without
-   * ordinary view access. Use the completed route access result
+   * Providers may authorize previews through create/update or revision access
+   * instead of ordinary view access. Use their completed route access result
    * only for the selected entity. Referenced entities and individual fields
    * retain their own access checks.
    */

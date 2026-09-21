@@ -140,7 +140,7 @@ final class EmbeddedPreviewSubscriber implements EventSubscriberInterface {
       'preview_url' => $frontend->baseUrl . $frontend_path,
     ];
     if ($content_route->isPreview) {
-      // Revision content requires the editor's token.
+      // Unsaved form values and revision content require the editor's token.
       // Neither the host page nor its preview context may enter page caches.
       $event->mergeCacheMaxAge(0);
     }

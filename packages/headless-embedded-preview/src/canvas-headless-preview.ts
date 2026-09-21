@@ -1,6 +1,6 @@
 /**
  * @file
- * Hosts authenticated headless previews inside canonical Drupal entity routes.
+ * Hosts authenticated headless previews inside Drupal entity routes.
  */
 
 import { createHeadlessPreviewHost } from '@drupal-canvas/headless-host';
@@ -29,6 +29,7 @@ interface PreviewState {
   host: HeadlessPreviewHost | null;
   hiddenElements: HiddenElementState[];
   navigator: DrupalHostNavigator;
+  restoreControls: () => void;
 }
 
 interface HiddenElementState {
@@ -145,12 +146,30 @@ Drupal.behaviors.canvasHeadlessPreview = {
           ) {
             syncFragment();
           }
+          const current = new URL(window.location.href);
+          if (
+            document.querySelector('.node-preview-container') &&
+            (target.origin !== current.origin ||
+              target.pathname !== current.pathname ||
+              target.search !== current.search)
+          ) {
+            // Dispatch a real link click so core's node preview behavior can
+            // confirm leaving the unsaved form preview.
+            const link = document.createElement('a');
+            link.href = url;
+            link.hidden = true;
+            preview.append(link);
+            link.click();
+            link.remove();
+            return;
+          }
           window.location.assign(url);
         },
         frontendOrigin: settings.frontendOrigin,
         resolveDrupalPath,
       });
       const state: PreviewState = {
+        restoreControls: () => {},
         syncFragment,
         destroyAvailabilityObserver: observeHeadlessPreviewAvailability({
           iframe,
@@ -172,17 +191,24 @@ Drupal.behaviors.canvasHeadlessPreview = {
         navigator,
       };
 
+      // Core places the edit backlink and view-mode selector in page_top.
+      // Keep the same form and its behaviors, above the iframe and messages.
+      const controls = document.querySelector('.node-preview-container');
+      if (controls?.parentNode) {
+        const parent = controls.parentNode;
+        const next = controls.nextSibling;
+        preview.prepend(controls);
+        state.restoreControls = () => parent.insertBefore(controls, next);
+      }
+
       state.host = createHeadlessPreviewHost({
         iframe,
         frontendOrigin: settings.frontendOrigin,
         draftUrl: `${settings.frontendOrigin}${settings.frontendBasePath}/api/draft`,
         fetchAssertion: async (params: Record<string, string>) => {
-          const csrf = await fetch(
-            `${settings.drupalBasePath}/session/token`,
-            {
-              credentials: 'same-origin',
-            },
-          );
+          const csrf = await fetch(`${settings.drupalBasePath}/session/token`, {
+            credentials: 'same-origin',
+          });
           if (!csrf.ok) {
             throw new Error('Could not obtain a preview CSRF token.');
           }
@@ -262,6 +288,7 @@ Drupal.behaviors.canvasHeadlessPreview = {
         window.removeEventListener('hashchange', state.syncFragment);
         state.navigator.destroy();
         state.host?.destroy();
+        state.restoreControls();
         for (const hidden of state.hiddenElements) {
           if (hidden.wasInert) {
             hidden.element.setAttribute('inert', '');

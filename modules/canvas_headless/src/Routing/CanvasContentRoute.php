@@ -10,8 +10,9 @@ use Symfony\Component\Routing\Route;
 /**
  * Identifies the entity and view mode shared by Drupal and frontend rendering.
  *
- * Supports core canonical, revision, and latest-version entity route names.
- * Conversion and access remain the responsibility of the route provider.
+ * Standard entity canonical, preview, revision, and latest-version route names
+ * are supported. Conversion and access remain the route provider's
+ * responsibility.
  */
 final readonly class CanvasContentRoute {
 
@@ -32,9 +33,10 @@ final readonly class CanvasContentRoute {
     if ($route?->hasDefault('_entity_form') || $route?->hasDefault('_form')) {
       return NULL;
     }
-    if ($route_name !== NULL && preg_match('/^entity\.([a-z0-9_]+)\.(canonical|revision|latest_version)$/', $route_name, $matches)) {
+    if ($route_name !== NULL && preg_match('/^entity\.([a-z0-9_]+)\.(canonical|preview|revision|latest_version)$/', $route_name, $matches)) {
       [, $entity_type, $operation] = $matches;
       $candidates = match ($operation) {
+        'preview' => [$entity_type . '_preview', $entity_type],
         'revision' => [$entity_type . '_revision'],
         default => [$entity_type],
       };

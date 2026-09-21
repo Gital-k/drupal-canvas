@@ -66,7 +66,7 @@ final class CanvasContentRouteEnhancerTest extends UnitTestCase {
     foreach (['node', 'media', 'taxonomy_term', 'custom_content'] as $entity_type) {
       $selected = $this->createMock(ContentEntityInterface::class);
       $selected->method('getEntityTypeId')->willReturn($entity_type);
-      foreach (['revision' => $entity_type . '_revision', 'latest_version' => $entity_type] as $operation => $parameter) {
+      foreach (['preview' => $entity_type . '_preview', 'revision' => $entity_type . '_revision', 'latest_version' => $entity_type] as $operation => $parameter) {
         $route_name = "entity.$entity_type.$operation";
         $parameters = [$parameter => $selected, 'view_mode_id' => 'teaser'];
         $content_route = CanvasContentRoute::resolve($route_name, $route, $parameters);
@@ -81,6 +81,17 @@ final class CanvasContentRouteEnhancerTest extends UnitTestCase {
       self::assertNotNull($content_route);
       self::assertSame($selected, $content_route->entity);
     }
+    $preview_route = new Route('/preview/{node_preview}', ['_entity_view' => 'node.teaser']);
+    $content_route = CanvasContentRoute::resolve('entity.node.preview', $preview_route, ['node_preview' => $entity]);
+    self::assertNotNull($content_route);
+    self::assertSame($entity, $content_route->entity);
+    self::assertSame('teaser', $content_route->viewMode);
+    self::assertTrue($content_route->isPreview);
+    self::assertNull(CanvasContentRoute::resolve('entity.node.preview', $preview_route, []));
+    self::assertNull(CanvasContentRoute::resolve('custom.preview', $preview_route, ['node_preview' => $entity]));
+    $preview_route->setDefault('_entity_form', 'node.edit');
+    self::assertNull(CanvasContentRoute::resolve('entity.node.preview', $preview_route, ['node_preview' => $entity]));
+
   }
 
   /**

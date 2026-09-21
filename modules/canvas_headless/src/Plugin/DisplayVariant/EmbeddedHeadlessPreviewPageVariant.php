@@ -22,10 +22,13 @@ final class EmbeddedHeadlessPreviewPageVariant extends VariantBase implements Pa
 
   public const string PLUGIN_ID = 'canvas_headless_preview';
 
+  private bool $hasNodePreviewControls = FALSE;
+
   /**
    * {@inheritdoc}
    */
   public function setMainContent(array $main_content): static {
+    $this->hasNodePreviewControls = isset($main_content['#attached']['page_top']['node_preview']);
     return $this;
   }
 
@@ -135,6 +138,10 @@ final class EmbeddedHeadlessPreviewPageVariant extends VariantBase implements Pa
         ],
       ],
     ];
+    if ($this->hasNodePreviewControls) {
+      // The original main content is discarded, but its page_top form remains.
+      $build['#attached']['library'][] = 'node/drupal.node.preview';
+    }
     if ($can_manage_frontends) {
       $build['#content']['canvas_headless_preview']['error']['content']['body']['manage'] = [
         '#type' => 'link',

@@ -26,21 +26,27 @@ use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\Entity\EntityViewDisplay;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Extension\ThemeSettingsProvider;
 use Drupal\Core\File\FileUrlGeneratorInterface;
+use Drupal\Core\Form\FormState;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\ParamConverter\ParamNotConvertedException;
 use Drupal\Core\Routing\RouteBuilderInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Core\Session\PermissionCheckerInterface;
+use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\Core\Theme\ThemeInitializationInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\Node;
@@ -1253,6 +1259,137 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     }
     catch (CacheableAccessDeniedHttpException) {
     }
+  }
+
+  /**
+   * Tests private unsaved form previews through the content API.
+   */
+  public function testEntityPreviews(): void {
+    $editor = $this->createUser(['access content', 'create article content', 'edit any article content', 'view all revisions']);
+    $this->setCurrentAccount($editor);
+    $component = Component::load(self::COMPONENT_ID);
+    self::assertInstanceOf(Component::class, $component);
+    foreach (['full', 'teaser'] as $view_mode) {
+      ContentTemplate::create([
+        'id' => 'node.article.' . $view_mode,
+        'content_entity_type_id' => 'node',
+        'content_entity_type_bundle' => 'article',
+        'content_entity_type_view_mode' => $view_mode,
+        'component_tree' => [[
+          'uuid' => $this->container->get('uuid')->generate(),
+          'component_id' => $component->id(),
+          'component_version' => $component->getActiveVersion(),
+          'inputs' => ['heading' => ['sourceType' => 'entity-field', 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value']],
+        ],
+        ],
+        'status' => TRUE,
+      ])->save();
+    }
+    $node = Node::create(['type' => 'article', 'title' => 'First revision', 'uid' => $editor->id(), 'status' => TRUE]);
+    $node->save();
+
+    $template_draft = ContentTemplate::load('node.article.full');
+    self::assertInstanceOf(ContentTemplate::class, $template_draft);
+    $template_draft->setComponentTree([]);
+    $this->container->get(AutoSaveManager::class)->saveEntity($template_draft);
+    $this->container->get(EntityTypeManagerInterface::class)->getStorage(ContentTemplate::ENTITY_TYPE_ID)->resetCache();
+
+    // An unrelated Canvas auto-save must not replace either selected source.
+    $auto_save = clone $node;
+    $auto_save->setTitle('Canvas auto-save');
+    $this->container->get(AutoSaveManager::class)->saveEntity($auto_save);
+    $node->setTitle('Unsaved form title');
+    $node->setUnpublished();
+    $form = $this->container->get(EntityTypeManagerInterface::class)->getFormObject('node', 'default')->setEntity($node);
+    $this->container->get(PrivateTempStoreFactory::class)->get('node_preview')->set((string) $node->uuid(), (new FormState())->setFormObject($form));
+    $account = $this->createTokenAccount(TRUE, $editor);
+    $this->setCurrentAccount($account);
+    self::assertFalse($account->hasPermission('edit any article content'));
+    foreach (['full', 'teaser'] as $view_mode) {
+      $response = $this->renderContentPath('/node/preview/' . $node->uuid() . '/' . $view_mode, [CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'false']);
+      $data = self::responseData($response);
+      self::assertTrue($data['route']['managedByCanvas']);
+      self::assertStringContainsString('Unsaved form title', \json_encode($data['content'], JSON_THROW_ON_ERROR));
+      self::assertSame('Unsaved form title', $data['head']['title']);
+      self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
+      self::assertSame($account, $this->container->get(AccountProxyInterface::class)->getAccount());
+    }
+    $this->setCurrentAccount($editor);
+    $new_node = Node::create(['type' => 'article', 'title' => 'New unsaved node', 'uid' => $editor->id()]);
+    $form = $this->container->get(EntityTypeManagerInterface::class)->getFormObject('node', 'default')->setEntity($new_node);
+    $this->container->get(PrivateTempStoreFactory::class)->get('node_preview')->set((string) $new_node->uuid(), (new FormState())->setFormObject($form));
+    $this->setCurrentAccount($account);
+    $data = self::responseData($this->renderContentPath('/node/preview/' . $new_node->uuid() . '/full'));
+    self::assertStringContainsString('New unsaved node', \json_encode($data['content'], JSON_THROW_ON_ERROR));
+
+    // A page variant can wrap Drupal-rendered content without a Canvas content
+    // template. Its nested entity must not reuse a previous form preview.
+    $template = ContentTemplate::load('node.article.full');
+    self::assertInstanceOf(ContentTemplate::class, $template);
+    $template->delete();
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
+    $this->config('system.theme')->set('default', 'stark')->save();
+    $this->createPageVariant('headless', 'Before page content', 'After page content');
+    $this->config('canvas.settings')->set('default_page_variant', 'headless')->save();
+    FieldStorageConfig::create([
+      'entity_type' => 'node',
+      'field_name' => 'field_preview',
+      'type' => 'string',
+    ])->save();
+    FieldConfig::create([
+      'entity_type' => 'node',
+      'bundle' => 'article',
+      'field_name' => 'field_preview',
+    ])->save();
+    EntityViewDisplay::create([
+      'targetEntityType' => 'node',
+      'bundle' => 'article',
+      'mode' => 'default',
+      'status' => TRUE,
+    ])->setComponent('field_preview', ['type' => 'string', 'label' => 'hidden'])->save();
+    $node->in_preview = TRUE;
+    foreach (['First unsaved field value', 'Second unsaved field value'] as $field_value) {
+      $this->setCurrentAccount($editor);
+      $node->set('field_preview', $field_value);
+      $form = $this->container->get(EntityTypeManagerInterface::class)->getFormObject('node', 'default')->setEntity($node);
+      $this->container->get(PrivateTempStoreFactory::class)->get('node_preview')->set((string) $node->uuid(), (new FormState())->setFormObject($form));
+      $this->setCurrentAccount($account);
+      $response = $this->renderContentPath('/node/preview/' . $node->uuid() . '/full');
+      $content = \json_encode(self::responseData($response)['content'], JSON_THROW_ON_ERROR);
+      self::assertStringContainsString('Before page content', $content);
+      self::assertStringContainsString($field_value, $content);
+      self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
+    }
+
+    // Owning a private preview does not grant create/update access.
+    $reader = $this->createUser(['access content']);
+    $this->setCurrentAccount($reader);
+    foreach ([$node, $new_node] as $denied_node) {
+      $form = $this->container->get(EntityTypeManagerInterface::class)->getFormObject('node', 'default')->setEntity($denied_node);
+      $this->container->get(PrivateTempStoreFactory::class)->get('node_preview')->set((string) $denied_node->uuid(), (new FormState())->setFormObject($form));
+    }
+    $reader_token = $this->createTokenAccount(TRUE, $reader);
+    $this->setCurrentAccount($reader_token);
+    self::assertFalse($reader_token->hasPermission('view all revisions'));
+    self::assertFalse($reader_token->hasPermission('view article revisions'));
+    self::assertFalse($reader_token->hasPermission('administer nodes'));
+    foreach ([
+      '/node/preview/' . $node->uuid() . '/full',
+      '/node/preview/' . $new_node->uuid() . '/full',
+    ] as $denied_path) {
+      try {
+        $denied_response = $this->renderContentPath($denied_path);
+        self::assertSame(403, $denied_response->getStatusCode(), $denied_path . ': ' . $denied_response->getContent());
+      }
+      catch (CacheableAccessDeniedHttpException) {
+        self::assertSame($reader_token, $this->container->get(AccountProxyInterface::class)->getAccount());
+      }
+    }
+
+    // A different editor cannot read another user's private form preview.
+    $this->setCurrentAccount($this->createTokenAccount(TRUE));
+    $this->expectException(ParamNotConvertedException::class);
+    $this->renderContentPath('/node/preview/' . $new_node->uuid() . '/full');
   }
 
   /**

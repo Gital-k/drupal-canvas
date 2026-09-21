@@ -36,6 +36,10 @@ final class CanvasContentEntityRenderer {
   /**
    * Resolves and builds the Canvas rendering strategy for an entity.
    *
+   * @param bool $is_entity_preview
+   *   Whether the route selected an exact preview entity whose render array
+   *   must remain uncached when nested inside a page variant.
+   *
    * @return array{build: ?array, cacheability: \Drupal\Core\Cache\CacheableMetadata}
    *   The Canvas render array, or NULL when Canvas does not render the entity,
    *   plus dependencies that determined the result.
@@ -45,6 +49,7 @@ final class CanvasContentEntityRenderer {
     string $view_mode,
     bool $is_preview,
     ?string $preview_language = NULL,
+    bool $is_entity_preview = FALSE,
   ): array {
     [$build, $template, $view_builder, $cacheability] = $this->buildEntityContent(
       $entity,
@@ -93,6 +98,13 @@ final class CanvasContentEntityRenderer {
         return self::unsupported($cacheability);
       }
       $build = $view_builder->build($view_builder->view($entity, $view_mode));
+    }
+
+    if ($is_entity_preview) {
+      // Like core's NodePreviewController, disable caching on the entity build
+      // before page wrapping. The outer page's max-age does not prevent nested
+      // entity render cache hits or writes.
+      $build['#cache']['max-age'] = 0;
     }
 
     // Keep the editable content region at the page variant's marker. Without

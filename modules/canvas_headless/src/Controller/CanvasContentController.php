@@ -73,7 +73,7 @@ final class CanvasContentController {
     $managed_by_canvas = FALSE;
     $build = NULL;
     $is_preview = PreviewTokenInspector::hasPreviewScope($this->currentUser->getAccount());
-    // The route has selected the exact revision to display. A Canvas
+    // The route has selected the exact unsaved entity or revision. A Canvas
     // auto-save must not replace it, nor select draft content templates.
     $is_entity_preview = $content_route !== NULL && $content_route->isPreview;
     $view_mode = NULL;
@@ -127,6 +127,7 @@ final class CanvasContentController {
         $use_auto_save,
         $is_entity_preview ? $content_route->viewMode : ($view_mode ?? $content_route->viewMode),
         $preview_language,
+        $is_entity_preview,
       );
       $head_result = $this->headBuilder->build($rendered_entity);
       $cacheability = (new BubbleableMetadata())
@@ -138,7 +139,8 @@ final class CanvasContentController {
       $cacheability = $head_result['cacheability'];
     }
     if ($is_entity_preview) {
-      // Revision previews must not enter render caches or response caches.
+      // Prevent render caching as well as response caching: unsaved form values
+      // can share the stored entity's UUID and revision ID.
       $cacheability->setCacheMaxAge(0);
       if ($build !== NULL) {
         $cacheability->applyTo($build);
@@ -299,6 +301,7 @@ final class CanvasContentController {
     bool $use_auto_save,
     string $view_mode = 'full',
     ?string $preview_language = NULL,
+    bool $is_entity_preview = FALSE,
   ): array {
     $entity = $stored_entity;
     $auto_save = NULL;
@@ -330,6 +333,7 @@ final class CanvasContentController {
       $view_mode,
       $use_auto_save,
       $preview_language,
+      $is_entity_preview,
     );
     $build = $render_result['build'];
     $cacheability = $render_result['cacheability']

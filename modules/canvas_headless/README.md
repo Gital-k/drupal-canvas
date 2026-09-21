@@ -54,23 +54,24 @@ Eligible links open outside the iframe: Drupal-resolved paths use their Drupal
 URL, while unresolved paths and external links use their original URL.
 `target="_blank"` opens a new tab.
 
-### Entity revision previews
+### Entity previews and revisions
 
 Entities with enabled Canvas content templates can embed the frontend on their
-`entity.{entity_type}.revision` and `entity.{entity_type}.latest_version` routes.
-This includes Content Moderation's latest-version routes. Embedding requires the
-authenticated access described above and an enabled Canvas template for the
-selected view mode. Other requests keep Drupal's normal rendering.
+`entity.{entity_type}.preview`, `entity.{entity_type}.revision`, and
+`entity.{entity_type}.latest_version` routes. This includes node form previews,
+core revision routes, and Content Moderation's latest-version routes. Embedding
+requires the authenticated access described above and an enabled Canvas template
+for the selected view mode. Other requests keep Drupal's normal rendering.
 
 Canvas currently enables content templates only for nodes. Other entity types
 require a module that adds content template support.
 
-Previews render the selected revision with saved Canvas templates and page
-variants. Canvas auto-saves do not replace them. Preview responses and their
-rendered content cannot be cached.
+Previews render the selected entity revision or unsaved form values with saved
+Canvas templates and page variants. Canvas auto-saves do not replace them. Preview
+responses and their rendered content cannot be cached.
 
-The frontend must serve revision paths through its Drupal content route handler.
-The SDK catch-all route can handle these paths.
+The frontend must serve preview and revision paths through its Drupal content
+route handler. The SDK catch-all route can handle these paths.
 
 ### Building the browser code
 

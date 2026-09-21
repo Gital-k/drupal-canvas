@@ -19,14 +19,15 @@ afterEach(() => {
 
 describe('Drupal preview behavior', () => {
   it.each([
-    ['#details', '', '/app', ''],
-    ['#', '', '/app', ''],
-    ['', '', '/app', ''],
-    ['#details', '/cms', '/app', '?display=full&filter=a%20b'],
-    ['#', '/cms/index.php', '', '?display=full'],
+    ['#details', false, '', '/app', ''],
+    ['#', false, '', '/app', ''],
+    ['', false, '', '/app', ''],
+    ['', true, '', '/app', ''],
+    ['#details', true, '/cms', '/app', '?display=full&filter=a%20b'],
+    ['#', true, '/cms/index.php', '', '?display=full'],
   ] as const)(
-    'authenticates and keeps canonical page fragments in sync from "%s"',
-    async (fragment, drupalBasePath, frontendBasePath, query) => {
+    'authenticates and keeps fragments and controls in sync from "%s", node preview: %s',
+    async (fragment, nodePreview, drupalBasePath, frontendBasePath, query) => {
       vi.useFakeTimers();
       vi.resetModules();
       const userActivation = { hasBeenActive: false, isActive: false };
@@ -34,11 +35,14 @@ describe('Drupal preview behavior', () => {
         configurable: true,
         value: userActivation,
       });
-      const path = '/fr/article';
+      const path = nodePreview
+        ? '/fr/node/preview/preview-uuid/full'
+        : '/article';
       const hostPath = `${drupalBasePath}${path}${query}`;
       const frontendUrl = `https://frontend.example${frontendBasePath}${path}${query}`;
       window.history.replaceState(null, '', `${hostPath}${fragment}`);
       document.body.innerHTML = `
+        ${nodePreview ? '<div class="node-preview-container"><a href="/node/1/edit">Back to content editing</a></div>' : ''}
         <main data-off-canvas-main-canvas>
           <div id="theme-content">Theme content</div>
           <div class="canvas-headless-preview">
@@ -114,6 +118,11 @@ describe('Drupal preview behavior', () => {
             },
           }),
         );
+        if (nodePreview) {
+          expect(
+            document.querySelector('.node-preview-container')!.parentElement,
+          ).toBe(document.querySelector('.canvas-headless-preview'));
+        }
         // The activation endpoint redirects the browser to the frontend page.
         iframe.src = `${frontendUrl}${fragment}`;
         expect(iframe.contentWindow!.location.href).toBe(
@@ -217,6 +226,27 @@ describe('Drupal preview behavior', () => {
         expect(window.location.href.endsWith(`${hostPath}#`)).toBe(true);
         expect(iframe.contentWindow!.location.href).toBe(`${frontendUrl}#`);
 
+        if (nodePreview) {
+          const confirmLeave = vi.fn((event: MouseEvent) => {
+            if ((event.target as Element).closest('a')) {
+              event.preventDefault();
+            }
+          });
+          document.addEventListener('click', confirmLeave);
+          try {
+            send({
+              type: 'canvas-headless:navigation',
+              hostSessionId: handshake.hostSessionId,
+              url: `https://frontend.example${frontendBasePath}/another-node`,
+            });
+            await vi.advanceTimersByTimeAsync(1);
+            expect(confirmLeave).toHaveBeenCalledOnce();
+            expect(window.location.pathname).toBe(`${drupalBasePath}${path}`);
+          } finally {
+            document.removeEventListener('click', confirmLeave);
+          }
+        }
+
         // Browser history can change the host hash without a frontend click.
         window.history.replaceState(null, '', `${hostPath}#details`);
         window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -237,6 +267,11 @@ describe('Drupal preview behavior', () => {
       expect(
         document.querySelector('#theme-content')!.hasAttribute('inert'),
       ).toBe(false);
+      if (nodePreview) {
+        expect(
+          document.querySelector('.node-preview-container')!.parentElement,
+        ).toBe(document.body);
+      }
     },
   );
 });
