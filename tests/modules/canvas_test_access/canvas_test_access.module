@@ -10,17 +10,26 @@ use Drupal\Core\Session\AccountInterface;
 /**
  * Implements hook_ENTITY_TYPE_access().
  *
- * Denies view access to canvas_page entity with id 1.
+ * - Denies view access to canvas_page entity with id 1.
+ * - Adds the cache contexts and tags stored in the `canvas_test_access` key
+ *   value store to the update access result of canvas_page entity with id 1.
+ * - Denies update access to the canvas_page entities whose ids are listed in
+ *   the `forbid_update_ids` key of the `canvas_test_access` key value store.
  */
 function canvas_test_access_canvas_page_access(EntityInterface $entity, string $operation, AccountInterface $account): AccessResultInterface {
-  $cacheContexts = \Drupal::keyValue('canvas_test_access')->get('cache_contexts', []);
-  $cacheTags = \Drupal::keyValue('canvas_test_access')->get('cache_tags', []);
+  $keyValue = \Drupal::keyValue('canvas_test_access');
+  $cacheContexts = $keyValue->get('cache_contexts', []);
+  $cacheTags = $keyValue->get('cache_tags', []);
+  $forbidUpdateIds = $keyValue->get('forbid_update_ids', []);
 
   if ((int) $entity->id() === 1 && $operation === 'view') {
     return AccessResult::forbidden();
   }
   if ((int) $entity->id() === 1 && $operation === 'update' && !empty($cacheTags) && !empty($cacheContexts)) {
     return AccessResult::allowed()->addCacheContexts($cacheContexts)->addCacheTags($cacheTags);
+  }
+  if ($operation === 'update' && in_array((int) $entity->id(), $forbidUpdateIds, TRUE)) {
+    return AccessResult::forbidden();
   }
 
   return AccessResult::neutral();

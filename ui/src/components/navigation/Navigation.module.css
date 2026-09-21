@@ -26,3 +26,8 @@
   text-decoration: none;
   color: inherit;
 }
+
+.locked {
+  cursor: default;
+  opacity: 0.5;
+}

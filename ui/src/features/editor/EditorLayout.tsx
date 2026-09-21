@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useParams } from 'react-router-dom';
+import { skipToken } from '@reduxjs/toolkit/query';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ContextualPanel from '@/components/panel/ContextualPanel';
@@ -11,6 +12,7 @@ import {
   SIDEBAR_MAX_PX,
   SIDEBAR_MIN_PX,
 } from '@/features/editor/editorLayoutStorage';
+import NoEditAccessWarning from '@/features/editor/NoEditAccessWarning';
 import { setActivePanel } from '@/features/ui/primaryPanelSlice';
 import {
   EditorFrameContext,
@@ -20,6 +22,7 @@ import {
   selectIsMultiSelect,
   selectSelectedComponentUuid,
 } from '@/features/ui/uiSlice';
+import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import { PAGE_VARIANT_ENTITY_TYPE } from '@/services/pageVariants';
 
 import type React from 'react';
@@ -36,8 +39,16 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const isMultiSelect = useAppSelector(selectIsMultiSelect);
 
-  const { entityType } = useParams();
+  const { entityId, entityType } = useParams();
   const dispatch = useAppDispatch();
+  // The layout query's own cache entry, keyed by the edited entity, is read
+  // instead of the global latest error: the latter outlives a navigation to
+  // another entity and can be overwritten by any other request's failure.
+  const { error: layoutError } = useAppSelector(
+    componentAndLayoutApi.endpoints.getPageLayout.select(
+      entityId && entityType ? { entityId, entityType } : skipToken,
+    ),
+  );
   // While a page template is edited, open the Templates panel so the left
   // sidebar shows which template is on the canvas.
   useEffect(() => {
@@ -155,6 +166,19 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({ context }) => {
   const showHandle = !isPanelHidden;
 
   const resizeCursor = getResizeCursor(rightWidthPx);
+
+  // The layout is what the editor edits. Without access to it there is
+  // nothing to edit and nothing a retry would fix, so the canvas and the
+  // contextual panel give way to an explanation.
+  if (layoutError && 'status' in layoutError && layoutError.status === 403) {
+    return (
+      <div ref={layoutRef} className={styles.layout}>
+        <div className={styles.center}>
+          <NoEditAccessWarning />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={layoutRef} className={styles.layout}>

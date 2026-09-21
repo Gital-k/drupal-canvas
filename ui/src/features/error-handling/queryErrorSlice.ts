@@ -6,6 +6,13 @@ export interface queryError {
   status: string;
   errors?: any;
   message: string;
+  /**
+   * The RTK Query endpoint that failed, when the error came from one.
+   *
+   * Lets a component react to a failure of one specific request instead of to
+   * any failure that happens to be the most recent.
+   */
+  endpointName?: string;
 }
 
 export interface queryErrorSliceState {

@@ -205,4 +205,122 @@ test.describe('Canvas UI Permissions', () => {
       page.getByText('You do not have permission to access the code editor.'),
     ).toBeVisible();
   });
+
+  test('Pages the user may view but not edit are listed read-only and cannot be opened', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.login({ username: 'editor', password: 'editor' });
+    const editable = await canvas.createCanvas({ title: 'Editable page' });
+    const locked = await canvas.createCanvas({ title: 'Locked page' });
+
+    // A module altering `update` access is reported by the content list as a
+    // page without the links that need `update` access. Strip them from the
+    // real response for the locked page.
+    await page.route('**/canvas/api/v0/content/canvas_page*', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const updateLinks = [
+        'edit-form',
+        'https://drupal.org/project/canvas#link-rel-set-as-homepage',
+        'disable',
+        'enable',
+      ];
+      body.data = body.data.map(
+        (item: { id: number; links: Record<string, string> }) =>
+          item.id === locked.entity_id
+            ? {
+                ...item,
+                links: Object.fromEntries(
+                  Object.entries(item.links).filter(
+                    ([rel]) => !updateLinks.includes(rel),
+                  ),
+                ),
+              }
+            : item,
+      );
+      await route.fulfill({ response, json: body });
+    });
+    // The layout of a page the user may not update is refused.
+    await page.route(
+      `**/canvas/api/v0/layout/canvas_page/${locked.entity_id}*`,
+      (route) =>
+        route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: ["The 'edit canvas_page' permission is required."],
+          }),
+        }),
+    );
+
+    await canvas.openCanvas(editable);
+    const editableUrl = page.url();
+
+    // The page navigation popover does not link the locked page.
+    await canvas.openContentNavigation();
+    const navigation = page.getByTestId('canvas-navigation-content');
+    const lockedNavRow = navigation.locator(
+      `[data-canvas-page-id="${locked.entity_id}"]`,
+    );
+    await expect(lockedNavRow).toHaveAttribute(
+      'data-canvas-page-locked',
+      'true',
+    );
+    await expect(lockedNavRow.locator('a')).toHaveCount(0);
+    await expect(
+      navigation
+        .locator(`[data-canvas-page-id="${editable.entity_id}"]`)
+        .locator('a'),
+    ).toHaveCount(1);
+    await canvas.closeContentNavigation();
+
+    // The Pages panel too lists the locked page greyed out with a lock, and a
+    // click does not leave the current page.
+    await canvas.openPagesPanel();
+    const pageList = page.getByTestId('canvas-page-list');
+    const lockedRow = pageList.locator(
+      `[data-canvas-page-id="${locked.entity_id}"]`,
+    );
+    await expect(lockedRow).toHaveAttribute('data-canvas-page-locked', 'true');
+    await expect(lockedRow.getByLabel('Not editable')).toBeVisible();
+    await expect(
+      pageList.locator(`[data-canvas-page-id="${editable.entity_id}"]`),
+    ).not.toHaveAttribute('data-canvas-page-locked');
+    // The row ignores pointer events, so click where it is rather than on it.
+    await expect(lockedRow).toHaveCSS('pointer-events', 'none');
+    const box = await lockedRow.boundingBox();
+    await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await expect(page).toHaveURL(editableUrl);
+
+    // Opening the locked page directly explains the situation instead of
+    // showing a generic error with a retry that can never succeed.
+    await page.goto(`/canvas/editor/canvas_page/${locked.entity_id}`);
+    await expect(page.getByTestId('canvas-no-edit-access')).toBeVisible();
+    await expect(
+      page.getByText('You do not have permission to edit this page.'),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'An unexpected error has occurred while fetching the layout.',
+      ),
+    ).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back to pages' }).click();
+    await expect(page).toHaveURL(/\/canvas\/?$/);
+
+    // The refused layout of the locked page does not stick to the next one.
+    // Navigate within the app: a full page load would start from an empty
+    // store and could not tell. The Pages panel opened above is restored from
+    // local storage, so it does not have to be opened again.
+    await expect(pageList).toBeVisible();
+    await pageList
+      .locator(`[data-canvas-page-id="${editable.entity_id}"]`)
+      .click();
+    await expect(page).toHaveURL(editableUrl);
+    await expect(page.getByTestId('canvas-no-edit-access')).toHaveCount(0);
+    await expect(
+      page.getByTestId('canvas-contextual-panel--page-data'),
+    ).toBeVisible();
+  });
 });

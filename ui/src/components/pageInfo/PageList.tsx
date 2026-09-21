@@ -3,6 +3,7 @@ import {
   ChevronDownIcon,
   ClockIcon,
   FileTextIcon,
+  LockClosedIcon,
   MagnifyingGlassIcon,
   PlusIcon,
 } from '@radix-ui/react-icons';
@@ -205,6 +206,12 @@ const PageListItem = ({
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const title = `${item.autoSaveLabel || item.title} ${item.autoSavePath || item.path}`;
+  // Pages the user may see but not edit are listed — hiding them would make
+  // the list lie about what exists — but they lead nowhere: opening one would
+  // load an editor that cannot fetch its layout. They are greyed out, carry a
+  // lock and ignore clicks instead.
+  // @see https://git.drupalcode.org/project/canvas/-/work_items/3592100
+  const canEdit = hasPermission('edit', item);
   const dropdownMenuContent = createPageMenuContent(
     item,
     onDuplicate,
@@ -224,53 +231,66 @@ const PageListItem = ({
   const willBeUnpublished =
     !item.status && !item.isNew && item.hasUnsavedStatusChange;
 
+  const row = (
+    <div>
+      <SidebarNode
+        disabled={!canEdit}
+        data-canvas-page-locked={!canEdit ? 'true' : undefined}
+        leadingContent={
+          !canEdit ? <LockClosedIcon aria-label="Not editable" /> : undefined
+        }
+        title={title}
+        variant={isHomepage ? 'homepage' : 'page'}
+        selected={isSelected}
+        trailingContent={
+          !isMenuOpen && (isUnpublished || willBeUnpublished) ? (
+            willBeUnpublished ? (
+              <Tooltip content="Applies on next publish">
+                <Badge
+                  size="1"
+                  variant="solid"
+                  color={isSelected ? 'blue' : 'gray'}
+                >
+                  <Flex align="center" gap="1">
+                    <ClockIcon width="11" height="11" />
+                    Unpublish
+                  </Flex>
+                </Badge>
+              </Tooltip>
+            ) : (
+              <Badge
+                size="1"
+                variant="solid"
+                color={isSelected ? 'blue' : 'gray'}
+              >
+                Unpublished
+              </Badge>
+            )
+          ) : undefined
+        }
+        dropdownMenuContent={
+          dropdownMenuContent ? (
+            <UnifiedMenu.Content menuType="dropdown">
+              {dropdownMenuContent}
+            </UnifiedMenu.Content>
+          ) : null
+        }
+        onMenuOpenChange={setIsMenuOpen}
+        onClick={canEdit && onSelect ? () => onSelect(item) : undefined}
+        data-canvas-page-id={item.id}
+      />
+    </div>
+  );
+
+  // Without a single permitted operation there is nothing to put in a context
+  // menu, so the row does not open an empty one.
+  if (!dropdownMenuContent) {
+    return row;
+  }
+
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger>
-        <div>
-          <SidebarNode
-            title={title}
-            variant={isHomepage ? 'homepage' : 'page'}
-            selected={isSelected}
-            trailingContent={
-              !isMenuOpen && (isUnpublished || willBeUnpublished) ? (
-                willBeUnpublished ? (
-                  <Tooltip content="Applies on next publish">
-                    <Badge
-                      size="1"
-                      variant="solid"
-                      color={isSelected ? 'blue' : 'gray'}
-                    >
-                      <Flex align="center" gap="1">
-                        <ClockIcon width="11" height="11" />
-                        Unpublish
-                      </Flex>
-                    </Badge>
-                  </Tooltip>
-                ) : (
-                  <Badge
-                    size="1"
-                    variant="solid"
-                    color={isSelected ? 'blue' : 'gray'}
-                  >
-                    Unpublished
-                  </Badge>
-                )
-              ) : undefined
-            }
-            dropdownMenuContent={
-              dropdownMenuContent ? (
-                <UnifiedMenu.Content menuType="dropdown">
-                  {dropdownMenuContent}
-                </UnifiedMenu.Content>
-              ) : null
-            }
-            onMenuOpenChange={setIsMenuOpen}
-            onClick={onSelect ? () => onSelect(item) : undefined}
-            data-canvas-page-id={item.id}
-          />
-        </div>
-      </ContextMenu.Trigger>
+      <ContextMenu.Trigger>{row}</ContextMenu.Trigger>
       <UnifiedMenu.Content menuType="context" align="start" side="right">
         {dropdownMenuContent}
       </UnifiedMenu.Content>
