@@ -808,7 +808,14 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'label' => 'Homepage',
       'description' => 'The default full-page layout.',
       'status' => TRUE,
-      'component_tree' => [$marker],
+      'component_tree' => [[
+        'parent_uuid' => NULL,
+        'slot' => NULL,
+        ...$marker,
+        'label' => NULL,
+        'inputs_resolved' => [],
+      ],
+      ],
     ];
     $this->assertSame($expected_normalization, $body);
 
@@ -846,7 +853,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     self::assertIsArray($body);
     self::assertSame('Homepage (updated)', $body['label']);
     self::assertNull($body['description']);
-    self::assertSame([$marker], $body['component_tree']);
+    self::assertSame($expected_normalization['component_tree'], $body['component_tree']);
 
     // PATCHing a tree without the marker: 422, the stored variant unchanged.
     $request_options[RequestOptions::JSON] = ['component_tree' => []];
