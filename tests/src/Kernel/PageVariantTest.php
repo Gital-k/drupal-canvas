@@ -19,6 +19,7 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Marker;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\Component\Serialization\Json;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigException;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
@@ -222,6 +223,14 @@ final class PageVariantTest extends CanvasKernelTestBase {
     ], Json::decode(Json::encode($normalized->values['component_tree'][0]['inputs_resolved'])));
     self::assertSame([], $normalized->values['component_tree'][1]['inputs_resolved']);
     self::assertSame($tree, $variant->getComponentTree()->getValue());
+    $expected_cacheability = CacheableMetadata::createFromObject($variant);
+    foreach ($variant->getComponentTree() as $item) {
+      $expected_cacheability->addCacheableDependency($item->get('inputs_resolved'));
+    }
+    self::assertContains('config:filter.format.canvas_html_block', $normalized->getCacheTags());
+    self::assertEqualsCanonicalizing($expected_cacheability->getCacheTags(), $normalized->getCacheTags());
+    self::assertEqualsCanonicalizing($expected_cacheability->getCacheContexts(), $normalized->getCacheContexts());
+    self::assertSame($expected_cacheability->getCacheMaxAge(), $normalized->getCacheMaxAge());
   }
 
   /**
