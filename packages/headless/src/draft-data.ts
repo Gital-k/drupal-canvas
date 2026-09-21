@@ -60,6 +60,8 @@ export interface DraftData {
     language?: string;
     viewMode?: string;
     pageVariant?: string;
+    /** Exclude Canvas auto-saves when true; omitted or false includes them. */
+    excludeAutoSave?: boolean;
   };
   sub: string;
   renewUrl: string;
@@ -128,7 +130,9 @@ export function parseDraftData(
           (data.previewContext.viewMode !== undefined &&
             typeof data.previewContext.viewMode !== 'string') ||
           (data.previewContext.pageVariant !== undefined &&
-            typeof data.previewContext.pageVariant !== 'string'))) ||
+            typeof data.previewContext.pageVariant !== 'string') ||
+          (data.previewContext.excludeAutoSave !== undefined &&
+            typeof data.previewContext.excludeAutoSave !== 'boolean'))) ||
       typeof data.sub !== 'string' ||
       typeof data.renewUrl !== 'string' ||
       typeof data.accessToken !== 'string' ||

@@ -147,6 +147,7 @@ class AssertionControllerTest extends KernelTestBase {
     self::assertSame('/some-path', $claims->claims()->get('path'));
     self::assertSame((string) $this->editor->id(), $claims->claims()->get('sub'));
     self::assertSame(PreviewAssertionFactory::TYP_HEADER, $claims->headers()->get('typ'));
+    self::assertFalse($claims->claims()->has('previewContext'));
   }
 
   /**
@@ -222,14 +223,19 @@ class AssertionControllerTest extends KernelTestBase {
   }
 
   /**
-   * Tests signed language context for activation, renewal, and recovery.
+   * Tests signed rendering context for activation, renewal, and recovery.
    */
   public function testMintPreviewLanguage(): void {
     ConfigurableLanguage::createFromLangcode('fr')->save();
     $this->setCurrentUser($this->editor);
     foreach ([[], ['renewal' => '1']] as $lane) {
-      $response = $this->request(self::mintRequest($lane + ['path' => '/some-path', 'language' => 'fr']));
-      self::assertSame(['language' => 'fr'], self::decodeAssertion($response->getContent())->claims()->get('previewContext'));
+      foreach ([FALSE, TRUE] as $exclude_auto_save) {
+        $response = $this->request(self::mintRequest($lane + ['path' => '/some-path', 'language' => 'fr', 'exclude_auto_save' => (string) (int) $exclude_auto_save]));
+        $claims = self::decodeAssertion($response->getContent())->claims();
+        self::assertSame(['excludeAutoSave' => $exclude_auto_save, 'language' => 'fr'], $claims->get('previewContext'));
+        parse_str((string) parse_url($claims->get('renewUrl'), PHP_URL_QUERY), $renew_query);
+        self::assertSame((string) (int) $exclude_auto_save, $renew_query['exclude_auto_save']);
+      }
     }
   }
 
@@ -332,6 +338,17 @@ class AssertionControllerTest extends KernelTestBase {
     self::assertIsString($query['assertion']);
     $claims = self::decodeAssertion($query['assertion']);
     self::assertSame('/some-path', $claims->claims()->get('path'));
+    self::assertFalse($claims->claims()->has('previewContext'));
+
+    // A standalone renewal link retains the signed auto-save selection.
+    $url = Url::fromRoute('canvas_headless.renew', [], ['query' => ['path' => '/some-path', 'exclude_auto_save' => '1']])->toString();
+    $response = $this->request(Request::create($url));
+    self::assertTrue($response->isRedirection());
+    parse_str((string) parse_url((string) $response->headers->get('Location'), PHP_URL_QUERY), $query);
+    self::assertIsString($query['assertion']);
+    $claims = self::decodeAssertion($query['assertion'])->claims();
+    self::assertSame(['excludeAutoSave' => TRUE], $claims->get('previewContext'));
+    self::assertStringEndsWith('?exclude_auto_save=1', $claims->get('renewUrl'));
   }
 
   /**

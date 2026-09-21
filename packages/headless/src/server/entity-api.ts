@@ -21,6 +21,8 @@ import type { EntityResult } from '../entity';
  * the session token has expired — the request is anonymous and resolves only
  * what anonymous visitors may see. Returns null for anything the current
  * access level cannot see (403/404).
+ * A live session's excludeAutoSave: true preview context excludes Canvas
+ * auto-saves while retaining the editor's access permissions.
  */
 export async function fetchEntity(options: {
   baseUrl: string;
@@ -49,6 +51,9 @@ export async function fetchEntity(options: {
   url.searchParams.set('id', id);
   if (viewMode) {
     url.searchParams.set('viewMode', viewMode);
+  }
+  if (liveDraft && draftData?.previewContext?.excludeAutoSave === true) {
+    url.searchParams.set('excludeAutoSave', 'true');
   }
   const response = await fetchImpl(url, {
     headers,

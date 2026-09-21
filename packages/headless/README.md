@@ -92,8 +92,10 @@ instead of `Page`. It contains `redirect.url`, `redirect.external`, and Drupal's
 configured `redirect.statusCode`. Handle it before reading page fields using the
 framework's redirect primitive.
 
-During an authorized draft session, the same call uses available content drafts.
-Public calls use stored content.
+Authorized draft sessions use Canvas auto-saves by default. Set
+`previewContext.excludeAutoSave` to `true` in the signed assertion to exclude
+them from `fetchPage()` and `fetchEntity()`, including after renewal. Public
+calls use stored content.
 
 `page.route.negotiatedLanguage` identifies the negotiated content language.
 `page.route.translations` lists every enabled language as

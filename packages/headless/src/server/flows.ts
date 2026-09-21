@@ -114,7 +114,9 @@ export async function redeemAssertion(
     (rawPreviewContext.viewMode === undefined ||
       typeof rawPreviewContext.viewMode === 'string') &&
     (rawPreviewContext.pageVariant === undefined ||
-      typeof rawPreviewContext.pageVariant === 'string')
+      typeof rawPreviewContext.pageVariant === 'string') &&
+    (rawPreviewContext.excludeAutoSave === undefined ||
+      typeof rawPreviewContext.excludeAutoSave === 'boolean')
       ? {
           ...(typeof rawPreviewContext.language === 'string' && {
             language: rawPreviewContext.language,
@@ -124,6 +126,9 @@ export async function redeemAssertion(
           }),
           ...(typeof rawPreviewContext.pageVariant === 'string' && {
             pageVariant: rawPreviewContext.pageVariant,
+          }),
+          ...(typeof rawPreviewContext.excludeAutoSave === 'boolean' && {
+            excludeAutoSave: rawPreviewContext.excludeAutoSave,
           }),
         }
       : undefined;
@@ -445,6 +450,17 @@ export function createDraftServer(options: DraftServerOptions): DraftServer {
       );
       if (!result.ok) {
         return result.response;
+      }
+
+      // Renewal continues the rendering choice if the assertion omits it.
+      if (
+        result.draftData.previewContext?.excludeAutoSave === undefined &&
+        existingSession.previewContext?.excludeAutoSave !== undefined
+      ) {
+        result.draftData.previewContext = {
+          ...result.draftData.previewContext,
+          excludeAutoSave: existingSession.previewContext.excludeAutoSave,
+        };
       }
 
       await storeDraftSession(result.draftData);

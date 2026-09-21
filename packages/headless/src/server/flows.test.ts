@@ -184,6 +184,25 @@ describe('redeemAssertion', () => {
     },
   );
 
+  it.each([false, true, 'false', 0, null])(
+    'retains only boolean excludeAutoSave claims (%s)',
+    async (excludeAutoSave) => {
+      const result = await redeemAssertion(
+        buildAssertion({ ...validClaims, previewContext: { excludeAutoSave } }),
+        CONFIG,
+        vi.fn().mockResolvedValue(tokenResponse()),
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.draftData.previewContext).toEqual(
+          typeof excludeAutoSave === 'boolean'
+            ? { excludeAutoSave }
+            : undefined,
+        );
+      }
+    },
+  );
+
   it('presents the previous verifier when one is passed', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(tokenResponse());
 
@@ -393,34 +412,60 @@ describe('renewDraftSession', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('renews the session and answers the new expiry as JSON', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(tokenResponse());
-    const { server, seedSession, cookies } = makeServer(
-      fetchImpl as unknown as typeof fetch,
-    );
-    seedSession(liveDraftData({ sub: '42' }));
+  it.each(
+    [undefined, false, true].flatMap((previousExcludeAutoSave) =>
+      [undefined, false, true].map((excludeAutoSave) => ({
+        previousExcludeAutoSave,
+        excludeAutoSave,
+      })),
+    ),
+  )(
+    'renews excludeAutoSave=$previousExcludeAutoSave with claim $excludeAutoSave',
+    async ({ previousExcludeAutoSave, excludeAutoSave }) => {
+      const fetchImpl = vi.fn().mockResolvedValue(tokenResponse());
+      const { server, seedSession, cookies } = makeServer(
+        fetchImpl as unknown as typeof fetch,
+      );
+      seedSession(
+        liveDraftData({
+          sub: '42',
+          previewContext: { excludeAutoSave: previousExcludeAutoSave },
+        }),
+      );
 
-    const response = await server.renewDraftSession(
-      renewRequest({ assertion: buildAssertion(validClaims) }),
-    );
+      const response = await server.renewDraftSession(
+        renewRequest({
+          assertion: buildAssertion({
+            ...validClaims,
+            previewContext: {
+              ...validClaims.previewContext,
+              ...(excludeAutoSave !== undefined && { excludeAutoSave }),
+            },
+          }),
+        }),
+      );
 
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { tokenExpiresAt: number };
-    expect(body.tokenExpiresAt).toBeGreaterThan(Date.now());
-    expect(
-      JSON.parse(cookies.get(DRAFT_DATA_COOKIE_NAME)!.value),
-    ).toMatchObject({ accessToken: 'access-token-value' });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { tokenExpiresAt: number };
+      expect(body.tokenExpiresAt).toBeGreaterThan(Date.now());
+      expect(
+        JSON.parse(cookies.get(DRAFT_DATA_COOKIE_NAME)!.value),
+      ).toMatchObject({ accessToken: 'access-token-value' });
 
-    // The renewal exchange spends the session's stored verifier at Drupal,
-    // and the session continues with a rotated one.
-    const exchangeBody = new URLSearchParams(fetchImpl.mock.calls[0][1].body);
-    expect(exchangeBody.get('code_verifier')).toBe('stored-verifier');
-    const stored = JSON.parse(
-      cookies.get(DRAFT_DATA_COOKIE_NAME)!.value,
-    ) as DraftData;
-    expect(typeof stored.codeVerifier).toBe('string');
-    expect(stored.codeVerifier).not.toBe('stored-verifier');
-  });
+      // The renewal exchange spends the session's stored verifier at Drupal,
+      // and the session continues with a rotated one.
+      const exchangeBody = new URLSearchParams(fetchImpl.mock.calls[0][1].body);
+      expect(exchangeBody.get('code_verifier')).toBe('stored-verifier');
+      const stored = JSON.parse(
+        cookies.get(DRAFT_DATA_COOKIE_NAME)!.value,
+      ) as DraftData;
+      expect(typeof stored.codeVerifier).toBe('string');
+      expect(stored.codeVerifier).not.toBe('stored-verifier');
+      expect(stored.previewContext?.excludeAutoSave).toBe(
+        excludeAutoSave ?? previousExcludeAutoSave,
+      );
+    },
+  );
 });
 
 describe('disableDraftMode', () => {
@@ -718,6 +763,7 @@ describe('fetchPage', () => {
           language: 'fr',
           viewMode: 'teaser',
           pageVariant: 'alternate',
+          excludeAutoSave: true,
         },
       }),
     );
@@ -728,7 +774,7 @@ describe('fetchPage', () => {
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       new URL(
-        'https://drupal.example/canvas/content-api?requestUri=%2Fexample&language=fr&viewMode=teaser&pageVariant=alternate',
+        'https://drupal.example/canvas/content-api?requestUri=%2Fexample&excludeAutoSave=true&language=fr&viewMode=teaser&pageVariant=alternate',
       ),
       expect.objectContaining({
         headers: {
@@ -747,7 +793,10 @@ describe('fetchPage', () => {
     seedSession(
       liveDraftData({
         path: '/example?language=fr',
-        previewContext: { pageVariant: 'alternate' },
+        previewContext: {
+          pageVariant: 'alternate',
+          excludeAutoSave: true,
+        },
       }),
     );
 
@@ -755,7 +804,7 @@ describe('fetchPage', () => {
 
     expect(fetchImpl).toHaveBeenCalledWith(
       new URL(
-        'https://drupal.example/canvas/content-api?requestUri=%2Fexample%3Flanguage%3Dfr&componentId=js.example',
+        'https://drupal.example/canvas/content-api?requestUri=%2Fexample%3Flanguage%3Dfr&componentId=js.example&excludeAutoSave=true',
       ),
       expect.any(Object),
     );
@@ -763,6 +812,35 @@ describe('fetchPage', () => {
       path: '/example?language=fr',
     });
   });
+
+  it.each([
+    [undefined, true],
+    [true, true],
+    [false, true],
+    [true, false],
+  ] as const)(
+    'applies excludeAutoSave=%s only to live page sessions (%s)',
+    async (excludeAutoSave, live) => {
+      const fetchImpl = vi.fn().mockResolvedValue(Response.json(page));
+      const { server, seedSession } = makeServer(fetchImpl);
+      seedSession(
+        liveDraftData({
+          tokenExpiresAt: Date.now() + (live ? 60_000 : -1),
+          previewContext: { excludeAutoSave },
+        }),
+      );
+
+      await server.fetchPage('/example');
+
+      const [url, init] = fetchImpl.mock.calls[0];
+      expect(url.searchParams.get('excludeAutoSave')).toBe(
+        live && excludeAutoSave === true ? 'true' : null,
+      );
+      expect(init.headers.Authorization).toBe(
+        live ? 'Bearer old-token' : undefined,
+      );
+    },
+  );
 
   it('keeps an expired draft session anonymous and marker-free', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(Response.json(page));
@@ -884,4 +962,33 @@ describe('fetchEntity', () => {
       server.fetchEntity({ type: 'node', id: '2' }),
     ).resolves.toEqual({ ...entity, content: null, managedByCanvas: false });
   });
+
+  it.each([
+    [undefined, true],
+    [true, true],
+    [false, true],
+    [true, false],
+  ] as const)(
+    'applies excludeAutoSave=%s only to live entity sessions (%s)',
+    async (excludeAutoSave, live) => {
+      const fetchImpl = vi.fn().mockResolvedValue(Response.json(entity));
+      const { server, seedSession } = makeServer(fetchImpl);
+      seedSession(
+        liveDraftData({
+          tokenExpiresAt: Date.now() + (live ? 60_000 : -1),
+          previewContext: { excludeAutoSave },
+        }),
+      );
+
+      await server.fetchEntity({ type: 'node', id: '2' });
+
+      const [url, init] = fetchImpl.mock.calls[0];
+      expect(url.searchParams.get('excludeAutoSave')).toBe(
+        live && excludeAutoSave === true ? 'true' : null,
+      );
+      expect(init.headers.Authorization).toBe(
+        live ? 'Bearer old-token' : undefined,
+      );
+    },
+  );
 });

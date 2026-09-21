@@ -245,15 +245,19 @@ describe('DraftSessionElement', () => {
     });
   });
 
-  it('tracks path changes through the observed attribute', () => {
-    const { element, snapshots, renewLink } = mount({ initialExpired: true });
+  it('tracks path changes and retains renewal query parameters', () => {
+    const { element, snapshots, renewLink } = mount({
+      initialExpired: true,
+      renewUrl:
+        'https://drupal.example/canvas-headless/renew?exclude_auto_save=1',
+    });
     expect(snapshots.at(-1)).toMatchObject({ path: '/' });
 
     element.setAttribute('path', '/node/7');
 
     expect(snapshots.at(-1)).toMatchObject({ path: '/node/7' });
     expect(renewLink.getAttribute('href')).toBe(
-      'https://drupal.example/canvas-headless/renew?path=%2Fnode%2F7',
+      'https://drupal.example/canvas-headless/renew?exclude_auto_save=1&path=%2Fnode%2F7',
     );
   });
 

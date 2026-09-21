@@ -106,7 +106,7 @@ final class CanvasContentEntityRenderer {
       : $build;
     $messages_block_displayed = FALSE;
     $build = CanvasPageVariant::renderComponentTree(
-      self::previewComponentTree($variant, $preview_language),
+      $is_preview ? self::previewComponentTree($variant, $preview_language) : $variant->getComponentTree(),
       $variant,
       $is_preview,
       $messages_block_displayed,
@@ -228,25 +228,27 @@ final class CanvasContentEntityRenderer {
   /**
    * Builds the edited page variant itself for a headless editor preview.
    *
-   * This renders the auto-saved tree directly, including temporarily invalid
-   * drafts. The page content marker therefore remains a visible editor
-   * placeholder instead of receiving routed content.
+   * By default this renders the auto-saved tree directly, including temporarily
+   * invalid drafts and the page content marker's editor placeholder. Excluding
+   * auto-saves renders saved trees and components without editor placeholders.
    *
    * @return array{build: ?array, cacheability: \Drupal\Core\Cache\CacheableMetadata}
    *   The page variant render array, or NULL for a theme-backed variant, plus
    *   its cacheability.
    */
-  public function buildPageVariantPreview(PageVariant $variant, ?string $preview_language = NULL): array {
+  public function buildPageVariantPreview(PageVariant $variant, ?string $preview_language = NULL, bool $use_auto_save = TRUE): array {
     $cacheability = (new CacheableMetadata())
       ->addCacheableDependency($variant);
     if ($preview_language !== NULL) {
       $cacheability->addCacheContexts(['languages:language_interface', 'languages:language_content']);
     }
-    $auto_save = $this->autoSaveManager->getAutoSaveEntity($variant);
-    $cacheability->addCacheableDependency($auto_save);
-    if ($auto_save->entity instanceof PageVariant) {
-      $variant = $auto_save->entity;
-      $cacheability->addCacheableDependency($variant);
+    if ($use_auto_save) {
+      $auto_save = $this->autoSaveManager->getAutoSaveEntity($variant);
+      $cacheability->addCacheableDependency($auto_save);
+      if ($auto_save->entity instanceof PageVariant) {
+        $variant = $auto_save->entity;
+        $cacheability->addCacheableDependency($variant);
+      }
     }
 
     if (self::containsThemePageTemplate($variant)) {
@@ -254,8 +256,8 @@ final class CanvasContentEntityRenderer {
     }
 
     return [
-      'build' => self::previewComponentTree($variant, $preview_language)
-        ->toRenderable($variant, isPreview: TRUE),
+      'build' => ($use_auto_save ? self::previewComponentTree($variant, $preview_language) : $variant->getComponentTree())
+        ->toRenderable($variant, isPreview: $use_auto_save),
       'cacheability' => $cacheability,
     ];
   }

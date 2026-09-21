@@ -13,6 +13,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageVariant;
+use Drupal\canvas\Entity\StagedLanguageConfigOverride;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Marker;
 use Drupal\canvas_headless\CanvasContentContextBuilder;
 use Drupal\canvas_headless\Grant\PreviewAssertionGrant;
@@ -202,6 +203,12 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertSame($page->uuid(), $data['context']['page']['mainEntity']['uuid']);
     self::assertContains(AutoSaveManager::CACHE_TAG, $result->getCacheableMetadata()->getCacheTags());
     self::assertContains('oauth2_scopes', $result->getCacheableMetadata()->getCacheContexts());
+
+    foreach (['true' => 'Stored title', 'false' => 'Auto-saved title'] as $exclude_auto_save => $expected_title) {
+      $result = $this->renderContentPath('/page/' . $page->id(), [CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => $exclude_auto_save]);
+      self::assertSame($expected_title, self::responseData($result)['head']['title']);
+      self::assertContains('url.query_args:' . CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY, $result->getCacheableMetadata()->getCacheContexts());
+    }
   }
 
   /**
@@ -504,6 +511,22 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertStringNotContainsString('Stored component heading', $variant_preview_content);
     self::assertStringNotContainsString('Published selected chrome', $variant_preview_content);
 
+    // An explicit variant can render its saved tree without draft components
+    // or the editor-only marker placeholder.
+    $stored_variant_preview = $this->renderContentPath(
+      '/page/' . $page->id(),
+      [
+        CanvasContentApiRequest::PAGE_VARIANT_PREVIEW_QUERY => $selected_id,
+        CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'true',
+      ],
+    );
+    $stored_variant_content = \json_encode(self::responseData($stored_variant_preview)['content'], JSON_THROW_ON_ERROR);
+    self::assertStringContainsString('Published selected chrome', $stored_variant_content);
+    self::assertStringNotContainsString('Draft page chrome', $stored_variant_content);
+    self::assertStringNotContainsString('Stored component heading', $stored_variant_content);
+    self::assertStringNotContainsString('canvas--page-content-marker-placeholder', $stored_variant_content);
+    self::assertNotContains(AutoSaveManager::CACHE_TAG, $stored_variant_preview->getCacheableMetadata()->getCacheTags());
+
     // A page variant has no canonical URL, so its frontend entry URI is the
     // site root. Detached preview routing must not inherit the front page's
     // format requirement.
@@ -556,6 +579,13 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       AutoSaveManager::CACHE_TAG,
       $preview->getCacheableMetadata()->getCacheTags(),
     );
+
+    $stored = $this->renderContentPath('/page/' . $page->id(), [CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'true']);
+    $stored_content = \json_encode(self::responseData($stored)['content'], JSON_THROW_ON_ERROR);
+    self::assertStringContainsString('Before page content', $stored_content);
+    self::assertStringNotContainsString('Draft page chrome', $stored_content);
+    self::assertStringNotContainsString('canvas-preview-content-region', $stored_content);
+    self::assertNotContains(AutoSaveManager::CACHE_TAG, $stored->getCacheableMetadata()->getCacheTags());
 
     // A content template's selection overrides the site default, including
     // an auto-saved template selection during a draft preview.
@@ -793,6 +823,11 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       'url.query_args:' . CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY,
       $response->getCacheableMetadata()->getCacheContexts(),
     );
+
+    // External component defaults come from saved metadata in either mode.
+    $stored_response = $this->renderContentPath($page_uri, $component_preview_context + [CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'true']);
+    self::assertSame($data['content'], self::responseData($stored_response)['content']);
+    self::assertNotContains(AutoSaveManager::CACHE_TAG, $stored_response->getCacheableMetadata()->getCacheTags());
   }
 
   /**
@@ -869,6 +904,50 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertStringContainsString('Rendered by a local JavaScript component', $content);
     self::assertSame(2, \substr_count($content, '"element":"drupal-markup"'));
     self::assertSame(1, \substr_count($content, '"element":"js-canvas-headless-local-test"'));
+
+    // Exclusion also reaches local JavaScript components nested in an explicit
+    // page variant, rather than only choosing the variant's saved tree.
+    $variant = $this->createPageVariant('local_components', 'Header', 'Footer');
+    $local_component_config = Component::load(self::LOCAL_COMPONENT_ID);
+    self::assertInstanceOf(Component::class, $local_component_config);
+    $marker = Component::load(Marker::PAGE_CONTENT_COMPONENT_ID);
+    self::assertInstanceOf(Component::class, $marker);
+    $variant->setComponentTree([
+      [
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $local_component_config->id(),
+        'component_version' => $local_component_config->getActiveVersion(),
+        'inputs' => ['heading' => 'Rendered by a local JavaScript component'],
+      ],
+      [
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $marker->id(),
+        'component_version' => $marker->getActiveVersion(),
+        'inputs' => [],
+      ],
+    ]);
+    self::assertEntityIsValid($variant);
+    $variant->save();
+    $local_draft = clone $local_component;
+    $local_draft->set('props', []);
+    $this->container->get(AutoSaveManager::class)->saveEntity($local_draft);
+    $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE));
+    foreach (['false', 'true'] as $exclude_auto_save) {
+      $response = $this->renderContentPath('/', [
+        CanvasContentApiRequest::PAGE_VARIANT_PREVIEW_QUERY => 'local_components',
+        CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => $exclude_auto_save,
+      ]);
+      $content = \json_encode(self::responseData($response)['content'], JSON_THROW_ON_ERROR);
+      self::assertStringContainsString('"element":"js-canvas-headless-local-test"', $content);
+      if ($exclude_auto_save === 'true') {
+        self::assertStringContainsString('Rendered by a local JavaScript component', $content);
+        self::assertNotContains(AutoSaveManager::CACHE_TAG, $response->getCacheableMetadata()->getCacheTags());
+      }
+      else {
+        self::assertStringNotContainsString('Rendered by a local JavaScript component', $content);
+        self::assertContains(AutoSaveManager::CACHE_TAG, $response->getCacheableMetadata()->getCacheTags());
+      }
+    }
   }
 
   /**
@@ -1002,6 +1081,16 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       AutoSaveManager::CACHE_TAG,
       $preview->getCacheableMetadata()->getCacheTags(),
     );
+
+    $stored = $this->renderContentPath('/node/' . $node->id(), [CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'true']);
+    self::assertNull(self::responseData($stored)['content']);
+    $template->enable()->save();
+    $this->container->get(AutoSaveManager::class)->saveEntity($draft);
+    $stored = $this->renderContentPath('/node/' . $node->id(), [CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'true']);
+    $stored_content = \json_encode(self::responseData($stored)['content'], JSON_THROW_ON_ERROR);
+    self::assertStringContainsString('Published template heading', $stored_content);
+    self::assertStringNotContainsString('Draft template heading', $stored_content);
+    self::assertNotContains(AutoSaveManager::CACHE_TAG, $stored->getCacheableMetadata()->getCacheTags());
 
     $draft->setComponentTree([]);
     $this->container->get(AutoSaveManager::class)->saveEntity($draft);
@@ -1139,6 +1228,13 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     catch (CacheableAccessDeniedHttpException $exception) {
       self::assertContains('user.permissions', $exception->getCacheContexts());
     }
+
+    $author = $this->createUser(['access content', 'view own unpublished content']);
+    $node = Node::create(['type' => 'article', 'title' => 'Private stored title', 'uid' => $author->id(), 'status' => FALSE]);
+    $node->save();
+    $this->setCurrentAccount($this->createTokenAccount(TRUE, $author));
+    $result = $this->renderContentPath('/node/' . $node->id(), [CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'true']);
+    self::assertSame('Private stored title', self::responseData($result)['head']['title']);
   }
 
   /**
@@ -1315,6 +1411,32 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
         self::assertSame('French article', $data['head']['title']);
         self::assertStringContainsString('French article', $content);
       }
+    }
+
+    $language_manager = $this->container->get(LanguageManagerInterface::class);
+    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
+    $translation_draft = StagedLanguageConfigOverride::fromLanguageConfigOverride($language_manager->getLanguageConfigOverride('fr', $variant->getConfigDependencyName()));
+    $translation_draft->setData('component_tree', [$tree[0]['uuid'] => ['inputs' => ['heading' => 'Draft French chrome']]]);
+    $translation_draft->save();
+    foreach ([
+      ['/unroutable', [CanvasContentApiRequest::PAGE_VARIANT_PREVIEW_QUERY => 'translated']],
+      ['/page/' . $page->id(), []],
+    ] as [$path, $context]) {
+      $stored_variant = $this->renderContentPath($path_prefix . $path, $context + [
+        'language' => 'fr',
+        CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'true',
+      ]);
+      $stored_content = json_encode(self::responseData($stored_variant)['content'], JSON_THROW_ON_ERROR);
+      self::assertStringContainsString('French chrome', $stored_content);
+      self::assertStringContainsString('Stored footer', $stored_content);
+      self::assertStringNotContainsString('Draft footer', $stored_content);
+      self::assertStringNotContainsString('Draft French chrome', $stored_content);
+      self::assertNotContains(AutoSaveManager::CACHE_TAG, $stored_variant->getCacheableMetadata()->getCacheTags());
+
+      $draft_variant = $this->renderContentPath($path_prefix . $path, $context + ['language' => 'fr']);
+      $draft_content = json_encode(self::responseData($draft_variant)['content'], JSON_THROW_ON_ERROR);
+      self::assertStringContainsString('Draft French chrome', $draft_content);
+      self::assertStringContainsString('Draft footer', $draft_content);
     }
   }
 
@@ -1923,7 +2045,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
   /**
    * Renders a routed entity through the public kernel boundary.
    *
-   * @param array{viewMode?: string, componentId?: string, pageVariant?: string} $preview_context
+   * @param array{viewMode?: string, componentId?: string, pageVariant?: string, excludeAutoSave?: string} $preview_context
    *   Optional editor preview context.
    */
   private function renderContentPath(string $request_uri, array $preview_context = []): CacheableJsonResponse {

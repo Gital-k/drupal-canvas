@@ -24,9 +24,11 @@ import type { PageResult } from '../page';
  * the request is anonymous and resolves only what anonymous visitors may
  * see. Returns null for anything the current access level cannot see
  * (403/404).
+ * A live session can exclude Canvas auto-saves with excludeAutoSave: true
+ * in its signed preview context, without changing the editor's permissions.
  *
- * The endpoint renders through Drupal's routing, so the default revision
- * is served; it has no notion of JSON:API's resourceVersion.
+ * Drupal's route selects the entity to render;
+ * the endpoint has no notion of JSON:API's resourceVersion.
  */
 export async function fetchPage(
   requestUri: string,
@@ -55,18 +57,21 @@ export async function fetchPage(
   if (componentPreviewId) {
     url.searchParams.set(CANVAS_COMPONENT_PREVIEW_QUERY, componentPreviewId);
   }
+  const pageVariantPreviewId =
+    !componentPreviewId && liveDraft
+      ? draftData?.previewContext?.pageVariant
+      : undefined;
+  if (liveDraft && draftData?.previewContext?.excludeAutoSave === true) {
+    url.searchParams.set('excludeAutoSave', 'true');
+  }
   if (liveDraft && draftData?.previewContext?.language) {
     url.searchParams.set('language', draftData.previewContext.language);
   }
   if (liveDraft && draftData?.previewContext?.viewMode) {
     url.searchParams.set('viewMode', draftData.previewContext.viewMode);
   }
-  if (
-    !componentPreviewId &&
-    liveDraft &&
-    draftData?.previewContext?.pageVariant
-  ) {
-    url.searchParams.set('pageVariant', draftData.previewContext.pageVariant);
+  if (pageVariantPreviewId) {
+    url.searchParams.set('pageVariant', pageVariantPreviewId);
   }
   const response = await fetchImpl(url, {
     headers,

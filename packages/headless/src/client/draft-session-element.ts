@@ -246,7 +246,9 @@ export class DraftSessionElement extends BaseElement {
         continue;
       }
       link.hidden = false;
-      link.href = `${this.#renewUrl}?path=${encodeURIComponent(this.#path)}`;
+      const renewUrl = new URL(this.#renewUrl);
+      renewUrl.searchParams.set('path', this.#path);
+      link.href = renewUrl.toString();
     }
 
     this.dispatchEvent(

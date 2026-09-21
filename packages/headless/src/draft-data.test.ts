@@ -48,31 +48,39 @@ describe('parseDraftData', () => {
     );
   });
 
-  it('round-trips optional editor preview context', () => {
-    const draftData = {
-      ...validDraftData,
-      previewContext: {
-        language: 'fr',
-        viewMode: 'teaser',
-        pageVariant: 'alternate',
-      },
-    };
-    expect(parseDraftData(serializeDraftData(draftData))).toEqual(draftData);
-  });
-
-  it.each([{ pageVariant: 42 }, { language: 42 }, { language: null }])(
-    'rejects invalid editor preview context %s',
-    (previewContext) => {
-      expect(
-        parseDraftData(
-          JSON.stringify({
-            ...validDraftData,
-            previewContext,
-          }),
-        ),
-      ).toBeNull();
+  it.each([undefined, false, true])(
+    'round-trips optional editor preview context with excludeAutoSave=%s',
+    (excludeAutoSave) => {
+      const draftData = {
+        ...validDraftData,
+        previewContext: {
+          language: 'fr',
+          viewMode: 'teaser',
+          pageVariant: 'alternate',
+          ...(excludeAutoSave !== undefined && { excludeAutoSave }),
+        },
+      };
+      expect(parseDraftData(serializeDraftData(draftData))).toEqual(draftData);
     },
   );
+
+  it.each([
+    { pageVariant: 42 },
+    { language: 42 },
+    { language: null },
+    { excludeAutoSave: 'false' },
+    { excludeAutoSave: 0 },
+    { excludeAutoSave: null },
+  ])('rejects invalid editor preview context %s', (previewContext) => {
+    expect(
+      parseDraftData(
+        JSON.stringify({
+          ...validDraftData,
+          previewContext,
+        }),
+      ),
+    ).toBeNull();
+  });
 
   it.each([null, undefined, ''])('returns null for %s', (value) => {
     expect(parseDraftData(value)).toBeNull();

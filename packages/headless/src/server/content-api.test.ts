@@ -64,7 +64,7 @@ describe('language negotiation transport', () => {
             previewContext: {
               language: 'fr',
               viewMode: 'full',
-              pageVariant: 'test',
+              excludeAutoSave: true,
             },
           },
         });
@@ -80,7 +80,7 @@ describe('language negotiation transport', () => {
           requestUri: '/fr/page/1?language=route-owned',
           language: 'fr',
           viewMode: 'full',
-          pageVariant: 'test',
+          excludeAutoSave: 'true',
           _canvas_headless_language_redirect: '1',
         });
       } finally {

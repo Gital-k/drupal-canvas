@@ -98,7 +98,12 @@ class PreviewAssertionFactory implements PreviewAssertionFactoryInterface {
     // browser reaches Drupal on — even in multi-origin topologies where the
     // app's server-side calls use a different one. Carried as a signed
     // claim, it needs no frontend configuration and cannot be tampered with.
-    $renew_url = Url::fromRoute('canvas_headless.renew', [], ['absolute' => TRUE])->toString();
+    $renew_options = ['absolute' => TRUE];
+    if (isset($preview_context['excludeAutoSave'])) {
+      // Standalone renewal must keep the session's auto-save selection.
+      $renew_options['query']['exclude_auto_save'] = (int) $preview_context['excludeAutoSave'];
+    }
+    $renew_url = Url::fromRoute('canvas_headless.renew', [], $renew_options)->toString();
     // The site UUID, not a URL: unique per installation and independent of
     // the request origin, it survives multi-origin topologies and fences
     // separately installed sites that share a keypair. Clones of one
