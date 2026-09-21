@@ -30,4 +30,4 @@ css:
   compiled: ''
 dataDependencies:
   drupalSettings:
-    - v0.locale
+    - v0.langcode

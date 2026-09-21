@@ -9,15 +9,15 @@ import {
 
 import type { CanvasDateFormatOptions } from './date-utils';
 
-/** Helper to set locale settings for the duration of a test. */
-function setLocale(
+/** Helper to set langcode settings for the duration of a test. */
+function setLangcode(
   langcode: string,
-  canvasLocale: string | null = langcode,
+  canvasLangcode: string | null = langcode,
 ): void {
   (
     globalThis as {
       drupalSettings?: {
-        canvasData?: { v0?: { locale?: string | null } };
+        canvasData?: { v0?: { langcode?: string | null } };
         langcode?: string;
       };
     }
@@ -25,7 +25,7 @@ function setLocale(
     langcode,
     canvasData: {
       v0: {
-        locale: canvasLocale,
+        langcode: canvasLangcode,
       },
     },
   };
@@ -37,7 +37,7 @@ function clearLocale(): void {
 }
 
 describe('canvasFormatDate', () => {
-  beforeEach(() => setLocale('en'));
+  beforeEach(() => setLangcode('en'));
   afterEach(() => clearLocale());
 
   it('returns a formatted date string for a valid ISO date (en)', () => {
@@ -66,21 +66,21 @@ describe('canvasFormatDate', () => {
   });
 
   it('formats differently for fr locale', () => {
-    setLocale('fr');
+    setLangcode('fr');
     const result = canvasFormatDate('2026-01-15');
     expect(result).not.toBe('2026-01-15');
     expect(result).not.toBe('');
   });
 
   it('formats for ja locale without throwing', () => {
-    setLocale('ja');
+    setLangcode('ja');
     const result = canvasFormatDate('2026-01-15');
     expect(result).not.toBe('2026-01-15');
     expect(result).not.toBe('');
   });
 
-  it('falls back gracefully for an invalid locale string', () => {
-    setLocale('invalid-LOCALE-999');
+  it('falls back gracefully for an invalid langcode string', () => {
+    setLangcode('invalid-LOCALE-999');
     // Should not throw; falls back to 'en' internally.
     const result = canvasFormatDate('2026-01-15');
     expect(typeof result).toBe('string');
@@ -94,10 +94,10 @@ describe('canvasFormatDate', () => {
     expect(result).not.toBe('2026-01-15');
   });
 
-  it('prefers canvasData.v0.locale over drupalSettings.langcode', () => {
-    setLocale('en', 'fr');
+  it('prefers canvasData.v0.langcode over drupalSettings.langcode', () => {
+    setLangcode('en', 'fr');
     const frenchResult = canvasFormatDate('2026-01-15');
-    setLocale('en', 'en');
+    setLangcode('en', 'en');
     const englishResult = canvasFormatDate('2026-01-15');
     expect(frenchResult).not.toBe('2026-01-15');
     expect(englishResult).not.toBe('2026-01-15');
@@ -122,7 +122,7 @@ describe('canvasFormatDate', () => {
 });
 
 describe('canvasFormatDateTime', () => {
-  beforeEach(() => setLocale('en'));
+  beforeEach(() => setLangcode('en'));
   afterEach(() => clearLocale());
 
   it('returns a formatted datetime string for a valid ISO datetime', () => {
@@ -162,7 +162,7 @@ describe('canvasFormatDateTime', () => {
 });
 
 describe('canvasFormatTime', () => {
-  beforeEach(() => setLocale('en'));
+  beforeEach(() => setLangcode('en'));
   afterEach(() => clearLocale());
 
   it('returns a formatted time string for a bare HH:MM:SS time', () => {
@@ -197,7 +197,7 @@ describe('canvasFormatTime', () => {
 });
 
 describe('optional props without a value', () => {
-  beforeEach(() => setLocale('en'));
+  beforeEach(() => setLangcode('en'));
   afterEach(() => clearLocale());
 
   it.each([null, undefined])(
@@ -221,7 +221,7 @@ describe('values without a UTC offset in a non-UTC timezone', () => {
   const originalTz = process.env.TZ;
   beforeEach(() => {
     process.env.TZ = 'America/New_York';
-    setLocale('en');
+    setLangcode('en');
   });
   afterEach(() => {
     if (originalTz === undefined) {
@@ -267,7 +267,7 @@ describe('values without a UTC offset in a non-UTC timezone', () => {
 });
 
 describe('canvasFormatDateRange', () => {
-  beforeEach(() => setLocale('en'));
+  beforeEach(() => setLangcode('en'));
   afterEach(() => clearLocale());
 
   it('formats both from and to fields', () => {

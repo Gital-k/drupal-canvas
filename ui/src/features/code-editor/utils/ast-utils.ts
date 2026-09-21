@@ -41,10 +41,10 @@ export const getDataDependenciesFromAst = (ast: File): DataDependencies =>
         getSiteData: ['v0.baseUrl', 'v0.branding'],
         getPageData: ['v0.breadcrumbs', 'v0.pageTitle', 'v0.mainEntity'],
         // The date formatting utilities read the active interface language.
-        canvasFormatDate: ['v0.locale'],
-        canvasFormatDateTime: ['v0.locale'],
-        canvasFormatTime: ['v0.locale'],
-        canvasFormatDateRange: ['v0.locale'],
+        canvasFormatDate: ['v0.langcode'],
+        canvasFormatDateTime: ['v0.langcode'],
+        canvasFormatTime: ['v0.langcode'],
+        canvasFormatDateRange: ['v0.langcode'],
       };
       const drupalSettingsDependencies = carry.drupalSettings || [];
       const computedSettings = drupalSettingsDependencies

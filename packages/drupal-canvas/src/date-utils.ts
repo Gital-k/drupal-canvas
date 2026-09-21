@@ -2,12 +2,12 @@
  * Locale-aware date formatting utilities for Canvas Code Components.
  *
  * These functions format ISO date/time strings using the Drupal-selected
- * locale from `drupalSettings.canvasData.v0.locale`. They are opt-in: Canvas passes date
+ * langcode from `drupalSettings.canvasData.v0.langcode`. They are opt-in: Canvas passes date
  * props to templates as raw ISO strings by default. Use these utilities when
  * you want to display a date in the user's locale.
  *
  * All functions accept an optional `options` object so callers can override
- * default format styles without losing the Drupal locale or the UTC timezone
+ * default format styles without losing the Drupal langcode or the UTC timezone
  * guard that prevents stored dates from shifting by the viewer's UTC offset.
  *
  * @example Twig: `{{ my_date_prop|canvasFormatDate }}`
@@ -19,7 +19,7 @@
  * Options accepted by the Canvas date formatting utilities.
  *
  * All fields are optional and default to `'short'`. Pass an options object to
- * override the format style without losing the Drupal locale or UTC timezone
+ * override the format style without losing the Drupal langcode or UTC timezone
  * guard.
  */
 export interface CanvasDateFormatOptions {
@@ -30,33 +30,33 @@ export interface CanvasDateFormatOptions {
 }
 
 /**
- * Reads the Drupal-selected locale from Canvas runtime settings when present,
+ * Reads the Drupal-selected langcode from Canvas runtime settings when present,
  * falling back to `drupalSettings.langcode` and then 'en'.
  *
- * Canvas attaches `canvasData.v0.locale` for every code component that imports
- * one of these utilities: the import adds `v0.locale` to the component's
+ * Canvas attaches `canvasData.v0.langcode` for every code component that imports
+ * one of these utilities: the import adds `v0.langcode` to the component's
  * `dataDependencies.drupalSettings`. Drupal core only sets
  * `drupalSettings.langcode` on pages with a machine name form element, so that
- * fallback is not a locale source on rendered pages.
+ * fallback is not a langcode source on rendered pages.
  *
  * @see ui/src/features/code-editor/utils/ast-utils.ts
  */
-const getDrupalLocale = (): string =>
+const getDrupalLangcode = (): string =>
   (
     globalThis as {
       drupalSettings?: {
-        canvasData?: { v0?: { locale?: string } };
+        canvasData?: { v0?: { langcode?: string } };
         langcode?: string;
       };
     }
-  ).drupalSettings?.canvasData?.v0?.locale ??
+  ).drupalSettings?.canvasData?.v0?.langcode ??
   (globalThis as { drupalSettings?: { langcode?: string } }).drupalSettings
     ?.langcode ??
   'en';
 
 /**
  * Creates an `Intl.DateTimeFormat` instance, falling back to 'en' locale if
- * the Drupal locale string is not a valid BCP 47 tag.
+ * the Drupal langcode string is not a valid BCP 47 tag.
  *
  * Drupal langcodes like `zh-hans` or `pt-br` use lowercase language tag
  * components which may throw `RangeError` in strict BCP 47 environments.
@@ -117,7 +117,7 @@ export function canvasFormatDate(
   if (iso == null) return '';
   const date = parseIso(iso);
   if (!date) return iso;
-  return createFormatter(getDrupalLocale(), {
+  return createFormatter(getDrupalLangcode(), {
     dateStyle: options?.dateStyle ?? 'short',
   }).format(date);
 }
@@ -144,7 +144,7 @@ export function canvasFormatDateTime(
   if (iso == null) return '';
   const date = parseIso(iso);
   if (!date) return iso;
-  return createFormatter(getDrupalLocale(), {
+  return createFormatter(getDrupalLangcode(), {
     dateStyle: options?.dateStyle ?? 'short',
     timeStyle: options?.timeStyle ?? 'short',
   }).format(date);
@@ -173,7 +173,7 @@ export function canvasFormatTime(
   const normalized = /^\d{2}:\d{2}/.test(iso) ? `1970-01-01T${iso}` : iso;
   const date = parseIso(normalized);
   if (!date) return iso;
-  return createFormatter(getDrupalLocale(), {
+  return createFormatter(getDrupalLangcode(), {
     timeStyle: options?.timeStyle ?? 'short',
   }).format(date);
 }

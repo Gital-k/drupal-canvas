@@ -105,7 +105,7 @@ export interface DrupalSettings {
   };
   canvasData: {
     v0: {
-      locale: string | null;
+      langcode: string | null;
       pageTitle: string;
       branding: {
         homeUrl: string;

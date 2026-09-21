@@ -780,7 +780,7 @@ describe('getDataDependenciesFromAst', () => {
     const ast = parse(code, { sourceType: 'module' });
     const result = getDataDependenciesFromAst(ast);
     expect(result).to.deep.equal({
-      drupalSettings: ['v0.locale'],
+      drupalSettings: ['v0.langcode'],
     });
   });
 

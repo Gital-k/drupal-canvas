@@ -220,8 +220,8 @@ When you want to display a date in the user's locale, use the Canvas date
 formatting utilities. Both Twig filters and JSX functions automatically:
 
 - Use the active Drupal interface language. The JSX functions read it from
-  `drupalSettings.canvasData.v0.locale`. Importing any of them from
-  `drupal-canvas` adds the `v0.locale` entry to the code component's
+  `drupalSettings.canvasData.v0.langcode`. Importing any of them from
+  `drupal-canvas` adds the `v0.langcode` entry to the code component's
   `dataDependencies.drupalSettings`, which attaches that setting wherever the
   component is rendered.
 - Treat a value without a UTC offset as UTC and apply `timeZone: 'UTC'`, so

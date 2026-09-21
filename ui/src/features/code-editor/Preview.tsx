@@ -270,8 +270,8 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
         ...drupalSettings.canvasData,
         v0: {
           ...drupalSettings.canvasData?.v0,
-          locale:
-            drupalSettings.canvasData?.v0?.locale ?? drupalSettings.langcode,
+          langcode:
+            drupalSettings.canvasData?.v0?.langcode ?? drupalSettings.langcode,
         },
       },
     };
