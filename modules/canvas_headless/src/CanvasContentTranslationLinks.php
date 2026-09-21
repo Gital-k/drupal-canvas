@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\canvas_headless;
 
+use Drupal\canvas\EntityTranslationMetadata;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
@@ -21,7 +23,7 @@ use Drupal\language\Plugin\LanguageNegotiation\LanguageNegotiationUI;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Builds accessible translation request URIs for routed content.
+ * Builds language-switcher metadata and request URIs for routed content.
  *
  * The optional language_negotiator service is NULL without the language module.
  * All language plugin references are guarded by the negotiator's presence.
@@ -41,7 +43,7 @@ final class CanvasContentTranslationLinks {
   /**
    * Returns language context and adds all translation dependencies.
    *
-   * @return array{negotiatedLanguage: string, translations: list<array{langcode: string, current: bool, url: string, external: bool}>}
+   * @return array{negotiatedLanguage: string, translations: list<array{langcode: string, name: string, nativeName: string, url: string, translationAvailable: bool, current: bool, external: bool}>}
    *   Language context for the route.
    */
   public function build(?ContentEntityInterface $entity, Request $request, CacheableMetadata $cacheability): array {
@@ -71,40 +73,36 @@ final class CanvasContentTranslationLinks {
       ($this->negotiator->isNegotiationMethodEnabled(LanguageNegotiationUI::METHOD_ID, LanguageInterface::TYPE_CONTENT) &&
         $this->negotiator->isNegotiationMethodEnabled(LanguageNegotiationSession::METHOD_ID, LanguageInterface::TYPE_INTERFACE))
     );
-    foreach ($entity->getTranslationLanguages() as $langcode => $language) {
-      $translation = $entity->getTranslation($langcode);
-      $access = $translation->access('view', $this->currentUser->getAccount(), TRUE);
-      $cacheability->addCacheableDependency($translation)->addCacheableDependency($access);
-      if (!$access->isAllowed()) {
-        continue;
-      }
-      $link = $links[$langcode] ?? [];
-      $target = $link['url'] ?? $canonical;
-      if (!$target instanceof Url) {
-        continue;
-      }
-      $url = clone $target;
-      $url->setOption('language', $link['language'] ?? $language);
-      $query = $link['query'] ?? [];
-      // Preview selectors are API implementation details, never public links.
-      unset($query[CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY]);
-      if ($session_enabled) {
-        // An empty URL prefix lets negotiation fall through to the session
-        // method even when URL negotiation has priority. Never carry another
-        // translation's selector or rely on session state for the current one.
-        $parameter = $this->configFactory->get('language.negotiation')->get('session.parameter');
-        $query[$parameter] = $langcode;
-      }
-      $url->setOption('query', $query)->setAbsolute();
-      $generated = $url->toString(TRUE);
-      $cacheability->addCacheableDependency($generated);
-      $uri = CanvasContentUrl::normalize($generated->getGeneratedUrl(), $request);
-      $result['translations'][] = [
-        'langcode' => $langcode,
-        'current' => $langcode === $entity->language()->getId(),
-        'url' => $uri,
-        'external' => UrlHelper::isExternal($uri),
-      ];
+    $translations = EntityTranslationMetadata::build(
+      $entity,
+      $this->languageManager,
+      $result['negotiatedLanguage'],
+      function (EntityInterface $translation, LanguageInterface $language) use ($links, $session_enabled, $request, $cacheability): string {
+        $langcode = $language->getId();
+        $link = $links[$langcode] ?? [];
+        $target = $link['url'] ?? NULL;
+        $url = $target instanceof Url ? clone $target : $translation->toUrl('canonical');
+        $url->setOption('entity', $translation);
+        $url->setOption('language', $link['language'] ?? $language);
+        $query = $link['query'] ?? [];
+        // Editor preview settings are not part of a translation's public URL.
+        unset($query[CanvasContentApiRequest::API_QUERY_PARAMETERS_KEY]);
+        if ($session_enabled) {
+          // Even with URL priority, an empty prefix can fall through to session
+          // negotiation. Explicitly select this language without session state.
+          $parameter = $this->configFactory->get('language.negotiation')->get('session.parameter');
+          $query[$parameter] = $langcode;
+        }
+        $url->setOption('query', $query)->setAbsolute();
+        $generated = $url->toString(TRUE);
+        $cacheability->addCacheableDependency($generated);
+        return CanvasContentUrl::normalize($generated->getGeneratedUrl(), $request);
+      },
+      $this->currentUser->getAccount(),
+      $cacheability,
+    );
+    foreach ($translations as $translation) {
+      $result['translations'][] = $translation + ['external' => UrlHelper::isExternal($translation['url'])];
     }
     return $result;
   }

@@ -117,7 +117,24 @@ describe('isPageRedirect', () => {
           managedByCanvas: true,
           negotiatedLanguage: 'fr',
           translations: [
-            { langcode: 'en', current: true, url: '/page', external: false },
+            {
+              langcode: 'en',
+              name: 'English',
+              nativeName: 'English',
+              translationAvailable: true,
+              current: false,
+              url: '/page',
+              external: false,
+            },
+            {
+              langcode: 'fr',
+              name: 'French',
+              nativeName: 'Français',
+              translationAvailable: false,
+              current: true,
+              url: '/fr/page',
+              external: false,
+            },
           ],
           entity: {
             entityType: 'canvas_page',

@@ -52,12 +52,19 @@ export interface DrupalRouteEntity {
   langcode: string;
 }
 
-/** An existing translation the requester may view. */
+/** An enabled language, matching Code Component translation metadata. */
 export interface DrupalRouteTranslation {
   langcode: string;
-  /** Matches the rendered entity language, not necessarily the requested one. */
+  /** Localized display name. */
+  name: string;
+  /** The language's own name. */
+  nativeName: string;
+  /** Exists and is viewable; false for both missing and denied translations. */
+  translationAvailable: boolean;
+  /** Matches negotiatedLanguage, even when the rendered entity falls back. */
   current: boolean;
-  /** Drupal request URI without its base path, or an absolute external URL. */
+  /** Drupal URI without its base path, or an external URL. Unavailable entries
+   * use Code Component fallback semantics, not a guarantee of access. */
   url: string;
   /** External URLs are not valid fetchPage input; map them to public URLs. */
   external: boolean;

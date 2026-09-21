@@ -1,8 +1,8 @@
-# 21. Structured translation links in the Headless content API
+# ADR 21: Structured translation links in the headless content API
 
 <!-- cspell:words hreflang contacto -->
 
-Date: 2026-09-18
+Date: 2026-09-21
 
 ## Status
 
@@ -10,39 +10,44 @@ Accepted
 
 ## Context
 
-A multilingual headless frontend needs to know which translations exist and how to request them. Drupal owns translation availability, access, aliases, and language negotiation; the frontend owns public URLs (ADR 18). HTML alternate links alone cannot describe availability or distinguish the negotiated language from the rendered fallback.
+A multilingual headless frontend needs language-switcher data. Drupal owns translation availability, access, aliases, and language negotiation; the frontend owns public URLs (ADR 18). HTML alternate links alone cannot describe availability or distinguish the negotiated language from the rendered fallback.
 
-The code-component contract serves a different switcher policy: it lists every enabled language, supplies localized and native names, marks availability, and provides fallback URLs for unavailable translations. Its `current` marker follows the requested language. A list of actual accessible translations instead lets a headless frontend offer only content it can retrieve, without interpreting fallback entries.
+Code Components access a page entity's translations through `getPageData()` from `drupal-canvas`, under `mainEntity.translations`. Using the same entry fields and semantics lets both consumers build all-language or available-only switchers without learning different meanings of availability and `current`.
 
 ## Decision
 
-The routed content API adds required `route.negotiatedLanguage` and `route.translations` fields:
+The routed content API provides required `route.negotiatedLanguage` and `route.translations` fields. The former is the negotiated content-language ID; `route.entity.langcode` remains the rendered entity language. The translations list is empty on monolingual sites and routes without a canonical content entity. Otherwise it lists every enabled language, matching Code Components:
 
-- `negotiatedLanguage` is the negotiated content-language ID.
-- `translations` contains accessible existing translations, including the rendered one. Missing and inaccessible translations have no entries. Monolingual sites and routes without a canonical content entity return an empty array.
-- Each entry has `langcode`, `current`, `url`, and `external`. `current` matches the rendered `route.entity.langcode`, not necessarily the negotiated language.
-- Non-external URLs are site-relative Drupal request URIs with the installation base path removed. Language prefixes and query parameters are preserved. External URLs remain absolute and are **not valid `fetchPage` input**; exposing them does not imply SDK domain-negotiation support.
+- `langcode`, `name`, and `nativeName` identify the language and provide its localized and native display names.
+- `translationAvailable` is true only when the translation exists and the requester may view it. Missing and denied translations both report false.
+- `current` follows the requested/negotiated language, even when Drupal renders another language.
+- `url` uses the available translation, or the supplied rendered entity when unavailable, in the entry's language URL form. This preserves Code Component fallback semantics; an unavailable entry's URL is not a guarantee of viewable content.
 
-For example, when French is requested but Drupal renders English, the language fields can be:
+Headless entries also include `external`. Non-external URLs are site-relative Drupal request URIs with the installation base path removed, preserving language prefixes and query parameters. These are inputs to `fetchPage`. External URLs remain absolute and are not valid `fetchPage` input; this flag does not imply SDK domain-negotiation support.
+
+For example, a French request that renders English can return these language fields:
 
 ```json
 {
   "negotiatedLanguage": "fr",
   "translations": [
-    { "langcode": "en", "current": true, "url": "/contact", "external": false },
-    { "langcode": "es", "current": false, "url": "/es/contacto", "external": false }
+    { "langcode": "en", "name": "English", "nativeName": "English", "url": "/contact", "translationAvailable": true, "current": false, "external": false },
+    { "langcode": "fr", "name": "French", "nativeName": "Français", "url": "/fr/page/1", "translationAvailable": false, "current": true, "external": false },
+    { "langcode": "es", "name": "Spanish", "nativeName": "Español", "url": "/es/contacto", "translationAvailable": true, "current": false, "external": false }
   ]
 }
 ```
 
-The frontend supplies display names and maps Drupal URIs to public URLs: `/es/contacto` might become `https://example.es/contacto` or `/es-ES/contacto`. The original `/es/contacto` remains the input for fetching that translation from Drupal. With query negotiation, `/contact?language=en` explicitly selects English even when it is the current language; no Drupal session is assumed.
+The frontend maps Drupal URIs to public URLs: `/es/contacto` might become `https://example.es/contacto` or `/es-ES/contacto`. The original `/es/contacto` remains the input for fetching that translation from Drupal. With query negotiation, each link includes the language to request, such as `/contact?language=en`. Following the link selects English regardless of the visitor's previous browsing or Drupal session.
 
-Links use Drupal's language-switch options in content-negotiation order, following interface negotiation where content delegates to it. Internal preview selectors are excluded. Every translation access decision, including denials, and every generated URL contributes cacheability. Responses also depend on language configuration, negotiated content/interface/URL languages, request URI, and preview account access. An authorized preview can therefore list a translation omitted from the public response.
+Headless links use Drupal's language-switch options in configured content-negotiation order, following interface negotiation where content delegates to it. Editor-only query parameters for previewing a view mode, component, page variant, or language are omitted. The links retain the site's language-selection parameters, not editor preview settings. These request-URI requirements justify consumer-specific URL processing, while enumeration, names, availability, and `current` share one policy.
 
-Metatag-provided head links pass through unchanged. This contract does not add hreflang generation, display-name fields, fallback entries, prefix-free alias fields, non-entity language links, entity-endpoint translation metadata, or SDK mapping helpers/templates.
+Every translation access decision, including denials, and every generated headless URL contributes cacheability. Responses also depend on language configuration and display names, negotiated content/interface/URL languages, request URI, and preview account access. Authorized previews can report translations as available that public requests cannot view.
+
+Providing structured translations does not generate HTML `hreflang` links. This contract excludes entity-endpoint translation metadata and SDK public-URL mapping helpers.
 
 ## Consequences
 
-Every entry denotes content the requester can view. Frontends that want an all-languages switcher must separately define how to present unavailable languages. Matching the code-component contract would reduce differences between consumers, but would change this invariant and the meaning of `current`; adding fallback entries is not necessarily compatible with existing consumers.
+Frontends can show all languages or filter by `translationAvailable`. After filtering, no entry is current when the requested language is unavailable. A frontend that instead highlights the rendered language compares entries with `route.entity.langcode`.
 
-Display names are a separate payload choice, not a reason to adopt fallback behavior. Even with matching availability semantics, headless URLs need the request-URI/base-path/external distinction because Drupal URLs and frontend public URLs are not interchangeable.
+Parity avoids conflicting switcher semantics but also retains the fallback URL behavior shared with Code Components. Consumers must not treat unavailable entries as promises of retrievable content. Headless URL normalization and public-URL mapping remain separate concerns because Drupal request URIs and frontend public URLs are not interchangeable.

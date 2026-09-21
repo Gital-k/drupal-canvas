@@ -530,23 +530,32 @@ components:
           description: Negotiated content-language ID, which may differ from the rendered entity language on fallback.
         translations:
           type: array
-          description: Accessible existing translations, including the rendered translation. Empty on monolingual sites and non-entity routes. No entries for missing translations.
+          description: All enabled languages, with Code Component translation metadata and fallback URL semantics. Empty on monolingual sites and routes without a canonical content entity.
           items:
             $ref: '#/components/schemas/RouteTranslation'
 
     RouteTranslation:
       type: object
       additionalProperties: false
-      required: [langcode, current, url, external]
+      required: [langcode, name, nativeName, translationAvailable, current, url, external]
       properties:
         langcode:
           type: string
+        name:
+          type: string
+          description: Localized language name.
+        nativeName:
+          type: string
+          description: The language's own name.
+        translationAvailable:
+          type: boolean
+          description: True only if the translation exists and the requester may view it. Missing and denied translations both report false.
         current:
           type: boolean
-          description: Matches the rendered entity language, including language fallback.
+          description: Matches negotiatedLanguage, even when the rendered entity falls back.
         url:
           type: string
-          description: Site-relative Drupal request URI with base path removed, or an absolute external URL. The frontend maps this to its public URL.
+          description: Site-relative Drupal request URI with base path removed, or an absolute external URL. The frontend maps this to its public URL. Unavailable entries use Code Component fallback URL semantics; their URLs are not guaranteed to be viewable.
         external:
           type: boolean
           description: External URLs are not valid content API or SDK fetchPage input. This does not imply domain negotiation support in the SDK.

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_headless\Kernel;
 
-// cspell:ignore unroutable francaise Btag
+// cspell:ignore unroutable francaise Btag Anglais
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Component;
@@ -1167,13 +1167,18 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     $route = self::responseData($response)['route'];
     self::assertSame('fr', $route['negotiatedLanguage']);
     self::assertSame([
-      ['langcode' => 'en', 'current' => FALSE, 'url' => '/hello?locale=fr', 'external' => FALSE],
-      ['langcode' => 'fr', 'current' => TRUE, 'url' => '/fr/bonjour?locale=fr', 'external' => FALSE],
+      ['langcode' => 'en', 'name' => 'English', 'nativeName' => 'English', 'url' => '/hello?locale=fr', 'translationAvailable' => TRUE, 'current' => FALSE, 'external' => FALSE],
+      ['langcode' => 'fr', 'name' => 'French', 'nativeName' => 'Français', 'url' => '/fr/bonjour?locale=fr', 'translationAvailable' => TRUE, 'current' => TRUE, 'external' => FALSE],
+      ['langcode' => 'de', 'name' => 'German', 'nativeName' => 'Deutsch', 'url' => '/de/page/' . $page->id() . '?locale=fr', 'translationAvailable' => FALSE, 'current' => FALSE, 'external' => FALSE],
     ], $route['translations']);
     foreach ($route['translations'] as $translation) {
-      $target = self::responseData($this->renderContentPath($translation['url']))['route'];
-      self::assertSame($translation['langcode'], $target['entity']['langcode']);
+      if ($translation['translationAvailable']) {
+        $target = self::responseData($this->renderContentPath($translation['url']))['route'];
+        self::assertSame($translation['langcode'], $target['entity']['langcode']);
+      }
     }
+    self::assertContains('languages:language_interface', $response->getCacheableMetadata()->getCacheContexts());
+    self::assertContains('config:language.entity.fr', $response->getCacheableMetadata()->getCacheTags());
     self::assertContains('languages:language_content', $response->getCacheableMetadata()->getCacheContexts());
     foreach (['config:configurable_language_list', 'config:language.types', 'config:language.negotiation'] as $tag) {
       self::assertContains($tag, $response->getCacheableMetadata()->getCacheTags());
@@ -1181,20 +1186,59 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     $fallback = self::responseData($this->renderContentPath('/de/page/' . $page->id()))['route'];
     self::assertSame('de', $fallback['negotiatedLanguage']);
     self::assertSame('en', $fallback['entity']['langcode']);
-    self::assertTrue($fallback['translations'][0]['current']);
-    self::assertCount(2, $fallback['translations']);
+    self::assertFalse($fallback['translations'][0]['current']);
+    self::assertTrue($fallback['translations'][2]['current']);
+    self::assertFalse($fallback['translations'][2]['translationAvailable']);
+    self::assertCount(3, $fallback['translations']);
+    self::assertSame([], array_filter($fallback['translations'], static fn (array $entry): bool => $entry['translationAvailable'] && $entry['current']));
 
     $page->getTranslation('fr')->set('status', FALSE)->save();
     $this->container->get(EntityTypeManagerInterface::class)->getAccessControlHandler('canvas_page')->resetCache();
     $response = $this->renderContentPath('/hello');
-    self::assertSame(['en'], array_column(self::responseData($response)['route']['translations'], 'langcode'));
+    $entries = self::responseData($response)['route']['translations'];
+    self::assertSame(['en', 'fr', 'de'], array_column($entries, 'langcode'));
+    self::assertSame([TRUE, FALSE, FALSE], array_column($entries, 'translationAvailable'));
+    // Keep the established language-specific fallback URL, even when denied.
+    self::assertSame('/fr/bonjour', $entries[1]['url']);
+    // Availability is not a route-access bypass: this established fallback URL
+    // still resolves to the denied translation, rather than viewable English.
+    try {
+      $this->renderContentPath($entries[1]['url']);
+      self::fail('An unavailable link must not bypass translation access.');
+    }
+    catch (CacheableAccessDeniedHttpException $exception) {
+      self::assertContains('user.permissions', $exception->getCacheContexts());
+    }
     self::assertContains('user.permissions', $response->getCacheableMetadata()->getCacheContexts());
     self::assertContains('canvas_page:' . $page->id(), $response->getCacheableMetadata()->getCacheTags());
     $editor = $this->createUser(['access content', Page::EDIT_PERMISSION]);
     self::assertInstanceOf(UserInterface::class, $editor);
     $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE, user: $editor));
     $preview = self::responseData($this->renderContentPath('/hello'))['route'];
-    self::assertSame(['en', 'fr'], array_column($preview['translations'], 'langcode'));
+    self::assertSame(['en', 'fr', 'de'], array_column($preview['translations'], 'langcode'));
+    self::assertSame([TRUE, TRUE, FALSE], array_column($preview['translations'], 'translationAvailable'));
+  }
+
+  /**
+   * Tests language names follow interface-language configuration overrides.
+   */
+  public function testTranslationLinkNames(): void {
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    $page = $this->createPage();
+    $this->config('language.negotiation')->set('url.prefixes', ['en' => '', 'fr' => 'fr'])->save();
+    $language_manager = $this->container->get(LanguageManagerInterface::class);
+    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $language_manager);
+    $language_manager->getLanguageConfigOverride('fr', 'language.entity.en')->set('label', 'Anglais')->save();
+    $this->container->get('kernel')->rebuildContainer();
+    $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE));
+    foreach (['' => 'English', '/fr' => 'Anglais'] as $prefix => $name) {
+      $response = $this->renderContentPath($prefix . '/page/' . $page->id());
+      $entries = self::responseData($response)['route']['translations'];
+      self::assertSame($name, $entries[0]['name']);
+      self::assertSame('English', $entries[0]['nativeName']);
+      self::assertContains('languages:language_interface', $response->getCacheableMetadata()->getCacheContexts());
+      self::assertContains('config:language.entity.en', $response->getCacheableMetadata()->getCacheTags());
+    }
   }
 
   /**
@@ -1219,8 +1263,8 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       $route = self::responseData($this->renderContentPath($path . '?locale=fr', ['viewMode' => 'full']))['route'];
       self::assertSame('fr', $route['negotiatedLanguage']);
       self::assertSame([
-        ['langcode' => 'en', 'current' => FALSE, 'url' => $path . '?locale=en', 'external' => FALSE],
-        ['langcode' => 'fr', 'current' => TRUE, 'url' => $path . '?locale=fr', 'external' => FALSE],
+        ['langcode' => 'en', 'name' => 'English', 'nativeName' => 'English', 'url' => $path . '?locale=en', 'translationAvailable' => TRUE, 'current' => FALSE, 'external' => FALSE],
+        ['langcode' => 'fr', 'name' => 'French', 'nativeName' => 'Français', 'url' => $path . '?locale=fr', 'translationAvailable' => TRUE, 'current' => TRUE, 'external' => FALSE],
       ], $route['translations']);
       foreach ($route['translations'] as $translation) {
         $target = self::responseData($this->renderContentPath($translation['url']))['route'];
@@ -1383,13 +1427,8 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertSame($session_first ? 'en' : 'fr', $route['negotiatedLanguage']);
     self::assertSame($session_first ? 'en' : 'fr', $route['entity']['langcode']);
     self::assertSame([
-      ['langcode' => 'en', 'current' => $session_first, 'url' => $path . '?locale=en', 'external' => FALSE],
-      [
-        'langcode' => 'fr',
-        'current' => !$session_first,
-        'url' => '/fr' . $path . '?locale=fr',
-        'external' => FALSE,
-      ],
+      ['langcode' => 'en', 'name' => 'English', 'nativeName' => 'English', 'url' => $path . '?locale=en', 'translationAvailable' => TRUE, 'current' => $session_first, 'external' => FALSE],
+      ['langcode' => 'fr', 'name' => 'French', 'nativeName' => 'Français', 'url' => '/fr' . $path . '?locale=fr', 'translationAvailable' => TRUE, 'current' => !$session_first, 'external' => FALSE],
     ], $route['translations']);
     foreach ($route['translations'] as $translation) {
       $target = self::responseData($this->renderContentPath($translation['url']))['route'];
@@ -1442,19 +1481,20 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       $route = self::responseData($this->renderContentPath($uri, ['viewMode' => 'full']))['route'];
       self::assertSame($negotiated, $route['negotiatedLanguage']);
       self::assertSame($rendered, $route['entity']['langcode']);
-      self::assertSame(['en', 'fr'], array_column($route['translations'], 'langcode'));
+      self::assertSame(['en', 'fr', 'de'], array_column($route['translations'], 'langcode'));
       foreach ($route['translations'] as $translation) {
         $langcode = $translation['langcode'];
-        self::assertSame($langcode === $rendered, $translation['current']);
+        self::assertSame($langcode === $negotiated, $translation['current']);
+        self::assertSame($langcode !== 'de', $translation['translationAvailable']);
         self::assertFalse($translation['external']);
-        self::assertSame(($langcode === 'fr' ? '/fr' : '') . $path, parse_url($translation['url'], PHP_URL_PATH));
+        self::assertSame(($langcode === 'en' ? '' : '/' . $langcode) . $path, parse_url($translation['url'], PHP_URL_PATH));
         $query_string = parse_url($translation['url'], PHP_URL_QUERY);
         self::assertIsString($query_string);
         parse_str($query_string, $query);
         self::assertEquals(['locale' => $langcode, 'campaign' => 'test'], $query);
         $target = self::responseData($this->renderContentPath($translation['url']))['route'];
         self::assertSame($langcode, $target['negotiatedLanguage']);
-        self::assertSame($langcode, $target['entity']['langcode']);
+        self::assertSame($langcode === 'de' ? 'en' : $langcode, $target['entity']['langcode']);
       }
     }
   }
@@ -1487,8 +1527,8 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE));
     $route = self::responseData($this->renderPage($page))['route'];
     self::assertSame([
-      ['langcode' => 'en', 'current' => TRUE, 'url' => '/page/' . $page->id(), 'external' => FALSE],
-      ['langcode' => 'fr', 'current' => FALSE, 'url' => 'http://fr.example.com/page/' . $page->id(), 'external' => TRUE],
+      ['langcode' => 'en', 'name' => 'English', 'nativeName' => 'English', 'url' => '/page/' . $page->id(), 'translationAvailable' => TRUE, 'current' => TRUE, 'external' => FALSE],
+      ['langcode' => 'fr', 'name' => 'French', 'nativeName' => 'Français', 'url' => 'http://fr.example.com/page/' . $page->id(), 'translationAvailable' => TRUE, 'current' => FALSE, 'external' => TRUE],
     ], $route['translations']);
   }
 
@@ -1514,8 +1554,8 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertInstanceOf(CacheableJsonResponse::class, $response);
     $route = self::responseData($response)['route'];
     self::assertSame([
-      ['langcode' => 'en', 'current' => FALSE, 'url' => '/page/' . $page->id(), 'external' => FALSE],
-      ['langcode' => 'fr', 'current' => TRUE, 'url' => '/fr/page/' . $page->id(), 'external' => FALSE],
+      ['langcode' => 'en', 'name' => 'English', 'nativeName' => 'English', 'url' => '/page/' . $page->id(), 'translationAvailable' => TRUE, 'current' => FALSE, 'external' => FALSE],
+      ['langcode' => 'fr', 'name' => 'French', 'nativeName' => 'Français', 'url' => '/fr/page/' . $page->id(), 'translationAvailable' => TRUE, 'current' => TRUE, 'external' => FALSE],
     ], $route['translations']);
   }
 

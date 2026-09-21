@@ -31,7 +31,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Tests dependencies of both included and omitted translation links.
+ * Tests dependencies of both available and unavailable translation entries.
  */
 #[CoversClass(CanvasContentTranslationLinks::class)]
 #[Group('canvas_headless')]
@@ -61,11 +61,13 @@ final class CanvasContentTranslationLinksTest extends UnitTestCase {
    */
   #[DataProvider('negotiationOrder')]
   public function testCacheabilityAndPrecedence(?bool $session_first): void {
-    $english = new Language(['id' => 'en']);
-    $french = new Language(['id' => 'fr']);
+    $english = new Language(['id' => 'en', 'name' => 'English']);
+    $french = new Language(['id' => 'fr', 'name' => 'French']);
+    $german = new Language(['id' => 'de', 'name' => 'German']);
     $manager = $this->createMock(LanguageManagerInterface::class);
     $manager->method('getCurrentLanguage')->willReturn($english);
     $manager->method('isMultilingual')->willReturn(TRUE);
+    $manager->method('getLanguages')->willReturn(['en' => $english, 'fr' => $french, 'de' => $german]);
     $account = $this->createMock(AccountProxyInterface::class);
     $account->method('getAccount')->willReturn($this->createMock(AccountInterface::class));
     $generated = (new GeneratedUrl())
@@ -80,7 +82,7 @@ final class CanvasContentTranslationLinksTest extends UnitTestCase {
     $entity = $this->createMock(ContentEntityInterface::class);
     $entity->method('hasLinkTemplate')->with('canonical')->willReturn(TRUE);
     $entity->method('toUrl')->with('canonical')->willReturn($url);
-    $entity->method('getTranslationLanguages')->willReturn(['en' => $english, 'fr' => $french]);
+    $entity->method('hasTranslation')->willReturnMap([['en', TRUE], ['fr', TRUE], ['de', FALSE]]);
     $entity->method('language')->willReturn($english);
     $entity->method('getCacheMaxAge')->willReturn(Cache::PERMANENT);
     $entity->method('getCacheTags')->willReturn([]);
@@ -147,7 +149,11 @@ final class CanvasContentTranslationLinksTest extends UnitTestCase {
     $result = $builder->build($entity, Request::create('http://localhost/page/1'), $cacheability);
     self::assertSame([
       'negotiatedLanguage' => 'en',
-      'translations' => [['langcode' => 'en', 'current' => TRUE, 'url' => '/page/1', 'external' => FALSE]],
+      'translations' => [
+        ['langcode' => 'en', 'name' => 'English', 'nativeName' => 'English', 'url' => '/page/1', 'translationAvailable' => TRUE, 'current' => TRUE, 'external' => FALSE],
+        ['langcode' => 'fr', 'name' => 'French', 'nativeName' => 'Français', 'url' => '/page/1', 'translationAvailable' => FALSE, 'current' => FALSE, 'external' => FALSE],
+        ['langcode' => 'de', 'name' => 'German', 'nativeName' => 'Deutsch', 'url' => '/page/1', 'translationAvailable' => FALSE, 'current' => FALSE, 'external' => FALSE],
+      ],
     ], $result);
     foreach (['allowed_translation', 'denied_translation', 'generated_url'] as $tag) {
       self::assertContains($tag, $cacheability->getCacheTags());

@@ -162,15 +162,18 @@ roots in its `default` slot. Routes Canvas does not manage and managed routes wi
 `head` is compatible with the [Unhead](https://unhead.unjs.io/) package. It always contains `title` and may also
 contain `meta`, `link`, and `script`. Canonical links are omitted because the frontend owns its public URLs.
 
-`route.negotiatedLanguage` is the negotiated content-language ID. `route.translations` lists only existing
-translations the requester can view, including the rendered translation. It is empty for monolingual sites and
-non-entity routes. Each entry has `langcode`, `current`, `url`, and `external`; `current` matches
-`route.entity.langcode`, even when Drupal falls back from the negotiated language.
+`route.negotiatedLanguage` is the negotiated content-language ID. `route.translations` lists every enabled
+language, matching Code Components' `getPageData().mainEntity.translations`: `langcode`, localized `name`,
+`nativeName`, `url`, `translationAvailable`, and `current`. Missing and denied translations both report
+`translationAvailable: false`, with the established Code Component fallback URL semantics, not a guarantee
+of access. `current` follows `route.negotiatedLanguage`; `route.entity.langcode` identifies the rendered
+language. Monolingual sites and routes without a canonical content entity return an empty list.
 
 A non-external `url` is a site-relative Drupal request URI, with the installation base path removed and the
 language prefix or query preserved. External URLs remain absolute and are **not valid `fetchPage` input**;
 this does not add SDK support for domain negotiation. Frontends map entries to their own public URLs.
-Preview selectors are not included. Metatag-provided head links pass through unchanged.
+The headless-only `external` flag and URL processing support Drupal request URIs: configured negotiation
+priority and explicit query-language selection are preserved, while editor-only preview settings are omitted.
 See [multilingual examples](../../docs/multilingual-sites-with-canvas-headless.md#translation-links).
 
 ### Redirect response
