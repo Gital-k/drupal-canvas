@@ -1,3 +1,5 @@
+/* eslint vitest/expect-expect: ["error", { "assertFunctionNames": ["expect", "assert", "expectTypeOf"] }] */
+
 import { expectTypeOf, it } from 'vitest';
 
 import type { getPageData } from 'drupal-canvas';
