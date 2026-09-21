@@ -37,6 +37,8 @@ export interface DraftRouteHandlers {
     HEAD: ServerRouteHandler;
     POST: ServerRouteHandler;
     PATCH: ServerRouteHandler;
+    /** Routed to the shared proxy's 405 response, never forwarded. */
+    PUT: ServerRouteHandler;
     DELETE: ServerRouteHandler;
     OPTIONS: ServerRouteHandler;
   };
@@ -71,6 +73,7 @@ export function createDraftRouteHandlers(): DraftRouteHandlers {
       HEAD: proxy,
       POST: proxy,
       PATCH: proxy,
+      PUT: proxy,
       DELETE: proxy,
       OPTIONS: proxy,
     },
