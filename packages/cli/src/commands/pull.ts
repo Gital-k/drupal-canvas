@@ -4,7 +4,6 @@ import { Option } from 'commander';
 import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
 import {
-  buildColorLookupByUuid,
   discoverCanvasProject,
   loadComponentsMetadata,
   transformColorExamplesInProps,
@@ -273,7 +272,9 @@ export function createComponentsPullTask(
 
   function buildMetadata(component: Component): Metadata {
     // Build UUID → BrandKitColorEntry map from the shared ref.
-    const colorsByUuid = buildColorLookupByUuid(brandKitColorsRef.colors);
+    const colorsByUuid = new Map(
+      brandKitColorsRef.colors.map((c) => [c.id, c]),
+    );
 
     const metadata: Metadata = {
       name: component.name,

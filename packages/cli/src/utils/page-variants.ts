@@ -1,8 +1,5 @@
-import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
-
-import { jsonRenderSpecToAuthoredElementMap } from './authored-elements';
+import { resolvedComponentTreeToAuthoredElementMap } from './authored-elements';
 import { collapseColorPropsInElements } from './prop-transforms';
-import { isRecord } from './utils';
 
 import type { ComponentMetadata } from '@drupal-canvas/discovery';
 import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
@@ -43,20 +40,10 @@ export function pageVariantToAuthoredSpec(
     return { ...meta, elements: {} };
   }
 
-  // The PageVariant config schema omits `parent_uuid`, `slot`, and `label`
-  // when they have no value, so the server returns root-level components
-  // with those keys absent. canvasTreeToSpec requires explicit `null` to
-  // recognize root components, so normalize back here.
-  const components = variant.component_tree.map((node) => ({
-    ...node,
-    parent_uuid: node.parent_uuid ?? null,
-    slot: node.slot ?? null,
-    label: node.label ?? null,
-    inputs: isRecord(node.inputs) ? node.inputs : {},
-  }));
-
-  const spec = canvasTreeToSpec(components);
-  const baseElements = jsonRenderSpecToAuthoredElementMap(spec);
+  const baseElements = resolvedComponentTreeToAuthoredElementMap(
+    variant.component_tree,
+    { fallbackToRawInputs: true },
+  );
   const elements =
     componentMetadata.length > 0
       ? collapseColorPropsInElements(baseElements, componentMetadata)

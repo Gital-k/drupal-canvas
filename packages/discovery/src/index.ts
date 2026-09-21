@@ -17,8 +17,6 @@ export {
   HEX_COLOR_PATTERN,
   UUID_PATTERN,
   buildBrandKitColorCss,
-  buildColorLookupByCssVariable,
-  buildColorLookupByUuid,
   colorTokenToCss,
   colorTokenValuesEqual,
   deriveColorName,

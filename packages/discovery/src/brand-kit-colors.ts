@@ -554,26 +554,6 @@ export function readBrandKitColors(
   return normalizeBrandKitColors((parsed as { colors?: unknown }).colors);
 }
 
-/**
- * Builds a Map from CSS variable (e.g. "--brand-red") to BrandKitColorEntry.
- * Useful for push operations that convert cssVarKey → UUID.
- */
-export function buildColorLookupByCssVariable(
-  colors: BrandKitColorEntry[],
-): Map<string, BrandKitColorEntry> {
-  return new Map(colors.map((c) => [c.cssVariable, c]));
-}
-
-/**
- * Builds a Map from UUID to BrandKitColorEntry.
- * Useful for pull operations that convert UUID → cssVarKey.
- */
-export function buildColorLookupByUuid(
-  colors: BrandKitColorEntry[],
-): Map<string, BrandKitColorEntry> {
-  return new Map(colors.map((c) => [c.id, c]));
-}
-
 export type ColorRefTransformDirection = 'toVarKey' | 'toUuid';
 
 /**

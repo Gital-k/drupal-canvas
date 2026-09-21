@@ -3,10 +3,7 @@ import path from 'path';
 import chalk from 'chalk';
 import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
-import {
-  buildColorLookupByCssVariable,
-  transformColorExamplesInProps,
-} from '@drupal-canvas/discovery';
+import { transformColorExamplesInProps } from '@drupal-canvas/discovery';
 import { getImportsFromAst } from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
 
 import { getGlobalCss } from './build-tailwind.js';
@@ -387,7 +384,9 @@ export async function pushBuiltComponents(
     spinner.start('Checking component operations');
   }
   // Build CSS variable → BrandKitColorEntry map for color example serialization.
-  const colorsByCssVariable = buildColorLookupByCssVariable(brandKitColors);
+  const colorsByCssVariable = new Map(
+    brandKitColors.map((c) => [c.cssVariable, c]),
+  );
 
   let uploadTasks: ComponentUploadTask[];
   try {

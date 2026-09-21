@@ -17,8 +17,7 @@ Set the `CANVAS_SITE_URL` environment variable to your Drupal site URL.
 ## Usage
 
 **1. next.config.ts** — the config wrapper generates the component manifest at
-build time, adds the SDK packages to `transpilePackages`, and sends a
-session-aware CSP `frame-ancestors` header:
+build time and sends a session-aware CSP `frame-ancestors` header:
 
 ```ts
 import { withCanvas } from '@drupal-canvas/headless-next/config';
@@ -90,6 +89,14 @@ path resolved through Drupal routing. Both are draft-session-aware. Render
 `@drupal-canvas/headless-next` in `generateMetadata()`. Handle `PageRedirect`
 before page rendering with `permanentRedirect()` for permanent redirects and
 `redirect()` for other redirects.
+
+The client's JSON:API prefix is resolved from the site's public site-data
+endpoint (fetched once per server instance), so sites serving JSON:API from a
+non-default prefix (e.g. `/api`) work without configuration. When that endpoint
+is unreachable, the `CANVAS_JSONAPI_PREFIX` environment variable applies, then
+the `/jsonapi` default. `getPublicClient()` and `getDraftClient()` are async for
+the same reason: `await` them like `getClient()`. For full manual control, use
+`JsonApiClient` from `@drupal-api-client/json-api-client` directly.
 
 `fetchEntity({ type, id, viewMode })` renders one content entity without
 page-level route or head data. Use it for embedded renders such as teaser cards.
