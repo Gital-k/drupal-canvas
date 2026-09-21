@@ -4,9 +4,14 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse } from '@babel/parser';
+import * as p from '@clack/prompts';
 
 import { setConfig } from '../config';
 import { readValidatedComponentMetadata } from '../utils/component-metadata';
+import {
+  COMMAND_RESULT_REPORT_OPTIONS,
+  reportResults,
+} from '../utils/report-results';
 import {
   createAssetsPullTask,
   createBrandKitPullTask,
@@ -17,6 +22,11 @@ import {
 import type { ApiService } from '../services/api';
 import type { Component } from '../types/Component';
 import type { Page, PageListItem } from '../types/Page';
+
+vi.mock('@clack/prompts', () => ({
+  log: { info: vi.fn(), warn: vi.fn(), message: vi.fn() },
+  note: vi.fn(),
+}));
 
 const mockComponent = (machineName: string): Component =>
   ({
@@ -887,8 +897,7 @@ export default function Crumbs({ show }) {
         outcome.results.find((r) => r.itemName === 'title')?.details,
       ).toEqual([{ content: 'Migrated getPageData() → usePageContext()' }]);
       expect(
-        outcome.results.find((r) => r.itemName === 'crumbs')?.details?.[0]
-          ?.content,
+        outcome.results.find((r) => r.itemName === 'crumbs')?.warnings?.[0],
       ).toContain(
         'Not migrated: `getPageData()` is called after a possible early return',
       );
@@ -940,6 +949,102 @@ export default function Header() {
         expect(written).toContain('const page = usePageContext();');
         expect(written).toContain('const site = useSiteContext();');
         expect(written).not.toMatch(/getPageData|getSiteData/);
+      },
+    );
+
+    it.each([
+      [
+        'mixed',
+        `import { getPageData, JsonApiClient } from 'drupal-canvas';
+const client = new JsonApiClient();
+export default function Header() {
+  const page = getPageData();
+  return <h1>{page.pageTitle}</h1>;
+}`,
+        true,
+      ],
+      [
+        'constructor-only',
+        `import { JsonApiClient } from 'drupal-canvas';
+export default function Header() {
+  const client = new JsonApiClient();
+  return <h1>Hello</h1>;
+}`,
+        false,
+      ],
+      [
+        'module-scope',
+        `import { JsonApiClient } from 'drupal-canvas';
+const client = new JsonApiClient();
+export default function Header() { return <h1>Hello</h1>; }`,
+        false,
+      ],
+      [
+        'unsafe-mixed',
+        `import { getPageData, JsonApiClient } from 'drupal-canvas';
+const client = new JsonApiClient();
+const page = getPageData();
+export default function Header() { return <h1>{page.pageTitle}</h1>; }`,
+        false,
+      ],
+    ] as const)(
+      'reports residual constructor migration for %s',
+      async (name, source, converted) => {
+        const api = {
+          listComponents: vi
+            .fn()
+            .mockResolvedValue({ a: getterComponent(name, source) }),
+        } as unknown as ApiService;
+        const task = createComponentsPullTask(
+          api,
+          tmpDir,
+          false,
+          { colors: [] },
+          { folders: [] },
+          { supported: true, reasons: [] },
+        );
+        await task.prepare();
+        const outcome = await task.execute();
+        const written = await fs.readFile(
+          path.join(tmpDir, name, 'index.tsx'),
+          'utf-8',
+        );
+        expect(written).toContain('const client = new JsonApiClient();');
+        if (converted) {
+          expect(written).toContain('const page = usePageContext();');
+        } else {
+          expect(written).toBe(source);
+        }
+        // Capture the actual terminal reporter with the same options as pull,
+        // rather than merely checking diagnostics in the codemod result.
+        const message = vi.mocked(p.log.message).mockClear();
+        reportResults(outcome.results, outcome.title, outcome.label, {
+          ...COMMAND_RESULT_REPORT_OPTIONS,
+          showTitle: false,
+        });
+        const report = message.mock.calls.map(([text]) => text).join('\n');
+        expect(report).toContain('Warnings');
+        expect(report).toContain(name);
+        expect(
+          report.match(
+            /`new JsonApiClient\(\)` is not migrated automatically/g,
+          ),
+        ).toHaveLength(1);
+        if (converted)
+          expect(report).toContain('Migrated getPageData() → usePageContext()');
+        if (name === 'unsafe-mixed') expect(report).toContain('module level');
+        expect(
+          outcome.notes?.filter((note) =>
+            note.includes('not migrated automatically):'),
+          ),
+        ).toEqual([
+          expect.stringContaining(`not migrated automatically): ${name}`),
+        ]);
+        expect(
+          outcome.notes?.filter((note) =>
+            note.startsWith('Migration prompt for AI agents:'),
+          ),
+        ).toHaveLength(1);
       },
     );
 
