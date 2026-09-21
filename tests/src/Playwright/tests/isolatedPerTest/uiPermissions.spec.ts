@@ -310,7 +310,17 @@ test.describe('Canvas UI Permissions', () => {
     await expect(page).toHaveURL(/\/canvas\/?$/);
 
     // The refused layout of the locked page does not stick to the next one.
-    await canvas.openCanvas(editable);
+    // Navigate within the app: a full page load would start from an empty
+    // store and could not tell. The Pages panel opened above is restored from
+    // local storage, so it does not have to be opened again.
+    await expect(pageList).toBeVisible();
+    await pageList
+      .locator(`[data-canvas-page-id="${editable.entity_id}"]`)
+      .click();
+    await expect(page).toHaveURL(editableUrl);
     await expect(page.getByTestId('canvas-no-edit-access')).toHaveCount(0);
+    await expect(
+      page.getByTestId('canvas-contextual-panel--page-data'),
+    ).toBeVisible();
   });
 });
