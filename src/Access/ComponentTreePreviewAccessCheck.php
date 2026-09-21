@@ -16,8 +16,12 @@ use Drupal\Core\TypedData\TranslatableInterface;
  * The editor edits the default translation. Loading the layout of a
  * non-default translation only previews it: it requires the same edit access
  * as the default translation plus 'view' access on the previewed translation,
- * not 'update' access on the previewed translation.
+ * not 'update' access on the previewed translation. Field-level access on the
+ * component tree is checked on the default translation only: the previewed
+ * translation's tree gets no field access check, matching how preview entities
+ * are checked elsewhere.
  *
+ * @see \Drupal\canvas\Access\PreviewEntityViewAccessCheck
  * @see \Drupal\canvas\Access\ComponentTreeEditAccessCheck
  *
  * @internal
