@@ -1071,6 +1071,13 @@ final class PageVariantTest extends CanvasKernelTestBase {
     $event = new PageDisplayVariantSelectionEvent('simple_page', new RouteMatch('canvas.test', $front_end, [], []));
     $subscriber->onSelectPageDisplayVariant($event);
     self::assertSame('simple_page', $event->getPluginId());
+
+    // Restoring the front-end theme must select the site default again, even
+    // though a separate admin theme remains configured.
+    $theme_manager->setActiveTheme($theme_initialization->getActiveThemeByName('stark'));
+    $event = new PageDisplayVariantSelectionEvent('simple_page', new RouteMatch('canvas.test', $front_end, [], []));
+    $subscriber->onSelectPageDisplayVariant($event);
+    self::assertSame(CanvasPageVariant::PLUGIN_ID, $event->getPluginId());
   }
 
   /**
