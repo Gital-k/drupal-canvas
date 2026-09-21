@@ -96,6 +96,9 @@ final class PersonalizationTest extends KernelTestBase {
       // The page variant resolver checks the site default selection.
       // @see \Drupal\canvas\PageVariantResolver
       'config:canvas.settings',
+      // The page variant selector checks the configured admin theme.
+      // @see \Drupal\canvas\EventSubscriber\PageVariantSelectorSubscriber
+      'config:system.theme',
       'http_response',
       'rendered',
     ], $cache_tags);
