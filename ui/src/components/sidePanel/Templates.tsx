@@ -21,15 +21,15 @@ import {
 } from '@/services/componentAndLayout';
 import { getCanvasSettings } from '@/utils/drupal-globals';
 
+import type { DrupalSettings } from '@drupal-canvas/types';
 import type { ModeData } from '@/services/componentAndLayout';
 
 const canvasSettings = getCanvasSettings();
+const supportedEntityTypes: DrupalSettings['canvas']['contentTemplateEntityTypes'] =
+  canvasSettings?.contentTemplateEntityTypes ?? {};
+const entityTypeIds = Object.keys(supportedEntityTypes);
 
 const Templates = () => {
-  const supportedEntityTypes =
-    canvasSettings?.contentTemplateEntityTypes ??
-    ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
-  const entityTypeIds = Object.keys(supportedEntityTypes);
   const [openEntityTypes, setOpenEntityTypes] = useState<string[]>([
     ...entityTypeIds,
     'page-templates',
@@ -121,10 +121,6 @@ interface TemplateDialogProps {
 
 const AddTemplateDialog = ({ isOpen, setIsOpen }: TemplateDialogProps) => {
   const { navigateToTemplateEditor } = useEditorNavigation();
-  const supportedEntityTypes =
-    canvasSettings?.contentTemplateEntityTypes ??
-    ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
-  const entityTypeIds = Object.keys(supportedEntityTypes);
   const defaultEntityType =
     entityTypeIds.length === 1 ? entityTypeIds[0] : null;
   const [selectedContentType, setSelectedContentType] = useState<string | null>(
@@ -279,17 +275,11 @@ const AddTemplateDialog = ({ isOpen, setIsOpen }: TemplateDialogProps) => {
                 style={{ width: '100%' }}
               />
               <Select.Content>
-                {Object.entries(supportedEntityTypes).map(([id, meta]) => {
-                  const { label } = meta as {
-                    label: string;
-                    bundleLabel: string | null;
-                  };
-                  return (
-                    <Select.Item key={id} value={id}>
-                      {label}
-                    </Select.Item>
-                  );
-                })}
+                {Object.entries(supportedEntityTypes).map(([id, { label }]) => (
+                  <Select.Item key={id} value={id}>
+                    {label}
+                  </Select.Item>
+                ))}
               </Select.Content>
             </Select.Root>
           </Flex>
@@ -302,7 +292,6 @@ const AddTemplateDialog = ({ isOpen, setIsOpen }: TemplateDialogProps) => {
               </DialogFieldLabel>
             </Box>
             <Select.Root
-              key={selectedEntityType}
               name="content-type"
               required
               disabled={!selectedEntityType}
