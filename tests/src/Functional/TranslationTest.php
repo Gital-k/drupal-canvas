@@ -945,10 +945,23 @@ class TranslationTest extends FunctionalTestBase {
 
     $layout_path = "/canvas/api/v0/layout/canvas_page/$page_id";
     $get = fn (string $prefix): ResponseInterface => $this->makeApiRequest('GET', Url::fromUri("base:$prefix$layout_path"), []);
-    $patch = fn (string $prefix): ResponseInterface => $this->makeApiRequest('PATCH', Url::fromUri("base:$prefix$layout_path"), [
-      'headers' => ['X-CSRF-Token' => $csrf_token, 'Content-Type' => 'application/json'],
-      'body' => '{}',
-    ]);
+    // Re-saves the heading component with its current model, using the auto-save
+    // hashes from a fresh GET so the PATCH does not trigger a conflict.
+    $heading_uuid = '11111111-1111-4111-8111-111111111111';
+    $heading_type = 'sdc.canvas_test_sdc.heading@' . $this->getHeadingComponentVersion();
+    $patch = function (string $prefix) use ($get, $csrf_token, $layout_path, $heading_uuid, $heading_type): ResponseInterface {
+      $current = json_decode((string) $get($prefix)->getBody(), TRUE);
+      return $this->makeApiRequest('PATCH', Url::fromUri("base:$prefix$layout_path"), [
+        'headers' => ['X-CSRF-Token' => $csrf_token, 'Content-Type' => 'application/json'],
+        'body' => json_encode([
+          'componentInstanceUuid' => $heading_uuid,
+          'componentType' => $heading_type,
+          'model' => $current['model'][$heading_uuid],
+          'autoSaves' => $current['autoSaves'],
+          'clientInstanceId' => 'test-client',
+        ]),
+      ]);
+    };
     // Returns the first content-region component name from a 200 response.
     $content_name = function (ResponseInterface $response): ?string {
       self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
@@ -960,7 +973,8 @@ class TranslationTest extends FunctionalTestBase {
     // Baseline: the user may edit both translations.
     self::assertSame('English heading', $content_name($get('')));
     self::assertSame('French heading', $content_name($get('/fr')));
-    self::assertNotSame(403, $patch('/fr')->getStatusCode());
+    $response = $patch('/fr');
+    self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
 
     // Without 'update' access on the French translation, previewing it still
     // works, but editing it does not.
@@ -968,7 +982,8 @@ class TranslationTest extends FunctionalTestBase {
     self::assertSame('English heading', $content_name($get('')));
     self::assertSame('French heading', $content_name($get('/fr')));
     self::assertSame(403, $patch('/fr')->getStatusCode());
-    self::assertNotSame(403, $patch('')->getStatusCode());
+    $response = $patch('');
+    self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
 
     // Without 'view' access on the French translation, it cannot be previewed.
     $forbid(['view' => ['fr']]);
