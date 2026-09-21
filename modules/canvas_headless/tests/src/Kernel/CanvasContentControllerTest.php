@@ -48,9 +48,12 @@ use Drupal\node\Entity\NodeType;
 use Drupal\path_alias\Entity\PathAlias;
 use Drupal\simple_oauth\Authentication\TokenAuthUser;
 use Drupal\simple_oauth\Entity\Oauth2Token;
+use Drupal\taxonomy\Entity\Term;
+use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\content_moderation\Traits\ContentModerationTestTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\Role;
 use Drupal\user\UserInterface;
@@ -74,6 +77,7 @@ use Symfony\Component\HttpKernel\KernelEvents;
 final class CanvasContentControllerTest extends CanvasKernelTestBase {
 
   use GenerateComponentConfigTrait;
+  use ContentModerationTestTrait;
   use RequestTrait;
   use UserCreationTrait;
 
@@ -170,7 +174,6 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       'access content',
       PageVariant::ADMIN_PERMISSION,
     ]);
-    \assert($editor instanceof UserInterface);
     $this->editor = $editor;
   }
 
@@ -1099,6 +1102,157 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertSame(200, $empty_preview->getStatusCode());
     self::assertNull($empty_preview_data['content']);
     self::assertTrue($empty_preview_data['route']['managedByCanvas']);
+  }
+
+  /**
+   * Tests exact revisions of different entity types through the content API.
+   */
+  public function testEntityRevisions(): void {
+    $editor = $this->createUser(['access content', 'view all revisions']);
+    $this->setCurrentAccount($editor);
+    $component = Component::load(self::COMPONENT_ID);
+    self::assertInstanceOf(Component::class, $component);
+    ContentTemplate::create([
+      'id' => 'node.article.full',
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => [[
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $component->id(),
+        'component_version' => $component->getActiveVersion(),
+        'inputs' => ['heading' => ['sourceType' => 'entity-field', 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value']],
+      ],
+      ],
+      'status' => TRUE,
+    ])->save();
+    $node = Node::create(['type' => 'article', 'title' => 'First revision', 'uid' => $editor->id(), 'status' => TRUE]);
+    $node->save();
+    $first_revision = $node->getRevisionId();
+    $node->setNewRevision(TRUE);
+    $node->setTitle('Current revision');
+    $node->save();
+
+    $template_draft = ContentTemplate::load('node.article.full');
+    self::assertInstanceOf(ContentTemplate::class, $template_draft);
+    $template_draft->setComponentTree([]);
+    $this->container->get(AutoSaveManager::class)->saveEntity($template_draft);
+    $this->container->get(EntityTypeManagerInterface::class)->getStorage(ContentTemplate::ENTITY_TYPE_ID)->resetCache();
+
+    // An unrelated Canvas auto-save must not replace either selected source.
+    $auto_save = clone $node;
+    $auto_save->setTitle('Canvas auto-save');
+    $this->container->get(AutoSaveManager::class)->saveEntity($auto_save);
+    $this->setCurrentAccount($this->createTokenAccount(TRUE, $editor));
+    $response = $this->renderContentPath('/node/' . $node->id() . '/revisions/' . $first_revision . '/view', [CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'false']);
+    $data = self::responseData($response);
+    self::assertStringContainsString('First revision', \json_encode($data['content'], JSON_THROW_ON_ERROR));
+    self::assertSame('First revision', $data['head']['title']);
+    self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
+
+    $reader = $this->createUser(['access content']);
+    $this->setCurrentAccount($this->createTokenAccount(TRUE, $reader));
+    try {
+      $this->renderContentPath('/node/' . $node->id() . '/revisions/' . $first_revision . '/view');
+      self::fail('Viewing a revision requires revision permissions.');
+    }
+    catch (CacheableAccessDeniedHttpException) {
+    }
+
+    // Latest moderated drafts add a form with an array of theme suggestions.
+    $this->enableModules(['workflows', 'content_moderation']);
+    $this->installEntitySchema('content_moderation_state');
+    $this->addEntityTypeAndBundleToWorkflow($this->createEditorialWorkflow(), 'node', 'article');
+    $this->container->get(RouteBuilderInterface::class)->rebuild();
+    $moderator = $this->createUser([
+      'access content',
+      'view all revisions',
+      'view latest version',
+      'view any unpublished content',
+      'use editorial transition publish',
+    ]);
+    $this->setCurrentAccount($moderator);
+    $moderated_node = Node::create([
+      'type' => 'article',
+      'title' => 'Published moderated content',
+      'uid' => $moderator->id(),
+      'moderation_state' => 'published',
+    ]);
+    $moderated_node->save();
+    $moderated_node->setNewRevision(TRUE);
+    $moderated_node->setTitle('Latest moderated draft');
+    $moderated_node->set('moderation_state', 'draft');
+    $moderated_node->save();
+    $moderator_token = $this->createTokenAccount(TRUE, $moderator);
+    $this->setCurrentAccount($moderator_token);
+    self::assertFalse($moderator_token->hasPermission('use editorial transition publish'));
+    foreach ([
+      '/node/' . $moderated_node->id() . '/latest',
+      '/node/' . $moderated_node->id() . '/revisions/' . $moderated_node->getRevisionId() . '/view',
+    ] as $path) {
+      $response = $this->renderContentPath($path);
+      $data = self::responseData($response);
+      self::assertSame(200, $response->getStatusCode());
+      self::assertTrue($data['route']['managedByCanvas']);
+      self::assertSame('Latest moderated draft', $data['head']['title']);
+      self::assertStringContainsString('Latest moderated draft', \json_encode($data['content'], JSON_THROW_ON_ERROR));
+      self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
+    }
+    $response = $this->renderContentPath('/node/' . $moderated_node->id(), [CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY => 'true']);
+    $data = self::responseData($response);
+    self::assertSame('Published moderated content', $data['head']['title']);
+    self::assertStringContainsString('Published moderated content', \json_encode($data['content'], JSON_THROW_ON_ERROR));
+    self::assertStringNotContainsString('Latest moderated draft', \json_encode($data['content'], JSON_THROW_ON_ERROR));
+
+    // A second entity type exercises core's generic revision route provider.
+    $this->enableModules(['taxonomy', 'canvas_headless_test']);
+    $this->installEntitySchema('taxonomy_term');
+    $this->installConfig(['taxonomy']);
+    Vocabulary::create(['vid' => 'topics', 'name' => 'Topics'])->save();
+    $this->container->get(RouteBuilderInterface::class)->rebuild();
+    $term_editor = $this->createUser(['access content', 'view term revisions in topics']);
+    $this->setCurrentAccount($term_editor);
+    ContentTemplate::create([
+      'id' => 'taxonomy_term.topics.full',
+      'content_entity_type_id' => 'taxonomy_term',
+      'content_entity_type_bundle' => 'topics',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => [[
+        'uuid' => $this->container->get('uuid')->generate(),
+        'component_id' => $component->id(),
+        'component_version' => $component->getActiveVersion(),
+        'inputs' => ['heading' => ['sourceType' => 'entity-field', 'expression' => 'ℹ︎␜entity:taxonomy_term:topics␝name␞␟value']],
+      ],
+      ],
+      'status' => TRUE,
+    ])->save();
+    $term = Term::create(['vid' => 'topics', 'name' => 'Unpublished term revision', 'status' => FALSE]);
+    $term->save();
+    $term_revision = $term->getRevisionId();
+    $term->setNewRevision(TRUE);
+    $term->setName('Current term');
+    $term->setPublished()->save();
+    $term_auto_save = clone $term;
+    $term_auto_save->setName('Canvas term auto-save');
+    $this->container->get(AutoSaveManager::class)->saveEntity($term_auto_save);
+    $term_token = $this->createTokenAccount(TRUE, $term_editor);
+    $this->setCurrentAccount($term_token);
+    self::assertTrue($term_token->hasPermission('view term revisions in topics'));
+    self::assertFalse($term_token->hasPermission('administer taxonomy'));
+    $path = '/taxonomy/term/' . $term->id() . '/revision/' . $term_revision . '/view';
+    $response = $this->renderContentPath($path);
+    $data = self::responseData($response);
+    self::assertTrue($data['route']['managedByCanvas']);
+    self::assertSame('Unpublished term revision', $data['head']['title']);
+    self::assertStringContainsString('Unpublished term revision', \json_encode($data['content'], JSON_THROW_ON_ERROR));
+    self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
+    $this->setCurrentAccount($this->createTokenAccount(TRUE, $reader));
+    try {
+      $this->renderContentPath('/taxonomy/term/' . $term->id() . '/revision/' . $term_revision . '/view');
+      self::fail('Revision permissions are required for non-node entities too.');
+    }
+    catch (CacheableAccessDeniedHttpException) {
+    }
   }
 
   /**

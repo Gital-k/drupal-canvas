@@ -14,7 +14,7 @@ use Drupal\canvas_headless\CanvasContentHeadBuilder;
 use Drupal\canvas_headless\CanvasContentTranslationLinks;
 use Drupal\canvas_headless\PreviewTokenInspector;
 use Drupal\canvas_headless\RenderConverter\JsComponentCanvasRenderConverter;
-use Drupal\canvas_headless\Routing\CanvasContentRouteEnhancer;
+use Drupal\canvas_headless\Routing\CanvasContentRoute;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
@@ -66,17 +66,16 @@ final class CanvasContentController {
       throw new BadRequestHttpException('The Canvas content API request is missing routed request context.');
     }
 
-    $primary_entity_param = $request->attributes->get(
-      CanvasContentRouteEnhancer::PRIMARY_ENTITY_PARAMETER,
-    );
-    $entity = \is_string($primary_entity_param)
-      ? $route_match->getParameter($primary_entity_param)
-      : NULL;
+    $content_route = CanvasContentRoute::resolve($route_match->getRouteName(), $route_match->getRouteObject(), $route_match->getParameters()->all());
+    $entity = $content_route?->entity;
     $content = NULL;
     $rendered_entity = NULL;
     $managed_by_canvas = FALSE;
     $build = NULL;
     $is_preview = PreviewTokenInspector::hasPreviewScope($this->currentUser->getAccount());
+    // The route has selected the exact revision to display. A Canvas
+    // auto-save must not replace it, nor select draft content templates.
+    $is_entity_preview = $content_route !== NULL && $content_route->isPreview;
     $view_mode = NULL;
     $api_query_parameters = [];
     if ($is_preview) {
@@ -89,7 +88,7 @@ final class CanvasContentController {
       \assert($view_mode === NULL || \is_string($view_mode));
     }
 
-    $use_auto_save = $is_preview && ($api_query_parameters[CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY] ?? 'false') !== 'true';
+    $use_auto_save = $is_preview && !$is_entity_preview && ($api_query_parameters[CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY] ?? 'false') !== 'true';
     if ($is_preview) {
       $route = $route_match->getRouteObject();
       \assert($route !== NULL);
@@ -126,7 +125,7 @@ final class CanvasContentController {
       [$build, $rendered_entity, $render_cacheability] = $this->renderEntity(
         $entity,
         $use_auto_save,
-        $view_mode ?? 'full',
+        $is_entity_preview ? $content_route->viewMode : ($view_mode ?? $content_route->viewMode),
         $preview_language,
       );
       $head_result = $this->headBuilder->build($rendered_entity);
@@ -137,6 +136,13 @@ final class CanvasContentController {
     else {
       $head_result = $this->headBuilder->buildFromRoute($request, $route_match);
       $cacheability = $head_result['cacheability'];
+    }
+    if ($is_entity_preview) {
+      // Revision previews must not enter render caches or response caches.
+      $cacheability->setCacheMaxAge(0);
+      if ($build !== NULL) {
+        $cacheability->applyTo($build);
+      }
     }
     $managed_by_canvas = $build !== NULL;
     if ($build !== NULL) {

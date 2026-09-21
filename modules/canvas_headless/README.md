@@ -54,7 +54,22 @@ Eligible links open outside the iframe: Drupal-resolved paths use their Drupal
 URL, while unresolved paths and external links use their original URL.
 `target="_blank"` opens a new tab.
 
-Drupal's unsaved node preview route is not changed.
+### Entity revision routes in the content API
+
+The content API supports `entity.{entity_type}.revision` and
+`entity.{entity_type}.latest_version` routes for entities with enabled Canvas
+content templates. This includes Content Moderation's latest-version routes.
+Drupal's revision access checks authorize the request.
+
+Canvas currently enables content templates only for nodes. Other entity types
+require a module that adds content template support.
+
+Previews render the selected revision with saved Canvas templates and page
+variants. Canvas auto-saves do not replace them. Preview responses and their
+rendered content cannot be cached.
+
+The frontend must serve revision paths through its Drupal content route handler.
+The SDK catch-all route can handle these paths.
 
 ### Building the browser code
 
@@ -242,9 +257,8 @@ Errors use RFC 9457 Problem Details and the `application/problem+json` media typ
 
 ## Known limitations
 
-- The rendered-content endpoint serves the default revision: an unpublished entity previews fully, but a published entity's forward
-  revision appears only in JSON:API-driven listings (the SDK hydrates working copies), not on pages rendered
-  through `fetchPage()`.
+- Canonical routes render the default revision. Use revision or latest-version
+  paths with `fetchPage()` to render a published entity's forward revision.
 - Core JSON:API filtered collections exclude unpublished content regardless of permissions; the example app avoids
   filtered collection queries for draft content.
 - Content gated by a view permission not declared preview-safe is invisible in previews until the owning module
