@@ -760,9 +760,8 @@ export function pushCommand(program: Command): void {
         applySyncOptionAliasesAndWarnings(options);
         updateConfigFromOptions(options);
 
-        // Validate the brand kit file at command start — before
-        // authentication (which can prompt), discovery, and any request —
-        // so a malformed file cannot cause a partial push.
+        // Validate the brand kit file upfront. Doing this before authentication
+        // and discovery ensures a malformed file won't cause a partial push.
         {
           const earlyConfig = getConfig();
           if (earlyConfig.includeBrandKit) {
@@ -943,6 +942,8 @@ export function pushCommand(program: Command): void {
           ...discoveredContentTemplates,
           ...discoveredPageTemplates,
         ];
+
+        // Begin block that fetches remote brand kit colors if needed.
         if (
           allDiscoveredEntities.length > 0 &&
           remoteBrandKitColors.length === 0
@@ -953,6 +954,9 @@ export function pushCommand(program: Command): void {
             allDiscoveredEntities,
             componentMetadata,
           );
+          // If the push payload needs to reference remote colors, fetch them
+          // before the push so colors can be matched with their uuids for
+          // updating.
           if (requiresRemoteColors) {
             try {
               const brandKit = await apiService.getBrandKit();

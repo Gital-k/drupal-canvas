@@ -420,14 +420,22 @@ function collapseResolvedColorPropValue(value: unknown): unknown {
 }
 
 /**
- * Collapses resolved server color objects back to authored form (pull direction).
+ * Converts server-resolved color prop values to CLI-friendly string form.
  *
- * The server returns color prop values as `{ value: ColorTokenValue,
- * cssVariable }` objects. This function converts them to either a
- * `canvas-color:<cssVarKey>` token reference (when the color belongs to the
- * brand kit and has a CSS variable) or a plain CSS string (hex / rgba / etc.)
- * for free-pick colors. Props on elements whose component type has no color
- * props in metadata are passed through unchanged.
+ * During a pull the server returns color props as resolved objects
+ * ({ value: ColorTokenValue, cssVariable, cssColorValue, colorName }) rather
+ * than the plain strings stored in the database. This function walks every
+ * element in the map and rewrites those objects to CLI-friendly strings:
+ *
+ *   - Brand kit colors (cssVariable present) → "canvas-color:<cssVarKey>"
+ *     e.g. { cssVariable: "--brand-red", … }  → "canvas-color:brand-red"
+ *   - Free-pick sRGB with a hex value         → "#rrggbb" or "#rrggbbaa"
+ *   - All other free-pick colors              → CSS function string via
+ *                                               serializeColorValue()
+ *   - Values already in CLI-friendly form     → unchanged (pass-through)
+ *
+ * The original map reference is returned when no values change, avoiding
+ * spurious database writes.
  */
 export function collapseColorPropsInElements(
   elements: AuthoredSpecElementMap,
