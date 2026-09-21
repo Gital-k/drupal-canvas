@@ -7,8 +7,8 @@ namespace Drupal\Tests\canvas\Kernel\Controller;
 // cspell:ignore Gábor Hojtsy uniquesearchterm gàbor autosave searchterm
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
@@ -619,7 +619,7 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
     self::assertArrayHasKey($forbidden_page_id, $data);
     self::assertEqualsCanonicalizing(
       [CanvasUriDefinitions::LINK_REL_DUPLICATE, CanvasUriDefinitions::LINK_REL_DELETE],
-      array_keys($data[$forbidden_page_id]['links']),
+      \array_keys($data[$forbidden_page_id]['links']),
     );
 
     // Other pages are not affected.
@@ -632,7 +632,7 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
         CanvasUriDefinitions::LINK_REL_DUPLICATE,
         CanvasUriDefinitions::LINK_REL_DELETE,
       ],
-      array_keys($data[$editable_page_id]['links']),
+      \array_keys($data[$editable_page_id]['links']),
     );
   }
 
