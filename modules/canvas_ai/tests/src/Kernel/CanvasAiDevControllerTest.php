@@ -11,6 +11,8 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\PluginManager\AiAgentManager;
 use Drupal\canvas_ai\CanvasAiPermissions;
 use Drupal\canvas_ai\CanvasAiTempStore;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\EditComponents;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\PlaceComponents;
 use Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder;
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -234,6 +236,53 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
     $temp_store = $this->container->get(CanvasAiTempStore::class);
     self::assertNull($temp_store->getStoredAgentState('test-request'));
     self::assertSame(['agent_id' => 'canvas_agent', 'state' => $state], $temp_store->getStoredConversationState('test-conversation'));
+  }
+
+  /**
+   * The placement results in the kept history are cut to their success line.
+   *
+   * The place_components and edit_components tools close their result with
+   * content that only serves the turn the tool ran in: the assigned UUIDs,
+   * the predicted layout, the dump of the applied updates and per-hop
+   * guidance. The state the next turn resumes keeps their success sentence
+   * alone. A failure result does not start with that sentence and is kept
+   * whole, as is a non-tool message quoting it.
+   *
+   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::trimKeptToolResults()
+   */
+  public function testKeptConversationStateCutsPlacementResults(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
+    $this->refreshContainer();
+    $this->setUpAiDevHops();
+    $this->keepToolCallsInHistory();
+
+    $state = [
+      'looped' => 4,
+      'context_tools' => [],
+      'chat_history' => [
+        ['role' => 'user', 'text' => 'Add a hero, retitle it, then add a card'],
+        ['role' => 'tool', 'text' => PlaceComponents::SUCCESS_MESSAGE . "\nThe placed components with their assigned UUIDs:\n- 00000000-0000-4000-8000-000000000001\nGuidance for the hops that remain in this turn.", 'tool_id' => 'call_1'],
+        ['role' => 'tool', 'text' => EditComponents::SUCCESS_MESSAGE . "\n00000000-0000-4000-8000-000000000001:\n    heading: Hello", 'tool_id' => 'call_2'],
+        ['role' => 'tool', 'text' => 'Failed to place components: the target region does not exist.', 'tool_id' => 'call_3'],
+        ['role' => 'assistant', 'text' => PlaceComponents::SUCCESS_MESSAGE . ' The hero and its new title are in place.'],
+      ],
+    ];
+    $agent = $this->createMock(AiAgentEntityWrapper::class);
+    $agent->method('determineSolvability')->willReturn(AiAgentInterface::JOB_SOLVABLE);
+    $agent->method('isFinished')->willReturn(TRUE);
+    $agent->method('toArray')->willReturn($state);
+    $agent->method('solve')->willReturn('The hero and the card are placed.');
+    $this->useMockedAgent($agent);
+
+    $this->hop([
+      'messages' => [['role' => 'user', 'text' => 'Add a hero, retitle it, then add a card']],
+    ]);
+
+    $expected = $state;
+    $expected['chat_history'][1]['text'] = PlaceComponents::SUCCESS_MESSAGE;
+    $expected['chat_history'][2]['text'] = EditComponents::SUCCESS_MESSAGE;
+    $temp_store = $this->container->get(CanvasAiTempStore::class);
+    self::assertSame(['agent_id' => 'canvas_agent', 'state' => $expected], $temp_store->getStoredConversationState('test-conversation'));
   }
 
   /**

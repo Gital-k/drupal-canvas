@@ -9,6 +9,7 @@ use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas_ai\CanvasAiPermissions;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\EditComponents;
 use Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder;
 use Drupal\Component\Uuid\Php;
 use Drupal\Component\Uuid\UuidInterface;
@@ -373,9 +374,11 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
    * 1 finished with instead of rebuilding it from the client transcript, which
    * carries text only, so the model's first request of turn 2 still holds the
    * edit_components call turn 1 made and its result: the agent need not repeat
-   * that work.
+   * that work. The kept result is cut to its success sentence — the dump of
+   * the applied updates only served the turn that made them.
    *
    * @see https://git.drupalcode.org/project/canvas/-/work_items/3592032
+   * @see https://git.drupalcode.org/project/canvas/-/work_items/3592082
    */
   public function testSecondTurnResumesTheHistoryOfTheFirst(): void {
     // Off after install: keeping the history costs tokens on every later turn.
@@ -442,9 +445,11 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
     self::assertSame('The hero heading now says Goodbye.', $responses[1]['message']);
 
     // The model's first request of turn 2 carries the history turn 1 built:
-    // its user message, the edit_components call, its result and the answer,
-    // then this turn's user message. The component catalog is not among them:
-    // the agent's default information tools feed the system prompt.
+    // its user message, the edit_components call, its result — the success
+    // sentence alone, with turn 1's dump of the applied updates cut off —
+    // and the answer, then this turn's user message. The component catalog
+    // is not among them: the agent's default information tools feed the
+    // system prompt.
     self::assertCount(2, $inputs);
     $input = $inputs[0];
     self::assertInstanceOf(ChatInput::class, $input);
@@ -456,7 +461,7 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
     self::assertStringContainsString('Change the hero heading to Hello', $messages[0]->getText());
     self::assertSame('edit_components', $messages[1]->toArray()['tools'][0]['function']['name']);
     self::assertSame('call_1', $messages[2]->getToolsId());
-    self::assertStringContainsString('The updates were applied successfully.', $messages[2]->getText());
+    self::assertSame(EditComponents::SUCCESS_MESSAGE, $messages[2]->getText());
     self::assertSame('The hero heading now says Hello.', $messages[3]->getText());
     self::assertStringContainsString('Now make it say Goodbye', $messages[4]->getText());
 
