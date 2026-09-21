@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import {
   ChevronDownIcon,
@@ -6,6 +7,7 @@ import {
   DotsVerticalIcon,
   FileTextIcon,
   HomeIcon,
+  LockClosedIcon,
   MagnifyingGlassIcon,
   PlusIcon,
 } from '@radix-ui/react-icons';
@@ -224,6 +226,24 @@ const NavigationItem = ({
     !item.status && !item.isNew && !item.hasUnsavedStatusChange;
   const willBeUnpublished =
     !item.status && !item.isNew && item.hasUnsavedStatusChange;
+  // A page the user may see but not edit is listed, but does not link into
+  // the editor: the editor could not fetch its layout.
+  // @see https://git.drupalcode.org/project/canvas/-/work_items/3592100
+  const canEdit = hasPermission('edit', item);
+
+  const pageContent = (
+    <>
+      <Box px="3" pt="1">
+        {item.internalPath === homepagePath ? <HomeIcon /> : <FileTextIcon />}
+      </Box>
+      <Flex flexGrow="1" align="center">
+        <Text as="span" size="1">
+          {item.autoSaveLabel || item.title}{' '}
+          <span className={styles.path}>{item.autoSavePath || item.path}</span>
+        </Text>
+      </Flex>
+    </>
+  );
 
   return (
     <Flex
@@ -235,25 +255,29 @@ const NavigationItem = ({
       pr="2"
       className={styles.item}
       data-canvas-page-id={item.id}
+      data-canvas-page-locked={!canEdit ? 'true' : undefined}
     >
-      <Link
-        to={urlForEditor('canvas_page', item.id)}
-        role={'listitem'}
-        className={styles.pageLink}
-        onClick={onSelect ? () => onSelect(item) : undefined}
-      >
-        <Box px="3" pt="1">
-          {item.internalPath === homepagePath ? <HomeIcon /> : <FileTextIcon />}
-        </Box>
-        <Flex flexGrow="1" align="center">
-          <Text as="span" size="1">
-            {item.autoSaveLabel || item.title}{' '}
-            <span className={styles.path}>
-              {item.autoSavePath || item.path}
-            </span>
-          </Text>
+      {canEdit ? (
+        <Link
+          to={urlForEditor('canvas_page', item.id)}
+          role={'listitem'}
+          className={styles.pageLink}
+          onClick={onSelect ? () => onSelect(item) : undefined}
+        >
+          {pageContent}
+        </Link>
+      ) : (
+        <Flex
+          role={'listitem'}
+          className={clsx(styles.pageLink, styles.locked)}
+          aria-disabled="true"
+        >
+          <Box px="3" pt="1">
+            <LockClosedIcon aria-label="Not editable" />
+          </Box>
+          {pageContent}
         </Flex>
-      </Link>
+      )}
       {!isMenuOpen && (isUnpublished || willBeUnpublished) && (
         <Flex align="center" mr="2">
           {willBeUnpublished ? (
@@ -272,7 +296,7 @@ const NavigationItem = ({
           )}
         </Flex>
       )}
-      {Object.keys(item.links).length && (
+      {Object.keys(item.links).length > 0 && (
         <DropdownMenu.Root onOpenChange={setIsMenuOpen}>
           <DropdownMenu.Trigger>
             <IconButton
