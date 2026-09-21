@@ -244,20 +244,6 @@ export function buildSkippedLocalOnlyPullResources(
 }
 
 /**
- * Transforms color examples in component props from UUID refs to cssVarKey refs.
- */
-function resolveColorExamplesInProps(
-  props: Record<string, unknown>,
-  colorsByUuid: Map<string, BrandKitColorEntry>,
-): Record<string, unknown> {
-  return transformColorExamplesInProps(
-    props,
-    colorsByUuid,
-    'toVarKey',
-  ) as Record<string, unknown>;
-}
-
-/**
  * Shared mutable reference for brand kit colors, populated during
  * brand kit task prepare() and used during component task execute().
  */
@@ -294,13 +280,14 @@ export function createComponentsPullTask(
       machineName: component.machineName,
       status: component.status,
       required: component.required || [],
-      props: resolveColorExamplesInProps(
+      props: transformColorExamplesInProps(
         {
           properties: stripProjectedContentEntityReferencePropKeys(
             component.props || {},
           ),
         },
         colorsByUuid,
+        'toVarKey',
       ) as Metadata['props'],
       slots: Array.isArray(component.slots) ? {} : component.slots || {},
       dataDependencies: component.dataDependencies?.entityFields

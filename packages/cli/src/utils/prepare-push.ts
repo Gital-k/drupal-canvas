@@ -61,21 +61,6 @@ interface PushProgressSpinner {
 }
 
 /**
- * Serializes color examples in component props for API submission.
- *
- * Converts canvas-color:<cssVarKey> strings to canvas-color:<uuid> strings.
- */
-function serializeColorExamplesInProps(
-  props: Record<string, unknown> | null | undefined,
-  colorsByCssVariable: Map<string, BrandKitColorEntry>,
-): Record<string, unknown> | null | undefined {
-  return transformColorExamplesInProps(props, colorsByCssVariable, 'toUuid') as
-    | Record<string, unknown>
-    | null
-    | undefined;
-}
-
-/**
  * Determine the operation for each component (create, update, or delete)
  * and build upload tasks with payloads attached.
  */
@@ -92,12 +77,13 @@ async function buildComponentUploadTasks(
   for (const [machineName, prepared] of preparedByName.entries()) {
     onProgress();
     // Serialize color examples for API submission.
-    const serializedProps = serializeColorExamplesInProps(
+    const serializedProps = transformColorExamplesInProps(
       prepared.componentPayload.props as
         | Record<string, unknown>
         | null
         | undefined,
       colorsByCssVariable,
+      'toUuid',
     );
     const serializedPayload: Component = {
       ...prepared.componentPayload,
