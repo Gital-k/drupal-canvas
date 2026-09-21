@@ -103,6 +103,7 @@ final class CanvasController {
 </head>
 <body {{ body_attributes }}>
   <div id="canvas" class="canvas-container"><div class="canvas-loading">Loading Drupal Canvas…</div></div>
+  <js-bottom-placeholder token="JS-BOTTOM-HERE-PLEASE">
 </body>
 </html>
 HTML;
@@ -304,6 +305,14 @@ HTML;
           'head' => '<head-placeholder token="HEAD-HERE-PLEASE">',
           'styles' => '<css-placeholder token="CSS-HERE-PLEASE">',
           'scripts' => '<js-placeholder token="JS-HERE-PLEASE">',
+          // Without this, footer-scope JS (the default `js` scope for asset
+          // libraries) has nowhere to be inserted: self::HTML has no
+          // 'scripts_bottom' token, so
+          // \Drupal\Core\Render\HtmlResponseAttachmentsProcessor computes
+          // footer-scope JS output but silently drops it. This mirrors the
+          // <js-bottom-placeholder> that the normal page template
+          // (html.html.twig) provides.
+          'scripts_bottom' => '<js-bottom-placeholder token="JS-BOTTOM-HERE-PLEASE">',
         ],
         'import_maps' => $this->globalImports->getImportMap(),
       ]);
