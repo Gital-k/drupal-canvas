@@ -52,7 +52,9 @@ export interface DrupalRouteEntity {
   langcode: string;
 }
 
-/** An enabled language, matching Code Component translation metadata. */
+/**
+ * An enabled language, matching getPageData() translation metadata from drupal-canvas.
+ */
 export interface DrupalRouteTranslation {
   langcode: string;
   /** Localized display name. */

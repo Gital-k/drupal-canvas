@@ -101,7 +101,7 @@ Links managed in Drupal need to point to the correct frontend destination, wheth
 ### Translation links
 
 `fetchPage` returns `route.negotiatedLanguage` and `route.translations`. On multilingual sites, the list
-includes **every enabled language**, matching `getPageData()` from `drupal-canvas` for Code Components
+includes **every enabled language**, matching `getPageData()` from `drupal-canvas`
 (`mainEntity.translations`). It is empty on monolingual sites and routes without a canonical content entity.
 
 Each entry supplies `langcode`, localized `name`, `nativeName`, `translationAvailable`, `current`, and `url`.
@@ -134,7 +134,7 @@ can render English. The response's `route` contains:
 }
 ```
 
-Unavailable entries preserve Code Component fallback URL semantics: generate the supplied rendered
+Unavailable entries use `getPageData()`'s fallback URL behavior: generate the supplied rendered
 entity's canonical URL using the entry's language. A missing translation can resolve to Drupal's fallback;
 **an unavailable URL is not guaranteed to be viewable**, particularly when a translation exists but access is denied.
 
@@ -163,7 +163,7 @@ do not imply that every link retrieves viewable content.
 entry `/es/contacto` to `https://example.es/contacto` or `/es-ES/contacto`. Use the original non-external
 Drupal URI, not the mapped public URL, when calling `fetchPage` for that translation.
 
-Headless URLs differ from Code Component URLs only where the content API needs request-URI handling:
+Translation URLs from `fetchPage()` use additional processing compared with those from `getPageData()`:
 the Drupal installation base path is removed, language-switch options follow configured negotiation
 priority, and query negotiation explicitly selects each language. For example, `/contact?language=en`
 selects English regardless of prior browsing or Drupal session state. Preserve that query string.

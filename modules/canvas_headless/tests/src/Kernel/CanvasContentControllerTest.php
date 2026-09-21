@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas_headless\Kernel;
 // cspell:ignore unroutable francaise Btag Anglais
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\CodeComponentDataProvider;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
@@ -45,10 +46,13 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
  * Tests routed Canvas content and scoped auto-save previews.
@@ -1217,6 +1221,81 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     $preview = self::responseData($this->renderContentPath('/hello'))['route'];
     self::assertSame(['en', 'fr', 'de'], array_column($preview['translations'], 'langcode'));
     self::assertSame([TRUE, TRUE, FALSE], array_column($preview['translations'], 'translationAvailable'));
+  }
+
+  /**
+   * Compares real API outputs while their request context is still active.
+   */
+  #[DataProvider('translationContractCases')]
+  public function testTranslationContractParity(string $requested, bool $french_published, bool $preview): void {
+    $this->installConfig(['user']);
+    $role = Role::load('anonymous');
+    self::assertInstanceOf(Role::class, $role);
+    $this->grantPermissions($role, ['access content']);
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    ConfigurableLanguage::createFromLangcode('de')->save();
+    $this->config('language.negotiation')->set('url.prefixes', ['en' => '', 'fr' => 'fr', 'de' => 'de'])->save();
+    $page = $this->createPage();
+    $page->addTranslation('fr', ['title' => 'French', 'status' => $french_published])->save();
+    $editor = $this->createUser(['access content', Page::EDIT_PERMISSION]);
+    self::assertInstanceOf(UserInterface::class, $editor);
+    $this->container->get('kernel')->rebuildContainer();
+    $account = $preview ? $this->createTokenAccount(with_preview_scope: TRUE, user: $editor) : new AnonymousUserSession();
+    $this->setCurrentAccount($account);
+
+    $captured = [];
+    $listener = function (ResponseEvent $event) use (&$captured, $account): void {
+      if (!$event->isMainRequest() || !$event->getRequest()->attributes->has(CanvasContentApiRequest::REQUESTED_URI_ATTRIBUTE)) {
+        return;
+      }
+      // Calling the provider after renderContentPath() would instead see the
+      // restored test request. Capture it here, on the actual routed request.
+      self::assertSame($event->getRequest(), $this->container->get(RequestStack::class)->getCurrentRequest());
+      self::assertSame($account, $this->container->get(AccountProxyInterface::class)->getAccount());
+      $captured[] = $this->container->get(CodeComponentDataProvider::class)->getCanvasDataMainEntityV0();
+    };
+    $dispatcher = $this->container->get(EventDispatcherInterface::class);
+    $dispatcher->addListener(KernelEvents::RESPONSE, $listener);
+    try {
+      // No auto-saves: only access differs between public and preview cases.
+      $response = $this->renderContentPath(($requested === 'en' ? '' : '/' . $requested) . '/page/' . $page->id());
+    }
+    finally {
+      $dispatcher->removeListener(KernelEvents::RESPONSE, $listener);
+    }
+    self::assertSame(200, $response->getStatusCode());
+    self::assertCount(1, $captured);
+    $main_entity = $captured[0][CodeComponentDataProvider::V0]['mainEntity'];
+    $route = self::responseData($response)['route'];
+    self::assertSame($requested, $route['negotiatedLanguage']);
+    self::assertSame($requested === 'de' ? 'en' : $requested, $route['entity']['langcode']);
+    self::assertSame($main_entity['uuid'], $route['entity']['uuid']);
+    self::assertSame($main_entity['requestedLanguage'], $route['negotiatedLanguage']);
+    self::assertSame($main_entity['renderedLanguage'], $route['entity']['langcode']);
+    self::assertSame(['en', 'fr', 'de'], array_column($route['translations'], 'langcode'));
+    self::assertSame([TRUE, $french_published || $preview, FALSE], array_column($route['translations'], 'translationAvailable'));
+
+    // Strip only the deliberate URL differences, not an allowlist of shared
+    // fields: unexpected fields, types, and ordering must fail this comparison.
+    $headless_entries = \array_map(static function (array $entry): array {
+      unset($entry['url'], $entry['external']);
+      return $entry;
+    }, $route['translations']);
+    $component_entries = \array_map(static function (array $entry): array {
+      unset($entry['url']);
+      return $entry;
+    }, $main_entity['translations']);
+    self::assertSame($component_entries, $headless_entries);
+  }
+
+  /**
+   * Provides available, missing, denied and preview-accessible translations.
+   */
+  public static function translationContractCases(): iterable {
+    yield 'available requested' => ['fr', TRUE, FALSE];
+    yield 'missing requested with fallback' => ['de', TRUE, FALSE];
+    yield 'denied for public' => ['en', FALSE, FALSE];
+    yield 'viewable in authorized preview' => ['en', FALSE, TRUE];
   }
 
   /**
