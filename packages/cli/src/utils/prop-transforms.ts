@@ -385,6 +385,11 @@ function isColorTokenValue(value: unknown): value is ColorTokenValue {
   );
 }
 
+/**
+ * Converts a single server-resolved color value to CLI-friendly string form.
+ * See {@link collapseColorPropsInElements} for the full conversion rules.
+ * Values that are not resolved objects pass through unchanged.
+ */
 function collapseResolvedColorPropValue(value: unknown): unknown {
   const resolvedColor = isRecord(value) ? value : null;
   const token = resolvedColor?.value;
