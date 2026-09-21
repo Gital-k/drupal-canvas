@@ -171,6 +171,7 @@ services:
       - { name: path_processor_inbound, priority: 200 }
   Drupal\canvas\Controller\CanvasBlockListController: ~
   Drupal\canvas\EventSubscriber\RecipeSubscriber: ~
+  Drupal\canvas\EventSubscriber\TourSubscriber: ~
 
   # Routing.
   Drupal\canvas\Entity\Routing\CanvasHtmlRouteEnhancer:
