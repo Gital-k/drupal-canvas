@@ -12,7 +12,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
 
 /**
- * Provides Drupal status messages above the published headless frontend.
+ * Renders an embedded headless preview with Drupal status messages above it.
  */
 #[PageDisplayVariant(
   id: self::PLUGIN_ID,

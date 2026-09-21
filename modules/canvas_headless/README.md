@@ -54,12 +54,13 @@ Eligible links open outside the iframe: Drupal-resolved paths use their Drupal
 URL, while unresolved paths and external links use their original URL.
 `target="_blank"` opens a new tab.
 
-### Entity revision routes in the content API
+### Entity revision previews
 
-The content API supports `entity.{entity_type}.revision` and
-`entity.{entity_type}.latest_version` routes for entities with enabled Canvas
-content templates. This includes Content Moderation's latest-version routes.
-Drupal's revision access checks authorize the request.
+Entities with enabled Canvas content templates can embed the frontend on their
+`entity.{entity_type}.revision` and `entity.{entity_type}.latest_version` routes.
+This includes Content Moderation's latest-version routes. Embedding requires the
+authenticated access described above and an enabled Canvas template for the
+selected view mode. Other requests keep Drupal's normal rendering.
 
 Canvas currently enables content templates only for nodes. Other entity types
 require a module that adds content template support.

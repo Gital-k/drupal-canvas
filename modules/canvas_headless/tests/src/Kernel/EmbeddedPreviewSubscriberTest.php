@@ -24,6 +24,8 @@ use Drupal\Core\Routing\RouteMatch;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\node\Entity\Node;
+use Drupal\taxonomy\Entity\Term;
+use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
@@ -202,6 +204,32 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
     $template->setStatus(TRUE)->save();
     $event = $this->selectVariant($node, dispatch: TRUE);
     self::assertSame(EmbeddedHeadlessPreviewPageVariant::PLUGIN_ID, $event->getPluginId());
+    $node->setUnpublished();
+    $event = $this->selectVariant($node, 'entity.node.revision');
+    self::assertSame(EmbeddedHeadlessPreviewPageVariant::PLUGIN_ID, $event->getPluginId());
+    self::assertSame(0, $event->getCacheMaxAge());
+    $plugin = $this->container->get('plugin.manager.display_variant')->createInstance($event->getPluginId(), $event->getPluginConfiguration());
+    self::assertInstanceOf(EmbeddedHeadlessPreviewPageVariant::class, $plugin);
+    $build = $plugin->build();
+    $this->enableModules(['taxonomy', 'canvas_headless_test']);
+    $this->installEntitySchema('taxonomy_term');
+    $this->installConfig(['taxonomy']);
+    Vocabulary::create(['vid' => 'topics', 'name' => 'Topics'])->save();
+    ContentTemplate::create([
+      'id' => 'taxonomy_term.topics.full',
+      'content_entity_type_id' => 'taxonomy_term',
+      'content_entity_type_bundle' => 'topics',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => [],
+      'status' => TRUE,
+    ])->save();
+    $term = Term::create(['vid' => 'topics', 'name' => 'Unpublished term', 'status' => FALSE]);
+    foreach (['revision', 'latest_version'] as $operation) {
+      $event = $this->selectVariant($term, 'entity.taxonomy_term.' . $operation);
+      self::assertSame(EmbeddedHeadlessPreviewPageVariant::PLUGIN_ID, $event->getPluginId());
+      self::assertSame(0, $event->getCacheMaxAge());
+    }
+    self::assertSame('simple_page', $this->selectVariant($term, 'entity.taxonomy_term.revision_delete_form')->getPluginId());
   }
 
   /**
@@ -324,6 +352,10 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
         self::assertContains('user.permissions', $event->getCacheContexts());
         self::assertContains('user.roles:authenticated', $event->getCacheContexts());
 
+        foreach (['revision', 'latest_version'] as $operation) {
+          self::assertSame('simple_page', $this->selectVariant($entity, 'entity.' . $entity->getEntityTypeId() . '.' . $operation)->getPluginId());
+        }
+
         $entity->setUnpublished();
         self::assertSame('simple_page', $this->selectVariant($entity)->getPluginId());
         $entity->setPublished();
@@ -338,7 +370,7 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
     $anonymous_account = new AnonymousUserSession();
     self::assertTrue($anonymous_account->hasPermission(PreviewUrlGeneratorInterface::PREVIEW_PERMISSION));
     $this->container->get(AccountProxyInterface::class)->setAccount($anonymous_account);
-    foreach (['canonical'] as $operation) {
+    foreach (['canonical', 'revision', 'latest_version'] as $operation) {
       self::assertSame('simple_page', $this->selectVariant($node, 'entity.node.' . $operation)->getPluginId());
     }
   }
@@ -369,6 +401,10 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
     $entity_type_id = $entity->getEntityTypeId();
     $parameter_name = $entity_type_id === Page::ENTITY_TYPE_ID ? 'canvas_page' : $entity_type_id;
     $route_name ??= 'entity.' . $entity_type_id . '.canonical';
+    $parameter_name = match (TRUE) {
+      str_ends_with($route_name, '.revision') => $entity_type_id . '_revision',
+      default => $parameter_name,
+    };
     $route = new Route('/' . $parameter_name . '/{' . $parameter_name . '}');
     $route_match = new RouteMatch(
       $route_name,
@@ -379,6 +415,10 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
     $path = $entity_type_id === Page::ENTITY_TYPE_ID
       ? '/page/' . $entity->id()
       : '/node/' . $entity->id();
+    $path = match ($route_name) {
+      'entity.node.revision' => '/node/' . $entity->id() . '/revisions/' . $entity->getRevisionId() . '/view',
+      default => $path,
+    };
     $request = Request::create('https://drupal.example' . $path);
     if ($is_content_api_request) {
       $request->attributes->set(CanvasContentApiRequest::REQUESTED_URI_ATTRIBUTE, $path);
