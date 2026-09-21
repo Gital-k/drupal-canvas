@@ -199,6 +199,9 @@ services:
   Drupal\canvas\Access\ComponentTreeEditAccessCheck:
     tags:
       - { name: access_check, applies_to: _canvas_component_tree_edit_access }
+  Drupal\canvas\Access\ComponentTreePreviewAccessCheck:
+    tags:
+      - { name: access_check, applies_to: _canvas_component_tree_preview_access }
   Drupal\canvas\Access\PreviewEntityViewAccessCheck:
     tags:
       - { name: access_check, applies_to: _canvas_preview_entity_view_access }

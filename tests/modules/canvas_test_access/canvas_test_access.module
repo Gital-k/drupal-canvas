@@ -11,10 +11,20 @@ use Drupal\Core\Session\AccountInterface;
  * Implements hook_ENTITY_TYPE_access().
  *
  * Denies view access to canvas_page entity with id 1.
+ *
+ * Denies the operations listed in the `forbidden_langcodes_by_operation`
+ * key-value entry for canvas_page translations in the listed languages, e.g.
+ * `['update' => ['fr']]` denies `update` on French translations.
  */
 function canvas_test_access_canvas_page_access(EntityInterface $entity, string $operation, AccountInterface $account): AccessResultInterface {
   $cacheContexts = \Drupal::keyValue('canvas_test_access')->get('cache_contexts', []);
   $cacheTags = \Drupal::keyValue('canvas_test_access')->get('cache_tags', []);
+  $forbiddenLangcodes = \Drupal::keyValue('canvas_test_access')->get('forbidden_langcodes_by_operation', []);
+
+  $langcode = $entity->language()->getId();
+  if (\in_array($langcode, $forbiddenLangcodes[$operation] ?? [], TRUE)) {
+    return AccessResult::forbidden("The '$operation' operation is forbidden on '$langcode' translations by canvas_test_access.");
+  }
 
   if ((int) $entity->id() === 1 && $operation === 'view') {
     return AccessResult::forbidden();

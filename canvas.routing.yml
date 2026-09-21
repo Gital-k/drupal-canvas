@@ -549,8 +549,9 @@ canvas.api.layout.get: &layout_get_route
     _title_callback: 'Drupal\canvas\Controller\ApiLayoutController::getLabel'
   requirements: &layout_get_route_requirements
     _canvas_authentication_required: TRUE
-    _canvas_component_tree_edit_access: TRUE
-    _entity_access: 'entity.update'
+    # Loading a non-default translation only previews it: requires edit access
+    # on the default translation and 'view' access on the previewed one.
+    _canvas_component_tree_preview_access: TRUE
     _format: 'json'
   options: &layout_get_route_options
     _canvas_use_template_draft: TRUE
@@ -595,8 +596,11 @@ canvas.api.layout.patch: &layout_patch_route
     _controller: 'Drupal\canvas\Controller\ApiLayoutController::patch'
     # We need a title callback because we use the HTML renderer to generate the preview.
     _title_callback: 'Drupal\canvas\Controller\ApiLayoutController::getLabel'
-  requirements:
-    <<: *layout_get_route_requirements
+  requirements: &layout_patch_route_requirements
+    _canvas_authentication_required: TRUE
+    _canvas_component_tree_edit_access: TRUE
+    _entity_access: 'entity.update'
+    _format: 'json'
   options:
     _canvas_use_template_draft: TRUE
     parameters:
@@ -609,7 +613,7 @@ canvas.api.layout.patch.content_template:
   <<: *layout_patch_route
   path: '/canvas/api/v0/layout-content-template/{entity}/{preview_entity}'
   requirements:
-    <<: *layout_get_route_requirements
+    <<: *layout_patch_route_requirements
     _canvas_preview_entity_view_access: TRUE
   options:
     _canvas_use_template_draft: TRUE
