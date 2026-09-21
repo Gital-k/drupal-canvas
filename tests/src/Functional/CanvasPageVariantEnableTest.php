@@ -57,6 +57,9 @@ class CanvasPageVariantEnableTest extends BrowserTestBase {
       'config:system.menu.account',
       'config:system.menu.main',
       'config:system.site',
+      // The page variant selector checks the configured admin theme.
+      // @see \Drupal\canvas\EventSubscriber\PageVariantSelectorSubscriber
+      'config:system.theme',
       'local_task',
       'rendered',
       'user:1',
