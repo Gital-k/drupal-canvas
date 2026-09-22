@@ -269,10 +269,15 @@ export function getPropsValues(
       // Apply each transform in sequence.
       const transformed = Object.entries(fieldTransforms).reduce(
         (transformed: any, [transformer, config]) => {
+          // Fall back to `fieldData[key]` if this prop hasn't been saved yet,
+          // so its transform (e.g. `dateTime`) doesn't drop the value.
+          const propSource =
+            (selectedModel as EvaluatedComponentModel).source?.[key] ??
+            fieldData[key];
           return transformsList[transformer as keyof Transforms](
             transformed,
             config as any,
-            (selectedModel as EvaluatedComponentModel).source[key] as any,
+            propSource as any,
           );
         },
         value,
