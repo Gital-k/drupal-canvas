@@ -191,6 +191,23 @@ describe('colorTokenValuesEqual', () => {
       colorTokenValuesEqual(red, { ...red, components: [0.8, 0.1, 0] }),
     ).toBeFalsy();
   });
+
+  it('treats sRGB components equal when they round to the same 8-bit channel', () => {
+    // 0.2667 is what a low PHP serialize_precision emits for 68/255 ≈ 0.26666…
+    const fromServer: ColorTokenValue = {
+      colorSpace: 'srgb',
+      components: [0.2667, 0, 0],
+      alpha: null,
+      hex: null,
+    };
+    const fromFile: ColorTokenValue = {
+      colorSpace: 'srgb',
+      components: [68 / 255, 0, 0],
+      alpha: null,
+      hex: '#cc0000',
+    };
+    expect(colorTokenValuesEqual(fromFile, fromServer)).toBeTruthy();
+  });
 });
 
 describe('serializeColorValue', () => {

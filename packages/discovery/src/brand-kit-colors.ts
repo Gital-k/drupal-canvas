@@ -337,7 +337,16 @@ export function colorTokenValuesEqual(
     return false;
   }
   for (let i = 0; i < a.components.length; i++) {
-    if (!numbersEqual(a.components[i], b.components[i])) {
+    const ai = a.components[i];
+    const bi = b.components[i];
+    // sRGB components are always n/255 (8-bit channel values); compare by
+    // rounded channel to absorb float serialization noise (PHP
+    // serialize_precision, YAML rounding by external tools).
+    const equal =
+      a.colorSpace === 'srgb'
+        ? Math.round(ai * 255) === Math.round(bi * 255)
+        : numbersEqual(ai, bi);
+    if (!equal) {
       return false;
     }
   }
