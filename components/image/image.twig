@@ -3,6 +3,8 @@
 {% set srcset = src|toSrcSet(width) %}
 {# Convert any stream wrapper image URL to a public, browser-resolvable URL. (No-op if not stream wrapper image URL. #}
 {% set src = file_url(src) %}
+{# Determine alt text: empty string if decorative, otherwise use provided alt or empty string #}
+{% set alt_text = decorative ? '' : (alt ?? '') %}
 <img
    class="{{ class ?? 'image' }}"
    src="{{ src }}"
@@ -10,9 +12,7 @@
      srcset="{{ srcset }}"
      sizes="{{ sizes ?? 'auto 100vw' }}"
    {% endif %}
-   {% if alt %}
-     alt="{{ alt }}"
-   {% endif %}
+   alt="{{ alt_text }}"
    {% if width %}
      width="{{ width }}"
    {% endif %}

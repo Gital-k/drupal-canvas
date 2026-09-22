@@ -24,6 +24,14 @@ props:
       type: string
       examples:
         - Placeholder text
+    decorative:
+      title: Mark image as 'decorative' for screen readers
+      description: When checked, the image will have an empty alt attribute, indicating it is decorative and should be ignored by screen readers. This overrides any alt text that may be set.
+      type: boolean
+      default: false
+      examples:
+        - false
+        - true
     width:
       title: Image width
       type: integer
