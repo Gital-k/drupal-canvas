@@ -235,7 +235,7 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
         $target_error = $this->pageBuilderHelper->validateRegionExists($target, $current_layout);
       }
       else {
-        $target_error = $this->pageBuilderHelper->validateSlotTargetExists($target);
+        $target_error = $this->pageBuilderHelper->validateSlotTargetExists($target, $components_by_uuid);
       }
       if ($target_error !== NULL) {
         $errors[] = $target_error;
