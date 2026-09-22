@@ -1067,7 +1067,7 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
                   element: "h1"
             YAML, target: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/column_one'),
         ],
-        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Component with UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" not found in layout',
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Invalid slot "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/column_one". Component with UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" not found in layout',
       ],
       'test_unknown_slot_name' => [
         'layout_type' => 'multi_region_with_slots',
@@ -1079,7 +1079,7 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
                   element: "h1"
             YAML, target: '2f957795-e30a-46a0-acfe-868adc0685bf/column_three'),
         ],
-        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Slot "column_three" not found in path "content/2f957795-e30a-46a0-acfe-868adc0685bf"',
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Slot "column_three" does not exist on component "2f957795-e30a-46a0-acfe-868adc0685bf".',
       ],
       'test_inside_slot_with_children' => [
         'layout_type' => 'multi_region_with_slots',
