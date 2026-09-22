@@ -1,9 +1,6 @@
 import path from 'node:path';
 import { writeComponentManifest } from '@drupal-canvas/headless/components-endpoint';
-import {
-  mergeFrameAncestors,
-  resolveDraftConfig,
-} from '@drupal-canvas/headless/server';
+import { resolveDraftConfig } from '@drupal-canvas/headless/server';
 
 import { writeComponentRegistryModule } from './component-registry';
 import { watchComponentRegistry } from './component-registry-watcher';
@@ -20,127 +17,12 @@ const COMPONENTS_MODULE_ID =
 
 const CSP_HEADER = 'content-security-policy';
 
-/**
- * The environment variable naming the origins allowed to embed the app. A
- * whitespace- or comma-separated list, because a Drupal site can be reached
- * on more than one origin the editor's browser might use: a multi-origin
- * topology where the app server and the browser see Drupal differently, one
- * frontend previewed from both a staging and a production Drupal, or a
- * multisite serving several editor hostnames. Unset, the origin of
- * CANVAS_SITE_URL is used, which is correct for the single-origin
- * deployment and needs no configuration at all.
- */
-const EDITOR_ORIGINS_ENV_VARIABLE = 'CANVAS_EDITOR_ORIGINS';
-
 type NextConfigInput =
   | NextConfig
   | ((
       phase: string,
       context: { defaultConfig: NextConfig },
     ) => NextConfig | Promise<NextConfig>);
-
-type HeaderRule = Awaited<
-  ReturnType<NonNullable<NextConfig['headers']>>
->[number];
-
-/**
- * The host shapes a Canvas editor can be served on: LDH domain labels, a
- * dotted-quad IPv4 literal. Literal IPv6 addresses are not supported by CSP
- * host-source matching; DNS hostnames resolving to IPv6 remain supported.
- *
- * Parsing with `URL` is not sufficient on its own. The URL host parser
- * permits characters that are meaningless in a hostname but meaningful in a
- * policy: `*` makes the source a wildcard matching every subdomain (and
- * `https://*` matches every origin), while `;` ends the directive and `,`
- * ends the whole policy, so a configured value could append a directive of
- * its own. Matching the host against this pattern, and taking the port from
- * `URL` (which parses it as digits), is what keeps a configured value to the
- * one origin it names.
- */
-const EDITOR_HOST_PATTERN =
-  /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}|[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*)$/;
-
-/**
- * One configured value as a CSP host-source, or null when it is not one.
- *
- * Values carrying credentials, using a scheme the editor cannot be served
- * over, or naming a host outside EDITOR_HOST_PATTERN are dropped rather than
- * repaired.
- */
-function toEditorOrigin(value: string): string | null {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      return null;
-    }
-    if (url.username || url.password) {
-      return null;
-    }
-    if (!EDITOR_HOST_PATTERN.test(url.hostname)) {
-      return null;
-    }
-    return url.origin;
-  } catch {
-    return null;
-  }
-}
-
-/** The deduplicated editor origins, in configured order. */
-function resolveEditorOrigins(): string[] {
-  const configured =
-    process.env[EDITOR_ORIGINS_ENV_VARIABLE] ??
-    process.env.CANVAS_SITE_URL ??
-    '';
-  return [
-    ...new Set(
-      configured
-        .split(/[\s,]+/)
-        .filter(Boolean)
-        .map(toEditorOrigin)
-        .filter((origin): origin is string => origin !== null),
-    ),
-  ];
-}
-
-/**
- * The `frame-ancestors` source list: 'self' always, plus every configured
- * editor origin. Resolved at build time from configuration rather than per
- * request from the draft session, so one static rule serves every host
- * identically — a rule conditioned on the session cookie is evaluated
- * differently by Next.js's own server and by hosted routing layers, which
- * silently dropped the editor origin wherever the two disagreed.
- */
-function resolveFrameAncestors(): string {
-  const origins = resolveEditorOrigins();
-  if (origins.length === 0) {
-    console.warn(
-      `[canvas] Neither ${EDITOR_ORIGINS_ENV_VARIABLE} nor CANVAS_SITE_URL ` +
-        'names a usable http(s) origin, so no Canvas editor may embed this ' +
-        'app and previews will be refused. Set ' +
-        `${EDITOR_ORIGINS_ENV_VARIABLE} to the origin editors reach Drupal on. ` +
-        'For IPv6, use a DNS hostname instead of a literal address.',
-    );
-  }
-  return ["'self'", ...origins].join(' ');
-}
-
-/** Merges the directive into one header rule, leaving its other headers. */
-function mergeRuleFrameAncestors(
-  rule: HeaderRule,
-  frameAncestors: string,
-): HeaderRule {
-  return {
-    ...rule,
-    headers: rule.headers.map((header) =>
-      header.key.toLowerCase() === CSP_HEADER
-        ? {
-            ...header,
-            value: mergeFrameAncestors(header.value, frameAncestors).join(', '),
-          }
-        : header,
-    ),
-  };
-}
 
 export interface WithCanvasOptions {
   /**
@@ -174,11 +56,8 @@ export const MANIFEST_ENV_VARIABLE = 'CANVAS_COMPONENT_MANIFEST_JSON';
  *   silently.
  * - Watches local component definitions in development and updates the
  *   generated implementation registry when components are added or removed.
- * - Sends `Content-Security-Policy: frame-ancestors`, admitting the app
- *   itself and every origin named by CANVAS_EDITOR_ORIGINS (default: the
- *   origin of CANVAS_SITE_URL). Merged into the app's own `headers()` rules,
- *   so no directive of theirs is discarded and an application-owned
- *   frame-ancestors stays authoritative.
+ * - Rejects static CSP header rules: mount the request-time Canvas
+ *   middleware/proxy separately and supply the app's CSP on its response.
  *
  * ```ts
  * // next.config.ts
@@ -232,28 +111,23 @@ export function withCanvas(
 
     const userHeaders = config.headers;
     const headers: NonNullable<NextConfig['headers']> = async () => {
-      // When several rules match a path and set the same key, Next.js keeps
-      // the LAST value, so the catch-all goes first and every app rule that
-      // sets a Content-Security-Policy gets the directive merged into its
-      // value. On paths the app's own rules match, the app's merged value
-      // wins; everywhere else the catch-all applies. No app directive is
-      // discarded, and an app-owned frame-ancestors stays authoritative.
-      const frameAncestors = resolveFrameAncestors();
       const userRules = userHeaders ? await userHeaders() : [];
-      return [
-        {
-          source: '/:path*',
-          headers: [
-            {
-              key: 'Content-Security-Policy',
-              value: mergeFrameAncestors(null, frameAncestors).join(', '),
-            },
-          ],
-        },
-        ...userRules.map((rule) =>
-          mergeRuleFrameAncestors(rule, frameAncestors),
-        ),
-      ];
+      if (
+        userRules.some((rule) =>
+          rule.headers.some(
+            (header) => header.key.toLowerCase() === CSP_HEADER,
+          ),
+        )
+      ) {
+        throw new Error(
+          '[canvas] Move Content-Security-Policy out of next.config headers(). ' +
+            'Set the complete policy on the response passed to applyCanvasHeaders() ' +
+            'from @drupal-canvas/headless-next/middleware in proxy.ts (Next.js 16) ' +
+            'or middleware.ts (Next.js 15). Static header rules can replace the ' +
+            'request-time policy rather than merge with it.',
+        );
+      }
+      return userRules;
     };
     const userWebpack = config.webpack;
     const webpack: NonNullable<NextConfig['webpack']> = (

@@ -17,8 +17,8 @@ Set the `CANVAS_SITE_URL` environment variable to your Drupal site URL.
 ## Usage
 
 **1. next.config.ts** — the config wrapper generates the component manifest at
-build time and sends the CSP `frame-ancestors` header that admits the Canvas
-editor:
+build time. It no longer sends a static CSP header; mount the request-time
+helper in step 2 as well:
 
 ```ts
 import { withCanvas } from '@drupal-canvas/headless-next/config';
@@ -26,27 +26,56 @@ import { withCanvas } from '@drupal-canvas/headless-next/config';
 export default withCanvas();
 ```
 
-**2. Editor origins** — responses are `frame-ancestors 'self'` plus the origin
-of `CANVAS_SITE_URL`, which is what the editor is served from in a single-origin
-deployment, so most apps configure nothing. Set `CANVAS_EDITOR_ORIGINS` when
-editors reach Drupal on a different origin than the app server does, or on more
-than one — a staging and a production Drupal previewing the same frontend, or a
-multisite:
+**2. Request-time CSP (required)** — create `proxy.ts` for Next.js 16, at the
+same level as `app` or `pages` (inside `src` when applicable):
 
-```bash
-CANVAS_EDITOR_ORIGINS="https://cms.example, https://staging-cms.example"
+```ts
+export { canvasMiddleware as default } from '@drupal-canvas/headless-next/middleware';
 ```
 
-Values must be `http(s)` origins without credentials, naming a real host: a
-domain or an IPv4 literal. Literal IPv6 addresses are dropped because CSP
-host-source matching does not support them; use a DNS hostname instead
-(hostnames resolving to IPv6 are supported). Anything else is dropped, and only
-the scheme, host, and port of each are used. An explicitly configured
-`CANVAS_EDITOR_ORIGINS` with no usable origins does not fall back to
-`CANVAS_SITE_URL`. Wildcards such as `https://*.example.com` are not accepted —
-name each origin. The directive is merged into any `Content-Security-Policy` the
-app sets through its own `headers()`, so no directive of the app's is discarded,
-and a `frame-ancestors` the app sets itself stays authoritative.
+For **Next.js 15**, put the same export in **`middleware.ts`**. Use an
+exports-aware TypeScript `moduleResolution` such as `bundler`, and follow
+`pageExtensions` if customized. Without a matcher this runs on every request;
+any matcher you add must cover all document/preview routes. Verify deployed
+headers: omitting this setup means Canvas supplies no framing policy.
+
+If the app already has middleware/proxy or a CSP, compose on the same response:
+
+```ts
+// proxy.ts (Next.js 16); name the file middleware.ts for Next.js 15.
+import { NextResponse } from 'next/server';
+import { applyCanvasHeaders } from '@drupal-canvas/headless-next/middleware';
+
+import type { NextRequest } from 'next/server';
+
+export default function handler(request: NextRequest) {
+  const response = NextResponse.next();
+  // Supply your COMPLETE existing CSP here, including any path-specific rules.
+  response.headers.set('Content-Security-Policy', "default-src 'self'");
+  return applyCanvasHeaders(request, response);
+}
+```
+
+**Migration:** move your complete CSP from `next.config.headers()` onto the
+response passed to `applyCanvasHeaders`. `withCanvas()` rejects static CSP rules
+because header layers can replace, rather than merge, policies. Other static
+headers and report-only CSP are unchanged. The helper preserves other directives
+and leaves application-owned `frame-ancestors` authoritative. Do not overwrite
+the result in a later handler. Reconcile hosting/CDN CSP separately: the helper
+cannot see it, and multiple policies intersect.
+
+By default, `frame-ancestors` admits `'self'`, the `CANVAS_SITE_URL` origin and
+the draft-session editor origin. Set `CANVAS_EDITOR_ORIGINS` to a comma- or
+whitespace-separated list of HTTP(S) URLs to replace both defaults. An empty or
+entirely invalid list admits only `'self'`. Origins are normalized and
+deduplicated; credentials, wildcards and literal IPv6 are rejected. For IPv6,
+use a DNS hostname. This controls embedding, not draft authorization.
+
+Both variables are read from server `process.env` per request. Restart
+self-hosted `next start` with updated environment values; rebuilding is not
+needed unless values are embedded, for example through `next.config.env`. For
+hosts that embed environment settings, rebuild/redeploy and verify headers
+rather than assuming a settings change updates the running deployment.
 
 **3. Route files** — mount the handlers, one file per route:
 

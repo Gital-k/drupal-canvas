@@ -4,6 +4,7 @@ export default defineConfig({
   clean: ['dist'],
   entry: {
     index: 'src/index.ts',
+    middleware: 'src/middleware.ts',
     'client/index': 'src/client/index.ts',
     'config/index': 'src/config/index.ts',
     'canvas-component-tree': 'src/canvas-component-tree.tsx',

@@ -34,7 +34,7 @@ describe('built output', () => {
   // `.js` and turns a package specifier into a literal file path.
   // `next/navigation.js` bypasses Next's server/client aliasing and breaks
   // every consumer Turbopack build.
-  it.each([['adapter.js'], ['client/draft-session.js']])(
+  it.each([['adapter.js'], ['client/draft-session.js'], ['middleware.js']])(
     'leaves Next.js subpath specifiers unresolved in dist/%s',
     (relativePath) => {
       const built = readFileSync(

@@ -2,20 +2,21 @@
 "@drupal-canvas/headless-next": minor
 ---
 
-Resolve the `frame-ancestors` policy from configuration instead of the draft
-session cookie.
+Resolve `frame-ancestors` at request time through an application-mounted
+middleware (Next.js 15) or proxy (Next.js 16), rather than static header rules
+whose cookie matching differs between Next.js and hosted routing layers.
 
-- Draft previews were refused on Vercel. The policy came from a `next.config`
-  header rule conditioned on the session cookie, and that condition is matched
-  against the raw, percent-encoded `Cookie` header there but against the
-  decoded value by Next.js's own server, so the editor origin was never added
-  and the editor's iframe was blocked. A rule with no condition behaves the
-  same on every host.
-- The policy now admits every origin `CANVAS_EDITOR_ORIGINS` names, defaulting
-  to the origin of `CANVAS_SITE_URL`, so a single-origin deployment needs no
-  new configuration. Set it when editors reach Drupal on a different origin
-  than the app server does, or on more than one.
-- Values must be `http(s)` origins without credentials, naming a domain or an
-  IPv4 literal; only their scheme, host, and port are used. Wildcard hosts and
-  literal IPv6 addresses are not accepted. For IPv6, use a DNS hostname:
-  hostnames resolving to IPv6 remain supported.
+- Mount `canvasMiddleware` from `@drupal-canvas/headless-next/middleware` on
+  all document/preview routes, or compose with
+  `applyCanvasHeaders(request, response)`. Percent-encoded draft cookies are
+  read through Next's parsed cookie API.
+- `withCanvas()` no longer emits a static CSP. Move the application's complete
+  CSP from `next.config.headers()` to the response passed to the helper;
+  static CSP rules now raise an actionable migration error. Existing
+  `frame-ancestors` and all other policies on that response are preserved.
+  Reconcile separately configured hosting/CDN CSP as well.
+- All adapters share the same editor-origin policy: unset
+  `CANVAS_EDITOR_ORIGINS` admits `'self'`, the `CANVAS_SITE_URL` origin and the
+  draft-session editor origin. An explicit list replaces both defaults, even
+  when empty or invalid. Literal IPv6 addresses are rejected; use a DNS hostname
+  (hostnames resolving to IPv6 remain supported).
