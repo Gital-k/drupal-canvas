@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { existsSync, watch } from 'node:fs';
+import { existsSync, realpathSync, watch } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,8 +53,10 @@ export async function watchCanvasSources(
       active = active
         .then(async () => {
           if (closed) return;
+          // Subscribe to the configured location even when its metadata is
+          // invalid. Fixing a file there must recover without editing config again.
+          subscribe();
           await generateCanvasSources(projectRoot);
-          if (!closed) subscribe();
         })
         .catch(onError);
     }, 75);
@@ -74,10 +76,11 @@ export async function watchCanvasSources(
   });
   config.on('error', onError);
   try {
-    await generateCanvasSources(projectRoot);
     subscribe();
+    await generateCanvasSources(projectRoot);
   } catch (error) {
     config.close();
+    sources?.close();
     throw error;
   }
   return async () => {
@@ -89,10 +92,21 @@ export async function watchCanvasSources(
   };
 }
 
-if (
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+// npm invokes bins through node_modules/.bin symlinks. Node resolves the module
+// URL, but argv[1] can retain the symlink; normalize both before comparing.
+function isEntrypoint() {
+  if (!process.argv[1]) return false;
+  try {
+    return (
+      realpathSync(process.argv[1]) ===
+      realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isEntrypoint()) {
   const args = process.argv.slice(2);
   const separator = args.indexOf('--');
   const command = separator < 0 ? [] : args.slice(separator + 1);

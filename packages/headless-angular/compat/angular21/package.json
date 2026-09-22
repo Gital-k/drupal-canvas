@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "ng build",
+    "build": "canvas-angular -- ng build",
+    "type-check": "canvas-angular -- ngc --noEmit",
+    "dev": "canvas-angular --watch -- ng serve",
     "start": "node dist/proof/server/server.mjs"
   },
   "dependencies": {

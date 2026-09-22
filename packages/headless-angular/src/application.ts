@@ -14,7 +14,16 @@ import {
   TransferState,
   untracked,
 } from '@angular/core';
-import { RedirectCommand, Router } from '@angular/router';
+import {
+  NavigationCancel,
+  NavigationCancellationCode,
+  NavigationEnd,
+  NavigationError,
+  NavigationSkipped,
+  NavigationStart,
+  RedirectCommand,
+  Router,
+} from '@angular/router';
 import { isPageRedirect, serializeJsonForHtml } from '@drupal-canvas/headless';
 import { assertCanvasPath } from '@drupal-canvas/headless-angular/contracts';
 import {
@@ -37,6 +46,14 @@ import type {
   DraftSessionRenewState,
 } from '@drupal-canvas/headless/client';
 
+interface PendingCanvasNavigation {
+  id: number;
+  done: Promise<void>;
+  release: () => void;
+  awaitingSuccessor?: boolean;
+  staged?: { data: CanvasPageData; sessionRevision: number };
+}
+
 /** Per-Angular-application store: SSR must bootstrap one application per request. */
 @Injectable({ providedIn: 'root' })
 export class CanvasPageStore {
@@ -47,11 +64,17 @@ export class CanvasPageStore {
   private readonly document = inject(DOCUMENT);
   private readonly head = inject(CanvasDocumentHead);
   private readonly destroy = inject(DestroyRef);
-  private controller?: AbortController;
+  private readonly router = inject(Router);
+  private navigationController?: AbortController;
+  private refreshController?: AbortController;
+  private navigation?: PendingCanvasNavigation;
+  private sessionRevision = 0;
   private readonly entityControllers = new Set<AbortController>();
   private generation = 0;
   private disposed = false;
+  /** Last committed router path, never the destination of an unfinished resolver. */
   readonly path = signal('/');
+  readonly pendingPath = signal<string | null>(null);
   readonly data = signal<CanvasPageData | null>(null);
   readonly error = signal<unknown>(null);
   readonly session = computed(() => this.data()?.session ?? null);
@@ -60,7 +83,7 @@ export class CanvasPageStore {
     return page && !isPageRedirect(page) ? page : null;
   });
   private readonly queue = createAsyncRefreshQueue(
-    () => this.load(this.path()),
+    () => this.refreshCommittedPage(),
     (error) => {
       if (
         !this.disposed &&
@@ -70,25 +93,101 @@ export class CanvasPageStore {
     },
   );
   constructor() {
+    const events = this.router.events.subscribe((event) => {
+      if (event instanceof NavigationStart)
+        this.beginNavigation(event.id, event.url);
+      else if (
+        event instanceof NavigationEnd &&
+        event.id === this.navigation?.id
+      ) {
+        const staged = this.navigation.staged;
+        this.path.set(event.urlAfterRedirects.split('#')[0]);
+        if (staged) this.commit(staged.data, staged.sessionRevision);
+        this.endNavigation();
+      } else if (
+        (event instanceof NavigationCancel ||
+          event instanceof NavigationError) &&
+        event.id === this.navigation?.id
+      ) {
+        this.navigationController?.abort();
+        this.navigation.staged = undefined;
+        if (
+          event instanceof NavigationCancel &&
+          (event.code === NavigationCancellationCode.Redirect ||
+            event.code === NavigationCancellationCode.SupersededByNewNavigation)
+        ) {
+          // Keep refreshes behind the whole redirect/supersession chain.
+          this.navigation.awaitingSuccessor = true;
+        } else this.endNavigation();
+      } else if (
+        event instanceof NavigationSkipped &&
+        (event.id === this.navigation?.id || this.navigation?.awaitingSuccessor)
+      )
+        this.endNavigation();
+    });
     this.destroy.onDestroy(() => {
       this.disposed = true;
-      this.controller?.abort();
+      events.unsubscribe();
+      this.navigationController?.abort();
+      this.refreshController?.abort();
+      this.endNavigation();
       for (const controller of this.entityControllers) controller.abort();
     });
+  }
+  private beginNavigation(id: number, path: string): void {
+    if (this.navigation?.id === id) return;
+    const previous = this.navigation;
+    let release!: () => void;
+    const done = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.navigation = { id, done, release };
+    this.pendingPath.set(path.split('#')[0]);
+    ++this.generation;
+    this.refreshController?.abort();
+    this.navigationController?.abort();
+    previous?.release();
+  }
+  private endNavigation(): void {
+    const previous = this.navigation;
+    this.navigation = undefined;
+    this.pendingPath.set(null);
+    previous?.release();
   }
   refresh(): Promise<void> {
     return this.disposed ? Promise.resolve() : this.queue.request();
   }
   setSession(session: CanvasSession): void {
+    ++this.sessionRevision;
     this.data.update((data) => (data ? { ...data, session } : data));
   }
   async load(path: string): Promise<CanvasPageData> {
     assertCanvasPath(path);
     if (this.disposed) throw new Error('Canvas store destroyed');
-    this.path.set(path);
+    // Also support construction inside a resolver, after NavigationStart fired.
+    const current = this.router.getCurrentNavigation();
+    if (current) this.beginNavigation(current.id, path);
+    const navigation = this.navigation;
     const generation = ++this.generation;
-    this.controller?.abort();
-    this.controller = new AbortController();
+    const sessionRevision = this.sessionRevision;
+    this.refreshController?.abort();
+    this.navigationController?.abort();
+    this.navigationController = new AbortController();
+    const result = await this.readPage(path, this.navigationController.signal);
+    if (!this.disposed && generation === this.generation) {
+      if (navigation && navigation === this.navigation)
+        navigation.staged = { data: result, sessionRevision };
+      else if (!navigation && !(result.page && isPageRedirect(result.page))) {
+        this.path.set(path);
+        this.commit(result, sessionRevision);
+      }
+    }
+    return result;
+  }
+  private async readPage(
+    path: string,
+    signal: AbortSignal,
+  ): Promise<CanvasPageData> {
     const key = makeStateKey<CanvasPageData>(`canvas:${path}`);
     let result: CanvasPageData;
     if (this.context?.canvas) {
@@ -103,19 +202,44 @@ export class CanvasPageStore {
     } else {
       result = await this.getJson(
         `/api/canvas/page?path=${encodeURIComponent(path)}`,
-        this.controller.signal,
-      );
-    }
-    if (!this.disposed && generation === this.generation) {
-      this.data.set(result);
-      this.error.set(null);
-      this.head.apply(
-        result.page && !isPageRedirect(result.page)
-          ? result.page.head
-          : { title: 'Not found' },
+        signal,
       );
     }
     return result;
+  }
+  private commit(result: CanvasPageData, sessionRevision: number): void {
+    if (result.page && isPageRedirect(result.page)) return;
+    // A renewal can complete while an older navigation response is in flight.
+    // Do not roll its epoch back before the queued post-navigation refresh.
+    const session = this.session();
+    this.data.set(
+      sessionRevision !== this.sessionRevision && session
+        ? { ...result, session }
+        : result,
+    );
+    this.error.set(null);
+    this.head.apply(result.page ? result.page.head : { title: 'Not found' });
+  }
+  private async refreshCommittedPage(): Promise<void> {
+    while (!this.disposed && this.navigation) await this.navigation.done;
+    if (this.disposed || !this.data()) return;
+    const generation = this.generation;
+    const sessionRevision = this.sessionRevision;
+    const path = this.path();
+    this.refreshController = new AbortController();
+    const result = await this.readPage(path, this.refreshController.signal);
+    if (this.disposed || this.navigation || generation !== this.generation)
+      return;
+    if (result.page && isPageRedirect(result.page)) {
+      const redirect = pageRedirect(result, this.router, this.document);
+      if (redirect)
+        await this.router.navigateByUrl(
+          redirect.redirectTo,
+          redirect.navigationBehaviorOptions,
+        );
+      return;
+    }
+    this.commit(result, sessionRevision);
   }
   async fetchEntity(
     options: CanvasEntityOptions,
@@ -160,15 +284,23 @@ export const canvasPageResolver: ResolveFn<
   const router = inject(Router);
   const document = inject(DOCUMENT);
   const result = await store.load(state.url.split('#')[0]);
-  if (result.page && isPageRedirect(result.page)) {
-    const target = result.page.redirect.url;
-    if (result.page.redirect.external)
-      document.defaultView?.location.assign(target);
-    else
-      return new RedirectCommand(router.parseUrl(target), { replaceUrl: true });
-  }
-  return result;
+  return pageRedirect(result, router, document) ?? result;
 };
+
+/** The resolver and refresh lane share identical redirect semantics. */
+function pageRedirect(
+  result: CanvasPageData,
+  router: Router,
+  document: Document,
+): RedirectCommand | null {
+  if (!result.page || !isPageRedirect(result.page)) return null;
+  const target = result.page.redirect.url;
+  if (result.page.redirect.external) {
+    document.defaultView?.location.assign(target);
+    return null;
+  }
+  return new RedirectCommand(router.parseUrl(target), { replaceUrl: true });
+}
 
 /** Own only Canvas head nodes. Angular manages body hydration independently. */
 @Injectable({ providedIn: 'root' })
@@ -290,7 +422,9 @@ export class CanvasDraftSession {
       });
     });
     effect(() => {
-      this.machine?.setPath(this.store.path());
+      // Subscribe even before hydration has created the session machine.
+      const path = this.store.path();
+      this.machine?.setPath(path);
     });
   }
 }

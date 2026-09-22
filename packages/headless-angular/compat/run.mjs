@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { rename } from 'node:fs/promises';
+import { rename, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { verifyInstalledBin } from './bin-proof.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(root, '../../..');
@@ -15,6 +17,7 @@ const run = (command, args, cwd = repo) =>
   execFileSync(command, args, { cwd, stdio: 'inherit' });
 const servers = [];
 const movedSources = [];
+const binResults = [];
 try {
   run('npx', [
     'turbo',
@@ -40,11 +43,9 @@ try {
     } else {
       run('npm', ['ci', '--ignore-scripts'], app);
     }
-    run(
-      'node',
-      ['node_modules/@drupal-canvas/headless-angular/tools/build.mjs'],
-      app,
-    );
+    binResults.push({ major, ...(await verifyInstalledBin(app)) });
+    // No stale output can make a no-op npm bin appear to build successfully.
+    await rm(path.join(app, 'dist'), { recursive: true, force: true });
     run('npm', ['run', 'build'], app);
     const saved = path.join(root, 'artifacts', `sources-${major}`);
     await rename(path.join(app, 'src'), saved);
@@ -73,6 +74,10 @@ try {
       });
     });
   }
+  await writeFile(
+    path.join(root, 'artifacts/npm-bin-proof.json'),
+    JSON.stringify(binResults, null, 2) + '\n',
+  );
   run('node', [path.join(root, 'verify.mjs')]);
 } finally {
   for (const server of servers) server.kill();

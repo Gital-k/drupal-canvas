@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 
 export async function verifyIntegration(origin, browser, evaluate) {
+  const control = (endpoint, body = {}) =>
+    fetch(origin + '/test/' + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   const response = await fetch(origin + '/integration/one', {
     headers: { Connection: 'close' },
   });
@@ -51,13 +57,71 @@ export async function verifyIntegration(origin, browser, evaluate) {
     false,
   );
   assert(evaluate(`${frame}.__messageListeners.size`) >= 3);
+  await control('hold', { path: '/integration/second?example=query' });
   evaluate(
     `(() => { const w = ${frame}; w.__sentinel = 'retained'; w.__button = w.document.querySelector('proof-counter button'); w.__button.click(); w.document.querySelector('#navigate').click(); })()`,
   );
   browser(
     'wait',
     '--fn',
-    `${frame}.document.querySelector('#page-title')?.textContent === 'Private /integration/second?example=query R1'`,
+    `fetch('/test/stats').then(r => r.json()).then(s => s.held === 1)`,
+  );
+  evaluate('window.__host.refresh()');
+  // Hold the resolver through BOTH a host refresh and genuine timer renewal.
+  browser(
+    'wait',
+    '--fn',
+    `${frame}.__integration.store.session().tokenExpiresAt > Date.now() + 600000`,
+  );
+  assert.equal(evaluate(`${frame}.location.pathname`), '/integration/one');
+  assert.equal(
+    evaluate(`${frame}.__integration.store.path()`),
+    '/integration/one',
+  );
+  assert.equal(
+    evaluate(`${frame}.__integration.store.pendingPath()`),
+    '/integration/second?example=query',
+  );
+  assert.equal(
+    evaluate(`${frame}.document.querySelector('#page-title').textContent`),
+    'Private /integration/one R1',
+  );
+  const heldStats = await (await fetch(origin + '/test/stats')).json();
+  assert.equal(
+    heldStats.held,
+    1,
+    'Refresh must not start a competing navigation request',
+  );
+  await control('release');
+  browser(
+    'wait',
+    '--fn',
+    `${frame}.document.querySelector('#page-title')?.textContent === 'Private /integration/second?example=query R1' && ${frame}.location.pathname === '/integration/second' && ${frame}.location.search === '?example=query'`,
+  );
+  browser(
+    'wait',
+    '--fn',
+    `fetch('/test/stats').then(r => r.json()).then(s => s.requests.length >= ${heldStats.requests.length + 2})`,
+  );
+  const automaticRefreshes = (
+    await (await fetch(origin + '/test/stats')).json()
+  ).requests.slice(heldStats.requests.length);
+  assert.deepEqual(
+    automaticRefreshes.map((request) => request.uri),
+    ['/integration/second?example=query', '/integration/second?example=query'],
+  );
+  // Drain the shared queue before asserting its post-navigation target/epoch.
+  await evaluate(`${frame}.__integration.store.refresh()`);
+  assert.equal(
+    evaluate(`${frame}.__integration.store.path()`),
+    '/integration/second?example=query',
+  );
+  assert.equal(evaluate(`${frame}.__integration.store.pendingPath()`), null);
+  assert.equal(evaluate(`${frame}.__integration.store.error()`), null);
+  assert(
+    evaluate(
+      `${frame}.__integration.store.session().tokenExpiresAt > Date.now() + 600000`,
+    ),
   );
   browser(
     'wait',
@@ -169,6 +233,27 @@ export async function verifyIntegration(origin, browser, evaluate) {
   assert.equal(metadata.status, 200);
   assert.equal((await metadata.json()).components.length, 2);
 
+  // A redirect discovered by HOST refresh must use Angular navigation, not
+  // commit a null page or replace the document and its stateful components.
+  await control('redirect', {
+    path: '/integration/second?example=query',
+    target: '/integration/refresh-target',
+    external: false,
+  });
+  evaluate('window.__host.refresh()');
+  browser(
+    'wait',
+    '--fn',
+    `${frame}.location.pathname === '/integration/refresh-target' && ${frame}.__integration.store.path() === '/integration/refresh-target'`,
+  );
+  assert.equal(
+    evaluate(`${frame}.document.querySelector('#page-title').textContent`),
+    'Private /integration/refresh-target R2',
+  );
+  assert.equal(evaluate(`${frame}.__sentinel`), 'retained');
+  assert.equal(evaluate(`${frame}.__button.isConnected`), true);
+  assert.equal(evaluate(`${frame}.document.querySelector('#not-found')`), null);
+
   evaluate(`${frame}.document.querySelector('#redirect').click()`);
   browser(
     'wait',
@@ -198,6 +283,48 @@ export async function verifyIntegration(origin, browser, evaluate) {
     0,
   );
   assert.deepEqual(browser('errors').errors, []);
+
+  // A fresh short-lived session lets a real RENEWAL refresh discover an
+  // external redirect. Same-origin destination, but external=true requires a
+  // document navigation rather than an Angular router transition.
+  await evaluate(
+    `window.__host.activate({ path: '/integration/renew-redirect', ttl: '12' })`,
+  );
+  browser(
+    'wait',
+    '--fn',
+    `${frame}.__integration?.store.path() === '/integration/renew-redirect'`,
+  );
+  evaluate(`${frame}.__redirectDocument = 'old document'`);
+  await control('redirect', {
+    path: '/integration/renew-redirect',
+    target: origin + '/integration/external-target',
+    external: true,
+  });
+  browser(
+    'wait',
+    '--fn',
+    `${frame}.location.pathname === '/integration/external-target' && ${frame}.__integration?.store.path() === '/integration/external-target'`,
+  );
+  assert.equal(evaluate(`${frame}.__redirectDocument ?? null`), null);
+  assert.equal(
+    evaluate(`${frame}.document.querySelector('#page-title').textContent`),
+    'Private /integration/external-target R2',
+  );
+  assert(
+    evaluate(
+      `${frame}.__integration.store.session().tokenExpiresAt > Date.now() + 600000`,
+    ),
+  );
+  assert.deepEqual(browser('errors').errors, []);
+  assert(
+    !browser('console').messages.some((message) =>
+      /AbortError/.test(message.text),
+    ),
+    'Refresh must never abort a resolver',
+  );
+  evaluate(`${frame}.__destroyApp()`);
+  browser('wait', '--fn', `${frame}.__messageListeners.size === 0`);
 
   const expired = await (
     await fetch(origin + '/test/assertion?path=/integration/one&ttl=1')
@@ -237,6 +364,9 @@ export async function verifyIntegration(origin, browser, evaluate) {
   );
   assert.equal(session.enabled, false, JSON.stringify({ origin, session }));
   return {
+    navigationRefreshOverlap: true,
+    hostRefreshRouterRedirect: true,
+    renewalRefreshDocumentRedirect: true,
     renewedInPlace: true,
     serverExchanges: stats.exchanges,
     metadataWithoutSources: true,

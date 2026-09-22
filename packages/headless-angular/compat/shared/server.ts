@@ -25,6 +25,29 @@ let issued = 0;
 let exchanges = 0;
 let revision = 1;
 const requests: { uri: string; authenticated: boolean }[] = [];
+let holdPath: string | null = null;
+const held: (() => void)[] = [];
+const redirects = new Map<
+  string,
+  { url: string; external: boolean; statusCode: number }
+>();
+app.post('/test/hold', express.json(), (req, res) => {
+  holdPath = req.body.path;
+  res.sendStatus(204);
+});
+app.post('/test/release', (_req, res) => {
+  holdPath = null;
+  held.splice(0).forEach((send) => send());
+  res.sendStatus(204);
+});
+app.post('/test/redirect', express.json(), (req, res) => {
+  redirects.set(req.body.path, {
+    url: req.body.target,
+    external: req.body.external,
+    statusCode: 302,
+  });
+  res.sendStatus(204);
+});
 app.get('/test/assertion', (req, res) => {
   const claims = {
     sub: '42',
@@ -60,6 +83,10 @@ app.get('/mock-drupal/canvas/content-api', (req, res) => {
   const uri = String(req.query['requestUri']);
   const authenticated = Boolean(req.headers.authorization);
   requests.push({ uri, authenticated });
+  if (redirects.has(uri)) {
+    res.json({ redirect: redirects.get(uri) });
+    return;
+  }
   if (uri === '/integration/missing') {
     res.sendStatus(404);
     return;
@@ -78,7 +105,7 @@ app.get('/mock-drupal/canvas/content-api', (req, res) => {
     uri === '/integration/watch'
       ? { element: 'js-watch', props: { label: 'Watched' } }
       : makeTree(new URL(`/published?revision=${revision}`, origin));
-  res.json({
+  const result = {
     content,
     head: {
       title: `${authenticated ? 'Private' : 'Public'} ${uri} R${revision}`,
@@ -111,7 +138,9 @@ app.get('/mock-drupal/canvas/content-api', (req, res) => {
         langcode: 'en',
       },
     },
-  });
+  };
+  if (uri === holdPath) held.push(() => res.json(result));
+  else res.json(result);
 });
 app.get('/mock-drupal/canvas/content-api/entity', (req, res) => {
   const result: EntityResult = {
@@ -138,7 +167,7 @@ app.post('/test/revision', (_req, res) => {
   res.json({ revision });
 });
 app.get('/test/stats', (_req, res) =>
-  res.json({ issued, exchanges, requests, revision }),
+  res.json({ issued, exchanges, requests, revision, held: held.length }),
 );
 
 app.get('/api/tree', (req, res) => {

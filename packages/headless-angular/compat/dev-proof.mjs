@@ -36,19 +36,8 @@ for (const major of [21, 22]) {
     path.join(root, 'artifacts', `angular${major}-dev.log`),
   );
   const child = spawn(
-    process.execPath,
-    [
-      'node_modules/@drupal-canvas/headless-angular/tools/build.mjs',
-      '--watch',
-      '--',
-      process.execPath,
-      'node_modules/@angular/cli/bin/ng.js',
-      'serve',
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(port),
-    ],
+    'npm',
+    ['run', 'dev', '--', '--host', '127.0.0.1', '--port', String(port)],
     {
       cwd: app,
       env: { ...process.env, PORT: String(port) },

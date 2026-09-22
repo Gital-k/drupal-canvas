@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import predefinedTemplates from '../../templates.json';
 import {
   assertUniqueTemplateIdentifiers,
   resolveTemplate,
@@ -22,6 +23,26 @@ const templates: Template[] = [
 ];
 
 describe('resolveTemplate', () => {
+  it('registers Angular for explicit selection and experimental discovery only', () => {
+    assertUniqueTemplateIdentifiers(predefinedTemplates);
+    const angular = resolveTemplate(predefinedTemplates, 'angular');
+    expect(angular).toEqual({
+      id: 'angular',
+      label: 'Angular',
+      experimental: true,
+      repository: {
+        url: 'https://github.com/drupal-canvas/headless-templates.git',
+        ref: 'main',
+        path: 'angular',
+      },
+    });
+    expect(
+      predefinedTemplates.filter((template) => !template.experimental),
+    ).not.toContain(angular);
+    expect(
+      resolveTemplate(predefinedTemplates, 'default')?.experimental,
+    ).not.toBe(true);
+  });
   it('resolves a canonical template ID', () => {
     expect(resolveTemplate(templates, 'default')?.id).toBe('default');
   });

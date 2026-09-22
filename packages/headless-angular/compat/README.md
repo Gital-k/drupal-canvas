@@ -26,11 +26,13 @@ node packages/headless-angular/compat/run.mjs
 
 This builds shared dependencies and the Angular 21 partial library, packs once,
 installs the same tarball in two independent dependency trees, generates
-concrete registry source, builds both SSR applications, starts only owned
-loopback servers on ports 4221/4222, and drives Chromium using the globally
-installed `agent-browser`. It aborts if either port is occupied, and closes the
-browser and owned servers after testing. No Drupal installation or fixture-root
-workaround is needed. There is no assumed external preview hostname.
+concrete registry source through the **npm-installed bin**, runs
+`canvas-angular -- ngc --noEmit` and `canvas-angular -- ng build`, starts only
+owned loopback servers on ports 4221/4222, and drives Chromium using the
+globally installed `agent-browser`. It aborts if either port is occupied, and
+closes the browser and owned servers after testing. No Drupal installation or
+fixture-root workaround is needed. There is no assumed external preview
+hostname.
 
 After intentionally changing the library or packed core, refresh the two local
 tarball lock entries and run the same proof with:
@@ -39,7 +41,11 @@ tarball lock entries and run the same proof with:
 node packages/headless-angular/compat/run.mjs --update-locks
 ```
 
-The default run uses `npm ci`; it does not silently accept a stale artifact.
+The default run uses `npm ci`; it does not silently accept a stale artifact. The
+installed-bin regression first deletes generated sources, verifies generation,
+checks child arguments and exit status, and requires a deliberately invalid
+TypeScript file to fail `ngc`. Build output is removed before building, so a
+no-op wrapper cannot reuse stale output. Development also runs via the npm bin.
 `angular21/package.json` and `angular22/package.json` are independently pinned
 configurations, not npm workspaces. Generated `src` directories are disposable
 copies of `shared`. The fixture contains only two purpose-built components, not
@@ -74,6 +80,8 @@ Generated, ignored artifacts are under `compat/artifacts/`:
 - `drupal-canvas-headless-0.7.0.tgz`: the checkout's shared core.
 - `browser-proof.json`: per-major artifact hashes/integrities, real hydration
   diagnostics, captured-node identity, shared geometry and integration results.
+- `npm-bin-proof.json`: installed-bin generation, child dispatch/exit and real
+  `ngc` failure detection on both majors.
 - `dev-proof.json` and `angular{21,22}-dev.log`: Angular CLI watcher/live-reload
   evidence.
 - `angular{21,22}-{draft,published,empty,empty-top}-ssr.html`: actual HTTP SSR
@@ -134,7 +142,13 @@ Both majors additionally verify:
 - Host refresh retaining component state, shared geometry exchange, and explicit
   three-request refresh-queue coalescing into two serialized passes.
 - Timer-driven in-place renewal from a 20-second fixture token to a 900-second
-  token, without reloading the iframe or losing its state.
+  token while a navigation response is deliberately held: host/renewal refreshes
+  wait without aborting its resolver, committing a pending path early, or
+  rolling back the renewed session epoch.
+- Host refresh following an internal redirect through Angular without losing
+  component identity; renewal refresh following an external-flagged redirect
+  through document navigation (loopback destination), not a false not-found
+  page.
 - Actual Angular application destruction removing shared protocol listeners,
   canceling queued work and removing owned head nodes.
 - Expired-cookie anonymous fallback with visible expiry, POST exit and cookie
@@ -146,11 +160,13 @@ Both majors additionally verify:
 
 Unit tests additionally cover request isolation, identity-pinned renewal/PKCE,
 CHIPS serialization/deletion attributes, CSP preservation, method/origin checks,
-component-preview context, malformed metadata and watcher recovery.
+component-preview context, malformed metadata and watcher recovery, including
+switching componentDir to invalid YAML and recovering by editing only that YAML.
 
 The package README is the stable adapter/template authoring contract. No
 template sibling or shared auth/protocol package was changed. No Workbench.
-Remaining work: 18 template component ports and starter CLI selection; live
-Drupal end-to-end validation; HTTPS cross-site CHIPS/renewal testing across the
-supported browser matrix (the current real-browser fixture uses same-origin
-loopback Chromium). Stop at this integration milestone for review.
+Create registers the experimental `angular` template; its scaffold flow is
+tested with a synthetic clone and mocked installation, not the unpublished
+template. Template ports, live Drupal end-to-end validation, and HTTPS
+cross-site CHIPS/renewal testing remain separate work (the current real-browser
+fixture uses same-origin loopback Chromium).

@@ -188,11 +188,16 @@ the fixed same-origin endpoints with cookies, never directly to Drupal with a
 bearer token. Do not import the `/server` entry or generated manifest into
 browser code.
 
-`CanvasPageStore.refresh()` uses the shared serialized/coalescing queue.
-Superseded page requests are aborted and generation-guarded; teardown aborts
-outstanding page and entity requests. `fetchEntity({ type, id, viewMode })`
-works through the request-scoped callback in SSR and the same-origin endpoint in
-the browser.
+`CanvasPageStore.refresh()` uses the shared serialized/coalescing queue and
+waits for pending router navigation (including redirect chains). Refresh never
+aborts a resolver. `path()` is the committed route; `pendingPath()` is the
+pending destination or null. Page data/head commit on successful navigation, not
+while a resolver is still running. Refresh redirects use the same
+internal-router versus external-document behavior as resolver redirects,
+retaining the current page until navigation completes. Superseded requests are
+aborted and generation-guarded; teardown aborts outstanding page and entity
+requests. `fetchEntity({ type, id, viewMode })` works through the request-scoped
+callback in SSR and the same-origin endpoint in the browser.
 
 `provideCanvas()` starts `CanvasDraftSession` **after hydration**. It owns the
 shared session machine, height reporter and geometry bridge, updates the current

@@ -59,11 +59,27 @@ describe('Angular CLI generated-source integration', () => {
       await rm(path.join(root, 'src/components/one'), { recursive: true });
       await expect.poll(registry).not.toContain('"one"');
       await add('different/three', 'three');
+      const validYaml = await readFile(
+        path.join(root, 'different/three/component.yml'),
+        'utf8',
+      );
+      await writeFile(
+        path.join(root, 'different/three/component.yml'),
+        'invalid: [',
+      );
       await writeFile(
         path.join(root, 'canvas.config.json'),
         config('different'),
       );
+      await expect.poll(() => errors.length).toBeGreaterThan(0);
+      expect(await registry()).toContain('"two"');
+      // Only fix YAML in the NEW root. No further config edit or restart.
+      await writeFile(
+        path.join(root, 'different/three/component.yml'),
+        validYaml,
+      );
       await expect.poll(registry).toContain('"three"');
+      await expect.poll(manifest).toContain('"machineName": "three"');
       expect(await registry()).not.toContain('"two"');
       await writeFile(
         path.join(root, 'different/three/component.yml'),
