@@ -27,11 +27,12 @@ final readonly class ContentTemplateRepository {
    * @return bool
    *   TRUE if the entity type supports content templates.
    *
-   * @todo Handle content entity types powered by base fields only (no
-   *   configurable fields via Field UI). Follow-up issue needed.
+   * @see docs/adr/0004-page-entity-type.md
+   * @todo Handle content entity types powered by base fields only (no configurable fields via Field UI) in <URL>
    */
   public static function isSupportedEntityType(EntityTypeInterface $entity_type): bool {
     return $entity_type instanceof ContentEntityTypeInterface
+      // Canvas' own component tree entity types (Page) never get templates.
       && !$entity_type->entityClassImplements(ComponentTreeEntityInterface::class)
       && (bool) $entity_type->get('field_ui_base_route');
   }

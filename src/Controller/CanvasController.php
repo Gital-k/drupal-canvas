@@ -140,7 +140,7 @@ HTML;
     $content_template_entity_types = [];
     $all_definitions = $this->entityTypeManager->getDefinitions();
     foreach ($all_definitions as $entity_type_id => $entity_type_definition) {
-      $is_template_supported = $this->contentTemplateRepository->isSupportedEntityType($entity_type_definition);
+      $is_template_supported = ContentTemplateRepository::isSupportedEntityType($entity_type_definition);
       if ($is_template_supported) {
         $has_bundle_support = $entity_type_definition->hasKey('bundle');
         $content_template_entity_types[$entity_type_id] = [
