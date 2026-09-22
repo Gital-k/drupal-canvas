@@ -33,7 +33,8 @@ export function dumpMetadataWithComments(
   }
 
   // Serialize to YAML then parse as Document for mutation
-  const yamlStr = yaml.stringify(metadata);
+  // Use singleQuote: true to match js-yaml output style for hex colors like '#abc123'.
+  const yamlStr = yaml.stringify(metadata, { singleQuote: true });
   const doc = yaml.parseDocument(yamlStr);
 
   let hasRestrictedProps = false;
@@ -108,5 +109,5 @@ export function dumpMetadataWithComments(
     doc.comment = ` Available color folders (append a UUID to x-canvas-color-folders on any color prop):\n${folderLines}`;
   }
 
-  return doc.toString();
+  return doc.toString({ singleQuote: true });
 }

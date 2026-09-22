@@ -223,4 +223,29 @@ describe('dumpMetadataWithComments', () => {
     // The UUID should appear without an inline comment
     expect(result).toContain('77777777-7777-4777-b777-777777777777');
   });
+
+  it('should single-quote hex color strings in examples', () => {
+    const metadata: Metadata = {
+      name: 'Test',
+      machineName: 'test',
+      status: true,
+      required: [],
+      props: {
+        properties: {
+          backgroundColor: {
+            type: 'string',
+            title: 'Background Color',
+            $ref: 'json-schema-definitions://canvas.module/color',
+            examples: ['#aabbcc'],
+          },
+        },
+      },
+      slots: {},
+      dataDependencies: {},
+    };
+
+    const result = dumpMetadataWithComments(metadata, []);
+
+    expect(result).toContain("'#aabbcc'");
+  });
 });
