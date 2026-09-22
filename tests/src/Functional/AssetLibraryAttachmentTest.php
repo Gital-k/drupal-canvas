@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Functional;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\Color;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -185,6 +186,7 @@ final class AssetLibraryAttachmentTest extends FunctionalTestBase {
    * Tests cached responses are invalidated when global assets change.
    *
    * @legacy-covers \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments
+   * @legacy-covers \Drupal\canvas\Entity\Color::postSave
    */
   public function testCachedResponsesInvalidated(): void {
     $this->container->get(ModuleInstallerInterface::class)->install(['page_cache']);
@@ -225,6 +227,24 @@ final class AssetLibraryAttachmentTest extends FunctionalTestBase {
       'original' => '.global { color: red; }',
       'compiled' => '.global{color:red}',
     ])->save();
+    $assert_cached_response('MISS');
+    $assert_cached_response('HIT');
+
+    // Changing a color changes the brand kit's generated CSS without saving the
+    // brand kit, and invalidates the cached response.
+    Color::create([
+      'name' => 'Test Red',
+      'cssVariable' => '--color-test-red',
+      'value' => [
+        'colorSpace' => 'srgb',
+        'components' => [0.8, 0.0, 0.0],
+        'hex' => '#cc0000',
+      ],
+      'weight' => 0,
+    ])->save();
+    $brand_kit = BrandKit::load(BrandKit::GLOBAL_ID);
+    \assert($brand_kit instanceof BrandKit);
+    self::assertStringContainsString('--color-test-red', $brand_kit->getCss());
     $assert_cached_response('MISS');
     $assert_cached_response('HIT');
 
