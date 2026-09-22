@@ -68,6 +68,37 @@ describe('CanvasComponentTree context and client', () => {
     ).not.toContainEqual(expect.stringContaining('usePageContext()'));
   });
 
+  it.each([
+    {
+      logo: { url: 'https://drupal.example/sites/default/files/logo.svg' },
+      favicon: { url: 'https://cdn.example/icon.png', mimeType: 'image/png' },
+    },
+    { logo: { url: '' }, favicon: { url: '', mimeType: 'image/png' } },
+  ])(
+    'passes theme assets through without requiring the frontend to render them: %j',
+    (assets) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      function Assets() {
+        expect(useSiteContext()?.themeAssets).toEqual(assets);
+        return <span>Assets are optional</span>;
+      }
+      const html = renderToStaticMarkup(
+        <CanvasComponentTree
+          tree={tree}
+          components={{ header: Assets }}
+          context={{
+            ...context,
+            site: { ...context.site!, themeAssets: assets },
+          }}
+        />,
+      );
+      expect(html).toContain('Assets are optional');
+      expect(html).not.toContain('<img');
+      expect(html).not.toContain('<link');
+      expect(warn).not.toHaveBeenCalled();
+    },
+  );
+
   it('inherits an outer provider when the context prop is omitted', () => {
     const html = renderToStaticMarkup(
       <CanvasContextProvider context={outerContext}>

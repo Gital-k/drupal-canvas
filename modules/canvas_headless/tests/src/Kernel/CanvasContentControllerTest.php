@@ -14,14 +14,17 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Marker;
+use Drupal\canvas_headless\CanvasContentContextBuilder;
 use Drupal\canvas_headless\Grant\PreviewAssertionGrant;
 use Drupal\canvas_headless\PreviewAssertionFactory;
 use Drupal\canvas_headless\PreviewLanguageRedirectResponse;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\consumers\Entity\Consumer;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Extension\ThemeSettingsProvider;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Routing\RouteBuilderInterface;
@@ -29,6 +32,7 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Core\Session\PermissionCheckerInterface;
+use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\Node;
@@ -197,6 +201,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
    * Tests the Canvas-owned endpoint response without Lupus services.
    */
   public function testCanvasContentResponse(): void {
+    $this->container->get('theme_installer')->install(['stark']);
     $page = $this->createPage();
     $page->setComponentTree([
       ...$page->getComponentTree()->getValue(),
@@ -263,8 +268,8 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       ],
       'baseUrl' => 'http://localhost',
       'themeAssets' => [
-        'logo' => ['url' => ''],
-        'favicon' => ['url' => '', 'mimeType' => ''],
+        'logo' => ['url' => 'http://localhost/core/themes/stark/logo.svg'],
+        'favicon' => ['url' => 'http://localhost/core/misc/favicon.ico', 'mimeType' => 'image/vnd.microsoft.icon'],
       ],
     ], $data['context']['site']);
     self::assertContains('config:system.site', $response->getCacheableMetadata()->getCacheTags());
@@ -276,6 +281,111 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertSame(200, $empty_response->getStatusCode());
     self::assertNull($empty_data['content']);
     self::assertTrue($empty_data['route']['managedByCanvas']);
+  }
+
+  /**
+   * Tests default-theme assets and cache invalidation independently of the active theme.
+   */
+  public function testDefaultThemeAssets(): void {
+    $this->container->get('theme_installer')->install(['stark', 'olivero']);
+    $this->config('system.theme')->set('default', 'stark')->set('admin', 'olivero')->save();
+    $this->container->get('theme.manager')->setActiveTheme($this->container->get('theme.initialization')->getActiveThemeByName('olivero'));
+    $this->config('olivero.settings')->set('logo.use_default', FALSE)->set('logo.path', 'https://admin.example/logo.svg')->save();
+    // The existing Drupal/Workbench path continues to read the active theme.
+    self::assertSame('https://admin.example/logo.svg', $this->container->get(CodeComponentDataProvider::class)->getCanvasDataThemeAssetsV0()['v0']['themeAssets']['logo']['url']);
+
+    $response = $this->renderContentPath('/user/login');
+    $assets = self::responseData($response)['context']['site']['themeAssets'];
+    self::assertSame('http://localhost/core/themes/stark/logo.svg', $assets['logo']['url']);
+    self::assertSame(['url' => 'http://localhost/core/misc/favicon.ico', 'mimeType' => 'image/vnd.microsoft.icon'], $assets['favicon']);
+    $tags = $response->getCacheableMetadata()->getCacheTags();
+    foreach (['system.theme', 'system.theme.global', 'core.extension', 'stark.settings'] as $name) {
+      self::assertContains('config:' . $name, $tags);
+    }
+    self::assertNotContains('config:olivero.settings', $tags);
+
+    // Core's rendered tag covers first creation without disabling caching.
+    self::assertTrue($this->config('stark.settings')->isNew());
+    self::assertContains('rendered', $tags);
+    self::assertSame(Cache::PERMANENT, $response->getCacheableMetadata()->getCacheMaxAge());
+    $cache = $this->container->get('cache.data');
+    $cache->set('theme-context', $assets, Cache::PERMANENT, $tags);
+    $this->config('stark.settings')->set('logo.use_default', TRUE)->save();
+    self::assertFalse($cache->get('theme-context'));
+    $cache->set('theme-context', $assets, Cache::PERMANENT, $tags);
+    // Uploaded assets are configured as file URIs, not managed file IDs.
+    $this->config('stark.settings')
+      ->set('logo.use_default', FALSE)->set('logo.path', 'public://brand.svg')
+      ->set('favicon.use_default', FALSE)->set('favicon.path', 'https://cdn.example/icon.png')
+      ->set('favicon.mimetype', 'image/png')->save();
+    self::assertFalse($cache->get('theme-context'));
+    $assets = self::responseData($this->renderContentPath('/user/login'))['context']['site']['themeAssets'];
+    self::assertStringEndsWith('/files/brand.svg', $assets['logo']['url']);
+    self::assertSame(['url' => 'https://cdn.example/icon.png', 'mimeType' => 'image/png'], $assets['favicon']);
+
+    $cache->set('theme-context', $assets, Cache::PERMANENT, $tags);
+    $this->config('stark.settings')->set('logo.path', 'public://replacement.svg')->save();
+    self::assertFalse($cache->get('theme-context'));
+    $assets = self::responseData($this->renderContentPath('/user/login'))['context']['site']['themeAssets'];
+    self::assertStringEndsWith('/files/replacement.svg', $assets['logo']['url']);
+
+    $cache->set('theme-context', $assets, Cache::PERMANENT, $tags);
+    $this->config('system.theme.global')->set('features.favicon', FALSE)->save();
+    self::assertFalse($cache->get('theme-context'));
+    $this->config('stark.settings')->set('logo.path', '')->save();
+    $assets = self::responseData($this->renderContentPath('/user/login'))['context']['site']['themeAssets'];
+    // Retain the provider's configured MIME type even without a favicon URL.
+    self::assertSame(['logo' => ['url' => ''], 'favicon' => ['url' => '', 'mimeType' => 'image/png']], $assets);
+
+    $this->config('system.theme.global')->set('features.favicon', TRUE)->save();
+    $this->config('stark.settings')->set('favicon.path', '')->set('favicon.mimetype', NULL)->save();
+    $assets = self::responseData($this->renderContentPath('/user/login'))['context']['site']['themeAssets'];
+    self::assertSame(['logo' => ['url' => ''], 'favicon' => ['url' => '', 'mimeType' => '']], $assets);
+    $cache->set('theme-context', $assets, Cache::PERMANENT, $tags);
+    $this->config('system.theme')->set('default', 'olivero')->save();
+    self::assertFalse($cache->get('theme-context'));
+    $response = $this->renderContentPath('/user/login');
+    $assets = self::responseData($response)['context']['site']['themeAssets'];
+    self::assertSame('https://admin.example/logo.svg', $assets['logo']['url']);
+    self::assertSame('http://localhost/core/themes/olivero/favicon.ico', $assets['favicon']['url']);
+    self::assertContains('config:olivero.settings', $response->getCacheableMetadata()->getCacheTags());
+    self::assertNotContains('config:stark.settings', $response->getCacheableMetadata()->getCacheTags());
+
+    $this->config('system.theme')->clear('default')->save();
+    $response = $this->renderContentPath('/user/login');
+    self::assertSame(['logo' => ['url' => ''], 'favicon' => ['url' => '', 'mimeType' => '']], self::responseData($response)['context']['site']['themeAssets']);
+    self::assertContains('config:system.theme', $response->getCacheableMetadata()->getCacheTags());
+  }
+
+  /**
+   * Tests that resolving assets never requests an active theme.
+   */
+  public function testThemeAssetsWithoutNegotiation(): void {
+    $this->container->get('theme_installer')->install(['stark']);
+    self::assertFalse($this->container->initialized(CanvasContentContextBuilder::class));
+    $theme_manager = $this->createMock(ThemeManagerInterface::class);
+    $theme_manager->expects(self::never())->method('getActiveTheme');
+    $settings = new ThemeSettingsProvider(
+      $theme_manager,
+      $this->container->get('theme.initialization'),
+      $this->container->get('theme_handler'),
+      $this->container->get('config.factory'),
+      $this->container->get('file_url_generator'),
+      $this->container->get('cache.memory'),
+    );
+    // Replace the provider already instantiated by Canvas's entity hooks.
+    $this->container->set(CodeComponentDataProvider::class, new CodeComponentDataProvider(
+      $this->container->get('config.factory'),
+      $this->container->get('request_stack'),
+      $this->container->get('current_route_match'),
+      $this->container->get('title_resolver'),
+      $this->container->get('breadcrumb'),
+      $this->container->get('language_manager'),
+      $this->container,
+      $settings,
+    ));
+    $response = $this->renderContentPath('/user/login');
+    self::assertSame('http://localhost/core/themes/stark/logo.svg', self::responseData($response)['context']['site']['themeAssets']['logo']['url']);
   }
 
   /**
@@ -919,6 +1029,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
    * Tests validation and rejection of non-content paths.
    */
   public function testCanvasContentPathValidation(): void {
+    $this->container->get('theme_installer')->install(['stark']);
     $missing_path = $this->request(
       Request::create('/canvas/content-api'),
     );
@@ -963,8 +1074,8 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
           ],
           'baseUrl' => 'http://localhost',
           'themeAssets' => [
-            'logo' => ['url' => ''],
-            'favicon' => ['url' => '', 'mimeType' => ''],
+            'logo' => ['url' => 'http://localhost/core/themes/stark/logo.svg'],
+            'favicon' => ['url' => 'http://localhost/core/misc/favicon.ico', 'mimeType' => 'image/vnd.microsoft.icon'],
           ],
         ],
       ],
