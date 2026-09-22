@@ -194,7 +194,11 @@ export function PreviewFrameApp() {
         // module executes, so concurrent imports would make the cascade
         // order (brand kit, then global, then component CSS) racy.
         for (const cssUrl of request.payload.cssUrls) {
-          await import(/* @vite-ignore */ cssUrl);
+          try {
+            await import(/* @vite-ignore */ cssUrl);
+          } catch (err) {
+            console.warn(`Failed to load CSS: ${cssUrl}`, err);
+          }
         }
 
         const registry = await defineComponentRegistry(
