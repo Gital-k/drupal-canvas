@@ -744,24 +744,22 @@ describe('Push components', () => {
             machineName: 'color-card',
             name: 'Color Card',
             props: {
-              properties: {
-                accent: {
-                  title: 'Accent',
-                  type: 'string',
-                  $ref: 'json-schema-definitions://canvas.module/color',
-                  examples: ['canvas-color:baguette-legs'],
-                },
-                unknown: {
-                  title: 'Unknown',
-                  type: 'string',
-                  $ref: 'json-schema-definitions://canvas.module/color',
-                  examples: ['canvas-color:not-on-server'],
-                },
-                heading: {
-                  title: 'Heading',
-                  type: 'string',
-                  examples: ['Welcome'],
-                },
+              accent: {
+                title: 'Accent',
+                type: 'string',
+                $ref: 'json-schema-definitions://canvas.module/color',
+                examples: ['canvas-color:baguette-legs'],
+              },
+              unknown: {
+                title: 'Unknown',
+                type: 'string',
+                $ref: 'json-schema-definitions://canvas.module/color',
+                examples: ['canvas-color:not-on-server'],
+              },
+              heading: {
+                title: 'Heading',
+                type: 'string',
+                examples: ['Welcome'],
               },
             },
             sourceCodeJs: 'export default function ColorCard() {}',
@@ -792,15 +790,13 @@ describe('Push components', () => {
     expect(api.createComponent).toHaveBeenCalledWith(
       expect.objectContaining({
         props: {
-          properties: {
-            accent: expect.objectContaining({
-              examples: ['canvas-color:55555555-5555-4555-9555-555555555555'],
-            }),
-            unknown: expect.objectContaining({
-              examples: ['canvas-color:not-on-server'],
-            }),
-            heading: expect.objectContaining({ examples: ['Welcome'] }),
-          },
+          accent: expect.objectContaining({
+            examples: ['canvas-color:55555555-5555-4555-9555-555555555555'],
+          }),
+          unknown: expect.objectContaining({
+            examples: ['canvas-color:not-on-server'],
+          }),
+          heading: expect.objectContaining({ examples: ['Welcome'] }),
         },
       }),
       true,

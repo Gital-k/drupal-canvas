@@ -74,20 +74,25 @@ async function buildComponentUploadTasks(
   for (const [machineName, prepared] of preparedByName.entries()) {
     onProgress();
     // Serialize color examples for API submission.
-    const serializedProps = transformColorExamplesInProps(
-      prepared.componentPayload.props as
-        | Record<string, unknown>
-        | null
-        | undefined,
+    // transformColorExamplesInProps expects a Metadata['props']-shaped wrapper
+    const wrappedProps = prepared.componentPayload.props
+      ? { properties: prepared.componentPayload.props }
+      : null;
+    const serializedResult = transformColorExamplesInProps(
+      wrappedProps,
       colorsByCssVariable,
       'toUuid',
     );
+    // Extract the flat map back from the wrapper to match Component['props'] type.
+    const serializedProps = serializedResult?.properties as
+      | Component['props']
+      | undefined;
     const serializedPayload: Component = {
       ...prepared.componentPayload,
       props:
         serializedProps === null || serializedProps === undefined
           ? prepared.componentPayload.props
-          : (serializedProps as Component['props']),
+          : serializedProps,
     };
     if (remoteNames.has(machineName)) {
       let componentPayload = serializedPayload;
