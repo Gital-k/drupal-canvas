@@ -22,16 +22,23 @@ use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\consumers\Entity\Consumer;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableJsonResponse;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Extension\ThemeHandlerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Extension\ThemeSettingsProvider;
+use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Routing\RouteBuilderInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Core\Session\PermissionCheckerInterface;
+use Drupal\Core\Theme\ThemeInitializationInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
@@ -201,7 +208,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
    * Tests the Canvas-owned endpoint response without Lupus services.
    */
   public function testCanvasContentResponse(): void {
-    $this->container->get('theme_installer')->install(['stark']);
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
     $page = $this->createPage();
     $page->setComponentTree([
       ...$page->getComponentTree()->getValue(),
@@ -287,9 +294,9 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
    * Tests default-theme assets and cache invalidation independently of the active theme.
    */
   public function testDefaultThemeAssets(): void {
-    $this->container->get('theme_installer')->install(['stark', 'olivero']);
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark', 'olivero']);
     $this->config('system.theme')->set('default', 'stark')->set('admin', 'olivero')->save();
-    $this->container->get('theme.manager')->setActiveTheme($this->container->get('theme.initialization')->getActiveThemeByName('olivero'));
+    $this->container->get(ThemeManagerInterface::class)->setActiveTheme($this->container->get(ThemeInitializationInterface::class)->getActiveThemeByName('olivero'));
     $this->config('olivero.settings')->set('logo.use_default', FALSE)->set('logo.path', 'https://admin.example/logo.svg')->save();
     // The existing Drupal/Workbench path continues to read the active theme.
     self::assertSame('https://admin.example/logo.svg', $this->container->get(CodeComponentDataProvider::class)->getCanvasDataThemeAssetsV0()['v0']['themeAssets']['logo']['url']);
@@ -361,26 +368,26 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
    * Tests that resolving assets never requests an active theme.
    */
   public function testThemeAssetsWithoutNegotiation(): void {
-    $this->container->get('theme_installer')->install(['stark']);
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
     self::assertFalse($this->container->initialized(CanvasContentContextBuilder::class));
     $theme_manager = $this->createMock(ThemeManagerInterface::class);
     $theme_manager->expects(self::never())->method('getActiveTheme');
     $settings = new ThemeSettingsProvider(
       $theme_manager,
-      $this->container->get('theme.initialization'),
-      $this->container->get('theme_handler'),
-      $this->container->get('config.factory'),
-      $this->container->get('file_url_generator'),
+      $this->container->get(ThemeInitializationInterface::class),
+      $this->container->get(ThemeHandlerInterface::class),
+      $this->container->get(ConfigFactoryInterface::class),
+      $this->container->get(FileUrlGeneratorInterface::class),
       $this->container->get('cache.memory'),
     );
     // Replace the provider already instantiated by Canvas's entity hooks.
     $this->container->set(CodeComponentDataProvider::class, new CodeComponentDataProvider(
-      $this->container->get('config.factory'),
-      $this->container->get('request_stack'),
-      $this->container->get('current_route_match'),
-      $this->container->get('title_resolver'),
+      $this->container->get(ConfigFactoryInterface::class),
+      $this->container->get(RequestStack::class),
+      $this->container->get(RouteMatchInterface::class),
+      $this->container->get(TitleResolverInterface::class),
       $this->container->get('breadcrumb'),
-      $this->container->get('language_manager'),
+      $this->container->get(LanguageManagerInterface::class),
       $this->container,
       $settings,
     ));
@@ -1029,7 +1036,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
    * Tests validation and rejection of non-content paths.
    */
   public function testCanvasContentPathValidation(): void {
-    $this->container->get('theme_installer')->install(['stark']);
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
     $missing_path = $this->request(
       Request::create('/canvas/content-api'),
     );
