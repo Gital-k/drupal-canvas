@@ -260,4 +260,32 @@ describe('brand kit color optimistic edits', () => {
     releaseWrite(200);
     await edit;
   });
+
+  it('does not roll back a newer edit when an older write is rejected', async () => {
+    const { readHex, editColor } = await setup([makeColor('a', '#ff0000')]);
+
+    // Dispatch two edits before either settles; capture both release handles.
+    const edit1 = editColor('a', '#0000ff'); // blue
+    await flush();
+    const releaseEdit1 = releaseWrite; // captured before edit2 overwrites it
+
+    const edit2 = editColor('a', '#00ff00'); // green
+    await flush();
+    const releaseEdit2 = releaseWrite;
+
+    // Both patches applied; cache shows the latest value.
+    expect(readHex('a')).toBe('#00ff00');
+
+    // Edit 1 fails — must not revert edit 2's value.
+    releaseEdit1(422);
+    await edit1;
+    await flush();
+    expect(readHex('a')).toBe('#00ff00');
+
+    // Edit 2 succeeds.
+    releaseEdit2(200);
+    await edit2;
+    await flush();
+    expect(readHex('a')).toBe('#00ff00');
+  });
 });

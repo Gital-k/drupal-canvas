@@ -29,6 +29,15 @@ const patchColors = (mutate: (colors: BrandKitColor[]) => void) =>
   });
 
 /**
+ * The newest in-flight write token per color id.
+ *
+ * A rejected write must not roll back a newer write to the same color that has
+ * already been applied optimistically. Each write records a token here and
+ * only undoes its patch while it is still the newest.
+ */
+const latestColorWrites = new Map<string, symbol>();
+
+/**
  * A single component instance using a specific color.
  */
 export interface ColorComponentUsage {
@@ -192,23 +201,29 @@ export const brandKitApi = createApi({
         body: changes,
       }),
       async onQueryStarted({ id, changes }, { dispatch, queryFulfilled }) {
-        // Apply the edit to the cache before the request goes out, so the color
-        // row and the preview update without waiting for the round trip.
+        const token = Symbol(); // uniquely identifies this write
+        latestColorWrites.set(id, token); // record as newest for this color
         const patchResult = dispatch(
           patchColors((colors) => {
             const color = colors.find((candidate) => candidate.id === id);
             if (color) {
-              Object.assign(color, changes);
+              Object.assign(color, changes); // apply optimistically
             }
           }),
         );
         try {
           await queryFulfilled;
-          // Trigger a server preview refresh so it immediately picks up color
-          // edits: a color prop resolves to a literal baked into the markup.
-          dispatch(setUpdatePreview(true));
+          dispatch(setUpdatePreview(true)); // trigger server preview refresh
         } catch {
-          patchResult.undo();
+          // Skip undo if a newer write for this color has since been applied —
+          // rolling back here would revert a change the user made after this one.
+          if (latestColorWrites.get(id) === token) {
+            patchResult.undo();
+          }
+        } finally {
+          if (latestColorWrites.get(id) === token) {
+            latestColorWrites.delete(id); // clean up once settled
+          }
         }
       },
       invalidatesTags: [
