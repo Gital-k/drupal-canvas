@@ -505,18 +505,10 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     // Determine the preview entity (if any), and ensure correct cacheability:
     // - for the query in ::getSuggestedPreviewEntity()
     // - for the access checking here
-    $preview_entity = $this->getSuggestedPreviewEntity();
     $preview_entity_cacheability = (new CacheableMetadata())
       ->addCacheContexts($storage->getEntityType()->getListCacheContexts())
       ->addCacheTags($storage->getEntityType()->getBundleListCacheTags($this->getTargetBundle()));
-    if ($preview_entity !== NULL) {
-      $preview_entity_access = $preview_entity->access('view', return_as_object: TRUE);
-      $preview_entity_cacheability->addCacheableDependency($preview_entity_access);
-      if (!$preview_entity_access->isAllowed()) {
-        // Do not return preview entity ID if not viewable.
-        $preview_entity = NULL;
-      }
-    }
+    $preview_entity = $this->getSuggestedPreviewEntity($preview_entity_cacheability);
 
     // Normalize component tree for API consumers.
     $component_tree = [];
@@ -616,32 +608,48 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     if ($entity_definition->entityClassImplements(EntityChangedInterface::class)) {
       $entity_query->sort('changed', 'DESC');
     }
-    else {
-      $entity_query->sort($id_key, 'DESC');
-    }
+    // Tie-break on ID, so the order is deterministic.
+    $entity_query->sort($id_key, 'DESC');
     return $entity_query;
   }
 
-  private function getSuggestedPreviewEntity(): ?ContentEntityInterface {
+  /**
+   * Suggests the most recently changed entity the current user can view.
+   *
+   * The most recently changed entity is not necessarily viewable: for example,
+   * the anonymous user's profile never is, and an unpublished node may not be.
+   * Checks up to 10 candidates, like ::suggestPreviewContentEntities() lists.
+   *
+   * @param \Drupal\Core\Cache\CacheableMetadata $cacheability
+   *   Receives the cacheability of the access checks performed.
+   *
+   * @return \Drupal\Core\Entity\ContentEntityInterface|null
+   *   The suggested preview entity, or NULL if there is no viewable one.
+   *
+   * @see \Drupal\canvas\Controller\ApiUiContentTemplateControllers::suggestPreviewContentEntities()
+   */
+  private function getSuggestedPreviewEntity(CacheableMetadata $cacheability): ?ContentEntityInterface {
     \assert($this->content_entity_type_id !== NULL);
 
-    $query = self::getPreviewSuggestionQuery(
+    $results = self::getPreviewSuggestionQuery(
       $this->getTargetEntityTypeId(),
       $this->getTargetBundle(),
-      1
-    );
-    $results = $query->execute();
+      10
+    )->execute();
     \assert(\is_array($results));
 
-    if (empty($results)) {
-      return NULL;
-    }
-
-    $entity = $this->entityTypeManager()
+    $entities = $this->entityTypeManager()
       ->getStorage($this->getTargetEntityTypeId())
-      ->load(reset($results));
-    \assert($entity instanceof ContentEntityInterface);
-    return $entity;
+      ->loadMultiple($results);
+    foreach ($entities as $entity) {
+      \assert($entity instanceof ContentEntityInterface);
+      $access = $entity->access('view', return_as_object: TRUE);
+      $cacheability->addCacheableDependency($access);
+      if ($access->isAllowed()) {
+        return $entity;
+      }
+    }
+    return NULL;
   }
 
 }
