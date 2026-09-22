@@ -82,7 +82,9 @@ final class FieldUiHooksTest extends CanvasKernelTestBase {
     string $bundle,
     bool $create_template,
   ): void {
-    $this->createContentType(['type' => $bundle]);
+    if ($entity_type === 'node') {
+      $this->createContentType(['type' => $bundle]);
+    }
     if ($create_template) {
       $this->createContentTemplate($entity_type, $bundle, 'full');
     }
@@ -164,6 +166,13 @@ final class FieldUiHooksTest extends CanvasKernelTestBase {
         'create_template' => TRUE,
         'entity_type' => 'node',
         'bundle' => 'article',
+      ],
+      'permission with template not present, bundleless entity type' => [
+        'permissions' => [ContentTemplate::ADMIN_PERMISSION],
+        'cta_should_exist' => TRUE,
+        'create_template' => FALSE,
+        'entity_type' => 'user',
+        'bundle' => 'user',
       ],
       // `path_alias` has no `field_ui_base_route`, so it cannot have templates.
       'permission but entity type does not support templates' => [
