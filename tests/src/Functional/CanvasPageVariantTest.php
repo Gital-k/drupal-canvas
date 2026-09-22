@@ -136,9 +136,9 @@ class CanvasPageVariantTest extends FunctionalTestBase {
 
     // 4. Drupal Canvas module installed: nothing changes, except the
     //    conditional attaching of the global asset library, which adds the
-    //    `route.name` cache context, and the `config:canvas.settings` cache
-    //    tag that every front-end page now carries (the site default page
-    //    variant selection is consulted even when no variant resolves).
+    //    `route.name` cache context, and the `config:canvas.settings` and
+    //    `config:system.theme` cache tags. The page variant selector checks the
+    //    site default selection and admin theme even when no variant resolves.
     // @see \Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant
     // @see \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments
     // @see \Drupal\canvas\EventSubscriber\PageVariantSelectorSubscriber
@@ -618,6 +618,8 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     // @see \Drupal\canvas\EventSubscriber\PageVariantSelectorSubscriber
     if ($this->container->get(ModuleHandlerInterface::class)->moduleExists('canvas')) {
       $expected_baseline_cache_tags[] = 'config:canvas.settings';
+      // The selector also checks whether the active theme is the admin theme.
+      $expected_baseline_cache_tags[] = 'config:system.theme';
     }
     $expected_dependency_cacheability = new CacheableMetadata();
     array_walk(
