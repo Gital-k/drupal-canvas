@@ -87,9 +87,9 @@ final class DrupalCanvasPageAgentConfigTest extends CanvasKernelTestBase {
     }
 
     // Both information tools feed the system prompt on every hop. Neither is
-    // limited to a loop: a tool limited that way is appended to the chat
-    // history as a user message instead, which a history kept across turns
-    // would repeat on every turn.
+    // limited to a loop: a tool limited that way runs only on the hops it
+    // lists, and its result is appended to the chat history as a user message
+    // instead, which a history kept across turns would repeat on every turn.
     // @see \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper::getDefaultInformationTools()
     $information_tools = Yaml::parse($agent->get('default_information_tools'));
     $catalog = $information_tools['available_components'];

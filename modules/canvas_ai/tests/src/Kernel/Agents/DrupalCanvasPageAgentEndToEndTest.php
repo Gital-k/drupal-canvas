@@ -459,6 +459,11 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
     self::assertStringContainsString('The updates were applied successfully.', $messages[2]->getText());
     self::assertSame('The hero heading now says Hello.', $messages[3]->getText());
     self::assertStringContainsString('Now make it say Goodbye', $messages[4]->getText());
+
+    // The catalog reaches the model through the system prompt. The recorded
+    // request the echoai provider matches carries the messages only, so this
+    // is the assertion that pins it.
+    self::assertStringContainsString('sdc.canvas_test_sdc.banner', $input->getSystemPrompt());
   }
 
 }
