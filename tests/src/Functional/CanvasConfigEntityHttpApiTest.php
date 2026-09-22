@@ -2846,6 +2846,22 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // Clean up the templates we just created/mutated.
     $this->assertExpectedResponse('DELETE', Url::fromUri('base:/canvas/api/v0/config/content_template/node.cat.full'), [], 204, NULL, NULL, NULL, NULL);
+
+    // The suggested preview entity is determined for the current user, not for
+    // the anonymous user: an unpublished node the current user owns and may
+    // view is a valid preview entity even though anonymous users cannot see it.
+    \assert($this->loggedInUser instanceof UserInterface);
+    $this->loggedInUser->addRole($this->drupalCreateRole(['view own unpublished content']))->save();
+    $unpublished_node = Node::create([
+      'type' => 'llama',
+      'title' => 'Unpublished llama',
+      'status' => FALSE,
+      'uid' => $this->loggedInUser->id(),
+    ]);
+    $unpublished_node->save();
+    $body = \json_decode((string) $this->makeApiRequest('GET', $list_url, [])->getBody(), TRUE);
+    self::assertIsArray($body);
+    self::assertSame((int) $unpublished_node->id(), $body['node']['bundles']['llama']['viewModes']['full']['suggestedPreviewEntityId']);
   }
 
   public function testColor(): void {
