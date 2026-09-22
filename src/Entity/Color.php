@@ -239,7 +239,7 @@ final class Color extends ConfigEntityBase implements CanvasHttpApiEligibleConfi
       // The brand kit is not saved, so its cache tags must be invalidated
       // explicitly for responses to refer to the newly generated files.
       // @see \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments()
-      $tags = Cache::mergeTags($tags, $brand_kit->getCacheTagsToInvalidate());
+      $tags = Cache::mergeTags($tags, array_values($brand_kit->getCacheTagsToInvalidate()));
     }
     Cache::invalidateTags($tags);
   }
