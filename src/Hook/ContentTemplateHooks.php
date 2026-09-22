@@ -151,10 +151,13 @@ final class ContentTemplateHooks {
       ->getDefinition($entity_type_id)->getBundleEntityType();
 
     $route_parameters = $url->getRouteParameters();
-    // Entity types without a bundle entity type (for example, user) have a
-    // single implicit bundle equal to the entity type ID, and their Field UI
+    // Field UI names the bundle route parameter after the bundle entity type,
+    // or `bundle` for entity types with plugin-based bundles (for example,
+    // commerce_license). Entity types without bundles (for example, user) have
+    // a single implicit bundle equal to the entity type ID, and their Field UI
     // routes carry no bundle route parameter.
-    $bundle = $bundle_entity_type !== NULL ? ($route_parameters[$bundle_entity_type] ?? NULL) : $entity_type_id;
+    // @see \Drupal\field_ui\Routing\RouteSubscriber::alterRoutes()
+    $bundle = $route_parameters[$bundle_entity_type ?? 'bundle'] ?? $entity_type_id;
     if (!\is_string($bundle)) {
       return;
     }
