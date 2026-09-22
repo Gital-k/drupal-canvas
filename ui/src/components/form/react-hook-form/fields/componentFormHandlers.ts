@@ -48,13 +48,8 @@ export const createComponentFormStateHandler = (
     newInputAndUiData: InputUIData,
     currFormStateRef: React.MutableRefObject<PropsValues>,
   ) => {
-    // Read the ref (rather than accepting a plain value) so that a
-    // debounced call picks up the *latest* form state at the moment it
-    // actually fires, not the state that existed when it was scheduled.
-    // Without this, two sibling fields (e.g. the date and time inputs of a
-    // single date-time prop) edited in quick succession can each schedule
-    // their own debounced save with a stale snapshot of the other's value,
-    // and whichever save lands last on the backend silently reverts it.
+    // Read the ref so debounced calls use form state as of fire time, not
+    // schedule time.
     const currFormState = currFormStateRef.current;
     // Apply (client-side) transforms for form state.
     const { propsValues: values, selectedModel } = getPropsValues(

@@ -70,12 +70,8 @@ export const ComponentFormField = <P extends Record<string, any>>({
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
 
-  // Keep a ref to the latest formState, updated synchronously on every
-  // render. Debounced saves read this ref (rather than closing over
-  // `formState` directly) so that when a save eventually fires, it merges
-  // in sibling fields' values that changed *after* this save was scheduled
-  // but before it fired (e.g. a date input and a time input belonging to
-  // the same date-time prop, edited in quick succession).
+  // Latest formState, read by debounced saves at fire time instead of the
+  // stale value closed over when the save was scheduled.
   const formStateRef = useRef(formState);
   formStateRef.current = formState;
 
@@ -102,13 +98,8 @@ export const ComponentFormField = <P extends Record<string, any>>({
         !isScalarProp ||
         components?.[selectedComponentType]?.source !== 'Code component' ||
         !['checkbox', 'radio'].includes(elementType as string);
-      // `newFormState` is a full copy of this field's own last-known formState
-      // with just this field's value updated (see createEnhancedOnChange).
-      // Reduce it to only the field(s) that actually changed, so that when
-      // this is later merged with the freshest formState (via formStateRef)
-      // in componentFormHandlers.ts, it doesn't clobber sibling fields (e.g.
-      // a date-time prop's time input) that changed more recently than this
-      // stale snapshot was taken.
+      // Reduce to only the field(s) that actually changed, to avoid
+      // clobbering sibling fields that changed since this snapshot was taken.
       const changedFormState = Object.fromEntries(
         Object.entries(newFormState).filter(
           ([key, value]) => formStateRef.current[key] !== value,

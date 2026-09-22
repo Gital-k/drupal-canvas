@@ -35,10 +35,12 @@ test.describe('Date formatting Twig filters', () => {
     await dateInput.fill('2026-01-15');
     await dateInput.press('Tab');
 
-    // Wait for the date prop's own save round-trip (and the
-    // component-instance-form rebuild it triggers) to complete before
-    // filling the next date/date-time field.
-    await page.waitForTimeout(3000);
+    // Wait for the date prop's save round-trip to complete before filling
+    // the next date/date-time field.
+    await page.waitForFunction(
+      () =>
+        !document.body.hasAttribute('data-canvas-layout-request-in-progress'),
+    );
 
     // Set a known datetime value.
     const dateTimeInput = page.locator(
