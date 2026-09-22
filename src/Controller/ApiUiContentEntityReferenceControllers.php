@@ -15,7 +15,6 @@ use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
-use Drupal\canvas\Utility\EntityFieldMappingSupport;
 use Drupal\canvas\Utility\TypedDataHelper;
 use Drupal\comment\CommentInterface;
 use Drupal\comment\CommentTypeInterface;
@@ -41,6 +40,7 @@ use Drupal\Core\TypedData\ComplexDataDefinitionInterface;
 use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
 use Drupal\Core\Url;
 use Drupal\file\FileInterface;
+use Drupal\options\Plugin\Field\FieldType\ListItemBase;
 use Drupal\text\Plugin\Field\FieldType\TextItemBase;
 use Drupal\user\UserInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -211,7 +211,7 @@ final class ApiUiContentEntityReferenceControllers extends ApiControllerBase {
       // @todo https://git.drupalcode.org/project/canvas/-/work_items/3589536
       if (
         $field_definition->getFieldStorageDefinition()->getCardinality() !== 1
-        && !EntityFieldMappingSupport::supportsDeltaLessMultiValuedMapping($field_definition)
+        && !\is_a($field_definition->getItemDefinition()->getClass(), ListItemBase::class, TRUE)
       ) {
         continue;
       }

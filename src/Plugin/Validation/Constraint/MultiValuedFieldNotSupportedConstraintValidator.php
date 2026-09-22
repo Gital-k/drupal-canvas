@@ -10,11 +10,11 @@ use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
-use Drupal\canvas\Utility\EntityFieldMappingSupport;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\options\Plugin\Field\FieldType\ListItemBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -155,7 +155,7 @@ final class MultiValuedFieldNotSupportedConstraintValidator extends ConstraintVa
       return FALSE;
     }
     return $field_definition->getFieldStorageDefinition()->getCardinality() !== 1
-      && !EntityFieldMappingSupport::supportsDeltaLessMultiValuedMapping($field_definition);
+      && !\is_a($field_definition->getItemDefinition()->getClass(), ListItemBase::class, TRUE);
   }
 
 }
