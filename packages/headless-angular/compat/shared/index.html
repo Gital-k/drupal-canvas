@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Canvas Angular proof</title>
+    <base href="/" />
+  </head>
+  <body>
+    <proof-app></proof-app>
+    <script>
+      // Executed after SSR markup is parsed, before the CLI's module bootstrap.
+      window.__ssrNodes = Array.from(
+        document.querySelectorAll(
+          'proof-counter, proof-counter button, canvas-markup, canvas-markup > span, template[data-canvas-marker], #trusted, #chrome',
+        ),
+      );
+    </script>
+  </body>
+</html>

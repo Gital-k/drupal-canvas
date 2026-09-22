@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "projects": {
+    "proof": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": "dist/proof",
+            "browser": "src/main.ts",
+            "server": "src/main.server.ts",
+            "ssr": {
+              "entry": "src/server.ts"
+            },
+            "outputMode": "server",
+            "index": "src/index.html",
+            "tsConfig": "tsconfig.json",
+            "styles": [
+              "src/styles.css"
+            ],
+            "optimization": false,
+            "sourceMap": true,
+            "security": {
+              "allowedHosts": [
+                "127.0.0.1"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

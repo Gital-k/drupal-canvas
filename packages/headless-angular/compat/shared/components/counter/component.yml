@@ -1,0 +1,9 @@
+name: Proof counter
+machineName: counter
+status: true
+props:
+  properties:
+    label:
+      type: string
+      title: Label
+      examples: [Counter]
