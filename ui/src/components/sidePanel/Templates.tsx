@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import parse from 'html-react-parser';
 import { PlusIcon } from '@radix-ui/react-icons';
-import { Box, Button, Flex, Select, Text } from '@radix-ui/themes';
+import { Box, Button, Flex, Select, Skeleton, Text } from '@radix-ui/themes';
 
 import Dialog, { DialogFieldLabel } from '@/components/Dialog';
 import ErrorBoundary from '@/components/error/ErrorBoundary';
+import ErrorCard from '@/components/error/ErrorCard';
 import {
   AccordionDetails,
   AccordionRoot,
@@ -34,12 +35,12 @@ const Templates = () => {
     ...entityTypeIds,
     'page-templates',
   ]);
-  const { data } = useGetContentTemplatesQuery();
+  const { data, error } = useGetContentTemplatesQuery();
 
   // Only entity types that actually have at least one template are listed.
-  // Until the templates have loaded nothing is known, so render nothing rather
-  // than every entity type: otherwise every empty accordion flashes on screen
-  // and then disappears once the response arrives.
+  // Until the templates have loaded nothing is known, so render a skeleton
+  // rather than every entity type: otherwise every empty accordion flashes on
+  // screen and then disappears once the response arrives.
   const visibleEntityTypeIds = data
     ? entityTypeIds.filter((entityTypeId) =>
         Object.values(data[entityTypeId]?.bundles ?? {}).some(
@@ -66,6 +67,19 @@ const Templates = () => {
       </PermissionCheck>
       <AccordionRoot value={openEntityTypes}>
         <PermissionCheck hasPermission="contentTemplates">
+          <Skeleton
+            height="1.2rem"
+            loading={!data && !error}
+            width="100%"
+            my="3"
+          >
+            {error && (
+              <ErrorCard
+                title="An unexpected error has occurred while fetching templates."
+                error={String(extractErrorMessageFromApiResponse(error))}
+              />
+            )}
+          </Skeleton>
           {visibleEntityTypeIds.map((entityTypeId) => (
             <AccordionDetails
               key={entityTypeId}
@@ -275,11 +289,15 @@ const AddTemplateDialog = ({ isOpen, setIsOpen }: TemplateDialogProps) => {
                 style={{ width: '100%' }}
               />
               <Select.Content>
-                {Object.entries(supportedEntityTypes).map(([id, { label }]) => (
-                  <Select.Item key={id} value={id}>
-                    {label}
-                  </Select.Item>
-                ))}
+                {Object.entries(supportedEntityTypes)
+                  // Entity types without a non-default view mode have nothing
+                  // to offer: the view modes endpoint omits them.
+                  .filter(([id]) => id in (data ?? {}))
+                  .map(([id, { label }]) => (
+                    <Select.Item key={id} value={id}>
+                      {label}
+                    </Select.Item>
+                  ))}
               </Select.Content>
             </Select.Root>
           </Flex>
