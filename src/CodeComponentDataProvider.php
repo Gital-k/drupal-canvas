@@ -161,18 +161,21 @@ readonly final class CodeComponentDataProvider {
   /**
    * Returns theme assets for V0 of drupalSettings.canvasData.
    *
+   * @param string|null $theme
+   *   An explicit theme name, or NULL to retain active-theme behavior.
+   *
    * @return array[]
    */
-  public function getCanvasDataThemeAssetsV0(): array {
+  public function getCanvasDataThemeAssetsV0(?string $theme = NULL): array {
     return [
       self::V0 => [
         'themeAssets' => [
           'logo' => [
-            'url' => $this->themeSettingsProvider->getSetting('logo.url') ?? '',
+            'url' => $this->themeSettingsProvider->getSetting('logo.url', $theme) ?? '',
           ],
           'favicon' => [
-            'url' => $this->themeSettingsProvider->getSetting('favicon.url') ?? '',
-            'mimeType' => $this->themeSettingsProvider->getSetting('favicon.mimetype') ?? '',
+            'url' => $this->themeSettingsProvider->getSetting('favicon.url', $theme) ?? '',
+            'mimeType' => $this->themeSettingsProvider->getSetting('favicon.mimetype', $theme) ?? '',
           ],
         ],
       ],

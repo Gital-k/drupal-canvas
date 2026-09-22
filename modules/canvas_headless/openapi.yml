@@ -100,10 +100,10 @@ paths:
                         baseUrl: https://example.com
                         themeAssets:
                           logo:
-                            url: ''
+                            url: https://example.com/core/themes/olivero/logo.svg
                           favicon:
-                            url: ''
-                            mimeType: ''
+                            url: https://example.com/core/themes/olivero/favicon.ico
+                            mimeType: image/vnd.microsoft.icon
                 redirect:
                   value:
                     redirect:
@@ -573,7 +573,11 @@ components:
             baseUrl:
               type: string
             themeAssets:
-              description: Always empty for headless frontends, which own their assets.
+              description: >-
+                Assets from Drupal's configured default theme, without request
+                theme negotiation. Frontends may choose whether to use them.
+                URLs may be empty for unset or disabled assets; favicon MIME
+                settings are preserved even when the URL is empty.
               type: object
               additionalProperties: false
               required: [logo, favicon]
