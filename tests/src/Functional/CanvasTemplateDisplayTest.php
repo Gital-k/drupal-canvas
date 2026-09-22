@@ -11,6 +11,7 @@ use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\entity_test\EntityTestHelper;
 use Drupal\layout_builder\Entity\LayoutBuilderEntityViewDisplay;
 use Drupal\node\NodeTypeInterface;
 use Drupal\Tests\BrowserTestBase;
@@ -61,6 +62,10 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
     'node',
     // The module being tested.
     'canvas',
+    // Provides `entity_test`: a `bundle` entity key without a bundle entity
+    // type, whose Field UI base route path contains `{bundle}`.
+    // @see \Drupal\entity_test\Routing\EntityTestRoutes::routes()
+    'entity_test',
   ];
 
   /**
@@ -269,6 +274,56 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
     // for the implicit `user` bundle.
     $this->assertSession()->elementsCount('xpath', self::TEMPLATE_LINK_XPATH, 1);
     $this->assertSession()->elementAttributeContains('xpath', self::TEMPLATE_LINK_XPATH, 'href', 'canvas/template/user/user/compact');
+  }
+
+  /**
+   * Tests the template link for an entity type with plugin-based bundles.
+   *
+   * Entity types with a `bundle` entity key but no bundle entity type get Field
+   * UI routes with a `bundle` route parameter. The template link must read that
+   * parameter rather than fall back to the entity type ID, so the bundle name
+   * deliberately differs from the entity type ID.
+   */
+  public function testPluginBundleEntityTypeTemplateLink(): void {
+    $account = $this->drupalCreateUser([
+      'administer entity_test content',
+      'administer entity_test display',
+      'administer entity_test fields',
+    ]);
+    \assert($account instanceof UserInterface);
+    $account->addRole('canvas_template_admin')->save();
+    $this->drupalLogin($account);
+
+    EntityTestHelper::createBundle('plugin_bundle', 'Plugin bundle', 'entity_test');
+    $this->viewDisplayStorage->create([
+      'targetEntityType' => 'entity_test',
+      'bundle' => 'plugin_bundle',
+      'mode' => 'full',
+      'status' => TRUE,
+    ])->save();
+
+    $template = $this->contentTemplateStorage->create([
+      'id' => 'entity_test.plugin_bundle.full',
+      'content_entity_type_id' => 'entity_test',
+      'content_entity_type_bundle' => 'plugin_bundle',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => [],
+      'status' => TRUE,
+    ]);
+    \assert($template instanceof ConfigEntityInterface);
+    $template->save();
+
+    $this->drupalGet('entity_test/structure/plugin_bundle/display');
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->elementsCount('xpath', self::TEMPLATE_LINK_XPATH, 1);
+    $this->assertSession()->elementAttributeContains('xpath', self::TEMPLATE_LINK_XPATH, 'href', 'canvas/template/entity_test/plugin_bundle/full');
+
+    // The content template list must build the "Edit fields" link with the
+    // same `bundle` route parameter.
+    $this->drupalGet('canvas/api/v0/config/content_template');
+    $this->assertSession()->statusCodeEquals(200);
+    $list = \json_decode($this->getSession()->getPage()->getContent(), TRUE);
+    $this->assertStringEndsWith('/entity_test/structure/plugin_bundle/fields', $list['entity_test']['bundles']['plugin_bundle']['editFieldsUrl']);
   }
 
   /**
