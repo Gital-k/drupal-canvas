@@ -21,7 +21,7 @@ interface IFrameSwapperProps {
   srcDocument: string;
   /**
    * CSS injected at the end of the preview document's <head> to guarantee it
-   * takes precedence over server-provided styles. Modifying this CSS updates 
+   * takes precedence over server-provided styles. Modifying this CSS updates
    * the iframe dynamically without a full reload.
    */
   headStyles: string;

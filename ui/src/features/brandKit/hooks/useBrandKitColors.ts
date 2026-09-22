@@ -22,13 +22,13 @@ export const useBrandKitColors = () => {
     currentData: autoSaveBrandKit,
     isFetching: isFetchingAutoSave,
     error: autoSaveError,
+  } = useGetAutoSaveQuery(BRAND_KIT_ID);
+
   // Colors intentionally come from the canonical Brand kit vs auto-save.
   const sourceColors = useMemo(
     () => canonicalBrandKit?.colors ?? [],
     [canonicalBrandKit?.colors],
   );
-
-  useEffect(() => {
 
   useEffect(() => {
     setColors(sourceColors ?? []);

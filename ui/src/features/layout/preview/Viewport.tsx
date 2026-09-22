@@ -48,7 +48,7 @@ const Viewport: React.FC<ViewportProps> = (props) => {
       ? NON_FULL_VIEW_MODE_MIN_HEIGHT
       : viewportMinHeight;
   useComponentHtmlMap(iframeRef.current);
-  // Mirror live Brand kit colors to the preview. This subscription 
+  // Mirror live Brand kit colors to the preview. This subscription
   // ensures optimistic cache updates aren't lost when the editor panel
   // unmounts.
   const { data: brandKit } = useGetBrandKitQuery(BRAND_KIT_ID);
