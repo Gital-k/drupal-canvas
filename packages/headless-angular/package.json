@@ -6,6 +6,7 @@
   "type": "module",
   "bin": { "canvas-angular": "./tools/build.mjs" },
   "sideEffects": false,
+  "publishConfig": { "access": "public", "directory": "dist" },
   "engines": { "node": ">=22.19.0 <23 || >=24.5.0" },
   "repository": { "type": "git", "url": "https://git.drupalcode.org/project/canvas.git", "directory": "packages/headless-angular" },
   "scripts": {
