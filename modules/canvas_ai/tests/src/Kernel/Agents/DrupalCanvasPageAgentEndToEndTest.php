@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel\Agents;
 
+use Drupal\ai\Event\PreGenerateResponseEvent;
+use Drupal\ai\OperationType\Chat\ChatInput;
+use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas_ai\CanvasAiPermissions;
 use Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder;
@@ -19,9 +22,10 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
- * Tests canvas_dev_page_builder_agent turns driven through the dev controller.
+ * Tests drupal_canvas_page_agent turns driven through the dev controller.
  *
  * Provider responses come from the ai module's echoai provider, which matches
  * each hop's request against a recorded fixture under
@@ -35,7 +39,7 @@ use Symfony\Component\DependencyInjection\Reference;
 #[Group('canvas_ai')]
 #[CoversClass(CanvasDevAiBuilder::class)]
 #[RunTestsInSeparateProcesses]
-final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
+final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
 
   use CanvasAiDevHopTrait;
   use GenerateComponentConfigTrait;
@@ -93,7 +97,7 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
     // The dev page builder agent is not the shipped default; sites select it
     // on the Agents & Tools form. The controller reads this setting.
     $this->config('canvas_dev_ai.settings')
-      ->set('main_agent', 'canvas_dev_page_builder_agent')
+      ->set('main_agent', 'drupal_canvas_page_agent')
       ->save();
     // The echoai provider reads the ai_mock_provider_result table before the
     // file fixtures this test drives it from.
@@ -140,7 +144,7 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
    * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::getNotSolvableMessage()
    */
   public function testMaxLoopsOutcomeIsReported(): void {
-    $agent = $this->config('ai_agents.ai_agent.canvas_dev_page_builder_agent');
+    $agent = $this->config('ai_agents.ai_agent.drupal_canvas_page_agent');
     $agent->set('max_loops', 0)->save();
 
     $response = $this->hop([
@@ -159,7 +163,7 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
    * The plan is the agent's answer; the frontend must not send another hop.
    */
   public function testWholePageRequestStopsAtThePlanGate(): void {
-    // fixture: tests/resources/ai_test/requests/chat/dev-page-builder-plan-gate.yml.
+    // fixture: tests/resources/ai_test/requests/chat/drupal-canvas-page-agent-plan-gate.yml.
     $hop = $this->hop([
       'messages' => [['role' => 'user', 'text' => 'Create me a landing page for a university site']],
       'current_layout' => self::emptyLayout(),
@@ -194,14 +198,14 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
       ],
     ];
 
-    // fixture: tests/resources/ai_test/requests/chat/dev-page-builder-edit-hop-1.yml.
+    // fixture: tests/resources/ai_test/requests/chat/drupal-canvas-page-agent-edit-hop-1.yml.
     $hop1 = $this->hop(['messages' => $messages, 'current_layout' => $layout]);
     $this->assertTrue($hop1['status']);
     $this->assertTrue($hop1['should_continue']);
     $this->assertArrayNotHasKey('component_updates', $hop1);
     $this->assertSame('Changing the hero heading now.', $hop1['progress']);
 
-    // fixture: tests/resources/ai_test/requests/chat/dev-page-builder-edit-hop-2.yml.
+    // fixture: tests/resources/ai_test/requests/chat/drupal-canvas-page-agent-edit-hop-2.yml.
     $hop2 = $this->hop(['messages' => $messages, 'current_layout' => $layout]);
     $this->assertTrue($hop2['status']);
     $this->assertFalse($hop2['should_continue']);
@@ -220,12 +224,12 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
   public function testTitleAndDescriptionSetInOneHopAreMerged(): void {
     $messages = [['role' => 'user', 'text' => 'Set the page title to Campus and the description to Visit us']];
 
-    // fixture: tests/resources/ai_test/requests/chat/dev-page-builder-metadata-hop-1.yml.
+    // fixture: tests/resources/ai_test/requests/chat/drupal-canvas-page-agent-metadata-hop-1.yml.
     $hop1 = $this->hop(['messages' => $messages, 'current_layout' => self::emptyLayout()]);
     $this->assertTrue($hop1['should_continue']);
     $this->assertArrayNotHasKey('canvas_page_data', $hop1);
 
-    // fixture: tests/resources/ai_test/requests/chat/dev-page-builder-metadata-hop-2.yml.
+    // fixture: tests/resources/ai_test/requests/chat/drupal-canvas-page-agent-metadata-hop-2.yml.
     $hop2 = $this->hop(['messages' => $messages, 'current_layout' => self::emptyLayout()]);
     $this->assertTrue($hop2['status']);
     $this->assertFalse($hop2['should_continue']);
@@ -268,7 +272,7 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
       ],
     ];
 
-    // fixture: tests/resources/ai_test/requests/chat/dev-page-builder-place-hop-1.yml.
+    // fixture: tests/resources/ai_test/requests/chat/drupal-canvas-page-agent-place-hop-1.yml.
     $hop1 = $this->hop([
       'messages' => $messages,
       'current_layout' => $empty_layout,
@@ -278,7 +282,7 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
     $this->assertArrayNotHasKey('operations', $hop1);
     $this->assertSame('Adding the hero banner now.', $hop1['progress']);
 
-    // fixture: tests/resources/ai_test/requests/chat/dev-page-builder-place-hop-2.yml.
+    // fixture: tests/resources/ai_test/requests/chat/drupal-canvas-page-agent-place-hop-2.yml.
     // The client has no operations to apply yet, so it re-sends the same
     // layout; the parked hero placement executes against it during this hop.
     $hop2 = $this->hop([
@@ -310,7 +314,7 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
       ],
     ], ['operations' => $hop2['operations']]);
 
-    // fixture: tests/resources/ai_test/requests/chat/dev-page-builder-place-hop-3.yml.
+    // fixture: tests/resources/ai_test/requests/chat/drupal-canvas-page-agent-place-hop-3.yml.
     // The client applied hop 2's operations before sending this hop, so the
     // layout now contains the hero the second placement references.
     $hop3 = $this->hop([
@@ -359,6 +363,103 @@ final class CanvasDevPageBuilderAgentEndToEndTest extends CanvasKernelTestBase {
         ],
       ],
     ], ['operations' => $hop3['operations']]);
+  }
+
+  /**
+   * Turn 2 resumes the agent history turn 1 built, tool messages included.
+   *
+   * The dev wizard sends the same conversation_id with every turn of one chat.
+   * With the site opted in, the backend resumes the agent from the state turn
+   * 1 finished with instead of rebuilding it from the client transcript, which
+   * carries text only, so the model's first request of turn 2 still holds the
+   * edit_components call turn 1 made and its result: the agent need not repeat
+   * that work.
+   *
+   * @see https://git.drupalcode.org/project/canvas/-/work_items/3592032
+   */
+  public function testSecondTurnResumesTheHistoryOfTheFirst(): void {
+    // Off after install: keeping the history costs tokens on every later turn.
+    // @see \Drupal\canvas_dev_ai\Form\CanvasDevAiAgentSelectionForm
+    $this->config('canvas_dev_ai.settings')->set('keep_tool_calls_in_history', TRUE)->save();
+
+    $layout = [
+      'regions' => [
+        'content' => [
+          'nodePathPrefix' => [0],
+          'components' => [
+            [
+              'name' => 'sdc.canvas_test_sdc.my-hero',
+              'uuid' => self::HERO_UUID,
+              'props' => ['heading' => 'Build Faster with Canvas', 'cta1href' => 'https://example.com'],
+            ],
+          ],
+        ],
+      ],
+    ];
+
+    // Turn 1 is the edit turn: hop 1 parks the edit_components call, hop 2
+    // executes it and closes the turn.
+    // fixtures: tests/resources/ai_test/requests/chat/
+    // drupal-canvas-page-agent-edit-hop-1.yml and drupal-canvas-page-agent-edit-hop-2.yml.
+    $responses = $this->driveTurn([
+      'messages' => [['role' => 'user', 'text' => 'Change the hero heading to Hello']],
+      'current_layout' => $layout,
+      'request_id' => 'turn-1',
+      'conversation_id' => 'conversation-1',
+    ]);
+    self::assertCount(2, $responses);
+    self::assertSame('The hero heading now says Hello.', $responses[1]['message']);
+
+    // Record what the model is sent on the next turn.
+    $inputs = [];
+    $this->container->get(EventDispatcherInterface::class)->addListener(
+      PreGenerateResponseEvent::EVENT_NAME,
+      static function (PreGenerateResponseEvent $event) use (&$inputs): void {
+        $inputs[] = $event->getInput();
+      },
+    );
+
+    // Turn 2 sends a new request_id under the same conversation_id, with the
+    // transcript the client holds: text only, as the wizard keeps it. The
+    // agent parks another edit_components call straight away, without reading
+    // the component again; the second hop runs it and closes the turn.
+    // fixtures: tests/resources/ai_test/requests/chat/
+    // drupal-canvas-page-agent-history-turn-2-hop-1.yml and -hop-2.yml.
+    $layout['regions']['content']['components'][0]['props']['heading'] = 'Hello';
+    $responses = $this->driveTurn([
+      'messages' => [
+        ['role' => 'user', 'text' => 'Change the hero heading to Hello'],
+        ['role' => 'assistant', 'text' => 'The hero heading now says Hello.'],
+        ['role' => 'user', 'text' => 'Now make it say Goodbye'],
+      ],
+      'current_layout' => $layout,
+      'request_id' => 'turn-2',
+      'conversation_id' => 'conversation-1',
+    ]);
+    self::assertCount(2, $responses);
+    self::assertSame('Changing the hero heading again now.', $responses[0]['progress']);
+    self::assertSame([self::HERO_UUID => ['heading' => 'Goodbye']], $responses[1]['component_updates']);
+    self::assertSame('The hero heading now says Goodbye.', $responses[1]['message']);
+
+    // The model's first request of turn 2 carries the history turn 1 built:
+    // the catalog and user message of turn 1, the edit_components call, its
+    // result and the answer, then this turn's catalog and user message. The
+    // second catalog is the per-turn injection of the agent's
+    // get_component_context default information tool.
+    self::assertCount(2, $inputs);
+    $input = $inputs[0];
+    self::assertInstanceOf(ChatInput::class, $input);
+    $messages = $input->getMessages();
+    self::assertSame(
+      ['user', 'user', 'assistant', 'tool', 'assistant', 'user', 'user'],
+      \array_map(static fn (ChatMessage $message): string => $message->getRole(), $messages),
+    );
+    self::assertStringContainsString('Change the hero heading to Hello', $messages[1]->getText());
+    self::assertSame('edit_components', $messages[2]->toArray()['tools'][0]['function']['name']);
+    self::assertSame('call_1', $messages[3]->getToolsId());
+    self::assertStringContainsString('The updates were applied successfully.', $messages[3]->getText());
+    self::assertSame('The hero heading now says Hello.', $messages[4]->getText());
+    self::assertStringContainsString('Now make it say Goodbye', $messages[6]->getText());
   }
 
 }
