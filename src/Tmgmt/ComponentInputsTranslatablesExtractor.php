@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentInstanceInputsConfigSchemaGenerator;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase;
+use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\Schema\Mapping;
 use Drupal\Core\Config\Schema\Sequence;
@@ -149,6 +150,17 @@ final class ComponentInputsTranslatablesExtractor {
       $static_prop_source = $component_source->getDefaultStaticPropSource($prop_name, FALSE);
     }
     catch (\OutOfRangeException) {
+      return $concrete_schema;
+    }
+    // A reference prop source (e.g. an entity/media reference) collapses to a
+    // scalar reference ID and has nothing translatable — regardless of the
+    // field's stored-property count or cardinality. Its `field.value.*` schema
+    // has multiple keys (e.g. entity_reference: `target_id` + `target_uuid`),
+    // so deriving a shape from that would wrongly yield a `mapping` for a value
+    // that is stored as a scalar. Leave $concrete_schema as `type: ignore`.
+    // @see \Drupal\canvas\PropSource\StaticPropSource::denormalizeValue()
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::isExplicitInputTranslatable()
+    if ($static_prop_source->expression instanceof ReferencePropExpressionInterface) {
       return $concrete_schema;
     }
     $field_type = $static_prop_source->fieldItemList->getFieldDefinition()->getType();
