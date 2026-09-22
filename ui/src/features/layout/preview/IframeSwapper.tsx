@@ -20,9 +20,9 @@ import styles from '@/features/layout/preview/Preview.module.css';
 interface IFrameSwapperProps {
   srcDocument: string;
   /**
-   * CSS injected into each preview document's head, after the server-provided
-   * stylesheets so it wins on equal specificity. Changing it updates loaded
-   * documents in place, without reloading the iframes.
+   * CSS injected at the end of the preview document's <head> to guarantee it
+   * takes precedence over server-provided styles. Modifying this CSS updates 
+   * the iframe dynamically without a full reload.
    */
   headStyles: string;
   setIsReloading: Dispatch<SetStateAction<boolean>>;

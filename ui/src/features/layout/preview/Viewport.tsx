@@ -48,10 +48,9 @@ const Viewport: React.FC<ViewportProps> = (props) => {
       ? NON_FULL_VIEW_MODE_MIN_HEIGHT
       : viewportMinHeight;
   useComponentHtmlMap(iframeRef.current);
-  // Mirror Brand kit colors into the preview, which only receives the
-  // server-rendered palette on a full editor reload. Color mutations patch
-  // this query optimistically, and subscribing here keeps the entry
-  // reconciled even while the Brand kit panel is closed.
+  // Mirror live Brand kit colors to the preview. This subscription 
+  // ensures optimistic cache updates aren't lost when the editor panel
+  // unmounts.
   const { data: brandKit } = useGetBrandKitQuery(BRAND_KIT_ID);
   const brandKitColorStyles = useMemo(
     () => buildColorStyles(brandKit?.colors),
