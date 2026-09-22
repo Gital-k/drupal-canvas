@@ -16,8 +16,8 @@ use Drupal\Core\Entity\ContentEntityInterface;
  * The context carries the same data Drupal-rendered Code Components read
  * through `usePageContext()` and `useSiteContext()`, generated for the routed
  * request so language, access, cacheability, and draft-preview semantics are
- * Drupal's. Headless frontends receive empty theme assets: the frontend owns
- * its own assets, and empty URLs are valid site context.
+ * Drupal's. Theme assets come from the configured default theme without request
+ * theme negotiation; the frontend chooses whether to use them.
  *
  * @see \Drupal\canvas\CodeComponentDataProvider
  * @see docs/adr/0021-code-component-runtime-compatibility-across-frontend-modes.md
@@ -73,6 +73,28 @@ final class CanvasContentContextBuilder {
       (new CacheableMetadata())->addCacheContexts(['url.site', 'route']),
     );
 
+    $theme_config = $this->configFactory->get('system.theme');
+    $cacheability->addCacheableDependency($theme_config);
+    $theme = $theme_config->get('default');
+    $theme_assets = [
+      'logo' => ['url' => ''],
+      'favicon' => ['url' => '', 'mimeType' => ''],
+    ];
+    // Never pass NULL: that would select the request's active theme instead.
+    if (\is_string($theme) && $theme !== '') {
+      $theme_assets = $provider->getCanvasDataThemeAssetsV0($theme)[$v0]['themeAssets'];
+      // Match the configuration inputs of Drupal's theme settings provider.
+      // File URLs and favicon MIME settings are resolved by that provider, not
+      // by loading managed file entities or inspecting their contents here.
+      foreach (['core.extension', 'system.theme.global', $theme . '.settings'] as $config_name) {
+        $cacheability->addCacheableDependency($this->configFactory->get($config_name));
+      }
+      // ThemeSettings uses this tag. System's ConfigCacheTag subscriber also
+      // invalidates it on the first save of previously absent theme settings,
+      // when Config::save() does not yet invalidate the config's own tag.
+      $cacheability->addCacheTags(['rendered']);
+    }
+
     return [
       'page' => [
         'pageTitle' => (string) $page_title,
@@ -82,10 +104,7 @@ final class CanvasContentContextBuilder {
       'site' => [
         'branding' => $branding,
         'baseUrl' => $base_url,
-        'themeAssets' => [
-          'logo' => ['url' => ''],
-          'favicon' => ['url' => '', 'mimeType' => ''],
-        ],
+        'themeAssets' => $theme_assets,
       ],
     ];
   }
