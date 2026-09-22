@@ -610,7 +610,13 @@ describe('fetchPage', () => {
       site: {
         branding: { homeUrl: '/', siteName: 'Example', siteSlogan: '' },
         baseUrl: 'https://drupal.example',
-        themeAssets: { logo: { url: '' }, favicon: { url: '', mimeType: '' } },
+        themeAssets: {
+          logo: { url: 'https://drupal.example/sites/default/files/logo.svg' },
+          favicon: {
+            url: 'https://cdn.example/icon.png',
+            mimeType: 'image/png',
+          },
+        },
       },
     },
     route: {

@@ -295,18 +295,24 @@ Preserve the existing Drupal-generated navigation URLs, including breadcrumbs,
 translation links, and the branding home URL. Do not add headless-specific URL
 rewriting; applications handle any routing adjustments.
 
-In headless context, preserve the theme-assets shape but return empty values:
+In headless context, return logo and favicon values from Drupal's configured
+default theme, preserving the `themeAssets` shape. Select the theme explicitly
+from `system.theme:default`, without request theme negotiation or selection of
+an active/admin theme. Frontends choose whether to use these assets; returning
+them allows branding to be managed in Drupal without another settings request.
 
-```ts
-themeAssets: {
-  logo: { url: '' },
-  favicon: { url: '', mimeType: '' },
-}
-```
+Use Drupal's theme settings and file URL resolution, including global settings,
+custom asset paths, theme/core defaults and the configured favicon MIME type.
+Response cacheability must account for the default-theme selection, installed
+themes, and global and theme-specific settings, including the first save of
+previously absent settings. Asset file paths and MIME settings are configuration;
+replacing file contents without changing those values does not change context.
 
-Drupal-rendered Code Components retain their existing theme assets. Shared
-components must handle empty asset URLs. Empty theme assets do not make site
-context unavailable or trigger a missing-context warning.
+Drupal-rendered Code Components and Workbench retain their existing active-theme
+behavior. Shared components must still handle empty asset URLs when assets are
+unset or disabled. Preserve the configured favicon MIME type even if its URL is
+empty. Empty theme assets do not make site context unavailable or trigger a
+missing-context warning.
 
 ### Consolidate JSON:API clients behind a context hook
 
