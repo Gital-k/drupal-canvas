@@ -33,10 +33,10 @@ export function makeTree(url: URL): CanvasComponentTreeElement {
                         title: `Outer v${revision}`,
                       },
                       slots: {
-                        default: [
-                          ...(revision === '2' ? [counter('added-uuid')] : []),
-                          counter('primary-uuid'),
-                        ],
+                        default: (revision === '2'
+                          ? ['added-uuid', 'sibling-uuid', 'primary-uuid']
+                          : ['primary-uuid', 'sibling-uuid']
+                        ).map(counter),
                         aside: {
                           element: 'js-frame',
                           props: { canvasUuid: 'nested-uuid', title: 'Nested' },

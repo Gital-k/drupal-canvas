@@ -69,6 +69,12 @@ export class App {
         hydrated: true,
         reused: angularNodes.every((node) => node.isConnected),
         captured: angularNodes.length,
+        capturedHosts: {
+          frames: angularNodes.filter((node) => node.matches('proof-frame'))
+            .length,
+          slots: angularNodes.filter((node) => node.matches('canvas-slot'))
+            .length,
+        },
         // Angular's innerHTML binding reassigns raw descendants during hydration.
         replacedMarkup: nodes
           .filter((node) => !node.isConnected)

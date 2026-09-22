@@ -5,6 +5,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { verifyIntegration } from './integration-proof.mjs';
+
 // Uses the session supplied by the harness. Never hijack the default browser.
 assert(
   process.env.AGENT_BROWSER_SESSION,
@@ -112,6 +114,12 @@ try {
         'SSR Angular nodes must survive hydration',
       );
       assert(proof.captured > 0);
+      assert.deepEqual(
+        proof.capturedHosts,
+        route.startsWith('/empty')
+          ? { frames: 0, slots: 0 }
+          : { frames: 2, slots: 6 },
+      );
       const check = evaluate(`(() => {
         const markers = [...document.querySelectorAll('template[data-canvas-marker]')];
         const geometry = window.__geometry;
@@ -129,7 +137,7 @@ try {
           } else {
             check(!document.querySelector('#default-markup'), 'Draft defaults should become placeholders');
             check(document.querySelectorAll('.canvas--slot-empty-placeholder').length === 3, 'Empty slot targets');
-            check(geometry.length === 11, 'Nested/default/named boundary count');
+            check(geometry.length === 12, 'Nested/default/named boundary count');
             const button = document.querySelector('proof-counter button').getBoundingClientRect();
             const rect = geometry.find(g => g.id === 'primary-uuid').rect;
             check(Math.abs(button.height - rect.height) < 1 && Math.abs(button.width - rect.width) < 1, 'Component geometry must measure rendered button');
@@ -143,9 +151,47 @@ try {
           check(document.querySelector('#trusted em')?.textContent === 'HTML', 'Trusted HTML not rendered');
           check(document.querySelector('#trusted').style.color === 'rgb(4, 5, 6)', 'Trusted HTML style stripped');
         }
-        return { markers: markers.length, geometry };
+        return { markers: markers.length, geometry, tuples: markers.map(m => [m.dataset.canvasMarker, m.dataset.canvasType, m.dataset.canvasUuid ?? m.dataset.canvasRegionId, m.dataset.canvasSlotName ?? null]) };
       })()`);
+      const expectedBoundaries =
+        route === '/published'
+          ? []
+          : route.startsWith('/empty')
+            ? [['region', 'content', null]]
+            : [
+                ['region', 'content', null],
+                ...[
+                  'frame-uuid',
+                  'primary-uuid',
+                  'sibling-uuid',
+                  'nested-uuid',
+                  'secondary-uuid',
+                ].map((id) => ['component', id, null]),
+                ...['frame-uuid', 'nested-uuid'].flatMap((id) =>
+                  ['default', 'aside', 'footer'].map((name) => [
+                    'slot',
+                    `${id}/${name}`,
+                    name,
+                  ]),
+                ),
+              ];
+      assert.deepEqual(
+        check.tuples.map(JSON.stringify).sort(),
+        expectedBoundaries
+          .flatMap((tuple) =>
+            ['start', 'end'].map((position) =>
+              JSON.stringify([position, ...tuple]),
+            ),
+          )
+          .sort(),
+      );
       if (route === '/draft' || route === '/published') {
+        assert.deepEqual(
+          evaluate(
+            `Array.from(document.querySelectorAll('proof-frame > section > main')[0].querySelectorAll('proof-counter button')).map(n => n.textContent)`,
+          ),
+          ['Request primary-uuid v1: 0', 'Request sibling-uuid v1: 0'],
+        );
         browser(
           'find',
           'role',
@@ -176,7 +222,17 @@ try {
         );
         assert.equal(
           evaluate(`document.querySelectorAll('proof-counter').length`),
-          3,
+          4,
+        );
+        assert.deepEqual(
+          evaluate(
+            `Array.from(document.querySelectorAll('proof-frame > section > main')[0].querySelectorAll('proof-counter button')).map(n => n.textContent)`,
+          ),
+          [
+            'Request added-uuid v2: 0',
+            'Request sibling-uuid v2: 0',
+            'Request primary-uuid v2: 1',
+          ],
         );
         assert.equal(
           evaluate(
@@ -204,6 +260,23 @@ try {
             'window.__geometry.some(g => g.id === "added-uuid")',
           );
       }
+      const expectedAfter =
+        route === '/draft'
+          ? [...expectedBoundaries, ['component', 'added-uuid', null]]
+          : expectedBoundaries;
+      const tuplesAfter = evaluate(
+        `Array.from(document.querySelectorAll('template[data-canvas-marker]')).map(m => [m.dataset.canvasMarker, m.dataset.canvasType, m.dataset.canvasUuid ?? m.dataset.canvasRegionId, m.dataset.canvasSlotName ?? null])`,
+      );
+      assert.deepEqual(
+        tuplesAfter.map(JSON.stringify).sort(),
+        expectedAfter
+          .flatMap((tuple) =>
+            ['start', 'end'].map((position) =>
+              JSON.stringify([position, ...tuple]),
+            ),
+          )
+          .sort(),
+      );
       const errors = browser('errors').errors;
       assert.deepEqual(errors, []);
       const logs = browser('console').messages;
@@ -226,7 +299,8 @@ try {
         hydrationLogs: logs.map((entry) => entry.text),
       });
     }
-    report.push({ major, artifactHash, tarballIntegrity, pages });
+    const integration = await verifyIntegration(origin, browser, evaluate);
+    report.push({ major, artifactHash, tarballIntegrity, pages, integration });
   }
   await writeFile(
     path.join(artifacts, 'browser-proof.json'),

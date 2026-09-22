@@ -8,10 +8,22 @@
   <body>
     <proof-app></proof-app>
     <script>
+      // Fixture-only bookkeeping to verify Angular application teardown.
+      window.__messageListeners = new Set();
+      const add = window.addEventListener.bind(window);
+      const remove = window.removeEventListener.bind(window);
+      window.addEventListener = (type, callback, options) => {
+        if (type === 'message') window.__messageListeners.add(callback);
+        return add(type, callback, options);
+      };
+      window.removeEventListener = (type, callback, options) => {
+        if (type === 'message') window.__messageListeners.delete(callback);
+        return remove(type, callback, options);
+      };
       // Executed after SSR markup is parsed, before the CLI's module bootstrap.
       window.__ssrNodes = Array.from(
         document.querySelectorAll(
-          'proof-counter, proof-counter button, canvas-markup, canvas-markup > span, template[data-canvas-marker], #trusted, #chrome',
+          'proof-frame, canvas-slot, proof-counter, proof-counter button, canvas-markup, canvas-markup > span, template[data-canvas-marker], #trusted, #chrome',
         ),
       );
     </script>

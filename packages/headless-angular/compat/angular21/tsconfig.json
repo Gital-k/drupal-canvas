@@ -18,6 +18,7 @@
     "strictTemplates": true
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "node_modules/@drupal-canvas/headless-host/src/index.ts"
   ]
 }

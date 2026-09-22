@@ -33,6 +33,20 @@ import type {
   CanvasMarker,
 } from '@drupal-canvas/headless';
 
+export {
+  CanvasPageStore,
+  CanvasDocumentHead,
+  CanvasDraftSession,
+  canvasPageResolver,
+  provideCanvas,
+} from './application';
+export type {
+  CanvasSession,
+  CanvasPageData,
+  CanvasRequestContext,
+  CanvasEntityOptions,
+} from '@drupal-canvas/headless-angular/contracts';
+
 /** Standalone Angular components, keyed by unchanged component.yml machine names. */
 export type CanvasComponentRegistry = Record<string, Type<unknown>>;
 type Child = string | CanvasComponentTreeElement;

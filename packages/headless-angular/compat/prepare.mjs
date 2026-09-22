@@ -7,7 +7,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(root, '../../..');
 const artifacts = path.join(root, 'artifacts');
 await mkdir(artifacts, { recursive: true });
-for (const pkg of ['headless', 'headless-angular']) {
+for (const pkg of ['headless', 'headless-angular', 'headless-host']) {
   const directory = path.join(
     repo,
     'packages',
@@ -35,6 +35,10 @@ for (const major of [21, 22]) {
             root: '',
             sourceRoot: 'src',
             architect: {
+              serve: {
+                builder: '@angular/build:dev-server',
+                options: { buildTarget: 'proof:build' },
+              },
               build: {
                 builder: '@angular/build:application',
                 options: {
@@ -74,7 +78,10 @@ for (const major of [21, 22]) {
           lib: ['ES2022', 'DOM'],
         },
         angularCompilerOptions: { strictTemplates: true },
-        include: ['src/**/*.ts'],
+        include: [
+          'src/**/*.ts',
+          'node_modules/@drupal-canvas/headless-host/src/index.ts',
+        ],
       },
       null,
       2,

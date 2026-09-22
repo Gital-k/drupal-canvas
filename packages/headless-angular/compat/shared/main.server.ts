@@ -4,8 +4,10 @@ import {
 } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { provideServerRendering, RenderMode, withRoutes } from '@angular/ssr';
+import { provideCanvas } from '@drupal-canvas/headless-angular';
 
-import { App, Shell } from './app';
+import { Shell } from './app';
+import { routes } from './routes';
 
 import type { BootstrapContext } from '@angular/platform-browser';
 
@@ -15,7 +17,8 @@ export default (context: BootstrapContext) =>
     {
       providers: [
         provideClientHydration(),
-        provideRouter([{ path: '**', component: App }]),
+        provideRouter(routes),
+        provideCanvas(),
         provideServerRendering(
           withRoutes([{ path: '**', renderMode: RenderMode.Server }]),
         ),

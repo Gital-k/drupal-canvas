@@ -3,12 +3,15 @@ import {
   provideClientHydration,
 } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
+import { provideCanvas } from '@drupal-canvas/headless-angular';
 
-import { App, Shell } from './app';
+import { Shell } from './app';
+import { routes } from './routes';
 
 bootstrapApplication(Shell, {
-  providers: [
-    provideClientHydration(),
-    provideRouter([{ path: '**', component: App }]),
-  ],
-}).catch(console.error);
+  providers: [provideClientHydration(), provideRouter(routes), provideCanvas()],
+})
+  .then((app) => {
+    Object.assign(window, { __destroyApp: () => app.destroy() });
+  })
+  .catch(console.error);

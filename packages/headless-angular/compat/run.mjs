@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
+import { rename } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,7 @@ assert(
 const run = (command, args, cwd = repo) =>
   execFileSync(command, args, { cwd, stdio: 'inherit' });
 const servers = [];
+const movedSources = [];
 try {
   run('npx', [
     'turbo',
@@ -40,12 +42,13 @@ try {
     }
     run(
       'node',
-      [
-        'node_modules/@drupal-canvas/headless-angular/tools/generate-registry.mjs',
-      ],
+      ['node_modules/@drupal-canvas/headless-angular/tools/build.mjs'],
       app,
     );
     run('npm', ['run', 'build'], app);
+    const saved = path.join(root, 'artifacts', `sources-${major}`);
+    await rename(path.join(app, 'src'), saved);
+    movedSources.push([saved, path.join(app, 'src')]);
     const port = 4200 + major;
     // Fail rather than reuse or stop a process that someone else owns.
     await new Promise((resolve, reject) => {
@@ -73,4 +76,5 @@ try {
   run('node', [path.join(root, 'verify.mjs')]);
 } finally {
   for (const server of servers) server.kill();
+  for (const [saved, source] of movedSources) await rename(saved, source);
 }

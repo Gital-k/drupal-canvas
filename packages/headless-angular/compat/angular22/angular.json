@@ -6,6 +6,12 @@
       "root": "",
       "sourceRoot": "src",
       "architect": {
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": {
+            "buildTarget": "proof:build"
+          }
+        },
         "build": {
           "builder": "@angular/build:application",
           "options": {
