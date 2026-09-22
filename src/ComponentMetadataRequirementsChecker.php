@@ -51,8 +51,9 @@ final class ComponentMetadataRequirementsChecker {
     // Check fundamentals.
     $validator = new Validator();
     foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
-      // Since Drupal 11.4, `type` is whatever the component declared: a string
+      // Since Drupal 11.5, `type` is whatever the component declared: a string
       // for a single type, an array only for a union of types.
+      // @see https://www.drupal.org/node/3554720
       $prop_types = (array) $prop['type'];
       if (\in_array(Attribute::class, $prop_types, TRUE)) {
         continue;
