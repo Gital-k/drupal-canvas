@@ -35,9 +35,9 @@ final class ComponentTreeFieldSymmetricalTranslationSynchronizer implements Fiel
    * {@inheritdoc}
    */
   public function synchronizeFields(ContentEntityInterface $entity, $sync_langcode, $original_langcode = NULL): void {
-    $net_new = $this->getDefaultTranslationNewComponentInstanceUuids($entity);
+    $pre_sync = $this->captureComponentInstanceStateByUuid($entity);
     $this->decorated->synchronizeFields($entity, $sync_langcode, $original_langcode);
-    $this->synchronizeComponentInstanceInputs($entity, $net_new);
+    $this->synchronizeComponentInstanceInputs($entity, $pre_sync);
   }
 
   /**
@@ -55,77 +55,133 @@ final class ComponentTreeFieldSymmetricalTranslationSynchronizer implements Fiel
   }
 
   /**
-   * Syncs non-translatable component instance input keys across translations.
+   * Rebuilds each translation's component instance inputs and labels.
    *
    * After core's synchronizer aligns tree structure (same UUIDs, same order),
-   * this propagates non-translatable input values from the default translation
-   * to all other translations, for every component tree field on the entity.
+   * this restores every non-default translation's translatable data from that
+   * instance's own pre-synchronization state, looked up BY UUID, and takes
+   * everything else from the default translation.
    *
-   * @param list<string> $net_new
-   *   UUIDs of net new component instances in the default translation.
+   * Looking values up by UUID rather than by delta is what makes this correct
+   * across structural edits. Core pairs items using a hash of the
+   * *synchronized* properties, which for a component tree include
+   * `parent_uuid` and `slot`. Re-parenting an instance therefore changes that
+   * hash, so core treats a long-lived instance as newly created and merges it
+   * by delta with whatever the translation happened to hold in that position
+   * - an unrelated component instance's inputs and label.
+   *
+   * Rebuilding rather than merging is equally load-bearing. The previous
+   * implementation merged, and a merge can only ever ADD keys: a foreign key
+   * that landed once could never be removed, and every later validation of
+   * that translation failed with "the `X` prop is not defined". Rebuilding
+   * also drops residue left behind when an instance stops using a prop.
+   *
+   * @param array<string, array<string, array<string, array{inputs: array, label: ?string, translatable_keys: array<string>}>>> $pre_sync
+   *   Per-instance state captured before core's synchronizer ran, keyed by
+   *   field name, then langcode, then component instance UUID.
+   *
+   * @see \Drupal\content_translation\FieldTranslationSynchronizer::synchronizeItems()
+   * @see \Drupal\content_translation\FieldTranslationSynchronizer::createMergedItem()
    */
-  private function synchronizeComponentInstanceInputs(ContentEntityInterface $entity, array $net_new): void {
+  private function synchronizeComponentInstanceInputs(ContentEntityInterface $entity, array $pre_sync): void {
     foreach ($this->allComponentTreeSymmetricalTranslations($entity) as $target_tree) {
-      $default_tree = $entity->getUntranslated()->get($target_tree->getName());
+      $field_name = $target_tree->getFieldDefinition()->getName();
+      $langcode = $target_tree->getEntity()->language()->getId();
+      $default_tree = $entity->getUntranslated()->get($field_name);
       \assert($default_tree instanceof ComponentTreeItemList);
-      foreach ($target_tree as $delta => $target_item) {
-        \assert($target_item instanceof ComponentTreeItem);
-        $default_item = $default_tree->get($delta);
-        \assert($default_item instanceof ComponentTreeItem);
 
+      $default_items = [];
+      foreach ($default_tree as $default_item) {
+        \assert($default_item instanceof ComponentTreeItem);
+        $default_items[$default_item->getUuid()] = $default_item;
+      }
+
+      foreach ($target_tree as $target_item) {
+        \assert($target_item instanceof ComponentTreeItem);
+        // Pair by UUID, not by delta: core's wholesale-copy branch can leave
+        // the two lists misaligned.
+        $target_uuid = $target_item->getUuid();
+        $default_item = $default_items[$target_uuid] ?? NULL;
+        if ($default_item === NULL) {
+          continue;
+        }
         $default_inputs = $default_item->getInputs() ?? [];
-        $target_inputs = $target_item->getInputs() ?? [];
 
         $inputs_typed_data = $default_item->get('inputs');
         \assert($inputs_typed_data instanceof ComponentInputs);
         $translatable_keys = \array_flip($inputs_typed_data->getTranslatableInputKeys());
-        $non_translatable_inputs = \array_diff_key($default_inputs, $translatable_keys);
 
-        // Non-translatable from default, translatable from target (or
-        // default for newly added instances with no prior translation).
-        $target_item->setInput(\array_merge(
-          !\in_array($target_item->getUuid(), $net_new, TRUE)
-            ? $target_inputs
-            // Core's createMergedItem() merges by delta position; after a
-            // prepend/reorder, target_item may carry inputs from a different
-            // instance.
-            // Unlike most field types, Canvas' field properties are
-            // dependent: which `inputs` make sense depends on the
-            // `component_id` and `component_version` field properties.
-            // Rectify what core did: use the default translation's inputs,
-            // not some other component instance in the current translation
-            // that happened to previously live at the delta of the new
-            // component instance (i.e. $target_inputs exists but is wrong!).
-            // @see \Drupal\content_translation\FieldTranslationSynchronizer::createMergedItem()
-            : $default_inputs,
-          $non_translatable_inputs,
-        ));
+        // This instance's own pre-synchronization state. Absent when the
+        // instance is new in the default translation, which then supplies
+        // every value - the case the previous `$net_new` branch handled.
+        $own = $pre_sync[$field_name][$langcode][$target_uuid] ?? NULL;
+        $own_inputs = $own['inputs'] ?? [];
+
+        // Keys this translation already had, in the order it already had
+        // them, so a rebuild is not also a reordering. A translatable prop
+        // the default translation leaves unset but this one sets survives;
+        // only keys that were translatable for THIS instance before
+        // synchronization qualify, so another component's residue cannot
+        // re-enter here.
+        $own_translatable = \array_flip($own['translatable_keys'] ?? []);
+        $rebuilt = [];
+        foreach ($own_inputs as $key => $own_value) {
+          if (\array_key_exists($key, $default_inputs)) {
+            $rebuilt[$key] = \array_key_exists($key, $translatable_keys)
+              ? $own_value
+              : $default_inputs[$key];
+          }
+          elseif (\array_key_exists($key, $own_translatable)) {
+            $rebuilt[$key] = $own_value;
+          }
+        }
+        // Then whatever only the default translation has, in its order.
+        foreach ($default_inputs as $key => $default_value) {
+          if (!\array_key_exists($key, $rebuilt)) {
+            $rebuilt[$key] = $default_value;
+          }
+        }
+        $target_item->setInput($rebuilt);
+
+        // `label` is translatable too, and core merged it by delta alongside
+        // the inputs, so it needs restoring from the same by-UUID state.
+        $target_item->setLabel($own === NULL ? $default_item->getLabel() : $own['label']);
       }
     }
   }
 
   /**
-   * Returns UUIDs of instances that are new in the default translation.
+   * Captures each non-default translation's per-instance translatable state.
    *
-   * "New" means not yet present in any non-default translation.
+   * Must be called BEFORE the decorated synchronizer runs. Afterwards the
+   * translation's items have already been re-aligned by delta, and the
+   * association between a component instance and its own inputs, label and
+   * translatable-key set is precisely what has been lost.
    *
-   * @return list<string>
+   * The translatable-key set is captured here rather than derived later
+   * because ComponentInputs::getTranslatableInputKeys() resolves the config
+   * schema mapping against the item's *actual* inputs - which, after
+   * synchronization, may be another instance's.
+   *
+   * @return array<string, array<string, array<string, array{inputs: array, label: ?string, translatable_keys: array<string>}>>>
+   *   Keyed by field name, then langcode, then component instance UUID.
    */
-  private function getDefaultTranslationNewComponentInstanceUuids(ContentEntityInterface $entity): array {
+  private function captureComponentInstanceStateByUuid(ContentEntityInterface $entity): array {
+    $captured = [];
     foreach ($this->allComponentTreeSymmetricalTranslations($entity) as $target_tree) {
-      $default_tree = $entity->getUntranslated()->get($target_tree->getName());
-      \assert($default_tree instanceof ComponentTreeItemList);
-      $net_new = iterator_to_array($default_tree->componentTreeItemsIterator(
-        ComponentTreeItemList::doesNotExistInOtherComponentTree($target_tree)
-      ));
-      // All non-default translations must be in sync, so checking only the
-      // first non-default translation suffices.
-      return \array_values(\array_map(
-        fn (ComponentTreeItem $i) => $i->getUuid(),
-        $net_new,
-      ));
+      $langcode = $target_tree->getEntity()->language()->getId();
+      foreach ($target_tree as $item) {
+        \assert($item instanceof ComponentTreeItem);
+        $inputs_typed_data = $item->get('inputs');
+        \assert($inputs_typed_data instanceof ComponentInputs);
+        $captured[$target_tree->getFieldDefinition()->getName()][$langcode][$item->getUuid()] = [
+          'inputs' => $item->getInputs() ?? [],
+          'label' => $item->getLabel(),
+          'translatable_keys' => $inputs_typed_data->getTranslatableInputKeys(),
+        ];
+      }
     }
-    return [];
+    return $captured;
   }
 
   /**
