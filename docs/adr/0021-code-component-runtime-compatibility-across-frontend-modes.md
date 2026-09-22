@@ -821,23 +821,7 @@ mode. The Drupal settings integration and headless React renderer supply the
 same component-facing contract through different data-delivery paths.
 
 Implementation spans Drupal context generation, dependency detection, the island
-renderer, the headless response, and React integration. Verification must cover
-field parity, separate islands and trees, concurrent requests, hydration,
-navigation, preview updates, missing context, and editor data inspection. Verify
-that matching SWR fallback data produces content in the initial server-rendered
-HTML and is retained during hydration, while components without fallback still
-fetch normally in the browser.
+renderer, the headless response, and React integration.
 
 JSON:API consolidation also requires a headless server endpoint for portable
-browser reads. Verify public and authenticated requests, custom prefixes,
-working-copy resources and collections, response serialization, session expiry
-and renewal, embedded-preview cookies, cache isolation, ADR 14's permission
-ceiling and documented exception, CSRF protection, and rejection of arbitrary
-destinations. Verify that SDK factories can construct the shared client while
-legacy getter and constructor calls throw outside Drupal and Workbench with
-clear migration guidance. Keep legacy Drupal and both Workbench preview paths
-covered. Verify nullable hook results and warnings for missing context, while
-valid empty page/site values remain available without warnings. Check pull's
-capability gates, all-or-nothing getter migration per file, alias handling, hook
-ordering, types, confirmation and overwrite protection, and successful and
-skipped-file reports.
+browser reads.
