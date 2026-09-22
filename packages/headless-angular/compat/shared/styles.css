@@ -1,12 +1,12 @@
 @import "@drupal-canvas/headless/preview.css";
 body {
-  font-family: sans-serif;
   margin: 2rem;
+  font-family: sans-serif;
 }
 section {
-  border: 1px solid #bbb;
-  padding: 1rem;
   margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #bbb;
 }
 button {
   padding: 0.5rem;
