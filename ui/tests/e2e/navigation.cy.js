@@ -85,9 +85,15 @@ describe('Navigation functionality', () => {
   it('Clicking "New page" creates a new page and navigates to it', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/canvas_page/1' });
 
+    // Close the right panel before creating a new page, to verify it
+    // automatically reopens once the new page loads.
+    cy.findByTestId('canvas-contextual-panel--close-icon').click();
+    cy.findByTestId('canvas-contextual-panel').should('not.be.visible');
+
     cy.findByTestId(navigationButtonTestId).click();
     cy.findByTestId(navigationNewButtonTestId).click();
     cy.findByTestId(navigationNewPageButtonTestId).click();
+    cy.findByTestId('canvas-contextual-panel').should('be.visible');
     cy.url().should('not.contain', '/canvas/editor/canvas_page/1');
     cy.url().should('contain', '/canvas/editor/canvas_page/4');
     cy.findByTestId('canvas-topbar').findByText('Draft');
