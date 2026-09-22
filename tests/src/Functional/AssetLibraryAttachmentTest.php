@@ -6,9 +6,11 @@ namespace Drupal\Tests\canvas\Functional;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Session\AccountInterface;
 use PHPUnit\Framework\Attributes\Group;
@@ -177,6 +179,61 @@ final class AssetLibraryAttachmentTest extends FunctionalTestBase {
     $this->drupalLogin($content_creator);
     $assert_auto_save_access($auto_save_js_path, TRUE);
     $assert_auto_save_access($auto_save_css_path, TRUE);
+  }
+
+  /**
+   * Tests cached responses are invalidated when global assets change.
+   *
+   * @legacy-covers \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments
+   */
+  public function testCachedResponsesInvalidated(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install(['page_cache']);
+    // We need to disable CSS aggregation to test the raw assets.
+    $this->container->get(ConfigFactoryInterface::class)->getEditable('system.performance')
+      ->set('css.preprocess', FALSE)
+      ->save();
+
+    $library = AssetLibrary::load(AssetLibrary::GLOBAL_ID);
+    \assert($library instanceof AssetLibrary);
+    $library->set('css', [
+      'original' => '.global { color: blue; }',
+      'compiled' => '.global{color:blue}',
+    ])->save();
+
+    $url_generator = $this->container->get(FileUrlGeneratorInterface::class);
+    $assert_cached_response = function (string $expected_page_cache) use ($url_generator): void {
+      $this->drupalGet('/user/login');
+      $this->assertSession()->responseHeaderEquals('X-Drupal-Cache', $expected_page_cache);
+      $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Tags', 'config:canvas.asset_library.global');
+      $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Tags', 'config:canvas.brand_kit.global');
+      $crawler = new Crawler($this->getSession()->getPage()->getContent());
+      // The response must refer to the current generated files.
+      foreach ([AssetLibrary::load(AssetLibrary::GLOBAL_ID), BrandKit::load(BrandKit::GLOBAL_ID)] as $asset) {
+        \assert($asset instanceof AssetLibrary || $asset instanceof BrandKit);
+        if ($asset->hasCss()) {
+          self::assertCount(1, $crawler->filter('link[href^="' . $url_generator->generateString($asset->getCssPath()) . '"]'));
+        }
+      }
+    };
+
+    // Anonymous responses are cached by Page Cache.
+    $assert_cached_response('MISS');
+    $assert_cached_response('HIT');
+
+    // Changing the global asset library invalidates the cached response.
+    $library->set('css', [
+      'original' => '.global { color: red; }',
+      'compiled' => '.global{color:red}',
+    ])->save();
+    $assert_cached_response('MISS');
+    $assert_cached_response('HIT');
+
+    // Saving the brand kit invalidates the cached response.
+    $brand_kit = BrandKit::load(BrandKit::GLOBAL_ID);
+    \assert($brand_kit instanceof BrandKit);
+    $brand_kit->save();
+    $assert_cached_response('MISS');
+    $assert_cached_response('HIT');
   }
 
 }
