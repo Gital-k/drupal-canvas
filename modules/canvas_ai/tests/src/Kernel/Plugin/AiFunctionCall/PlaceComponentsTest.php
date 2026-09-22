@@ -1081,6 +1081,19 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
         ],
         'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Slot "column_three" does not exist on component "2f957795-e30a-46a0-acfe-868adc0685bf".',
       ],
+      // The druplicon is a child of column_two and has no slots of its own.
+      'test_child_component_as_slot_parent' => [
+        'layout_type' => 'multi_region_with_slots',
+        'operations' => [
+          self::buildOperation(<<<YAML
+            - sdc.canvas_test_sdc.heading:
+                props:
+                  text: "Some text"
+                  element: "h1"
+            YAML, target: '4e45ef4c-501c-4612-b02b-1911e88a4592/column_one'),
+        ],
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Slot "column_one" does not exist on component "4e45ef4c-501c-4612-b02b-1911e88a4592".',
+      ],
       'test_inside_slot_with_children' => [
         'layout_type' => 'multi_region_with_slots',
         'operations' => [
