@@ -51,7 +51,10 @@ final class ComponentMetadataRequirementsChecker {
     // Check fundamentals.
     $validator = new Validator();
     foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
-      if (\in_array(Attribute::class, (array) $prop['type'], TRUE)) {
+      // Since Drupal 11.4, `type` is whatever the component declared: a string
+      // for a single type, an array only for a union of types.
+      $prop_types = (array) $prop['type'];
+      if (\in_array(Attribute::class, $prop_types, TRUE)) {
         continue;
       }
 
@@ -62,7 +65,7 @@ final class ComponentMetadataRequirementsChecker {
       }
 
       // For array types, also check enum in items.
-      $is_array_prop_type = \in_array('array', (array) $prop['type'], TRUE);
+      $is_array_prop_type = \in_array('array', $prop_types, TRUE);
       if ($is_array_prop_type && isset($prop['items']['enum']) && \in_array('', $prop['items']['enum'], TRUE)) {
         $messages[] = \sprintf('Prop "%s" has an empty enum value in items.', $prop_name);
       }
@@ -104,12 +107,11 @@ final class ComponentMetadataRequirementsChecker {
         $example = $prop['examples'][0];
         // PHP's "associative arrays" are JSON's "objects". The JSON Schema
         // validator expects such "objects" to be \stdClass objects.
-        $prop_types = (array) $prop['type'];
         if ($prop_types === ['object'] && \is_array($example)) {
           $example = (object) $example;
         }
         // Similarly, for `type: array, items: {type: object}`.
-        if ($prop_types[0] === 'array' && ($prop['items']['type'] ?? NULL) === 'object' && \is_array($example)) {
+        if ($is_array_prop_type && ($prop['items']['type'] ?? NULL) === 'object' && \is_array($example)) {
           $example = \array_map(
             fn (array|object $item) => (object) $item,
             $example,
