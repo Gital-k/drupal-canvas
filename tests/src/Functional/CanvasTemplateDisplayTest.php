@@ -274,6 +274,12 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
     // for the implicit `user` bundle.
     $this->assertSession()->elementsCount('xpath', self::TEMPLATE_LINK_XPATH, 1);
     $this->assertSession()->elementAttributeContains('xpath', self::TEMPLATE_LINK_XPATH, 'href', 'canvas/template/user/user/compact');
+
+    // The view mode display route redirects to the Canvas template editor.
+    // @see \Drupal\canvas\Access\ViewModeAccessCheck
+    // @see \Drupal\canvas\Controller\ViewModeDisplayController
+    $this->drupalGet('admin/config/people/accounts/display/compact');
+    $this->assertStringContainsString('canvas/template/user/user/compact', $this->getSession()->getCurrentUrl());
   }
 
   /**
@@ -317,6 +323,12 @@ final class CanvasTemplateDisplayTest extends BrowserTestBase {
     $this->assertSession()->statusCodeEquals(200);
     $this->assertSession()->elementsCount('xpath', self::TEMPLATE_LINK_XPATH, 1);
     $this->assertSession()->elementAttributeContains('xpath', self::TEMPLATE_LINK_XPATH, 'href', 'canvas/template/entity_test/plugin_bundle/full');
+
+    // The view mode display route redirects to the Canvas template editor.
+    // @see \Drupal\canvas\Access\ViewModeAccessCheck
+    // @see \Drupal\canvas\Controller\ViewModeDisplayController
+    $this->drupalGet('entity_test/structure/plugin_bundle/display/full');
+    $this->assertStringContainsString('canvas/template/entity_test/plugin_bundle/full', $this->getSession()->getCurrentUrl());
 
     // The content template list must build the "Edit fields" link with the
     // same `bundle` route parameter.
