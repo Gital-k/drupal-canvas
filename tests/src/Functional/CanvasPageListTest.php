@@ -137,6 +137,24 @@ class CanvasPageListTest extends FunctionalTestBase {
     $assert->elementTextEquals('css', 'table tbody tr:nth-child(2) td:nth-child(2)', 'Disabled');
     $assert->linkByHrefExists(Url::fromUri('base:canvas/template/node/article/full')->toString());
     $assert->linkByHrefExists(Url::fromUri('base:canvas/template/node/article/teaser')->toString());
+    $assert->buttonNotExists('Reset');
+
+    $this->submitForm(['search' => 'teaser'], 'Apply');
+    $assert->addressEquals($collection_url->setOption('query', ['search' => 'teaser']));
+    $assert->elementsCount('css', 'table tbody tr', 1);
+    $assert->elementTextEquals('css', 'table tbody tr:nth-child(1) td:nth-child(1)', 'Article content items — Teaser view');
+    $assert->fieldValueEquals('search', 'teaser');
+
+    $this->submitForm(['search' => '', 'status' => '1'], 'Apply');
+    $assert->elementsCount('css', 'table tbody tr', 1);
+    $assert->elementTextEquals('css', 'table tbody tr:nth-child(1) td:nth-child(2)', 'Enabled');
+
+    $this->submitForm(['search' => 'teaser', 'status' => '1'], 'Apply');
+    $assert->pageTextContains('No content templates match the filters.');
+
+    $this->submitForm([], 'Reset');
+    $assert->addressEquals(Url::fromRoute('entity.content_template.collection'));
+    $assert->elementsCount('css', 'table tbody tr', 2);
   }
 
 }
