@@ -943,10 +943,14 @@ export function pushCommand(program: Command): void {
           ...discoveredPageTemplates,
         ];
 
-        // Begin block that fetches remote brand kit colors if needed.
+        // Fetch remote brand kit colors for page/template color-prop reconciliation
+        // when the primary brand-kit fetch was skipped or returned nothing. Skip
+        // when includesBrandKit && hasBrandKitConfig because the fetch was already
+        // attempted above (even if it returned an empty colors array).
         if (
           allDiscoveredEntities.length > 0 &&
-          remoteBrandKitColors.length === 0
+          remoteBrandKitColors.length === 0 &&
+          !(includesBrandKit && hasBrandKitConfig)
         ) {
           const componentMetadata =
             await loadComponentsMetadata(discoveryResult);
@@ -1289,7 +1293,7 @@ export function pushCommand(program: Command): void {
               componentPushApiService,
               'Pushing',
               componentSpinner,
-              includesBrandKit ? remoteBrandKitColors : [],
+              remoteBrandKitColors,
             );
           } catch (error) {
             reportDiscoveryWarnings(componentDiscoveryWarnings);

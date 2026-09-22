@@ -757,6 +757,8 @@ async function preparePagePreview(options: {
     )
     .map((component) => component.cssEntryPath);
 
+  const brandKitColors = readBrandKitColors(options.projectRoot);
+
   const pageTemplate = selectPageTemplate(
     options.discoveryResult.pageTemplates,
     parsedPage.pageVariant,
@@ -797,7 +799,7 @@ async function preparePagePreview(options: {
     }
     pageTemplateSpec = resolvePageColorPropsForPreview(
       parsedPageTemplate.pageTemplate.spec,
-      readBrandKitColors(options.projectRoot),
+      brandKitColors,
       options.discoveryResult.componentSchemas,
     );
   }
@@ -812,7 +814,7 @@ async function preparePagePreview(options: {
       },
       spec: resolvePageColorPropsForPreview(
         parsedPage.spec,
-        readBrandKitColors(options.projectRoot),
+        brandKitColors,
         options.discoveryResult.componentSchemas,
       ),
       pageTemplateSpec,

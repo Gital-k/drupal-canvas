@@ -280,8 +280,11 @@ export async function writeBrandKitColorsConfig(
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       fileContent = parsed as Record<string, unknown>;
     }
-  } catch {
-    // File missing or invalid; start fresh.
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+    // File does not exist; start fresh with the schema reference.
   }
 
   await fs.writeFile(

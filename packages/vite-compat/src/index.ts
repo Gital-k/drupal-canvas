@@ -307,13 +307,6 @@ function resolveColorPropExampleForPreview(
   return example;
 }
 
-function resolvePageColorPropValue(
-  value: unknown,
-  brandKitColors: NormalizedBrandKitColor[],
-): unknown {
-  return resolveColorPropExampleForPreview(value, brandKitColors);
-}
-
 export function resolvePageColorPropsForPreview<T>(
   spec: T,
   brandKitColors: NormalizedBrandKitColor[],
@@ -361,7 +354,7 @@ export function resolvePageColorPropsForPreview<T>(
       // Only resolve color values for props declared with the color $ref
       const isColorProp = colorPropNames?.has(propName) ?? false;
       const nextPropValue = isColorProp
-        ? resolvePageColorPropValue(rawPropValue, brandKitColors)
+        ? resolveColorPropExampleForPreview(rawPropValue, brandKitColors)
         : rawPropValue;
       nextProps[propName] = nextPropValue;
       hasPropUpdates ||= nextPropValue !== rawPropValue;
