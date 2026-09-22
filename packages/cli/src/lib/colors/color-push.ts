@@ -107,16 +107,38 @@ function needsWeightReassignment(
 export function buildColorPushPlannedResults(
   colors: BrandKitColorsFileMap,
   remoteColors: BrandKitColorEntry[],
-  operationLabels: { create: string; update: string; delete: string },
+  operationLabels: {
+    create: string;
+    update: string;
+    unchanged: string;
+    delete: string;
+  },
   pruneColors: boolean,
 ): Result[] {
   const locals = normalizeBrandKitColors(colors);
   const remoteByVariable = new Map(remoteColors.map((c) => [c.cssVariable, c]));
   const localVariables = new Set(locals.map((c) => c.cssVariable));
   const results: Result[] = [];
+  const reassignWeights = needsWeightReassignment(locals, remoteColors);
 
-  for (const color of locals) {
+  for (const [index, color] of locals.entries()) {
     const existing = remoteByVariable.get(color.cssVariable);
+    let label: string;
+    if (!existing) {
+      label = operationLabels.create;
+    } else {
+      const token = color.token as ColorTokenValue;
+      const localName = assertedName(color);
+      // @todo: This logic mirrors pushColors() and should stay in sync with it.
+      const changed =
+        (localName !== undefined && localName !== existing.name) ||
+        !colorTokenValuesEqual(token, existing.value) ||
+        (color.explicitDisplayFormat !== undefined &&
+          (color.explicitDisplayFormat ?? null) !==
+            (existing.displayFormat ?? null)) ||
+        (reassignWeights && existing.weight !== index);
+      label = changed ? operationLabels.update : operationLabels.unchanged;
+    }
     results.push({
       itemName: itemName(
         assertedName(color) ?? existing?.name ?? color.name,
@@ -124,11 +146,7 @@ export function buildColorPushPlannedResults(
       ),
       itemType: 'Color',
       success: true,
-      details: [
-        {
-          content: existing ? operationLabels.update : operationLabels.create,
-        },
-      ],
+      details: [{ content: label }],
     });
   }
 

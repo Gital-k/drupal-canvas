@@ -1026,6 +1026,7 @@ export function pushCommand(program: Command): void {
         const operationLabels: Record<string, string> = {
           create: 'create',
           update: 'update',
+          unchanged: 'unchanged',
           delete: 'delete',
         };
         const plannedResults: Result[] = [
@@ -1114,6 +1115,7 @@ export function pushCommand(program: Command): void {
                 {
                   create: operationLabels.create,
                   update: operationLabels.update,
+                  unchanged: operationLabels.unchanged,
                   delete: operationLabels.delete,
                 },
                 options.pruneColors ?? false,

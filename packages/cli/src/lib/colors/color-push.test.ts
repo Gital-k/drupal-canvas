@@ -286,9 +286,14 @@ describe('buildColorPushPlannedResults', () => {
     'brand-red': '#cc0000',
     'brand-blue': '#0000cc',
   };
-  const labels = { create: 'create', update: 'update', delete: 'delete' };
+  const labels = {
+    create: 'create',
+    update: 'update',
+    unchanged: 'unchanged',
+    delete: 'delete',
+  };
 
-  it('plans create for new and update for existing entries', () => {
+  it('plans create for new and unchanged for matching entries', () => {
     const results = buildColorPushPlannedResults(
       colors,
       [remoteColor()],
@@ -299,11 +304,27 @@ describe('buildColorPushPlannedResults', () => {
       expect.objectContaining({
         itemName: 'Brand Red (--brand-red)',
         itemType: 'Color',
-        details: [{ content: 'update' }],
+        details: [{ content: 'unchanged' }],
       }),
       expect.objectContaining({
         itemName: 'Brand Blue (--brand-blue)',
         details: [{ content: 'create' }],
+      }),
+    ]);
+  });
+
+  it('plans update for existing entries when values differ', () => {
+    const results = buildColorPushPlannedResults(
+      { 'brand-red': '#0000ff' },
+      [remoteColor()],
+      labels,
+      false,
+    );
+    expect(results).toEqual([
+      expect.objectContaining({
+        itemName: 'Brand Red (--brand-red)',
+        itemType: 'Color',
+        details: [{ content: 'update' }],
       }),
     ]);
   });
@@ -323,6 +344,27 @@ describe('buildColorPushPlannedResults', () => {
       expect.objectContaining({
         itemName: 'Extra (--extra)',
         details: [{ content: 'delete' }],
+      }),
+    ]);
+  });
+
+  it('plans unchanged for entries that match the server exactly', () => {
+    const results = buildColorPushPlannedResults(
+      colors,
+      [remoteColor(), remoteBlue()],
+      labels,
+      false,
+    );
+    expect(results).toEqual([
+      expect.objectContaining({
+        itemName: 'Brand Red (--brand-red)',
+        itemType: 'Color',
+        details: [{ content: 'unchanged' }],
+      }),
+      expect.objectContaining({
+        itemName: 'Brand Blue (--brand-blue)',
+        itemType: 'Color',
+        details: [{ content: 'unchanged' }],
       }),
     ]);
   });
