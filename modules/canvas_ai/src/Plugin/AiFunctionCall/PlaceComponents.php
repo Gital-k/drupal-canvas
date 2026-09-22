@@ -229,7 +229,7 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
 
     // A target naming a region must match a region present in the layout. A
     // target containing a slash names a `parent_uuid/slot_name` pair instead,
-    // whose parent is resolved during nodePath calculation.
+    // which must name a component on the page and one of its slots.
     if ($has_target) {
       if (strpos($target, '/') === FALSE) {
         $target_error = $this->pageBuilderHelper->validateRegionExists($target, $current_layout);
