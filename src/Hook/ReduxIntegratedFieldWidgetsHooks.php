@@ -64,7 +64,8 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         'css' => [],
       ];
     }
-    if ($extension === 'media_library') {
+    if ($extension === 'media_library'
+    && $this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
       // Typically, it's safe to assume the base libraries of a theme are
       // present, but we can't do this in Drupal Canvas. Here, the Media Library
       // dialog renders with the Admin Theme, but is triggered from a page
