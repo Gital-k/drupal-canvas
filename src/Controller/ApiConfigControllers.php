@@ -407,8 +407,14 @@ final class ApiConfigControllers extends ApiControllerBase {
 
     // If problematic cache contexts are present or if the markup is empty,
     // attempt to re-render in a way that the Component preview is strongly
-    // cacheable while still sufficiently accurate.
-    if (!empty($problematic_cache_contexts) || empty($representation->values['default_markup'])) {
+    // cacheable while still sufficiently accurate. Only entities with a
+    // preview get one: for the others (for example, ContentTemplate) there is
+    // no markup to make cacheable, and re-normalizing as the anonymous user
+    // would compute user-specific values, such as the suggested preview
+    // entity, for the wrong user.
+    // @see \Drupal\canvas\ClientSideRepresentation::renderPreviewIfAny()
+    $has_preview = \array_key_exists('default_markup', $representation->values);
+    if ($has_preview && (!empty($problematic_cache_contexts) || empty($representation->values['default_markup']))) {
       $ignorable_cache_contexts = ['session', 'user'];
 
       if (array_diff($problematic_cache_contexts, $ignorable_cache_contexts)) {
