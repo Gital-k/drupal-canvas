@@ -317,6 +317,10 @@ function resolvePageColorPropValue(
 export function resolvePageColorPropsForPreview<T>(
   spec: T,
   brandKitColors: NormalizedBrandKitColor[],
+  componentSchemas: ReadonlyMap<
+    string,
+    { colorPropNames: ReadonlySet<string> }
+  > = new Map(),
 ): T {
   const specRecord = asRecord(spec);
   if (!specRecord) {
@@ -339,14 +343,26 @@ export function resolvePageColorPropsForPreview<T>(
       continue;
     }
 
+    // Look up color prop names from schema index keyed by bare component name.
+    // Canvas prefixes component names with 'js.' in spec element.type values
+    // (e.g. 'js.nav' → 'nav') but componentSchemas is keyed by the bare name
+    // as stored in DiscoveredComponent.name by the discovery process.
+    const elementType = String(element.type ?? '');
+    const normalizedComponentName = elementType.startsWith('js.')
+      ? elementType.slice(3)
+      : elementType;
+    const schema = componentSchemas.get(normalizedComponentName);
+    const colorPropNames = schema?.colorPropNames;
+
     let hasPropUpdates = false;
     const nextProps: Record<string, unknown> = {};
 
     for (const [propName, rawPropValue] of Object.entries(props)) {
-      const nextPropValue = resolvePageColorPropValue(
-        rawPropValue,
-        brandKitColors,
-      );
+      // Only resolve color values for props declared with the color $ref
+      const isColorProp = colorPropNames?.has(propName) ?? false;
+      const nextPropValue = isColorProp
+        ? resolvePageColorPropValue(rawPropValue, brandKitColors)
+        : rawPropValue;
       nextProps[propName] = nextPropValue;
       hasPropUpdates ||= nextPropValue !== rawPropValue;
     }

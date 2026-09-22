@@ -385,20 +385,35 @@ describe('vite-compat', () => {
         },
       };
 
-      const result = resolvePageColorPropsForPreview(spec, [
-        {
-          rawKey: 'baguette-legs',
-          key: 'baguette-legs',
-          cssVariable: '--baguette-legs',
-          name: 'Baguette Legs',
-          token: {
-            colorSpace: 'srgb',
-            components: [0.2, 0.3, 0.4],
-            hex: '#334d66',
+      // Schema index keyed by bare component name (discovery strips any 'js.' prefix).
+      // Only brandPastel and free are declared as color props; title is a plain string.
+      const componentSchemas = new Map([
+        [
+          'canvas_test_code_components_color_three_colors',
+          {
+            colorPropNames: new Set<string>(['brandPastel', 'free']),
           },
-          rawValue: '#334d66',
-        },
+        ],
       ]);
+
+      const result = resolvePageColorPropsForPreview(
+        spec,
+        [
+          {
+            rawKey: 'baguette-legs',
+            key: 'baguette-legs',
+            cssVariable: '--baguette-legs',
+            name: 'Baguette Legs',
+            token: {
+              colorSpace: 'srgb',
+              components: [0.2, 0.3, 0.4],
+              hex: '#334d66',
+            },
+            rawValue: '#334d66',
+          },
+        ],
+        componentSchemas,
+      );
 
       const props = result.elements['node-1'].props as Record<string, unknown>;
       expect(props.brandPastel).toEqual({
@@ -441,6 +456,96 @@ describe('vite-compat', () => {
       const result = resolvePageColorPropsForPreview(spec, []);
       const props = result.elements.root.props as Record<string, unknown>;
       expect(props.brandPastel).toBe('canvas-color:baguette-legs');
+    });
+
+    it('does not transform color-like values on non-color props', () => {
+      // Regression test: a string prop with a value that parses as a CSS color
+      // should NOT be transformed if the prop is not declared with the color $ref.
+      const spec = {
+        root: 'canvas:component-tree',
+        elements: {
+          'canvas:component-tree': {
+            type: 'canvas:component-tree',
+            props: {},
+            children: ['node-1'],
+          },
+          'node-1': {
+            type: 'js.my_component',
+            props: {
+              title: '#ff0000',
+              subtitle: 'rgb(1, 2, 3)',
+            },
+          },
+        },
+      };
+
+      // Schema index: 'title' and 'subtitle' are NOT color props
+      const componentSchemas = new Map([
+        [
+          'my_component',
+          {
+            colorPropNames: new Set<string>(),
+          },
+        ],
+      ]);
+
+      const result = resolvePageColorPropsForPreview(
+        spec,
+        [],
+        componentSchemas,
+      );
+      const props = result.elements['node-1'].props as Record<string, unknown>;
+
+      // These should remain as raw strings, NOT transformed to ResolvedColorProp objects
+      expect(props.title).toBe('#ff0000');
+      expect(props.subtitle).toBe('rgb(1, 2, 3)');
+    });
+
+    it('transforms only color props when schema is provided', () => {
+      const spec = {
+        root: 'canvas:component-tree',
+        elements: {
+          'canvas:component-tree': {
+            type: 'canvas:component-tree',
+            props: {},
+            children: ['node-1'],
+          },
+          'node-1': {
+            type: 'js.my_component',
+            props: {
+              colorProp: '#ff0000',
+              textProp: '#00ff00',
+            },
+          },
+        },
+      };
+
+      // Schema index: only 'colorProp' is a color prop
+      const componentSchemas = new Map([
+        [
+          'my_component',
+          {
+            colorPropNames: new Set<string>(['colorProp']),
+          },
+        ],
+      ]);
+
+      const result = resolvePageColorPropsForPreview(
+        spec,
+        [],
+        componentSchemas,
+      );
+      const props = result.elements['node-1'].props as Record<string, unknown>;
+
+      // colorProp should be transformed
+      expect(props.colorProp).toEqual(
+        expect.objectContaining({
+          cssColorValue: '#ff0000',
+        }),
+      );
+
+      // textProp should remain a raw string
+      expect(props.textProp).toBe('#00ff00');
     });
   });
 

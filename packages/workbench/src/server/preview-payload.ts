@@ -798,6 +798,7 @@ async function preparePagePreview(options: {
     pageTemplateSpec = resolvePageColorPropsForPreview(
       parsedPageTemplate.pageTemplate.spec,
       readBrandKitColors(options.projectRoot),
+      options.discoveryResult.componentSchemas,
     );
   }
 
@@ -812,6 +813,7 @@ async function preparePagePreview(options: {
       spec: resolvePageColorPropsForPreview(
         parsedPage.spec,
         readBrandKitColors(options.projectRoot),
+        options.discoveryResult.componentSchemas,
       ),
       pageTemplateSpec,
       bundleSources: toPreviewablePageRegistrySources(

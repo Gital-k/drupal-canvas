@@ -356,7 +356,15 @@ describe('preview-payload', () => {
 
     await writeFile(
       path.join(root, 'src/components/nav/component.yml'),
-      'name: Nav\n',
+      `name: Nav
+machineName: nav
+props:
+  properties:
+    backgroundColor:
+      title: Background Color
+      type: string
+      $ref: json-schema-definitions://canvas.module/color
+`,
     );
     await writeFile(
       path.join(root, 'src/components/nav/index.tsx'),

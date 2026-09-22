@@ -103,6 +103,7 @@ function makeDiscoveryResult(projectRoot: string): DiscoveryResult {
       scannedFiles: 0,
       ignoredFiles: 0,
     },
+    componentSchemas: new Map(),
   };
 }
 

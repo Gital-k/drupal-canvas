@@ -316,6 +316,7 @@ async function loadPreviewPageSpec(
     spec: resolvePageColorPropsForPreview(
       parsedPage.spec,
       readBrandKitColors(discoveryResult.projectRoot),
+      discoveryResult.componentSchemas,
     ),
     pageVariant: parsedPage.pageVariant,
     status: 200,
@@ -395,6 +396,7 @@ async function loadPreviewContentTemplateSpec(
     spec: resolvePageColorPropsForPreview(
       parsedTemplate.spec,
       readBrandKitColors(discoveryResult.projectRoot),
+      discoveryResult.componentSchemas,
     ),
     metadata: parsedTemplate.metadata,
     status: 200,
@@ -484,6 +486,7 @@ async function loadPreviewPageTemplateSpec(
     spec: resolvePageColorPropsForPreview(
       parsedPageTemplate.pageTemplate.spec,
       readBrandKitColors(discoveryResult.projectRoot),
+      discoveryResult.componentSchemas,
     ),
     status: 200,
     error: null,

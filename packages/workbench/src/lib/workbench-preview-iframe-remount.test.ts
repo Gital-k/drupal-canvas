@@ -38,6 +38,7 @@ const baseDiscovery: DiscoveryResult = {
   pageTemplates: [],
   warnings: [],
   stats: { scannedFiles: 0, ignoredFiles: 0 },
+  componentSchemas: new Map(),
 };
 
 const baseManifest: PreviewManifest = {

@@ -134,6 +134,7 @@ describe('preview-contract', () => {
         scannedFiles: 1,
         ignoredFiles: 0,
       },
+      componentSchemas: new Map(),
     });
 
     expect(manifest.componentRoot).toBe('/tmp/workspace');

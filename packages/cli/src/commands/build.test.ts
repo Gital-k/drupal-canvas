@@ -130,6 +130,7 @@ describe('buildCommand', () => {
         scannedFiles: 2,
         ignoredFiles: 0,
       },
+      componentSchemas: new Map(),
     } as DiscoveryResult;
     vi.mocked(discoverCanvasProject).mockResolvedValue(discoveryResult);
     vi.mocked(buildCanvasProject).mockResolvedValue({

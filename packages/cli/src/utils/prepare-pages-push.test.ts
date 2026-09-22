@@ -27,6 +27,7 @@ const emptyDiscoveryResult: DiscoveryResult = {
   pageTemplates: [],
   warnings: [],
   stats: { scannedFiles: 0, ignoredFiles: 0 },
+  componentSchemas: new Map(),
 };
 
 function mockDiscoveredPage(
