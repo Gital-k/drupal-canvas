@@ -657,23 +657,31 @@ XML;
     ];
 
     // Nested-slot components are flattened to top-level entries; component_id
-    // comes from "name"; props default to [] when absent.
+    // comes from "name"; props default to [] when absent; slots contain the
+    // full slot target keys.
     $expected = [
       "3af8363b-143c-4136-9e7c-47374cb56679" => [
         "component_id" => "sdc.canvas_test_sdc.heading",
         "props" => ["text" => "Hello", "element" => "h1"],
+        "slots" => [],
       ],
       "e9e4308d-86f3-4253-ba12-abb8c037e5be" => [
         "component_id" => "sdc.canvas_test_sdc.two_column",
         "props" => [],
+        "slots" => [
+          "e9e4308d-86f3-4253-ba12-abb8c037e5be/column_one",
+          "e9e4308d-86f3-4253-ba12-abb8c037e5be/column_two",
+        ],
       ],
       "29d9f67e-38e9-4a76-b20d-bbe11fc9a609" => [
         "component_id" => "sdc.canvas_test_sdc.image",
         "props" => ["src" => "/image.png"],
+        "slots" => [],
       ],
       "d280666e-b608-46e0-81e0-1919542195ad" => [
         "component_id" => "sdc.canvas_test_sdc.druplicon",
         "props" => [],
+        "slots" => [],
       ],
     ];
 
@@ -728,7 +736,8 @@ XML;
     $this->container->get(CanvasAiTempStore::class)
       ->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, Json::encode($layout));
 
-    $this->assertSame($expected, $this->canvasAiPageBuilderHelper->validateSlotTargetExists($target));
+    $components_by_uuid = $this->canvasAiPageBuilderHelper->getComponentsByUuid($layout);
+    $this->assertSame($expected, $this->canvasAiPageBuilderHelper->validateSlotTargetExists($target, $components_by_uuid));
   }
 
   /**
@@ -743,15 +752,15 @@ XML;
       'empty slot' => ['2f957795-e30a-46a0-acfe-868adc0685bf/column_two', NULL],
       'unknown parent' => [
         'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/column_one',
-        'Component with UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" not found in layout',
+        'Invalid slot "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/column_one". Component with UUID "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" not found in layout',
       ],
       'unknown slot' => [
         '2f957795-e30a-46a0-acfe-868adc0685bf/column_three',
-        'Slot "column_three" not found in path "content/2f957795-e30a-46a0-acfe-868adc0685bf"',
+        'Slot "column_three" does not exist on component "2f957795-e30a-46a0-acfe-868adc0685bf".',
       ],
       'child component as parent' => [
         '4e45ef4c-501c-4612-b02b-1911e88a4592/column_one',
-        'Slot "column_one" not found in path "content/2f957795-e30a-46a0-acfe-868adc0685bf/column_one/4e45ef4c-501c-4612-b02b-1911e88a4592"',
+        'Slot "column_one" does not exist on component "4e45ef4c-501c-4612-b02b-1911e88a4592".',
       ],
     ];
   }
