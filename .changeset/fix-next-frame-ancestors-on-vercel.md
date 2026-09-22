@@ -15,6 +15,7 @@ session cookie.
   to the origin of `CANVAS_SITE_URL`, so a single-origin deployment needs no
   new configuration. Set it when editors reach Drupal on a different origin
   than the app server does, or on more than one.
-- Values must be `http(s)` origins without credentials, naming a domain, an
-  IPv4 literal, or a bracketed IPv6 literal; only their scheme, host, and port
-  are used. Wildcard hosts are not accepted.
+- Values must be `http(s)` origins without credentials, naming a domain or an
+  IPv4 literal; only their scheme, host, and port are used. Wildcard hosts and
+  literal IPv6 addresses are not accepted. For IPv6, use a DNS hostname:
+  hostnames resolving to IPv6 remain supported.

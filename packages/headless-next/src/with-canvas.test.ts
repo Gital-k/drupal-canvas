@@ -60,6 +60,9 @@ describe('frame-ancestors', () => {
   });
 
   it.each([
+    ['an IPv6 loopback literal', 'http://[::1]:3199'],
+    ['an IPv6 literal', 'https://[2001:db8::1]:8443'],
+    ['an IPv4-mapped IPv6 literal', 'https://[::ffff:192.0.2.1]'],
     ['a non-http scheme', 'javascript:alert(1)'],
     ['embedded credentials', 'https://user:pw@evil.example'],
     ['an unparseable value', 'not a url'],
@@ -81,10 +84,25 @@ describe('frame-ancestors', () => {
     ['a hyphenated host', 'https://site-1.ddev.site'],
     ['a port', 'http://localhost:3000'],
     ['an IPv4 literal', 'https://127.0.0.1:32991'],
-    ['an IPv6 literal', 'https://[::1]:8443'],
   ])('admits %s', async (_label, value) => {
     await expect(policy({ CANVAS_EDITOR_ORIGINS: value })).resolves.toBe(
       `frame-ancestors 'self' ${value}`,
+    );
+  });
+
+  it.each([
+    { CANVAS_SITE_URL: 'http://[::1]:3199' },
+    {
+      CANVAS_EDITOR_ORIGINS: 'https://[2001:db8::1]:8443',
+      CANVAS_SITE_URL: 'https://cms.example',
+    },
+  ])('rejects literal IPv6 without falling back: %j', async (env) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(policy(env)).resolves.toBe("frame-ancestors 'self'");
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'For IPv6, use a DNS hostname instead of a literal address.',
+      ),
     );
   });
 

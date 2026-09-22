@@ -45,7 +45,8 @@ type HeaderRule = Awaited<
 
 /**
  * The host shapes a Canvas editor can be served on: LDH domain labels, a
- * dotted-quad IPv4 literal, or a bracketed IPv6 literal.
+ * dotted-quad IPv4 literal. Literal IPv6 addresses are not supported by CSP
+ * host-source matching; DNS hostnames resolving to IPv6 remain supported.
  *
  * Parsing with `URL` is not sufficient on its own. The URL host parser
  * permits characters that are meaningless in a hostname but meaningful in a
@@ -57,7 +58,7 @@ type HeaderRule = Awaited<
  * one origin it names.
  */
 const EDITOR_HOST_PATTERN =
-  /^(?:\[[0-9A-Fa-f:.]+\]|(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}|[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*)$/;
+  /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}|[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*)$/;
 
 /**
  * One configured value as a CSP host-source, or null when it is not one.
@@ -116,7 +117,8 @@ function resolveFrameAncestors(): string {
       `[canvas] Neither ${EDITOR_ORIGINS_ENV_VARIABLE} nor CANVAS_SITE_URL ` +
         'names a usable http(s) origin, so no Canvas editor may embed this ' +
         'app and previews will be refused. Set ' +
-        `${EDITOR_ORIGINS_ENV_VARIABLE} to the origin editors reach Drupal on.`,
+        `${EDITOR_ORIGINS_ENV_VARIABLE} to the origin editors reach Drupal on. ` +
+        'For IPv6, use a DNS hostname instead of a literal address.',
     );
   }
   return ["'self'", ...origins].join(' ');

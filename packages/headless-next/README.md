@@ -38,12 +38,15 @@ CANVAS_EDITOR_ORIGINS="https://cms.example, https://staging-cms.example"
 ```
 
 Values must be `http(s)` origins without credentials, naming a real host: a
-domain, an IPv4 literal, or a bracketed IPv6 literal. Anything else is dropped,
-and only the scheme, host, and port of each are used. Wildcards such as
-`https://*.example.com` are not accepted — name each origin. The directive is
-merged into any `Content-Security-Policy` the app sets through its own
-`headers()`, so no directive of the app's is discarded, and a `frame-ancestors`
-the app sets itself stays authoritative.
+domain or an IPv4 literal. Literal IPv6 addresses are dropped because CSP
+host-source matching does not support them; use a DNS hostname instead
+(hostnames resolving to IPv6 are supported). Anything else is dropped, and only
+the scheme, host, and port of each are used. An explicitly configured
+`CANVAS_EDITOR_ORIGINS` with no usable origins does not fall back to
+`CANVAS_SITE_URL`. Wildcards such as `https://*.example.com` are not accepted —
+name each origin. The directive is merged into any `Content-Security-Policy` the
+app sets through its own `headers()`, so no directive of the app's is discarded,
+and a `frame-ancestors` the app sets itself stays authoritative.
 
 **3. Route files** — mount the handlers, one file per route:
 
