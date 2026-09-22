@@ -76,7 +76,6 @@ final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
             [
               "name" => "sdc.starshot_demo.starshot-heading",
               "uuid" => "678e9ee1-dc49-4495-b7cb-9bdd5625a59b",
-              "nodePath" => [0, 0],
             ],
           ],
         ],
@@ -86,14 +85,12 @@ final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
             [
               "name" => "sdc.canvas_test_sdc.two_column",
               "uuid" => "2f957795-e30a-46a0-acfe-868adc0685bf",
-              "nodePath" => [1, 0],
               "slots" => [
                 "2f957795-e30a-46a0-acfe-868adc0685bf/column_one" => [
                   "components" => [
                     [
                       "name" => "sdc.canvas_test_sdc.image",
                       "uuid" => "837173ae-5940-4c48-a304-31c6d81901b5",
-                      "nodePath" => [1, 0, 0, 0],
                     ],
                   ],
                 ],
@@ -102,7 +99,6 @@ final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
                     [
                       "name" => "sdc.canvas_test_sdc.druplicon",
                       "uuid" => "4e45ef4c-501c-4612-b02b-1911e88a4592",
-                      "nodePath" => [1, 0, 1, 0],
                     ],
                   ],
                 ],
@@ -152,7 +148,6 @@ final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
             [
               "name" => "sdc.starshot_demo.starshot-heading",
               "uuid" => "678e9ee1-dc49-4495-b7cb-9bdd5625a59b",
-              "nodePath" => [0, 0],
             ],
           ],
         ],
@@ -162,21 +157,18 @@ final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
             [
               "name" => "sdc.canvas_test_sdc.two_column",
               "uuid" => "2f957795-e30a-46a0-acfe-868adc0685bf",
-              "nodePath" => [1, 0],
               "slots" => [
                 "2f957795-e30a-46a0-acfe-868adc0685bf/column_one" => [
                   "components" => [
                     [
                       "name" => "sdc.canvas_test_sdc.image",
                       "uuid" => "837173ae-5940-4c48-a304-31c6d81901b5",
-                      "nodePath" => [1, 0, 0, 0],
                       "slots" => [
                         "837173ae-5940-4c48-a304-31c6d81901b5/inner_slot" => [
                           "components" => [
                             [
                               "name" => "sdc.canvas_test_sdc.druplicon",
                               "uuid" => "7fd447a9-f1b3-4b9c-ae23-ee4b174f7b84",
-                              "nodePath" => [1, 0, 1, 0, 0, 0],
                             ],
                           ],
                         ],
@@ -189,7 +181,6 @@ final class CanvasAiPageBuilderHelperTest extends CanvasKernelTestBase {
                     [
                       "name" => "sdc.canvas_test_sdc.druplicon",
                       "uuid" => "4e45ef4c-501c-4612-b02b-1911e88a4592",
-                      "nodePath" => [1, 0, 1, 0],
                     ],
                   ],
                 ],
@@ -713,14 +704,12 @@ XML;
             [
               'name' => 'sdc.canvas_test_sdc.two_column',
               'uuid' => '2f957795-e30a-46a0-acfe-868adc0685bf',
-              'nodePath' => [0, 0],
               'slots' => [
                 '2f957795-e30a-46a0-acfe-868adc0685bf/column_one' => [
                   'components' => [
                     [
                       'name' => 'sdc.canvas_test_sdc.druplicon',
                       'uuid' => '4e45ef4c-501c-4612-b02b-1911e88a4592',
-                      'nodePath' => [0, 0, 0, 0],
                     ],
                   ],
                 ],
