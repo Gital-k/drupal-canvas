@@ -100,7 +100,7 @@ final class ContentTemplateListFilterForm extends FormBase {
         self::STATUS => (string) $form_state->getValue(self::STATUS),
       ], static fn (string $value): bool => $value !== '');
     }
-    // Redirecting to a GET request keeps filtered listings bookmarkable.
+    // Redirecting to a GET request lets filtered listings be linked to.
     $form_state->setRedirectUrl(Url::fromRoute('entity.content_template.collection', [], ['query' => $query]));
   }
 
