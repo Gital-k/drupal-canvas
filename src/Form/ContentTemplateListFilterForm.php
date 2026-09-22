@@ -8,6 +8,7 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Filters the content template listing by label and status.
@@ -22,6 +23,15 @@ final class ContentTemplateListFilterForm extends FormBase {
   public function __construct(
     private readonly ModuleHandlerInterface $moduleHandler,
   ) {}
+
+  /**
+   * {@inheritdoc}
+   *
+   * Before Drupal 11.4, FormBase::create() passes no constructor arguments.
+   */
+  public static function create(ContainerInterface $container): static {
+    return new static($container->get(ModuleHandlerInterface::class));
+  }
 
   /**
    * {@inheritdoc}
