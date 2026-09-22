@@ -45,8 +45,6 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
  * ends and resumed by the next. Otherwise every turn is seeded from the client
  * transcript, which carries text only.
  *
- * @todo Replace the single request/response call with the real hop loop in https://git.drupalcode.org/project/canvas/-/work_items/3591777
- *
  * @internal
  */
 final class CanvasDevAiBuilder extends ControllerBase {
@@ -372,8 +370,6 @@ final class CanvasDevAiBuilder extends ControllerBase {
    * @throws \RuntimeException
    *   Carrying the message shown to the user.
    *
-   * @todo Reject a main agent the selection form could not have offered, once the page builder and Drupal Canvas agents exist, in https://git.drupalcode.org/project/canvas/-/work_items/3591777
-   *
    * @see \Drupal\canvas_dev_ai\Form\CanvasDevAiAgentSelectionForm
    */
   private function resolveAgentId(array $prompt): string {
@@ -680,13 +676,6 @@ final class CanvasDevAiBuilder extends ControllerBase {
           $structured_output['canvas_page_data'] += $response['canvas_page_data'];
         }
         $response = array_merge($response, $structured_output);
-      }
-      // @todo Remove this branch without replacing it: neither agent runs here, and a file-upload turn carries no layout of its own, so deleting the key at turn end would leave the layout-reading tools with nothing. See https://git.drupalcode.org/project/canvas/-/work_items/3591777
-      if (\in_array($tool->getPluginId(), [
-        'ai_agents::ai_agent::canvas_page_builder_agent',
-        'ai_agents::ai_agent::canvas_template_builder_agent',
-      ], TRUE)) {
-        $this->canvasAiTempStore->deleteData(CanvasAiTempStore::CURRENT_LAYOUT_KEY);
       }
     }
     // Only the final hop carries a message: the agent's answer to the user.
