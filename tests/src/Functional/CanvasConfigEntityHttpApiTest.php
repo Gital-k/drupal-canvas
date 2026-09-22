@@ -2862,6 +2862,26 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $body = \json_decode((string) $this->makeApiRequest('GET', $list_url, [])->getBody(), TRUE);
     self::assertIsArray($body);
     self::assertSame((int) $unpublished_node->id(), $body['node']['bundles']['llama']['viewModes']['full']['suggestedPreviewEntityId']);
+
+    // The suggested preview entity must be the most recently changed entity
+    // that the current user can view, not just the most recently changed one.
+    // The current user cannot view other users' profiles, only their own, so a
+    // blocked user created last must be skipped in favor of the current user.
+    // (On a real site, the anonymous user is such a never-viewable user.)
+    $this->createUser([], NULL, FALSE, ['status' => 0]);
+    $request_options[RequestOptions::JSON] = [
+      'entityType' => 'user',
+      'bundle' => 'user',
+      'viewMode' => 'full',
+      'status' => TRUE,
+      'component_tree' => [],
+    ];
+    $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL);
+    $body = \json_decode((string) $this->makeApiRequest('GET', $list_url, [])->getBody(), TRUE);
+    self::assertIsArray($body);
+    \assert($this->loggedInUser instanceof UserInterface);
+    self::assertSame((int) $this->loggedInUser->id(), $body['user']['bundles']['user']['viewModes']['full']['suggestedPreviewEntityId']);
+    $this->assertExpectedResponse('DELETE', Url::fromUri('base:/canvas/api/v0/config/content_template/user.user.full'), [], 204, NULL, NULL, NULL, NULL);
   }
 
   public function testColor(): void {
