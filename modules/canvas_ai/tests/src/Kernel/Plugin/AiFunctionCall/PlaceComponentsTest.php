@@ -1172,7 +1172,6 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
               [
                 'name' => 'sdc.canvas_test_sdc.two_column',
                 'uuid' => '2f957795-e30a-46a0-acfe-868adc0685bf',
-                'nodePath' => [1, 0],
                 'slots' => [
                   '2f957795-e30a-46a0-acfe-868adc0685bf/column_one' => [
                     'components' => [],
@@ -1182,7 +1181,6 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
                       [
                         'name' => 'sdc.canvas_test_sdc.druplicon',
                         'uuid' => '4e45ef4c-501c-4612-b02b-1911e88a4592',
-                        'nodePath' => [1, 0, 1, 0],
                       ],
                     ],
                   ],
