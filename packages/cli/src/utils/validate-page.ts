@@ -106,7 +106,7 @@ export async function validatePages(
       for (const entry of unreconciledColors) {
         details.push({
           heading: `elements.${entry.elementId}.props.${entry.propName}`,
-          content: `Unknown brand kit color key "${entry.key}". Run \`canvas pull --include-brand-kit\` to refresh local colors, or push the color before referencing it.`,
+          content: `Unknown brand kit color key "${entry.key}". Run \`canvas pull\` to refresh local colors, or push the color before referencing it.`,
         });
       }
 
