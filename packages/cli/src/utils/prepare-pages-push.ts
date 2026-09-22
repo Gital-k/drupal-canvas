@@ -26,8 +26,6 @@ import type { ApiService } from '../services/api';
 import type { Page, PageListItem } from '../types/Page';
 import type { Result } from '../types/Result';
 
-const PAGE_PUSH_CONCURRENCY = 1;
-
 export async function entitiesHaveColorProps(
   discovered: Array<{ path: string }>,
   componentMetadata: ComponentMetadata[],
@@ -175,53 +173,47 @@ export async function pushPages(
   apiService: Pick<ApiService, 'createPage' | 'updatePage'>,
   includePageVariant: boolean = true,
 ): Promise<PagePushOperationResult[]> {
-  const results = await processInPool(
-    preparedPages,
-    async (entry) => {
-      const page = entry.result;
-      const remotePage = page.uuid
-        ? remotePageByUuid.get(page.uuid)
-        : undefined;
+  const results = await processInPool(preparedPages, async (entry) => {
+    const page = entry.result;
+    const remotePage = page.uuid ? remotePageByUuid.get(page.uuid) : undefined;
 
-      if (remotePage) {
-        // Keep this guard at the write boundary even though push validates earlier.
-        const pathAliasChange = getPathAliasChange(page.path, remotePage.path);
-        if (pathAliasChange) {
-          throw new Error(formatPagePathAliasChangeError(pathAliasChange));
-        }
-
-        await apiService.updatePage(remotePage.id, {
-          title: page.title,
-          description: page.description,
-          ...(includePageVariant ? { pageVariant: page.pageVariant } : {}),
-          status: remotePage.status,
-          path: normalizePathAlias(page.path),
-          components: page.components,
-        });
-        return { title: page.title, operation: 'Updated' as const };
-      } else {
-        const created = await apiService.createPage({
-          title: page.title,
-          description: page.description,
-          ...(includePageVariant ? { pageVariant: page.pageVariant } : {}),
-          status: false,
-          path: page.path,
-          components: page.components,
-        });
-        // Write the server-assigned UUID back into the local file.
-        const fileContent = await fs.readFile(page.filePath, 'utf-8');
-        const spec = JSON.parse(fileContent);
-        spec.uuid = created.uuid;
-        await fs.writeFile(
-          page.filePath,
-          JSON.stringify(spec, null, 2) + '\n',
-          'utf-8',
-        );
-        return { title: page.title, operation: 'Created' as const };
+    if (remotePage) {
+      // Keep this guard at the write boundary even though push validates earlier.
+      const pathAliasChange = getPathAliasChange(page.path, remotePage.path);
+      if (pathAliasChange) {
+        throw new Error(formatPagePathAliasChangeError(pathAliasChange));
       }
-    },
-    PAGE_PUSH_CONCURRENCY,
-  );
+
+      await apiService.updatePage(remotePage.id, {
+        title: page.title,
+        description: page.description,
+        ...(includePageVariant ? { pageVariant: page.pageVariant } : {}),
+        status: remotePage.status,
+        path: normalizePathAlias(page.path),
+        components: page.components,
+      });
+      return { title: page.title, operation: 'Updated' as const };
+    } else {
+      const created = await apiService.createPage({
+        title: page.title,
+        description: page.description,
+        ...(includePageVariant ? { pageVariant: page.pageVariant } : {}),
+        status: false,
+        path: page.path,
+        components: page.components,
+      });
+      // Write the server-assigned UUID back into the local file.
+      const fileContent = await fs.readFile(page.filePath, 'utf-8');
+      const spec = JSON.parse(fileContent);
+      spec.uuid = created.uuid;
+      await fs.writeFile(
+        page.filePath,
+        JSON.stringify(spec, null, 2) + '\n',
+        'utf-8',
+      );
+      return { title: page.title, operation: 'Created' as const };
+    }
+  });
 
   return results.map((result) => {
     const preparedPage = preparedPages[result.index];

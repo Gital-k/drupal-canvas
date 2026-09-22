@@ -16,7 +16,7 @@ import {
   formatComponentPathConstraintMessage,
   resolvePreviewRuntimeSettings,
   withBrandKitColorCss,
-} from './preview-payload';
+} from './previgew-payload';
 import { trustSystemCertificates } from './system-ca';
 
 import type { DiscoveryResult } from '@drupal-canvas/discovery';
