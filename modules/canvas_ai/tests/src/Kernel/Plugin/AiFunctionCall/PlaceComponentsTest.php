@@ -219,6 +219,64 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Tests that a boolean prop given "true"/"false" as a string is coerced.
+   *
+   * That is the only value shape a model writes for a boolean prop that is
+   * unambiguous enough to fix silently; it must validate and be stored as a
+   * real boolean rather than failing the whole placement.
+   *
+   * @see \Drupal\canvas_ai\AiResponseValidator::normalizeBooleanProps()
+   */
+  public function testTypedValuesAreNormalizedBeforeValidation(): void {
+    $this->container->get(AccountProxyInterface::class)->setAccount($this->privilegedUser);
+    $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, $this->getCurrentLayout('multi_region_empty'));
+
+    $tool = $this->functionCallManager->createInstance('canvas_ai:place_components');
+    $this->assertInstanceOf(PlaceComponents::class, $tool);
+    $tool->setContextValue('operations', [
+      self::buildOperation(<<<YAML
+        - sdc.canvas_test_sdc.shoe_badge:
+            props:
+              variant: "primary"
+              pill: "False"
+        YAML),
+    ]);
+    $tool->execute();
+
+    self::assertStringStartsWith('Components placed successfully.', $tool->getReadableOutput());
+    $placed = $tool->getStructuredOutput()['operations'][0]['components'];
+    self::assertSame(['variant' => 'primary', 'pill' => FALSE], $placed[0]['fieldValues']);
+  }
+
+  /**
+   * Tests that a value a media-bound prop cannot store is reported.
+   *
+   * The frontend strips a value it cannot store from a media-bound prop and
+   * falls back to the component's default image, so without this check the
+   * placement would validate while the model believes it supplied an image.
+   *
+   * @see \Drupal\canvas_ai\AiResponseValidator::collectUnstorableValueViolations()
+   */
+  public function testUnstorableImageValueIsReported(): void {
+    $this->container->get(AccountProxyInterface::class)->setAccount($this->privilegedUser);
+    $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, $this->getCurrentLayout('multi_region_empty'));
+
+    $result = $this->getComponentToolOutput([
+      self::buildOperation(<<<YAML
+        - sdc.canvas_test_sdc.image:
+            props:
+              image:
+                src: "https://example.com/hero.jpg"
+                alt: "Hero"
+        YAML),
+    ]);
+
+    $normalized = self::normalizeErrorString($result);
+    $this->assertStringStartsWith('Failed to place components: Component validation errors:', $normalized);
+    $this->assertStringContainsString('components.0.[sdc.canvas_test_sdc.image].props.image: Component `sdc.canvas_test_sdc.image`: the value given for the `image` prop cannot be stored. Give a non-empty value of the type the component details describe, or omit the prop.', $normalized);
+  }
+
+  /**
    * Tests placing components with invalid placement parameters.
    */
   #[DataProvider('invalidPlacementDataProvider')]

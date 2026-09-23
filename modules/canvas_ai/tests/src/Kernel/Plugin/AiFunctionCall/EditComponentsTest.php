@@ -221,6 +221,117 @@ final class EditComponentsTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Tests that a boolean prop given "true"/"false" as a string is coerced.
+   *
+   * The client receives only the props the edit changed, in canonical form:
+   * `promote: "true"` becomes the real boolean `true`, and the component's
+   * other props, which validation merges in, are not echoed back.
+   *
+   * @see \Drupal\canvas_ai\AiResponseValidator::normalizeBooleanProps()
+   */
+  public function testTypedValuesAreNormalizedBeforeValidation(): void {
+    $this->container->get(AccountProxyInterface::class)->setAccount($this->privilegedUser);
+    $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, json_encode([
+      'regions' => [
+        'content' => [
+          'nodePathPrefix' => [0],
+          'components' => [
+            [
+              'name' => 'sdc.canvas_test_sdc.shoe_badge',
+              'uuid' => '1f7f5b2b-3b34-4a1a-9b8a-8f7c9a6d5e21',
+              'props' => ['variant' => 'primary'],
+            ],
+          ],
+        ],
+      ],
+    ], JSON_THROW_ON_ERROR));
+
+    $edits = [
+      [
+        'component_uuid' => '1f7f5b2b-3b34-4a1a-9b8a-8f7c9a6d5e21',
+        'props' => 'pill: "True"',
+      ],
+    ];
+    $tool = $this->functionCallManager->createInstance('canvas_ai:edit_components');
+    $this->assertInstanceOf(EditComponents::class, $tool);
+    $tool->setContextValue('component_edits', $edits);
+    $tool->execute();
+
+    self::assertEquals([
+      'component_updates' => [
+        '1f7f5b2b-3b34-4a1a-9b8a-8f7c9a6d5e21' => ['pill' => TRUE],
+      ],
+    ], $tool->getStructuredOutput());
+    $this->assertStringContainsString('The updates were applied successfully.', $tool->getReadableOutput());
+  }
+
+  /**
+   * Tests that an edit giving a media-bound prop a partial object is rejected.
+   *
+   * The frontend strips a value it cannot store from a media-bound prop and
+   * falls back to the component's default image, so without this check the
+   * edit would validate while the model believes it supplied an image.
+   *
+   * @see \Drupal\canvas_ai\AiResponseValidator::collectUnstorableValueViolations()
+   */
+  public function testUnstorableImageValueIsReported(): void {
+    $this->container->get(AccountProxyInterface::class)->setAccount($this->privilegedUser);
+    $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, json_encode([
+      'regions' => [
+        'content' => [
+          'nodePathPrefix' => [0],
+          'components' => [
+            [
+              'name' => 'sdc.canvas_test_sdc.image',
+              'uuid' => '9f5c5f21-2b0a-4a6e-9c2f-0d6f2a7c1e11',
+              'props' => [],
+            ],
+          ],
+        ],
+      ],
+    ], JSON_THROW_ON_ERROR));
+
+    $edits = [['component_uuid' => '9f5c5f21-2b0a-4a6e-9c2f-0d6f2a7c1e11', 'props' => "image:\n  src: \"https://example.com/hero.jpg\"\n  alt: \"Hero\""]];
+    $result = $this->getToolOutput('canvas_ai:edit_components', ['component_edits' => $edits]);
+    $normalized = self::normalizeErrorString($result);
+    $this->assertStringStartsWith('Failed to edit components: Component validation errors:', $normalized);
+    $this->assertStringContainsString('components.0.[sdc.canvas_test_sdc.image].props.image: Component `sdc.canvas_test_sdc.image`: the value given for the `image` prop cannot be stored. Give a non-empty value of the type the component details describe, or omit the prop.', $normalized);
+  }
+
+  /**
+   * Tests that a boolean prop value other than "true"/"false" is rejected.
+   *
+   * `BooleanData::getCastedValue()` casts any non-empty string to `TRUE`, so
+   * silently letting an unrecognized string like `"maybe"` through would
+   * store the wrong value with no error anywhere.
+   *
+   * @see \Drupal\canvas_ai\AiResponseValidator::normalizeBooleanProps()
+   */
+  public function testEditComponentUnrecognizedBooleanValueReportsError(): void {
+    $this->container->get(AccountProxyInterface::class)->setAccount($this->privilegedUser);
+    $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, json_encode([
+      'regions' => [
+        'content' => [
+          'nodePathPrefix' => [0],
+          'components' => [
+            [
+              'name' => 'sdc.canvas_test_sdc.shoe_badge',
+              'uuid' => '1f7f5b2b-3b34-4a1a-9b8a-8f7c9a6d5e21',
+              'props' => ['variant' => 'primary'],
+            ],
+          ],
+        ],
+      ],
+    ], JSON_THROW_ON_ERROR));
+
+    $edits = [['component_uuid' => '1f7f5b2b-3b34-4a1a-9b8a-8f7c9a6d5e21', 'props' => 'pill: "maybe"']];
+    $result = $this->getToolOutput('canvas_ai:edit_components', ['component_edits' => $edits]);
+    $normalized = self::normalizeErrorString($result);
+    $this->assertStringStartsWith('Failed to edit components: Component validation errors:', $normalized);
+    $this->assertStringContainsString('components.0.[sdc.canvas_test_sdc.shoe_badge].props.pill: Component `sdc.canvas_test_sdc.shoe_badge`: the `pill` prop value "maybe" cannot be stored: expected a boolean (`true` or `false`).', $normalized);
+  }
+
+  /**
    * Tests that editing a component runs its prop values through the validator.
    *
    * An undefined prop name and an out-of-enum value both reach the shared

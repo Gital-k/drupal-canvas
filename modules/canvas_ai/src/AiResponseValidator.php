@@ -37,47 +37,58 @@ class AiResponseValidator {
   /**
    * Validates the component structure.
    *
+   * A boolean prop given the string "true"/"false" is coerced to a real
+   * boolean before validation; that is the only value shape worth silently
+   * fixing. Callers that store or forward the props must use the return
+   * value, not their input, so what was validated is what gets placed.
+   *
    * @param array $componentGroups
    *   The component groups to validate.
+   *
+   * @return array
+   *   The component groups, with recognized boolean strings coerced.
    *
    * @throws \Drupal\canvas\Exception\ConstraintViolationException
    *   When validation fails.
    */
-  public function validateComponentStructure(array $componentGroups): void {
+  public function validateComponentStructure(array $componentGroups): array {
     // Create a mapping of components to their original paths.
     $pathMapping = [];
-    // Props that do not exist on their component are silently dropped by
-    // ComponentSourceInterface::clientModelToInput(), so field-level validation
-    // below never sees them. Collect them during conversion instead.
-    $unknownPropViolations = new ConstraintViolationList();
+    // Some violations are found outside of ComponentTreeItemList->validate():
+    // props that do not exist on their component, boolean props given a
+    // value that cannot be confidently interpreted, and values the component
+    // source dropped rather than stored. Collect them during conversion
+    // instead.
+    $outOfBandViolations = new ConstraintViolationList();
 
     // Convert YAML structure to Canvas ComponentTreeItem format.
-    $componentTreeData = $this->convertToComponentTreeData($componentGroups, NULL, NULL, 'components', $pathMapping, $unknownPropViolations);
+    $componentTreeData = $this->convertToComponentTreeData($componentGroups, NULL, NULL, 'components', $pathMapping, $outOfBandViolations);
 
     $componentTreeItemList = $this->createDanglingComponentTreeItemList();
     $componentTreeItemList->setValue($componentTreeData);
     $violations = $componentTreeItemList->validate();
 
-    if ($violations->count() > 0 || $unknownPropViolations->count() > 0) {
+    if ($violations->count() > 0 || $outOfBandViolations->count() > 0) {
       $translatedViolations = $this->translateConstraintPropertyPathsAndRoot(
         $this->buildPathTranslationMap($componentTreeData, $pathMapping),
         $violations,
         ''
       );
-      // Unknown-prop violations are built with already-translated paths.
-      $translatedViolations->addAll($unknownPropViolations);
+      // Out-of-band violations are built with already-translated paths.
+      $translatedViolations->addAll($outOfBandViolations);
       throw new ConstraintViolationException(
         $translatedViolations,
         'Component validation errors'
       );
     }
+    return $componentGroups;
   }
 
   /**
    * Converts component groups to component tree data.
    *
    * @param array $componentGroups
-   *   The component groups to convert.
+   *   The component groups to convert. Prop values are normalized in place.
    * @param string|null $parentUuid
    *   The parent UUID, if any.
    * @param string|null $slotName
@@ -86,23 +97,26 @@ class AiResponseValidator {
    *   The path prefix for the current level.
    * @param array &$pathMapping
    *   Reference to path mapping array.
-   * @param \Symfony\Component\Validator\ConstraintViolationList $unknownPropViolations
-   *   Collects violations for props that do not exist on their component.
+   * @param \Symfony\Component\Validator\ConstraintViolationList $outOfBandViolations
+   *   Collects violations found outside of field-level validation.
    *
    * @return array
    *   The converted component tree data.
    */
   private function convertToComponentTreeData(
-    array $componentGroups,
+    array &$componentGroups,
     ?string $parentUuid,
     ?string $slotName,
     string $pathPrefix,
     array &$pathMapping,
-    ConstraintViolationList $unknownPropViolations,
+    ConstraintViolationList $outOfBandViolations,
   ): array {
     $componentTreeData = [];
-    foreach ($componentGroups as $groupIndex => $componentGroup) {
-      foreach ($componentGroup as $componentId => $componentData) {
+    foreach ($componentGroups as $groupIndex => &$componentGroup) {
+      if (!\is_array($componentGroup)) {
+        continue;
+      }
+      foreach ($componentGroup as $componentId => &$componentData) {
         $componentUuid = $this->uuidService->generate();
 
         $componentPath = \sprintf('%s.%d.[%s]', $pathPrefix, $groupIndex, $componentId);
@@ -117,11 +131,31 @@ class AiResponseValidator {
         if ($component instanceof Component && !empty($componentData['props'])) {
           $clientNormalized = $component->normalizeForClientSide()->values;
           $propSources = $clientNormalized['propSources'] ?? NULL;
-          $this->collectUnknownPropViolations($componentId, $componentData['props'], $propSources, $componentPath, $unknownPropViolations);
+          $this->collectUnknownPropViolations(
+            $componentId,
+            $componentData['props'],
+            $propSources,
+            $componentPath,
+            $outOfBandViolations
+          );
           if (\is_array($componentData['props'])) {
+            $componentData['props'] = $this->normalizeBooleanProps(
+              $componentData['props'],
+              $propSources, $componentId,
+              $componentPath,
+              $outOfBandViolations
+            );
             $clientModel['source'] = $propSources ?? [];
             $clientModel['resolved'] = $componentData['props'];
             $inputs = $component->getComponentSource()->clientModelToInput($componentUuid, $component, $clientModel, NULL);
+            $this->collectUnstorableValueViolations(
+              $componentId,
+              $componentData['props'],
+              $propSources,
+              $inputs,
+              $componentPath,
+              $outOfBandViolations
+            );
           }
         }
 
@@ -140,7 +174,10 @@ class AiResponseValidator {
 
         // Process slots recursively.
         if (isset($componentData['slots']) && \is_array($componentData['slots'])) {
-          foreach ($componentData['slots'] as $slot => $slotComponentGroups) {
+          foreach ($componentData['slots'] as $slot => &$slotComponentGroups) {
+            if (!\is_array($slotComponentGroups)) {
+              continue;
+            }
             $slotPath = \sprintf('%s.slots.%s', $componentPath, $slot);
             $componentTreeData = array_merge(
               $componentTreeData,
@@ -150,13 +187,16 @@ class AiResponseValidator {
                 $slot,
                 $slotPath,
                 $pathMapping,
-                $unknownPropViolations
+                $outOfBandViolations
               )
             );
           }
+          unset($slotComponentGroups);
         }
       }
+      unset($componentData);
     }
+    unset($componentGroup);
     return $componentTreeData;
   }
 
@@ -178,15 +218,12 @@ class AiResponseValidator {
   private function collectUnknownPropViolations(string $componentId, mixed $props, ?array $propSources, string $componentPath, ConstraintViolationList $violations): void {
     // @todo Remove once \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::clientModelToInput() records dropped props in its own violation list.
     if (!\is_array($props)) {
-      $violations->add(new ConstraintViolation(
+      $this->addGarbageInputViolation(
+        $violations,
         \sprintf('Component `%s`: the props must be a mapping of prop names to values.', $componentId),
-        NULL,
-        [],
-        NULL,
         \sprintf('%s.props', $componentPath),
         $props,
-        code: ComponentTreeItem::VIOLATION_CODE_GARBAGE_INPUT,
-      ));
+      );
       return;
     }
     // Unknown props on block components are NOT validated here. Block inputs are
@@ -204,16 +241,136 @@ class AiResponseValidator {
     // otherwise pass validation.
     // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::clientModelToInput()
     foreach (\array_diff_key($props, $propSources) as $propName => $propValue) {
-      $violations->add(new ConstraintViolation(
+      $this->addGarbageInputViolation(
+        $violations,
         \sprintf('Component `%s`: the `%s` prop is not defined.', $componentId, $propName),
-        NULL,
-        [],
-        NULL,
         \sprintf('%s.props.%s', $componentPath, $propName),
         $propValue,
-        code: ComponentTreeItem::VIOLATION_CODE_GARBAGE_INPUT,
-      ));
+      );
     }
+  }
+
+  /**
+   * Coerces "true"/"false" strings on boolean props to real booleans.
+   *
+   * A client may write the strings "true"/"false" instead of a YAML/JSON
+   * boolean literal; that is the only value shape unambiguous enough to fix
+   * silently. Anything else on a boolean prop is reported instead of being
+   * passed through: `Evaluator::doEvaluate()` casts any non-empty string to
+   * `TRUE`, which would silently store the wrong value with no error at all.
+   *
+   * @param array $props
+   *   The AI-supplied props.
+   * @param array|null $propSources
+   *   The component's defined prop sources, or NULL for sources that are not
+   *   prop-based (e.g. block components).
+   * @param string $componentId
+   *   The component ID, used in violation messages.
+   * @param string $componentPath
+   *   The component path, used to build the violation property path.
+   * @param \Symfony\Component\Validator\ConstraintViolationList $violations
+   *   The list to add a violation to when a value cannot be interpreted.
+   *
+   * @return array
+   *   The props, with recognized boolean strings coerced to real booleans.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
+   */
+  private function normalizeBooleanProps(array $props, ?array $propSources, string $componentId, string $componentPath, ConstraintViolationList $violations): array {
+    if ($propSources === NULL) {
+      return $props;
+    }
+    foreach ($props as $propName => $propValue) {
+      $isBooleanProp = ($propSources[$propName]['jsonSchema']['type'] ?? NULL) === 'boolean';
+      if (!$isBooleanProp || \is_bool($propValue) || $propValue === NULL) {
+        continue;
+      }
+      if (\is_string($propValue)) {
+        $word = \strtolower($propValue);
+        if ($word === 'true' || $word === 'false') {
+          $props[$propName] = $word === 'true';
+          continue;
+        }
+      }
+      $this->addGarbageInputViolation(
+        $violations,
+        \sprintf('Component `%s`: the `%s` prop value %s cannot be stored: expected a boolean (`true` or `false`).', $componentId, $propName, \json_encode($propValue)),
+        \sprintf('%s.props.%s', $componentPath, $propName),
+        $propValue,
+      );
+    }
+    return $props;
+  }
+
+  /**
+   * Collects violations for supplied values the component source dropped.
+   *
+   * `ComponentSourceInterface::clientModelToInput()` leaves out a prop whose
+   * value it cannot store in the prop's field type: an image object or URL
+   * string handed to a media-bound prop, or a value the field considers
+   * empty. Field-level validation then never sees that prop, so the
+   * placement would validate and the component would render without it.
+   * Report the dropped value instead, so the model can supply one of the
+   * right shape. This naturally only fires for reference/media-shaped props:
+   * a bad enum or boolean value fails a different way and is not dropped.
+   *
+   * @param string $componentId
+   *   The component ID.
+   * @param array $props
+   *   The AI-supplied props.
+   * @param array|null $propSources
+   *   The component's defined prop sources, or NULL for sources that are not
+   *   prop-based (e.g. block components).
+   * @param array $inputs
+   *   The inputs `clientModelToInput()` produced from those props.
+   * @param string $componentPath
+   *   The component path, used to build the violation property path.
+   * @param \Symfony\Component\Validator\ConstraintViolationList $violations
+   *   The list to add violations to.
+   */
+  private function collectUnstorableValueViolations(string $componentId, array $props, ?array $propSources, array $inputs, string $componentPath, ConstraintViolationList $violations): void {
+    if ($propSources === NULL) {
+      return;
+    }
+    foreach ($props as $propName => $propValue) {
+      if (!isset($propSources[$propName]) || \array_key_exists($propName, $inputs)) {
+        continue;
+      }
+      $storage = $propSources[$propName]['sourceTypeSettings']['storage']['target_type'] ?? NULL;
+      $hint = \is_string($storage)
+        ? \sprintf('This prop stores a reference to a %s entity: give the ID of an existing one, or copy the default image object exactly as the component details give it.', $storage)
+        : 'Give a non-empty value of the type the component details describe, or omit the prop.';
+      $this->addGarbageInputViolation(
+        $violations,
+        \sprintf('Component `%s`: the value given for the `%s` prop cannot be stored. %s', $componentId, $propName, $hint),
+        \sprintf('%s.props.%s', $componentPath, $propName),
+        $propValue,
+      );
+    }
+  }
+
+  /**
+   * Adds a violation for a prop value that cannot be stored as given.
+   *
+   * @param \Symfony\Component\Validator\ConstraintViolationList $violations
+   *   The list to add the violation to.
+   * @param string $message
+   *   The violation message.
+   * @param string $path
+   *   The violation's property path.
+   * @param mixed $value
+   *   The offending value, for the violation's `getInvalidValue()`.
+   */
+  private function addGarbageInputViolation(ConstraintViolationList $violations, string $message, string $path, mixed $value): void {
+    $violations->add(new ConstraintViolation(
+      $message,
+      NULL,
+      [],
+      NULL,
+      $path,
+      $value,
+      code: ComponentTreeItem::VIOLATION_CODE_GARBAGE_INPUT,
+    ));
   }
 
   /**
