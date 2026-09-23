@@ -841,23 +841,4 @@ final class ApiLayoutController {
     }
   }
 
-  /**
-   * Resolves the host entity for component input conversion/representation.
-   *
-   * Page variant trees have no host entity, but pasted components may carry
-   * entity field prop sources; an empty stand-in entity keeps input
-   * conversion and the client-side model working, exactly as the component
-   * instance form does. Other entities keep the route's preview entity (which
-   * is NULL outside content template routes).
-   *
-   * @see \Drupal\canvas\Form\ComponentInstanceForm::buildForm()
-   * @see \Drupal\canvas\Entity\PageVariant::createEmptyTargetEntity()
-   */
-  private static function resolveHostEntity(ComponentTreeConfigEntityBase|FieldableEntityInterface $entity, ?FieldableEntityInterface $preview_entity): ?FieldableEntityInterface {
-    if ($entity instanceof PageVariant && $preview_entity === NULL) {
-      return $entity->createEmptyTargetEntity();
-    }
-    return $preview_entity;
-  }
-
 }
