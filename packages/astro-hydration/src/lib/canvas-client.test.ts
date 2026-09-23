@@ -1,4 +1,4 @@
-import { useJsonApiClient, usePageContext } from 'drupal-canvas';
+import { useJsonApiClient, usePageContext } from 'drupal-canvas/react';
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -102,7 +102,7 @@ describe('canvas island client renderer', () => {
     const [preact, hooks, canvas, client] = await Promise.all([
       import('preact'),
       import('preact/test-utils'),
-      import('drupal-canvas'),
+      import('drupal-canvas/react'),
       import('./canvas-client'),
     ]);
     const FreshProbe: ComponentType<Record<string, unknown>> = () =>

@@ -20,14 +20,16 @@
  */
 
 import {
-  CanvasContextProvider,
   createJsonApiClient,
   declareCanvasRuntime,
   drupalSettingsToCanvasContext,
   drupalSettingsToJsonApiRuntimeConfig,
-  JsonApiClientProvider,
   readCanvasDataV0,
 } from 'drupal-canvas';
+import {
+  CanvasContextProvider,
+  JsonApiClientProvider,
+} from 'drupal-canvas/react';
 import { h, render } from 'preact';
 
 // The code editor preview is a Drupal environment for the legacy runtime APIs

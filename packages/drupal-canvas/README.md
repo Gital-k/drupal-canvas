@@ -2,6 +2,12 @@
 
 Utilities and base components for building Drupal Canvas Code Components.
 
+React context hooks/providers are exported from `drupal-canvas/react`, together
+with `CanvasContextProviderProps` and `JsonApiClientProviderProps`. Context data
+and client types remain at the root. Existing components (`FormattedText`,
+`Image`, `Region`, `RegionsProvider`), utilities and legacy subpaths are
+unchanged; authoring helpers remain on `drupal-canvas/json-render-utils`.
+
 ## Utilities
 
 ### `cn`
@@ -42,7 +48,7 @@ hooks read it synchronously. They return `null`, with one actionable console
 warning, when no provider is mounted or the integration supplied no such data.
 
 ```jsx
-import { usePageContext, useSiteContext } from 'drupal-canvas';
+import { usePageContext, useSiteContext } from 'drupal-canvas/react';
 
 export default function PageHeader() {
   const page = usePageContext();
@@ -74,7 +80,7 @@ To reach components outside a Canvas tree, such as a site header in a headless
 application, wrap them in `CanvasContextProvider`:
 
 ```jsx
-import { CanvasContextProvider } from 'drupal-canvas';
+import { CanvasContextProvider } from 'drupal-canvas/react';
 
 <CanvasContextProvider context={page.context}>
   <SiteHeader />
@@ -155,7 +161,7 @@ Workbench preview paths provide it; the hook never fetches data or creates a
 client on render. Use it with SWR or another fetching library:
 
 ```jsx
-import { useJsonApiClient } from 'drupal-canvas';
+import { useJsonApiClient } from 'drupal-canvas/react';
 import { DrupalJsonApiParams } from 'drupal-jsonapi-params';
 import useSWR from 'swr';
 
@@ -196,7 +202,7 @@ Provide a client explicitly for components outside a Canvas tree with
 `JsonApiClientProvider`:
 
 ```jsx
-import { JsonApiClientProvider } from 'drupal-canvas';
+import { JsonApiClientProvider } from 'drupal-canvas/react';
 
 <JsonApiClientProvider client={client}>
   <SiteHeader />
