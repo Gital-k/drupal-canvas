@@ -1,10 +1,3 @@
-!compat/angular21/package-lock.json
-!compat/angular22/package-lock.json
 dist/
-compat/artifacts/
-compat/angular21/src/
-compat/angular22/src/
-compat/angular21/dist/
-compat/angular22/dist/
-compat/angular21/.angular/
-compat/angular22/.angular/
+# Previously generated local compatibility artifacts are not package sources.
+compat/

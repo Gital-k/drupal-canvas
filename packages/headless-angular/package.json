@@ -12,7 +12,6 @@
   "scripts": {
     "build": "ng-packagr -p ng-package.json -c tsconfig.json",
     "type-check": "ngc -p tsconfig.json --noEmit",
-    "test:compat": "node compat/run.mjs",
     "test": "vitest run tests"
   },
   "peerDependencies": {

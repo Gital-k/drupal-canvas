@@ -1,6 +1,0 @@
-{
-  "componentDir": "src/components",
-  "aliasBaseDir": "src",
-  "globalCssPath": "src/styles.css",
-  "sync": { "pages": false, "contentTemplates": false, "regions": false }
-}
