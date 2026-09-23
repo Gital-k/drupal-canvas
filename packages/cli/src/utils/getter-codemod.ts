@@ -1,7 +1,7 @@
 /**
  * @file
  * The pull codemod that migrates `getPageData()` and `getSiteData()` calls to
- * the `usePageContext()` and `useSiteContext()` hooks from `drupal-canvas`.
+ * the `usePageContext()` and `useSiteContext()` hooks from `drupal-canvas/react`.
  *
  * The migration is all-or-nothing per file and deliberately conservative: a
  * file is rewritten only when every getter usage in it is safe. A safe usage
@@ -55,7 +55,7 @@ const CLIENT_SOURCES = new Set([
 ]);
 
 /** The source the hooks are imported from. */
-const HOOK_SOURCE = 'drupal-canvas';
+const HOOK_SOURCE = 'drupal-canvas/react';
 
 export interface GetterConversion {
   from: GetterName;
@@ -604,7 +604,7 @@ export function migrateGetterCalls(
   const declarations = declarationCounts(ast);
   const wrappers = resolveWrapperBindings(ast, declarations);
   const callsByGetter = new Map<GetterName, CallExpression[]>();
-  /** Getters whose hook needs a named import from `drupal-canvas`. */
+  /** Getters whose hook needs a named import from `drupal-canvas/react`. */
   const namedGetters = new Set<GetterName>();
   const edits: Edit[] = [];
   let unsafe = false;
@@ -681,7 +681,7 @@ export function migrateGetterCalls(
         noteUnsafe(`\`${node.name}.${getter}()\` is ${problem}`);
         return;
       }
-      // The hooks are exported by the `drupal-canvas` root only, so the
+      // The hooks are exported by `drupal-canvas/react`, so the
       // member call becomes a plain hook call with a named import; this also
       // keeps the hook visible to the import-based data dependency detection.
       edits.push({
@@ -763,7 +763,7 @@ export function migrateGetterCalls(
       noteUnsafe(`\`${binding.local}\` is declared more than once in the file`);
     }
   }
-  // The replacement hook name must resolve to the `drupal-canvas` import at
+  // The replacement hook name must resolve to the `drupal-canvas/react` import at
   // every call site: any other declaration of that name (a parameter, a
   // local, another import), whether or not the hook is already imported,
   // could shadow it somewhere in the file.
@@ -789,7 +789,7 @@ export function migrateGetterCalls(
     });
   }
 
-  // Import rewrites. Hooks the file already imports from `drupal-canvas`
+  // Import rewrites. Hooks the file already imports from `drupal-canvas/react`
   // are reused, never imported twice.
   const hooksNeeded = new Set<HookName>();
   for (const getter of namedGetters) {

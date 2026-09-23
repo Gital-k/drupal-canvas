@@ -887,7 +887,7 @@ export default function Crumbs({ show }) {
         'utf-8',
       );
       expect(written).toContain(
-        "import { usePageContext } from 'drupal-canvas';",
+        "import { usePageContext } from 'drupal-canvas/react';",
       );
       expect(written).toContain('const { pageTitle } = usePageContext();');
       expect(
@@ -910,7 +910,7 @@ export default function Crumbs({ show }) {
 
     it.each([
       "import { sortMenu, getPageData, getSiteData } from 'drupal-canvas/drupal-utils';",
-      "import { usePageContext, useSiteContext, getPageData, getSiteData } from 'drupal-canvas';",
+      "import { getPageData, getSiteData } from 'drupal-canvas'; import { usePageContext, useSiteContext } from 'drupal-canvas/react';",
     ])(
       'writes valid migrated source for adjacent trailing getters: %s',
       async (imports) => {
@@ -1146,7 +1146,9 @@ export default function Header() { return <h1>{page.pageTitle}</h1>; }`,
         );
         expect(written).toBe(
           supported
-            ? safeSource.replaceAll('getPageData', 'usePageContext')
+            ? safeSource
+                .replaceAll('getPageData', 'usePageContext')
+                .replace("'drupal-canvas'", "'drupal-canvas/react'")
             : safeSource,
         );
         const metadata = await fs.readFile(

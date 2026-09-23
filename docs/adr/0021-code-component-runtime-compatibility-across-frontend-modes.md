@@ -121,10 +121,25 @@ Workbench and CLI utilities, preserve upstream JSON:API contracts, and keep the
 existing types for unchanged and deprecated APIs. Replacement hooks and
 providers use the public types defined below.
 
+### React context entry point
+
+The React context APIs use `drupal-canvas/react`: `CanvasContextProvider`,
+`usePageContext`, `useSiteContext`, `useHasCanvasContext`,
+`JsonApiClientProvider`, `useJsonApiClient`, and `useHasJsonApiClient`.
+Their provider prop types, `CanvasContextProviderProps` and
+`JsonApiClientProviderProps`, use the same entry point. These APIs are not
+aliased at the package root. Framework-neutral context data and client types
+remain available from `drupal-canvas`.
+
+Existing components and utilities keep their public paths: `FormattedText`,
+`Image`, `Region`, and `RegionsProvider` remain at the root, existing subpaths
+remain supported, and authoring helpers remain at `drupal-canvas/json-render-utils`.
+This is not a migration of existing component imports.
+
 ### Replace page and site getters with context hooks
 
 Replace `getPageData()` with `usePageContext()` and `getSiteData()` with
-`useSiteContext()` from `drupal-canvas` as the shared APIs for React Code
+`useSiteContext()` from `drupal-canvas/react` as the shared APIs for React Code
 Components. The replacement hooks synchronously read React context; they do not
 fetch data or read global Drupal settings directly.
 
@@ -145,7 +160,7 @@ frontend modes must migrate to the hooks.
 A shared Code Component uses the same hooks in either frontend:
 
 ```tsx
-import { usePageContext, useSiteContext } from 'drupal-canvas';
+import { usePageContext, useSiteContext } from 'drupal-canvas/react';
 
 export default function PageHeader() {
   const page = usePageContext();
@@ -223,7 +238,7 @@ return types are `usePageContext(): PageContext | null` and
 An explicit `context` prop takes precedence over an outer provider, including
 `null` page or site values; it does not merge with inherited context.
 
-Export `CanvasContextProvider` from `drupal-canvas` with a `context` prop and
+Export `CanvasContextProvider` from `drupal-canvas/react` with a `context` prop and
 React children. The rendering integrations use this provider internally.
 Application authors can also use it to make context available to components
 outside the Canvas tree, such as a site header:
@@ -328,7 +343,7 @@ draft handling, proxy logic, and URL mapping must work without React in any
 frontend framework. React hooks and providers are a convenience layer over this
 shared implementation, not a requirement for using it.
 
-React Code Components use `useJsonApiClient()` from `drupal-canvas`. The hook
+React Code Components use `useJsonApiClient()` from `drupal-canvas/react`. The hook
 reads a client from context. It does not fetch data or create a client on each
 render. Components can use the client with SWR or another fetching library.
 
@@ -399,8 +414,12 @@ Include a short AI-agent migration prompt in these errors:
 Make getter migration a codemod—an automatic source-code rewrite—run as part of
 pull, with no separate opt-in or opt-out. Enable conversion only when the
 connected Drupal site advertises context-hook support through
-`/canvas/api/v0/site-data` and the installed `drupal-canvas` package exports
-both hooks. If either check fails or cannot be verified, leave getter calls
+`/canvas/api/v0/site-data` (`capabilities.contextHooks`) and the installed
+`drupal-canvas/react` entry exports both hooks as runtime values. The site
+capability covers the React import-map entry and provider integration. Verify
+the installed entry statically under import export conditions; a root-only
+package does not satisfy this check. No additional capability flag is needed.
+If either check fails or cannot be verified, leave getter calls
 unchanged and report the limitation with migration guidance. Extend Drupal's
 import-based dependency detection together with the hooks so migrated components
 still receive their data.
@@ -422,8 +441,9 @@ nullable types. Generate no null guards, fallback values, or non-null
 assertions. Strict TypeScript checks may still require follow-up for nullable
 results; report this limitation with the successful conversions.
 
-Keep import changes minimal and account for aliases. Remove legacy imports only
-when unused.
+Import replacement hooks from `drupal-canvas/react`. Keep import changes minimal
+and account for aliases. Remove legacy imports only when unused; do not rewrite
+unrelated component or utility imports.
 
 Show planned conversions before pull confirmation and honor `--yes`. Never
 modify files protected by `--skip-overwrite`. Report successful conversions with
@@ -435,7 +455,7 @@ source files.
 #### Public client-provider API
 
 Export `useJsonApiClient`, `JsonApiClientProvider`, and
-`JsonApiClientProviderProps` from `drupal-canvas`. Use the shared
+`JsonApiClientProviderProps` from `drupal-canvas/react`. Use the shared
 `JsonApiClient` type rather than introducing a separate React-specific client
 interface:
 
