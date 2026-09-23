@@ -45,8 +45,6 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
  * ends and resumed by the next. Otherwise every turn is seeded from the client
  * transcript, which carries text only.
  *
- * @todo Replace the single request/response call with the real hop loop in https://git.drupalcode.org/project/canvas/-/work_items/3591777
- *
  * @internal
  */
 final class CanvasDevAiBuilder extends ControllerBase {
@@ -172,7 +170,7 @@ final class CanvasDevAiBuilder extends ControllerBase {
     $agent->setModelName($default['model_id']);
     $agent->setAiConfiguration([]);
     $agent->setCreateDirectly(TRUE);
-    $agent->setTokenContexts($this->buildTokenContexts($prompt, $current_layout));
+    $agent->setTokenContexts($this->buildTokenContexts($prompt));
     // Stop the agent after a single tool decision, so each request returns
     // quickly and the frontend drives the next hop.
     $agent->setLooped(FALSE);
@@ -371,8 +369,6 @@ final class CanvasDevAiBuilder extends ControllerBase {
    *
    * @throws \RuntimeException
    *   Carrying the message shown to the user.
-   *
-   * @todo Reject a main agent the selection form could not have offered, once the page builder and Drupal Canvas agents exist, in https://git.drupalcode.org/project/canvas/-/work_items/3591777
    *
    * @see \Drupal\canvas_dev_ai\Form\CanvasDevAiAgentSelectionForm
    */
@@ -625,15 +621,13 @@ final class CanvasDevAiBuilder extends ControllerBase {
    *
    * @param array $prompt
    *   The decoded prompt.
-   * @param string $current_layout
-   *   The JSON-encoded current layout.
    *
    * @return array
    *   The token contexts.
    *
    * @see \Drupal\canvas_ai\Hook\CanvasAiHooks::canvas_ai_tokens()
    */
-  private function buildTokenContexts(array $prompt, string $current_layout): array {
+  private function buildTokenContexts(array $prompt): array {
     $selected_component = $prompt['selected_component'] ?? NULL;
     $component_agent_dynamic_state = $this->canvasAiPageBuilderHelper->generateComponentAgentDynamicPromptSection([
       'selected_component' => $selected_component,
@@ -650,7 +644,6 @@ final class CanvasDevAiBuilder extends ControllerBase {
       'page_description' => $prompt['page_description'] ?? NULL,
       'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None',
       'component_agent_dynamic_state' => $component_agent_dynamic_state,
-      'available_regions' => Json::encode($this->canvasAiPageBuilderHelper->getAvailableRegions($current_layout)),
       // JSON-encode so the libraries render as readable data in the system
       // prompt token rather than the string "Array".
       'custom_libraries' => Json::encode(self::getSupportedLibraries()),
@@ -680,13 +673,6 @@ final class CanvasDevAiBuilder extends ControllerBase {
           $structured_output['canvas_page_data'] += $response['canvas_page_data'];
         }
         $response = array_merge($response, $structured_output);
-      }
-      // @todo Remove this branch without replacing it: neither agent runs here, and a file-upload turn carries no layout of its own, so deleting the key at turn end would leave the layout-reading tools with nothing. See https://git.drupalcode.org/project/canvas/-/work_items/3591777
-      if (\in_array($tool->getPluginId(), [
-        'ai_agents::ai_agent::canvas_page_builder_agent',
-        'ai_agents::ai_agent::canvas_template_builder_agent',
-      ], TRUE)) {
-        $this->canvasAiTempStore->deleteData(CanvasAiTempStore::CURRENT_LAYOUT_KEY);
       }
     }
     // Only the final hop carries a message: the agent's answer to the user.
