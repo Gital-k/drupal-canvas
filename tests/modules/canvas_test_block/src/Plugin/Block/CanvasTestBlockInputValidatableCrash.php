@@ -25,6 +25,13 @@ class CanvasTestBlockInputValidatableCrash extends CanvasTestBlockInputUnvalidat
   public static bool $forceCrash = FALSE;
 
   /**
+   * When set, this block throws this exception instead of a generic one.
+   *
+   * @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\BlockComponentTest::testFlowControlExceptionIsNotSwallowed()
+   */
+  public static ?\Throwable $crashWith = NULL;
+
+  /**
    * {@inheritdoc}
    */
   public function defaultConfiguration(): array {
@@ -40,8 +47,8 @@ class CanvasTestBlockInputValidatableCrash extends CanvasTestBlockInputUnvalidat
    * {@inheritdoc}
    */
   public function build(): array {
-    if ($this->configuration['crash'] || self::$forceCrash) {
-      throw new \Exception('Intentional test exception.');
+    if ($this->configuration['crash'] || self::$forceCrash || self::$crashWith !== NULL) {
+      throw self::$crashWith ?? new \Exception('Intentional test exception.');
     }
     return [
       '#markup' => $this->t('<div>Hello, :name!</div>', [':name' => $this->configuration['name']]),

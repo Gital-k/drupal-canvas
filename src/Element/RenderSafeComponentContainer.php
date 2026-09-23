@@ -7,6 +7,7 @@ namespace Drupal\canvas\Element;
 use Drupal\Component\Utility\Xss;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Form\EnforcedResponseException;
+use Drupal\Core\Form\Exception\BrokenPostRequestException;
 use Drupal\Core\Form\FormAjaxException;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Render\Attribute\RenderElement;
@@ -66,7 +67,10 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
         return $this->renderer->render($element['#component']);
       }
       // @todo Remove when https://www.drupal.org/i/2367555 is fixed.
-      catch (EnforcedResponseException | FormAjaxException $e) {
+      catch (EnforcedResponseException | FormAjaxException | BrokenPostRequestException $e) {
+        // BrokenPostRequestException is flow control too: core's guard for an
+        // AJAX form request whose POST body was dropped.
+        // @see \Drupal\Core\Form\EventSubscriber\FormAjaxSubscriber::onException()
         throw $e;
       }
       catch (\Throwable $e) {
@@ -91,6 +95,7 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
           $element['#component_uuid'] ?? '',
           CacheableMetadata::createFromRenderArray($element['#component']),
         );
+
         // Convey to the caller that this component instance render crashed.
         $element['#render_crashed'] = TRUE;
         return $this->renderer->render($fallback);

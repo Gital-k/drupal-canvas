@@ -23,6 +23,7 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
 use Drupal\Core\Field\FieldItemList;
 use Drupal\Core\Form\EnforcedResponseException;
+use Drupal\Core\Form\Exception\BrokenPostRequestException;
 use Drupal\Core\Form\FormAjaxException;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RenderableInterface;
@@ -358,7 +359,8 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           ];
         }
         // @todo Remove when https://www.drupal.org/i/2367555 is fixed.
-        catch (EnforcedResponseException | FormAjaxException $e) {
+        catch (EnforcedResponseException | FormAjaxException | BrokenPostRequestException $e) {
+          // @see \Drupal\canvas\Element\RenderSafeComponentContainer::renderComponent()
           throw $e;
         }
         catch (\Throwable $e) {
