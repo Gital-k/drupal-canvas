@@ -818,27 +818,21 @@ final class ApiLayoutController {
   private function updateEntity(FieldableEntityInterface|ComponentTreeConfigEntityBase $entity, array $layout, array $model, ?array $entity_form_fields, ?FieldableEntityInterface $preview_entity): void {
     if ($entity instanceof FieldableEntityInterface) {
       \assert(!\is_null($entity_form_fields));
-      // If we are not auto-saving there is no reason to convert the
-      // 'entity_form_fields'. This can cause access issue for just viewing the
-      // preview. This runs the conversion as if the user had no access to edit
-      // the entity fields which is all the that is necessary when not
-      // auto-saving.
-      $this->converter->convert([
-        'layout' => $layout,
-        'model' => $model,
-        'entity_form_fields' => $entity_form_fields,
-      ], $entity, validate: FALSE);
     }
     else {
       \assert(\is_null($entity_form_fields));
       \assert(!$entity instanceof ContentTemplate || !\is_null($preview_entity));
-      $host_entity = self::resolveHostEntity($entity, $preview_entity);
-      // @todo Use \Drupal\canvas\ClientDataToEntityConverter here
-      //   as well in https://drupal.org/i/3543197.
-      // @todo Remove php-stan-ignore in https://drupal.org/i/3548273.
-      // @phpstan-ignore-next-line argument.type
-      $entity->setComponentTree(self::convertClientToServer($layout['components'], $model, $host_entity, FALSE));
     }
+    // If we are not auto-saving there is no reason to convert the
+    // 'entity_form_fields'. This can cause access issue for just viewing the
+    // preview. This runs the conversion as if the user had no access to edit
+    // the entity fields which is all the that is necessary when not
+    // auto-saving.
+    $this->converter->convert([
+      'layout' => $layout,
+      'model' => $model,
+      'entity_form_fields' => $entity_form_fields,
+    ], $entity, validate: FALSE, preview_entity: $preview_entity);
   }
 
 }
