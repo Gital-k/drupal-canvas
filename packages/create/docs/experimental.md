@@ -20,8 +20,8 @@ Select a template
   Next.js
   Astro
   Nuxt
-  Angular
   TanStack Start
+  Angular
 ```
 
 The available experimental template IDs are:
@@ -31,8 +31,8 @@ The available experimental template IDs are:
 | `nextjs`         | Next.js        |
 | `astro`          | Astro          |
 | `nuxt`           | Nuxt           |
-| `angular`        | Angular        |
 | `tanstack-start` | TanStack Start |
+| `angular`        | Angular        |
 
 The experimental flag is only needed for interactive discovery. An experimental
 template ID can be provided directly without it:
